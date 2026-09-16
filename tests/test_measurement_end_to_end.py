@@ -145,6 +145,15 @@ THREE_D_VIEWPORT = "main"
 LOOK = [-0.577, -0.577, -0.577]
 
 
+def _solid_distance():
+    from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
+
+    return MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
+
+
+SOLID_DISTANCE = _solid_distance()
+
+
 class TestAMeasurementMadeInTheThreeDView:
     """Two faces, in the solid, through the reserved drawing."""
 
@@ -347,23 +356,63 @@ class TestAPairWithNothingBetweenThem:
         assert [kind["operation"] for kind in verdict["kinds"]] == ["distance"]
         assert verdict["reason"] is None
 
-    def test_what_counts_as_the_same_place(self):
-        from kumiki.drawing import DEGENERATE_SEPARATION, is_degenerate_separation
+    def test_what_counts_as_nothing_between_them(self):
+        from kumiki.drawing import DEGENERATE_SEPARATION, measures_nothing
 
-        assert is_degenerate_separation((1, 2, 3), (1, 2, 3)) is True
-        assert is_degenerate_separation((0, 0, 0), (DEGENERATE_SEPARATION / 10, 0, 0)) is True
-        assert is_degenerate_separation((0, 0, 0), (1, 0, 0)) is False
+        face = {"kind": "plane", "at": [0, 0, 0], "normal": [0, 0, 1]}
+        touching = {"kind": "point", "at": [5, 7, 0]}
+        barely = {"kind": "point", "at": [5, 7, DEGENERATE_SEPARATION / 10]}
+        clear = {"kind": "point", "at": [5, 7, 50]}
 
-    def test_the_anchors_decide_rather_than_the_features(self):
-        """Two features that merely TOUCH still measure something elsewhere.
+        assert measures_nothing(face, touching, SOLID_DISTANCE) is True
+        assert measures_nothing(face, barely, SOLID_DISTANCE) is True
+        assert measures_nothing(face, clear, SOLID_DISTANCE) is False
 
-        It is where the dimension would attach that decides whether it comes to
-        anything, so the rule is asked of the anchors.
+    def test_the_features_decide_and_no_anchor_is_computed(self):
+        """What a distance comes to is a property of the two geometries.
+
+        A perpendicular distance is the same wherever along the pair you stand,
+        so it can be had from the features and the space alone. Asking placed
+        ends instead would make a rule about what a measurement IS depend on
+        where it happens to be drawn.
         """
-        from kumiki.drawing import is_degenerate_separation
+        from kumiki.drawing import measures_nothing, pair_separation
 
-        assert is_degenerate_separation((0, 0, 0), (0, 0, 0)) is True
-        assert is_degenerate_separation((0, 0, 0), (0, 0, 50)) is False
+        face = {"kind": "plane", "at": [0, 0, 0], "normal": [0, 0, 1]}
+        # An arris lying IN that face, running off to one side. Its `at` is
+        # nowhere near the face's, and the separation is still nothing.
+        lying_in_it = {"kind": "line", "at": [900, -40, 0], "direction": [1, 0, 0]}
+
+        assert pair_separation(face, lying_in_it, SOLID_DISTANCE) == 0.0
+        assert measures_nothing(face, lying_in_it, SOLID_DISTANCE) is True
+
+    def test_an_angle_measures_no_length_so_the_rule_leaves_it_alone(self):
+        from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
+        from kumiki.drawing import measures_nothing, pair_separation
+
+        angle = MeasurementKind(MeasurementOperation.ANGLE, MeasurementSpace.THREE_D)
+        face = {"kind": "plane", "at": [0, 0, 0], "normal": [0, 0, 1]}
+        lying_in_it = {"kind": "line", "at": [900, -40, 0], "direction": [1, 0, 0]}
+
+        assert pair_separation(face, lying_in_it, angle) is None
+        assert measures_nothing(face, lying_in_it, angle) is False
+
+    def test_kinds_do_not_fail_together(self):
+        """Two points one above the other: a vertical worth having, no horizontal."""
+        from kumiki.drawing import MeasurementDirection as D
+        from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
+        from kumiki.drawing import measures_nothing
+
+        axes = {"look": (0, -1, 0), "right": (1, 0, 0), "up": (0, 0, 1)}
+        below = {"kind": "point", "at": [0, 0, 0]}
+        above = {"kind": "point", "at": [0, 0, 50]}
+
+        def kind(direction):
+            return MeasurementKind(MeasurementOperation.DISTANCE,
+                                   MeasurementSpace.PROJECTED, direction)
+
+        assert measures_nothing(below, above, kind(D.HORIZONTAL), axes) is True
+        assert measures_nothing(below, above, kind(D.VERTICAL), axes) is False
 
 
 class TestAMeasurementMadeOnASheet:

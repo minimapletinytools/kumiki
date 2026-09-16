@@ -90,10 +90,19 @@ A click is refused, with a reason said rather than silently ignored, when:
 | `no-reference` | a feature nobody declared, so a dimension to it could not be saved |
 | `not-measurable` | no plane or line of its own: a cylinder's barrel, a lofted side |
 | `no-kind` | the pair admits nothing in this space, from here |
-| `degenerate` | the two are in the same place, so there is nothing between them to measure |
+| `degenerate` | the pair has nothing between them to measure — an arris lying on a face |
 
 A refusal leaves `HOLDING` exactly as it was. The first end is not lost because
 the second was wrong.
+
+`degenerate` is judged per kind, from the two features and the space — never
+from placed ends. What a distance comes to is a property of the geometries and
+holds wherever the dimension is drawn, so asking the anchors would make a rule
+about what a measurement *is* depend on where it happens to sit. Per kind
+because they do not fail together: two points one above the other have a
+vertical distance worth measuring and a horizontal one that is nothing at all,
+so the vertical stays on offer and the horizontal is not admitted. Only when
+nothing survives is the pair refused.
 
 ## Rules that outlive any one state
 

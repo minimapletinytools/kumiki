@@ -1975,7 +1975,8 @@ def _pick_verdict(
     Otherwise:
 
       kinds    what the pair admits, best first. Empty means the click refuses,
-               and the hover paints it red.
+               and the hover paints it red. A kind that would come to nothing
+               is not admitted.
       plane    the plane it would be taken on.
       anchors  where it would attach, at both ends, through the same rules that
                place a written measurement -- so what is drawn while deciding is
@@ -1986,7 +1987,7 @@ def _pick_verdict(
     and a refusal derived separately will eventually disagree, and the
     disagreement is invisible until someone clicks.
     """
-    from kumiki.drawing import is_degenerate_separation
+    from kumiki.drawing import measures_nothing
 
     if not payload.get("heldGeometry") or not payload.get("look"):
         return None
@@ -2005,28 +2006,32 @@ def _pick_verdict(
     plane = _plane_for_pick(located_pick, timber, payload)
     # Structured, not named: `angle` composes for a solid angle and is also what
     # every measurement written before spaces called a projected one.
-    kinds = [kind.as_wire() for kind
-             in _kinds_for_pair(payload["heldGeometry"], geometry,
-                                payload["look"], payload)]
-    if not kinds:
+    admitted = _kinds_for_pair(payload["heldGeometry"], geometry,
+                               payload["look"], payload)
+    if not admitted:
         return {"kinds": [], "plane": plane, "anchors": None, "reason": "no-kind"}
+    # A kind that comes to nothing is not a kind this pair admits. Asked of the
+    # two features, NOT of placed ends: what a distance comes to is a property
+    # of the geometries and the space, and holds wherever the dimension is
+    # drawn. An arris lying ON a face is the ordinary way to reach this, and a
+    # single tenoned timber offers a dozen such pairs.
+    #
+    # Per kind, because they do not fail together: two points one above the
+    # other have a vertical distance worth measuring and a horizontal one that
+    # is nothing at all.
+    axes = {"look": payload["look"], "right": payload.get("right"),
+            "up": payload.get("up")}
+    kinds = [kind.as_wire() for kind in admitted
+             if not measures_nothing(payload["heldGeometry"], geometry, kind, axes)]
+    if not kinds:
+        # Refused here, so the hover paints it red and the click says why --
+        # both following from the verdict without either knowing this rule.
+        return {"kinds": [], "plane": plane, "anchors": None, "angle": None,
+                "reason": "degenerate"}
     # Where it would sit: anchors for a distance, a corner for an angle. By the
     # rules that place it once written, so the preview IS the measurement rather
     # than a likeness of one.
     placement = _pick_placement(state, located_pick, timber, payload, slot_state)
-    anchors = placement.get("anchors")
-    if anchors and is_degenerate_separation(anchors["a"], anchors["b"]):
-        # The two ends land in the same place, so the measurement comes to
-        # nothing and draws as nothing -- which reads as one that failed rather
-        # than one that was never worth making. An arris lying ON a face is the
-        # ordinary way to reach this, and there are a dozen such pairs on a
-        # single tenoned timber.
-        #
-        # Refused HERE so the hover paints it red and the click says why, both
-        # of which follow from the verdict without either having to know about
-        # this rule.
-        return {"kinds": [], "plane": plane, "anchors": None, "angle": None,
-                "reason": "degenerate"}
     return {
         "kinds": kinds,
         "plane": plane,

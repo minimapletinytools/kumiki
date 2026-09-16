@@ -367,13 +367,90 @@ class TestTheViewerAgrees:
         assert out.returncode == 0, out.stderr
         return json.loads(out.stdout)
 
+    A_AT = [0.0, 0.0, 0.0]
+    B_AT = [137.0, 91.0, 53.0]
+
+    def _viewer_values(self):
+        """What measureValue makes of every pair, in both spaces."""
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("node is not available")
+        script = (
+            "const m = require(%s);"
+            "const cases = %s, look = %s, a = %s, b = %s;"
+            "const axes = { look, right: [1,0,0], up: [0,0,1] };"
+            "const out = [];"
+            "for (const ca of cases) { for (const cb of cases) {"
+            "  for (const space of ['projected', '3d']) {"
+            "    const solid = space === '3d';"
+            "    const fa = solid ? m.solidForm(ca) : m.projectedForm(ca, look);"
+            "    const fb = solid ? m.solidForm(cb) : m.projectedForm(cb, look);"
+            "    const kinds = solid ? m.solidKinds(fa, fb)"
+            "                        : m.availableKinds(fa, fb);"
+            "    const row = [];"
+            "    for (const kind of kinds) {"
+            "      const v = m.measureValue(kind, a, b, fa, fb,"
+            "        Object.assign({}, axes, { space }));"
+            "      row.push(v.unit === 'length' ? v.value : null); }"
+            "    out.push(row); } } }"
+            "process.stdout.write(JSON.stringify(out));"
+            % (json.dumps(str(Path(__file__).resolve().parent.parent
+                              / "kigumi" / "webview" / "measurements.js")),
+               json.dumps(self.CASES), json.dumps(self.LOOKS[0]),
+               json.dumps(self.A_AT), json.dumps(self.B_AT))
+        )
+        out = subprocess.run([present(node, "node on PATH"), "-e", script],
+                             capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return json.loads(out.stdout)
+
+    def test_the_two_agree_on_what_a_pair_comes_to(self):
+        """`pair_separation` against the viewer's `measureValue`, pair by pair.
+
+        Python had no way to say what a measurement came to -- only the viewer
+        computed that -- so the rule that refuses a pair with nothing between
+        them was first written against PLACED ANCHORS, which made what a
+        measurement IS depend on where it happened to be drawn. Python can
+        answer it from the geometries now, and this is what stops that answer
+        drifting from the one the viewer draws with.
+
+        None on both sides for an angle: it measures no length, so the rule
+        leaves it alone.
+        """
+        from kumiki.drawing import pair_separation, projected_kinds, solid_kinds
+
+        axes = {"look": self.LOOKS[0], "right": [1, 0, 0], "up": [0, 0, 1]}
+        mine = []
+        for one in self.CASES:
+            for other in self.CASES:
+                for space in ("projected", "3d"):
+                    # A None case is "nothing to measure", and stays None.
+                    a = None if one is None else dict(one, at=self.A_AT)
+                    b = None if other is None else dict(other, at=self.B_AT)
+                    admitted = (solid_kinds(a, b) if space == "3d"
+                                else projected_kinds(a, b, self.LOOKS[0]))
+                    mine.append([pair_separation(a, b, kind, axes)
+                                 for kind in admitted])
+
+        theirs = self._viewer_values()
+        assert len(theirs) == len(mine), "the two walked different pairs"
+        assert any(any(value for value in row) for row in mine), "no lengths compared"
+        for row, their_row in zip(mine, theirs):
+            assert len(row) == len(their_row)
+            for value, their_value in zip(row, their_row):
+                if value is None or their_value is None:
+                    assert value is None and their_value is None
+                else:
+                    assert value == pytest.approx(their_value, abs=1e-9)
+
     def test_the_two_agree_on_what_counts_as_no_distance(self):
         """One epsilon, two files.
 
-        The runner refuses a PICK whose ends land in the same place; the viewer
-        refuses to draw a WRITTEN measurement that comes to nothing. Different
-        moments, same rule, and two numbers that drifted apart would mean a pick
-        allowed and then never drawn -- which is the thing being fixed.
+        The runner refuses a PICK the two features have nothing between; the
+        viewer refuses to draw a WRITTEN measurement that comes to nothing.
+        Different moments, same rule, and two numbers that drifted apart would
+        mean a pick allowed and then never drawn -- which is the thing being
+        fixed.
         """
         from kumiki.drawing import DEGENERATE_SEPARATION
 

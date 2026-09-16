@@ -484,16 +484,93 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
     return tuple(-part for part in unit) if lean < 0 else unit
 
 
-def is_degenerate_separation(first: Sequence[float], second: Sequence[float]) -> bool:
-    """Whether two anchors are close enough to be the same place.
+def pair_separation(
+    one: Optional[Mapping], other: Optional[Mapping],
+    kind: MeasurementKind, axes: Optional[Mapping] = None,
+) -> Optional[float]:
+    """What a distance between these two comes to, FROM THE FEATURES ALONE.
 
-    Asked of the anchors rather than the features: two features that merely
-    touch still have a distance worth measuring between other parts of them,
-    and it is where the dimension would ATTACH that decides whether it comes to
-    anything.
+    No anchors. Where a dimension attaches is a separate question: a
+    perpendicular distance is the same wherever along the pair you stand, so
+    what it comes to is a property of the two features and the space, and
+    nothing else. Asking the placed ends instead makes a rule about what a
+    measurement IS depend on where it happens to be drawn.
+
+    None when the pair measures no length -- an angle, or a pair that admits
+    nothing.
+
+    THE VIEWER HAS A COPY, as measureValue in measurements.js, because it needs
+    the number on every frame and cannot ask python for it. A test runs the two
+    against each other.
     """
-    gap = [second[i] - first[i] for i in range(3)]
-    return _dot(gap, gap) < DEGENERATE_SEPARATION * DEGENERATE_SEPARATION
+    if kind.operation is not MeasurementOperation.DISTANCE:
+        return None
+    at_one = (one or {}).get("at")
+    at_other = (other or {}).get("at")
+    if not at_one or not at_other:
+        return None
+
+    look = _unit((axes or {}).get("look") or (0, 0, -1))
+    solid = kind.space is MeasurementSpace.THREE_D
+    if solid:
+        form_one, run_one = solid_form(one)
+        form_other, run_other = solid_form(other)
+    else:
+        form_one, run_one = projected_form(one, look)
+        form_other, run_other = projected_form(other, look)
+    if form_one is None or form_other is None:
+        return None
+
+    gap = [at_other[i] - at_one[i] for i in range(3)]
+    if not solid:
+        # On a sheet, only what survives the projection counts.
+        along = _dot(gap, look)
+        gap = [gap[i] - look[i] * along for i in range(3)]
+
+    if kind.direction is MeasurementDirection.HORIZONTAL:
+        return abs(_dot(gap, _unit((axes or {}).get("right") or (1, 0, 0))))
+    if kind.direction is MeasurementDirection.VERTICAL:
+        return abs(_dot(gap, _unit((axes or {}).get("up") or (0, 0, 1))))
+
+    # Square to whichever of the two constrains it most. A plane leaves one
+    # direction to measure along, a line leaves two, and two points leave the
+    # distance itself.
+    def constraining(form):
+        # A form with no way to run constrains nothing, so it is passed over --
+        # as the viewer's copy passes it over. Squaring to a zero direction
+        # would call every such pair nothing at all.
+        one_run = run_one if form_one is form else None
+        other_run = run_other if form_other is form else None
+        for run in (one_run, other_run):
+            if run is not None and any(part for part in run):
+                return run
+        return None
+
+    plane = constraining(MeasurementFeature.PLANE)
+    if plane is not None:
+        return abs(_dot(gap, _unit(plane)))
+
+    line = constraining(MeasurementFeature.LINE)
+    if line is None:
+        return math.sqrt(_dot(gap, gap))
+    unit = _unit(line)
+    slide = _dot(gap, unit)
+    across = [gap[i] - unit[i] * slide for i in range(3)]
+    return math.sqrt(_dot(across, across))
+
+
+def measures_nothing(
+    one: Optional[Mapping], other: Optional[Mapping],
+    kind: MeasurementKind, axes: Optional[Mapping] = None,
+) -> bool:
+    """Whether this pair has nothing between them to dimension.
+
+    From the features, not from placed ends: what a distance comes to does not
+    depend on where it is drawn. An arris lying ON a face is the ordinary way
+    to reach this.
+    """
+    gap = pair_separation(one, other, kind, axes)
+    return gap is not None and gap < DEGENERATE_SEPARATION
 
 
 def angle_rays(first: MeasureSpan, second: MeasureSpan):
