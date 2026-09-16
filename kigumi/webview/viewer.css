@@ -8,6 +8,7 @@
     --hv-title: #5873a6;
     --hv-dim: #6e7691;
     --hv-accent: #8ca4cf;
+    --hv-broken: #c0392b;
     --hv-mesh: #afbccf;
     --hv-edge: #5d6882;
     --hv-strong: #39496e;
@@ -270,6 +271,24 @@ canvas { display: block; width: 100%; height: 100%; }
     opacity: 0.55;
 }
 
+/* A measurement whose reference no longer finds a feature, or whose plane
+   disagrees with the view it is drawn in. Broken wherever you look at it, and
+   something to go and mend -- as against the refusals that are about THIS view,
+   which are information rather than damage and stay quiet. */
+.dp-broken,
+.lp-broken {
+    color: var(--hv-broken, #c0392b);
+    opacity: 1;
+}
+
+.lp-broken-note,
+.dp-broken .dp-reason {
+    color: var(--hv-broken, #c0392b);
+    font-style: italic;
+    margin-left: 6px;
+    opacity: 0.9;
+}
+
 .dp-reason {
     font-style: italic;
     opacity: 0.85;
@@ -304,6 +323,34 @@ canvas { display: block; width: 100%; height: 100%; }
 .dim-witness {
     stroke-width: 0.8;
     opacity: 0.7;
+}
+
+/* The overlay itself takes no clicks -- it covers the whole canvas -- but one
+   dimension does, so that clicking it is how you select it. The hit area is
+   exactly what was drawn, because it IS what was drawn. */
+.dim-group {
+    pointer-events: auto;
+    /* Move, because that is what dragging it does -- and selecting it is what
+       happens when the drag turns out to be a click. */
+    cursor: move;
+}
+
+.dim-focused .dim-line,
+.dim-focused .dim-witness {
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-width: 2;
+}
+
+.dim-focused .dim-label {
+    fill: var(--hv-accent, #4a7dbd);
+}
+
+/* A measurement being made, before it is confirmed. Dashed, because it is not
+   there yet -- and drawn at all, because confirming what you cannot see is
+   confirming blind. */
+.dim-pending {
+    stroke-dasharray: 5 3;
+    opacity: 0.85;
 }
 
 .dim-label {
@@ -426,6 +473,21 @@ canvas { display: block; width: 100%; height: 100%; }
 .ip-detail-label {
     color: var(--hv-dim);
     min-width: 78px;
+}
+
+/* How a focused measurement is measured, when the pair admits more than one
+   way. Sized to its row rather than to the panel: the label beside it is the
+   fixed part. */
+.ip-kind {
+    font: inherit;
+    font-size: 0.95em;
+    color: var(--hv-text);
+    background: var(--hv-panel-bg);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 3px;
+    padding: 0 2px;
+    max-width: 100%;
+    cursor: pointer;
 }
 
 .ip-detail-value {
@@ -552,6 +614,16 @@ canvas { display: block; width: 100%; height: 100%; }
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.context-menu-checked::before {
+    content: '\2713\00a0';
+}
+
+.context-menu-note {
+    margin-left: 8px;
+    opacity: 0.6;
+    font-size: 0.85em;
+}
+
 .context-menu-item {
     display: block;
     width: 100%;

@@ -348,6 +348,40 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'addMeasurement' || message.type === 'updateMeasurement'
+                || message.type === 'deleteMeasurement') {
+                // Through the same path every other drawings command takes, so
+                // the whole set comes back as one 'scenes' message and the
+                // panels redraw from one answer. Posting a shape of its own is
+                // how a measurement gets made and never appears.
+                //
+                // Rebuilt field by field rather than forwarded: anything added
+                // to the message has to be added here too, which is how a field
+                // arrives empty and something silently stops working.
+                const command = {
+                    addMeasurement: 'add_measurement',
+                    updateMeasurement: 'update_measurement',
+                    deleteMeasurement: 'delete_measurement',
+                }[message.type];
+                this._handleDrawingsCommand(command, {
+                    drawingId: message.drawingId,
+                    viewportId: message.viewportId,
+                    a: message.a,
+                    b: message.b,
+                    measureId: message.measureId || null,
+                    kind: message.kind || null,
+                    plane: message.plane || null,
+                    // Where it sat. Undoing a delete has to put the dimension
+                    // back where it was, not at the default -- losing a drag to
+                    // an undo is the quiet edit this path avoids everywhere
+                    // else.
+                    placement: message.placement || null,
+                    changes: message.changes || null,
+                }, { enter: false }).catch((err) => {
+                    this.log(`[measure] ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'requestDrawingFromSelection') {
                 this._handleRequestDrawingFromSelection(message).catch((err) => {
                     this.log(`[drawing] requestDrawingFromSelection error: ${err.message || err}`);
@@ -369,28 +403,6 @@ class FrameViewSession {
             if (message.type === 'requestCSGByPath') {
                 this._handleRequestCSGByPath(message).catch((err) => {
                     this.log(`[layers] requestCSGByPath error: ${err.message || err}`);
-                });
-                return;
-            }
-            if (message.type === 'requestExportStl') {
-                this._handleExportBatchRequest({
-                    formats: ['stl', '3mf'],
-                    includeCombined: true,
-                    includeIndividuals: message.includeIndividuals !== false,
-                    includeAccessories: message.includeAccessories !== false,
-                }).catch((err) => {
-                    this.log(`[export] requestExportStl error: ${err.message || err}`);
-                });
-                return;
-            }
-            if (message.type === 'requestExportStep') {
-                this._handleExportBatchRequest({
-                    formats: ['step'],
-                    includeCombined: true,
-                    includeIndividuals: message.includeIndividuals !== false,
-                    includeAccessories: message.includeAccessories !== false,
-                }).catch((err) => {
-                    this.log(`[export] requestExportStep error: ${err.message || err}`);
                 });
                 return;
             }
@@ -971,6 +983,22 @@ class FrameViewSession {
             // has to be added here too -- which is how this arrived empty and
             // edges stopped being selectable while still highlighting.
             tolerances: message.tolerances || null,
+            // Which feature at the point is wanted, and what would be measured
+            // to it. With these the runner offers one that can finish the
+            // measurement rather than the most specific one, says whether it
+            // can, and works out the plane -- all in the request that was being
+            // made anyway.
+            candidateIndex: message.candidateIndex || 0,
+            heldGeometry: message.heldGeometry || null,
+            heldAt: message.heldAt || null,
+            heldReference: message.heldReference || null,
+            look: message.look || null,
+            right: message.right || null,
+            up: message.up || null,
+            // Which space to judge the pair in. Without it the runner projects,
+            // and in the 3D view -- where the camera is oblique and no face is
+            // ever seen exactly edge-on -- that makes every face unmeasurable.
+            space: message.space || null,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
@@ -983,9 +1011,30 @@ class FrameViewSession {
         const result = await this.runnerSession.slotRequest('hover_feature_at_point', this.slotName, {
             memberKey: message.memberKey,
             point: message.point,
+            // From wherever the selection already is, exactly as the click
+            // does. Dropped here, the hover asked from the top of the tree
+            // while a click asked from the focus -- so once you had drilled in,
+            // the hover lit the outer node and the click took something deeper.
+            currentPath: message.currentPath || [],
             // The same tolerances the click will use. Hover that answers by a
             // different rule lights things a click then refuses.
             tolerances: message.tolerances || null,
+            // Which feature at the point is wanted, and what would be measured
+            // to it. With these the runner offers one that can finish the
+            // measurement rather than the most specific one, says whether it
+            // can, and works out the plane -- all in the request that was being
+            // made anyway.
+            candidateIndex: message.candidateIndex || 0,
+            heldGeometry: message.heldGeometry || null,
+            heldAt: message.heldAt || null,
+            heldReference: message.heldReference || null,
+            look: message.look || null,
+            right: message.right || null,
+            up: message.up || null,
+            // Which space to judge the pair in. Without it the runner projects,
+            // and in the 3D view -- where the camera is oblique and no face is
+            // ever seen exactly edge-on -- that makes every face unmeasurable.
+            space: message.space || null,
         });
         // The request number goes out and comes back untouched, so the viewer
         // can tell an answer about where the pointer is now from one about

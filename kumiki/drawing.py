@@ -13,6 +13,7 @@ are two dimensions with two numbers, and either may be meaningless while the
 other is fine.
 """
 
+import math
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
@@ -213,6 +214,570 @@ _LEGACY_KIND_NAMES: Mapping[str, MeasurementKind] = {
 }
 
 
+#: How square something has to be to the view before it counts as square. An
+#: edge a hair off end-on still projects to a line, just a very short one, and
+#: calling it a point would refuse a dimension that is drawable.
+ALIGNMENT_EPSILON = 1e-3
+
+#: Two projected directions within this of parallel are treated as parallel: the
+#: angle between them would be a number nobody wrote down deliberately, and
+#: their separation is what was meant.
+PARALLEL_EPSILON = 1e-2
+
+
+def _unit(vector: Sequence[float]) -> Tuple[float, float, float]:
+    size = math.sqrt(sum(float(part) * float(part) for part in vector))
+    if size == 0:
+        return (0.0, 0.0, 0.0)
+    return tuple(float(part) / size for part in vector)
+
+
+def _dot(a: Sequence[float], b: Sequence[float]) -> float:
+    return sum(float(x) * float(y) for x, y in zip(a, b))
+
+
+def projected_form(
+    geometry: Optional[Mapping], look: Sequence[float],
+) -> Tuple[MeasurementFeature, Optional[Tuple[float, float, float]]]:
+    """What a feature behaves as once projected, and which way it runs.
+
+    A point stays a point. An edge seen end-on becomes one, and otherwise stays
+    a line. A face is a LINE seen edge-on and an AREA at any other angle -- and
+    an area covers the view, which is the whole of what PROJECTS_TO means by a
+    face having two answers.
+
+    The direction comes back with it because a pair of lines admits different
+    kinds depending on whether they are parallel, and the caller would otherwise
+    have to work the projection out a second time to find out.
+
+    None for `geometry` is a feature lying on no plane or line -- a cylinder's
+    barrel, a lofted side -- which is good to select and cannot be measured to.
+
+    THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
+    against each other. Two copies of a rule is how a rule drifts; the reason
+    for the second one is that the viewer projects on every pointer move and
+    cannot ask python each time.
+    """
+    kind = (geometry or {}).get("kind")
+    gaze = _unit(look)
+    if kind == "point":
+        return (MeasurementFeature.POINT, None)
+    if kind == "line":
+        direction = _unit(geometry.get("direction") or (0, 0, 0))
+        if abs(_dot(direction, gaze)) > 1 - ALIGNMENT_EPSILON:
+            return (MeasurementFeature.POINT, None)
+        return (MeasurementFeature.LINE, _flatten(direction, gaze))
+    if kind == "plane":
+        normal = _unit(geometry.get("normal") or (0, 0, 0))
+        if abs(_dot(normal, gaze)) > ALIGNMENT_EPSILON:
+            # Not edge-on: it covers the view, and an area has no distance.
+            return (MeasurementFeature.AREA, None)
+        # Edge-on, so it draws as a line along the plane, square to its normal
+        # and to the line of sight.
+        return (MeasurementFeature.LINE, _cross(normal, gaze))
+    return (None, None)
+
+
+def _flatten(direction: Sequence[float], gaze: Sequence[float]) -> Tuple[float, float, float]:
+    """The part of a direction that survives projection."""
+    along = _dot(direction, gaze)
+    return _unit([direction[i] - gaze[i] * along for i in range(3)])
+
+
+def _cross(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float, float]:
+    return _unit([
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ])
+
+
+@dataclass(frozen=True)
+class MeasureSpan:
+    """What a feature is, where a measurement is being taken.
+
+    Three shapes, and which ones can occur depends on the space:
+
+    ON A SHEET, two. A point is a point; an edge is a line with an extent; and a
+    FACE seen edge-on is also a line with an extent, while a face seen at any
+    other angle covers the view and admits no measurement at all.
+
+    IN THE SOLID, three. Nothing is projected away, so a face is a PLANE -- it
+    is measurable from anywhere, not only edge-on, and it is not a line. Leaving
+    it as a line there is what leaned a dimension between an edge and the face
+    it runs parallel to: the anchors were placed by the two-lines rule, which
+    shares a station along one direction, and a face has two directions to be
+    square to rather than one.
+
+    `interval` is how far it reaches along `direction`, as stations from `at`,
+    taken from what the feature occupies once cropped to the timber. `normal` is
+    set instead, for a plane. All three are None for a point.
+    """
+
+    at: Tuple[float, float, float]
+    direction: Optional[Tuple[float, float, float]] = None
+    interval: Optional[Tuple[float, float]] = None
+    normal: Optional[Tuple[float, float, float]] = None
+    #: For a LINE, the way out of the material across it -- an arris bisects the
+    #: two faces that form it. Only used to decide which side an angle opens on,
+    #: and absent whenever nothing could work it out.
+    outward: Optional[Tuple[float, float, float]] = None
+
+    @property
+    def is_point(self) -> bool:
+        return self.direction is None and self.normal is None
+
+    @property
+    def is_plane(self) -> bool:
+        return self.normal is not None
+
+    @property
+    def is_line(self) -> bool:
+        return self.direction is not None
+
+    def ends(self) -> Tuple[Tuple[float, float, float], ...]:
+        """The two extremities, or the point itself.
+
+        A plane has no extremities along any one direction, so it answers with
+        the one point it is placed at; the rules that ask this are the ones for
+        lines.
+        """
+        if self.is_point or self.is_plane:
+            return (self.at,)
+        unit = _unit(self.direction)
+        return tuple(
+            tuple(self.at[i] + unit[i] * station for i in range(3))
+            for station in (self.interval or (0.0, 0.0))
+        )
+
+
+def _stations(span: MeasureSpan, along: Sequence[float]) -> Tuple[float, float]:
+    """How far a span reaches along a direction, as absolute stations.
+
+    Absolute -- measured from the world origin rather than from the span's own
+    point -- because two features have two different points, and overlap is a
+    question about one shared ruler.
+    """
+    reach = [_dot(end, along) for end in span.ends()]
+    return (min(reach), max(reach))
+
+
+def _at_station(span: MeasureSpan, along: Sequence[float], station: float):
+    """The point on a span that sits at a given station along `along`."""
+    if span.is_point:
+        return span.at
+    unit = _unit(span.direction)
+    rate = _dot(unit, along)
+    if abs(rate) < 1e-12:
+        return span.at
+    step = (station - _dot(span.at, along)) / rate
+    return tuple(span.at[i] + unit[i] * step for i in range(3))
+
+
+def _foot_on(span: MeasureSpan, point: Sequence[float]):
+    """Where a perpendicular from `point` meets a span, kept on the span."""
+    unit = _unit(span.direction)
+    station = _dot([point[i] - span.at[i] for i in range(3)], unit)
+    low, high = span.interval or (station, station)
+    # Clamped: a dimension whose end floats off the end of a short edge points
+    # at nothing, and the nearest place on the feature is the honest answer.
+    station = max(low, min(high, station))
+    return tuple(span.at[i] + unit[i] * station for i in range(3))
+
+
+def _representative_point(span: MeasureSpan) -> Tuple[float, float, float]:
+    """The one point that stands for a span when something must be dropped onto it.
+
+    A point is itself. A line offers the middle of its surviving extent, which is
+    where a reader would put a finger on it.
+    """
+    if not span.is_line:
+        return tuple(span.at)
+    low, high = span.interval or (0.0, 0.0)
+    unit = _unit(span.direction)
+    middle = (low + high) / 2
+    return tuple(span.at[i] + unit[i] * middle for i in range(3))
+
+
+def _foot_on_plane(span: MeasureSpan, point: Sequence[float]):
+    """Where a perpendicular from `point` meets a plane.
+
+    NOT clamped to the face, unlike the foot on a line: a span carries a plane's
+    normal and a point on it, not its outline, so there is nothing here to clamp
+    against. For a pair that admits a distance the two features face each other,
+    which is when the foot lands on the face anyway. Clamping properly wants the
+    face's corners -- see the note in cutcsg about extents being an AABB.
+    """
+    unit = _unit(span.normal)
+    gap = _dot([point[i] - span.at[i] for i in range(3)], unit)
+    return tuple(point[i] - unit[i] * gap for i in range(3))
+
+
+def _closest_on_line(point, at, direction):
+    """Where a line comes nearest a point."""
+    unit = _unit(direction)
+    step = _dot([point[i] - at[i] for i in range(3)], unit)
+    return tuple(at[i] + unit[i] * step for i in range(3))
+
+
+def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
+    """The line two planes share: a point on it and its direction, or None.
+
+    None when they are parallel, which has no corner to stand in -- and admits a
+    distance rather than an angle anyway.
+    """
+    one, other = _unit(first.normal), _unit(second.normal)
+    along = _cross(one, other)
+    # The UNNORMALISED cross, because the closed form below divides by its
+    # square length. Normalising first and dividing by one puts the point out by
+    # a factor of the sine between the planes, which is right only when they
+    # happen to meet square.
+    scale = _dot(along, along)
+    if scale < PARALLEL_EPSILON:
+        return None
+    reach_one, reach_other = _dot(one, first.at), _dot(other, second.at)
+    part_one, part_other = _cross(other, along), _cross(along, one)
+    point = tuple(
+        (reach_one * part_one[i] + reach_other * part_other[i]) / scale
+        for i in range(3))
+    return point, _unit(along)
+
+
+def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = None):
+    """A unit ray from `vertex`, turned to point at where the feature is.
+
+    Which of the two supplementary angles is meant is decided here, and where
+    the feature actually lies is usually what says it: a face reaches off to one
+    side of the corner, and an arris runs away from it.
+
+    An edge that STRADDLES the vertex reaches equally both ways and says
+    nothing. The other feature's outward normal says it instead -- the way out
+    of the material across it -- because the angle a reader means is the one
+    with both timbers in it. Note it is the OTHER feature's: an edge's own
+    normal is square to the edge, so it cannot choose a direction along it.
+    """
+    unit = _unit(ray)
+    if not any(abs(part) > 1e-9 for part in unit):
+        return None
+    if span.is_line:
+        stations = [_dot([end[i] - vertex[i] for i in range(3)], unit)
+                    for end in span.ends()]
+        low, high = min(stations), max(stations)
+        straddles = low < -1e-9 < 1e-9 < high
+        outward = other.outward if other is not None else None
+        if straddles and outward is not None:
+            lean = -_dot(unit, _unit(outward))
+        else:
+            # The longer side, which for an edge running off one way is that way.
+            lean = high + low
+    else:
+        lean = _dot(unit, [span.at[i] - vertex[i] for i in range(3)])
+    return tuple(-part for part in unit) if lean < 0 else unit
+
+
+def angle_rays(first: MeasureSpan, second: MeasureSpan):
+    """Where an angle between two features is, and which two ways it opens.
+
+    A vertex, two unit rays from it, and the plane they span, in world space,
+    as `{"vertex", "from", "to", "normal"}` -- or None when the pair makes no
+    corner.
+
+    Worked out here rather than in the viewer for the same reason the anchors of
+    a distance are: an angle drawn from one derivation and labelled from another
+    will eventually disagree, and the disagreement is a picture that means
+    nothing next to a number that is right.
+
+    THE RAYS DECIDE THE VALUE. The angle a reader wants is the one the two
+    features actually subtend -- the corner they make, not its supplement -- so
+    it is read off the rays rather than from the features' normals, which cannot
+    tell 45 degrees from 135.
+    """
+    if first is None or second is None:
+        return None
+    if first.is_plane and second.is_plane:
+        crossing = _plane_crossing(first, second)
+        if crossing is None:
+            return None
+        point, along = crossing
+        middle = tuple((first.at[i] + second.at[i]) / 2 for i in range(3))
+        vertex = _closest_on_line(middle, point, along)
+        # Square to the shared corner, and lying in its own face.
+        rays = (_ray_toward(_cross(along, _unit(first.normal)), vertex, first),
+                _ray_toward(_cross(along, _unit(second.normal)), vertex, second))
+    elif first.is_line and second.is_line:
+        placed = _closest_between(first, second)
+        if placed is None:
+            return None
+        vertex = placed
+        rays = (_ray_toward(first.direction, vertex, first, second),
+                _ray_toward(second.direction, vertex, second, first))
+    elif first.is_line or second.is_line:
+        line, plane = (first, second) if first.is_line else (second, first)
+        vertex = _line_meets_plane(line, plane)
+        if vertex is None:
+            return None
+        in_plane = _flatten_onto(line.direction, plane.normal)
+        if in_plane is None:
+            return None
+        line_ray = _ray_toward(line.direction, vertex, line, plane)
+        plane_ray = _ray_toward(in_plane, vertex, plane)
+        rays = (line_ray, plane_ray) if first.is_line else (plane_ray, line_ray)
+    else:
+        return None
+    if rays[0] is None or rays[1] is None:
+        return None
+    # The plane the angle is IN: the one both rays lie in, which for two faces
+    # is the plane they are each perpendicular to -- its normal is the corner
+    # they share. Carried so the arc can be swept in it rather than drawn flat
+    # on the screen, where it shows the projected angle and agrees with the
+    # number it labels only from the one direction.
+    upright = _cross(rays[0], rays[1])
+    if not any(abs(part) > 1e-9 for part in upright):
+        return None
+    return {
+        "vertex": list(vertex),
+        "from": list(rays[0]),
+        "to": list(rays[1]),
+        "normal": list(_unit(upright)),
+    }
+
+
+def _closest_between(first: MeasureSpan, second: MeasureSpan):
+    """Where two lines come nearest each other, kept on both.
+
+    Two edges in a frame are skew as often as they cross, so there is usually no
+    single point on both. The midpoint of their nearest approach is the honest
+    place to stand, and each station is clamped to what survives of its edge so
+    the arc lands on the timber rather than out past the end of it.
+    """
+    one, other = _unit(first.direction), _unit(second.direction)
+    facing = _dot(one, other)
+    spread = 1 - facing * facing
+    if spread < PARALLEL_EPSILON:
+        return None
+    gap = [first.at[i] - second.at[i] for i in range(3)]
+    lean_one, lean_other = _dot(one, gap), _dot(other, gap)
+    station_one = (facing * lean_other - lean_one) / spread
+    station_other = (lean_other - facing * lean_one) / spread
+    station_one = _clamp_to(station_one, first.interval)
+    station_other = _clamp_to(station_other, second.interval)
+    on_one = [first.at[i] + one[i] * station_one for i in range(3)]
+    on_other = [second.at[i] + other[i] * station_other for i in range(3)]
+    return tuple((on_one[i] + on_other[i]) / 2 for i in range(3))
+
+
+def _clamp_to(station: float, interval):
+    if interval is None:
+        return station
+    low, high = interval
+    return max(low, min(high, station))
+
+
+def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan):
+    """Where a line crosses a plane, or its nearest point when it runs flat."""
+    unit, normal = _unit(line.direction), _unit(plane.normal)
+    rate = _dot(unit, normal)
+    if abs(rate) < PARALLEL_EPSILON:
+        # Running along the face: it never crosses, so stand where the edge is
+        # and drop that onto the face.
+        return _foot_on_plane(plane, _representative_point(line))
+    step = _dot([plane.at[i] - line.at[i] for i in range(3)], normal) / rate
+    step = _clamp_to(step, line.interval)
+    return tuple(line.at[i] + unit[i] * step for i in range(3))
+
+
+def _flatten_onto(direction, normal):
+    """The part of a direction that lies in a plane."""
+    unit, up = _unit(direction), _unit(normal)
+    along = _dot(unit, up)
+    flat = [unit[i] - up[i] * along for i in range(3)]
+    if not any(abs(part) > 1e-9 for part in flat):
+        return None
+    return _unit(flat)
+
+
+def angle_between(rays) -> Optional[float]:
+    """The angle the rays open, in degrees. The value a reader sees."""
+    if not rays:
+        return None
+    facing = max(-1.0, min(1.0, _dot(_unit(rays["from"]), _unit(rays["to"]))))
+    return math.degrees(math.acos(facing))
+
+
+def distance_anchors(
+    first: MeasureSpan,
+    second: MeasureSpan,
+    kind: MeasurementKind,
+    axes: Optional[Mapping] = None,
+):
+    """Where a distance between these two features attaches, at both ends.
+
+    A property of the PAIR and the plane, not of either feature alone. An anchor
+    chosen per feature cannot know where the sensible attachment point is for a
+    given pair -- two parallel edges each anchoring at their own midpoint gave a
+    dimension that leaned if the midpoints were offset along their length.
+
+    PERPENDICULAR, between two parallel lines: both ends sit at one station
+    along the shared direction, which is what makes the line between them square
+    to both. The station is the middle of the overlap of their extents, so the
+    dimension lands where the two features actually face each other. Where they
+    do not overlap there is no such place, so it goes to the end of the FIRST
+    nearest the second, and the other end is projected across from there.
+
+    PERPENDICULAR, a point and a line: the point does not move -- it is the
+    whole of what is being measured from -- and the other end is the foot of the
+    perpendicular dropped onto the line.
+
+    PERPENDICULAR, anything and a PLANE: the same rule one step further. The
+    anchor is chosen on whichever feature has less freedom -- a point has none,
+    a line one direction, a plane two -- and dropped onto the other square to
+    it. A face only IS a plane in the solid; on a sheet it is a line seen
+    edge-on and takes the rules above.
+
+    PERPENDICULAR, two points: themselves. With no line to be square to, the
+    distance between them is the distance.
+
+    HORIZONTAL or VERTICAL: the first end stays put and the second is projected
+    onto the axis through it, so the dimension runs along the sheet's own
+    direction and reads the separation in it. Offered only between two points
+    today -- kinds_for lists no other pair for them -- so the two closest points
+    on the two features are the two points.
+    """
+    named = kind.name if hasattr(kind, "name") else str(kind)
+
+    if named in ("projected_horizontal_distance", "projected_vertical_distance"):
+        axis = _unit((axes or {}).get(
+            "right" if named.endswith("horizontal_distance") else "up") or (1, 0, 0))
+        offset = _dot([second.at[i] - first.at[i] for i in range(3)], axis)
+        return (first.at, tuple(first.at[i] + axis[i] * offset for i in range(3)))
+
+    # A PLANE is measured to by dropping a perpendicular onto it. The anchor is
+    # chosen on whichever feature has less freedom -- a point has none, a line
+    # one direction, a plane two -- and carried to the other square to it. That
+    # is what makes the dimension perpendicular to the face rather than merely
+    # touching it: an edge and the face it runs parallel to were both treated as
+    # lines and put through the shared-station rule, which shares ONE direction,
+    # and the dimension leaned by however far the two were offset in the other.
+    #
+    # Only in the solid: on a sheet a face is a line and never gets here.
+    if first.is_plane or second.is_plane:
+        if first.is_plane and second.is_plane:
+            # Parallel faces. Either centroid will do, and the first is the one
+            # the reader chose first.
+            return (first.at, _foot_on_plane(second, first.at))
+        if first.is_plane:
+            from_second = _representative_point(second)
+            return (_foot_on_plane(first, from_second), from_second)
+        from_first = _representative_point(first)
+        return (from_first, _foot_on_plane(second, from_first))
+
+    if first.is_point and second.is_point:
+        return (first.at, second.at)
+    if first.is_point:
+        return (first.at, _foot_on(second, first.at))
+    if second.is_point:
+        return (_foot_on(first, second.at), second.at)
+
+    along = _unit(first.direction)
+    first_low, first_high = _stations(first, along)
+    second_low, second_high = _stations(second, along)
+    low, high = max(first_low, second_low), min(first_high, second_high)
+    if low <= high:
+        station = (low + high) / 2
+    else:
+        # Nothing faces anything: go to the end of the first that is nearest.
+        station = first_high if first_high < second_low else first_low
+    return (_at_station(first, along, station), _at_station(second, along, station))
+
+
+def projected_kinds(
+    one: Optional[Mapping], other: Optional[Mapping], look: Sequence[float],
+) -> Tuple[MeasurementKind, ...]:
+    """Which kinds this pair admits, seen from `look`. Empty when none.
+
+    The two halves put together: project both, then ask the table. This is the
+    question "could these two be measured against each other from here", which
+    is what decides whether a feature is worth preferring under the pointer.
+    """
+    form_one, run_one = projected_form(one, look)
+    form_other, run_other = projected_form(other, look)
+    if form_one is None or form_other is None:
+        return ()
+    parallel = None
+    if run_one is not None and run_other is not None:
+        parallel = abs(_dot(run_one, run_other)) > 1 - PARALLEL_EPSILON
+    return kinds_for(form_one, form_other, MeasurementSpace.PROJECTED, parallel=parallel)
+
+
+def solid_form(
+    geometry: Optional[Mapping],
+) -> Tuple[Optional[MeasurementFeature], Optional[Tuple[float, float, float]]]:
+    """What a feature IS, with nothing projected away.
+
+    The 3D view's camera belongs to the reader and turns as they look around, so
+    a feature there cannot be classified by how it happens to appear from where
+    they are standing: a face is a plane whatever angle it is seen from. Asking
+    `projected_form` there said a face was an AREA -- covering the view, nothing
+    to measure -- for every face not seen exactly edge-on, which is nearly all
+    of them.
+
+    The direction that comes back is the line's own, or the plane's normal, for
+    deciding whether a pair runs together.
+
+    THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
+    against each other.
+    """
+    kind = (geometry or {}).get("kind")
+    if kind == "point":
+        return (MeasurementFeature.POINT, None)
+    if kind == "line":
+        return (MeasurementFeature.LINE, _unit(geometry.get("direction") or (0, 0, 0)))
+    if kind == "plane":
+        return (MeasurementFeature.PLANE, _unit(geometry.get("normal") or (0, 0, 0)))
+    return (None, None)
+
+
+def _solid_parallel(
+    form_one: MeasurementFeature,
+    run_one: Optional[Sequence[float]],
+    form_other: MeasurementFeature,
+    run_other: Optional[Sequence[float]],
+) -> Optional[bool]:
+    """Whether two solid features run together.
+
+    Two planes are parallel when their NORMALS align and two lines when their
+    DIRECTIONS do -- but a line is parallel to a plane when it runs square to
+    the normal, which is the opposite test. One of these carries a normal and
+    the other a direction, so comparing them as though both were directions
+    would have called a line lying in a plane a crossing.
+    """
+    if run_one is None or run_other is None:
+        return None
+    alignment = abs(_dot(run_one, run_other))
+    if form_one is form_other:
+        return alignment > 1 - PARALLEL_EPSILON
+    return alignment < PARALLEL_EPSILON
+
+
+def solid_kinds(
+    one: Optional[Mapping], other: Optional[Mapping],
+) -> Tuple[MeasurementKind, ...]:
+    """Which kinds this pair admits in the 3D view. Empty when none.
+
+    The counterpart of `projected_kinds` for a view that projects nothing. No
+    camera comes into it: what a pair admits in the solid does not depend on
+    where anyone is standing.
+    """
+    form_one, run_one = solid_form(one)
+    form_other, run_other = solid_form(other)
+    if form_one is None or form_other is None:
+        return ()
+    return kinds_for(
+        form_one, form_other, MeasurementSpace.THREE_D,
+        parallel=_solid_parallel(form_one, run_one, form_other, run_other),
+    )
+
+
 def kinds_for(
     feature_a: MeasurementFeature,
     feature_b: MeasurementFeature,
@@ -266,6 +831,64 @@ def kinds_for(
 
 
 @dataclass(frozen=True)
+class MeasurementPlane:
+    """The flat surface a measurement is taken and drawn on.
+
+    The measurement's own property, not the viewport's. A drawing viewport is
+    locked, so a measurement in one could be evaluated against the viewport and
+    get a stable answer; the 3D view's camera is not, and the same two faces
+    would read a different number from one moment to the next as it orbits.
+    Carrying the plane makes the number the measurement's, and leaves the
+    viewport deciding only how it is drawn.
+
+    Floats rather than exact scalars, like Rect and for the same reason: this is
+    where a dimension is drawn, not where a joint is cut.
+
+    Its own dataclass rather than a bare pair because it will grow. A plane that
+    tracks a feature -- so that moving the timber moves the dimension with it --
+    is the obvious next form, and a pair of vectors leaves nowhere to say which
+    kind of plane this is.
+
+    None on a Measure means "derive it from the viewport", which is what every
+    measurement written before this means, and all an orthographic viewport's
+    measurements are entitled to mean.
+    """
+
+    #: A point on the plane, in world space.
+    at: Tuple[float, float, float]
+    #: The plane's normal, in world space. Not required to be unit length on the
+    #: way in; compared up to sign, since a plane has no front.
+    normal: Tuple[float, float, float]
+
+    def __post_init__(self):
+        for name in ("at", "normal"):
+            value = tuple(float(part) for part in getattr(self, name))
+            if len(value) != 3:
+                raise ValueError(f"A plane's {name} is [x, y, z], got {getattr(self, name)!r}")
+            object.__setattr__(self, name, value)
+        if not any(self.normal):
+            raise ValueError("A plane's normal cannot be zero length")
+
+    @classmethod
+    def from_wire(cls, value) -> Optional['MeasurementPlane']:
+        """A plane as read from a file, or one already built.
+
+        The same shape as MeasurementKind.from_wire and MeasurementPlacement's,
+        and for the same reason: the field holds a MeasurementPlane, and saying
+        so is only true if the conversion from the file's form happens somewhere
+        that takes the file's form as its argument type.
+        """
+        if value is None or isinstance(value, cls):
+            return value
+        if isinstance(value, Mapping):
+            return cls(at=value.get("at"), normal=value.get("normal"))
+        raise TypeError(f"Expected a plane or a mapping, got {type(value).__name__}")
+
+    def as_wire(self) -> Dict[str, list]:
+        return {"at": list(self.at), "normal": list(self.normal)}
+
+
+@dataclass(frozen=True)
 class MeasurementPlacement:
     """Where a dimension sits, as distinct from what it measures.
 
@@ -278,8 +901,20 @@ class MeasurementPlacement:
     measurement written before placement existed means.
     """
 
-    #: How far the dimension line sits from the features, in page units.
-    #: None asks the viewport for its own default.
+    #: How far the dimension line sits from the features, in WORLD units,
+    #: measured along the in-plane perpendicular to the run.
+    #:
+    #: World rather than page or screen, so that where somebody put a dimension
+    #: does not depend on how far they were zoomed in at the time, and so that
+    #: it means the same thing in a drawing viewport and in the 3D view. What
+    #: zoom changes is how big the drawing is, not where on it a dimension was
+    #: placed. Only the drawn SIZE of things -- line weights, text -- is in
+    #: pixels, so that it stays legible at any scale.
+    #:
+    #: None asks the viewport for its own default, which IS a pixel distance:
+    #: there is nothing in the world to derive one from, and an untouched
+    #: dimension sitting a readable distance away at any zoom is the better
+    #: default.
     offset: Optional[float] = None
 
     @classmethod
@@ -325,6 +960,11 @@ class Measure:
     #: Where the dimension sits. Deliberately not part of identity: moving a
     #: dimension line is not measuring something else.
     placement: Optional[MeasurementPlacement] = None
+    #: The plane this is taken and drawn on, or None to take the viewport's.
+    #: Not part of identity either: the same two features measured on a
+    #: different plane is the same measurement seen from elsewhere, and giving
+    #: it a second identity would let a file hold both and draw them twice.
+    plane: Optional[MeasurementPlane] = None
 
     def __post_init__(self):
         self._canonicalise_anchors()

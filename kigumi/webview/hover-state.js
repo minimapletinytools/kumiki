@@ -65,6 +65,18 @@
             /** What is under the pointer, as the runner answered. */
             this.feature = null;
             this.at = null;
+            /**
+             * The answer currently ON SCREEN, which is not the same as the last
+             * one received: a redraw is skipped when it would change nothing.
+             */
+            this.drawn = null;
+            /**
+             * Which of the features under the pointer is meant, once somebody
+             * has said -- by Tab, or from the right-click menu. Undefined means
+             * "choose for me", and ZERO IS A CHOICE, so the two cannot be the
+             * same value.
+             */
+            this.candidate = undefined;
             this._pending = null;
             this._asked = 0;
             this._outstanding = false;
@@ -97,6 +109,83 @@
             this._pending = { x, y };
             this._stillFrames = 0;
             return { ask: false, reason: 'pending' };
+        }
+
+        /**
+         * The pointer is at a point. Answers whether it is worth asking about.
+         *
+         * TWO thresholds, deliberately different:
+         *
+         *  - the CANDIDATE is forgotten on any movement at all, because cycling
+         *    is about one place and somewhere else is a different question;
+         *  - the QUESTION is only asked once the pointer has travelled past the
+         *    slop, measured from the last point that counted.
+         *
+         * Both used to live on the app, on either side of the call into here,
+         * which is the seam both hover bugs grew on.
+         */
+        pointerAt(x, y) {
+            if (this.at === null || x !== this.at.x || y !== this.at.y) {
+                this.candidate = undefined;
+            }
+            return this.moved(x, y);
+        }
+
+        /** Step to the next of `count` features under the pointer. */
+        cycle(count) {
+            const many = Math.max(1, count || 1);
+            this.candidate = ((this.candidate === undefined ? -1 : this.candidate) + 1) % many;
+            return this.candidate;
+        }
+
+        /** Name one outright, as the right-click menu does. */
+        choose(index) {
+            this.candidate = Number(index);
+            return this.candidate;
+        }
+
+        /**
+         * Which feature to ask for, as the runner wants it.
+         *
+         * Null, never undefined: zero is a choice -- stepping round to the first
+         * feature, or picking the first row of the menu -- and the runner has to
+         * tell that from "choose for me".
+         */
+        get asking() {
+            return this.candidate === undefined ? null : this.candidate;
+        }
+
+        /**
+         * Whether drawing this answer would put something different on screen.
+         *
+         * The feature AND the verdict: what is drawn is geometry plus a colour,
+         * and the colour turns on what is held, which changes without the
+         * pointer moving.
+         */
+        wouldRedraw(answer) {
+            return !HoverState.sameHighlight(this.drawn, answer);
+        }
+
+        /** Remember what is now on screen. */
+        markDrawn(answer) {
+            this.drawn = answer || null;
+            return this.drawn;
+        }
+
+        /**
+         * Ask about the same place again, without the pointer having moved.
+         *
+         * For when the QUESTION changed rather than the place: stepping to the
+         * next feature under the pointer asks the same point a different thing,
+         * and `moved` would refuse it for not having travelled far enough.
+         */
+        askAgain() {
+            if (this.at === null) {
+                return false;
+            }
+            this._pending = { x: this.at.x, y: this.at.y };
+            this._stillFrames = 0;
+            return true;
         }
 
         /**
@@ -168,7 +257,37 @@
         }
 
         /**
-         * Whether two answers are about the same feature, so redrawing is pointless.
+         * Whether the runner judged this pair unmeasurable from where we stand.
+         *
+         * A verdict with no kinds, not an absent verdict: no verdict at all
+         * means no measurement is being made, which is an ordinary hover and
+         * not a refusal. Both are read; collapsing them is how a red hover
+         * became a click that was accepted and drew nothing.
+         */
+        static isRefused(answer) {
+            const verdict = answer && answer.verdict;
+            return Boolean(verdict
+                && Array.isArray(verdict.kinds)
+                && verdict.kinds.length === 0);
+        }
+
+        /**
+         * Whether drawing this answer would put the same thing on screen.
+         *
+         * The feature AND the verdict. What is drawn is geometry plus a colour,
+         * and the colour turns on what is held -- which changes without the
+         * pointer moving, because taking a first end is a button press. Comparing
+         * the feature alone left a highlight green after a first end was taken
+         * under a resting pointer, and green is the colour that promises the
+         * click will be taken.
+         */
+        static sameHighlight(one, other) {
+            return HoverState.sameFeature(one, other)
+                && HoverState.isRefused(one) === HoverState.isRefused(other);
+        }
+
+        /**
+         * Whether two answers are about the same feature.
          *
          * The feature's name as well as the path: two faces of one prism share
          * a path and differ only by which face, so comparing paths alone would

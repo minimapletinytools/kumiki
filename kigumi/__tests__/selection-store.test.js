@@ -471,3 +471,250 @@ describe('focusing a measurement', () => {
         expect(selection.isMeasurementFocused('right', 'a|b')).toBe(false);
     });
 });
+
+const { SELECTION_MODES } = require('../webview/selection-store');
+
+describe('a drawing has no timber selection', () => {
+    // Picking a timber is something you do in the model. Refused in the store
+    // rather than checked by each of the several callers that offer it, one of
+    // which would eventually forget.
+    const inDrawing = () => {
+        const store = new SelectionStore();
+        store.setMode(SELECTION_MODES.DRAWING);
+        return store;
+    };
+
+    test('selecting a timber does nothing', () => {
+        const store = inDrawing();
+
+        store.selectTimber('A');
+
+        expect(store.getSelectedTimbers()).toEqual([]);
+    });
+
+    test('nor does toggling, selecting several, or selecting a joint', () => {
+        const store = inDrawing();
+
+        store.toggleTimber('A');
+        store.selectTimbers(['B', 'C']);
+        store.selectJoint('j1', ['D']);
+
+        expect(store.getSelectedTimbers()).toEqual([]);
+    });
+
+    test('but focusing a feature still narrows to its timber', () => {
+        // The invariant is left alone: it is what the canvas draws by, and a
+        // feature belongs to a timber in a drawing as much as in the model.
+        const store = inDrawing();
+
+        store.setCsgFocus({ timberKey: 'A', path: ['cut'] });
+
+        expect(store.getSelectedTimbers()).toEqual(['A']);
+        expect(store.csgFocus.timberKey).toBe('A');
+    });
+
+    test('changing mode drops what the other mode held', () => {
+        const store = new SelectionStore();
+        store.selectTimber('A');
+        store.setCsgFocus({ timberKey: 'A', path: [] });
+
+        store.setMode(SELECTION_MODES.DRAWING);
+
+        expect(store.getSelectedTimbers()).toEqual([]);
+        expect(store.csgFocus).toBeNull();
+    });
+
+    test('setting the mode it is already in changes nothing', () => {
+        const store = new SelectionStore();
+        store.selectTimber('A');
+
+        expect(store.setMode(SELECTION_MODES.MODEL)).toBe(false);
+        expect(store.getSelectedTimbers()).toEqual(['A']);
+    });
+});
+
+describe('picking a feature in a drawing', () => {
+    const hits = [
+        { memberKey: 'front', hit: { point: {} } },
+        { memberKey: 'behind', hit: { point: {} } },
+    ];
+
+    test('goes straight to the feature, with nothing selected', () => {
+        // In the model this would select the timber and take a second click to
+        // drill in. A drawing has no selection to drill in from.
+        const decision = choosePickAction({
+            hits, selectedTimbers: [], shiftKey: false, inDrawing: true,
+        });
+
+        expect(decision.action).toBe('csg');
+        expect(decision.memberKey).toBe('front');
+    });
+
+    test('and shift does not toggle a selection that does not exist', () => {
+        const decision = choosePickAction({
+            hits, selectedTimbers: [], shiftKey: true, inDrawing: true,
+        });
+
+        expect(decision.action).toBe('csg');
+    });
+
+    test('while the model still wants a timber selected first', () => {
+        const decision = choosePickAction({
+            hits, selectedTimbers: [], shiftKey: false,
+        });
+
+        expect(decision.action).toBe('select');
+    });
+
+    test('a click on nothing still clears', () => {
+        expect(choosePickAction({ hits: [], selectedTimbers: [], inDrawing: true }).action)
+            .toBe('clear');
+    });
+});
+
+describe('measurements picked out to delete together', () => {
+    const one = { viewportId: 'front', measureKey: 'a|b' };
+    const other = { viewportId: 'front', measureKey: 'c|d' };
+    const elsewhere = { viewportId: 'top', measureKey: 'a|b' };
+
+    test('looking at one picks out exactly it', () => {
+        const store = new SelectionStore();
+
+        store.setMeasurementFocus(one);
+
+        expect(store.getMarkedMeasurements()).toEqual([one]);
+    });
+
+    test('looking at another replaces what was picked out', () => {
+        // Several at once can only be deleted; everything else is about one.
+        const store = new SelectionStore();
+        store.setMeasurementFocus(one);
+
+        store.setMeasurementFocus(other);
+
+        expect(store.getMarkedMeasurements()).toEqual([other]);
+    });
+
+    test('adding one keeps the others and moves the focus', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus(one);
+
+        store.toggleMeasurementMark(other);
+
+        expect(store.getMarkedMeasurements()).toEqual([one, other]);
+        expect(store.measurementFocus.measureKey).toBe('c|d');
+    });
+
+    test('the same key in another viewport is another measurement', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus(one);
+
+        store.toggleMeasurementMark(elsewhere);
+
+        expect(store.getMarkedMeasurements()).toHaveLength(2);
+        expect(store.isMeasurementMarked('top', 'a|b')).toBe(true);
+    });
+
+    test('taking the focused one back out leaves nothing focused', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus(one);
+
+        store.toggleMeasurementMark(one);
+
+        expect(store.getMarkedMeasurements()).toEqual([]);
+        expect(store.measurementFocus).toBeNull();
+    });
+
+    test('looking at a feature instead puts the measurements down', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus(one);
+        store.toggleMeasurementMark(other);
+
+        store.setCsgFocus({ timberKey: 'A', path: [] });
+
+        expect(store.getMarkedMeasurements()).toEqual([]);
+    });
+
+    test('and so does clearing everything', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus(one);
+
+        store.clearAll();
+
+        expect(store.getMarkedMeasurements()).toEqual([]);
+    });
+});
+
+const { drawButtonKey } = require('../webview/selection-store');
+
+describe('what the draw button says', () => {
+    // Never disabled: drawing nothing means drawing the whole frame, which is a
+    // reasonable thing to ask for. So it says which of the two it will do.
+    test('nothing selected draws the frame', () => {
+        expect(drawButtonKey(0)).toBe('viewer.selection.drawFrame');
+    });
+
+    test('one timber is singular, several are not', () => {
+        expect(drawButtonKey(1)).toBe('viewer.selection.drawTimber');
+        expect(drawButtonKey(4)).toBe('viewer.selection.drawTimbers');
+    });
+
+    test('a missing count reads as nothing selected', () => {
+        expect(drawButtonKey(undefined)).toBe('viewer.selection.drawFrame');
+    });
+});
+
+describe('reaching a feature while a measurement is being made', () => {
+    // The 3D view normally takes two clicks: select the timber, then pick a
+    // feature on it. While an end is HELD that would mean a feature on any
+    // other timber could not be hovered, let alone previewed, until it was
+    // selected first -- and measuring between two timbers is the ordinary case.
+    const hits = [
+        { memberKey: 'post#0', hit: { point: { x: 0, y: 0, z: 0 } } },
+        { memberKey: 'girt#0', hit: { point: { x: 1, y: 0, z: 0 } } },
+    ];
+
+    test('normally an unselected timber is selected, not drilled into', () => {
+        const decision = choosePickAction({
+            hits, selectedTimbers: new Set(), shiftKey: false,
+            inDrawing: false, measuring: false,
+        });
+
+        expect(decision.action).toBe('select');
+    });
+
+    test('but while measuring the click goes straight to the feature', () => {
+        const decision = choosePickAction({
+            hits, selectedTimbers: new Set(), shiftKey: false,
+            inDrawing: false, measuring: true,
+        });
+
+        expect(decision.action).toBe('csg');
+        expect(decision.memberKey).toBe('post#0');
+    });
+
+    test('the nearest one, not whichever happened to be selected', () => {
+        const decision = choosePickAction({
+            hits, selectedTimbers: new Set(['girt#0']), shiftKey: false,
+            inDrawing: false, measuring: true,
+        });
+
+        expect(decision.memberKey).toBe('post#0');
+    });
+
+    test('a drawing already did this, measuring or not', () => {
+        for (const measuring of [false, true]) {
+            expect(choosePickAction({
+                hits, selectedTimbers: new Set(), shiftKey: false,
+                inDrawing: true, measuring,
+            }).action).toBe('csg');
+        }
+    });
+
+    test('empty space is still empty space', () => {
+        expect(choosePickAction({
+            hits: [], selectedTimbers: new Set(), shiftKey: false,
+            inDrawing: false, measuring: true,
+        }).action).toBe('clear');
+    });
+});

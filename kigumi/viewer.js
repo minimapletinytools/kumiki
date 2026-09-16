@@ -143,6 +143,8 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const bootDiagnosticsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'boot-diagnostics.js'))).toString();
     const i18nJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'i18n.js'))).toString();
     const selectionStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-store.js'))).toString();
+    const selectionVisualsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-visuals.js'))).toString();
+    const highlightsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'highlights.js'))).toString();
     const layerStateStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layer-state-store.js'))).toString();
     const layersPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layers-panel.js'))).toString();
     const assemblyTimelineJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'assembly-timeline.js'))).toString();
@@ -152,8 +154,10 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const sceneManagerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'scene-manager.js'))).toString();
     const inputControllerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'input-controller.js'))).toString();
     const measurementsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measurements.js'))).toString();
+    const measureDraftJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measure-draft.js'))).toString();
+    const undoStacksJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'undo-stacks.js'))).toString();
+    const contextMenuJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'context-menu.js'))).toString();
     const hoverStateJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'hover-state.js'))).toString();
-    const measureModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measure-mode.js'))).toString();
     const pickTolerancesJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'pick-tolerances.js'))).toString();
     const renderModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'render-mode.js'))).toString();
     const drawingPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'drawing-panel.js'))).toString();
@@ -201,6 +205,8 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__BOOT_DIAGNOSTICS_JS_URI__', bootDiagnosticsJsUri)
         .replace('__I18N_JS_URI__', i18nJsUri)
         .replace('__SELECTION_STORE_JS_URI__', selectionStoreJsUri)
+        .replace('__SELECTION_VISUALS_JS_URI__', selectionVisualsJsUri)
+        .replace('__HIGHLIGHTS_JS_URI__', highlightsJsUri)
         .replace('__LAYER_STATE_STORE_JS_URI__', layerStateStoreJsUri)
         .replace('__LAYERS_PANEL_JS_URI__', layersPanelJsUri)
         .replace('__ASSEMBLY_TIMELINE_JS_URI__', assemblyTimelineJsUri)
@@ -210,8 +216,10 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__SCENE_MANAGER_JS_URI__', sceneManagerJsUri)
         .replace('__INPUT_CONTROLLER_JS_URI__', inputControllerJsUri)
         .replace('__MEASUREMENTS_JS_URI__', measurementsJsUri)
+        .replace('__MEASURE_DRAFT_JS_URI__', measureDraftJsUri)
+        .replace('__UNDO_STACKS_JS_URI__', undoStacksJsUri)
+        .replace('__CONTEXT_MENU_JS_URI__', contextMenuJsUri)
         .replace('__HOVER_STATE_JS_URI__', hoverStateJsUri)
-        .replace('__MEASURE_MODE_JS_URI__', measureModeJsUri)
         .replace('__PICK_TOLERANCES_JS_URI__', pickTolerancesJsUri)
         .replace('__RENDER_MODE_JS_URI__', renderModeJsUri)
         .replace('__DRAWING_PANEL_JS_URI__', drawingPanelJsUri)

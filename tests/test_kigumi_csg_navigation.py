@@ -1928,3 +1928,340 @@ class TestAFeatureOnALabelledRoot:
 
         assert found is not None
         assert found[0].name == name
+
+
+class TestChoosingAmongTheFeaturesAtAPoint:
+    """Which feature under the pointer a pick takes, when several are there.
+
+    The most specific one answers "what is this thing here" -- an edge beats the
+    two faces that form it. While a measurement is being made that is the wrong
+    default: holding a face and being handed the arris beside it means most
+    hovers refuse, and the face you want is never the best answer anywhere,
+    since it shows as a line and on that line the edge wins.
+    """
+
+    def _slot(self, frame, member):
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(frame, member)
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        vertices = []
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                vertices.extend([float(world[i, 0]) for i in range(3)])
+        mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
+
+        class Slot:
+            mesh_cache = {member: {"local_csg": local, "cut_timber": cut_timber, "mesh": mesh}}
+
+        class State:
+            _active = Slot()
+
+        return State(), Slot(), vertices
+
+    def _at_an_edge(self, frame, member):
+        state, slot, vertices = self._slot(frame, member)
+        for index in range(0, len(vertices), 3):
+            payload = {"memberKey": member, "point": vertices[index:index + 3],
+                       "currentPath": [], "ctrlClick": False}
+            first = runner._handle_find_csg_at_point(state, dict(payload), slot)
+            if first.get("featureType") == "EDGE" and first.get("candidateCount", 0) > 1:
+                return state, slot, payload, first
+        raise AssertionError("no point offered an edge and something else")
+
+    def test_a_plain_pick_takes_the_most_specific_feature(self, mortise_and_tenon_frame):
+        _state, _slot, _payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        assert first["featureType"] == "EDGE"
+
+    def test_the_count_says_how_many_there_are_to_step_through(self, mortise_and_tenon_frame):
+        _state, _slot, _payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        assert first["candidateCount"] >= 2
+
+    def test_naming_one_outright_reaches_a_face(self, mortise_and_tenon_frame):
+        state, slot, payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        second = runner._handle_find_csg_at_point(
+            state, dict(payload, candidateIndex=1), slot)
+
+        assert second["featureLabel"] != first["featureLabel"]
+        assert second["reference"] is not None
+
+    def test_a_named_choice_is_final(self, mortise_and_tenon_frame):
+        """The preferences exist to guess what was meant, and it has been said.
+
+        Letting them run anyway puts the most specific feature back, so stepping
+        to a face landed on the arris again every time.
+        """
+        state, slot, payload, _first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+        hits = self._hits_at(mortise_and_tenon_frame, "receiving_timber", payload["point"])
+
+        reached = [
+            runner._handle_find_csg_at_point(
+                state, dict(payload, candidateIndex=index), slot)["featureLabel"]
+            for index in range(1, len(hits))
+        ]
+
+        assert reached == [hit.feature.name for hit in hits[1:]]
+
+    def _hits_at(self, frame, member, point):
+        from kumiki.cutcsg import FeatureTestTolerances
+
+        cut_timber = _cut_timber_by_name(frame, member)
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        rot, pos = runner._build_inv_transform_float(timber.transform)
+        local_pt = runner._inv_transform_point(rot, pos, [float(p) for p in point])
+        return runner._features_at_point(
+            local, local_pt, 5e-4, FeatureTestTolerances(face=5e-4))
+
+    def test_a_chosen_face_can_still_be_measured_to(self, mortise_and_tenon_frame):
+        # The point of reaching it.
+        state, slot, payload, _first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        second = runner._handle_find_csg_at_point(
+            state, dict(payload, candidateIndex=1), slot)
+
+        assert runner.resolve_anchor(mortise_and_tenon_frame, second["reference"]) is not None
+
+
+class TestWhatAPickCarriesBack:
+    """Enough for the viewer to judge the pair without asking again."""
+
+    def _first_pick(self, frame, member, extra=None):
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(frame, member)
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        vertices = []
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                vertices.extend([float(world[i, 0]) for i in range(3)])
+        mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
+
+        class Slot:
+            mesh_cache = {member: {"local_csg": local, "cut_timber": cut_timber, "mesh": mesh}}
+
+        class State:
+            _active = Slot()
+
+        for index in range(0, len(vertices), 3):
+            payload = {"memberKey": member, "point": vertices[index:index + 3],
+                       "currentPath": [], "ctrlClick": False, **(extra or {})}
+            result = runner._handle_find_csg_at_point(State(), payload, Slot())
+            if result.get("reference") and result.get("geometry"):
+                return result
+        raise AssertionError("no point resolved to a measurable feature")
+
+    def test_it_carries_the_feature_s_own_geometry(self, mortise_and_tenon_frame):
+        pick = self._first_pick(mortise_and_tenon_frame, "receiving_timber")
+
+        assert pick["geometry"]["kind"] in {"plane", "line", "point"}
+
+    def test_and_where_a_dimension_would_attach(self, mortise_and_tenon_frame):
+        pick = self._first_pick(mortise_and_tenon_frame, "receiving_timber")
+
+        assert pick["at"] is not None
+        assert len(pick["at"]) == 3
+
+    def test_the_anchor_is_the_one_a_saved_measurement_resolves_to(
+            self, mortise_and_tenon_frame):
+        # The viewer decides from this anchor whether a pair measures anything,
+        # and the saved dimension attaches at the resolved one. Two answers, and
+        # a pair accepted while hovering can be drawn reading zero.
+        pick = self._first_pick(mortise_and_tenon_frame, "receiving_timber")
+
+        resolved = runner.resolve_anchor(mortise_and_tenon_frame, pick["reference"])
+
+        assert pick["at"] == pytest.approx(resolved["at"])
+
+    def test_a_first_pick_is_judged_about_nothing(self, mortise_and_tenon_frame):
+        # No measurement is being made, which is a different answer from "this
+        # pair admits nothing" -- and the viewer reads both. A plane needs both
+        # ends and a camera, and a first pick has neither.
+        pick = self._first_pick(mortise_and_tenon_frame, "receiving_timber")
+
+        assert pick["verdict"] is None
+
+    def test_a_second_pick_brings_the_plane_with_it(self, mortise_and_tenon_frame):
+        held = {"kind": "plane", "normal": [0, 0, 1], "at": [0, 0, 0]}
+        pick = self._first_pick(
+            mortise_and_tenon_frame, "receiving_timber",
+            {"heldGeometry": held, "heldAt": [0, 0, 0], "look": [0, 1, 0]})
+
+        assert pick["verdict"] is not None
+        assert pick["verdict"]["plane"] is not None
+        assert len(pick["verdict"]["plane"]["normal"]) == 3
+
+    def test_the_verdict_says_why_when_it_admits_nothing(
+            self, mortise_and_tenon_frame):
+        # Empty kinds and a reason, rather than a bare absence: the viewer draws
+        # the refusal and says it, and both come from this one answer.
+        held = {"kind": "plane", "normal": [0, 0, 1], "at": [0, 0, 0]}
+        pick = self._first_pick(
+            mortise_and_tenon_frame, "receiving_timber",
+            {"heldGeometry": held, "heldAt": [0, 0, 0], "look": [0, 1, 0]})
+
+        verdict = pick["verdict"]
+        if verdict["kinds"]:
+            assert verdict["reason"] is None
+        else:
+            assert verdict["reason"] == "no-kind" 
+
+
+class TestPreferringAFeatureThatCanFinishTheMeasurement:
+    """While something is held, which feature under the pointer is offered.
+
+    Valid first: a candidate that admits a measurement with the held feature
+    beats one that does not. Then type: holding a face offers a face, holding an
+    edge offers an edge. Type is the tie-break rather than the rule, since a
+    candidate matching by type that admits nothing is worse than one that does
+    not match and admits a distance.
+    """
+
+    LOOK = [0, 1, 0]
+    HELD_FACE = {"kind": "plane", "normal": [0, 0, 1], "at": [0, 0, 0]}
+
+    def _slot(self, frame, member):
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(frame, member)
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        vertices = []
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                vertices.extend([float(world[i, 0]) for i in range(3)])
+        mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
+
+        class Slot:
+            mesh_cache = {member: {"local_csg": local, "cut_timber": cut_timber, "mesh": mesh}}
+
+        class State:
+            _active = Slot()
+
+        return State(), Slot(), vertices
+
+    def _where_the_default_is_an_edge(self, frame, member):
+        """A point whose plain answer is an edge, with a face also on offer."""
+        state, slot, vertices = self._slot(frame, member)
+        for index in range(0, len(vertices), 3):
+            base = {"memberKey": member, "point": vertices[index:index + 3],
+                    "currentPath": [], "ctrlClick": False}
+            plain = runner._handle_find_csg_at_point(state, dict(base), slot)
+            if plain.get("featureType") != "EDGE" or plain.get("candidateCount", 0) < 2:
+                continue
+            held = runner._handle_find_csg_at_point(state, dict(
+                base, heldGeometry=self.HELD_FACE, heldAt=[0, 0, 0], look=self.LOOK), slot)
+            if held.get("featureType") == "FACE":
+                return plain, held
+        raise AssertionError("no point offered an edge by default and a face as well")
+
+    def test_holding_a_face_offers_a_face_where_a_click_would_take_the_edge(
+            self, mortise_and_tenon_frame):
+        plain, held = self._where_the_default_is_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        assert plain["featureType"] == "EDGE"
+        assert held["featureType"] == "FACE"
+
+    def test_and_what_it_offers_can_be_measured_against_what_is_held(
+            self, mortise_and_tenon_frame):
+        from kumiki.drawing import projected_kinds
+
+        _plain, held = self._where_the_default_is_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        assert projected_kinds(self.HELD_FACE, held["geometry"], self.LOOK)
+
+    def test_holding_nothing_leaves_the_ordinary_answer_standing(
+            self, mortise_and_tenon_frame):
+        # No held feature is a plain click, and a plain click means "what is
+        # this thing here" -- for which the most specific answer is right.
+        state, slot, vertices = self._slot(mortise_and_tenon_frame, "receiving_timber")
+        base = {"memberKey": "receiving_timber", "point": vertices[0:3],
+                "currentPath": [], "ctrlClick": False}
+
+        plain = runner._handle_find_csg_at_point(state, dict(base), slot)
+        with_camera = runner._handle_find_csg_at_point(
+            state, dict(base, look=self.LOOK), slot)
+
+        assert with_camera["featureLabel"] == plain["featureLabel"]
+
+
+class TestPointingAtAnAccessory:
+    """A wedge is drawn, so a ray hits it. There is nothing inside one to pick.
+
+    An accessory is cached with a mesh and nothing else -- no CSG, no declared
+    features -- and asking about one used to raise. The HOVER asks about
+    whatever the pointer crosses, and a raise there is reported once and then
+    suppressed, so passing the pointer over a single wedge left hover silently
+    dead for the rest of the session.
+    """
+
+    def _slot_with_accessory(self):
+        class Slot:
+            mesh_cache = {
+                "accessory:Wedge#3": {"mesh": {"vertices": [], "indices": []}},
+                "brokenTimber#0": {"mesh": {"vertices": [], "indices": []}},
+            }
+
+        class State:
+            _active = Slot()
+
+        return State(), Slot()
+
+    def test_it_answers_rather_than_raising(self):
+        state, slot = self._slot_with_accessory()
+
+        result = runner._handle_find_csg_at_point(
+            state, {"memberKey": "accessory:Wedge#3", "point": [0, 0, 0]}, slot)
+
+        assert result["memberKey"] == "accessory:Wedge#3"
+        assert result["featureLabel"] is None
+        assert result["geometry"] is None
+
+    def test_and_says_there_is_no_measurement_to_be_made_here(self):
+        # None, not an empty verdict: nothing is being judged, which is a
+        # different answer from "this pair admits nothing".
+        state, slot = self._slot_with_accessory()
+
+        result = runner._handle_find_csg_at_point(
+            state, {"memberKey": "accessory:Wedge#3", "point": [0, 0, 0],
+                    "heldGeometry": {"kind": "plane", "normal": [0, 0, 1]},
+                    "look": [0, 1, 0]}, slot)
+
+        assert result["verdict"] is None
+
+    def test_it_carries_every_key_the_viewer_reads(self):
+        state, slot = self._slot_with_accessory()
+
+        result = runner._handle_find_csg_at_point(
+            state, {"memberKey": "accessory:Wedge#3", "point": [0, 0, 0]}, slot)
+
+        for key in ("path", "reference", "at", "candidates", "candidateCount",
+                    "featureType", "nodeDisplayName", "highlightMesh", "stats"):
+            assert key in result, key
+
+    def test_but_a_timber_with_nothing_cached_is_still_a_fault(self):
+        # Timbers are cached with their CSG or not at all, so this one is a bug
+        # worth hearing about rather than a place with nothing in it.
+        state, slot = self._slot_with_accessory()
+
+        with pytest.raises(ValueError):
+            runner._handle_find_csg_at_point(
+                state, {"memberKey": "brokenTimber#0", "point": [0, 0, 0]}, slot)

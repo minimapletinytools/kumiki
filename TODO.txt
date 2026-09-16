@@ -1,3 +1,27 @@
+:: 9/12/2026 do kumiki vid 
+
+There's a hidden assembly solver in kumiki that allows you to dissamble your designs and make your own ikea assembly explosion animations
+
+Why is this feature disabled by default?
+
+well kumiki is a term for interlocking wooden puzzles in japan
+
+The current dissamebly easily handles simple puzzles with single step solutions
+
+But puzzles requiring multiple steps are much harder for it to handle
+
+And these can get quite complicated
+
+So until the kumki's assembly feature can really live up to its own name
+
+- 6 sliding piece puzzle
+- 3 pcs burr puzzle https://www.youtube.com/watch?v=8ffj5BrKnfs
+- 6 pcs chinese cross puzzle https://www.youtube.com/watch?v=Vxw2LPQ8c4c
+- gordian knot puzzle lol https://sketchfab.com/3d-models/gordian-knot-assembly-cf579718b14649839d5f04beef1c6e2b
+ 
+
+
+
 :: 9/12/2026 NEW LHS AND DRAWING SPEC
 
 We introduce drawing mode and drawings view
@@ -220,51 +244,33 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
-
-
-DONE-add proper reference face/edge support to timbers
-  DONE-the data model. reference_faces is now TimberTicket.reference_features, an ordered
-    tuple[TimberFeature, ...] -- long faces, arrises, center planes, centerlines -- with
-    primary_reference_edge() for the first of them that is a line. Center planes and long
-    face centerlines are new to the vocabulary (TimberCenterplane, TimberLongFaceCenterline)
-    and measuring.py locates both. A reference on a face the rough timber does not match
-    warns instead of raising.
-  -what's left is the consumers: nothing reads reference_features yet.
-    -it is not in the viewer payload
-    -the red line. NOTE a non-perfect reference is a PTW feature, and the PTW prism is not
-     in the rendered CSG tree (only the rough one is), so drawing it, or using it as a
-     measurement anchor, needs the "render PTW as an overlay alongside the actual geometry"
-     work first. the old coincidence assert is what let us dodge that question.
-    -consider whether an empty list should default to the perfect long faces
-DONE-fix website non blocking failure: There's a git failed with exit code 128 annotation on the build job, but it's non-fatal — the run is green and the site is correct. It's from the docs step (mkdocs gen_ref_pages),
-  -it was NOT the docs step. mkdocs runs no git at all during a build. An agent worktree had
-   been committed at .claude/worktrees/agent-a2f3ab6060436522d, which git recorded as a
-   gitlink with no .gitmodules entry, so `git submodule foreach` failed -- and
-   actions/checkout runs one in post-job cleanup. It was on EVERY workflow, not just this one.
-   Untracked it and added .claude/worktrees/ to .gitignore.
-DONE-highlight is kind aweird. I tihnk there's some debouncing right now on already highligted features or something cuz if you mouse around an already highlighted featuer it's unwilling to highlight nearbye stuff. IDK something is stil werid
-  -Issue 2 — I ruled two things out but haven't confirmed the cause.
-    Not the dedup: HoverState.sameFeature compares memberKey + path + featureLabel, and moving between features changes at least one, so it redraws correctly. Not the resolution either — the sweep above shows neighbouring points resolving to different features cleanly.
-
-    What I did measure: feature resolution costs 0.77ms on a 28-triangle test timber, and earlier today I measured it doubling (0.40 → 0.81ms) when default features landed — every primitive now names ~18 things instead of 0. A hover answer is a full pick, including the triangle walk for the highlight mesh, and HoverState deliberately allows only one question in flight, so the highlight refreshes at exactly the rate the runner answers. If that rate roughly halved, "unwilling to highlight nearby stuff" is what a lagging highlight feels like — it's behind you, not stuck.
-
-    That's a plausible mechanism, not a confirmed one, and I'd rather not repeat today's pattern of a confident wrong answer. The decisive test is a live profile of one hover round-trip in the running extension. If it confirms, the fix is a cheaper hover path — resolve the feature but skip the triangle walk until the pointer rests — which is roughly what the original design intended before hover was made byte-identical to a click.
-
-    Want me to add that timing to the hover result so it shows up in the viewer log?
-DONE-finish halfspace decorative cut 
-DONE/IGNORE-fix tusk failing from other direction bug
-DONE-test out roundover on bottom stretchers again on coffee table
-DONE-figure out why roundovers break on stretcher sin coffe tabel (I tihnk ivene if you don't do the hous ejoint)
-IGNORE-consider refactoring runner.py
-DONE-consider doing the big 1 joint per file reorg
-  -decide how to reorg examples too...
-  -maybe get ird of folder + example support, examples are always leaf nodes?
-DONE-DO THE PARAMETRIC PARAMETER REFACTOR
-DONE-add support for optionla parameters in kiwari (gets a check box to enabel or disable them) which can take the None value which will often (or always if that mkes it esaier) be the default.
-IGNORE-consider renaming kiwari methods
-DONE-update patterns to be sensible with parameters.. do thec leanup!!
-
 -DO LHS MENU AND DRAWING INTERFACE DESIGN SPEC 
+  DONE-after amesaurement is taken in drawing view, the camera snapping back breaks
+  DONE-face to face non parallel measurements seem be mesauring distance not angle
+  DONE-similarl, face to edge and edge to edge non parallel measurements seem to be measuring distance as well
+  DONE-def need to improve rules for measurementp lacement
+  -edges don't know their outward facing normal when measuring angles between them. I think you have a few choices here
+    -attempt to remap edges to adjacent face features when possible. so measurement is between faces and not edges
+    -or just do the remap when rendering the measurement so measurement remains between actually selected features
+  -angles should have anchors too? it's weird cuz their anchors want to move as you zoom. maybe pick the intersection point as the anchor and determine the maximal extents that the measurement is willing to tolerate before it goes way off the fetaures?
+  -BUG first click in drawing view dosen't do anythnig, only second click allows acutal selection, highlight always works
+  -timber goes into x-ray view when a feature is selected in drawing mode 
+  -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
+    -or maybe allow selectino of xrayed features?
+  -measurement seleciton interface is a little screwy??
+
+
+  -measurements between 2 parallel lines/faces should hav ethe |---| perpendicular
+     ok, before we go onto that, lets fix the placement of the 2 end points of the measurement. right now it's way off.
+    the way to do it is to place the first endpoint based on the first feature selected, and the second endpoint should
+    be based on the first by perpendicularly projecting it from the first fetaure to the second feature. At least in the
+  cases where the 2 features being measured are perpendicular
+  -add hotkey for "measure from this"
+  -get rid of "confirm measurement" maybe, or add hotkey for it
+
+  -fix face extents to not be AABB but rather corners 
+
+
 
 
 -do joint rename to match what's in your new book
@@ -413,6 +419,49 @@ DONE-update patterns to be sensible with parameters.. do thec leanup!!
 
 
 :: TODONE 
+
+DONE-add proper reference face/edge support to timbers
+  DONE-the data model. reference_faces is now TimberTicket.reference_features, an ordered
+    tuple[TimberFeature, ...] -- long faces, arrises, center planes, centerlines -- with
+    primary_reference_edge() for the first of them that is a line. Center planes and long
+    face centerlines are new to the vocabulary (TimberCenterplane, TimberLongFaceCenterline)
+    and measuring.py locates both. A reference on a face the rough timber does not match
+    warns instead of raising.
+  -what's left is the consumers: nothing reads reference_features yet.
+    -it is not in the viewer payload
+    -the red line. NOTE a non-perfect reference is a PTW feature, and the PTW prism is not
+     in the rendered CSG tree (only the rough one is), so drawing it, or using it as a
+     measurement anchor, needs the "render PTW as an overlay alongside the actual geometry"
+     work first. the old coincidence assert is what let us dodge that question.
+    -consider whether an empty list should default to the perfect long faces
+DONE-fix website non blocking failure: There's a git failed with exit code 128 annotation on the build job, but it's non-fatal — the run is green and the site is correct. It's from the docs step (mkdocs gen_ref_pages),
+  -it was NOT the docs step. mkdocs runs no git at all during a build. An agent worktree had
+   been committed at .claude/worktrees/agent-a2f3ab6060436522d, which git recorded as a
+   gitlink with no .gitmodules entry, so `git submodule foreach` failed -- and
+   actions/checkout runs one in post-job cleanup. It was on EVERY workflow, not just this one.
+   Untracked it and added .claude/worktrees/ to .gitignore.
+DONE-highlight is kind aweird. I tihnk there's some debouncing right now on already highligted features or something cuz if you mouse around an already highlighted featuer it's unwilling to highlight nearbye stuff. IDK something is stil werid
+  -Issue 2 — I ruled two things out but haven't confirmed the cause.
+    Not the dedup: HoverState.sameFeature compares memberKey + path + featureLabel, and moving between features changes at least one, so it redraws correctly. Not the resolution either — the sweep above shows neighbouring points resolving to different features cleanly.
+
+    What I did measure: feature resolution costs 0.77ms on a 28-triangle test timber, and earlier today I measured it doubling (0.40 → 0.81ms) when default features landed — every primitive now names ~18 things instead of 0. A hover answer is a full pick, including the triangle walk for the highlight mesh, and HoverState deliberately allows only one question in flight, so the highlight refreshes at exactly the rate the runner answers. If that rate roughly halved, "unwilling to highlight nearby stuff" is what a lagging highlight feels like — it's behind you, not stuck.
+
+    That's a plausible mechanism, not a confirmed one, and I'd rather not repeat today's pattern of a confident wrong answer. The decisive test is a live profile of one hover round-trip in the running extension. If it confirms, the fix is a cheaper hover path — resolve the feature but skip the triangle walk until the pointer rests — which is roughly what the original design intended before hover was made byte-identical to a click.
+
+    Want me to add that timing to the hover result so it shows up in the viewer log?
+DONE-finish halfspace decorative cut 
+DONE/IGNORE-fix tusk failing from other direction bug
+DONE-test out roundover on bottom stretchers again on coffee table
+DONE-figure out why roundovers break on stretcher sin coffe tabel (I tihnk ivene if you don't do the hous ejoint)
+IGNORE-consider refactoring runner.py
+DONE-consider doing the big 1 joint per file reorg
+  -decide how to reorg examples too...
+  -maybe get ird of folder + example support, examples are always leaf nodes?
+DONE-DO THE PARAMETRIC PARAMETER REFACTOR
+DONE-add support for optionla parameters in kiwari (gets a check box to enabel or disable them) which can take the None value which will often (or always if that mkes it esaier) be the default.
+IGNORE-consider renaming kiwari methods
+DONE-update patterns to be sensible with parameters.. do thec leanup!!
+
 
 DONE-add instructions for model house building
   -2 approachs, the 1 big block approach
@@ -1686,9 +1735,98 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 :: ARCHIVE
 
+:: 9/13/2026 gordian knot notes 
+
+https://sketchfab.com/3d-models/gordian-knot-assembly-cf579718b14649839d5f04beef1c6e2b
+
+lets add the the holes next, but first lets name and orient the pieces. the 2 Z length axis pieces are called YELLOW
+and RED (yellow is -x, red is +x). the 2 X lengtha xis pieces are PURPLE (-y) and GREEN (+y)  the 2 Y facing pieces
+are ORANGE (+z) and BLUE (-z). each piece should be oriented in nice RHS coordinates. so that if I look at the X
+pieces looking down from the +Z axis, with up direction in the +x, then +Y should be to the left
+
+each piece has square cutouts in it, in the pieces own coordiante,s we will go from left ot right top to bottom to draw the cutouts:
+
+RED
+
+XXXXX
+X X X
+X X
+X XXX
+  X
+X X X
+XXXXX
+
+YELLOW
+
+XXXXX
+X X X
+X
+X X X
+X X X
+X X X
+XXXXX
+
+PURPLE
+
+XXXXX
+X X X
+X   X
+X   X
+    X
+X X X
+XXXXX
+
+GREEN
+
+XXXXX
+X X X
+X X X
+X X X
+X X X
+X X X
+XXXXX
+
+ORANGE
+
+XXXXX
+X X X
+X   X
+X   X
+X   
+X X X
+XXXXX
+
+BLUE
+
+XXXXX
+X X X
+X   
+X   X
+X  XX   
+X X X
+XXXXX
 
 
+:: 9/13/2026 kumiki promo shortened
 
+Hi friends, I'm finally ready to share the programmatic timber frame design (CAD) program I've been working on. A culmination of my years of software design experience and my woodworking obsession :). I hope ya'll will find it useful. It's open source and completely free.[https://kumiki.build/\](https://kumiki.build)
+
+---
+
+kumiki is a **parametric CAD** program so designs are programmed with code. A year ago I would have said this program is just for myself or the handful of others willing to trudge through code, but now with AI code driven interfaces are accessible -- for better or worse. The shed in the screenshot took about an hour to design this way, and every joint is still fully modeled, parametric geometry — not a rendering, an actual buildable frame. You can of course implement your designs by hand too.
+
+There's a youtube playlist of kumiki in action on the website. 
+
+If anything in the program looks wrong or could use improvement, I'd love to know.
+
+kumiki is under active development. It is not just a hobby project. It is intended for professional use. Here's what's coming:
+
+* standalone app with simplified installation process (the hardest part of kumiki right now is just getting it installed correctly)
+* full automated drawing generation with both code and UI manual overrides
+* improved frame disassembly solver
+* the complete set of joints from Dorian Bracht's Japanese Joinery book (just an arbitrary goal, and joints not from this book are also being added!)
+* more furniture joints and more support for furniture making in general.
+* improved examples, patterns, and agent instructions
 
 :: 8/2026 reddit kumiki promo draft
 
@@ -1705,7 +1843,7 @@ kumiki answers both of those questions. It's a python library with an intuitive 
 * connect timbers together with joints (with dozens of supported fully modeled parametric joints)
 * assembly everything into a frame
 
-A year ago I would have said this program is just for myself a handful of others willing to trudge through code, but now AI has made code driven interfaces accessible -- for better or worse. The shed in the screenshot took about an hour to design this way, and every joint is still fully modeled, parametric geometry — not a rendering, an actual buildable frame. You can of course implement your designs by hand too.
+A year ago I would have said this program is just for myself a handful of others willing to trudge through code, but now with AI code driven interfaces are accessible -- for better or worse. The shed in the screenshot took about an hour to design this way, and every joint is still fully modeled, parametric geometry — not a rendering, an actual buildable frame. You can of course implement your designs by hand too.
 
 I've also put together a few videos of kumiki in action [here].(https://www.youtube.com/playlist?list=PLWKU1B561fyM) 
 

@@ -103,6 +103,15 @@
      * `aligned` and `perpendicular` both become one kind: between two points
      * the shortest distance IS the distance, which is why the two collapsed.
      */
+    /** The kinds the solid admits, by their composed names. */
+    const SOLID_KIND_NAMES = Object.freeze(['angle', 'perpendicular_distance']);
+
+    /** How many segments an arc is drawn with. Enough to read as a curve. */
+    const ANGLE_ARC_SAMPLES = 24;
+
+    /** How far past the arc the label sits, as a multiple of the radius. */
+    const ANGLE_LABEL_REACH = 1.28;
+
     const LEGACY_KINDS = Object.freeze({
         aligned: 'projected_perpendicular_distance',
         perpendicular: 'projected_perpendicular_distance',
@@ -112,8 +121,88 @@
     });
 
     /** A kind by its composed name, whatever name it arrived under. */
+    /** Whether a vector points anywhere. Guards every rule that normalises one. */
+    function hasDirection(vector) {
+        return Array.isArray(vector)
+            && vector.length === 3
+            && vector.some((part) => Number.isFinite(part) && Math.abs(part) > 1e-12);
+    }
+
     function normalizeKind(kind) {
         return LEGACY_KINDS[kind] || kind;
+    }
+
+    /**
+     * A kind's composed name, however it arrived.
+     *
+     * A file and the runner write kinds STRUCTURED -- {operation, space,
+     * direction} -- because one name is ambiguous: `angle` composes for a solid
+     * angle and is also what every measurement written before spaces existed
+     * calls a projected one. Everything below compares names, and comparing a
+     * structured kind against them matched nothing, so every measurement a
+     * python file declared with a kind read as `kind-unavailable`.
+     */
+    function kindName(kind, space) {
+        if (!kind) {
+            return null;
+        }
+        if (typeof kind === 'string') {
+            // `angle` composes for a SOLID angle and is also what everything
+            // written before spaces called a projected one, so a bare name
+            // cannot say which it is. Where the caller knows the space, it
+            // settles it; otherwise the older reading wins, as it does in
+            // python. Without this the solid name was upgraded to the projected
+            // one and every rule below about solid angles was unreachable.
+            if (space === '3d' && SOLID_KIND_NAMES.indexOf(kind) !== -1) {
+                return kind;
+            }
+            return normalizeKind(kind);
+        }
+        const operation = kind.operation || 'distance';
+        const parts = [];
+        if ((kind.space || 'projected') === 'projected') {
+            parts.push('projected');
+        }
+        if (operation === 'distance') {
+            parts.push(kind.direction || 'perpendicular');
+        }
+        parts.push(operation);
+        return parts.join('_');
+    }
+
+    /**
+     * A kind in the form python reads back, which says the space outright.
+     *
+     * `space` settles the one name that cannot say it for itself: a bare
+     * `angle` composes for a solid angle, and python reads it as the projected
+     * one because every file holding that word was written meaning that. So a
+     * solid angle has to be written structured or it comes back as a different
+     * measurement. Every other name carries its own space.
+     */
+    function kindWire(kind, space) {
+        if (!kind) {
+            return null;
+        }
+        if (typeof kind !== 'string') {
+            return {
+                operation: kind.operation || 'distance',
+                space: kind.space || 'projected',
+                direction: kind.direction || 'perpendicular',
+            };
+        }
+        const name = kindName(kind, space);
+        const parts = name.split('_');
+        const projected = parts[0] === 'projected';
+        if (projected) {
+            parts.shift();
+        }
+        const operation = parts[parts.length - 1];
+        return {
+            operation,
+            space: projected ? 'projected' : (space || '3d'),
+            direction: operation === 'distance' && parts.length > 1
+                ? parts[0] : 'perpendicular',
+        };
     }
 
     const PROJECTED_RULES = Object.freeze({
@@ -126,6 +215,82 @@
         'line-line-parallel': Object.freeze(['projected_perpendicular_distance']),
         'line-line-crossing': Object.freeze(['projected_angle']),
     });
+
+    /**
+     * What a feature IS, with nothing projected away.
+     *
+     * The 3D view's camera belongs to the reader and turns as they look around,
+     * so a feature there cannot be classified by how it happens to appear: a
+     * face is a plane whatever angle it is seen from. Asking projectedForm
+     * there called every face not seen exactly edge-on an 'area' -- nothing to
+     * measure -- which is nearly all of them.
+     *
+     * PYTHON HAS A COPY OF THIS, as solid_form in drawing.py, and a test runs
+     * the two against each other.
+     */
+    function solidForm(geometry) {
+        if (!geometry || !geometry.kind) {
+            return { form: 'none' };
+        }
+        if (geometry.kind === 'point') {
+            return { form: 'point' };
+        }
+        if (geometry.kind === 'line') {
+            return { form: 'line', direction: normalized(geometry.direction || [0, 0, 0]) };
+        }
+        if (geometry.kind === 'plane') {
+            // The NORMAL, under its own name. It was carried as `direction`
+            // once, which is the field meaning "the way this feature runs as
+            // drawn" -- so an angle between two faces built its arc out of two
+            // normals and pointed at nothing.
+            return { form: 'plane', normal: normalized(geometry.normal || [0, 0, 0]) };
+        }
+        return { form: 'none' };
+    }
+
+    /** What a solid form is oriented by: a line's direction, a plane's normal. */
+    function orientationOf(form) {
+        return (form && (form.normal || form.direction)) || null;
+    }
+
+    /**
+     * Whether two solid features run together.
+     *
+     * Two planes are parallel when their NORMALS align and two lines when their
+     * DIRECTIONS do -- but a line is parallel to a plane when it runs square to
+     * the normal, the opposite test. One carries a normal and the other a
+     * direction, so comparing them as though both were directions would call a
+     * line lying in a plane a crossing.
+     */
+    function solidParallel(formA, formB) {
+        const one = orientationOf(formA);
+        const other = orientationOf(formB);
+        if (!one || !other) {
+            return null;
+        }
+        const alignment = Math.abs(dot(one, other));
+        return formA.form === formB.form
+            ? alignment > 1 - PARALLEL_EPSILON
+            : alignment < PARALLEL_EPSILON;
+    }
+
+    /**
+     * Which kinds this pair admits in the 3D view, best first.
+     *
+     * No camera comes into it: what a pair admits in the solid does not depend
+     * on where anyone is standing. Two flat features that cross admit an angle;
+     * anything else admits the distance between them.
+     */
+    function solidKinds(formA, formB) {
+        if (formA.form === 'none' || formB.form === 'none') {
+            return [];
+        }
+        const flat = (form) => form === 'line' || form === 'plane';
+        if (flat(formA.form) && flat(formB.form) && solidParallel(formA, formB) === false) {
+            return ['angle'];
+        }
+        return ['perpendicular_distance'];
+    }
 
     /**
      * Which kinds this pair admits in this viewport, best first.
@@ -208,9 +373,71 @@
             delta[2] - gaze[2] * along,
         ];
 
-        const named = normalizeKind(kind);
+        const named = kindName(kind, axes && axes.space);
 
+        if (named === 'angle') {
+            // From the RAYS when the measurement has them: they are the two
+            // ways the corner opens, so the number and the arc drawn from them
+            // are one answer. Normals alone cannot tell 45 degrees from 135 --
+            // they give the same absolute dot either way -- which is the whole
+            // reason the side has to be settled where the corner is.
+            if (axes && axes.rays
+                    && hasDirection(axes.rays.from) && hasDirection(axes.rays.to)) {
+                const facing = Math.max(-1, Math.min(1,
+                    dot(normalized(axes.rays.from), normalized(axes.rays.to))));
+                return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
+            }
+            // No rays: a pair that makes no corner, or an older measurement.
+            const one = orientationOf(formA);
+            const other = orientationOf(formB);
+            if (!hasDirection(one) || !hasDirection(other)) {
+                // Nothing to take an angle between. Answered rather than
+                // thrown: this runs for every measurement on every frame,
+                // inside the render loop, and a throw there stops the frame --
+                // which has happened, and froze the viewer until a reload.
+                return { unit: 'angle', value: 0 };
+            }
+            const facing = Math.min(1, Math.abs(dot(one, other)));
+            const between = Math.acos(facing) * 180 / Math.PI;
+            return {
+                unit: 'angle',
+                value: formA.form === formB.form ? between : 90 - between,
+            };
+        }
+        if (named === 'perpendicular_distance') {
+            // In the solid, so the whole separation rather than the part of it
+            // that survives a projection.
+            const plane = formA.form === 'plane' && hasDirection(formA.normal) ? formA
+                : (formB.form === 'plane' && hasDirection(formB.normal) ? formB : null);
+            if (plane) {
+                // To a plane, the distance is taken along its normal.
+                return {
+                    unit: 'length',
+                    value: Math.abs(dot(delta, normalized(plane.normal))),
+                };
+            }
+            const solidLine = formA.form === 'line' && hasDirection(formA.direction) ? formA
+                : (formB.form === 'line' && hasDirection(formB.direction) ? formB : null);
+            if (solidLine === null) {
+                return { unit: 'length', value: length(delta) };
+            }
+            const along = normalized(solidLine.direction);
+            const slide = dot(delta, along);
+            return {
+                unit: 'length',
+                value: length([
+                    delta[0] - along[0] * slide,
+                    delta[1] - along[1] * slide,
+                    delta[2] - along[2] * slide,
+                ]),
+            };
+        }
         if (named === 'projected_angle') {
+            if (!hasDirection(formA.direction) || !hasDirection(formB.direction)) {
+                // Two lines with no direction subtend nothing. Answered rather
+                // than thrown: this runs for every measurement on every frame.
+                return { unit: 'angle', value: 0 };
+            }
             const facing = Math.min(1, Math.abs(dot(formA.direction, formB.direction)));
             return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
         }
@@ -224,7 +451,8 @@
             // Between two points there is no line to be square to, and the
             // shortest distance is just the distance -- which is what makes
             // this one kind rather than the two it used to be.
-            const line = formA.form === 'line' ? formA : (formB.form === 'line' ? formB : null);
+            const line = formA.form === 'line' && hasDirection(formA.direction) ? formA
+                : (formB.form === 'line' && hasDirection(formB.direction) ? formB : null);
             if (line === null) {
                 return { unit: 'length', value: length(flat) };
             }
@@ -254,6 +482,65 @@
      * sheet -- which the rules should already have refused, but a dimension
      * drawn from a crossing at infinity would be worse than none.
      */
+    /**
+     * Points along an angle's arc, in world space, swept in the angle's OWN plane.
+     *
+     * A drafted angle lies on the work. Drawn instead as a flat arc between two
+     * projected directions it shows the PROJECTED angle, which agrees with the
+     * number beside it only when the camera happens to look down the plane --
+     * from anywhere else a right angle reads as twenty degrees and the arc
+     * floats free of the timber.
+     *
+     * `radius` is in world units, so the arc foreshortens with everything else.
+     */
+    function angleArcPoints(rays, radius, samples) {
+        if (!hasDirection(rays && rays.from) || !hasDirection(rays && rays.to)) {
+            // Not a corner. A measurement carrying rays of no length describes
+            // nothing, and sweeping them would draw a heap of identical points
+            // that reads as a dot on the timber.
+            return [];
+        }
+        const from = normalized(rays.from);
+        const upright = normalized(rays.normal || cross(rays.from, rays.to));
+        if (!hasDirection(upright)) {
+            // Parallel rays span no plane, so there is no way round from one to
+            // the other.
+            return [];
+        }
+        // In the plane, square to `from`, turning toward `to`.
+        const across = cross(upright, from);
+        const facing = Math.max(-1, Math.min(1, dot(from, normalized(rays.to))));
+        const sweep = Math.acos(facing);
+        const count = Math.max(2, samples || ANGLE_ARC_SAMPLES);
+        const points = [];
+        for (let step = 0; step <= count; step += 1) {
+            const turn = sweep * (step / count);
+            const along = Math.cos(turn);
+            const over = Math.sin(turn);
+            points.push([
+                rays.vertex[0] + (from[0] * along + across[0] * over) * radius,
+                rays.vertex[1] + (from[1] * along + across[1] * over) * radius,
+                rays.vertex[2] + (from[2] * along + across[2] * over) * radius,
+            ]);
+        }
+        return points;
+    }
+
+    /** Where an angle's label sits: past the middle of its arc, in the plane. */
+    function angleLabelPoint(rays, radius) {
+        const middle = angleArcPoints(rays, radius, 2)[1];
+        const out = subtract(middle, rays.vertex);
+        const size = length(out);
+        if (size < 1e-9) {
+            return middle;
+        }
+        return [
+            rays.vertex[0] + (out[0] / size) * radius * ANGLE_LABEL_REACH,
+            rays.vertex[1] + (out[1] / size) * radius * ANGLE_LABEL_REACH,
+            rays.vertex[2] + (out[2] / size) * radius * ANGLE_LABEL_REACH,
+        ];
+    }
+
     function angleLayout(fromPoint, fromDirection, toPoint, toDirection, options) {
         const settings = options || {};
         const radius = settings.radius === undefined ? 34 : settings.radius;
@@ -309,35 +596,108 @@
      * Whether a measurement can be drawn in this viewport, and what it comes to.
      *
      * One answer for both the sheet and the list, so that a dimension which is
-     * not drawn and a row which says why cannot disagree. Four ways to fail, and
-     * they are worth telling apart: a reference that no longer resolves is
-     * broken everywhere, while the other three are about this view alone -- the
-     * same measurement can read fine under one viewport and be refused by the
-     * next.
+     * not drawn and a row which says why cannot disagree. Five ways to fail, and
+     * they are worth telling apart: a reference that no longer resolves, and a
+     * plane that disagrees with the view it is drawn in, are broken wherever you
+     * look at them, while the other three are about this view alone -- the same
+     * measurement can read fine under one viewport and be refused by the next.
+     *
+     * The measurement's own plane decides the projection when it has one; the
+     * viewport's look is the fallback, which is what every measurement written
+     * before planes existed relies on. That is what keeps a number steady while
+     * a camera orbits -- the plane does not move when the camera does.
+     *
+     * `options.orthographic` says whether the viewport projects onto a plane at
+     * all. A perspective camera does not, so the match below means nothing there
+     * and is not asked -- see the 3D view and a drawing's preview.
      */
-    function measurementStatus(measure, axes) {
+    /**
+     * How closely a measurement's plane has to match an orthographic viewport's.
+     *
+     * Both are computed -- one derived when the measurement was made, one from
+     * the viewport's declared camera -- so they agree to within arithmetic
+     * rather than exactly.
+     */
+    const PLANE_MATCH_EPSILON = 1e-6;
+
+    /**
+     * Whether a measurement's plane is the one this viewport projects onto.
+     *
+     * Up to sign, since a plane has no front, and only in direction: where the
+     * plane sits along the view cannot change an orthographic projection.
+     */
+    function planeMatchesView(plane, look) {
+        if (!plane || !plane.normal) {
+            return true;
+        }
+        return Math.abs(Math.abs(dot(normalized(plane.normal), normalized(look))) - 1)
+            <= PLANE_MATCH_EPSILON;
+    }
+
+    /**
+     * Which space a measurement is taken in.
+     *
+     * Its own kind knows, when it has one written structured. A kind that
+     * arrived as a bare name cannot say -- `angle` reads as the projected one
+     * -- so the view answers instead, and only the 3D view has no sheet.
+     */
+    function measureSpace(measure, options) {
+        const kind = measure && measure.kind;
+        if (kind && typeof kind !== 'string' && kind.space) {
+            return kind.space;
+        }
+        return (options && options.space) || 'projected';
+    }
+
+    function measurementStatus(measure, axes, options) {
         if (!measure || measure.unresolved || !measure.a || !measure.b
             || !measure.a.at || !measure.b.at) {
             return { drawable: false, reason: 'unresolved' };
         }
-        const formA = projectedForm(measure.a.geometry, axes.look);
-        const formB = projectedForm(measure.b.geometry, axes.look);
-        const available = availableKinds(formA, formB);
-        if (available.length === 0) {
-            return { drawable: false, reason: 'not-measurable', formA, formB };
+        const orthographic = !options || options.orthographic !== false;
+        const plane = measure.plane || null;
+        if (orthographic && !planeMatchesView(plane, axes.look)) {
+            // Not re-planed to match: that would quietly change the number
+            // someone has already read off the sheet.
+            return { drawable: false, reason: 'plane-mismatch', plane };
         }
-        if (measure.kind && available.indexOf(measure.kind) === -1) {
+        const look = plane && plane.normal ? plane.normal : axes.look;
+        // Which space this is judged in comes from the MEASUREMENT, not from
+        // the camera: a drawing shown in perspective still projects onto its
+        // sheet, so "not orthographic" does not mean "solid". A kind says its
+        // own space; without one, the view says, and only the 3D view has no
+        // sheet to project onto.
+        const space = measureSpace(measure, options);
+        const solid = space === '3d';
+        const formA = solid
+            ? solidForm(measure.a.geometry)
+            : projectedForm(measure.a.geometry, look);
+        const formB = solid
+            ? solidForm(measure.b.geometry)
+            : projectedForm(measure.b.geometry, look);
+        const available = solid
+            ? solidKinds(formA, formB)
+            : availableKinds(formA, formB);
+        if (available.length === 0) {
+            return { drawable: false, reason: 'not-measurable', space, formA, formB };
+        }
+        const wanted = kindName(measure.kind, space);
+        if (wanted && available.indexOf(wanted) === -1) {
             return {
                 drawable: false, reason: 'kind-unavailable',
-                kind: measure.kind, available, formA, formB,
+                kind: wanted, available, space, formA, formB,
             };
         }
-        const kind = measure.kind || available[0];
-        const value = measureValue(kind, measure.a.at, measure.b.at, formA, formB, axes);
+        const kind = wanted || available[0];
+        // The plane's look, not the viewport's, for the same reason the forms
+        // were taken with it: the two have to describe one projection.
+        const value = measureValue(
+            kind, measure.a.at, measure.b.at, formA, formB,
+            { ...axes, look, space, rays: measure.angle || null });
         if (value.unit === 'length' && value.value < DEGENERATE_WORLD) {
-            return { drawable: false, reason: 'degenerate', kind, formA, formB };
+            return { drawable: false, reason: 'degenerate', kind, space, formA, formB };
         }
-        return { drawable: true, kind, value, available, formA, formB };
+        return { drawable: true, kind, value, available, space, formA, formB };
     }
 
     // Below this the two anchors are on top of each other in this view, and
@@ -407,17 +767,137 @@
         return angle;
     }
 
+    /**
+     * Just the reference part of an anchor, as the file holds it.
+     *
+     * A measurement read back carries where its anchors resolved to as well --
+     * a world point and the plane or line it lies on -- and writing that back
+     * would put in the drawings file what the next resolve recomputes anyway,
+     * and what goes stale the moment the timber moves.
+     */
+    function anchorReference(anchor) {
+        if (!anchor) {
+            return null;
+        }
+        if (anchor.kind === 'edge') {
+            // Its two parents carry no resolved fields of their own: only the
+            // anchor they hang off is merged into.
+            return {
+                kind: 'edge',
+                timber: anchor.timber,
+                a: anchor.a,
+                b: anchor.b,
+                type: anchor.type,
+            };
+        }
+        return {
+            timber: anchor.timber,
+            csgPath: anchor.csgPath || [],
+            feature: anchor.feature,
+            type: anchor.type,
+        };
+    }
+
+    /**
+     * A measurement's identity, as a string, scoped to its viewport.
+     *
+     * The two features plus the id that lets one pair be measured twice --
+     * sorted, because measuring A to B and measuring B to A are one
+     * measurement, and the anchors are already canonically ordered.
+     */
+    function measurementKey(measure) {
+        const name = (anchor) => {
+            if (!anchor) {
+                return '';
+            }
+            if (anchor.kind === 'edge') {
+                // A derived edge has no csgPath or feature of its own -- it is
+                // named by the two faces that form it, sorted, the same way
+                // DerivedFeaturePath sorts them. Leaving them out gave every
+                // derived edge on a timber the same key, so editing one edited
+                // whichever happened to be found first.
+                const parents = [anchor.a, anchor.b]
+                    .map((part) => `${((part || {}).csgPath || []).join('/')}/${(part || {}).feature || ''}`)
+                    .sort()
+                    .join('&');
+                return [anchor.timber, 'edge', parents, anchor.type].join('|');
+            }
+            return [anchor.timber, (anchor.csgPath || []).join('/'), anchor.feature, anchor.type]
+                .join('|');
+        };
+        return [name(measure.a), name(measure.b)].sort().join('::')
+            + '::' + (measure.measureId || '');
+    }
+
+    /**
+     * How far from the run a dimension sits, given where the pointer is.
+     *
+     * The one degree of freedom a dimension has once its two ends are fixed:
+     * it slides along the perpendicular and nowhere else. Signed, because
+     * which SIDE it sits on is the other half of that freedom -- dragging
+     * through the run puts it on the far side rather than stopping at zero.
+     *
+     * The same perpendicular dimensionLayout offsets along, so what is dragged
+     * is what is drawn.
+     */
+    function offsetForPointer(from, to, pointer) {
+        const run = { x: to.x - from.x, y: to.y - from.y };
+        const span = Math.hypot(run.x, run.y);
+        if (span < DEGENERATE_PIXELS) {
+            return null;
+        }
+        const away = { x: -run.y / span, y: run.x / span };
+        return (pointer.x - from.x) * away.x + (pointer.y - from.y) * away.y;
+    }
+
+    /**
+     * Why a measurement cannot be drawn, when the reason is not about the view.
+     *
+     * An anchor that no longer resolves, and a plane that disagrees with the
+     * viewport it is drawn in, are wrong wherever you look at them -- a rename
+     * away from being fixed, or a drawing whose python has moved. The other
+     * three refusals are about THIS view: the same measurement reads fine under
+     * one viewport and is refused by the next, which is information rather than
+     * damage.
+     *
+     * Worth telling apart because only the first kind is something to go and
+     * mend, and only the first kind should be shouting.
+     */
+    const BROKEN_REASONS = Object.freeze(['unresolved', 'plane-mismatch']);
+
+    function isBroken(status) {
+        return Boolean(status) && !status.drawable
+            && BROKEN_REASONS.indexOf(status.reason) !== -1;
+    }
+
     const KigumiMeasurements = {
         PROJECTED_RULES,
+        BROKEN_REASONS,
+        isBroken,
+        measurementKey,
+        offsetForPointer,
+        anchorReference,
         normalizeKind,
         projectedForm,
+        measureSpace,
+        kindName,
+        kindWire,
+        solidForm,
+        orientationOf,
+        hasDirection,
+        solidKinds,
+        solidParallel,
         measurementStatus,
+        planeMatchesView,
+        PLANE_MATCH_EPSILON,
         availableKinds,
         kindApplies,
         projectedSeparation,
         measureValue,
         dimensionLayout,
         angleLayout,
+        angleArcPoints,
+        angleLabelPoint,
         DEGENERATE_PIXELS,
         DEGENERATE_WORLD,
         ALIGNMENT_EPSILON,

@@ -59,10 +59,12 @@
          * out here, because whether one can be drawn depends on how things lie
          * to that viewport's camera, which only the viewer knows.
          */
-        setDrawing({ drawing, viewports, members }) {
+        setDrawing({ drawing, viewports, members, slice }) {
             this.drawing = drawing || null;
             this.viewports = viewports || [];
             this.members = members || [];
+            /** What the members are a slice of, or null for all of them. */
+            this.slice = slice || null;
             this._render();
         }
 
@@ -96,8 +98,18 @@
                 'viewports', t('viewer.drawing.viewports'), () => this._viewportRows(),
             ));
             this.el.appendChild(this._section(
-                'members', t('viewer.drawing.members'), () => this._memberRows(),
+                'members', this._membersTitle(), () => this._memberRows(),
             ));
+        }
+
+        /**
+         * "members (everything)", or "members (the piece it is of)".
+         *
+         * The list alone cannot say which: a drawing of every timber and a
+         * drawing that happens to name every timber look the same in it.
+         */
+        _membersTitle() {
+            return membersTitle(this.slice, t);
         }
 
         _header() {
@@ -193,8 +205,10 @@
             const row = document.createElement('div');
             const focused = this.selectionManager
                 && this.selectionManager.isMeasurementFocused(viewport.id, entry.key);
+            const broken = globalScope.KigumiMeasurements.isBroken(entry.status);
             row.className = 'dp-row dp-measurement'
                 + (entry.status.drawable ? '' : ' dp-unavailable')
+                + (broken ? ' dp-broken' : '')
                 + (focused ? ' dp-focused' : '');
 
             const origin = document.createElement('span');
@@ -239,7 +253,18 @@
         }
     }
 
-    const KigumiDrawingPanel = { DrawingPanel, ORIGIN_MARKS };
+    /**
+     * "members (everything)", or "members (the piece it is of)".
+     *
+     * The list alone cannot say which: a drawing of every timber and a drawing
+     * that happens to name every timber look identical in it.
+     */
+    function membersTitle(slice, translate) {
+        const of = slice || translate('viewer.drawing.members.everything');
+        return `${translate('viewer.drawing.members')} (${of})`;
+    }
+
+    const KigumiDrawingPanel = { DrawingPanel, ORIGIN_MARKS, membersTitle };
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = KigumiDrawingPanel;
     }

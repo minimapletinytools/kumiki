@@ -150,6 +150,78 @@ class TestWhatAPairAdmits:
             kinds_for(PLANE, POINT, PROJECTED)
 
 
+class TestWhatTheSolidAdmits:
+    """The 3D view classifies features as they ARE, projecting nothing.
+
+    Its camera belongs to the reader and turns as they look around, so asking
+    what a face looks like from here called nearly every face an AREA -- nothing
+    to measure -- and refused it.
+    """
+
+    SIDE = {"kind": "plane", "normal": [1, 0, 0]}
+    FAR_SIDE = {"kind": "plane", "normal": [-1, 0, 0]}
+    TOP = {"kind": "plane", "normal": [0, 0, 1]}
+    UPRIGHT = {"kind": "line", "direction": [0, 0, 1]}
+    ALONG = {"kind": "line", "direction": [1, 0, 0]}
+
+    def test_a_face_is_a_plane_from_wherever_it_is_seen(self):
+        from kumiki.drawing import MeasurementFeature, solid_form
+
+        assert solid_form(self.TOP)[0] is MeasurementFeature.PLANE
+
+    def test_an_edge_is_a_line_even_when_it_points_at_you(self):
+        from kumiki.drawing import MeasurementFeature, solid_form
+
+        assert solid_form(self.UPRIGHT)[0] is MeasurementFeature.LINE
+
+    def test_two_faces_meeting_at_a_corner_admit_an_angle(self):
+        from kumiki.drawing import solid_kinds
+
+        assert [k.name for k in solid_kinds(self.SIDE, self.TOP)] == ["angle"]
+
+    def test_two_parallel_faces_admit_the_distance_between_them(self):
+        from kumiki.drawing import solid_kinds
+
+        assert [k.name for k in solid_kinds(self.SIDE, self.FAR_SIDE)] == [
+            "perpendicular_distance"]
+
+    def test_crossing_edges_admit_an_angle(self):
+        from kumiki.drawing import solid_kinds
+
+        assert [k.name for k in solid_kinds(self.UPRIGHT, self.ALONG)] == ["angle"]
+
+    def test_an_edge_lying_in_a_face_is_parallel_to_it(self):
+        """A normal is not a direction.
+
+        The line runs square to the normal exactly when it lies in the plane, so
+        comparing the two as though both were directions would call this a
+        crossing and offer an angle of nothing.
+        """
+        from kumiki.drawing import solid_kinds
+
+        assert [k.name for k in solid_kinds(self.UPRIGHT, self.SIDE)] == [
+            "perpendicular_distance"]
+
+    def test_an_edge_square_to_a_face_crosses_it(self):
+        from kumiki.drawing import solid_kinds
+
+        assert [k.name for k in solid_kinds(self.ALONG, self.SIDE)] == ["angle"]
+
+    def test_a_feature_lying_on_nothing_admits_nothing(self):
+        from kumiki.drawing import solid_kinds
+
+        assert solid_kinds({"kind": "barrel"}, self.SIDE) == ()
+
+    def test_the_solid_never_offers_a_direction_of_the_sheet(self):
+        """Horizontal and vertical are the page's, and the solid has no up."""
+        from kumiki.drawing import MeasurementDirection, solid_kinds
+
+        for a in (self.SIDE, self.TOP, self.UPRIGHT, self.ALONG):
+            for b in (self.SIDE, self.TOP, self.UPRIGHT, self.ALONG):
+                for kind in solid_kinds(a, b):
+                    assert kind.direction is MeasurementDirection.PERPENDICULAR
+
+
 class TestTheViewerAgrees:
     """The viewer's copy of the table, checked against this one by running it."""
 
@@ -166,6 +238,160 @@ class TestTheViewerAgrees:
         out = subprocess.run([present(node, "node on PATH"), "-e", script], capture_output=True, text=True, timeout=60)
         assert out.returncode == 0, out.stderr
         return json.loads(out.stdout)
+
+    #: Geometry to project, spanning every answer projected_form can give.
+    CASES = [
+        {"kind": "point", "at": [0, 0, 0]},
+        {"kind": "line", "direction": [1, 0, 0]},
+        {"kind": "line", "direction": [0, 1, 0]},          # end-on: a point
+        {"kind": "line", "direction": [0, 0.9995, 0.03]},  # a hair off end-on
+        # Straddling ALIGNMENT_EPSILON, so the two sides disagree the moment
+        # either moves its threshold. Without a case in the gap this comparison
+        # passes whatever the epsilons are, which is a test of nothing.
+        {"kind": "line", "direction": [0.0999, 0.995, 0]},
+        {"kind": "plane", "normal": [1, 0.005, 0]},
+        {"kind": "line", "direction": [1, 1, 0]},          # oblique
+        {"kind": "plane", "normal": [0, 0, 1]},            # edge-on: a line
+        {"kind": "plane", "normal": [0, 1, 0]},            # facing: an area
+        {"kind": "plane", "normal": [0, 1, 0.0005]},       # barely off facing
+        {"kind": "plane", "normal": [1, 1, 0]},            # oblique
+        None,                                              # nothing to measure
+    ]
+    LOOKS = [[0, 1, 0], [0, -1, 0], [1, 0, 0], [0.577, 0.577, 0.577]]
+
+    def _viewer_forms(self):
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("node is not available")
+        script = (
+            "const m = require(%s);"
+            "const cases = %s, looks = %s;"
+            "const out = [];"
+            "for (const look of looks) { for (const g of cases) {"
+            "  const f = m.projectedForm(g, look);"
+            "  out.push([f.form, f.direction || null]); } }"
+            "process.stdout.write(JSON.stringify(out));"
+            % (json.dumps(str(Path(__file__).resolve().parent.parent
+                              / "kigumi" / "webview" / "measurements.js")),
+               json.dumps(self.CASES), json.dumps(self.LOOKS))
+        )
+        out = subprocess.run([present(node, "node on PATH"), "-e", script],
+                             capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return json.loads(out.stdout)
+
+    def _viewer_solid(self):
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("node is not available")
+        script = (
+            "const m = require(%s);"
+            "const cases = %s;"
+            "const out = [];"
+            "for (const a of cases) { for (const b of cases) {"
+            "  out.push(m.solidKinds(m.solidForm(a), m.solidForm(b))); } }"
+            "process.stdout.write(JSON.stringify(out));"
+            % (json.dumps(str(Path(__file__).resolve().parent.parent
+                              / "kigumi" / "webview" / "measurements.js")),
+               json.dumps(self.CASES))
+        )
+        out = subprocess.run([present(node, "node on PATH"), "-e", script],
+                             capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return json.loads(out.stdout)
+
+    def test_the_two_solid_tables_say_the_same_thing(self):
+        """The 3D view's rule, in python and in the viewer's copy of it.
+
+        The same reason the projected pair are checked against each other: two
+        copies of a table is how a table drifts.
+        """
+        from kumiki.drawing import solid_kinds
+
+        theirs = self._viewer_solid()
+        mine = [[kind.name for kind in solid_kinds(a, b)]
+                for a in self.CASES for b in self.CASES]
+
+        assert theirs == mine
+
+    def test_the_two_projections_say_the_same_thing(self):
+        """The rule the runner prefers features by, and the one the viewer draws by.
+
+        The viewer keeps a copy because it projects on every pointer move and
+        cannot ask python each time. Two copies of a rule is how a rule drifts,
+        so they are run against each other here.
+        """
+        from kumiki.drawing import projected_form
+
+        mine = []
+        for look in self.LOOKS:
+            for geometry in self.CASES:
+                form, direction = projected_form(geometry, look)
+                mine.append([
+                    form.value if form is not None else "none",
+                    list(direction) if direction is not None else None,
+                ])
+
+        theirs = self._viewer_forms()
+        assert len(theirs) == len(mine)
+        for (form, direction), (their_form, their_direction) in zip(mine, theirs):
+            assert form == their_form
+            if direction is None or their_direction is None:
+                assert direction is None and their_direction is None
+            else:
+                assert direction == pytest.approx(their_direction, abs=1e-9)
+
+    def _viewer_status_kinds(self):
+        """What measurementStatus says a WRITTEN measurement admits."""
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("node is not available")
+        script = (
+            "const m = require(%s);"
+            "const cases = %s, look = %s;"
+            "const out = [];"
+            "for (const a of cases) { for (const b of cases) {"
+            "  for (const space of ['projected', '3d']) {"
+            "    const status = m.measurementStatus("
+            "      { a: { at: [0,0,0], geometry: a }, b: { at: [137,91,53], geometry: b } },"
+            "      { look, right: [1,0,0], up: [0,0,1] },"
+            "      { orthographic: space === 'projected', space });"
+            "    out.push(status.available || []); } } }"
+            "process.stdout.write(JSON.stringify(out));"
+            % (json.dumps(str(Path(__file__).resolve().parent.parent
+                              / "kigumi" / "webview" / "measurements.js")),
+               json.dumps(self.CASES), json.dumps(self.LOOKS[0]))
+        )
+        out = subprocess.run([present(node, "node on PATH"), "-e", script],
+                             capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return json.loads(out.stdout)
+
+    def test_a_written_measurement_is_judged_the_way_a_pick_is(self):
+        """The fifth place the verdict is decided, against the rules it must match.
+
+        The two anchors are deliberately off every axis: a pair whose ends come
+        to zero is refused as degenerate before its kinds are reported, which
+        says nothing about whether the two sides agree.
+
+        The runner answers what a PICK admits; measurementStatus answers what a
+        measurement already written admits, which no pick is happening for. That
+        second answer is legitimate and it is also where three shipped bugs
+        came from -- it judged in the wrong space, it upgraded a solid kind's
+        name to the projected one, and it compared a structured kind against a
+        list of names. Nothing pinned it to the rules until here.
+        """
+        from kumiki.drawing import projected_kinds, solid_kinds
+
+        mine = []
+        for one in self.CASES:
+            for other in self.CASES:
+                for space in ("projected", "3d"):
+                    admitted = (solid_kinds(one, other) if space == "3d"
+                                else projected_kinds(one, other, self.LOOKS[0]))
+                    mine.append([kind.name for kind in admitted])
+
+        assert self._viewer_status_kinds() == mine
 
     def test_the_two_tables_say_the_same_thing(self):
         expected = {
