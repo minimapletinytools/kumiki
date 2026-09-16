@@ -153,3 +153,110 @@ describe('what a state does to the opacities', () => {
             selectionVisualPolicy(SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB, BASE));
     });
 });
+
+describe('folding the state into something comparable', () => {
+    // The value the whole pulled design rests on: the frame loop folds the
+    // state and redraws when the answer differs. Only its COMPLETENESS was
+    // checked, by a test that reads the source; what it actually does with what
+    // it is given was not checked at all until it came out of viewer-app.js.
+    const { visualSignatureOf } = require('../webview/selection-visuals.js');
+
+    const base = () => ({
+        unselectedTransparencyPercent: 60,
+        selectedTransparencyPercent: 0,
+        edgeLineVisibilityPercent: 100,
+        edgeMode: 'overlay',
+        showDrawingGhosts: true,
+        selected: ['post#0'],
+        focus: { timberKey: 'post#0', path: ['cut'], featureLabel: 'front' },
+        lit: { csg: { key: 'post#0|cut|front' }, hover: null, held: null },
+        members: [['post#0', 'timber-default', false, false]],
+    });
+
+    test('the same state folds the same way', () => {
+        expect(visualSignatureOf(base())).toBe(visualSignatureOf(base()));
+    });
+
+    test('and nothing at all is still an answer', () => {
+        expect(typeof visualSignatureOf(undefined)).toBe('string');
+        expect(visualSignatureOf(undefined)).toBe(visualSignatureOf({}));
+    });
+
+    test.each([
+        ['unselectedTransparencyPercent', 61],
+        ['selectedTransparencyPercent', 20],
+        ['edgeLineVisibilityPercent', 50],
+        ['edgeMode', 'none'],
+        ['showDrawingGhosts', false],
+    ])('changing %s changes it', (field, value) => {
+        const changed = { ...base(), [field]: value };
+
+        expect(visualSignatureOf(changed)).not.toBe(visualSignatureOf(base()));
+    });
+
+    test('selecting another timber changes it', () => {
+        const changed = { ...base(), selected: ['post#0', 'girt#0'] };
+
+        expect(visualSignatureOf(changed)).not.toBe(visualSignatureOf(base()));
+    });
+
+    test.each([
+        ['timberKey', 'girt#0'],
+        ['featureLabel', 'back'],
+    ])('picking a different %s changes it', (field, value) => {
+        const changed = { ...base(), focus: { ...base().focus, [field]: value } };
+
+        expect(visualSignatureOf(changed)).not.toBe(visualSignatureOf(base()));
+    });
+
+    test('drilling deeper changes it', () => {
+        const changed = { ...base(), focus: { ...base().focus, path: ['cut', 'deeper'] } };
+
+        expect(visualSignatureOf(changed)).not.toBe(visualSignatureOf(base()));
+    });
+
+    test('a timber appearing or leaving changes it', () => {
+        // A geometry rebuild, without anyone having to say so.
+        const more = { ...base(), members: [...base().members, ['girt#0', 'timber-default', false, false]] };
+
+        expect(visualSignatureOf(more)).not.toBe(visualSignatureOf(base()));
+        expect(visualSignatureOf({ ...base(), members: [] }))
+            .not.toBe(visualSignatureOf(base()));
+    });
+
+    test.each([
+        ['being hidden', 2],
+        ['leaving the drawing', 3],
+    ])('a member %s changes it', (_what, index) => {
+        const members = base().members.map((row) => [...row]);
+        members[0][index] = true;
+
+        expect(visualSignatureOf({ ...base(), members }))
+            .not.toBe(visualSignatureOf(base()));
+    });
+
+    test('what is lit changes it', () => {
+        const hovering = { ...base(), lit: { ...base().lit, hover: { key: 'girt#0|', refused: false } } };
+
+        expect(visualSignatureOf(hovering)).not.toBe(visualSignatureOf(base()));
+    });
+
+    test('and so does the same thing turning red under a resting pointer', () => {
+        const allowed = { ...base(), lit: { hover: { key: 'girt#0|', refused: false } } };
+        const refused = { ...base(), lit: { hover: { key: 'girt#0|', refused: true } } };
+
+        expect(visualSignatureOf(allowed)).not.toBe(visualSignatureOf(refused));
+    });
+
+    test('two different states cannot fold to one string', () => {
+        // The focus contributes three adjacent fields -- member, path, feature.
+        // Joined on a separator that can appear inside one of them, these two
+        // states BOTH come out "a|b|c|d", and a collision here is a frame that
+        // never redraws because the answer looked unchanged.
+        const one = { ...base(), focus: { timberKey: 'a', path: ['b|c'], featureLabel: 'd' } };
+        const other = { ...base(), focus: { timberKey: 'a|b', path: ['c'], featureLabel: 'd' } };
+
+        expect(visualSignatureOf(one)).not.toBe(visualSignatureOf(other));
+    });
+
+});

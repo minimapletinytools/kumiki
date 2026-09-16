@@ -111,10 +111,51 @@
         return factory(baseUnselectedOpacity);
     }
 
+    /**
+     * Everything the look of the frame depends on, folded into one value.
+     *
+     * Taken as a plain snapshot so it can be checked: the caller READS the
+     * state -- nothing announces a change -- and this turns what it read into
+     * something comparable.
+     *
+     * JSON rather than joining on a separator. Several of these values are
+     * themselves built by joining -- a focus key is member, path and feature
+     * with bars between them -- so a separator that can appear inside a part
+     * makes two different states able to fold to one string, and a collision
+     * there is a frame that never redraws.
+     */
+    function visualSignatureOf(inputs) {
+        const found = inputs || {};
+        const focus = found.focus || null;
+        const lit = found.lit || {};
+        return JSON.stringify([
+            found.unselectedTransparencyPercent,
+            found.selectedTransparencyPercent,
+            found.edgeLineVisibilityPercent,
+            found.edgeMode,
+            Boolean(found.showDrawingGhosts),
+            // Which timbers are selected, and what is picked inside one. Order
+            // is not normalised: a different order costs one extra pass, and
+            // missing a change costs a frame that lies about the state.
+            found.selected || [],
+            focus ? [focus.timberKey || '', (focus.path || []).join('/'),
+                     focus.featureLabel || ''] : null,
+            // What is LIT. Identity only -- the colours follow the policy,
+            // which the opacities above already stand for.
+            lit.csg ? lit.csg.key : null,
+            lit.hover ? [lit.hover.key, Boolean(lit.hover.refused)] : null,
+            lit.held ? lit.held.key : null,
+            // The member set itself, so a rebuild that adds or drops timbers
+            // changes this without anyone having to say so.
+            found.members || [],
+        ]);
+    }
+
     const KigumiSelectionVisuals = {
         SELECTION_VISUAL_STATES,
         SELECTION_VISUAL_POLICIES,
         computeSelectionVisualContext,
+        visualSignatureOf,
         selectionVisualPolicy,
     };
 

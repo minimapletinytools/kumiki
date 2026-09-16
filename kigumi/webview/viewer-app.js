@@ -177,80 +177,6 @@ const DEFAULT_AXIS_ORBIT_SPEED = 0.008;
 // nudge within a small cone, so the same hand movement should cover less of it.
 const TILT_ORBIT_SPEED = 0.0016;
 
-// How long to wait for a paint before going ahead without one. Comfortably
-// longer than a healthy frame, so it only takes effect when paints have
-// actually stopped.
-const PAINT_WAIT_FALLBACK_MS = 100;
-
-const DEFAULT_FOOTPRINT_COLOR = 'orange';
-
-function normalizeViewerOptions(viewerOptions) {
-    const opts = (viewerOptions && typeof viewerOptions === 'object') ? viewerOptions : {};
-    const geometryMode = GeometryMode.VALID_MODES.has(opts.geometryMode) ? opts.geometryMode : GeometryMode.DEFAULT_MODE;
-    return { geometryMode };
-}
-
-function createInitialViewState() {
-    return {
-        phase: ViewerPhase.BOOTING,
-        loadingText: t('viewer.chrome.loading.raisingFrame'),
-        refreshToken: 0,
-        error: null,
-        sourceHasPendingChanges: false,
-    };
-}
-
-const INITIAL_PAYLOAD = window.__KIGUMI_INITIAL_PAYLOAD__ || {
-    frame: {},
-    geometry: { meshes: [] },
-    uiState: {
-        phase: ViewerPhase.WAITING_FOR_RUNNER,
-        loadingText: 'raising frame',
-        refreshToken: 0,
-    },
-    viewerOptions: {},
-    viewerSettings: null,
-};
-// Acquired by boot-diagnostics.js, which runs first so it can catch a module
-// that throws on evaluation. acquireVsCodeApi() may only be called once.
-const vscode = window.__kigumiVsCode
-    || (typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null);
-const VIEWER_APP_VERSION = '2026.03.17.4';
-const SelectionStore = window.SelectionStore;
-const CameraController = window.CameraController;
-const GeometryMode = window.GeometryMode;
-const KigumiTags = window.KigumiTags;
-const KigumiUnits = window.KigumiUnits;
-const TagIndex = window.TagIndex;
-const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
-
-// Deep enough to read against pale timbers on the light themes, where the
-// paler blues these used to be washed out into the stock.
-const CSG_HIGHLIGHT_COLORS = Object.freeze({
-    tagged: 0x29b6f6,
-    feature: 0x0288d1,
-});
-
-// What the pointer is over, as opposed to what is selected. A different hue as
-// well as a different shape -- an outline rather than a fill -- so the two
-// never read as the same state.
-const HOVER_COLOR = 0xffa726;
-// Shown while measuring, for a feature that cannot finish the measurement from
-// where you are looking. Said in colour rather than only by refusing the click,
-// since the answer depends on the view and the useful thing is to see that.
-const HOVER_REFUSED_COLOR = 0xef5350;
-// The feature a measurement is being taken FROM, while the other end is chosen.
-// Its own colour: it is neither hovered nor selected, it is held.
-const HELD_COLOR = 0x66bb6a;
-const HELD_OPACITY = 0.8;
-// Above the hover, which is itself above the selection, for the same reason the
-// hover was put there: while one end is held it is the thing on screen most
-// worth seeing, and the pointer passes over it constantly.
-const HELD_RENDER_ORDER = 1101;
-// Opaque enough to hold its own over a selected face rather than
-// tinting it. Under a fill this washed out to nothing.
-const HOVER_OPACITY = 0.8;
-
 // A selected edge is drawn as a line rather than shaded like a face, so it
 // needs a width of its own -- several times the timbers' own edge lines, or the
 // selection does not read as thicker than the geometry it sits on.
@@ -284,11 +210,12 @@ function heldHighlightKey(reference) {
 
 // Which state a selection is in, and what that does to every timber's opacity.
 // Lives in selection-visuals.js so it can be loaded and tested without lit.
+const SelectionVisuals = window.KigumiSelectionVisuals;
 const {
     SELECTION_VISUAL_STATES,
     computeSelectionVisualContext,
     selectionVisualPolicy,
-} = window.KigumiSelectionVisuals;
+} = SelectionVisuals;
 
 const RENDER_PROFILES = Object.freeze({
     'timber-default': Object.freeze({
@@ -4256,11 +4183,6 @@ class KigumiViewerApp extends LitElement {
         this.selectionPanel.updateInfo(this.currentFrameData);
     }
 
-    _escapeHtml(str) {
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
-    }
 
 
 
@@ -4303,42 +4225,29 @@ class KigumiViewerApp extends LitElement {
         // asking the same question twice and allocating the edge positions
         // twice with it.
         const lit = state || this._highlightState();
-        const focus = this.selectionManager.csgFocus;
         const drawn = this.activeSceneMembers;
-        const parts = [
-            this.unselectedTransparencyPercent,
-            this.selectedTransparencyPercent,
-            this.edgeLineVisibilityPercent,
-            this.edgeMode,
-            this.showDrawingGhosts ? 1 : 0,
-            // Which timbers are selected, and what is picked inside one. Joined
-            // rather than compared: a different ORDER only costs one extra pass,
-            // and missing a change costs a frame that lies about the state.
-            (this.selectionManager.getSelectedTimbers() || []).join(','),
-            focus ? (focus.timberKey || '') : '',
-            focus && Array.isArray(focus.path) ? focus.path.join('/') : '',
-            focus ? (focus.featureLabel || '') : '',
-        ];
-        // What is LIT, as well as what everything looks like: the overlays are
-        // derived in the same pass, so the state they are derived from has to
-        // be in the same answer. Identity only -- their colours follow the
-        // policy, which is folded above.
-        parts.push(
-            lit.csg ? lit.csg.key : '',
-            lit.hover ? `${lit.hover.key}:${lit.hover.refused ? 'no' : 'ok'}` : '',
-            lit.held ? lit.held.key : '',
-        );
+        const members = [];
         for (const [key, bundle] of this.sceneManager.entries()) {
-            parts.push(
-                // The member set itself: a rebuild that adds or drops timbers
-                // changes this without anyone having to say so.
+            members.push([
                 key,
                 bundle.profileId || '',
-                this.isMemberHidden(key) ? 1 : 0,
-                drawn && !drawn.has(key) ? 1 : 0,
-            );
+                this.isMemberHidden(key),
+                Boolean(drawn && !drawn.has(key)),
+            ]);
         }
-        return parts.join('|');
+        // Gathered here, folded there. The reading is what makes this pulled;
+        // the folding is a pure function and is tested as one.
+        return SelectionVisuals.visualSignatureOf({
+            unselectedTransparencyPercent: this.unselectedTransparencyPercent,
+            selectedTransparencyPercent: this.selectedTransparencyPercent,
+            edgeLineVisibilityPercent: this.edgeLineVisibilityPercent,
+            edgeMode: this.edgeMode,
+            showDrawingGhosts: this.showDrawingGhosts,
+            selected: this.selectionManager.getSelectedTimbers() || [],
+            focus: this.selectionManager.csgFocus,
+            lit,
+            members,
+        });
     }
 
     /**
