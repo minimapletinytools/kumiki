@@ -446,3 +446,62 @@ describe('everything the frame is drawn from is in the signature it is drawn for
         expect(pass).toContain('applySelectionOpacity');
     });
 });
+
+describe('a pointer gesture owns its listeners', () => {
+    // Four drags, and two patterns. The gizmo and the light dial keep their
+    // listeners for the life of the viewer and check a flag -- nothing to pair,
+    // nothing to get wrong. The rail resize and the measurement drag put theirs
+    // up for the length of the drag, and that pairing is the part worth owning.
+    //
+    // The measurement drag used CLOSURES, which disconnectedCallback could not
+    // name and so could not take down: leaving the viewer with the mouse still
+    // held leaked both handlers, and each held the whole app. The rail resize
+    // had been given a line in teardown by hand; a name means neither needs one.
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+    /** Every place a pointer listener goes up, by the method it is in. */
+    function listenerHomes(kind) {
+        const homes = new Set();
+        const pattern = new RegExp(`window\\.${kind}EventListener\\('pointer`, 'g');
+        for (const match of app.matchAll(pattern)) {
+            const before = app.slice(0, match.index);
+            const method = [...before.matchAll(/\n    ([a-zA-Z_][A-Za-z0-9_]*)\(/g)].pop();
+            homes.add(method ? method[1] : '(top level)');
+        }
+        return homes;
+    }
+
+    test('they go up in two places only', () => {
+        // The persistent pair, and the gesture helper.
+        expect([...listenerHomes('add')].sort())
+            .toEqual(['_beginPointerGesture', 'setupUiEvents']);
+    });
+
+    test('and come down in two', () => {
+        expect([...listenerHomes('remove')].sort())
+            .toEqual(['_endPointerGesture', 'disconnectedCallback']);
+    });
+
+    test('leaving ends whatever is mid-drag', () => {
+        expect(methodBody(app, 'disconnectedCallback')).toContain('_endAllPointerGestures');
+    });
+
+    test('a gesture stops listening before its end runs', () => {
+        // An end that throws still leaves nothing listening.
+        // Inside the UP handler only. Searching the whole method finds the
+        // guard at the top, which is always before anything and so would pass
+        // whatever the handler did.
+        const begin = methodBody(app, '_beginPointerGesture');
+        const up = begin.slice(begin.indexOf('const up ='));
+        const stops = up.indexOf('this._endPointerGesture(name)');
+        const calls = up.indexOf('onEnd(event)');
+
+        expect(stops).toBeGreaterThan(-1);
+        expect(calls).toBeGreaterThan(stops);
+    });
+
+    test('and beginning one twice does not leave the first listening', () => {
+        expect(methodBody(app, '_beginPointerGesture'))
+            .toContain('this._endPointerGesture(name);');
+    });
+});

@@ -1391,6 +1391,8 @@ class KigumiViewerApp extends LitElement {
          * that wanted it and none has a lifetime of its own.
          */
         this._highlightObjects = new Map();
+        /** Pointer gestures running now, by name. See _beginPointerGesture. */
+        this._pointerGestures = new Map();
         /**
          * The geometry the runner sent for the current selection, kept so the
          * overlay can be re-derived rather than built once on arrival. Only
@@ -1455,8 +1457,6 @@ class KigumiViewerApp extends LitElement {
         this.onEnterDrawingRequested = this.onEnterDrawingRequested.bind(this);
         this.onSaveDrawingsRequested = this.onSaveDrawingsRequested.bind(this);
         this.onRailResizeStart = this.onRailResizeStart.bind(this);
-        this.onRailResizeMove = this.onRailResizeMove.bind(this);
-        this.onRailResizeEnd = this.onRailResizeEnd.bind(this);
         this.onWindowContextMenuDismiss = this.onWindowContextMenuDismiss.bind(this);
     }
 
@@ -1624,10 +1624,10 @@ class KigumiViewerApp extends LitElement {
         window.removeEventListener('pointerup', this.onGizmoPointerUp);
         window.removeEventListener('pointermove', this.onLightDialPointerMove);
         window.removeEventListener('pointerup', this.onLightDialPointerUp);
-        // Only attached mid-drag, so this matters when the panel closes with
-        // the mouse still down.
-        window.removeEventListener('pointermove', this.onRailResizeMove);
-        window.removeEventListener('pointerup', this.onRailResizeEnd);
+        // Whatever is mid-drag, whether or not anything is: the rail being
+        // resized, a dimension being moved. This is what a NAME buys -- the
+        // measurement drag used closures nothing here could refer to.
+        this._endAllPointerGestures();
         if (this.animationHandle) {
             cancelAnimationFrame(this.animationHandle);
             this.animationHandle = null;
@@ -3809,8 +3809,6 @@ class KigumiViewerApp extends LitElement {
         };
 
         const onUp = () => {
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
             const dragged = this._draggingMeasurement;
             this._draggingMeasurement = null;
             if (!moved || !dragged) {
@@ -3821,8 +3819,7 @@ class KigumiViewerApp extends LitElement {
                 viewportId, measureKey, { offset: dragged.offset }, { offset: was });
         };
 
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
+        this._beginPointerGesture('measurement-drag', { onMove, onEnd: onUp });
     }
 
     /** Write where a dimension now sits, and what would put it back. */
@@ -5879,6 +5876,54 @@ class KigumiViewerApp extends LitElement {
     // would not.
     // ------------------------------------------------------------------
 
+    /**
+     * Run a pointer gesture, owning its listeners for as long as it lasts.
+     *
+     * They go up when it starts and come down when it ends, in ONE place -- and
+     * because the gesture has a name, teardown can end it. The measurement drag
+     * put its handlers up as closures, which disconnectedCallback could not
+     * name and so could not take down: leaving the viewer with the mouse still
+     * held leaked both, holding the whole app with them.
+     *
+     * Only for gestures whose listeners live as long as the drag. The gizmo and
+     * the light dial keep theirs for the life of the viewer and check a flag,
+     * which has no pairing to get wrong and is left alone.
+     */
+    _beginPointerGesture(name, { onMove, onEnd }) {
+        this._endPointerGesture(name);
+        const move = (event) => onMove(event);
+        const up = (event) => {
+            // Taken down BEFORE the handler runs, so an end that throws still
+            // leaves nothing listening.
+            this._endPointerGesture(name);
+            if (onEnd) {
+                onEnd(event);
+            }
+        };
+        this._pointerGestures.set(name, { move, up });
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+    }
+
+    /** Stop listening for one, whether or not it is running. */
+    _endPointerGesture(name) {
+        const gesture = this._pointerGestures.get(name);
+        if (!gesture) {
+            return false;
+        }
+        window.removeEventListener('pointermove', gesture.move);
+        window.removeEventListener('pointerup', gesture.up);
+        this._pointerGestures.delete(name);
+        return true;
+    }
+
+    /** Leaving: nothing should still be listening for a pointer. */
+    _endAllPointerGestures() {
+        for (const name of Array.from(this._pointerGestures.keys())) {
+            this._endPointerGesture(name);
+        }
+    }
+
     onRailResizeStart(event) {
         const rail = this.renderRoot.querySelector('#left-rail');
         if (!rail || event.button !== 0) {
@@ -5893,8 +5938,10 @@ class KigumiViewerApp extends LitElement {
         if (handle) {
             handle.classList.add('is-dragging');
         }
-        window.addEventListener('pointermove', this.onRailResizeMove);
-        window.addEventListener('pointerup', this.onRailResizeEnd);
+        this._beginPointerGesture('rail-resize', {
+            onMove: (moveEvent) => this.onRailResizeMove(moveEvent),
+            onEnd: () => this.onRailResizeEnd(),
+        });
     }
 
     onRailResizeMove(event) {
@@ -5916,8 +5963,6 @@ class KigumiViewerApp extends LitElement {
         if (handle) {
             handle.classList.remove('is-dragging');
         }
-        window.removeEventListener('pointermove', this.onRailResizeMove);
-        window.removeEventListener('pointerup', this.onRailResizeEnd);
     }
 
     /** The layers panel expanded a row and needs that timber's tree. */

@@ -154,9 +154,22 @@ into the module -- a cycled choice forgotten on any movement at all, a question
 re-asked only past the slop -- and are one method. Twenty-two tests came with
 them, for state that could not be tested while it sat on the app.
 
-**4. One drag concept.** Fold the four ad-hoc drags into `PointerDrag`'s shape,
-with the listener lifetime owned by the module rather than by four pairs of
-hand-matched calls.
+**4. One drag concept.** *Done, and smaller than planned.* Looking at the four
+found only one real defect, so only that was changed.
+
+The gizmo and the light dial keep their listeners for the life of the viewer and
+check a flag: nothing to pair, nothing to get wrong, and folding them in would
+have been risk without benefit. The rail resize and the measurement drag put
+theirs up for the length of the drag, and only the measurement drag had a
+problem -- its handlers were CLOSURES, which `disconnectedCallback` could not
+name and so could not take down, so leaving the viewer mid-drag leaked both and
+each held the whole app. The rail resize had been given a line in teardown by
+hand.
+
+Both run through `_beginPointerGesture` now, which owns the pairing and gives
+each gesture a name so teardown can end whatever is running without knowing what
+that is. Pointer listeners go up in two places and come down in two, which a
+test checks by reading which method each sits in.
 
 **5. Declare the protocol.** One list of message types shared by both sides,
 with a test that every posted type is handled and every handled type is posted.
