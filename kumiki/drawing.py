@@ -217,6 +217,15 @@ _LEGACY_KIND_NAMES: Mapping[str, MeasurementKind] = {
 #: How square something has to be to the view before it counts as square. An
 #: edge a hair off end-on still projects to a line, just a very short one, and
 #: calling it a point would refuse a dimension that is drawable.
+#: Below this, in world units, two features are in the same place and there is
+#: nothing between them to dimension. A measurement that comes to zero draws as
+#: nothing, which reads as a measurement that failed rather than one that was
+#: never worth making -- so a pair this close is refused at the pick instead.
+#:
+#: THE VIEWER HAS A COPY, as DEGENERATE_WORLD in measurements.js, for judging a
+#: measurement already written. A test runs the two against each other.
+DEGENERATE_SEPARATION = 1e-6
+
 ALIGNMENT_EPSILON = 1e-3
 
 #: Two projected directions within this of parallel are treated as parallel: the
@@ -473,6 +482,18 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
     else:
         lean = _dot(unit, [span.at[i] - vertex[i] for i in range(3)])
     return tuple(-part for part in unit) if lean < 0 else unit
+
+
+def is_degenerate_separation(first: Sequence[float], second: Sequence[float]) -> bool:
+    """Whether two anchors are close enough to be the same place.
+
+    Asked of the anchors rather than the features: two features that merely
+    touch still have a distance worth measuring between other parts of them,
+    and it is where the dimension would ATTACH that decides whether it comes to
+    anything.
+    """
+    gap = [second[i] - first[i] for i in range(3)]
+    return _dot(gap, gap) < DEGENERATE_SEPARATION * DEGENERATE_SEPARATION
 
 
 def angle_rays(first: MeasureSpan, second: MeasureSpan):

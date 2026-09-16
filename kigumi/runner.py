@@ -1986,6 +1986,8 @@ def _pick_verdict(
     and a refusal derived separately will eventually disagree, and the
     disagreement is invisible until someone clicks.
     """
+    from kumiki.drawing import is_degenerate_separation
+
     if not payload.get("heldGeometry") or not payload.get("look"):
         return None
     if located_pick is None:
@@ -2008,13 +2010,27 @@ def _pick_verdict(
                                 payload["look"], payload)]
     if not kinds:
         return {"kinds": [], "plane": plane, "anchors": None, "reason": "no-kind"}
+    # Where it would sit: anchors for a distance, a corner for an angle. By the
+    # rules that place it once written, so the preview IS the measurement rather
+    # than a likeness of one.
+    placement = _pick_placement(state, located_pick, timber, payload, slot_state)
+    anchors = placement.get("anchors")
+    if anchors and is_degenerate_separation(anchors["a"], anchors["b"]):
+        # The two ends land in the same place, so the measurement comes to
+        # nothing and draws as nothing -- which reads as one that failed rather
+        # than one that was never worth making. An arris lying ON a face is the
+        # ordinary way to reach this, and there are a dozen such pairs on a
+        # single tenoned timber.
+        #
+        # Refused HERE so the hover paints it red and the click says why, both
+        # of which follow from the verdict without either having to know about
+        # this rule.
+        return {"kinds": [], "plane": plane, "anchors": None, "angle": None,
+                "reason": "degenerate"}
     return {
         "kinds": kinds,
         "plane": plane,
-        # Where it would sit: anchors for a distance, a corner for an angle.
-        # By the rules that place it once written, so the preview IS the
-        # measurement rather than a likeness of one.
-        **_pick_placement(state, located_pick, timber, payload, slot_state),
+        **placement,
         "reason": None,
     }
 

@@ -3880,6 +3880,9 @@ class KigumiViewerApp extends LitElement {
             'nothing-under-pointer': 'there is nothing there to measure to',
             'no-kind': 'those two cannot be measured against each other from '
                 + 'this view -- turn the camera, or pick a different feature',
+            'degenerate': 'those two are in the same place, so there is nothing '
+                + 'between them to measure -- an arris lying on a face is the '
+                + 'usual way to land here',
         }[reason] || reason;
         // Through the viewer log, which the extension does listen for. It used
         // to post a `log` message as well, which nothing has ever handled -- so

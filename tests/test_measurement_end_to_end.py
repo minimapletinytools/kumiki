@@ -276,6 +276,96 @@ class TestAMeasurementMadeInTheThreeDView:
         assert across == pytest.approx(0.0, abs=1e-9)
 
 
+class TestAPairWithNothingBetweenThem:
+    """Two features in the same place measure nothing, and are refused.
+
+    An arris lying ON a face is the ordinary way to reach this -- a tenon cheek
+    and the edge that runs along it -- and there are a dozen such pairs on one
+    tenoned timber. They admitted a distance, which came to zero, and drew as
+    nothing: indistinguishable from a measurement that failed.
+    """
+
+    def _degenerate_pair(self, viewer):
+        """An arris and the face it lies on, found rather than assumed."""
+        import math
+
+        member = viewer.members[0]
+        for edge, face in (("arris.0", "tenon_front"), ("arris.1", "tenon_left"),
+                           ("arris.2", "tenon_back")):
+            try:
+                held = viewer.pick(member, edge)
+                viewer.pick(member, face, viewer.holding(held, LOOK, "3d"))
+            except AssertionError:
+                continue
+            return member, edge, face
+        raise AssertionError("the fixture has no arris lying on a face")
+
+    def test_the_fixture_has_such_a_pair(self, viewer):
+        # Without one, everything below passes by never reaching the rule.
+        member, edge, face = self._degenerate_pair(viewer)
+
+        assert edge and face and member
+
+    def test_it_is_refused_and_says_why(self, viewer):
+        member, edge, face = self._degenerate_pair(viewer)
+        held = viewer.pick(member, edge)
+
+        verdict = viewer.pick(member, face, viewer.holding(held, LOOK, "3d"))["verdict"]
+
+        assert verdict["kinds"] == []
+        assert verdict["reason"] == "degenerate"
+
+    def test_so_the_hover_paints_it_red_and_the_click_refuses(self, viewer):
+        # Both follow from the verdict without either knowing this rule: empty
+        # kinds is what the hover draws red and what the click turns away.
+        member, edge, face = self._degenerate_pair(viewer)
+        held = viewer.pick(member, edge)
+
+        verdict = viewer.pick(member, face, viewer.holding(held, LOOK, "3d"))["verdict"]
+
+        assert verdict is not None, "not an ordinary hover: a measurement IS being made"
+        assert verdict["kinds"] == [], "empty, which is what paints it red"
+
+    def test_and_nothing_is_offered_to_place(self, viewer):
+        # Neither anchors nor a corner: there is no measurement to place.
+        member, edge, face = self._degenerate_pair(viewer)
+        held = viewer.pick(member, edge)
+
+        verdict = viewer.pick(member, face, viewer.holding(held, LOOK, "3d"))["verdict"]
+
+        assert verdict["anchors"] is None
+        assert verdict["angle"] is None
+
+    def test_a_pair_with_something_between_them_is_untouched(self, viewer):
+        # The rule must not reach past the case it is for.
+        member = viewer.members[0]
+        held = viewer.pick(member, "rough.front")
+
+        verdict = viewer.pick(member, "rough.back",
+                              viewer.holding(held, LOOK, "3d"))["verdict"]
+
+        assert [kind["operation"] for kind in verdict["kinds"]] == ["distance"]
+        assert verdict["reason"] is None
+
+    def test_what_counts_as_the_same_place(self):
+        from kumiki.drawing import DEGENERATE_SEPARATION, is_degenerate_separation
+
+        assert is_degenerate_separation((1, 2, 3), (1, 2, 3)) is True
+        assert is_degenerate_separation((0, 0, 0), (DEGENERATE_SEPARATION / 10, 0, 0)) is True
+        assert is_degenerate_separation((0, 0, 0), (1, 0, 0)) is False
+
+    def test_the_anchors_decide_rather_than_the_features(self):
+        """Two features that merely TOUCH still measure something elsewhere.
+
+        It is where the dimension would attach that decides whether it comes to
+        anything, so the rule is asked of the anchors.
+        """
+        from kumiki.drawing import is_degenerate_separation
+
+        assert is_degenerate_separation((0, 0, 0), (0, 0, 0)) is True
+        assert is_degenerate_separation((0, 0, 0), (0, 0, 50)) is False
+
+
 class TestAMeasurementMadeOnASheet:
     """The same chain in a drawing, where a face is a line seen edge-on."""
 

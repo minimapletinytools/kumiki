@@ -367,6 +367,31 @@ class TestTheViewerAgrees:
         assert out.returncode == 0, out.stderr
         return json.loads(out.stdout)
 
+    def test_the_two_agree_on_what_counts_as_no_distance(self):
+        """One epsilon, two files.
+
+        The runner refuses a PICK whose ends land in the same place; the viewer
+        refuses to draw a WRITTEN measurement that comes to nothing. Different
+        moments, same rule, and two numbers that drifted apart would mean a pick
+        allowed and then never drawn -- which is the thing being fixed.
+        """
+        from kumiki.drawing import DEGENERATE_SEPARATION
+
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("node is not available")
+        script = (
+            "const m = require(%s);"
+            "process.stdout.write(String(m.DEGENERATE_WORLD));"
+            % json.dumps(str(Path(__file__).resolve().parent.parent
+                             / "kigumi" / "webview" / "measurements.js"))
+        )
+        out = subprocess.run([present(node, "node on PATH"), "-e", script],
+                             capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+
+        assert float(out.stdout) == DEGENERATE_SEPARATION
+
     def test_a_written_measurement_is_judged_the_way_a_pick_is(self):
         """The fifth place the verdict is decided, against the rules it must match.
 

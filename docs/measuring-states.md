@@ -90,6 +90,7 @@ A click is refused, with a reason said rather than silently ignored, when:
 | `no-reference` | a feature nobody declared, so a dimension to it could not be saved |
 | `not-measurable` | no plane or line of its own: a cylinder's barrel, a lofted side |
 | `no-kind` | the pair admits nothing in this space, from here |
+| `degenerate` | the two are in the same place, so there is nothing between them to measure |
 
 A refusal leaves `HOLDING` exactly as it was. The first end is not lost because
 the second was wrong.
