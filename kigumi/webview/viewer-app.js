@@ -4388,7 +4388,7 @@ class KigumiViewerApp extends LitElement {
         const held = this.measureDraft && this.measureDraft.heldEnd;
         const hover = this._hoverDrawn;
         return {
-            csg: (source && focus && source.key === csgFocusKey(focus)) ? source : null,
+            csg: window.KigumiHighlights.sourceForFocus(source, csgFocusKey(focus)),
             hover: hover ? {
                 key: `${hover.memberKey}|${(hover.path || []).join('/')}|${hover.featureLabel || ''}`,
                 mesh: hover.highlightMesh,
@@ -4415,34 +4415,28 @@ class KigumiViewerApp extends LitElement {
      * something should be lit; that is highlightsFor's job, and it is pure.
      */
     _reconcileHighlights(wanted) {
-        const seen = new Set();
-        for (const descriptor of wanted) {
-            seen.add(descriptor.id);
-            let object = this._highlightObjects.get(descriptor.id);
-            if (!object) {
-                object = this._buildHighlightObject(descriptor);
-                if (!object) {
-                    continue;
+        window.KigumiHighlights.reconcile(this._highlightObjects, wanted, {
+            build: (descriptor) => {
+                const object = this._buildHighlightObject(descriptor);
+                if (object) {
+                    this.scene.add(object);
                 }
-                this.scene.add(object);
-                this._highlightObjects.set(descriptor.id, object);
-            }
+                return object;
+            },
             // Appearance every pass, geometry only once: the opacity follows
             // the selection, which the old code froze at the moment the
             // message arrived.
-            object.material.color.setHex(descriptor.color);
-            object.material.opacity = descriptor.opacity;
-            object.renderOrder = descriptor.renderOrder;
-        }
-        for (const [id, object] of Array.from(this._highlightObjects.entries())) {
-            if (seen.has(id)) {
-                continue;
-            }
-            this.scene.remove(object);
-            object.geometry.dispose();
-            object.material.dispose();
-            this._highlightObjects.delete(id);
-        }
+            update: (object, descriptor) => {
+                object.material.color.setHex(descriptor.color);
+                object.material.opacity = descriptor.opacity;
+                object.renderOrder = descriptor.renderOrder;
+            },
+            drop: (object) => {
+                this.scene.remove(object);
+                object.geometry.dispose();
+                object.material.dispose();
+            },
+        });
     }
 
     /** One overlay, of either shape. */

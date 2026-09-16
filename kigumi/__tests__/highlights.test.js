@@ -208,3 +208,143 @@ describe('identity is what the reconciler keeps', () => {
         expect(dim[0].opacity).not.toBe(bright[0].opacity);
     });
 });
+
+describe('keeping the scene in step with the list', () => {
+    // The decisions -- what is new, what is still wanted, what has gone -- with
+    // the three.js half handed in. Untested until it was pulled out of
+    // viewer-app.js, which no test can load.
+    const { reconcile } = require('../webview/highlights.js');
+
+    function spy() {
+        const built = [];
+        const updated = [];
+        const dropped = [];
+        return {
+            built, updated, dropped,
+            handlers: {
+                build: (d) => { built.push(d.id); return { id: d.id, color: d.color }; },
+                update: (object, d) => { updated.push(d.id); object.color = d.color; },
+                drop: (object) => { dropped.push(object.id); },
+            },
+        };
+    }
+
+    const lit = (id, color = 1) => ({ id, color });
+
+    test('what is new is built', () => {
+        const watch = spy();
+        const existing = new Map();
+
+        reconcile(existing, [lit('a'), lit('b')], watch.handlers);
+
+        expect(watch.built).toEqual(['a', 'b']);
+        expect([...existing.keys()]).toEqual(['a', 'b']);
+    });
+
+    test('what is still wanted is updated, never rebuilt', () => {
+        // Its geometry has not changed; rebuilding would throw away a mesh to
+        // draw the same mesh.
+        const watch = spy();
+        const existing = new Map();
+        reconcile(existing, [lit('a')], watch.handlers);
+        watch.built.length = 0;
+
+        reconcile(existing, [lit('a', 0xff0000)], watch.handlers);
+
+        expect(watch.built).toEqual([]);
+        expect(watch.updated).toEqual(['a', 'a']);
+        expect(existing.get('a').color).toBe(0xff0000);
+    });
+
+    test('what has gone is dropped and forgotten', () => {
+        const watch = spy();
+        const existing = new Map();
+        reconcile(existing, [lit('a'), lit('b')], watch.handlers);
+
+        reconcile(existing, [lit('a')], watch.handlers);
+
+        expect(watch.dropped).toEqual(['b']);
+        expect([...existing.keys()]).toEqual(['a']);
+    });
+
+    test('an empty list drops everything', () => {
+        // Nothing selected, nothing hovered, nothing held: the scene empties
+        // because the list did, not because anything remembered to clear it.
+        const watch = spy();
+        const existing = new Map();
+        reconcile(existing, [lit('a'), lit('b')], watch.handlers);
+
+        reconcile(existing, [], watch.handlers);
+
+        expect(watch.dropped.sort()).toEqual(['a', 'b']);
+        expect(existing.size).toBe(0);
+    });
+
+    test('a descriptor nothing can be made of is skipped, not remembered', () => {
+        // A source can arrive without the geometry to draw. Storing a null
+        // would make the next pass think it was still there.
+        const existing = new Map();
+        const dropped = [];
+
+        reconcile(existing, [lit('a')], {
+            build: () => null,
+            update: () => { throw new Error('should not update what was never built'); },
+            drop: (object) => dropped.push(object),
+        });
+
+        expect(existing.size).toBe(0);
+        expect(dropped).toEqual([]);
+    });
+
+    test('and it is not dropped on the next pass either', () => {
+        const existing = new Map();
+        const dropped = [];
+        const handlers = { build: () => null, update: () => {}, drop: (o) => dropped.push(o) };
+
+        reconcile(existing, [lit('a')], handlers);
+        reconcile(existing, [lit('a')], handlers);
+
+        expect(dropped).toEqual([]);
+    });
+
+    test('the same list twice changes nothing the second time', () => {
+        const watch = spy();
+        const existing = new Map();
+        const list = [lit('a'), lit('b')];
+        reconcile(existing, list, watch.handlers);
+        watch.built.length = 0;
+        watch.dropped.length = 0;
+
+        reconcile(existing, list, watch.handlers);
+
+        expect(watch.built).toEqual([]);
+        expect(watch.dropped).toEqual([]);
+    });
+
+    test('missing handlers are tolerated rather than thrown at', () => {
+        expect(() => reconcile(new Map(), [lit('a')], undefined)).not.toThrow();
+    });
+});
+
+describe('a selection highlight outliving its selection', () => {
+    const { sourceForFocus } = require('../webview/highlights.js');
+    const source = { key: 'post#0|cut|front', mesh: {} };
+
+    test('is offered while the focus still names it', () => {
+        expect(sourceForFocus(source, 'post#0|cut|front')).toBe(source);
+    });
+
+    test('and not once the focus has moved', () => {
+        // The geometry is kept so the overlay can be re-derived; a message from
+        // before the focus moved describes a selection nobody has.
+        expect(sourceForFocus(source, 'girt#0|cut|back')).toBeNull();
+    });
+
+    test('nor when there is no focus at all', () => {
+        expect(sourceForFocus(source, null)).toBeNull();
+    });
+
+    test('and no source is no highlight', () => {
+        expect(sourceForFocus(null, 'post#0|cut|front')).toBeNull();
+    });
+});

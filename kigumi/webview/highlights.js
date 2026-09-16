@@ -172,8 +172,71 @@
         return out;
     }
 
+    /**
+     * Which selection geometry is still about the selection.
+     *
+     * The runner's answer is kept rather than drawn on arrival, so it outlives
+     * the moment it arrived in -- and a message from before the focus moved
+     * describes a selection nobody has. Offered only while it still names what
+     * is focused, which is how a stale highlight stops being possible rather
+     * than being cleaned up after.
+     */
+    function sourceForFocus(source, focusKey) {
+        if (!source || !focusKey || source.key !== focusKey) {
+            return null;
+        }
+        return source;
+    }
+
+    /**
+     * Make what exists match what should exist.
+     *
+     * `existing` is a Map of id to whatever the caller builds; `build`,
+     * `update` and `drop` are how it makes, refreshes and disposes of one. The
+     * three.js half lives with the caller; the DECISIONS -- what is new, what
+     * is still wanted, what has gone -- live here, where they can be checked.
+     *
+     * An overlay that is still wanted is UPDATED, never rebuilt: its geometry
+     * has not changed, only its colour or opacity might have, and rebuilding
+     * would throw away a mesh to draw the same mesh.
+     */
+    function reconcile(existing, wanted, handlers) {
+        const { build, update, drop } = handlers || {};
+        const seen = new Set();
+        for (const descriptor of wanted || []) {
+            seen.add(descriptor.id);
+            let object = existing.get(descriptor.id);
+            if (object === undefined) {
+                object = build ? build(descriptor) : null;
+                if (object === null || object === undefined) {
+                    // Nothing could be made of it. Not an error -- a source can
+                    // arrive without the geometry to draw -- and not a reason
+                    // to stop.
+                    seen.delete(descriptor.id);
+                    continue;
+                }
+                existing.set(descriptor.id, object);
+            }
+            if (update) {
+                update(object, descriptor);
+            }
+        }
+        for (const id of Array.from(existing.keys())) {
+            if (seen.has(id)) {
+                continue;
+            }
+            if (drop) {
+                drop(existing.get(id));
+            }
+            existing.delete(id);
+        }
+        return existing;
+    }
+
     const KigumiHighlights = {
         highlightsFor,
+        reconcile,
+        sourceForFocus,
         CSG_COLORS,
         HOVER_COLOR,
         HOVER_REFUSED_COLOR,
