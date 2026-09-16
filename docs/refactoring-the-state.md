@@ -171,11 +171,24 @@ each gesture a name so teardown can end whatever is running without knowing what
 that is. Pointer listeners go up in two places and come down in two, which a
 test checks by reading which method each sits in.
 
-**5. Declare the protocol.** One list of message types shared by both sides,
-with a test that every posted type is handled and every handled type is posted.
-It deletes the two dead handlers and closes the silent-drop class for good —
-the existing `pick-payload-wiring` test does this for one message's fields, and
-this is the same idea for the whole surface.
+**5. Declare the protocol.** *Done, and it found more than it was aimed at.*
+`message-types.js` declares the surface and a test reconciles both sides against
+it. Neither side imports the declaration and neither needs to: a typo fails as
+an undeclared type, which is the same catch by a shorter road than rewriting
+forty call sites.
+
+What it caught on its first run:
+
+- Two handlers for messages nobody sends, as expected.
+- **Measurement refusals posted into the void.** They went out as `log`; the
+  extension only knows `viewerLog`. Every reason a pick was refused was sent
+  twice and arrived once.
+- **The hover's `currentPath` dropped in the rebuild** — a fifth instance of
+  the silent-drop class, and a behavioural one: the hover asked the runner from
+  the top of the tree while a click asked from the focus, so once you had
+  drilled into a timber the hover lit the outer node and the click took
+  something deeper. The rule that hover must ask what the click asks is now a
+  test rather than a comment.
 
 ## What I would not do
 

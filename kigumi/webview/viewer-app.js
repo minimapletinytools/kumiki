@@ -3954,10 +3954,10 @@ class KigumiViewerApp extends LitElement {
             'no-kind': 'those two cannot be measured against each other from '
                 + 'this view -- turn the camera, or pick a different feature',
         }[reason] || reason;
+        // Through the viewer log, which the extension does listen for. It used
+        // to post a `log` message as well, which nothing has ever handled -- so
+        // every reason a pick was refused went out twice and arrived once.
         this.emitViewerLog('measure-refused', { reason, said });
-        if (typeof vscode !== 'undefined') {
-            vscode.postMessage({ type: 'log', text: `[measure] ${said}` });
-        }
     }
 
 

@@ -406,28 +406,6 @@ class FrameViewSession {
                 });
                 return;
             }
-            if (message.type === 'requestExportStl') {
-                this._handleExportBatchRequest({
-                    formats: ['stl', '3mf'],
-                    includeCombined: true,
-                    includeIndividuals: message.includeIndividuals !== false,
-                    includeAccessories: message.includeAccessories !== false,
-                }).catch((err) => {
-                    this.log(`[export] requestExportStl error: ${err.message || err}`);
-                });
-                return;
-            }
-            if (message.type === 'requestExportStep') {
-                this._handleExportBatchRequest({
-                    formats: ['step'],
-                    includeCombined: true,
-                    includeIndividuals: message.includeIndividuals !== false,
-                    includeAccessories: message.includeAccessories !== false,
-                }).catch((err) => {
-                    this.log(`[export] requestExportStep error: ${err.message || err}`);
-                });
-                return;
-            }
             if (message.type === 'requestExportFiles') {
                 this._handleExportBatchRequest(message).catch((err) => {
                     this.log(`[export] requestExportFiles error: ${err.message || err}`);
@@ -1033,6 +1011,11 @@ class FrameViewSession {
         const result = await this.runnerSession.slotRequest('hover_feature_at_point', this.slotName, {
             memberKey: message.memberKey,
             point: message.point,
+            // From wherever the selection already is, exactly as the click
+            // does. Dropped here, the hover asked from the top of the tree
+            // while a click asked from the focus -- so once you had drilled in,
+            // the hover lit the outer node and the click took something deeper.
+            currentPath: message.currentPath || [],
             // The same tolerances the click will use. Hover that answers by a
             // different rule lights things a click then refuses.
             tolerances: message.tolerances || null,
