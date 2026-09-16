@@ -257,3 +257,58 @@ describe('anchorIsMeasurable', () => {
             .toBe('not-measurable');
     });
 });
+
+describe('the comparable form of a reference', () => {
+    // Load-bearing twice over: it decides whether a pick is the end already
+    // held, and it is what the held HIGHLIGHT is keyed by, so two references
+    // that compare equal must key equal too.
+    const { referenceKey } = require('../webview/measure-draft.js');
+    const key = (reference) => JSON.stringify(referenceKey(reference));
+
+    test('a plain feature is its timber, path, name and type', () => {
+        expect(referenceKey({
+            timber: 'post#0', csgPath: ['cut'], feature: 'front', type: 'FACE',
+        })).toEqual(['post#0', 'single', 'cut', 'front', 'FACE']);
+    });
+
+    test('the same feature on another timber keys differently', () => {
+        expect(key({ timber: 'post#0', csgPath: [], feature: 'front' }))
+            .not.toBe(key({ timber: 'girt#0', csgPath: [], feature: 'front' }));
+    });
+
+    test('and the same name at a different depth does too', () => {
+        expect(key({ timber: 'post#0', csgPath: ['cut'], feature: 'front' }))
+            .not.toBe(key({ timber: 'post#0', csgPath: ['cut', 'deeper'], feature: 'front' }));
+    });
+
+    test('an edge keys the same written either way round', () => {
+        // The same two faces make the same edge, and python sorts its parents
+        // for exactly this reason.
+        const one = { kind: 'edge', timber: 'post#0', a: PARENT_X, b: PARENT_Y };
+        const other = { kind: 'edge', timber: 'post#0', a: PARENT_Y, b: PARENT_X };
+
+        expect(key(one)).toBe(key(other));
+    });
+
+    test('but two different edges do not', () => {
+        const one = { kind: 'edge', timber: 'post#0', a: PARENT_X, b: PARENT_Y };
+        const other = {
+            kind: 'edge', timber: 'post#0',
+            a: PARENT_X, b: { csgPath: ['body'], feature: 'z' },
+        };
+
+        expect(key(one)).not.toBe(key(other));
+    });
+
+    test('an edge and a plain feature are never the same thing', () => {
+        expect(key({ kind: 'edge', timber: 'post#0', a: PARENT_X, b: PARENT_Y }))
+            .not.toBe(key({ timber: 'post#0', csgPath: ['cut'], feature: 'x' }));
+    });
+
+    test('a parent with nothing in it still keys', () => {
+        // References come off the wire; a missing half must not throw where it
+        // is used, which is on every frame that draws a held end.
+        expect(() => referenceKey({ kind: 'edge', timber: 'post#0', a: null, b: PARENT_Y }))
+            .not.toThrow();
+    });
+});

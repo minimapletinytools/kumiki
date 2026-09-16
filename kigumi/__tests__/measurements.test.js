@@ -874,3 +874,121 @@ describe('the arc of an angle lies in the angle\'s own plane', () => {
         expect(angleArcPoints(square, 100).length).toBeGreaterThan(8);
     });
 });
+
+describe('a frame is never stopped by one bad measurement', () => {
+    // measureValue runs for every measurement on every frame, inside the render
+    // loop. A throw there stops the frame -- which has happened: an arc built
+    // from a form that had no direction took the whole viewer down until a
+    // reload. A measurement that describes nothing should draw nothing, not
+    // stop everything.
+    const { measureValue, angleArcPoints, hasDirection } = Measurements;
+    const AXES = { look: [0, 0, -1], right: [1, 0, 0], up: [0, 0, 1] };
+    const FORMS = [{ form: 'plane' }, { form: 'line' }, { form: 'point' }, { form: 'area' }, {}];
+    const KINDS = [
+        'angle', 'perpendicular_distance', 'projected_angle',
+        'projected_perpendicular_distance', 'projected_horizontal_distance',
+        'projected_vertical_distance',
+    ];
+
+    test.each(KINDS)('%s answers for every shape of form, however empty', (kind) => {
+        for (const a of FORMS) {
+            for (const b of FORMS) {
+                const value = measureValue(kind, [0, 0, 0], [1, 2, 3], a, b, AXES);
+                expect(typeof value.value).toBe('number');
+                expect(Number.isNaN(value.value)).toBe(false);
+            }
+        }
+    });
+
+    test('an angle between nothing is zero, not an exception', () => {
+        expect(measureValue('projected_angle', [0, 0, 0], [1, 0, 0], {}, {}, AXES))
+            .toEqual({ unit: 'angle', value: 0 });
+    });
+
+    test('rays of no length describe no corner, so no arc is drawn', () => {
+        // Sweeping them would pile identical points on one spot, which reads as
+        // a dot sitting on the timber.
+        expect(angleArcPoints({ vertex: [0, 0, 0], from: [0, 0, 0], to: [0, 1, 0] }, 10))
+            .toEqual([]);
+    });
+
+    test('and neither do two rays pointing the same way', () => {
+        // Parallel rays span no plane, so there is no way round from one to the
+        // other.
+        expect(angleArcPoints({ vertex: [0, 0, 0], from: [1, 0, 0], to: [1, 0, 0] }, 10))
+            .toEqual([]);
+    });
+
+    test('what counts as a direction', () => {
+        expect(hasDirection([1, 0, 0])).toBe(true);
+        expect(hasDirection([0, 0, 0])).toBe(false);
+        expect(hasDirection([NaN, 0, 0])).toBe(false);
+        expect(hasDirection([1, 0])).toBe(false);
+        expect(hasDirection(null)).toBe(false);
+    });
+});
+
+describe('which space a measurement is judged in', () => {
+    // Three shipped bugs came from this decision, and it was only ever tested
+    // through the answers it produced.
+    const { measureSpace } = Measurements;
+
+    test('its own kind says, when it has one written structured', () => {
+        expect(measureSpace({ kind: { operation: 'angle', space: '3d' } }, {})).toBe('3d');
+    });
+
+    test('and that beats what the view says', () => {
+        // A measurement carries the space it was taken in. The view it happens
+        // to be shown in does not change what it measured.
+        expect(measureSpace({ kind: { operation: 'angle', space: '3d' } }, { space: 'projected' }))
+            .toBe('3d');
+    });
+
+    test('a kind that arrived as a bare name cannot say', () => {
+        // `angle` is the solid name AND the pre-spaces projected one.
+        expect(measureSpace({ kind: 'angle' }, { space: '3d' })).toBe('3d');
+    });
+
+    test('so the view answers instead', () => {
+        expect(measureSpace({}, { space: '3d' })).toBe('3d');
+    });
+
+    test('and a sheet is what is assumed when nothing says', () => {
+        // Only the 3D view has no sheet to project onto.
+        expect(measureSpace({}, {})).toBe('projected');
+        expect(measureSpace(null, null)).toBe('projected');
+    });
+});
+
+describe('whether two solid features run together', () => {
+    // A normal is not a direction, and getting that backwards calls an edge
+    // lying in a face a crossing.
+    const { solidParallel, solidForm } = Measurements;
+    const face = (normal) => solidForm({ kind: 'plane', normal });
+    const edge = (direction) => solidForm({ kind: 'line', direction });
+
+    test('two faces are parallel when their NORMALS align', () => {
+        expect(solidParallel(face([0, 0, 1]), face([0, 0, -1]))).toBe(true);
+        expect(solidParallel(face([0, 0, 1]), face([1, 0, 0]))).toBe(false);
+    });
+
+    test('two edges when their DIRECTIONS do', () => {
+        expect(solidParallel(edge([1, 0, 0]), edge([-1, 0, 0]))).toBe(true);
+        expect(solidParallel(edge([1, 0, 0]), edge([0, 1, 0]))).toBe(false);
+    });
+
+    test('but an edge and a face when they are SQUARE to each other', () => {
+        // The edge lies in the plane exactly when it runs across the normal.
+        expect(solidParallel(edge([1, 0, 0]), face([0, 0, 1]))).toBe(true);
+        expect(solidParallel(edge([0, 0, 1]), face([0, 0, 1]))).toBe(false);
+    });
+
+    test('and the answer does not depend on which was picked first', () => {
+        expect(solidParallel(face([0, 0, 1]), edge([1, 0, 0])))
+            .toBe(solidParallel(edge([1, 0, 0]), face([0, 0, 1])));
+    });
+
+    test('a feature with no orientation cannot be compared', () => {
+        expect(solidParallel(solidForm({ kind: 'point' }), face([0, 0, 1]))).toBeNull();
+    });
+});

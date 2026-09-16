@@ -121,6 +121,13 @@
     });
 
     /** A kind by its composed name, whatever name it arrived under. */
+    /** Whether a vector points anywhere. Guards every rule that normalises one. */
+    function hasDirection(vector) {
+        return Array.isArray(vector)
+            && vector.length === 3
+            && vector.some((part) => Number.isFinite(part) && Math.abs(part) > 1e-12);
+    }
+
     function normalizeKind(kind) {
         return LEGACY_KINDS[kind] || kind;
     }
@@ -374,7 +381,8 @@
             // are one answer. Normals alone cannot tell 45 degrees from 135 --
             // they give the same absolute dot either way -- which is the whole
             // reason the side has to be settled where the corner is.
-            if (axes && axes.rays) {
+            if (axes && axes.rays
+                    && hasDirection(axes.rays.from) && hasDirection(axes.rays.to)) {
                 const facing = Math.max(-1, Math.min(1,
                     dot(normalized(axes.rays.from), normalized(axes.rays.to))));
                 return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
@@ -382,6 +390,13 @@
             // No rays: a pair that makes no corner, or an older measurement.
             const one = orientationOf(formA);
             const other = orientationOf(formB);
+            if (!hasDirection(one) || !hasDirection(other)) {
+                // Nothing to take an angle between. Answered rather than
+                // thrown: this runs for every measurement on every frame,
+                // inside the render loop, and a throw there stops the frame --
+                // which has happened, and froze the viewer until a reload.
+                return { unit: 'angle', value: 0 };
+            }
             const facing = Math.min(1, Math.abs(dot(one, other)));
             const between = Math.acos(facing) * 180 / Math.PI;
             return {
@@ -392,8 +407,8 @@
         if (named === 'perpendicular_distance') {
             // In the solid, so the whole separation rather than the part of it
             // that survives a projection.
-            const plane = formA.form === 'plane' ? formA
-                : (formB.form === 'plane' ? formB : null);
+            const plane = formA.form === 'plane' && hasDirection(formA.normal) ? formA
+                : (formB.form === 'plane' && hasDirection(formB.normal) ? formB : null);
             if (plane) {
                 // To a plane, the distance is taken along its normal.
                 return {
@@ -401,8 +416,8 @@
                     value: Math.abs(dot(delta, normalized(plane.normal))),
                 };
             }
-            const solidLine = formA.form === 'line' ? formA
-                : (formB.form === 'line' ? formB : null);
+            const solidLine = formA.form === 'line' && hasDirection(formA.direction) ? formA
+                : (formB.form === 'line' && hasDirection(formB.direction) ? formB : null);
             if (solidLine === null) {
                 return { unit: 'length', value: length(delta) };
             }
@@ -418,6 +433,11 @@
             };
         }
         if (named === 'projected_angle') {
+            if (!hasDirection(formA.direction) || !hasDirection(formB.direction)) {
+                // Two lines with no direction subtend nothing. Answered rather
+                // than thrown: this runs for every measurement on every frame.
+                return { unit: 'angle', value: 0 };
+            }
             const facing = Math.min(1, Math.abs(dot(formA.direction, formB.direction)));
             return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
         }
@@ -431,7 +451,8 @@
             // Between two points there is no line to be square to, and the
             // shortest distance is just the distance -- which is what makes
             // this one kind rather than the two it used to be.
-            const line = formA.form === 'line' ? formA : (formB.form === 'line' ? formB : null);
+            const line = formA.form === 'line' && hasDirection(formA.direction) ? formA
+                : (formB.form === 'line' && hasDirection(formB.direction) ? formB : null);
             if (line === null) {
                 return { unit: 'length', value: length(flat) };
             }
@@ -473,8 +494,19 @@
      * `radius` is in world units, so the arc foreshortens with everything else.
      */
     function angleArcPoints(rays, radius, samples) {
+        if (!hasDirection(rays && rays.from) || !hasDirection(rays && rays.to)) {
+            // Not a corner. A measurement carrying rays of no length describes
+            // nothing, and sweeping them would draw a heap of identical points
+            // that reads as a dot on the timber.
+            return [];
+        }
         const from = normalized(rays.from);
         const upright = normalized(rays.normal || cross(rays.from, rays.to));
+        if (!hasDirection(upright)) {
+            // Parallel rays span no plane, so there is no way round from one to
+            // the other.
+            return [];
+        }
         // In the plane, square to `from`, turning toward `to`.
         const across = cross(upright, from);
         const facing = Math.max(-1, Math.min(1, dot(from, normalized(rays.to))));
@@ -852,6 +884,7 @@
         kindWire,
         solidForm,
         orientationOf,
+        hasDirection,
         solidKinds,
         solidParallel,
         measurementStatus,
