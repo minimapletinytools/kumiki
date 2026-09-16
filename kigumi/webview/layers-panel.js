@@ -50,6 +50,13 @@
             this.tagIndex = [];
             this.tagEntriesById = new Map();
             this.el = null;
+            // Where the tree is scrolled to. The tree is wiped and rebuilt on
+            // every change, and emptying a scroll container puts it back at the
+            // top, so the place has to outlive the rows.
+            this._treeScrollTop = 0;
+            // Which row has been scrolled into view, so a rebuild does not do
+            // it again. See _reveal.
+            this._revealedNodeId = null;
             // Drawings, and which of them is open. Set by the viewer; the panel
             // keeps no list of its own to fall out of step.
             this.drawings = [];
@@ -144,6 +151,7 @@
 
         _render() {
             if (!this.el) return;
+            this._rememberTreeScroll();
             this.el.innerHTML = '';
             this.el.className = 'lp-panel ' + (this.collapsed ? 'lp-collapsed' : 'lp-expanded');
             if (this.viewport) {
@@ -164,7 +172,12 @@
             });
             this.el.appendChild(toggleBtn);
 
-            if (this.collapsed) return;
+            if (this.collapsed) {
+                // The tree went with the wipe. Left set, it would be a detached
+                // element later renders drew into and nobody saw.
+                this._treeEl = null;
+                return;
+            }
 
             const header = document.createElement('div');
             header.className = 'lp-header';
@@ -200,6 +213,7 @@
 
         _renderTree() {
             if (!this._treeEl) return;
+            this._rememberTreeScroll();
             this._treeEl.innerHTML = '';
             if (this.drawingsEnabled) {
                 // No save button here. Saving is offered in the drawing panel,
@@ -224,7 +238,27 @@
                     () => this._makeMeasurementsEyeButton(),
                 );
             }
+            // Before the highlight, which may scroll to reveal a row: put the
+            // reader back where they were first, then let a reveal move from
+            // there. Done the other way round, a reveal would be undone.
+            this._treeEl.scrollTop = this._treeScrollTop;
             this._syncHighlight();
+        }
+
+        /**
+         * Note where the tree is scrolled to, for the rebuild about to wipe it.
+         *
+         * Pulled from the element at the one moment it matters -- just before
+         * the rows go -- rather than tracked on every scroll event.
+         *
+         * A tree with no rows has no position worth keeping. That is the empty
+         * one _render() has just built, and taking its 0 would throw away the
+         * place we are about to return to.
+         */
+        _rememberTreeScroll() {
+            if (this._treeEl && this._treeEl.children.length) {
+                this._treeScrollTop = this._treeEl.scrollTop;
+            }
         }
 
         _renderSection(parent, sectionId, title, buildRows, buildAction) {
@@ -871,14 +905,37 @@
                     '.lp-row-csg[data-node-id="' + CSS.escape(focusedId) + '"]');
                 if (row) {
                     row.classList.add('lp-selected');
-                    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    this._reveal(focusedId, row);
                 }
             } else if (selectedTimbers.size === 1) {
                 // Scroll to selected timber row (canvas click)
                 const key = Array.from(selectedTimbers)[0];
                 const row = this.el.querySelector('.lp-row[data-node-id="timber:' + CSS.escape(key) + '"]');
-                if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                if (row) this._reveal('timber:' + key, row);
+            } else {
+                this._revealedNodeId = null;
             }
+        }
+
+        /**
+         * Scroll a row into view, but only when it is not the one already shown.
+         *
+         * Marking rows selected is DERIVED, and redone on every rebuild at no
+         * cost. Scrolling to one is an EFFECT, and re-running it on a rebuild
+         * moved the tree under the reader: clicking a 3D measurement rebuilds
+         * the tree, and the rebuild scrolled back to whichever timber was
+         * selected -- above the measurements, so always upward, and away from
+         * the row just clicked.
+         *
+         * What is remembered is the one row showing now, so coming back to a
+         * row after looking at another reveals it again.
+         */
+        _reveal(nodeId, row) {
+            if (this._revealedNodeId === nodeId) {
+                return;
+            }
+            this._revealedNodeId = nodeId;
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
 
         /**
@@ -922,6 +979,10 @@
                 this._focusedCsgNodeId = target.id;
                 this.selectionManager.setFocusedNodeId(target.id);
             }
+            // Asked for by name, so it scrolls even to the row already showing.
+            // _reveal suppresses the reveals a rebuild would repeat, not the
+            // ones somebody requested.
+            this._revealedNodeId = null;
             this._renderTree();
         }
 
