@@ -46,6 +46,42 @@ const KigumiMeasurements = window.KigumiMeasurements;
 // One definition of a measurement's identity, shared with the panels.
 const { measurementKey } = KigumiMeasurements;
 const { DrawingPanel } = window.KigumiDrawingPanel;
+// Read off `window` like their neighbours above rather than left as bare
+// globals. They resolved either way -- these modules publish the name -- but
+// only by accident of load order, and an accident is what kept the missing
+// declarations below invisible for so long.
+const CsgTreeView = window.CsgTreeView;
+const KigumiKiwariValues = window.KigumiKiwariValues;
+const choosePickAction = window.choosePickAction;
+
+// Swept away with the unused constants around it when the state was folded out
+// of this file, and every name here is used still. Six of them went on working
+// by accident -- selection-store.js and its neighbours publish the same names
+// on `window`, so a bare read finds the global -- which is why the viewer only
+// broke at the first one that has no global to fall back on. Declared, so that
+// what this file depends on is stated rather than inherited.
+const INITIAL_PAYLOAD = window.__KIGUMI_INITIAL_PAYLOAD__ || {
+    frame: {},
+    geometry: { meshes: [] },
+    uiState: {
+        phase: ViewerPhase.WAITING_FOR_RUNNER,
+        loadingText: 'raising frame',
+        refreshToken: 0,
+    },
+    viewerOptions: {},
+    viewerSettings: null,
+};
+// Acquired by boot-diagnostics.js, which runs first so it can catch a module
+// that throws on evaluation. acquireVsCodeApi() may only be called once.
+const vscode = window.__kigumiVsCode
+    || (typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null);
+const VIEWER_APP_VERSION = '2026.03.17.4';
+const SelectionStore = window.SelectionStore;
+const CameraController = window.CameraController;
+const GeometryMode = window.GeometryMode;
+const KigumiTags = window.KigumiTags;
+const KigumiUnits = window.KigumiUnits;
+const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
 /**
  * What names one measurement within its viewport.
@@ -176,6 +212,29 @@ const DEFAULT_AXIS_ORBIT_SPEED = 0.008;
 // A drag on a locked viewport turns more slowly than a free orbit -- it is a
 // nudge within a small cone, so the same hand movement should cover less of it.
 const TILT_ORBIT_SPEED = 0.0016;
+
+// How long to wait for a paint before going ahead without one. Comfortably
+// longer than a healthy frame, so it only takes effect when paints have
+// actually stopped.
+const PAINT_WAIT_FALLBACK_MS = 100;
+
+const DEFAULT_FOOTPRINT_COLOR = 'orange';
+
+function normalizeViewerOptions(viewerOptions) {
+    const opts = (viewerOptions && typeof viewerOptions === 'object') ? viewerOptions : {};
+    const geometryMode = GeometryMode.VALID_MODES.has(opts.geometryMode) ? opts.geometryMode : GeometryMode.DEFAULT_MODE;
+    return { geometryMode };
+}
+
+function createInitialViewState() {
+    return {
+        phase: ViewerPhase.BOOTING,
+        loadingText: t('viewer.chrome.loading.raisingFrame'),
+        refreshToken: 0,
+        error: null,
+        sourceHasPendingChanges: false,
+    };
+}
 
 // A selected edge is drawn as a line rather than shaded like a face, so it
 // needs a width of its own -- several times the timbers' own edge lines, or the
