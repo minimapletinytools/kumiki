@@ -1,8 +1,13 @@
 # Measurements — specification
 
-Status: agreed, not yet built. Supersedes the measurement parts of
-`drawing-mode-plan.md`, which stands for everything about scenes, pages and
-viewports.
+Status: built. Supersedes the measurement parts of `drawing-mode-plan.md`,
+which stands for everything about scenes, pages and viewports.
+
+What was built differs from this document in one way worth knowing before
+reading it: the pending/confirmed pair described below became a hold-and-hover
+flow -- you take one end, and the measurement previews against whatever the
+pointer is over until a click writes it. `measuring-states.md` is the account
+of what exists; this remains the reasoning behind it.
 
 This is an overhaul rather than an extension. The picking interaction on the
 `measure-mode-wiring` branch is replaced: measurements now start from a feature
