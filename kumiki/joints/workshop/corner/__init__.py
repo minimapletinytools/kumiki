@@ -18,6 +18,10 @@ from .mitered_and_keyed_lap_joint import (
     cut_箱相欠き車知栓仕口,
     cut_hako_aikaki_shachi_sen_shikuchi,
 )
+from .dovetail_corner_joint import (
+    SingleDovetailSizeParameter,
+    cut_dovetail_corner_joint,
+)
 
 __all__ = [
     "cut_plain_miter_joint",
@@ -28,4 +32,6 @@ __all__ = [
     "cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers",
     "cut_箱相欠き車知栓仕口",
     "cut_hako_aikaki_shachi_sen_shikuchi",
+    "SingleDovetailSizeParameter",
+    "cut_dovetail_corner_joint",
 ]
