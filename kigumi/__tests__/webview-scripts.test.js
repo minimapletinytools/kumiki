@@ -505,3 +505,89 @@ describe('a pointer gesture owns its listeners', () => {
             .toContain('this._endPointerGesture(name);');
     });
 });
+
+// The right-click menu that lists the features under the pointer. Reaching one
+// of its rows means moving the pointer off the canvas, which cleared the hover
+// -- so every row did nothing at all. The hover is PINNED while the menu is up,
+// and these guard the four places that has to hold. viewer-app.js cannot be
+// loaded here (it imports lit and defines a custom element), so they are read.
+describe('the feature menu holds the hover still', () => {
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+    test('opening the menu pins, and a menu that did not open does not', () => {
+        const body = methodBody(app, 'showFeatureContextMenu');
+
+        expect(body).toMatch(/if \(!this\._hover\.pin\(\)\) \{\s*return false;/);
+        expect(body).toContain('this._hover.unpin()');
+    });
+
+    test('closing it unpins, whether or not anything was open', () => {
+        // Choosing a row closes the menu BEFORE onChoose runs, so a close that
+        // only unpinned when it found something open would never unpin at all.
+        const body = methodBody(app, 'closeMemberContextMenu');
+        const unpinAt = body.indexOf('this._hover.unpin()');
+
+        expect(unpinAt).toBeGreaterThan(-1);  // -1 would pass the ordering below
+        expect(unpinAt).toBeLessThan(body.indexOf('this.contextMenu.close()'));
+    });
+
+    test('leaving the canvas cannot take a pinned hover down', () => {
+        const body = methodBody(app, 'clearHover');
+
+        expect(body).toMatch(/this\._hover\.pinned[\s\S]*?return false;/);
+    });
+
+    test('taking a row unpins before it clicks', () => {
+        // What follows is an ordinary click, and it reads the hover the pointer
+        // owns. Clicking first would have it read a pinned one.
+        const body = methodBody(app, '_takeFeatureFromMenu');
+        const unpinAt = body.indexOf('this._hover.unpin()');
+
+        // Asserted present first: a missing line indexOf's to -1, which is
+        // less than anything and would pass this as an ordering.
+        expect(unpinAt).toBeGreaterThan(-1);
+        expect(unpinAt).toBeLessThan(body.indexOf('this.handleCanvasClick('));
+    });
+
+    test('a row is taken by the same click the view would make', () => {
+        // Not a second copy of the decision: drilling, selecting and taking a
+        // measurement end are all handleCanvasClick's job to tell apart.
+        const body = methodBody(app, '_takeFeatureFromMenu');
+
+        expect(body).toContain('this.handleCanvasClick(');
+        expect(body).toMatch(/clientX: at\.x/);
+        expect(body).toMatch(/shiftKey: Boolean\(event/);
+    });
+
+    test('which row is marked is derived, not stored on the items', () => {
+        // Stored, it would be a second opinion about which feature is lit, and
+        // Tab moves it without the pointer moving.
+        const body = methodBody(app, 'showFeatureContextMenu');
+
+        expect(body).not.toMatch(/checked:/);
+        expect(methodBody(app, '_featureMenuActiveId')).toContain('drawn.candidateIndex');
+    });
+
+    test('a new answer reaches the menu, which marks the row it came from', () => {
+        // Tab changes the answer without the pointer moving, and nothing else
+        // would draw the menu again.
+        const body = methodBody(app, 'handleHoverResult');
+
+        expect(body).toMatch(
+            /this\._hover\.markDrawn\(message\);[\s\S]*?contextMenu\.isOpen[\s\S]*?requestUpdate\(\)/);
+    });
+
+    test('hovering a row is answered only for a pinned hover', () => {
+        // Bound on every row of every menu, so the guard is what keeps the
+        // export menu out of it.
+        const body = methodBody(app, '_showFeatureFromMenu');
+
+        expect(body).toContain('this._hover.pinned');
+    });
+
+    test('and a mode change closes the menu before it clears the hover', () => {
+        const at = app.indexOf('this.closeMemberContextMenu();\n        this.clearHover();');
+
+        expect(at).toBeGreaterThan(-1);
+    });
+});

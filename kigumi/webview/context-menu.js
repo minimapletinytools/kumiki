@@ -30,8 +30,8 @@
             if (!this._open) {
                 return null;
             }
-            const { x, y, title, items } = this._open;
-            return { x, y, title, items };
+            const { x, y, title, items, kind } = this._open;
+            return { x, y, title, items, kind };
         }
 
         /**
@@ -41,10 +41,15 @@
          * with the id of whatever is picked, and the menu closes either way --
          * a menu that stays open after a choice is one nobody dismissed.
          *
+         * `kind` says WHICH menu this is, for a caller that renders one of them
+         * differently -- the feature menu marks the row the view is lighting,
+         * which the export menu has no notion of. Carried rather than inferred
+         * from the items, which would be a second place to decide it.
+         *
          * Opening replaces whatever was open. Two menus at once is not a state
          * worth being able to reach.
          */
-        open({ x, y, title, items, onChoose }) {
+        open({ x, y, title, items, kind, onChoose }) {
             const usable = (items || []).filter((item) => item && item.id);
             if (usable.length === 0) {
                 // Nothing to offer is not a menu. Saying so here means no
@@ -52,7 +57,9 @@
                 this._open = null;
                 return false;
             }
-            this._open = { x, y, title: title || null, items: usable, onChoose };
+            this._open = {
+                x, y, title: title || null, kind: kind || null, items: usable, onChoose,
+            };
             return true;
         }
 
@@ -68,8 +75,13 @@
          * A disabled item is offered so that what is NOT available is visible
          * rather than missing, and choosing one does nothing at all -- not even
          * close, since the menu has not been used.
+         *
+         * `event` is whatever chose, passed through untouched: shift and ctrl
+         * mean the same thing on a menu row as on the thing it stands for, and
+         * a menu that dropped them would be a different click from the one it
+         * is offering.
          */
-        choose(id) {
+        choose(id, event) {
             if (!this._open) {
                 return false;
             }
@@ -80,7 +92,7 @@
             const { onChoose } = this._open;
             this._open = null;
             if (typeof onChoose === 'function') {
-                onChoose(id, item);
+                onChoose(id, item, event || null);
             }
             return true;
         }

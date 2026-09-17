@@ -988,7 +988,12 @@ class FrameViewSession {
             // measurement rather than the most specific one, says whether it
             // can, and works out the plane -- all in the request that was being
             // made anyway.
-            candidateIndex: message.candidateIndex || 0,
+            // `?? null`, NOT `|| 0`: null means "choose for me" and zero is a
+            // choice. Collapsing them made _best_matching_candidate unreachable
+            // from the viewer -- every hover was forced to the first feature at
+            // the point, so while an end was held the runner could not offer
+            // the one that finishes the measurement, which is what it is for.
+            candidateIndex: message.candidateIndex ?? null,
             heldGeometry: message.heldGeometry || null,
             heldAt: message.heldAt || null,
             heldReference: message.heldReference || null,
@@ -1024,7 +1029,12 @@ class FrameViewSession {
             // measurement rather than the most specific one, says whether it
             // can, and works out the plane -- all in the request that was being
             // made anyway.
-            candidateIndex: message.candidateIndex || 0,
+            // `?? null`, NOT `|| 0`: null means "choose for me" and zero is a
+            // choice. Collapsing them made _best_matching_candidate unreachable
+            // from the viewer -- every hover was forced to the first feature at
+            // the point, so while an end was held the runner could not offer
+            // the one that finishes the measurement, which is what it is for.
+            candidateIndex: message.candidateIndex ?? null,
             heldGeometry: message.heldGeometry || null,
             heldAt: message.heldAt || null,
             heldReference: message.heldReference || null,

@@ -618,6 +618,23 @@ canvas { display: block; width: 100%; height: 100%; }
     content: '\2713\00a0';
 }
 
+/* The row the view is lighting, which Tab moves without the pointer moving --
+   so it cannot be the same thing as :hover, and reads stronger than it. */
+.context-menu-item.context-menu-checked {
+    background: var(--hv-control-bg-hover);
+    box-shadow: inset 2px 0 0 var(--hv-accent);
+    color: var(--hv-title);
+}
+
+.context-menu-hint {
+    color: var(--hv-dim);
+    font: 10px 'Segoe UI', sans-serif;
+    padding: 6px 8px 2px;
+    border-top: 1px solid var(--hv-panel-border);
+    margin-top: 4px;
+    white-space: nowrap;
+}
+
 .context-menu-note {
     margin-left: 8px;
     opacity: 0.6;

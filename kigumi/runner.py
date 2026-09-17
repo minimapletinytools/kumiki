@@ -5344,6 +5344,7 @@ def _nothing_at_point(member_key: str) -> Dict[str, Any]:
         "reference": None,
         "candidateCount": 0,
         "candidates": [],
+        "candidateIndex": None,
         "geometry": None,
         "at": None,
         "verdict": None,
@@ -5555,6 +5556,19 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
             {"label": hit.feature.name, "type": hit.feature.feature_type().name}
             for hit in feature_hits
         ],
+        # And WHICH of them this answer is, so the viewer can mark the one it is
+        # showing -- the right-click menu lights the row the view is lighting,
+        # rather than keeping a second opinion about which that is.
+        #
+        # Matched by name at the end rather than recorded on the way: the choice
+        # can come from a named index, from the preference when none was named,
+        # or from one of the fallbacks, and all of them have to be reported the
+        # same way.
+        "candidateIndex": next(
+            (index for index, hit in enumerate(feature_hits)
+             if hit.feature.name == feature_label),
+            None,
+        ),
         # Where the feature is, unbounded, in world space. What decides whether
         # a pair can be dimensioned is what each PROJECTS to, and the viewer
         # projects on every pointer move -- so it gets the plane or the line and

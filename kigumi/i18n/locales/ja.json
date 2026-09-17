@@ -114,6 +114,7 @@
   "viewer.chrome.gizmo.light": "ライト",
   "viewer.contextMenu.exportStl": "STLとしてエクスポート",
   "viewer.contextMenu.features": "ここの特徴",
+  "viewer.contextMenu.tabToCycle": "Tabキーで切り替え",
   "viewer.contextMenu.exportStep": "STEPとしてエクスポート",
   "viewer.chrome.navHint.leftClick": "左/右ドラッグで回転 • 中ドラッグでパン • スクロールでズーム • Fでフォーカス",
   "viewer.chrome.navHint.rightClick": "右ドラッグで回転 • 中ドラッグでパン • スクロールでズーム • Fでフォーカス",

@@ -472,3 +472,84 @@ describe('what is on screen', () => {
         expect(hover.candidate).toBeUndefined();
     });
 });
+
+// The right-click menu names the features under the pointer. Reaching one of
+// its rows means moving the pointer off the canvas -- which cleared the hover
+// and forgot the cycled choice, so the menu was choosing on behalf of something
+// that had already gone. Pinned, the place stays and only the question moves.
+describe('holding the question still while a menu asks it', () => {
+    function hovering() {
+        const hover = new HoverState({ slop: 0 });
+        hover.pointerAt(100, 100);
+        hover.due();
+        hover.answered(1, { memberKey: 'post', candidateCount: 3 });
+        return hover;
+    }
+
+    test('there is nothing to hold on to before the pointer has been anywhere', () => {
+        expect(new HoverState().pin()).toBe(false);
+    });
+
+    test('pinning holds the point it is already asking about', () => {
+        const hover = hovering();
+
+        expect(hover.pin()).toBe(true);
+        expect(hover.pinned).toBe(true);
+        expect(hover.at).toEqual({ x: 100, y: 100 });
+    });
+
+    test('the pointer moving away does not move it', () => {
+        const hover = hovering();
+        hover.pin();
+
+        const answer = hover.pointerAt(400, 20);
+
+        expect(answer).toEqual({ ask: false, reason: 'pinned' });
+        expect(hover.at).toEqual({ x: 100, y: 100 });
+    });
+
+    test('and does not forget the choice being made', () => {
+        // The whole point. Cycling is forgotten on ANY movement, and using a
+        // menu is movement.
+        const hover = hovering();
+        hover.cycle(3);
+        hover.pin();
+
+        hover.pointerAt(400, 20);
+
+        expect(hover.asking).toBe(0);
+    });
+
+    test('a pinned hover still asks about its own point', () => {
+        const hover = hovering();
+        hover.pin();
+        hover.due();
+
+        hover.choose(2);
+        expect(hover.askAgain()).toBe(true);
+
+        expect(hover.due()).toMatchObject({ x: 100, y: 100 });
+    });
+
+    test('unpinning gives the pointer the question back', () => {
+        const hover = hovering();
+        hover.pin();
+        hover.pointerAt(400, 20);
+
+        hover.unpin();
+        hover.pointerAt(400, 20);
+
+        expect(hover.pinned).toBe(false);
+        expect(hover.at).toEqual({ x: 400, y: 20 });
+    });
+
+    test('clearing outright ends the pin as well', () => {
+        // A mode change means what it says, and leaves nothing behind.
+        const hover = hovering();
+        hover.pin();
+
+        hover.clear();
+
+        expect(hover.pinned).toBe(false);
+    });
+});

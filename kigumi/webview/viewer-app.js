@@ -1640,6 +1640,8 @@ class KigumiViewerApp extends LitElement {
             this.handleCanvasHover(event);
         });
         canvas.addEventListener('pointerleave', () => {
+            // clearHover refuses while the feature menu holds the hover pinned:
+            // reaching one of its rows means leaving the canvas.
             this.clearHover();
         });
 
@@ -3133,8 +3135,15 @@ class KigumiViewerApp extends LitElement {
         if (decision.action !== 'csg' || !target) {
             // Either nothing under the pointer, or a click here would take the
             // whole timber rather than anything inside it.
-            this._hover.clear();
-            this._forgetHover();
+            if (this._hover.pinned) {
+                // The feature menu is holding this point and what it offers has
+                // gone. Close it rather than leave rows naming features that are
+                // not there -- and only the feature menu pins, so this cannot
+                // reach the export menu, which a hover finding nothing must not
+                // dismiss.
+                this.closeMemberContextMenu();
+            }
+            this.clearHover();
             return;
         }
 
@@ -3179,6 +3188,12 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this._hover.markDrawn(message);
+        if (this.contextMenu.isOpen) {
+            // The feature menu marks the row THIS answer came from, so a new
+            // answer has to reach it. Tab changes the answer without the pointer
+            // moving, and nothing else would draw the menu again.
+            this.requestUpdate();
+        }
         // What the pointer is offering, drawn as the measurement it would make.
         this._updateMeasurePreview(message);
         // Nothing is drawn here. What the pointer is over is part of the state,
@@ -3943,10 +3958,17 @@ class KigumiViewerApp extends LitElement {
 
     /** Leaving the canvas, or changing mode: nothing should stay lit. */
     clearHover() {
+        if (this._hover && this._hover.pinned) {
+            // The feature menu is asking, about the point it was opened at, and
+            // reaching one of its rows means leaving the canvas. Anything that
+            // really means "end this" closes the menu first, which unpins.
+            return false;
+        }
         if (this._hover) {
             this._hover.clear();
         }
         this._forgetHover();
+        return true;
     }
 
     handleCanvasClick(event) {
@@ -4057,28 +4079,118 @@ class KigumiViewerApp extends LitElement {
             // One feature under the pointer is not a choice.
             return false;
         }
-        const current = (this._hover.candidate || 0) % candidates.length;
-        return this.contextMenu.open({
+        // Held where it is for as long as the menu is up. Reaching a row means
+        // moving the pointer off the canvas, which would otherwise clear the
+        // hover and forget the cycled choice -- so the menu would be naming
+        // features of something that was no longer there, which is exactly what
+        // it did: every row did nothing at all.
+        if (!this._hover.pin()) {
+            return false;
+        }
+        const opened = this.contextMenu.open({
             x: clientX,
             y: clientY,
+            kind: 'feature',
             title: t('viewer.contextMenu.features'),
+            // No `checked`: which row is current is not a fact to copy in here
+            // and then keep up to date. It is derived at render time from the
+            // answer on screen, so the row marked and the feature lit cannot
+            // come to disagree. See _featureMenuActiveId.
             items: candidates.map((candidate, index) => ({
                 id: String(index),
                 label: candidate.label,
                 note: (candidate.type || '').toLowerCase(),
-                checked: index === current,
             })),
-            onChoose: (id) => {
-                const chosen = this._hover.choose(id);
-                this._hover.askAgain();
-                this.emitViewerLog('measure-cycle', {
-                    index: chosen, of: candidates.length, from: 'menu',
-                });
-            },
-        }) && (this.requestUpdate(), true);
+            // A row is the feature it names: choosing one is the click that
+            // would have taken it in the view.
+            onChoose: (id, item, event) => this._takeFeatureFromMenu(id, event),
+        });
+        if (!opened) {
+            this._hover.unpin();
+            return false;
+        }
+        this.requestUpdate();
+        return true;
+    }
+
+    /**
+     * Light the feature a menu row names, as hovering it in the view would.
+     *
+     * The place does not change and the question does, which is what askAgain
+     * is for. Everything else follows: the runner answers, the hover draws it,
+     * and the menu marks the row that answer came from.
+     */
+    _showFeatureFromMenu(id) {
+        if (!this._hover || !this._hover.pinned) {
+            return;
+        }
+        const index = Number(id);
+        if (this._hover.asking === index) {
+            return;
+        }
+        this._hover.choose(index);
+        this._hover.askAgain();
+    }
+
+    /**
+     * Take the feature a menu row names, as clicking it in the view would.
+     *
+     * The same pick a click makes, at the point the menu was opened at, rather
+     * than a second copy of that decision: handleCanvasClick already sends
+     * whatever the hover is asking for, and drilling, selecting and taking a
+     * measurement end are all its job to tell apart.
+     */
+    _takeFeatureFromMenu(id, event) {
+        const at = this._hover && this._hover.at;
+        if (!at) {
+            return;
+        }
+        const index = Number(id);
+        this._hover.choose(index);
+        this.emitViewerLog('measure-cycle', {
+            index, of: (this._hover.feature && this._hover.feature.candidateCount) || 0,
+            from: 'menu',
+        });
+        // Unpinned before the pick, not after: what follows is an ordinary
+        // click, and it must see a hover the pointer owns again.
+        this._hover.unpin();
+        this.handleCanvasClick({
+            clientX: at.x,
+            clientY: at.y,
+            shiftKey: Boolean(event && event.shiftKey),
+            ctrlKey: Boolean(event && event.ctrlKey),
+            metaKey: Boolean(event && event.metaKey),
+        });
+    }
+
+    /**
+     * Which row the menu should mark: the one the view is lighting.
+     *
+     * Read off the answer on screen rather than off what was asked for, and
+     * only for the feature menu. The runner says which candidate it settled on
+     * -- it does not always get one named, since with nothing cycled it picks
+     * whichever can finish the measurement in hand -- so this is the only way
+     * to mark the right row before anything has been cycled.
+     *
+     * Derived every render, which is what keeps it in step with the highlight:
+     * one fact, read twice, rather than two copies kept in agreement.
+     */
+    _featureMenuActiveId() {
+        const state = this.contextMenu.state;
+        if (!state || state.kind !== 'feature') {
+            return null;
+        }
+        const drawn = this._hover && this._hover.drawn;
+        const index = drawn ? drawn.candidateIndex : null;
+        return index === null || index === undefined ? null : String(index);
     }
 
     closeMemberContextMenu() {
+        // Unconditional: the menu may already be closed -- choosing a row closes
+        // it before onChoose runs -- and the pin has to go either way.
+        if (this._hover) {
+            this._hover.unpin();
+        }
         if (this.contextMenu.close()) {
             this.requestUpdate();
         }
@@ -5041,6 +5153,15 @@ class KigumiViewerApp extends LitElement {
         if (!state) {
             return '';
         }
+        // Which row the view is lighting, asked every render rather than stored
+        // when it changed. Tab moves it without the pointer moving, so the mark
+        // cannot ride on a mouseover.
+        const isFeatureMenu = state.kind === 'feature';
+        // Bound on every row of every menu: _showFeatureFromMenu answers only
+        // for a PINNED hover, which only the feature menu takes -- so exporting
+        // a member cannot reach it, and there is no conditional listener to get
+        // wrong.
+        const activeId = this._featureMenuActiveId();
         return html`
             <div
                 id="member-context-menu"
@@ -5056,16 +5177,22 @@ class KigumiViewerApp extends LitElement {
                 ${state.items.map((item) => html`
                     <button
                         type="button"
-                        class="context-menu-item${item.checked ? ' context-menu-checked' : ''}"
+                        class="context-menu-item${
+                            item.checked || item.id === activeId
+                                ? ' context-menu-checked' : ''}"
                         ?disabled=${Boolean(item.disabled)}
-                        @click=${() => {
-                            this.contextMenu.choose(item.id);
+                        @mouseenter=${() => this._showFeatureFromMenu(item.id)}
+                        @click=${(event) => {
+                            this.contextMenu.choose(item.id, event);
                             this.requestUpdate();
                         }}
                     >${item.label}${item.note
                         ? html`<span class="context-menu-note">${item.note}</span>`
                         : ''}</button>
                 `)}
+                ${isFeatureMenu
+                    ? html`<div class="context-menu-hint">${t('viewer.contextMenu.tabToCycle')}</div>`
+                    : ''}
             </div>
         `;
     }
@@ -6997,6 +7124,8 @@ class KigumiViewerApp extends LitElement {
         // was being made in, and either left behind is something the new mode
         // cannot act on. The store drops the selection; this drops the draft.
         this.clearMeasureDraft();
+        // Before clearHover, which a menu holding the hover pinned would refuse.
+        this.closeMemberContextMenu();
         this.clearHover();
         this.selectionManager.setMode(
             this.isInDrawing

@@ -49,3 +49,24 @@ describe('everything the pick request carries survives the trip to the runner', 
         expect(missing).toEqual([]);
     });
 });
+
+// Forwarding a field is not the same as forwarding its VALUE. `|| 0` and
+// `|| null` look like defaults and are conversions: they rewrite the one value
+// the runner reads as meaning something else.
+describe('and means the same thing on arrival', () => {
+    const forwarded = [...session.matchAll(
+        /^\s*candidateIndex: ([^,\n]+),/gm)].map((m) => m[1].trim());
+
+    test('candidateIndex is forwarded to both the click and the hover', () => {
+        expect(forwarded).toHaveLength(2);
+    });
+
+    test.each([0, 1])('neither of them turns null into zero (%i)', (which) => {
+        // The runner's contract, stated in its own comments: None is "choose
+        // for me" and ZERO IS A CHOICE -- stepping round to the first feature,
+        // or picking the first row of the menu. `|| 0` says the second when the
+        // viewer said the first, which left _best_matching_candidate dead code
+        // for every request the viewer makes.
+        expect(forwarded[which]).not.toMatch(/\|\|/);
+    });
+});

@@ -2265,3 +2265,54 @@ class TestPointingAtAnAccessory:
         with pytest.raises(ValueError):
             runner._handle_find_csg_at_point(
                 state, {"memberKey": "brokenTimber#0", "point": [0, 0, 0]}, slot)
+
+
+class TestAPickSaysWhichCandidateItIs:
+    """So the viewer can mark the row it is showing, rather than guess at it.
+
+    The right-click menu lists the features at the point and has to light the
+    one the view is lighting. Without this it would have to keep an opinion of
+    its own about which that is, and two opinions about one fact is how they
+    come to disagree.
+    """
+
+    def _at_an_edge(self, frame, member):
+        # The same fixture point the cycling tests use: somewhere an edge and
+        # the faces that form it are all under the pointer.
+        return TestChoosingAmongTheFeaturesAtAPoint()._at_an_edge(frame, member)
+
+    def test_a_named_choice_is_reported_back(self, mortise_and_tenon_frame):
+        state, slot, payload, _first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        answer = runner._handle_find_csg_at_point(
+            state, dict(payload, candidateIndex=1), slot)
+
+        assert answer["candidateIndex"] == 1
+
+    def test_every_step_round_reports_the_step_it_took(self, mortise_and_tenon_frame):
+        state, slot, payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+        count = first["candidateCount"]
+        assert count >= 2, "the fixture has nothing to step through"
+
+        reported = [
+            runner._handle_find_csg_at_point(
+                state, dict(payload, candidateIndex=index), slot)["candidateIndex"]
+            for index in range(count)
+        ]
+
+        assert reported == list(range(count))
+
+    def test_an_unnamed_pick_says_which_one_it_settled_on(self, mortise_and_tenon_frame):
+        # The case the menu needs most: nothing has been cycled yet, so the row
+        # to mark is whichever the runner's own preference chose.
+        _state, _slot, _payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        assert first["candidateIndex"] is not None
+        assert (first["candidates"][first["candidateIndex"]]["label"]
+                == first["featureLabel"])
+
+    def test_a_pick_that_found_nothing_says_nothing(self):
+        assert runner._nothing_at_point("post")["candidateIndex"] is None

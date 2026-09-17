@@ -18,7 +18,7 @@ describe('what a right-click offers', () => {
 
         menu.open({ x: 10, y: 20, title: 'Front Post', items });
 
-        expect(menu.state).toEqual({ x: 10, y: 20, title: 'Front Post', items });
+        expect(menu.state).toEqual({ x: 10, y: 20, title: 'Front Post', kind: null, items });
     });
 
     test('an empty menu is not a menu', () => {
@@ -130,5 +130,51 @@ describe('where it sits', () => {
 
         expect(at.x).toBeGreaterThanOrEqual(0);
         expect(at.y).toBeGreaterThanOrEqual(0);
+    });
+});
+
+
+// Which menu this is, for a caller that renders one of them differently: the
+// feature menu marks the row the 3D view is lighting, which exporting a member
+// has no notion of.
+describe('which menu is open', () => {
+    test('a menu that did not say is no kind in particular', () => {
+        const menu = new ContextMenu();
+
+        menu.open({ x: 0, y: 0, items });
+
+        expect(menu.state.kind).toBeNull();
+    });
+
+    test('and one that did says so', () => {
+        const menu = new ContextMenu();
+
+        menu.open({ x: 0, y: 0, items, kind: 'feature' });
+
+        expect(menu.state.kind).toBe('feature');
+    });
+});
+
+// Shift and ctrl mean the same thing on a menu row as on the thing it stands
+// for, so whatever chose is handed on untouched.
+describe('what chose', () => {
+    test('is passed to onChoose', () => {
+        const menu = new ContextMenu();
+        const seen = [];
+        menu.open({ x: 0, y: 0, items, onChoose: (id, item, event) => seen.push(event) });
+
+        menu.choose('stl', { shiftKey: true });
+
+        expect(seen).toEqual([{ shiftKey: true }]);
+    });
+
+    test('and is null when nothing was given', () => {
+        const menu = new ContextMenu();
+        const seen = [];
+        menu.open({ x: 0, y: 0, items, onChoose: (id, item, event) => seen.push(event) });
+
+        menu.choose('stl');
+
+        expect(seen).toEqual([null]);
     });
 });

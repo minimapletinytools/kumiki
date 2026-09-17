@@ -77,6 +77,10 @@
              * same value.
              */
             this.candidate = undefined;
+            /**
+             * Whether somebody else owns the question. See pin().
+             */
+            this._pinned = false;
             this._pending = null;
             this._asked = 0;
             this._outstanding = false;
@@ -125,10 +129,49 @@
          * which is the seam both hover bugs grew on.
          */
         pointerAt(x, y) {
+            if (this._pinned) {
+                // The menu is asking, about the point it was opened at. Reaching
+                // one of its rows means moving the pointer, and the pointer
+                // moving is what forgets a cycled choice -- so a menu that let
+                // it through would be choosing on behalf of a hover that had
+                // already dropped the choice. See pin().
+                return { ask: false, reason: 'pinned' };
+            }
             if (this.at === null || x !== this.at.x || y !== this.at.y) {
                 this.candidate = undefined;
             }
             return this.moved(x, y);
+        }
+
+        /**
+         * Hold the question still, at the point it is already asking about.
+         *
+         * For the right-click menu, which lists the features here by name. The
+         * pointer has to leave the canvas to reach it, and leaving the canvas
+         * clears the hover -- so the menu would be naming features of a hover
+         * that no longer existed, which is exactly what it did.
+         *
+         * Pinned, the place stays put and only the QUESTION moves: Tab, a
+         * mouseover in the menu and a click on one of its rows all ask about
+         * the same point.
+         *
+         * False when there is no place to hold on to.
+         */
+        pin() {
+            if (this.at === null) {
+                return false;
+            }
+            this._pinned = true;
+            return true;
+        }
+
+        /** The menu is gone; the pointer asks again. */
+        unpin() {
+            this._pinned = false;
+        }
+
+        get pinned() {
+            return this._pinned;
         }
 
         /** Step to the next of `count` features under the pointer. */
