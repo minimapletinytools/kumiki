@@ -283,23 +283,31 @@ DONE-JUST REDO THIS,
     -efautre seleciton
     -measurement selected (selected measurement highlights selected feature)
   -create a table showing the visual state given everything above
--measuring selection fixes
+DONE-repyl to bostoncarpenter on reddit
+DONE-right clicking to list featuers works but clicking on the featuer in the right click menu doesn't do antyhnig
+DONE-the right click menu should say "tab to cycle" and as you cycle it highlights the item in the menu and also highlight it in the view, so the tab hovering is in sync with the menu highlighting (note this i adifferent highlighting then when we mouseover)
+DONE-clciknig on measurements in the tree view restes the scroll in the 3d view (causes it to scroll upward so you don't see what you just cilkced)
+DONE-0 length measurements are being premitted and they show up as nothing, maybe don't permit 0 length measurements?
+IGNORE-mesaurement positioning in 3d view seems to not work like I'd expect (the overlapping intervals thing i.e. maybe that was only done for 2d)
+DONE-fix lighting in ortho drawing
+DONE-following up on viewports, lets create a proper viewport class in DRawing.py that matches the viewport topology we had worked on earlier. The viewport class holds its label, sizing informatio and eventually other viewport specific info. It is unaware of its own position in the hierarchy but is aware of its chlidren. in order to get its ID, it must be queried from the DRawing objec tthat owns the viewport. can you propose a plan to refactor drawing.py so thta viweport info is contained as such
+DONE-reflects should not render in drawing moed
+DONE-add support for 3d measurements
+  -maybe there should be a spceial drawing that's available in regular view mode...
+DONE-"draw" button should say "new drawing" instead
+DONE-the LHS button states are kinda screwy right now
+DONE-revisit how to do LHS menu for drawing mode...
+
+-MEASURING RELATED STUFF
   -the selected timber blue thing is weird when we're in measuring mode, especially in 2d where there is no concept of selection and then drilling in
   -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
--fetaure priority fixes
   -fix priority of feature selection in 2d view, it should prioritize on features closest to camera, just refine the rules in general
-  -conceivably we could disallow selection fo faces entierly in 2d view? but we need to be mindful about this when determining if all featuers of a timber are solved.
   -right now faces that are perpencdiluar to the camera can't seem to be selected (they dont show up in the right click menu), instead only the face parallel to the camera shows up, we actually don't want that one to show up cuz it's easy enough to click on it through other means. 
-  DONE-right clicking to list featuers works but clicking on the featuer in the right click menu doesn't do antyhnig
-  DONE-the right click menu should say "tab to cycle" and as you cycle it highlights the item in the menu and also highlight it in the view, so the tab hovering is in sync with the menu highlighting (note this i adifferent highlighting then when we mouseover)
+    -conceivably we could disallow selection fo faces entierly in 2d view? but we need to be mindful about this when determining if all featuers of a timber are solved.
   -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
     -either add it as a separate menu after a divider
     -get rid of it in 2d drawing view
     -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
--more measuring stuff
-  DONE-clciknig on measurements in the tree view restes the scroll in the 3d view (causes it to scroll upward so you don't see what you just cilkced)
-  DONE-0 length measurements are being premitted and they show up as nothing, maybe don't permit 0 length measurements?
-  IGNORE-mesaurement positioning in 3d view seems to not work like I'd expect (the overlapping intervals thing i.e. maybe that was only done for 2d)
   -angle mesaurement anchor positon derivatino needs to be improved
     -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
     -definitely highlight the features being measured...
@@ -314,17 +322,7 @@ DONE-JUST REDO THIS,
   -fix face extents to not be AABB but rather corners 
   -the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
 
--tenon square peg holes need to intersect with the tenon prism for derived edges
-
--repyl to bostoncarpenter on reddit
--do joint rename to match what's in your new book
--add srcibe notching ot more joints...
-
 -DRAWING NONSENSE
-  DONE-fix lighting in ortho drawing
-  DONE-following up on viewports, lets create a proper viewport class in DRawing.py that matches the viewport topology we had worked on earlier. The viewport class holds its label, sizing informatio and eventually other viewport specific info. It is unaware of its own position in the hierarchy but is aware of its chlidren. in order to get its ID, it must be queried from the DRawing objec tthat owns the viewport. can you propose a plan to refactor drawing.py so thta viweport info is contained as such
-  DONE-reflects should not render in drawing moed
-
   -do the drawing border and meta info stuff
     -add background border for drawing...
     -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
@@ -337,24 +335,19 @@ DONE-JUST REDO THIS,
       for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
       
   -conisder just shippingthe defalut drawing with every frame by default 
-  -add support for 3d measurements
-    -maybe there should be a spceial drawing that's available in regular view mode...
-  -"draw" button should say "new drawing" instead
-  -the LHS button states are kinda screwy right now
-  -revisit how to do LHS menu for drawing mode...
     
   
   
   
 
+-tenon square peg holes need to intersect with the tenon prism for derived edges
+-do joint rename to match what's in your new book
+-add srcibe notching ot more joints...
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
-
 -add support for multilpe frames in jigumi (returns list of frames but you'll need to figure out how to do kiwari...)
 -create a header for the are below the 3d view main panel in kigumi so it appears a littlem or esensible. it should says "scroll here for more" as well. amybe you can stick some doc information there too.
-
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
-
 
 -rename/reorg all mortise and tenon joints
   DONE-mortise_and_tenon_join/...
