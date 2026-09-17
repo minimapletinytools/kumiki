@@ -37,6 +37,7 @@ from .splice import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
     cut_plain_splice_lap_joint_on_aligned_timbers,
     cut_lapped_gooseneck_joint_on_aligned_timbers,
+    cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers,
     cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers,
 )
 from .cross import (
@@ -392,15 +393,15 @@ def cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         arrangement = replace(arrangement, front_face_on_timber1=front_face)
 
     timber_width = arrangement.timber1.get_size_in_face_normal_axis(front_face.rotate_right())
-    stepped_shoulder_depth = timber_width * scalar(1, 5)
+    rebated_shoulder_depth = timber_width * scalar(1, 5)
     scarf_length = timber_width * scalar(4)
     dado_depth = timber_width * scalar(1, 5)
     dado_height = timber_width * scalar(1, 5)
     stub_tenon_width = timber_width * scalar(1, 5)
 
-    return cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+    return cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
         arrangement=arrangement,
-        stepped_shoulder_depth=stepped_shoulder_depth,
+        rebated_shoulder_depth=rebated_shoulder_depth,
         scarf_length=scarf_length,
         dado_depth=dado_depth,
         dado_height=dado_height,
@@ -408,7 +409,13 @@ def cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     )
 
 
+cut_basic_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
 cut_basic_kanawa_tsugi_joint_on_aligned_timbers = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
+cut_basic_kanawa_tsugi = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
+cut_basic_金輪継ぎ_joint_on_aligned_timbers = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
+cut_basic_金輪継ぎ = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
+cut_basic_かなわつぎ_joint_on_aligned_timbers = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
+cut_basic_かなわつぎ = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
 
 
 # ============================================================================

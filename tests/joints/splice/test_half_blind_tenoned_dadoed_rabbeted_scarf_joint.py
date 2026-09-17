@@ -14,8 +14,8 @@ from tests.testing_shavings import (
 def _render_cutting(cutting: Cutting):
     return CutTimber(cutting.timber, cuts=[cutting]).render_timber_with_cuts_csg_local()
 
-class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
-    """Test cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers."""
+class TestRebatedObliqueAndDadoedScarfJoint:
+    """Test cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers."""
 
     def test_basic_construction_and_stub_tenon_interlock(self):
         """The joint builds two end-cut cuttings with an interlocking stub
@@ -52,10 +52,10 @@ class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
         front_face_on_timber1 = arrangement.front_face_on_timber1
         assert front_face_on_timber1 is not None
 
-        SL, DD, DH, SSD, STW = inches(10), inches(1), inches(1.5), inches(1), inches(1.5)
-        joint = cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+        SL, DD, DH, RSD, STW = inches(10), inches(1), inches(1.5), inches(1), inches(1.5)
+        joint = cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
             arrangement=arrangement,
-            stepped_shoulder_depth=SSD, scarf_length=SL, dado_depth=DD, dado_height=DH,
+            rebated_shoulder_depth=RSD, scarf_length=SL, dado_depth=DD, dado_height=DH,
             stub_tenon_width=STW, joint_center_relative_to_timber1_end=overlap,
         )
 
@@ -74,14 +74,14 @@ class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
         u_dir = -timber1.get_face_direction_global(arrangement.timber1_end)
         v_face = front_face_on_timber1.rotate_right()
         v_dir = timber1.get_face_direction_global(v_face)
-        # corner->p4 is NOT the naive (-(SL+SSD)/2, -SSD/2) chord -- the joint
-        # computes p4 via the actual scarf angle (atan2(SSD/2, sqrt((SL/2)^2 -
-        # (SSD/2)^2))), which only reduces to that straight-line approximation
-        # in the limit SSD << SL. Recompute it the same way the joint does
-        # (stepped_shoulder_length defaults to SSD here, as in the call above).
-        some_var_x = sqrt((SL / scalar(2)) ** 2 - (SSD / scalar(2)) ** 2)
-        scarf_hypotneuse = some_var_x + SSD / scalar(2)
-        scarf_angle = atan2(SSD / scalar(2), some_var_x)
+        # corner->p4 is NOT the naive (-(SL+RSD)/2, -RSD/2) chord -- the joint
+        # computes p4 via the actual scarf angle (atan2(RSD/2, sqrt((SL/2)^2 -
+        # (RSD/2)^2))), which only reduces to that straight-line approximation
+        # in the limit RSD << SL. Recompute it the same way the joint does
+        # (rebated_shoulder_length defaults to RSD here, as in the call above).
+        some_var_x = sqrt((SL / scalar(2)) ** 2 - (RSD / scalar(2)) ** 2)
+        scarf_hypotneuse = some_var_x + RSD / scalar(2)
+        scarf_angle = atan2(RSD / scalar(2), some_var_x)
         corner_to_p4_u = -cos(scarf_angle) * scarf_hypotneuse
         corner_to_p4_v = -sin(scarf_angle) * scarf_hypotneuse
         expected_direction = safe_normalize_vector(u_dir * corner_to_p4_u + v_dir * corner_to_p4_v)
@@ -132,5 +132,58 @@ class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
         assert csg2.contains_point(p2), "timber2 should retain its own stub tenon peg"
         p2_as_timber1 = uv_point(timber2_peg_u, timber2_peg_v, scalar(0), timber1)
         assert not csg1.contains_point(p2_as_timber1), "timber1 should have a pocket for timber2's peg"
+
+    def test_compatibility_aliases_and_names(self):
+        """Verify backward compatibility function and argument aliases, and Japanese aliases."""
+        timber_size = create_v2(inches(4), inches(6))
+        timber_length = inches(20)
+        overlap = inches(8)
+
+        timber1 = create_timber(
+            length=timber_length, size=timber_size,
+            bottom_position=create_v3(-timber_length + overlap, scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            ticket="timber1",
+        )
+        timber2 = create_timber(
+            length=timber_length, size=timber_size,
+            bottom_position=create_v3(-overlap, scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            ticket="timber2",
+        )
+        arrangement = SpliceJointTimberArrangement(
+            timber1=timber1, timber2=timber2,
+            timber1_end=TimberEnd.TOP, timber2_end=TimberEnd.BOTTOM,
+            front_face_on_timber1=TimberLongFace.RIGHT,
+        )
+
+        SL, DD, DH, SSD, STW = inches(10), inches(1), inches(1.5), inches(1), inches(1.5)
+
+        # 1. Backward-compatible function name with old argument name stepped_shoulder_depth
+        joint_old = cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+            arrangement=arrangement,
+            stepped_shoulder_depth=SSD, scarf_length=SL, dado_depth=DD, dado_height=DH,
+            stub_tenon_width=STW, joint_center_relative_to_timber1_end=overlap,
+        )
+        assert len(joint_old.cuttings) == 2
+
+        # 2. Japanese aliases
+        assert cut_kanawa_tsugi_joint_on_aligned_timbers is cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+        assert cut_kanawa_tsugi is cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+        assert cut_金輪継ぎ_joint_on_aligned_timbers is cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+        assert cut_金輪継ぎ is cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+        assert cut_かなわつぎ_joint_on_aligned_timbers is cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+        assert cut_かなわつぎ is cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+
+        # 3. Basic joint wrapper and aliases
+        joint_basic = cut_basic_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(arrangement)
+        assert len(joint_basic.cuttings) == 2
+        assert cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers is cut_basic_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+        assert cut_basic_kanawa_tsugi is cut_basic_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+        assert cut_basic_金輪継ぎ is cut_basic_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+        assert cut_basic_かなわつぎ is cut_basic_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers
+
 
 

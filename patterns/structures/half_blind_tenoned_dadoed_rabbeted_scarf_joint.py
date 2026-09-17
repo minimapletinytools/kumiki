@@ -23,7 +23,7 @@ timber_length = inches(48)
 
 overlap = inches(8)  # how far each timber's raw body extends past the joint center
 
-stepped_shoulder_depth = inches(1)
+rebated_shoulder_depth = inches(1)
 scarf_length = inches(10)
 dado_depth = inches(1)
 dado_height = inches(1.5)
@@ -59,9 +59,9 @@ def example() -> Frame:
         front_face_on_timber1=TimberLongFace.RIGHT,
     )
 
-    joint = cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+    joint = cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
         arrangement=arrangement,
-        stepped_shoulder_depth=stepped_shoulder_depth,
+        rebated_shoulder_depth=rebated_shoulder_depth,
         scarf_length=scarf_length,
         dado_depth=dado_depth,
         dado_height=dado_height,
@@ -71,5 +71,5 @@ def example() -> Frame:
 
     return Frame.from_joints(
         [joint],
-        name="Half-Blind Tenoned Dadoed Rabbeted Scarf Joint",
+        name="Rebated Oblique and Dadoed Scarf Joint",
     )
