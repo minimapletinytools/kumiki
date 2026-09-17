@@ -244,35 +244,79 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
--DO LHS MENU AND DRAWING INTERFACE DESIGN SPEC 
+DONE-DO LHS MENU AND DRAWING INTERFACE DESIGN SPEC 
   DONE-after amesaurement is taken in drawing view, the camera snapping back breaks
   DONE-face to face non parallel measurements seem be mesauring distance not angle
   DONE-similarl, face to edge and edge to edge non parallel measurements seem to be measuring distance as well
   DONE-def need to improve rules for measurementp lacement
-  -edges don't know their outward facing normal when measuring angles between them. I think you have a few choices here
-    -attempt to remap edges to adjacent face features when possible. so measurement is between faces and not edges
-    -or just do the remap when rendering the measurement so measurement remains between actually selected features
-  -angles should have anchors too? it's weird cuz their anchors want to move as you zoom. maybe pick the intersection point as the anchor and determine the maximal extents that the measurement is willing to tolerate before it goes way off the fetaures?
-  -BUG first click in drawing view dosen't do anythnig, only second click allows acutal selection, highlight always works
+  DONE-measurement offset positino should actually be in teh viewport coordinates and not in the screen coordinates! they're rendering SIZE is in the screen
+  DONE?-BUG? when I try and measure 2 adjacent faces in 3d view  the second face sometimes highlights in red but I can still cilck it, other items its green but when I cilck it no angle mesaurement shows up
+    -I think the sequence that fails is, select a face -> select another fetaure (measurement shows up if valid) -> select another feature, no measurement show up anymore
+  DONE?-BUG also observed the following in 2d view (also seen in 3d view but not sure abotu repo): select feature -> select another feature (measurement shows up as expected) -> select another feature, mesauerment shows up but extents are messed up until I hit confirm
+  DONE-BUG when creating measurements in 3d view, if we go from angle to angle its ok or length to length is ok, but if we go from angle to length or length to angle (that is by selecting another feature that permits an angle/length type measurement to a length/angle measurement for the second feature) it will get stuck on the first feature kind...
+    -in general, 3d view measurements seem a little broken can we systemitaclly make it more similar to the 2d drawing view mesaurements?
+  DONE-as you hover to a new feature to measure to, the measurement should also pop up
+  DONE-measuring edge to parallel face (and presumably point to edge/face) in 3d view, the anchor on the face (or edge if its from a point) needs to be determined by the orthogonal projection of soem point coming from the edge (or point). So right now if you sleect a face, and then an edge in 3d, the line may nto be perpendicular to the face 
+  DONE-the mesaures [...] dropdown should not exist if there's only one choice and it should contain human readable kinds inside rather than code refreneces
+  IGNORE/DONE-angle measurement drawings are kinda screwy
+    -if 2 faces aren't actually touching don't allow measuring?
+    -if 2 edges are'nt touching then don't allow mesauring?
+    DONE?-angle mesauerments between 2 faces  should take into account their face normals to determine which "side" the angle is on
+    DONE-angle measurements between 2 edges should aso take into account their edge normals, edge normals are a bit harder to get, average their face normals if it's a derived feature, otherwies I think you can use the CSG get normal function.
+
+DONE-2 non parallel lines create length measurement in 3d view not angle mesaurement right now
+DONE-cmd z doesn't seem to do anything?
+DONE-edges don't know their outward facing normal when measuring angles between them. I think you have a few choices here
+  -attempt to remap edges to adjacent face features when possible. so measurement is between faces and not edges
+  -or just do the remap when rendering the measurement so measurement remains between actually selected features
+DONE-angles should have anchors too? it's weird cuz their anchors want to move as you zoom. maybe pick the intersection point as the anchor and determine the maximal extents that the measurement is willing to tolerate before it goes way off the fetaures?
+DONE-BUG first click in drawing view dosen't do anythnig, only second click allows acutal selection, highlight always works
+DONE-get rid of "confirm measurement" maybe, or add hotkey for it
+DONE-measurements between 2 parallel lines/faces should hav ethe |---| perpendicular
+   ok, before we go onto that, lets fix the placement of the 2 end points of the measurement. right now it's way off.
+  the way to do it is to place the first endpoint based on the first feature selected, and the second endpoint should
+  be based on the first by perpendicularly projecting it from the first fetaure to the second feature. At least in the
+DONE-JUST REDO THIS,
+  -visual state should fall out from a bunch of things
+    -which mode we're in (in particluar, fix xray stuff when feature is selected in 2d view)
+    -selection
+    -efautre seleciton
+    -measurement selected (selected measurement highlights selected feature)
+  -create a table showing the visual state given everything above
+-measuring selection fixes
+  -the selected timber blue thing is weird when we're in measuring mode, especially in 2d where there is no concept of selection and then drilling in
+  -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
+-fetaure priority fixes
+  -fix priority of feature selection in 2d view, it should prioritize on features closest to camera, just refine the rules in general
+  -conceivably we could disallow selection fo faces entierly in 2d view? but we need to be mindful about this when determining if all featuers of a timber are solved.
+  -right now faces that are perpencdiluar to the camera can't seem to be selected (they dont show up in the right click menu), instead only the face parallel to the camera shows up, we actually don't want that one to show up cuz it's easy enough to click on it through other means. 
+  DONE-right clicking to list featuers works but clicking on the featuer in the right click menu doesn't do antyhnig
+  DONE-the right click menu should say "tab to cycle" and as you cycle it highlights the item in the menu and also highlight it in the view, so the tab hovering is in sync with the menu highlighting (note this i adifferent highlighting then when we mouseover)
+  -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
+    -either add it as a separate menu after a divider
+    -get rid of it in 2d drawing view
+    -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
+-more measuring stuff
+  DONE-clciknig on measurements in the tree view restes the scroll in the 3d view (causes it to scroll upward so you don't see what you just cilkced)
+  DONE-0 length measurements are being premitted and they show up as nothing, maybe don't permit 0 length measurements?
+  IGNORE-mesaurement positioning in 3d view seems to not work like I'd expect (the overlapping intervals thing i.e. maybe that was only done for 2d)
+  -angle mesaurement anchor positon derivatino needs to be improved
+    -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
+    -definitely highlight the features being measured...
+  -for angle measurements you should be allowed to measure to axis aligned planes
+  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
+  -when face is highlighted in green (for measure from) it's internal tris should not be highlighted. it should look like it was selected but in green like we do for regular selection
+  cases where the 2 features being measured are perpendicular
+  -add hotkey for "measure from this"
   -timber goes into x-ray view when a feature is selected in drawing mode 
   -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
     -or maybe allow selectino of xrayed features?
-  -measurement seleciton interface is a little screwy??
-
-
-  -measurements between 2 parallel lines/faces should hav ethe |---| perpendicular
-     ok, before we go onto that, lets fix the placement of the 2 end points of the measurement. right now it's way off.
-    the way to do it is to place the first endpoint based on the first feature selected, and the second endpoint should
-    be based on the first by perpendicularly projecting it from the first fetaure to the second feature. At least in the
-  cases where the 2 features being measured are perpendicular
-  -add hotkey for "measure from this"
-  -get rid of "confirm measurement" maybe, or add hotkey for it
-
   -fix face extents to not be AABB but rather corners 
+  -the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
 
+-tenon square peg holes need to intersect with the tenon prism for derived edges
 
-
-
+-repyl to bostoncarpenter on reddit
 -do joint rename to match what's in your new book
 -add srcibe notching ot more joints...
 
