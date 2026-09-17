@@ -25,6 +25,11 @@ from ..shavings.shavings import (
 from ..shavings.relief import warn_if_arrangement_timbers_imperfect
 
 
+# TODO rename this half_lapped_japanese_splice_joints or osmething
+# TODO add support for stub tenno on the half lap and rename to  half_lapped_gooseneck_splice_joint_with_stub_tenon / koshikake_mechigai_kama_tsugi
+# TODO add ari tsugi variant in this file
+# you can keep the current alias that cuts it with out the lap
+
 def cut_lapped_gooseneck_joint_on_aligned_timbers(
     arrangement: SpliceJointTimberArrangement,
     gooseneck_length: Numeric,
