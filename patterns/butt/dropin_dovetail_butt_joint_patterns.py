@@ -44,7 +44,7 @@ def create_dovetail_butt_joint_example(k=None, *, position: Optional[V3] = None)
         receiving_timber_shoulder_inset=inches(scalar(1, 2)),  # 0.5" shoulder inset
         dovetail_length=inches(4),                                # 4" long dovetail tenon
         dovetail_small_width=inches(scalar(3, 2)),             # 1.5" narrow end
-        dovetail_large_width=inches(3),                          # 3" wide end
+        dovetail_angle=atan(scalar(3, 16)),                    # Flares from 1.5" to 3" over 4" length
         dovetail_lateral_offset=scalar(0),                     # Centered
         dovetail_depth=inches(scalar(5, 2))                    # 2.5" deep cut
     )

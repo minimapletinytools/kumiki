@@ -407,7 +407,7 @@ def create_honeycomb_shed():
     
     # dovetail_shoulder_inset = inches(1, 2)
     # dovetail_small_width = inches(3, 2)
-    # dovetail_large_width = inches(2)
+    # dovetail_angle = atan(scalar(1, 8))
     # dovetail_length = inches(2)
     # dovetail_depth = inches(2)
     # 
@@ -423,7 +423,7 @@ def create_honeycomb_shed():
     #         receiving_timber_shoulder_inset=dovetail_shoulder_inset,
     #         dovetail_length=dovetail_length,
     #         dovetail_small_width=dovetail_small_width,
-    #         dovetail_large_width=dovetail_large_width,
+    #         dovetail_angle=dovetail_angle,
     #         dovetail_lateral_offset=0,
     #         dovetail_depth=dovetail_depth
     #     )

@@ -4,7 +4,7 @@ Uses canonical timber configurations from construction.py
 """
 
 from kumiki.kiwari import kiwari
-from kumiki.rule import inches, Transform, scalar, create_v2, degrees, Matrix, sqrt
+from kumiki.rule import inches, Transform, scalar, create_v2, degrees, Matrix, sqrt, atan
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, create_timber,
@@ -274,7 +274,7 @@ def example_basic_dropin_dovetail_butt_joint(position=None):
     width = arrangement.butt_timber.get_size_in_face_normal_axis(dovetail_timber_face.rotate_right())
     dovetail_length = width / scalar(2)
     dovetail_small_width = width * scalar(1, 2)
-    dovetail_large_width = width * scalar(2, 3)
+    dovetail_angle = atan(scalar(1, 6))
     receiving_timber_shoulder_inset = inches(1)  # 1 inch inset
 
     joint = cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
@@ -285,7 +285,7 @@ def example_basic_dropin_dovetail_butt_joint(position=None):
         receiving_timber_shoulder_inset=receiving_timber_shoulder_inset,
         dovetail_length=dovetail_length,
         dovetail_small_width=dovetail_small_width,
-        dovetail_large_width=dovetail_large_width
+        dovetail_angle=dovetail_angle,
     )
     return joint
 

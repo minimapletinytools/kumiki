@@ -9,7 +9,7 @@ from tests.testing_shavings import (
     create_standard_horizontal_timber,
     create_centered_horizontal_timber,
 )
-from kumiki.rule import inches, degrees, are_vectors_parallel, safe_dot_product, safe_normalize_vector
+from kumiki.rule import inches, degrees, are_vectors_parallel, safe_dot_product, safe_normalize_vector, atan
 from kumiki.ticket import TimberTicket
 from kumiki.cutcsg import Difference, SolidUnion, ConvexPolygonExtrusion, RectangularPrism, HalfSpace
 from kumiki.example_shavings import (
@@ -70,9 +70,9 @@ class TestHousedDovetailButtJoint:
         Post LEFT face at x=-4.  shoulder_distance_from_end = 4 - 1 = 3.
         Shoulder in global: x = 0 - 3 = -3.
         dovetail_depth = 8/2 = 4 (from RIGHT face y=+4 inward to y=0).
-        Dovetail profile: narrow (small_width=2) at shoulder x=-3,
-        widening (large_width=4) toward x=1 (past end, clipped by timber body at x=0).
-        At x=-1: profile width ≈ 3, Z ∈ [48.5, 51.5], Y ∈ [0, 4].
+        # Dovetail profile: narrow (small_width=2) at shoulder x=-3,
+        # widening (dovetail_angle=atan(1/4), so large_width=4) toward x=1 (past end, clipped by timber body at x=0).
+        # At x=-1: profile width ≈ 3, Z ∈ [48.5, 51.5], Y ∈ [0, 4].
         """
         arrangement = _make_simple_butt_arrangement()
         dovetail_timber = arrangement.butt_timber
@@ -83,7 +83,7 @@ class TestHousedDovetailButtJoint:
             receiving_timber_shoulder_inset=scalar(1),
             dovetail_length=scalar(4),
             dovetail_small_width=scalar(2),
-            dovetail_large_width=scalar(4),
+            dovetail_angle=atan(scalar(1, 4)),
         )
 
         # ---- structure ----
@@ -186,7 +186,7 @@ class TestHousedDovetailButtJoint:
                 receiving_timber_shoulder_inset=scalar(1),
                 dovetail_length=scalar(3),
                 dovetail_small_width=scalar(3, 2),
-                dovetail_large_width=scalar(3),
+                dovetail_angle=atan(scalar(1, 4)),
             )
 
             assert len(joint.cuttings) == 2
@@ -203,12 +203,28 @@ class TestHousedDovetailButtJoint:
             receiving_timber_shoulder_inset=scalar(0),
             dovetail_length=scalar(3),
             dovetail_small_width=scalar(3, 2),
-            dovetail_large_width=scalar(3),
+            dovetail_angle=atan(scalar(1, 4)),
         )
 
         recv_neg_csg = joint.cuttings[arrangement.receiving_timber.ticket.path].negative_csg
         assert not isinstance(recv_neg_csg, SolidUnion), \
             "With zero inset, receiving negative CSG should be the socket alone (no SolidUnion)"
+
+    def test_straight_dovetail_zero_angle(self):
+        """With dovetail_angle=0, dovetail is straight (rectangular tenon)."""
+        arrangement = _make_simple_butt_arrangement()
+
+        joint = cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            receiving_timber_shoulder_inset=scalar(1),
+            dovetail_length=scalar(4),
+            dovetail_small_width=scalar(2),
+            dovetail_angle=scalar(0),
+        )
+
+        assert len(joint.cuttings) == 2
+        _render_cutting(joint.cuttings["butt_timber"])
+        _render_cutting(joint.cuttings["receiving_timber"])
 
     # 🐪
     def test_validation_errors(self):
@@ -218,31 +234,37 @@ class TestHousedDovetailButtJoint:
         with pytest.raises(ValueError, match="dovetail_length must be positive"):
             cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
-                dovetail_length=scalar(0), dovetail_small_width=scalar(3, 2), dovetail_large_width=scalar(3),
+                dovetail_length=scalar(0), dovetail_small_width=scalar(3, 2), dovetail_angle=atan(scalar(1, 4)),
             )
 
         with pytest.raises(ValueError, match="dovetail_small_width must be positive"):
             cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
-                dovetail_length=scalar(3), dovetail_small_width=scalar(-1), dovetail_large_width=scalar(3),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(-1), dovetail_angle=atan(scalar(1, 4)),
             )
 
-        with pytest.raises(ValueError, match="dovetail_large_width.*must be greater"):
+        with pytest.raises(ValueError, match="dovetail_angle must be non-negative"):
             cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
-                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_large_width=scalar(1),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_angle=degrees(-5),
+            )
+
+        with pytest.raises(ValueError, match="dovetail_angle must be less than 90 degrees"):
+            cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
+                arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_angle=degrees(90),
             )
 
         with pytest.raises(ValueError, match="receiving_timber_shoulder_inset must be non-negative"):
             cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=arrangement, receiving_timber_shoulder_inset=scalar(-1),
-                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_large_width=scalar(3),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_angle=atan(scalar(1, 4)),
             )
 
         with pytest.raises(ValueError, match="dovetail_depth must be positive"):
             cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
-                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_large_width=scalar(3),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_angle=atan(scalar(1, 4)),
                 dovetail_depth=scalar(0),
             )
 
@@ -269,7 +291,7 @@ class TestHousedDovetailButtJoint:
                 receiving_timber_shoulder_inset=scalar(1),
                 dovetail_length=scalar(3),
                 dovetail_small_width=scalar(3, 2),
-                dovetail_large_width=scalar(3),
+                dovetail_angle=atan(scalar(1, 4)),
             )
 
 

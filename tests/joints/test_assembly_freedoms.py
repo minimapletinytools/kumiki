@@ -125,7 +125,7 @@ class TestButtFamilyFreedoms:
             receiving_timber_shoulder_inset=scalar(0),
             dovetail_length=inches(3),
             dovetail_small_width=inches(1),
-            dovetail_large_width=inches(2),
+            dovetail_angle=atan(scalar(1, 6)),
         )
 
         # The taper blocks axial pull: exactly one lift-out DOF along the

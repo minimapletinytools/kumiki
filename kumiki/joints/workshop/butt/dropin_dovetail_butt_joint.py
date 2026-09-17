@@ -22,6 +22,8 @@ from kumiki.rule import (
     scalar,
     Matrix,
     Transform,
+    tan,
+    pi,
 )
 from kumiki.measuring import (
     mark_distance_from_end_along_centerline,
@@ -50,7 +52,7 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     receiving_timber_shoulder_inset: Numeric,
     dovetail_length: Numeric,
     dovetail_small_width: Numeric,
-    dovetail_large_width: Numeric,
+    dovetail_angle: Numeric,
     dovetail_lateral_offset: Numeric = scalar(0),
     dovetail_depth: Optional[Numeric] = None,
 ) -> Joint:
@@ -68,7 +70,7 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         receiving_timber_shoulder_inset: Distance to inset the shoulder notch on the receiving timber
         dovetail_length: Length of the dovetail tenon
         dovetail_small_width: Width of the narrow end of the dovetail (at the tip)
-        dovetail_large_width: Width of the wide end of the dovetail (at the base)
+        dovetail_angle: Flare angle of the dovetail in radians (0 for straight dovetails)
         dovetail_lateral_offset: Lateral offset of the dovetail from center (default 0)
         dovetail_depth: Depth of the dovetail cut. If None, defaults to half the timber dimension
 
@@ -95,16 +97,16 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         raise ValueError(f"dovetail_length must be positive, got {dovetail_length}")
     if dovetail_small_width <= 0:
         raise ValueError(f"dovetail_small_width must be positive, got {dovetail_small_width}")
-    if dovetail_large_width <= 0:
-        raise ValueError(f"dovetail_large_width must be positive, got {dovetail_large_width}")
+    if dovetail_angle < 0:
+        raise ValueError(f"dovetail_angle must be non-negative, got {dovetail_angle}")
+    if dovetail_angle >= pi / scalar(2):
+        raise ValueError(
+            f"dovetail_angle must be less than 90 degrees (pi/2 radians), got {dovetail_angle}"
+        )
     if receiving_timber_shoulder_inset < 0:
         raise ValueError(f"receiving_timber_shoulder_inset must be non-negative, got {receiving_timber_shoulder_inset}")
 
-    if dovetail_large_width <= dovetail_small_width:
-        raise ValueError(
-            f"dovetail_large_width ({dovetail_large_width}) must be greater than "
-            f"dovetail_small_width ({dovetail_small_width})"
-        )
+    dovetail_large_width = dovetail_small_width + scalar(2) * dovetail_length * tan(dovetail_angle)
 
     if dovetail_depth is not None and dovetail_depth <= 0:
         raise ValueError(f"dovetail_depth must be positive if provided, got {dovetail_depth}")

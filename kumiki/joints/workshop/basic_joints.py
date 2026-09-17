@@ -625,13 +625,13 @@ def cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     receiving_timber_shoulder_inset: Numeric,
     dovetail_length: Numeric,
     dovetail_small_width: Numeric,
-    dovetail_large_width: Numeric,
+    dovetail_angle: Numeric,
 ) -> Joint:
     """
     Creates a housed dovetail butt joint (蟻継ぎ / Ari Tsugi) with default proportions.
 
     Dovetail dimensions scale with the timber width regardless of the values passed for
-    dovetail_length, dovetail_small_width, and dovetail_large_width — those parameters are
+    dovetail_length, dovetail_small_width, and dovetail_angle — those parameters are
     overridden internally (present for API compatibility). For full control, use
     `cut_dropin_dovetail_butt_joint_on_face_aligned_timbers` directly.
 
@@ -643,7 +643,7 @@ def cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         receiving_timber_shoulder_inset: Distance to inset the shoulder notch on the receiving timber.
         dovetail_length: Overridden internally by default proportions.
         dovetail_small_width: Overridden internally by default proportions.
-        dovetail_large_width: Overridden internally by default proportions.
+        dovetail_angle: Overridden internally by default proportions.
 
     Returns:
         Joint object containing the two CutTimbers with dovetail cuts.
@@ -655,7 +655,7 @@ def cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     width = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face.rotate_right())
     dovetail_length = width/scalar(2)
     dovetail_small_width = width*scalar(1, 2)
-    dovetail_large_width = width*scalar(2, 3)
+    dovetail_angle = atan(scalar(1, 6))
 
     return cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
@@ -667,7 +667,7 @@ def cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         receiving_timber_shoulder_inset=receiving_timber_shoulder_inset,
         dovetail_length=dovetail_length,
         dovetail_small_width=dovetail_small_width,
-        dovetail_large_width=dovetail_large_width
+        dovetail_angle=dovetail_angle,
     )
 
 

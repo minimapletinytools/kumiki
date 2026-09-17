@@ -1290,7 +1290,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     floor_joist_dovetail_shoulder_inset = inches(0)
     floor_joist_dovetail_small_width = inches(2)
-    floor_joist_dovetail_large_width = inches(scalar(5, 2))
+    floor_joist_dovetail_angle = atan(scalar(1, 6))  # 1:6 flare (2" to 2.5" over 1.5" length)
     floor_joist_dovetail_length = inches(scalar(3, 2))
     floor_joist_dovetail_depth = inches(2)
     
@@ -1320,7 +1320,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 receiving_timber_shoulder_inset=floor_joist_dovetail_shoulder_inset,
                 dovetail_length=floor_joist_dovetail_length,
                 dovetail_small_width=floor_joist_dovetail_small_width,
-                dovetail_large_width=floor_joist_dovetail_large_width,
+                dovetail_angle=floor_joist_dovetail_angle,
                 dovetail_lateral_offset=scalar(0),
                 dovetail_depth=floor_joist_dovetail_depth,
             )
@@ -1336,7 +1336,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 receiving_timber_shoulder_inset=floor_joist_dovetail_shoulder_inset,
                 dovetail_length=floor_joist_dovetail_length,
                 dovetail_small_width=floor_joist_dovetail_small_width,
-                dovetail_large_width=floor_joist_dovetail_large_width,
+                dovetail_angle=floor_joist_dovetail_angle,
                 dovetail_lateral_offset=scalar(0),
                 dovetail_depth=floor_joist_dovetail_depth,
             )
@@ -1386,7 +1386,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 receiving_timber_shoulder_inset=floor_joist_dovetail_shoulder_inset,
                 dovetail_length=floor_joist_dovetail_length,
                 dovetail_small_width=floor_joist_dovetail_small_width,
-                dovetail_large_width=floor_joist_dovetail_large_width,
+                dovetail_angle=floor_joist_dovetail_angle,
                 dovetail_lateral_offset=scalar(0),
                 dovetail_depth=floor_joist_dovetail_depth,
             )
@@ -1402,7 +1402,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 receiving_timber_shoulder_inset=floor_joist_dovetail_shoulder_inset,
                 dovetail_length=floor_joist_dovetail_length,
                 dovetail_small_width=floor_joist_dovetail_small_width,
-                dovetail_large_width=floor_joist_dovetail_large_width,
+                dovetail_angle=floor_joist_dovetail_angle,
                 dovetail_lateral_offset=scalar(0),
                 dovetail_depth=floor_joist_dovetail_depth,
             )
@@ -1419,7 +1419,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             receiving_timber_shoulder_inset=floor_joist_dovetail_shoulder_inset,
             dovetail_length=floor_joist_dovetail_length,
             dovetail_small_width=floor_joist_dovetail_small_width,
-            dovetail_large_width=floor_joist_dovetail_large_width,
+            dovetail_angle=floor_joist_dovetail_angle,
             dovetail_lateral_offset=scalar(0),
             dovetail_depth=floor_joist_dovetail_depth,
         ),
@@ -1433,7 +1433,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             receiving_timber_shoulder_inset=floor_joist_dovetail_shoulder_inset,
             dovetail_length=floor_joist_dovetail_length,
             dovetail_small_width=floor_joist_dovetail_small_width,
-            dovetail_large_width=floor_joist_dovetail_large_width,
+            dovetail_angle=floor_joist_dovetail_angle,
             dovetail_lateral_offset=scalar(0),
             dovetail_depth=floor_joist_dovetail_depth,
         ),

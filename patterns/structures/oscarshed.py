@@ -913,7 +913,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Dovetail parameters
     dovetail_shoulder_inset = inches(scalar(1, 2))  # 1/2 inch shoulder inset
     dovetail_small_width = inches(scalar(3, 2))     # 1.5 inch small width
-    dovetail_large_width = inches(2)                   # 2 inch large width
+    dovetail_angle = atan(scalar(1, 8))             # 1:8 flare (1.5" to 2" over 2" length)
     dovetail_length = inches(2)                        # 2 inch long
     dovetail_depth = inches(2)                         # 2 inch deep
     
@@ -933,7 +933,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             receiving_timber_shoulder_inset=dovetail_shoulder_inset,
             dovetail_length=dovetail_length,
             dovetail_small_width=dovetail_small_width,
-            dovetail_large_width=dovetail_large_width,
+            dovetail_angle=dovetail_angle,
             dovetail_lateral_offset=scalar(0),
             dovetail_depth=dovetail_depth
         )
@@ -949,7 +949,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             receiving_timber_shoulder_inset=dovetail_shoulder_inset,
             dovetail_length=dovetail_length,
             dovetail_small_width=dovetail_small_width,
-            dovetail_large_width=dovetail_large_width,
+            dovetail_angle=dovetail_angle,
             dovetail_lateral_offset=scalar(0),
             dovetail_depth=dovetail_depth
         )
