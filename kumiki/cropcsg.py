@@ -46,6 +46,14 @@ approximately_crop_plane_to_area_on_csg still only intersects the solids that
 ENCLOSE the region and counts anything subtracted as still present. Its name
 says so. It shows up as an anchor placed where a later cut has since removed the
 material.
+
+Exactness along a line buys one more thing: the difference between being ON a
+solid and being INSIDE it. Both readings of the walk already exist, so
+crop_line_to_boundary_segments_on_csg subtracts one from the other and hands
+back the stretches that lie on the surface. That is what an ARRIS is, and the
+reason to ask for it rather than for material is that a cutter is extended past
+the piece on purpose -- so its arrises run on into wood that is still there,
+where there is no edge to draw.
 """
 
 import math
@@ -497,6 +505,18 @@ Span = Tuple[float, float]
 _VERIFY_EPS = 1e-9
 
 
+# Slack for the one comparison that decides whether a line lying IN a face
+# plane counts as on the solid. A line that lies exactly in a plane should
+# measure an offset of 0 from it, and measures 4e-18 instead -- an arris is
+# built from the very corners of the prism whose faces it lies in, so the
+# rounding is unavoidable and always present. Everywhere else in this file a
+# comparison decides which side of a plane something is on, and noise that
+# small does not change the side; here the two readings are SUPPOSED to differ
+# at exactly zero, so without slack the reading is chosen by rounding noise.
+# Nanometres, so nothing a timber is dimensioned in reaches it.
+_IN_PLANE_EPS = 1e-9
+
+
 def _spans_within_primitive(
     faces: BoundingHalfSpaces,
     line: Line,
@@ -523,8 +543,12 @@ def _spans_within_primitive(
         along = float((normal.T * direction)[0, 0])
         offset = float((normal.T * (origin - point))[0, 0])
         if abs(along) < 1e-12:
-            # Parallel to the line: it either keeps all of it or none.
-            if offset >= tolerance if removing else offset > tolerance:
+            # Parallel to the line: it either keeps all of it or none. The
+            # slack is _IN_PLANE_EPS's whole reason to exist -- a line lying IN
+            # this face is the case the two readings disagree about, and it is
+            # the case that does not compute a clean zero.
+            if (offset >= tolerance - _IN_PLANE_EPS if removing
+                    else offset > tolerance + _IN_PLANE_EPS):
                 return []
             continue
         bound = (tolerance - offset) / along
@@ -876,26 +900,96 @@ def crop_line_to_segments_on_csg(
     mortise wall meeting the face it opens onto -- or an arris the cut planed
     away, and along one dimension those are the same fact. So it is not decided
     on the line: both readings are computed, and where they disagree the SOLID
-    is asked, at the midpoint of each doubtful stretch. See the end of this
-    function.
+    is asked, at the midpoint of each doubtful stretch. See _closed_spans.
+    """
+    seed = _seed_span(line, seed_reach, near)
+    spans = _closed_spans(line, csg, seed, tolerance)
+    if spans is None:
+        return None
+    return _segments(line, spans)
+
+
+def crop_line_to_boundary_segments_on_csg(
+    line: Line,
+    csg,
+    seed_reach: Numeric,
+    near: Optional[V3] = None,
+    tolerance: float = 0.0,
+) -> Optional[List[LineSegment]]:
+    """The parts of a line that lie on a solid's SURFACE rather than inside it.
+
+    The same three return values as crop_line_to_segments_on_csg, and the same
+    walk; what differs is the question. That one asks whether there is material
+    along the line, which an edge buried in the middle of a solid answers yes
+    to just as loudly as one running along its face. An ARRIS is the second and
+    never the first, so asking for material draws it carrying on into whatever
+    the piece is still made of -- a tenon's arris continuing past the shoulder
+    and down the shank, because the cutter that shaped the tenon was extended
+    back there and the shank is solid around it.
+
+    Boundary is closure minus interior, and both readings already exist: the
+    closed one is what crop_line_to_segments_on_csg returns, and the open one
+    is the same walk read the other way (see _interior_spans). Subtracting them
+    leaves exactly the stretches where the line is on the surface.
+
+    The interior is taken at MINUS `tolerance`, for the reason the whole file
+    errs outwards: a set being taken away is erred on by removing less of it.
+    A widened interior would eat `tolerance` off the real edge at the very
+    place it emerges from the material; a narrowed one leaves `tolerance` of
+    overhang instead, which is the harmless direction.
+    """
+    seed = _seed_span(line, seed_reach, near)
+    closed = _closed_spans(line, csg, seed, tolerance)
+    if closed is None:
+        return None
+    interior = _interior_spans(line, csg, seed, -tolerance)
+    if interior is None:
+        return None
+    return _segments(line, _subtracted_spans(closed, interior))
+
+
+def _seed_span(line: Line, seed_reach: Numeric, near: Optional[V3]) -> Span:
+    """The interval to start clipping from, centred where the feature is."""
+    direction = unit_vector(line.direction)
+    reach = float(seed_reach)
+    centre = (0.0 if near is None
+              else float(((near - line.point).T * direction)[0, 0]))
+    return (centre - reach, centre + reach)
+
+
+def _segments(line: Line, spans: Sequence[Span]) -> List[LineSegment]:
+    """Spans of a line's parameter as the pieces of line they stand for."""
+    direction = unit_vector(line.direction)
+    origin = line.point
+    return [
+        LineSegment(
+            line=line,
+            start=origin + direction * scalar(low),
+            end=origin + direction * scalar(high),
+        )
+        for low, high in spans
+    ]
+
+
+def _closed_spans(
+    line: Line, csg, seed: Span, tolerance: float,
+) -> Optional[List[Span]]:
+    """Where a line lies on a solid, counting its surface as on it.
+
+    Two readings of the one ambiguous case, and the solid itself to settle it.
+
+    A line lying IN a cut's wall is either an arris that cut just made, or an
+    arris it planed away -- and along one dimension those look identical. So
+    both answers are computed: the permissive one keeps every such line, the
+    strict one lets a flush cut take it. Where they differ is exactly the set
+    of doubtful stretches, and each is put to is_point_on_boundary at its
+    midpoint -- "is this still on the surface of the piece", which is what an
+    edge highlight means, asked of the solid rather than guessed from the
+    line. A handful of point tests per edge, only where there is doubt.
     """
     direction = unit_vector(line.direction)
     origin = line.point
-    reach = float(seed_reach)
-    centre = 0.0 if near is None else float(((near - origin).T * direction)[0, 0])
 
-    seed = (centre - reach, centre + reach)
-
-    # Two readings of the one ambiguous case, and the solid itself to settle it.
-    #
-    # A line lying IN a cut's wall is either an arris that cut just made, or an
-    # arris it planed away -- and along one dimension those look identical. So
-    # both answers are computed: the permissive one keeps every such line, the
-    # strict one lets a flush cut take it. Where they differ is exactly the set
-    # of doubtful stretches, and each is put to is_point_on_boundary at its
-    # midpoint -- "is this still on the surface of the piece", which is what an
-    # edge highlight means, asked of the solid rather than guessed from the
-    # line. A handful of point tests per edge, only where there is doubt.
     permissive = _spans_on_csg(csg, line, seed, tolerance, flush_removes=False)
     if permissive is None:
         return None
@@ -909,13 +1003,21 @@ def crop_line_to_segments_on_csg(
         middle = origin + direction * scalar((low + high) / 2.0)
         if not csg.is_point_on_boundary(middle, eps=scalar(_VERIFY_EPS)):
             gone.append((low, high))
-    spans = _subtracted_spans(permissive, gone)
+    return _subtracted_spans(permissive, gone)
 
-    return [
-        LineSegment(
-            line=line,
-            start=origin + direction * scalar(low),
-            end=origin + direction * scalar(high),
-        )
-        for low, high in spans
-    ]
+
+def _interior_spans(
+    line: Line, csg, seed: Span, tolerance: float,
+) -> Optional[List[Span]]:
+    """Where a line is strictly INSIDE a solid -- swallowed, not on its face.
+
+    The same walk read open instead of closed, and `removing` is the switch
+    that does it. Within a primitive it picks which comparison decides a line
+    lying in a face plane (see _spans_within_primitive), and a Difference flips
+    it on the way into each solid it subtracts, so that a line on a cut's wall
+    survives the cut. Handing it in at the TOP inverts that everywhere at once:
+    the body no longer keeps a line lying in its own face, and a cut now takes
+    one lying in its wall. What is left is the material with its whole surface
+    peeled off, which is the interior.
+    """
+    return _spans_on_csg(csg, line, seed, tolerance, removing=True)

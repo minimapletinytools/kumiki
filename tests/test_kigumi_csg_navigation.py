@@ -1388,6 +1388,153 @@ class TestEdgeHighlightSpan:
         assert checked == 4, f"expected the four shoulder edges, got {checked}"
 
 
+class TestAnArrisStopsWhereTheSurfaceDoes:
+    """An arris runs along the face of the piece, never buried inside it.
+
+    The cutter that shapes a tenon is extended back past the shoulder on
+    purpose, so that an oblique shoulder comes out clean. Its arrises run back
+    with it, into the shank -- where there is material all around them, and so
+    no edge. Cropping to where there is MATERIAL keeps all of that: every
+    arris of this tenon came back the full 198.8mm of the prism (202.8mm once
+    a tolerant clip had padded both ends), instead of stopping at the
+    shoulder. Cropping to where there is SURFACE is what it means.
+    """
+
+    @pytest.fixture(scope="class")
+    def oblique_shoulder_frame(self):
+        """A brace tenoned into a post: 45 degrees, so the shoulder is oblique.
+
+        The square case cannot show this -- a perpendicular shoulder needs no
+        back extension, so the prism stops at the shoulder anyway and a
+        material crop happens to give the right answer.
+        """
+        from kumiki.construction import ButtJointTimberArrangement
+        from kumiki.example_shavings import create_canonical_example_brace_joint_timbers
+        from kumiki.joints.workshop.mixed import cut_mortise_and_tenon_joint
+        from kumiki.timber import TimberEnd
+
+        arrangement = create_canonical_example_brace_joint_timbers(create_v3(0, 0, 0))
+        joint = cut_mortise_and_tenon_joint(
+            arrangement=ButtJointTimberArrangement(
+                butt_timber=arrangement.brace_timber,
+                receiving_timber=arrangement.timber1,
+                butt_timber_end=TimberEnd.BOTTOM,
+            ),
+            tenon_size=Matrix([inches(2), inches(2)]),
+            tenon_length=inches(5),
+            mortise_depth=inches(3),
+        )
+        return Frame.from_joints([joint])
+
+    def _tenon_arris(self, frame, name):
+        from kumiki.cutcsg import csg_children
+
+        cut_timber = _cut_timber_by_name(frame, "brace_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        stack = [local]
+        while stack:
+            node = stack.pop()
+            if getattr(node.label, "name", None) == "tenon":
+                for feature in node.get_declared_features():
+                    if feature.name == name:
+                        return feature, node, cut_timber.timber, local
+            stack.extend(csg_children(node))
+        raise AssertionError(f"no feature named {name!r} on the tenon")
+
+    def _lengths_mm(self, segments):
+        return sorted(round(math.dist(s["start"], s["end"]) * 1000, 2)
+                      for s in segments)
+
+    @pytest.mark.parametrize("name, expected_mm", [
+        # 5" of tenon measured at the centreline, and a shoulder at 45 degrees
+        # to the tenon's axis: each arris sits 1" off that centreline in the
+        # height axis, so the shoulder meets it an inch early on one side and
+        # an inch late on the other. 4" and 6", twice each.
+        ("arris.0", 101.6),
+        ("arris.1", 101.6),
+        ("arris.2", 152.4),
+        ("arris.3", 152.4),
+    ])
+    def test_a_tenons_arris_stops_at_the_shoulder(
+            self, oblique_shoulder_frame, name, expected_mm):
+        feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
+
+        segments, absent = runner._edge_highlight_segments(feature, owner, timber, root)
+
+        assert not absent
+        assert self._lengths_mm(segments) == pytest.approx([expected_mm], abs=0.01)
+
+    def test_the_tenons_tip_is_exactly_its_own_cross_section(
+            self, oblique_shoulder_frame):
+        """Not a hair over.
+
+        These four are entirely on the surface either way, so they are here for
+        the other half of the bug: a declared arris lies IN two of its own
+        prism's faces, the exact clip mistook that for lying outside them, and
+        every one of them was drawn by a 2mm-tolerant clip that pushed both
+        ends out. 50.8mm of tenon read as 54.8mm.
+        """
+        for name in ("arris.8", "arris.9", "arris.10", "arris.11"):
+            feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
+
+            segments, absent = runner._edge_highlight_segments(
+                feature, owner, timber, root)
+
+            assert not absent, name
+            assert self._lengths_mm(segments) == pytest.approx(
+                [float(inches(2)) * 1000], abs=0.01), name
+
+    def test_the_back_of_the_cutter_is_not_an_edge_at_all(
+            self, oblique_shoulder_frame):
+        """Where the extension ends, buried in the shank.
+
+        The prism has a cap back there and four arrises around it, and they are
+        inside solid wood. Absent, not merely short -- there is no stretch of
+        them anywhere on the piece.
+        """
+        for name in ("arris.4", "arris.5", "arris.6", "arris.7"):
+            feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
+
+            segments, absent = runner._edge_highlight_segments(
+                feature, owner, timber, root)
+
+            assert segments is None, name
+            assert absent, name
+
+    def test_every_reported_stretch_is_really_on_the_surface(
+            self, oblique_shoulder_frame):
+        """The property the whole change is for, asked of the solid itself.
+
+        is_point_on_boundary is the independent answer here: it is not how the
+        segments are worked out, so agreeing with it is evidence rather than a
+        tautology.
+        """
+        from kumiki.cutcsg import CSGFeatureType, csg_children
+
+        cut_timber = _cut_timber_by_name(oblique_shoulder_frame, "brace_timber")
+        root = cut_timber.render_timber_with_cuts_csg_local()
+        checked = 0
+        stack = [root]
+        while stack:
+            node = stack.pop()
+            stack.extend(csg_children(node))
+            for feature in node.get_declared_features():
+                if feature.feature_type() != CSGFeatureType.EDGE:
+                    continue
+                segments, _ = runner._edge_highlight_segments(
+                    feature, node, cut_timber.timber, root)
+                for segment in segments or []:
+                    start = runner._to_v3(segment["start"])
+                    end = runner._to_v3(segment["end"])
+                    for fraction in (0.15, 0.5, 0.85):
+                        local = cut_timber.timber.transform.global_to_local(
+                            start + (end - start) * scalar(repr(fraction)))
+                        assert root.is_point_on_boundary(local, eps=scalar("1e-7")), (
+                            f"{feature.name} reports a stretch that is not on the piece")
+                        checked += 1
+        assert checked > 0
+
+
 class TestResolvingADerivedEdge:
     """A picked edge, written down and found again.
 

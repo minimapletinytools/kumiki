@@ -2657,6 +2657,20 @@ def _declared_line_span(feature: Any, node: Any, located: Any):
     return (reach[0], reach[-1])
 
 
+def _intersected_spans(one: List[Any], other: List[Any]) -> List[Any]:
+    """The stretches covered by both sets of intervals.
+
+    Empty intervals are dropped rather than kept as zero-length ones: two
+    bounds that only touch describe a point, and a point is not a piece of a
+    line anything wants to draw or measure.
+    """
+    return [
+        (max(a[0], b[0]), min(a[1], b[1]))
+        for a in one for b in other
+        if max(a[0], b[0]) < min(a[1], b[1])
+    ]
+
+
 def _intersected_line_pieces(
     located: Any, solids: List[Any], reach: float, near: Any, declared=None,
 ):
@@ -2679,11 +2693,7 @@ def _intersected_line_pieces(
         if intervals is None:
             intervals = found
             continue
-        intervals = [
-            (max(one[0], other[0]), min(one[1], other[1]))
-            for one in intervals for other in found
-            if max(one[0], other[0]) < min(one[1], other[1])
-        ]
+        intervals = _intersected_spans(intervals, found)
     return intervals or []
 
 
@@ -4652,20 +4662,46 @@ def _cropped_edge_segments(
 
     Three conditions, all necessary, so all three are intersected:
 
+      - the SURFACE is there. Not merely the material: an arris runs along the
+        face of the piece and is never buried in the middle of it, so asking
+        where there is wood keeps every stretch the line is swallowed by. A
+        tenon's arris is the case -- the cutter that shaped it is extended back
+        past the shoulder on purpose, and the shank is solid around it there,
+        so a material test drew the arris carrying on down the timber.
       - both parent faces are there. A derived edge is where two faces MEET,
         and a face is bounded by the solid that declared it. Without this the
         line runs the length of the timber, since a mortise wall's plane
-        carries on long after the mortise stops.
-      - the material is there. The whole tree, so that a cut which removes part
-        of the edge shortens it and one through the middle splits it in two.
+        carries on long after the mortise stops. Surface alone does not cover
+        it: a mortise floor's plane meets the timber's own side a foot away,
+        and that line is on the surface without being an edge of anything.
+      - the feature says so itself. Exact, and free -- a prism's arris is a
+        pair of its own corners and a derived edge reaches as far as both its
+        faces do. _measure_span has asked this all along; an edge highlight
+        did not, and so had nothing to hold the ends but a tolerant clip.
 
-    Written as an Intersection so the interval algebra does the work: the
-    edge is on the body AND on its parents, which is what an intersection is.
-    Not the perfect-timber box, which used to stand in for the body -- rough
-    stock is larger than it, so every rough arris clipped away to nothing.
+    The bounds are intersected as intervals rather than written as one CSG
+    Intersection, because the first condition is about the surface of ONE solid
+    and an intersection's surface includes the other's. Intersecting root with
+    a parent made the parent's own face count as boundary, which is the whole
+    length of the arris.
     """
-    from kumiki.cropcsg import crop_line_to_segments_on_csg
-    from kumiki.cutcsg import Intersection
+    from kumiki.cropcsg import (crop_line_to_boundary_segments_on_csg,
+                                crop_line_to_segments_on_csg)
+    from kumiki.geometry import Line, unit_vector
+
+    # Normalised first, because everything below measures along it in metres:
+    # stations are compared against the edge tolerance and against what the
+    # feature declares, and cropcsg parameterises by its own unit direction. A
+    # Line does not promise that its direction is one.
+    line = Line(direction=unit_vector(line.direction), point=line.point)
+
+    near = timber.get_perfect_timber_within_csg_local().transform.position
+    reach = float(timber.length) * 4
+    station = lambda point: float(((point - line.point).T * line.direction)[0, 0])
+    spans = lambda pieces: None if pieces is None else [
+        tuple(sorted((station(piece.start), station(piece.end))))
+        for piece in pieces
+    ]
 
     # A derived edge is bounded by the two solids its parent faces belong to.
     # A declared one -- a timber's own arris -- belongs to a single primitive,
@@ -4675,20 +4711,32 @@ def _cropped_edge_segments(
         hit.owner for hit in hits
         if hit is not None and getattr(hit, "owner", None) is not None
     ]
+    derived = bool(parents)
     if not parents:
         parents = [owner] if owner is not None else []
 
-    solid = root_csg
-    for parent in parents:
-        solid = Intersection(left=solid, right=parent)
+    declared = _declared_line_span(edge_feature, owner, line) if owner is not None else None
 
     def clipped(tolerance):
-        return crop_line_to_segments_on_csg(
-            line, solid,
-            seed_reach=float(timber.length) * 4,
-            near=timber.get_perfect_timber_within_csg_local().transform.position,
-            tolerance=tolerance,
-        )
+        found = spans(crop_line_to_boundary_segments_on_csg(
+            line, root_csg, seed_reach=reach, near=near, tolerance=tolerance))
+        if found is None:
+            return None
+        bounds = []
+        if declared is not None:
+            # Widened with everything else: a derived edge found by a tolerant
+            # test has parents whose corners are that far from its line, so an
+            # unwidened declared span would undo the fallback it is part of.
+            bounds.append([(declared[0] - tolerance, declared[1] + tolerance)])
+        for parent in parents:
+            within = spans(crop_line_to_segments_on_csg(
+                line, parent, seed_reach=reach, near=near, tolerance=tolerance))
+            if within is None:
+                return None
+            bounds.append(within)
+        for bound in bounds:
+            found = _intersected_spans(found, bound)
+        return found
 
     # Two questions, one number, and only one of them wants it.
     #
@@ -4702,8 +4750,15 @@ def _cropped_edge_segments(
     #
     # So take the exact spans where there are any, and fall back to the tolerant
     # ones only for the edge that exact clipping loses entirely.
+    #
+    # Only a DERIVED edge, though. The tolerance belongs to how that edge was
+    # found -- two faces counted as meeting because they came within it -- and a
+    # declared arris was not found that way at all: its line is the primitive's
+    # own corners and sits exactly where it says. Widening for one anyway
+    # resurrected stretches the exact reading had correctly called absent, which
+    # is how a bore's end arris came back as a 6mm stub floating off the piece.
     cropped = clipped(0.0)
-    if not cropped:
+    if not cropped and derived:
         cropped = clipped(float(_edge_tolerance()))
     if cropped is None:
         # A solid it cannot describe: no answer, rather than a wrong one.
@@ -4711,12 +4766,14 @@ def _cropped_edge_segments(
     if not cropped:
         return (None, True)
 
+    at = lambda reached: timber.transform.local_to_global(
+        line.point + line.direction * scalar_of(reached))
     return ([
         {
-            "start": _vector3_to_floats(timber.transform.local_to_global(segment.start)),
-            "end": _vector3_to_floats(timber.transform.local_to_global(segment.end)),
+            "start": _vector3_to_floats(at(low)),
+            "end": _vector3_to_floats(at(high)),
         }
-        for segment in cropped
+        for low, high in cropped
     ], False)
 
 
