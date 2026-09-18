@@ -95,6 +95,10 @@ The key idea is that the code remains the source of truth. The 3D viewer becomes
 ::: 7/29 board notes
 
 board related joints
+DONE-dovetail_corner_joint
+DONE-Half-blind dovetail corenr joint
+DONE-sliding dovetail (maybe you want tapered variants)
+  -the tricky thing about this is th edovetail can be on edge or end...
 -you should do the FauxTimber thing again that changes the timber orientation so you can use existing cuts on it. Make sure to convert the maybe end cuts into actual cuts when rotating back
 -multi morise and tenon
   -this could be a compound joint helpre that calls morties and tenon joint in a regular pattern
@@ -103,8 +107,6 @@ board related joints
 -reinforced_edge_joint
 -reinforced_corner_butt_joint
 -reinforce_corner_miter_joint
--dovetail_corner_joint
--Half-blind dovetail corenr joint
 -route-a-corner/edge
   -corner
     -rabet_corner_joint/rabet_edge_joint (single/dobule variants)
@@ -113,8 +115,6 @@ board related joints
   -shiplap
   -cleat joint (not really a joint)
   -dado_joint (edge to face)
-DONE-sliding dovetail (maybe you want tapered variants)
-  -the tricky thing about this is th edovetail can be on edge or end...
 -blind housed dovetail
 -splined miter joint
 -bridge joint(just tongue nad fork)
@@ -131,6 +131,11 @@ DONE-sliding dovetail (maybe you want tapered variants)
 :: TODO
 
 -MEASURING RELATED STUFF
+  -the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
+  -fix face extents to not be AABB but rather corners 
+  -angle mesaurement anchor positon derivatino needs to be improved
+    -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
+    -definitely highlight the features being measured...
   -the selected timber blue thing is weird when we're in measuring mode, especially in 2d where there is no concept of selection and then drilling in
   -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
   -fix priority of feature selection in 2d view, it should prioritize on features closest to camera, just refine the rules in general
@@ -140,9 +145,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
     -either add it as a separate menu after a divider
     -get rid of it in 2d drawing view
     -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
-  -angle mesaurement anchor positon derivatino needs to be improved
-    -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
-    -definitely highlight the features being measured...
   -for angle measurements you should be allowed to measure to axis aligned planes
   -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
   -when face is highlighted in green (for measure from) it's internal tris should not be highlighted. it should look like it was selected but in green like we do for regular selection
@@ -151,37 +153,41 @@ DONE-sliding dovetail (maybe you want tapered variants)
   -timber goes into x-ray view when a feature is selected in drawing mode 
   -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
     -or maybe allow selectino of xrayed features?
-  -fix face extents to not be AABB but rather corners 
-  -the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
+  -test edge face -> point derivation at some point...
 
 -DRAWING NONSENSE
   -do the drawing border and meta info stuff
     -add background border for drawing...
     -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
-
   -and you should highlight the refreence edge as wel if there is one in drawing mode
       -or just add an option in general to highlight the reference edge for 3d view mode as well
   -make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
     -welly oush ould force show lines for PTW faces (maybe light grey)
     -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
       for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
-      
   -conisder just shippingthe defalut drawing with every frame by default 
     
-  
 
 DONE-do joint rename to match what's in your new book  
 DONE-tenon edge lines not being cropped properly on doubel angled mortise and tenon joint
+IGNORE-create a header for the are below the 3d view main panel in kigumi so it appears a littlem or esensible. it should says "scroll here for more" as well. amybe you can stick some doc information there too.
+DONE-overlap priority is: non derived features first -> order by highest priority within derived group (derived group priority = enum index) -> feature priority -> feature name -> feature order
+DONE-you'll need line / face -> point derived features tooo
+DONE-add center axis feature to peg hole
 
--make a decision on derived edge groups
+
+
 -tenon square peg holes need to intersect with the tenon prism for derived edges
--you'll need line / face -> point derived features tooo
+  -make a decision on derived edge groups
+
+-improve panel functions, think bout the simplest way to do this...
+-update shed example to include panels
+  -make a video about this maybe after you do some more edge joints
 
 
 -add srcibe notching ot more joints...
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
 -add support for multilpe frames in jigumi (returns list of frames but you'll need to figure out how to do kiwari...)
--create a header for the are below the 3d view main panel in kigumi so it appears a littlem or esensible. it should says "scroll here for more" as well. amybe you can stick some doc information there too.
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
   
@@ -204,8 +210,6 @@ DONE-tenon edge lines not being cropped properly on doubel angled mortise and te
 -add shouder to cross lap joint
   -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
   -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
--update shed example to include panels
-  -make a video about this maybe after you do some more edge joints
 -patern book changes
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
