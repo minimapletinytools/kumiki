@@ -862,6 +862,12 @@
                         label: accKey.replace(/^accessory:[^:]+:/, '').replace(/^accessory:/, ''),
                         hasChildren: false,
                         selectNode: { type: 'accessory', key: accKey },
+                        // An accessory is a scene member like any other: it is
+                        // drawn, it is pickable, and hiding it is keyed the
+                        // same way. Without this it had no memberKey, which is
+                        // what the lock and hide buttons hang off -- so a peg
+                        // could be selected and never hidden.
+                        memberKey: accKey,
                     }));
                 }
             }
