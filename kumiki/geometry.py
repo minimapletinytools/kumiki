@@ -36,7 +36,9 @@ from .rule import (
     cross_product,
     safe_dot_product,
     safe_normalize_vector,
+    are_vectors_perpendicular,
     safe_transform_vector,
+    safe_zero_test,
     safe_zero_test_sq,
 )
 
@@ -396,3 +398,77 @@ def planes_are_parallel(a: Optional[Plane], b: Optional[Plane]) -> bool:
     if a is None or b is None:
         return False
     return are_vectors_parallel(a.normal, b.normal)
+
+
+def intersect_line_plane(line: Optional[Line], plane: Optional[Plane]) -> Optional[Point]:
+    """The point where a line crosses a plane, or None if it crosses in no single point.
+
+    None covers three cases that all mean "no point here": either argument
+    missing (a caller passing through a locate() that declined), the line
+    parallel to the plane, and the line lying IN the plane. The last is the one
+    that turns up constantly when deriving points -- an edge lies in both of the
+    faces that formed it -- and it is geometrically a whole shared line rather
+    than a point, so it is not an intersection this can describe.
+    """
+    if line is None or plane is None:
+        return None
+
+    # Running along the plane covers parallel and lying-in at once, and neither
+    # gives a point. Normalised because are_vectors_perpendicular compares a raw
+    # dot product against zero, and a plane's normal is not required to be unit.
+    normal = _unit_or_none(plane.normal)
+    direction = _unit_or_none(line.direction)
+    if normal is None or direction is None:
+        return None
+    if are_vectors_perpendicular(direction, normal):
+        return None
+
+    # Scale-invariant in the normal, which is why only the guard above needed
+    # the unit form.
+    distance = (
+        safe_dot_product(normal, plane.point) - safe_dot_product(normal, line.point)
+    ) / safe_dot_product(normal, direction)
+    return Point(position=line.point + direction * distance)
+
+
+def _unit_or_none(vector: V3) -> Optional[V3]:
+    """*vector* normalised, or None if it has no direction to normalise."""
+    if safe_zero_test_sq(safe_dot_product(vector, vector)):
+        return None
+    return safe_normalize_vector(vector)
+
+
+def points_are_coincident(a: Optional[Point], b: Optional[Point]) -> bool:
+    """Whether two points are the same point."""
+    if a is None or b is None:
+        return False
+    between = b.position - a.position
+    return safe_zero_test_sq(safe_dot_product(between, between))
+
+
+def lines_are_coincident(a: Optional[Line], b: Optional[Line]) -> bool:
+    """Whether two lines are the same infinite line.
+
+    Not "do they cross": two lines meeting at a point are different lines. This
+    answers whether two features NAME the same geometry, which is what deciding
+    between duplicate features needs.
+    """
+    if a is None or b is None:
+        return False
+    first, second = _unit_or_none(a.direction), _unit_or_none(b.direction)
+    if first is None or second is None or not are_vectors_parallel(first, second):
+        return False
+    between = b.point - a.point
+    if safe_zero_test_sq(safe_dot_product(between, between)):
+        return True  # same base point, so the parallel test already settled it
+    return are_vectors_parallel(safe_normalize_vector(between), first)
+
+
+def planes_are_coincident(a: Optional[Plane], b: Optional[Plane]) -> bool:
+    """Whether two planes are the same infinite plane, facing either way."""
+    if a is None or b is None:
+        return False
+    normal, other = _unit_or_none(a.normal), _unit_or_none(b.normal)
+    if normal is None or other is None or not are_vectors_parallel(normal, other):
+        return False
+    return safe_zero_test(safe_dot_product(normal, b.point - a.point))

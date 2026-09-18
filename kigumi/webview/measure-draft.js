@@ -169,16 +169,18 @@
     /**
      * A comparable form of a reference.
      *
-     * An edge's two parents are sorted, because the same edge written either
-     * way round is the same edge -- the rule DerivedFeaturePath applies when it
-     * sorts its parents on the python side.
+     * A derived feature's two parents are sorted, because the same feature
+     * written either way round is the same feature -- the rule
+     * DerivedFeaturePath applies when it sorts its parents on the python side.
+     * The kind goes in the key: an edge and a point can be built from one pair
+     * of parents, and they are not the same reference.
      */
     function referenceKey(reference) {
-        if (reference.kind === 'edge') {
+        if (reference.kind === 'edge' || reference.kind === 'point') {
             const parents = [reference.a, reference.b]
                 .map((part) => [((part || {}).csgPath || []).join('/'), (part || {}).feature || ''])
                 .sort();
-            return [reference.timber, 'edge', parents];
+            return [reference.timber, reference.kind, parents];
         }
         return [
             reference.timber,

@@ -6,7 +6,9 @@ This module contains tests for the CSG primitives and operations.
 
 import pytest
 from kumiki.rule import Orientation, Transform, create_v3, radians, scalar, Matrix, simplify, sqrt, cos, sin, pi, safe_zero_test, safe_equality_test, safe_compare, Comparison
-from kumiki.geometry import Line, Plane, Point, intersect_planes, planes_are_parallel
+from kumiki.geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
+                             lines_are_coincident, planes_are_coincident, planes_are_parallel,
+                             points_are_coincident)
 from kumiki.cutcsg import (
     CutCSGLabel,
     HalfSpace,
@@ -24,7 +26,9 @@ from kumiki.cutcsg import (
     EmptyCSG,
     PrismFace,
     CSGFeature,
+    CylinderAxisFeature,
     DerivedEdgeFeature,
+    DerivedPointFeature,
     OwnedFeatureHit,
     CSGFeatureExtent,
     safe_zero_test_sq,
@@ -3771,6 +3775,83 @@ class TestPlaneIntersection:
         assert not planes_are_parallel(x2, None)
 
 
+class TestLinePlaneIntersection:
+    def _line(self, direction, point):
+        return Line(direction=create_v3(*direction), point=create_v3(*point))
+
+    def _plane(self, normal, point):
+        return Plane(normal=create_v3(*normal), point=create_v3(*point))
+
+    def test_a_line_crossing_a_plane_meets_it_at_a_point(self):
+        up = self._line((scalar(0), scalar(0), scalar(1)), (scalar(3), scalar(3), scalar(0)))
+        z10 = self._plane((scalar(0), scalar(0), scalar(1)), (scalar(0), scalar(0), scalar(10)))
+        at = intersect_line_plane(up, z10)
+        assert at is not None
+        assert points_are_coincident(at, Point(create_v3(scalar(3), scalar(3), scalar(10))))
+
+    def test_the_planes_normal_need_not_be_unit_length(self):
+        up = self._line((scalar(0), scalar(0), scalar(1)), (scalar(3), scalar(3), scalar(0)))
+        scaled = self._plane((scalar(0), scalar(0), scalar(5)), (scalar(0), scalar(0), scalar(10)))
+        assert points_are_coincident(
+            intersect_line_plane(up, scaled), Point(create_v3(scalar(3), scalar(3), scalar(10))))
+
+    def test_a_line_parallel_to_the_plane_never_meets_it(self):
+        across = self._line((scalar(1), scalar(0), scalar(0)), (scalar(0), scalar(0), scalar(0)))
+        z10 = self._plane((scalar(0), scalar(0), scalar(1)), (scalar(0), scalar(0), scalar(10)))
+        assert intersect_line_plane(across, z10) is None
+
+    def test_a_line_lying_in_the_plane_meets_it_everywhere_and_so_nowhere(self):
+        within = self._line((scalar(1), scalar(0), scalar(0)), (scalar(0), scalar(0), scalar(10)))
+        z10 = self._plane((scalar(0), scalar(0), scalar(1)), (scalar(0), scalar(0), scalar(10)))
+        assert intersect_line_plane(within, z10) is None
+
+    def test_a_missing_argument_is_no_intersection(self):
+        z10 = self._plane((scalar(0), scalar(0), scalar(1)), (scalar(0), scalar(0), scalar(10)))
+        assert intersect_line_plane(None, z10) is None
+        assert intersect_line_plane(
+            self._line((scalar(0), scalar(0), scalar(1)), (scalar(0), scalar(0), scalar(0))),
+            None) is None
+
+
+class TestNamingTheSameGeometry:
+    """Whether two features describe one piece of geometry -- not whether they touch."""
+
+    def test_a_line_written_either_way_round_is_one_line(self):
+        assert lines_are_coincident(
+            Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                 point=create_v3(scalar(3), scalar(3), scalar(0))),
+            Line(direction=create_v3(scalar(0), scalar(0), scalar(-1)),
+                 point=create_v3(scalar(3), scalar(3), scalar(7))))
+
+    def test_two_lines_that_cross_are_two_lines(self):
+        assert not lines_are_coincident(
+            Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                 point=create_v3(scalar(3), scalar(3), scalar(0))),
+            Line(direction=create_v3(scalar(1), scalar(0), scalar(0)),
+                 point=create_v3(scalar(3), scalar(3), scalar(0))))
+
+    def test_parallel_lines_apart_are_two_lines(self):
+        assert not lines_are_coincident(
+            Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                 point=create_v3(scalar(3), scalar(3), scalar(0))),
+            Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                 point=create_v3(scalar(3), scalar(4), scalar(0))))
+
+    def test_a_plane_has_no_front(self):
+        assert planes_are_coincident(
+            Plane(normal=create_v3(scalar(0), scalar(0), scalar(1)),
+                  point=create_v3(scalar(0), scalar(0), scalar(10))),
+            Plane(normal=create_v3(scalar(0), scalar(0), scalar(-2)),
+                  point=create_v3(scalar(9), scalar(9), scalar(10))))
+
+    def test_offset_planes_are_two_planes(self):
+        assert not planes_are_coincident(
+            Plane(normal=create_v3(scalar(0), scalar(0), scalar(1)),
+                  point=create_v3(scalar(0), scalar(0), scalar(10))),
+            Plane(normal=create_v3(scalar(0), scalar(0), scalar(1)),
+                  point=create_v3(scalar(0), scalar(0), scalar(11))))
+
+
 class TestDerivedEdges:
     """Edges are derived from face pairs the group rules allow to meet."""
 
@@ -3877,6 +3958,14 @@ class TestDerivedEdgesInAQuery:
     """Edges surface through find_all_features on a compound node."""
 
     def _cut_timber(self):
+        """A body with a shoulder plane cut across it, as a joint leaves one.
+
+        The line the shoulder cuts across the right face is no arris of
+        anything, so deriving it is the only way to name it -- which is the
+        only state a derived feature is used in. Two faces of a bare prism
+        would not do: the prism declares the arris between them itself, and a
+        declared feature beats a derived one naming the same line.
+        """
         body = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
@@ -3885,38 +3974,43 @@ class TestDerivedEdgesInAQuery:
             _features=[
                 SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
                                               properties=FeatureProperties(group=FeatureGroup.B2)),
-                SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
             ],
         )
-        return Difference(base=body, subtract=[])
+        shoulder = HalfSpace(
+            normal=create_v3(0, 0, 1), offset=scalar(5),
+            _features=[HalfSpaceFeature(
+                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+        )
+        return Difference(base=body, subtract=[shoulder])
+
+    #: On the right face, where the shoulder crosses it.
+    ON_EDGE = (scalar(2), scalar(0), scalar(5))
 
     def test_an_edge_appears_alongside_its_faces(self):
         csg = self._cut_timber()
-        on_arris = create_v3(scalar(2), scalar(3), scalar(5))
-        names = {h.name for h in csg.find_all_features(on_arris)}
-        assert "rough.front×rough.right" in names
-        assert {"rough.right", "rough.front"} <= names
+        names = {h.name for h in csg.find_all_features(create_v3(*self.ON_EDGE))}
+        assert "shoulder×rough.right" in names
+        assert {"rough.right", "shoulder"} <= names
 
     def test_the_edge_outranks_its_own_faces(self):
         """A point on an edge is more specifically the edge than either face."""
         csg = self._cut_timber()
-        best = csg.find_first_feature(create_v3(scalar(2), scalar(3), scalar(5)))
+        best = csg.find_first_feature(create_v3(*self.ON_EDGE))
         assert best is not None
         assert best.feature_type() == CSGFeatureType.EDGE
-        assert best.name == "rough.front×rough.right"
+        assert best.name == "shoulder×rough.right"
 
     def test_mid_face_yields_no_edge(self):
         csg = self._cut_timber()
-        best = csg.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
+        best = csg.find_first_feature(create_v3(scalar(2), scalar(0), scalar(2)))
         assert best is not None and best.name == "rough.right"
 
     def test_the_edge_tolerance_governs_the_snap(self):
         """A face too far to claim the point can still pair into an edge."""
         csg = self._cut_timber()
-        # On the right face, 1.5mm shy of the arris: outside a 0.5mm face
-        # tolerance for rough.front, inside a 2mm edge tolerance.
-        near = create_v3(scalar(2), scalar(3) - scalar(15, 10000), scalar(5))
+        # On the right face, 1.5mm shy of the shoulder: outside a 0.5mm face
+        # tolerance for the shoulder, inside a 2mm edge tolerance.
+        near = create_v3(scalar(2), scalar(0), scalar(5) - scalar(15, 10000))
         best = csg.find_first_feature(near)
         assert best is not None and best.feature_type() == CSGFeatureType.EDGE
 
@@ -3926,15 +4020,15 @@ class TestDerivedEdgesInAQuery:
 
     def test_the_owner_is_the_compound_node(self):
         csg = self._cut_timber()
-        best = csg.find_first_feature(create_v3(scalar(2), scalar(3), scalar(5)))
+        best = csg.find_first_feature(create_v3(*self.ON_EDGE))
         assert best.owner is csg
 
     def test_an_edge_is_reported_once_however_deeply_nested(self):
         """Derivation runs at the queried node, not at every level below it."""
         inner = self._cut_timber()
         outer = SolidUnion(children=[SolidUnion(children=[inner])])
-        names = [h.name for h in outer.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))]
-        assert names.count("rough.front×rough.right") == 1
+        names = [h.name for h in outer.find_all_features(create_v3(*self.ON_EDGE))]
+        assert names.count("shoulder×rough.right") == 1
 
     def test_a_primitive_derives_its_own_arrises(self):
         """No compound node needed: two faces of one prism meet at an arris.
@@ -3962,29 +4056,463 @@ class TestDerivedEdgesInAQuery:
 
     def test_two_edges_sharing_a_name_are_both_reported(self):
         """Nothing dedupes by name -- two tenons declaring the same face names
-        produce two genuinely different edges that happen to share one."""
-        def prism(offset):
+        produce two genuinely different edges that happen to share one.
+
+        Dropping a duplicate derived feature goes by GEOMETRY, so two edges
+        that are different lines both stand however alike their names are. They
+        have to cross for one query to see both, which is what the two prisms
+        crossing at right angles arranges.
+        """
+        def prism(size):
             return RectangularPrism(
-                size=Matrix([scalar(2), scalar(2)]),
-                transform=Transform(position=create_v3(offset, scalar(0), scalar(0)),
-                                    orientation=Orientation.identity()),
+                size=size,
+                transform=Transform.identity(),
                 start_distance=scalar(0),
                 end_distance=scalar(10),
                 _features=[
-                    SimpleRectangularPrismFeature("tenon_right", face=PrismFace.RIGHT,
-                                                  properties=FeatureProperties(group=FeatureGroup.B2)),
-                    SimpleRectangularPrismFeature("tenon_front", face=PrismFace.FRONT,
+                    SimpleRectangularPrismFeature("tenon_side", face=PrismFace.RIGHT,
                                                   properties=FeatureProperties(group=FeatureGroup.B2)),
                 ],
             )
-        # Two coincident prisms, so one point sits on both arrises. Every
-        # allowed pairing of the four faces derives, cross-prism ones included
-        # -- a face meeting a face on another primitive is what derivation is
-        # for -- so the count is more than two. What matters is that nothing
-        # collapses them: they are distinct edges that share a name.
-        union = SolidUnion(children=[prism(scalar(0)), prism(scalar(0))])
-        names = [h.name for h in union.find_all_features(create_v3(scalar(1), scalar(1), scalar(5)))]
-        assert names.count("tenon_front×tenon_right") > 1
+        # A narrow prism each way, so their two "tenon_side" faces are the
+        # planes x=1 and y=1, and one shoulder across both makes an edge in
+        # each. The edges cross at (1, 1, 5), the inner corner of the plus.
+        across = prism(Matrix([scalar(2), scalar(20)]))
+        along = RectangularPrism(
+            size=Matrix([scalar(2), scalar(20)]),
+            transform=Transform(position=create_v3(0, 0, 0),
+                                orientation=Orientation.from_z_and_y(
+                                    create_v3(0, 0, 1), create_v3(-1, 0, 0))),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[
+                SimpleRectangularPrismFeature("tenon_side", face=PrismFace.RIGHT,
+                                              properties=FeatureProperties(group=FeatureGroup.B2)),
+            ],
+        )
+        shoulder = HalfSpace(
+            normal=create_v3(0, 0, 1), offset=scalar(5),
+            _features=[HalfSpaceFeature(
+                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+        )
+        csg = Difference(base=SolidUnion(children=[across, along]), subtract=[shoulder])
+        names = [h.name for h in csg.find_all_features(create_v3(scalar(1), scalar(1), scalar(5)))]
+        assert names.count("shoulder×tenon_side") > 1
+
+
+class TestACylindersAxis:
+    """The centre line of a bore -- a feature in the void, not on a surface."""
+
+    def _bore(self, group=FeatureGroup.NONE, start=scalar(0), end=scalar(10)):
+        return Cylinder(
+            axis_direction=create_v3(0, 0, 1), radius=scalar(1),
+            position=create_v3(2, 3, 0), start_distance=start, end_distance=end,
+            _features=[CylinderAxisFeature(
+                "peg_hole_axis", properties=FeatureProperties(group=group))])
+
+    def _axis(self, bore):
+        return next(f for f in bore.get_declared_features() if f.name == "peg_hole_axis")
+
+    def test_it_is_an_edge(self):
+        """A line, and measurement dispatches on the geometry not the pedigree."""
+        assert self._axis(self._bore()).feature_type() == CSGFeatureType.EDGE
+
+    def test_it_is_never_real(self):
+        """Even asked for outright: an axis names no boundary."""
+        bore = Cylinder(
+            axis_direction=create_v3(0, 0, 1), radius=scalar(1),
+            position=create_v3(2, 3, 0), start_distance=scalar(0), end_distance=scalar(10),
+            _features=[CylinderAxisFeature(
+                "peg_hole_axis", properties=FeatureProperties(real=True))])
+        assert not self._axis(bore).real
+
+    def test_it_runs_down_the_middle(self):
+        bore = self._bore()
+        located = self._axis(bore).locate(bore)
+        assert isinstance(located, Line)
+        assert lines_are_coincident(located, Line(
+            direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            point=create_v3(scalar(2), scalar(3), scalar(0))))
+
+    def test_its_extent_is_the_bores_own_span(self):
+        """It knows its ends outright, where a derived edge has to ask its parents."""
+        bore = self._bore()
+        extent = self._axis(bore).get_extent(bore)
+        assert extent is not None and extent.ends is not None
+        assert points_are_coincident(
+            Point(extent.anchor), Point(create_v3(scalar(2), scalar(3), scalar(5))))
+        assert points_are_coincident(
+            Point(extent.ends[0]), Point(create_v3(scalar(2), scalar(3), scalar(0))))
+        assert points_are_coincident(
+            Point(extent.ends[1]), Point(create_v3(scalar(2), scalar(3), scalar(10))))
+
+    def test_an_endless_bore_has_an_anchor_and_no_ends(self):
+        bore = self._bore(end=None)
+        extent = self._axis(bore).get_extent(bore)
+        assert extent is not None and extent.ends is None
+
+    def test_the_point_test_is_unbounded_like_every_other(self):
+        bore = self._bore()
+        axis = self._axis(bore)
+        assert axis.test_point_unbounded(bore, create_v3(scalar(2), scalar(3), scalar(5)))
+        assert not axis.test_point_unbounded(bore, create_v3(scalar(3), scalar(3), scalar(5)))
+        # Past the end of the bore, and still on the line it lies on.
+        assert axis.test_point_unbounded(bore, create_v3(scalar(2), scalar(3), scalar(50)))
+
+    def test_it_is_selectable_in_the_void_the_bore_made(self):
+        """Which is what real=False buys: no boundary gate, so it survives there."""
+        body = RectangularPrism(
+            size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(20))
+        csg = Difference(base=body, subtract=[self._bore(end=scalar(20))])
+        mid_air = create_v3(scalar(2), scalar(3), scalar(5))
+
+        assert not csg.is_point_on_boundary(mid_air, scalar("5e-4"))
+        assert [h.name for h in csg.find_all_features(mid_air)] == ["peg_hole_axis"]
+
+    def test_it_derives_nothing_by_default(self):
+        """FeatureGroup.NONE, so an axis crossing a face makes no point there."""
+        body = RectangularPrism(
+            size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(20),
+            _features=[SimpleRectangularPrismFeature(
+                "cap", face=PrismFace.TOP,
+                properties=FeatureProperties(group=FeatureGroup.B1))])
+        # A blind bore, so the cap is still there where the axis crosses it --
+        # which is the only arrangement where a pair could form at all.
+        csg = Difference(base=body, subtract=[self._bore(end=scalar(10))])
+        at_cap = create_v3(scalar(2), scalar(3), scalar(20))
+
+        assert not any(h.feature_type() == CSGFeatureType.POINT
+                       for h in csg.find_all_features(at_cap))
+
+    def test_a_pairing_group_would_derive_one_at_a_blind_bores_far_face(self):
+        """Why NONE is the default: the point is real geometry and a lie about the hole.
+
+        The axis is an infinite line, so in a pairing group it crosses the face
+        the bore never reached and derives a point at the middle of an opening
+        that does not exist.
+        """
+        body = RectangularPrism(
+            size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(20),
+            _features=[SimpleRectangularPrismFeature(
+                "cap", face=PrismFace.TOP,
+                properties=FeatureProperties(group=FeatureGroup.B1))])
+        csg = Difference(base=body,
+                         subtract=[self._bore(group=FeatureGroup.A, end=scalar(10))])
+        at_cap = create_v3(scalar(2), scalar(3), scalar(20))
+
+        points = [h.name for h in csg.find_all_features(at_cap)
+                  if h.feature_type() == CSGFeatureType.POINT]
+        # Parents sort by group then name, and the axis is in the better group.
+        assert points == ["peg_hole_axis\u00d7cap"]
+
+
+class TestDerivedPoints:
+    """A point is derived where an edge crosses a face."""
+
+    def _body(self, *features):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=list(features),
+        )
+
+    def _arris(self, name="rough.front_right", group=FeatureGroup.B1):
+        body = self._body(SimpleRectangularPrismEdgeFeature(
+            name=name, faces=(PrismFace.FRONT, PrismFace.RIGHT),
+            properties=FeatureProperties(group=group)))
+        feature = next(f for f in body.get_declared_features() if f.name == name)
+        return OwnedFeatureHit(feature=feature, owner=body)
+
+    def _at(self, feature):
+        """Where a derived feature locates to, narrowed to a Point.
+
+        The owner is ignored by a derived feature -- its geometry comes from
+        its parents -- but it is passed for real rather than as None, because
+        the signature asks for a node.
+        """
+        assert feature is not None
+        located = feature.locate(self._body())
+        assert isinstance(located, Point)
+        return located
+
+    def _plane(self, normal, offset, name="shoulder", group=FeatureGroup.A):
+        space = HalfSpace(
+            normal=normal, offset=offset,
+            _features=[HalfSpaceFeature(name, properties=FeatureProperties(group=group))])
+        feature = next(f for f in space.get_declared_features() if f.name == name)
+        return OwnedFeatureHit(feature=feature, owner=space)
+
+    def test_an_edge_crossing_a_face_derives_a_point(self):
+        """The arris runs up x=2, y=3; the shoulder cuts across at z=5."""
+        point = DerivedPointFeature.derive(
+            self._arris(), self._plane(create_v3(0, 0, 1), scalar(5)))
+
+        assert point is not None
+        assert point.feature_type() == CSGFeatureType.POINT
+        assert points_are_coincident(
+            self._at(point), Point(create_v3(scalar(2), scalar(3), scalar(5))))
+
+    def test_the_name_and_the_point_do_not_depend_on_the_order(self):
+        arris, plane = self._arris(), self._plane(create_v3(0, 0, 1), scalar(5))
+        forward = DerivedPointFeature.derive(arris, plane)
+        backward = DerivedPointFeature.derive(plane, arris)
+
+        assert forward is not None and backward is not None
+        assert forward.name == backward.name
+        assert points_are_coincident(self._at(forward), self._at(backward))
+
+    def test_an_edge_lying_in_the_face_derives_nothing(self):
+        """The case that fires for every edge against a face that formed it."""
+        assert DerivedPointFeature.derive(
+            self._arris(), self._plane(create_v3(1, 0, 0), scalar(2))) is None
+
+    def test_an_edge_parallel_to_the_face_derives_nothing(self):
+        assert DerivedPointFeature.derive(
+            self._arris(), self._plane(create_v3(1, 0, 0), scalar(0))) is None
+
+    def test_groups_that_may_not_meet_derive_nothing(self):
+        assert DerivedPointFeature.derive(
+            self._arris(group=FeatureGroup.B1),
+            self._plane(create_v3(0, 0, 1), scalar(5), group=FeatureGroup.B1)) is None
+
+    def test_two_faces_derive_no_point(self):
+        """Three planes meet at a point too; this is not the pair that says so."""
+        assert DerivedPointFeature.derive(
+            self._plane(create_v3(0, 0, 1), scalar(5)),
+            self._plane(create_v3(1, 0, 0), scalar(2), name="other",
+                        group=FeatureGroup.B1)) is None
+
+    def test_a_derived_edge_is_in_no_group_so_pairs_with_nothing(self):
+        """Which is what keeps one vertex to one derived point.
+
+        Three faces meeting define three edges, and each of those crosses the
+        third face at the same vertex. Only the declared arris is in a pairing
+        group, so only one of those routes is taken.
+        """
+        right = OwnedFeatureHit(
+            feature=SimpleRectangularPrismFeature(
+                "rough.right", face=PrismFace.RIGHT,
+                properties=FeatureProperties(group=FeatureGroup.B2)),
+            owner=self._body())
+        front = OwnedFeatureHit(
+            feature=SimpleRectangularPrismFeature(
+                "rough.front", face=PrismFace.FRONT,
+                properties=FeatureProperties(group=FeatureGroup.B2)),
+            owner=self._body())
+        edge = DerivedEdgeFeature.derive(right, front)
+
+        assert edge is not None
+        assert edge.group is FeatureGroup.NONE
+        assert DerivedPointFeature.derive(
+            OwnedFeatureHit(feature=edge, owner=self._body()),
+            self._plane(create_v3(0, 0, 1), scalar(5))) is None
+
+    def test_the_extent_is_the_point_itself(self):
+        point = DerivedPointFeature.derive(
+            self._arris(), self._plane(create_v3(0, 0, 1), scalar(5)))
+        assert point is not None
+        extent = point.get_extent(self._body())
+
+        assert extent is not None
+        assert extent.ends is None and extent.aabb is None
+        assert points_are_coincident(
+            Point(extent.anchor), Point(create_v3(scalar(2), scalar(3), scalar(5))))
+
+    def test_a_point_is_real_only_where_both_parents_are(self):
+        ghost = self._plane(create_v3(0, 0, 1), scalar(5))
+        ghost = OwnedFeatureHit(
+            feature=HalfSpaceFeature("shoulder", properties=FeatureProperties(
+                group=FeatureGroup.A, real=False)),
+            owner=ghost.owner)
+        point = DerivedPointFeature.derive(self._arris(), ghost)
+
+        assert point is not None and not point.real
+
+
+class TestDerivedPointsInAQuery:
+    """Points surface through find_all_features, one per vertex."""
+
+    def _cut_timber(self):
+        body = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[
+                SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
+                                              properties=FeatureProperties(group=FeatureGroup.B1)),
+                SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
+                                              properties=FeatureProperties(group=FeatureGroup.B1)),
+                SimpleRectangularPrismEdgeFeature(
+                    name="rough.front_right", faces=(PrismFace.FRONT, PrismFace.RIGHT),
+                    properties=FeatureProperties(group=FeatureGroup.B1)),
+            ],
+        )
+        shoulder = HalfSpace(
+            normal=create_v3(0, 0, 1), offset=scalar(5),
+            _features=[HalfSpaceFeature(
+                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+        )
+        return Difference(base=body, subtract=[shoulder])
+
+    #: Where the shoulder crosses the front/right arris.
+    VERTEX = (scalar(2), scalar(3), scalar(5))
+
+    def test_the_vertex_yields_a_point(self):
+        csg = self._cut_timber()
+        names = {h.name for h in csg.find_all_features(create_v3(*self.VERTEX))}
+        assert "shoulder×rough.front_right" in names
+
+    def test_the_point_outranks_the_edges_and_faces_there(self):
+        """A point sits on an edge sits on a face; the narrowest wins."""
+        csg = self._cut_timber()
+        best = csg.find_first_feature(create_v3(*self.VERTEX))
+        assert best is not None
+        assert best.feature_type() == CSGFeatureType.POINT
+        assert best.name == "shoulder×rough.front_right"
+
+    def test_one_point_per_vertex(self):
+        """Three faces meet here and so do three edges. One point comes back."""
+        csg = self._cut_timber()
+        points = [h for h in csg.find_all_features(create_v3(*self.VERTEX))
+                  if h.feature_type() == CSGFeatureType.POINT]
+        assert len(points) == 1
+
+    def test_no_point_along_the_edge_away_from_the_vertex(self):
+        csg = self._cut_timber()
+        along = create_v3(scalar(2), scalar(3), scalar(2))
+        assert not any(h.feature_type() == CSGFeatureType.POINT
+                       for h in csg.find_all_features(along))
+
+    def test_the_owner_is_the_compound_node(self):
+        csg = self._cut_timber()
+        best = csg.find_first_feature(create_v3(*self.VERTEX))
+        assert best.owner is csg
+
+
+class TestThePreferredFeature:
+    """Which of two features naming the same geometry is the one that answers."""
+
+    def _prism(self, *features):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=list(features),
+        )
+
+    def test_a_declared_feature_beats_a_derived_one_naming_the_same_line(self):
+        """The prism's own arris, not the pair of faces that also make it.
+
+        A derived feature goes only where it is the only way to name its
+        geometry, so the derived edge comes off rather than sitting beside the
+        arris as a second way to say the same thing.
+        """
+        prism = self._prism(
+            SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
+                                          properties=FeatureProperties(group=FeatureGroup.B2)),
+            SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
+                                          properties=FeatureProperties(group=FeatureGroup.B2)),
+        )
+        hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
+        edges = [h for h in hits if h.feature_type() == CSGFeatureType.EDGE]
+
+        assert len(edges) == 1
+        assert not edges[0].feature.is_derived()
+
+    def test_a_declared_feature_wins_even_as_an_anonymous_default(self):
+        """Declaredness ranks above priority, and has to.
+
+        arris.0 is a default nobody named, at the losing end of the priority
+        scale; the derived edge is built from two authored faces at the winning
+        end. Were priority to decide, the derived edge would sort first and be
+        kept -- and the arris, being declared, is never dropped, so BOTH would
+        stand and the duplicate would survive. Ordering declaredness first is
+        what makes dropping duplicates work at all.
+        """
+        prism = self._prism(
+            SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
+                                          properties=FeatureProperties(group=FeatureGroup.B2)),
+            SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
+                                          properties=FeatureProperties(group=FeatureGroup.B2)),
+        )
+        hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
+        arris = next(h for h in hits if h.feature_type() == CSGFeatureType.EDGE)
+
+        assert arris.name == "arris.0"
+        assert arris.feature.priority > min(h.feature.priority for h in hits)
+
+    def test_coincident_declared_features_both_stand(self):
+        """Only derived features are ever dropped.
+
+        Relief geometry embeds the mating timber's rough body, so two timbers'
+        faces genuinely land on one plane under one name. Collapsing those
+        would eat a real feature.
+        """
+        first = self._prism(SimpleRectangularPrismFeature(
+            "rough.right", face=PrismFace.RIGHT,
+            properties=FeatureProperties(group=FeatureGroup.B1)))
+        second = self._prism(SimpleRectangularPrismFeature(
+            "rough.right", face=PrismFace.RIGHT,
+            properties=FeatureProperties(group=FeatureGroup.B1)))
+        union = SolidUnion(children=[first, second])
+
+        faces = [h for h in union.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
+                 if h.name == "rough.right"]
+        assert len(faces) == 2
+
+    def test_a_better_group_sorts_first(self):
+        """Group rank, by the enum's own index, with A ahead of B1."""
+        prism = self._prism(
+            SimpleRectangularPrismFeature("joint_face", face=PrismFace.RIGHT,
+                                          properties=FeatureProperties(group=FeatureGroup.A)),
+            SimpleRectangularPrismFeature("body_face", face=PrismFace.RIGHT,
+                                          properties=FeatureProperties(group=FeatureGroup.B1)),
+        )
+        names = [h.name for h in prism.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))]
+
+        assert names.index("joint_face") < names.index("body_face")
+
+    def test_a_derived_feature_answers_with_its_best_parents_rank(self):
+        right = OwnedFeatureHit(
+            feature=SimpleRectangularPrismFeature(
+                "a", face=PrismFace.RIGHT, properties=FeatureProperties(group=FeatureGroup.A)),
+            owner=self._prism())
+        front = OwnedFeatureHit(
+            feature=SimpleRectangularPrismFeature(
+                "b", face=PrismFace.FRONT, properties=FeatureProperties(group=FeatureGroup.B1)),
+            owner=self._prism())
+        edge = DerivedEdgeFeature.derive(right, front)
+
+        assert edge is not None
+        assert edge.group_rank() == FeatureGroup.A.value
+        assert edge.is_derived()
+
+    def test_two_derived_features_on_different_geometry_both_stand(self):
+        """Dropping goes by geometry, so different lines are different features."""
+        body = self._prism(SimpleRectangularPrismFeature(
+            "rough.right", face=PrismFace.RIGHT,
+            properties=FeatureProperties(group=FeatureGroup.B2)))
+        near = HalfSpace(
+            normal=create_v3(0, 0, 1), offset=scalar(5),
+            _features=[HalfSpaceFeature("shoulder",
+                                        properties=FeatureProperties(group=FeatureGroup.A))])
+        csg = Difference(base=body, subtract=[near])
+        on_edge = create_v3(scalar(2), scalar(0), scalar(5))
+        edges = [h for h in csg.find_all_features(on_edge)
+                 if h.feature_type() == CSGFeatureType.EDGE]
+
+        # The shoulder edge across the right face, and the prism's own arrises
+        # are elsewhere -- so exactly the one derived edge, kept because
+        # nothing else names that line.
+        assert len(edges) == 1
+        assert edges[0].feature.is_derived()
 
 
 class TestGatherRefineIsolation:
@@ -3997,6 +4525,8 @@ class TestGatherRefineIsolation:
     """
 
     def _cut_timber(self):
+        """A body with a shoulder across it -- see TestDerivedEdgesInAQuery on
+        why two faces of a bare prism will not do."""
         body = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
@@ -4005,15 +4535,18 @@ class TestGatherRefineIsolation:
             _features=[
                 SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
                                               properties=FeatureProperties(group=FeatureGroup.B2)),
-                SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
             ],
         )
-        return Difference(base=body, subtract=[])
+        shoulder = HalfSpace(
+            normal=create_v3(0, 0, 1), offset=scalar(5),
+            _features=[HalfSpaceFeature(
+                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+        )
+        return Difference(base=body, subtract=[shoulder])
 
     def _near_arris(self, gap):
-        """On the right face, *gap* short of the right/front arris."""
-        return create_v3(scalar(2), scalar(3) - gap, scalar(5))
+        """On the right face, *gap* short of where the shoulder crosses it."""
+        return create_v3(scalar(2), scalar(0), scalar(5) - gap)
 
     def test_the_edge_tolerance_sets_the_snap_distance(self):
         csg = self._cut_timber()
@@ -4045,8 +4578,8 @@ class TestGatherRefineIsolation:
         tolerances = FeatureTestTolerances(face=scalar(5, 10000), edge=scalar(2, 1000))
         names = {h.name for h in csg.find_all_features(self._near_arris(scalar(15, 10000)), tolerances)}
         assert "rough.right" in names          # the face the point is on
-        assert "rough.front" not in names      # 1.5mm away: too far to claim
-        assert "rough.front×rough.right" in names  # but near enough to pair
+        assert "shoulder" not in names         # 1.5mm away: too far to claim
+        assert "shoulder×rough.right" in names  # but near enough to pair
 
 
 class TestBuriedFacesAreNotReported:
@@ -4093,11 +4626,18 @@ class TestBuriedFacesAreNotReported:
                        for h in union.find_all_features(buried))
 
     def test_the_same_faces_report_fine_on_their_own(self):
-        """The gate is about the union, not about the faces being wrong."""
+        """The gate is about the union, not about the faces being wrong.
+
+        The arris comes back as the prism's own declared one rather than as the
+        pair of faces: a derived feature is dropped where something already
+        names the same line. What matters here is that the faces report at all.
+        """
         small = self._small()
         on_arris = create_v3(scalar(2), scalar(3), scalar(5))
-        names = {h.name for h in small.find_all_features(on_arris)}
-        assert {"small.right", "small.front", "small.front×small.right"} <= names
+        hits = small.find_all_features(on_arris)
+        names = {h.name for h in hits}
+        assert {"small.right", "small.front"} <= names
+        assert any(h.feature_type() == CSGFeatureType.EDGE for h in hits)
 
 
 class TestCutCSGLabel:

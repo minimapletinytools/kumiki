@@ -38,8 +38,9 @@ from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.mixed import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
 )
+from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
 from kumiki.rule import Matrix, Transform, create_v3, inches, scalar
-from kumiki.timber import Frame
+from kumiki.timber import Frame, PegShape
 from kumiki.triangles import triangulate_cutcsg
 
 # Generous epsilon: mesh vertices come out of a boolean op, so surface points
@@ -78,6 +79,25 @@ def mortise_and_tenon_frame():
         tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(7, 2),
+    )
+    return Frame.from_joints([joint])
+
+
+@pytest.fixture(scope="module")
+def pegged_mortise_and_tenon_frame():
+    """The same joint, pegged with one round peg -- so there is a bore to aim down."""
+    arrangement = create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0))
+    joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        arrangement=arrangement,
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
+        tenon_length=inches(3),
+        mortise_depth=inches(7, 2),
+        peg_parameters=SimplePegParameters(
+            shape=PegShape.ROUND,
+            peg_positions=[(inches(1), scalar(0))],
+            size=inches(1, 2),
+        ),
     )
     return Frame.from_joints([joint])
 
@@ -1535,6 +1555,226 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
         assert checked > 0
 
 
+class TestTheRayReachesASegment:
+    """The snap test behind picking a feature that lies in a void.
+
+    Plain geometry, so it is tested as plain geometry: the closest approach of a
+    ray and a segment, clamped to the segment and to what is in front of the
+    ray's origin.
+    """
+
+    ENDS = ([0.0, 0.0, 0.0], [0.0, 0.0, 10.0])
+
+    def _reaches(self, origin, direction, tolerance):
+        return runner._ray_reaches_segment(
+            origin, runner._normalize(direction), self.ENDS, tolerance)
+
+    def test_a_ray_straight_through_it_reaches_it(self):
+        assert self._reaches([5, 0, 5], [-1, 0, 0], 0.01)
+
+    def test_a_ray_that_misses_by_less_than_the_tolerance_reaches_it(self):
+        assert self._reaches([5, 0.5, 5], [-1, 0, 0], 1.0)
+
+    def test_a_ray_that_misses_by_more_does_not(self):
+        """A snap, not a magnet."""
+        assert not self._reaches([5, 0.5, 5], [-1, 0, 0], 0.1)
+
+    def test_it_is_bounded_by_the_segment_not_the_line(self):
+        """Past the end, so a peg hole is not selectable from off the timber."""
+        assert self._reaches([5, 0, 10], [-1, 0, 0], 0.01)
+        assert not self._reaches([5, 0, 20], [-1, 0, 0], 1.0)
+
+    def test_a_ray_pointing_away_does_not_reach_it(self):
+        """Behind the origin is behind the camera."""
+        assert not self._reaches([5, 0, 5], [1, 0, 0], 0.01)
+
+    def test_a_parallel_ray_is_measured_from_the_middle(self):
+        assert self._reaches([0, 0.5, -5], [0, 0, 1], 1.0)
+        assert not self._reaches([0, 0.5, -5], [0, 0, 1], 0.1)
+
+    def test_a_ray_down_the_segment_itself_reaches_it(self):
+        assert self._reaches([0, 0, -5], [0, 0, 1], 0.01)
+
+    def test_a_segment_of_no_length_is_not_reachable(self):
+        assert not runner._ray_reaches_segment(
+            [0, 0, 0], [0, 0, 1], ([1.0, 1.0, 1.0], [1.0, 1.0, 1.0]), 100.0)
+
+
+class TestTheRayFromThePayload:
+    """Turning what the viewer sent into the timber's own space."""
+
+    def _identity(self):
+        from kumiki.rule import Transform
+        return runner._build_inv_transform_float(Transform.identity())
+
+    def test_no_ray_is_not_a_fault(self):
+        """A pick can be made without one -- everything on a surface still works."""
+        rot, pos = self._identity()
+        assert runner._local_ray_from_payload({}, rot, pos) is None
+        assert runner._local_ray_from_payload({"ray": None}, rot, pos) is None
+
+    def test_a_malformed_ray_is_declined_rather_than_guessed_at(self):
+        rot, pos = self._identity()
+        for ray in ({"origin": [0, 0, 0]}, {"origin": [0, 0], "direction": [0, 0, 1]},
+                    {"origin": "nope", "direction": [0, 0, 1]}):
+            assert runner._local_ray_from_payload({"ray": ray}, rot, pos) is None
+
+    def test_the_direction_is_rotated_but_not_moved(self):
+        """A direction has no position; offsetting it would tilt the ray."""
+        from kumiki.rule import Transform, create_v3, Orientation
+        transform = Transform(position=create_v3(10, 20, 30),
+                              orientation=Orientation.identity())
+        rot, pos = runner._build_inv_transform_float(transform)
+        origin, direction = runner._local_ray_from_payload(
+            {"ray": {"origin": [10, 20, 35], "direction": [0, 0, 1]}}, rot, pos)
+
+        assert [round(c, 6) for c in origin] == [0, 0, 5]
+        assert [round(c, 6) for c in direction] == [0, 0, 1]
+
+
+class TestPickingAlongTheRay:
+    """Aiming down a bore selects its centre line.
+
+    A hit point is on a surface, and a bore's axis is the bore's RADIUS from
+    every surface the bore has -- so no tolerance on the point can ever reach
+    it. The ray can, because the pointer goes through the middle of the hole on
+    its way to whatever it struck.
+    """
+
+    def _slot(self, frame):
+        from kumiki.cutcsg import CylinderAxisFeature, csg_children
+
+        cut_timber = _cut_timber_by_name(frame, "butt_timber")
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+
+        axis = owner = None
+        def walk(node):
+            nonlocal axis, owner
+            for feature in node.get_declared_features():
+                if isinstance(feature, CylinderAxisFeature):
+                    axis, owner = feature, node
+            for child in csg_children(node):
+                walk(child)
+        walk(local)
+        assert axis is not None, "the pegged fixture has no peg hole axis"
+
+        vertices = []
+        nearest = None
+        line = axis.locate(owner)
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                local_point = [float(vertex[i]) for i in range(3)]
+                world = timber.transform.local_to_global(runner._to_v3(local_point))
+                vertices.extend([float(world[i, 0]) for i in range(3)])
+                offset = runner._to_v3(local_point) - line.point
+                along = offset - line.direction * (offset.T * line.direction)[0, 0]
+                radial = math.sqrt(float((along.T * along)[0, 0]))
+                if nearest is None or radial < nearest[0]:
+                    nearest = (radial, [float(world[i, 0]) for i in range(3)])
+
+        mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
+
+        class Slot:
+            mesh_cache = {"butt_timber": {
+                "local_csg": local, "cut_timber": cut_timber, "mesh": mesh}}
+
+        class State:
+            _active = Slot()
+
+        return State(), Slot(), axis, owner, timber, nearest
+
+    def _aim(self, axis, owner, timber, sideways):
+        """A ray down the bore, *sideways* metres off its centre line."""
+        ends = axis.get_extent(owner).ends
+        start = timber.transform.local_to_global(ends[0])
+        end = timber.transform.local_to_global(ends[1])
+        direction = [float(end[i, 0] - start[i, 0]) for i in range(3)]
+        length = math.sqrt(sum(c * c for c in direction))
+        direction = [c / length for c in direction]
+        # Any perpendicular will do to step off the line.
+        seed = [0, 0, 1] if abs(direction[2]) < 0.9 else [1, 0, 0]
+        across = [
+            direction[1] * seed[2] - direction[2] * seed[1],
+            direction[2] * seed[0] - direction[0] * seed[2],
+            direction[0] * seed[1] - direction[1] * seed[0],
+        ]
+        across_length = math.sqrt(sum(c * c for c in across))
+        across = [c / across_length for c in across]
+        origin = [float(start[i, 0]) - direction[i] * 0.5 + across[i] * sideways
+                  for i in range(3)]
+        return {"origin": origin, "direction": direction}
+
+    def _pick(self, frame, sideways=None):
+        state, slot, axis, owner, timber, nearest = self._slot(frame)
+        payload = {
+            "memberKey": "butt_timber",
+            # What a raycast down the hole actually strikes: the bore wall.
+            "point": nearest[1],
+            "currentPath": [], "ctrlClick": False,
+            "tolerances": {"edge": 0.002, "point": 0.004},
+        }
+        if sideways is not None:
+            payload["ray"] = self._aim(axis, owner, timber, sideways)
+        return runner._handle_find_csg_at_point(state, payload, slot), axis, owner
+
+    def test_the_surface_is_a_whole_bore_radius_from_the_axis(self, pegged_mortise_and_tenon_frame):
+        """The premise of this whole class, pinned.
+
+        The nearest the rendered mesh ever comes to the axis is the bore's own
+        radius -- necessarily, since the barrel IS that surface. A pick built on
+        the hit point cannot reach the middle however generous its tolerance,
+        which is why the ray had to be sent at all.
+        """
+        _state, _slot, _axis, owner, _timber, nearest = self._slot(pegged_mortise_and_tenon_frame)
+        # rel, because the barrel is triangulated as a polygon: its vertices sit
+        # a facet's worth inside the true radius.
+        assert nearest[0] == pytest.approx(float(owner.radius), rel=1e-3)
+        assert nearest[0] > float(runner._edge_tolerance())
+
+    def test_without_a_ray_the_axis_is_not_even_a_candidate(self, pegged_mortise_and_tenon_frame):
+        result, _axis, _owner = self._pick(pegged_mortise_and_tenon_frame)
+        labels = [candidate["label"] for candidate in result["candidates"]]
+        assert "peg_hole_axis" not in labels
+        assert result["featureLabel"] != "peg_hole_axis"
+
+    def test_aiming_down_the_bore_selects_the_axis(self, pegged_mortise_and_tenon_frame):
+        result, _axis, _owner = self._pick(pegged_mortise_and_tenon_frame, sideways=0.001)
+        assert result["featureLabel"] == "peg_hole_axis"
+        assert result["featureType"] == "EDGE"
+        assert "peg_hole_axis" in [c["label"] for c in result["candidates"]]
+
+    def test_aiming_wide_of_it_does_not(self, pegged_mortise_and_tenon_frame):
+        """3mm off, outside the 2mm edge tolerance: a snap, not a magnet."""
+        result, _axis, _owner = self._pick(pegged_mortise_and_tenon_frame, sideways=0.003)
+        assert result["featureLabel"] != "peg_hole_axis"
+
+    def test_the_selected_axis_is_measurable(self, pegged_mortise_and_tenon_frame):
+        """A line to measure against, and a reference that can be written down."""
+        result, _axis, _owner = self._pick(pegged_mortise_and_tenon_frame, sideways=0.001)
+        assert result["geometry"]["kind"] == "line"
+        assert result["at"] is not None
+        assert result["reference"] is not None
+        assert result["reference"]["feature"] == "peg_hole_axis"
+
+    def test_it_draws_as_a_line_the_length_of_the_bore(self, pegged_mortise_and_tenon_frame):
+        """Not cropped to the cut solid: the axis lies in the void the bore made,
+        so clipping it to what the cuts left would report it absent."""
+        result, axis, owner = self._pick(pegged_mortise_and_tenon_frame, sideways=0.001)
+        segments = result.get("highlightEdgeSegments")
+
+        assert segments and len(segments) == 1
+        drawn = math.sqrt(sum(
+            (segments[0]["end"][i] - segments[0]["start"][i]) ** 2 for i in range(3)))
+        bore = owner
+        assert drawn == pytest.approx(float(bore.end_distance - bore.start_distance))
+
+    def test_it_lights_no_triangles(self, pegged_mortise_and_tenon_frame):
+        """It has no surface; the line IS the highlight."""
+        result, _axis, _owner = self._pick(pegged_mortise_and_tenon_frame, sideways=0.001)
+        assert result["highlightMesh"]["vertices"] == []
+
+
 class TestResolvingADerivedEdge:
     """A picked edge, written down and found again.
 
@@ -1563,14 +1803,15 @@ class TestResolvingADerivedEdge:
                         return local, hit.feature
         raise AssertionError("no derived edge found on the finished surface")
 
-    def _reference(self, frame, local, edge, member_key):
+    def _reference(self, frame, local, derived, member_key, kind="EDGE"):
         from kumiki.identity import DerivedFeaturePath, FeatureRef, ResolvedTimberPath
 
         positions = runner._node_positions(local)
         return DerivedFeaturePath(
             timber=ResolvedTimberPath.parse(member_key),
-            a=FeatureRef(tuple(positions[id(edge.a.owner)][2]), edge.a.feature.name),
-            b=FeatureRef(tuple(positions[id(edge.b.owner)][2]), edge.b.feature.name),
+            a=FeatureRef(tuple(positions[id(derived.a.owner)][2]), derived.a.feature.name),
+            b=FeatureRef(tuple(positions[id(derived.b.owner)][2]), derived.b.feature.name),
+            kind=kind,
         )
 
     def test_a_picked_edge_resolves_to_a_place(self, mortise_and_tenon_frame):
@@ -1587,6 +1828,56 @@ class TestResolvingADerivedEdge:
         assert resolved is not None, f"{reference.describe()} did not resolve"
         assert resolved["at"] is not None
         assert resolved["geometry"]["kind"] == "line"
+
+    def test_a_picked_point_resolves_to_a_place(self, mortise_and_tenon_frame):
+        """The same round trip for a derived POINT, which names an edge and a face.
+
+        A mortise and tenon leaves four of them: the corners where the shoulder
+        plane crosses the tenon timber's four long arrises.
+        """
+        from kumiki.cutcsg import CSGFeatureType, DerivedPointFeature
+        from kumiki.triangles import triangulate_cutcsg
+
+        entries, _ = runner._assign_member_keys(mortise_and_tenon_frame)
+        entry = next(e for e in entries if "butt" in e["memberKey"])
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+
+        found = None
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                point = runner._to_v3([float(vertex[i]) for i in range(3)])
+                for hit in local.find_all_features(point):
+                    if isinstance(hit.feature, DerivedPointFeature):
+                        found = hit.feature
+                        break
+                if found is not None:
+                    break
+            if found is not None:
+                break
+        assert found is not None, "no derived point found on the finished surface"
+
+        reference = self._reference(
+            mortise_and_tenon_frame, local, found, entry["memberKey"], kind="POINT")
+        wire = runner.serialize_feature_path(reference)
+        assert wire["kind"] == "point" and wire["type"] == "POINT"
+        assert runner.deserialize_feature_path(wire).identity() == reference.identity()
+
+        resolved = runner.resolve_anchor(mortise_and_tenon_frame, wire)
+        assert resolved is not None, f"{reference.describe()} did not resolve"
+        assert resolved["at"] is not None
+        assert resolved["geometry"]["kind"] == "point"
+
+    def test_an_edge_and_a_point_from_one_pair_are_two_references(self, mortise_and_tenon_frame):
+        """The kind is part of the identity, not inferred from the parents."""
+        entries, _ = runner._assign_member_keys(mortise_and_tenon_frame)
+        entry = next(e for e in entries if "butt" in e["memberKey"])
+        local, edge = self._picked_edge(mortise_and_tenon_frame)
+        as_edge = self._reference(mortise_and_tenon_frame, local, edge, entry["memberKey"])
+        as_point = self._reference(
+            mortise_and_tenon_frame, local, edge, entry["memberKey"], kind="POINT")
+
+        assert as_edge.identity() != as_point.identity()
 
     def test_a_parent_that_is_gone_breaks_the_reference(self, mortise_and_tenon_frame):
         # Rather than resolving to whichever edge happens to be nearby.
@@ -1842,6 +2133,74 @@ class TestHoveringOverAFeature:
         # of not drawing this from the CSG.
         assert len(result["highlightMesh"]["vertices"]) % 9 == 0
         assert result["featureLabel"] is not None
+
+    def test_a_click_on_a_vertex_answers_with_the_derived_point(self, mortise_and_tenon_frame):
+        """The whole path, as the viewer walks it: pick, type, reference.
+
+        The tenon timber's shoulder crosses its four long arrises, and each
+        crossing is a point nothing declares -- so this is a derived one all the
+        way out to the reference a measurement would hold.
+        """
+        from kumiki.cutcsg import DerivedPointFeature
+
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._a_point_on(
+            local, cut_timber, lambda f: isinstance(f, DerivedPointFeature))
+        clicked = runner._handle_find_csg_at_point(state, {
+            "memberKey": "butt_timber", "point": point,
+            "currentPath": [], "ctrlClick": False,
+        }, slot)
+
+        assert clicked["featureType"] == "POINT"
+        assert clicked["featureLabel"].startswith("shoulder\u00d7rough.")
+
+        reference = clicked["reference"]
+        assert reference is not None
+        assert reference["kind"] == "point" and reference["type"] == "POINT"
+        assert reference["a"]["feature"] and reference["b"]["feature"]
+
+        # And it resolves back to somewhere, which is what makes it measurable.
+        resolved = runner.resolve_anchor(mortise_and_tenon_frame, reference)
+        assert resolved is not None
+        assert resolved["geometry"]["kind"] == "point"
+
+    def test_the_pick_log_is_off_unless_asked_for(self, mortise_and_tenon_frame, capsys, monkeypatch):
+        """Hover asks this on every rest of the pointer, into a shared channel."""
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._a_point_on(local, cut_timber, lambda f: True)
+        payload = {"memberKey": "butt_timber", "point": point,
+                   "currentPath": [], "ctrlClick": False}
+
+        monkeypatch.delenv("KIGUMI_PICK_LOG", raising=False)
+        runner._handle_find_csg_at_point(state, dict(payload), slot)
+        assert "[pick]" not in capsys.readouterr().err
+
+        monkeypatch.setenv("KIGUMI_PICK_LOG", "1")
+        runner._handle_find_csg_at_point(state, dict(payload), slot)
+        logged = capsys.readouterr().err
+        assert "[pick]" in logged
+        # Every candidate, not just the winner: the question it answers is
+        # usually why something is NOT in the list.
+        assert "declared" in logged or "derived" in logged
+
+    def test_a_vertex_lights_no_triangles(self, mortise_and_tenon_frame):
+        """A point has no surface to highlight, so the mesh walk is skipped.
+
+        Without that, picking one sends the viewer the strip of triangles
+        around the vertex, which reads as a smear rather than as a point.
+        """
+        from kumiki.cutcsg import DerivedPointFeature
+
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._a_point_on(
+            local, cut_timber, lambda f: isinstance(f, DerivedPointFeature))
+        clicked = runner._handle_find_csg_at_point(state, {
+            "memberKey": "butt_timber", "point": point,
+            "currentPath": [], "ctrlClick": False,
+        }, slot)
+
+        assert clicked["highlightMesh"]["vertices"] == []
+        assert not clicked.get("highlightEdgeSegments")
 
     def test_it_is_the_same_answer_a_click_gives(self, mortise_and_tenon_frame):
         # Not a likeness of it. The only difference is what the viewer does

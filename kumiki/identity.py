@@ -270,25 +270,36 @@ class SingleFeaturePath(FeaturePath):
 
 @dataclass(frozen=True)
 class DerivedFeaturePath(FeaturePath):
-    """An edge, named by the two faces that form it rather than by itself.
+    """An edge or a point, named by the two features that form it.
 
-    A derived edge is built on demand from a pair of faces and is not among any
-    node's declared features, so it cannot be looked up by name: resolving one
-    means resolving both parents and deriving again. That also sidesteps edge
+    A derived feature is built on demand from a pair of hits and is not among
+    any node's declared features, so it cannot be looked up by name: resolving
+    one means resolving both parents and deriving again. That also sidesteps
     names not being unique -- two tenons on one timber declare the same face
     names, so their edges share a name while being different edges.
 
-    One timber, not one per parent. Both faces are always in the same timber's
-    tree, and holding a timber on each would allow writing a pair that could
-    never resolve.
+    ALWAYS TWO PARENTS, whichever kind it is. An edge is two faces; a point is
+    an edge and a face. Three faces also meet at a point and two edges crossing
+    do too, and neither is written here: the group rules keep derivation to one
+    route per piece of geometry, so a point arrives as one declared edge
+    against one face and never as a set of planes. That is what lets this stay
+    a pair rather than becoming a list.
+
+    One timber, not one per parent. Both are always in the same timber's tree,
+    and holding a timber on each would allow writing a pair that could never
+    resolve.
 
     `a` and `b` are sorted at construction, because deriving sorts its parents
-    too: the same edge written either way round is the same reference.
+    too: the same feature written either way round is the same reference.
     """
 
     timber: ResolvedTimberPath
     a: FeatureRef = field(default_factory=FeatureRef)
     b: FeatureRef = field(default_factory=FeatureRef)
+    #: "EDGE" or "POINT". Carried rather than inferred from the parents: a
+    #: reference is read back before anything is resolved, and what it names
+    #: has to be known then.
+    kind: str = "EDGE"
 
     def __post_init__(self):
         first, second = sorted((self.a, self.b), key=lambda ref: ref.identity())
@@ -297,10 +308,10 @@ class DerivedFeaturePath(FeaturePath):
 
     @property
     def feature_type(self) -> str:
-        return "EDGE"
+        return self.kind
 
     def identity(self) -> Tuple[Any, ...]:
-        return (str(self.timber), self.a.identity(), self.b.identity(), "EDGE")
+        return (str(self.timber), self.a.identity(), self.b.identity(), self.kind)
 
     def describe(self) -> str:
         return f"{self.timber} > {self.a.describe()} x {self.b.describe()}"

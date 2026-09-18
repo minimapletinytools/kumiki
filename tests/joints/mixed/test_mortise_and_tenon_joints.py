@@ -1188,6 +1188,108 @@ class TestMortiseAndTenonFeatures:
         assert {edge for edge in edges if edge.startswith("rough.") and "\u00d7" not in edge}
 
 
+class TestThePegHoleCentreline:
+    """A round peg hole names the line the drill follows.
+
+    It is the one thing on a bore that can be measured to: the barrel is
+    curved, so it declines to locate, and a hole is dimensioned from its centre
+    anyway rather than from a tangent to its wall.
+    """
+
+    def _rendered(self, simple_T_configuration):
+        tenon_timber, mortise_timber = simple_T_configuration
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=mortise_timber,
+                butt_timber=tenon_timber,
+                butt_timber_end=TimberEnd.BOTTOM,
+                front_face_on_butt_timber=TimberLongFace.FRONT,
+            ),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(4),
+            peg_parameters=SimplePegParameters(
+                shape=PegShape.ROUND,
+                peg_positions=[(scalar(2), scalar(0))],
+                depth=scalar(5),
+                size=scalar(1, 2),
+                stickout_length=scalar(0),
+            ),
+        )
+        return {name: CutTimber(cutting.timber, cuts=[cutting]).render_timber_with_cuts_csg_local()
+                for name, cutting in joint.cuttings.items()}
+
+    def _axes(self, rendered):
+        """Every peg hole centreline in a tree, with the bore that owns it."""
+        from kumiki.cutcsg import CylinderAxisFeature, csg_children
+
+        found = []
+
+        def walk(node):
+            for feature in node.get_declared_features():
+                if isinstance(feature, CylinderAxisFeature):
+                    found.append((feature, node))
+            for child in csg_children(node):
+                walk(child)
+
+        walk(rendered)
+        return found
+
+    def test_both_timbers_get_one(self, simple_T_configuration):
+        """The hole is drilled through the pair, so each carries its own copy."""
+        rendered = self._rendered(simple_T_configuration)
+        for name in ("tenon_timber", "mortise_timber"):
+            axes = self._axes(rendered[name])
+            assert len(axes) == 1, f"{name} has {len(axes)} peg hole centrelines"
+            assert axes[0][0].name == "peg_hole_axis"
+
+    def test_it_is_a_non_real_edge(self, simple_T_configuration):
+        from kumiki.cutcsg import CSGFeatureType
+
+        axis, _bore = self._axes(self._rendered(simple_T_configuration)["tenon_timber"])[0]
+        assert axis.feature_type() == CSGFeatureType.EDGE
+        assert not axis.real
+
+    def test_it_runs_the_length_of_the_bore(self, simple_T_configuration):
+        from kumiki.geometry import Line
+
+        axis, bore = self._axes(self._rendered(simple_T_configuration)["tenon_timber"])[0]
+        located, extent = axis.locate(bore), axis.get_extent(bore)
+
+        assert isinstance(located, Line)
+        assert extent is not None and extent.ends is not None
+
+    def test_it_is_selectable_inside_the_hole(self, simple_T_configuration):
+        """Where there is no material at all, which is what a bore's axis is for."""
+        rendered = self._rendered(simple_T_configuration)["tenon_timber"]
+        axis, bore = self._axes(rendered)[0]
+        midpoint = axis.get_extent(bore).anchor
+
+        assert not rendered.is_point_on_boundary(midpoint, scalar("5e-4"))
+        assert [hit.name for hit in rendered.find_all_features(midpoint)] == ["peg_hole_axis"]
+
+    def test_it_derives_no_point_where_it_leaves_the_timber(self, simple_T_configuration):
+        """Two reasons, either of which is enough.
+
+        The centreline is in FeatureGroup.NONE, so it pairs with nothing. And a
+        through hole takes the face away exactly where the axis crosses it, so
+        the face is not on the boundary there and is not a hit to pair with.
+        A blind hole would leave the far face intact -- and the group is what
+        stops a point being derived at the middle of an opening the drill never
+        made.
+        """
+        from kumiki.cutcsg import CSGFeatureType
+
+        for name in ("tenon_timber", "mortise_timber"):
+            rendered = self._rendered(simple_T_configuration)[name]
+            axis, bore = self._axes(rendered)[0]
+            for end in axis.get_extent(bore).ends:
+                assert not any(hit.feature_type() == CSGFeatureType.POINT
+                               for hit in rendered.find_all_features(end)), (
+                    f"{name} derived a point where the peg hole axis leaves it")
+
+
 class TestBuildAButtCSGNaming:
     """The geometry build_a_butt hands back carries names too.
 

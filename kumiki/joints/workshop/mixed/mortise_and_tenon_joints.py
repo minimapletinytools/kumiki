@@ -25,6 +25,7 @@ from kumiki.cutcsg import (
     adopt_csg,
     PrismFace,
     Cylinder,
+    CylinderAxisFeature,
     HalfSpaceFeature,
     SimpleRectangularPrismFeature,
 )
@@ -518,6 +519,12 @@ def cut_mortise_and_tenon_joint(
                     position=center_global,
                     start_distance=scalar(0),
                     end_distance=depth,
+                    # The line the drill follows. Named because it is what a peg
+                    # hole is dimensioned from -- a bore is located by its centre,
+                    # not by a tangent to its wall -- and the barrel declines to
+                    # locate, being curved, so without this the hole has nothing
+                    # measurable on it at all.
+                    _features=[CylinderAxisFeature("peg_hole_axis")],
                     label=CutCSGLabel(label),
                 )
             return RectangularPrism(

@@ -779,11 +779,11 @@
         if (!anchor) {
             return null;
         }
-        if (anchor.kind === 'edge') {
+        if (anchor.kind === 'edge' || anchor.kind === 'point') {
             // Its two parents carry no resolved fields of their own: only the
             // anchor they hang off is merged into.
             return {
-                kind: 'edge',
+                kind: anchor.kind,
                 timber: anchor.timber,
                 a: anchor.a,
                 b: anchor.b,
@@ -810,17 +810,17 @@
             if (!anchor) {
                 return '';
             }
-            if (anchor.kind === 'edge') {
-                // A derived edge has no csgPath or feature of its own -- it is
-                // named by the two faces that form it, sorted, the same way
-                // DerivedFeaturePath sorts them. Leaving them out gave every
-                // derived edge on a timber the same key, so editing one edited
-                // whichever happened to be found first.
+            if (anchor.kind === 'edge' || anchor.kind === 'point') {
+                // A derived feature has no csgPath or feature of its own -- it
+                // is named by the two parents that form it, sorted, the same
+                // way DerivedFeaturePath sorts them. Leaving them out gave
+                // every derived edge on a timber the same key, so editing one
+                // edited whichever happened to be found first.
                 const parents = [anchor.a, anchor.b]
                     .map((part) => `${((part || {}).csgPath || []).join('/')}/${(part || {}).feature || ''}`)
                     .sort()
                     .join('&');
-                return [anchor.timber, 'edge', parents, anchor.type].join('|');
+                return [anchor.timber, anchor.kind, parents, anchor.type].join('|');
             }
             return [anchor.timber, (anchor.csgPath || []).join('/'), anchor.feature, anchor.type]
                 .join('|');

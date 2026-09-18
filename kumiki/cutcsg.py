@@ -25,7 +25,9 @@ from abc import ABC, abstractmethod
 from enum import Enum, Flag
 import warnings
 from .rule import *
-from .geometry import Line, Plane, Point, intersect_planes, planes_are_parallel
+from .geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
+                       lines_are_coincident, planes_are_coincident, planes_are_parallel,
+                       points_are_coincident)
 
 
 # ============================================================================
@@ -453,13 +455,67 @@ def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']
     surface it happens to lie on should not steal the click. Then the more
     specific kind -- a point sits on an edge sits on a face, and the narrowest
     claimant is the better answer, so an edge beats the two faces that formed
-    it. Then author-set priority.
+    it.
+
+    Specificity stays ahead of everything below it on purpose. Declaredness
+    ranks above priority, but ABOVE specificity it would hand a click on an
+    arris to one of the declared faces meeting there, which is the answer
+    deriving edges exists to stop giving.
+
+    Then, in order: a declared feature before a derived one; the pairing group,
+    best rank first; author-set priority; the name; and, last, the order the
+    features were gathered in, which sorted() preserves without a key of its
+    own.
     """
     return sorted(hits, key=lambda hit: (
         hit.feature.real,
         _FEATURE_TYPE_SPECIFICITY[hit.feature.feature_type()],
+        hit.feature.is_derived(),
+        hit.feature.group_rank(),
         hit.feature.priority,
+        hit.feature.name,
     ))
+
+
+def _names_same_geometry(one: 'OwnedFeatureHit', other: 'OwnedFeatureHit') -> bool:
+    """Whether two hits name the same point, line or plane.
+
+    Different kinds are never the same geometry, and a feature that declines to
+    locate never matches anything -- a cylinder's barrel is not comparable to
+    another, so it is never dropped as a duplicate of one.
+    """
+    here, there = one.locate(), other.locate()
+    if isinstance(here, Point) and isinstance(there, Point):
+        return points_are_coincident(here, there)
+    if isinstance(here, Line) and isinstance(there, Line):
+        return lines_are_coincident(here, there)
+    if isinstance(here, Plane) and isinstance(there, Plane):
+        return planes_are_coincident(here, there)
+    return False
+
+
+def _drop_duplicate_derived(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
+    """Sorted hits with derived duplicates removed. Expects _sort_feature_hits order.
+
+    A derived feature goes only where it is the ONLY way to name its geometry.
+    If something already kept names the same point or line, the derived one is
+    saying it a second way, and the ordering has already put the preferred one
+    first.
+
+    ONLY DERIVED HITS ARE EVER DROPPED, and the asymmetry is load bearing. Two
+    declared features can coincide and still be genuinely different things:
+    relief geometry embeds the MATING timber's rough body to scribe against, so
+    two timbers' rough faces land on one plane carrying the same reserved names
+    (see FeatureGroup). Collapsing coincident declared features would eat one of
+    those; collapsing derived ones can only ever remove a second route to
+    something already reachable.
+    """
+    kept: List['OwnedFeatureHit'] = []
+    for hit in hits:
+        if hit.feature.is_derived() and any(_names_same_geometry(hit, other) for other in kept):
+            continue
+        kept.append(hit)
+    return kept
 
 
 def derive_edge_hits(
@@ -486,6 +542,31 @@ def derive_edge_hits(
             edge = DerivedEdgeFeature.derive(face_hits[i], face_hits[j])
             if edge is not None:
                 hits.append(OwnedFeatureHit(feature=edge, owner=owner))
+    return hits
+
+
+def derive_point_hits(
+    owner: 'CutCSG',
+    edge_hits: List['OwnedFeatureHit'],
+    face_hits: List['OwnedFeatureHit'],
+) -> List['OwnedFeatureHit']:
+    """Every point where one of *edge_hits* crosses one of *face_hits*, owned by *owner*.
+
+    O(edges x faces) over the few of each near the query point, and both lists
+    come from a scan at the point tolerance, so a pair that turns up here meets
+    there by construction -- the same argument derive_edge_hits makes for not
+    testing the conjunction again.
+
+    An edge lies IN both faces that formed it, and those pairs cost a rejection
+    each rather than needing filtering: intersect_line_plane declines a line in
+    its plane.
+    """
+    hits: List['OwnedFeatureHit'] = []
+    for edge_hit in edge_hits:
+        for face_hit in face_hits:
+            point = DerivedPointFeature.derive(edge_hit, face_hit)
+            if point is not None:
+                hits.append(OwnedFeatureHit(feature=point, owner=owner))
     return hits
 
 
@@ -653,6 +734,25 @@ class CSGFeature(ABC):
     @property
     def group(self) -> FeatureGroup:
         return self.properties.group
+
+    def is_derived(self) -> bool:
+        """Whether this feature was built from others rather than declared.
+
+        A feature a primitive simply HAS beats one assembled out of two hits at
+        a query point, wherever both could answer -- so this is a key the
+        ordering sorts on, and the only kind of feature duplicate-dropping is
+        allowed to discard.
+        """
+        return False
+
+    def group_rank(self) -> int:
+        """Where this feature's pairing group sits in the preference order.
+
+        The enum's own index, lowest first, so FeatureGroup.A outranks B1. A
+        derived feature answers with the best rank among its parents: it is as
+        good as the most preferred thing that went into it.
+        """
+        return self.group.value
 
     @property
     def real(self) -> bool:
@@ -881,8 +981,151 @@ class DerivedEdgeFeature(CSGFeature):
                 # An edge exists only where both its faces do.
                 real=a.feature.real and b.feature.real,
                 priority=max(a.feature.priority, b.feature.priority),
-                # Groups govern which faces meet; nothing pairs edges yet, so
-                # this is not meaningful for a derived edge and stays default.
+                # NONE, and said outright rather than left to the default, now
+                # that edges DO pair -- DerivedPointFeature pairs one with a
+                # face. Keeping derived edges out of every group is what makes
+                # a derived point canonical without a tie-break: the vertex
+                # where a joint plane crosses a timber arris is reachable
+                # through the declared arris and no other way, where letting
+                # derived edges pair would reach it three more times over. It
+                # is also what keeps a derived point's two parents both
+                # DECLARED, which is what a two-parent path can name.
+                group=FeatureGroup.NONE,
+            ),
+            a=first,
+            b=second,
+        )
+
+    def is_derived(self) -> bool:
+        return True
+
+    def group_rank(self) -> int:
+        """The better rank of the two faces that formed it."""
+        ranks = [hit.feature.group.value for hit in (self.a, self.b) if hit is not None]
+        return min(ranks) if ranks else FeatureGroup.NONE.value
+
+
+@dataclass(frozen=True)
+class DerivedPointFeature(CSGFeature):
+    """The point where an edge feature crosses a face feature.
+
+    The same bargain DerivedEdgeFeature makes, one dimension down: built rather
+    than authored, out of the two hits at a query point, and used only where the
+    point exists in no other form. A timber's own corners are its own to declare
+    -- see FeatureCategory.CORNER -- and a point that a primitive names beats
+    this wherever both could answer.
+
+    EDGE against FACE and nothing else. Three faces meeting also define a point,
+    and two edges crossing do too, but each of those is a second and third way
+    to name the vertex this already names, and the group rules are what keep it
+    to one: a derived edge is in FeatureGroup.NONE, so the only edge that can
+    pair here is one a primitive declared.
+
+    Parents are carried with their own owners, as an edge's are, because they
+    generally live on different primitives -- a timber's arris and a joint's
+    shoulder plane. The `owner` passed to this feature's methods is the compound
+    node containing both, and is unused: the geometry comes from the parents.
+    """
+    a: Optional['OwnedFeatureHit'] = None
+    b: Optional['OwnedFeatureHit'] = None
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.POINT
+
+    def is_derived(self) -> bool:
+        return True
+
+    def group_rank(self) -> int:
+        """The better rank of the edge and the face that formed it."""
+        ranks = [hit.feature.group.value for hit in (self.a, self.b) if hit is not None]
+        return min(ranks) if ranks else FeatureGroup.NONE.value
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        if self.a is None or self.b is None:
+            return False
+        return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
+                and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
+
+    def _line_and_plane(self) -> Tuple[Optional[Line], Optional[Plane]]:
+        """The parents' geometry, sorted into which is which.
+
+        Parents are stored in the order that names the feature deterministically
+        rather than edge-then-face, so this picks them apart by what they
+        located to rather than by position.
+        """
+        line: Optional[Line] = None
+        plane: Optional[Plane] = None
+        for hit in (self.a, self.b):
+            if hit is None:
+                continue
+            located = hit.locate()
+            if isinstance(located, Line) and line is None:
+                line = located
+            elif isinstance(located, Plane) and plane is None:
+                plane = located
+        return line, plane
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        line, plane = self._line_and_plane()
+        return intersect_line_plane(line, plane)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        """The point itself, which is the whole of where it is.
+
+        No `ends` and no `aabb`: a point has no length to bound and no box worth
+        drawing. Where an edge has to work out how far its parents reach along
+        their shared line, a point either is somewhere or is nowhere.
+        """
+        located = self.locate(owner)
+        if not isinstance(located, Point):
+            return None
+        return CSGFeatureExtent(anchor=located.position)
+
+    @staticmethod
+    def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedPointFeature']:
+        """The point where *a* and *b* cross, or None if they cross in none.
+
+        None when: they are not one EDGE and one FACE; their groups may not
+        meet; either names something that is not THERE; or the line does not
+        pierce the plane in a single point -- which includes the line LYING in
+        the plane, the case that would otherwise fire for every edge against
+        each of the faces that formed it.
+
+        The not-there test is the one DerivedEdgeFeature.derive explains at
+        length: a barrel has no plane but has an extent, a half space has a
+        plane but no extent, and only a feature with neither is absent.
+        """
+        types = {a.feature.feature_type(), b.feature.feature_type()}
+        if types != {CSGFeatureType.EDGE, CSGFeatureType.FACE}:
+            return None
+        if not feature_groups_intersect(a.feature.group, b.feature.group):
+            return None
+
+        for hit in (a, b):
+            if (hit.feature.locate(hit.owner) is None
+                    and hit.feature.get_extent(hit.owner) is None):
+                return None
+
+        edge, face = ((a, b) if a.feature.feature_type() == CSGFeatureType.EDGE else (b, a))
+        located_edge, located_face = edge.locate(), face.locate()
+        if not isinstance(located_edge, Line):
+            return None
+        if intersect_line_plane(located_edge, _as_plane(located_face)) is None:
+            return None
+
+        # Deterministic order, so the same point gets the same identity however
+        # traversal reached it.
+        first, second = sorted(
+            (a, b), key=lambda hit: (hit.feature.group.value, hit.feature.name))
+        return DerivedPointFeature(
+            name=f"{first.feature.name}\u00d7{second.feature.name}",
+            properties=FeatureProperties(
+                # A point exists only where both its parents do.
+                real=a.feature.real and b.feature.real,
+                priority=max(a.feature.priority, b.feature.priority),
+                # Nothing pairs points; see DerivedEdgeFeature on why this is
+                # said rather than defaulted.
+                group=FeatureGroup.NONE,
             ),
             a=first,
             b=second,
@@ -1142,6 +1385,89 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
                     anchor=(shared[0] + shared[1]) / scalar(2),
                     ends=(shared[0], shared[1]))
         return CSGFeatureExtent(anchor=line.point)
+
+
+@dataclass(frozen=True)
+class CylinderAxisFeature(CSGFeature):
+    """The centre line of a Cylinder, down the middle of the void it cuts.
+
+    NOT REAL, and that is the whole character of it. Every other feature names
+    a piece of the boundary a solid actually has; this names a line through the
+    middle of a bore, which is the material that ISN'T there. `real=False` is
+    what carries that: collect_feature_hits gates real features on the combined
+    solid's boundary, so gating this one would make it unselectable everywhere
+    it exists, and _sort_feature_hits puts non-real features ahead of real ones
+    because snapping to an axis is deliberate and the surface it passes through
+    should not steal the click.
+
+    An EDGE, because it is a line and measurement dispatches on the kind of
+    geometry rather than on how the geometry came about. It is authored, not a
+    default: a cylinder has one whether or not anyone cares, and the ones worth
+    naming are the ones a joint drills on purpose.
+
+    Left in FeatureGroup.NONE by default, which keeps it out of derivation. The
+    axis of a peg hole crosses the timber's faces, and pairing it with them
+    would derive a point at the centre of the hole on each face -- a real
+    enough place, and not one anybody asked for. A caller that wants those
+    points asks for them by choosing a group.
+    """
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.EDGE
+
+    @property
+    def real(self) -> bool:
+        """Never. An axis names no surface, whatever properties it was given.
+
+        A constant rather than a default, for the reason feature_type() is a
+        method: an axis has no way to claim it is boundary, and a caller that
+        set real=True on one would get a feature that vanishes wherever it is
+        selectable and is selectable nowhere it exists.
+        """
+        return False
+
+    def _axis(self, owner: 'CutCSG') -> Optional[V3]:
+        if not isinstance(owner, Cylinder):
+            return None
+        return safe_normalize_vector(owner.axis_direction)
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        axis = self._axis(owner)
+        if axis is None:
+            return None
+        return Line(direction=axis, point=cast(Cylinder, owner).position)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        """Where the axis runs, bounded by the cylinder's own two ends.
+
+        Unlike a derived edge, which has to ask its parents how far they reach,
+        a cylinder knows its own span outright.
+        """
+        axis = self._axis(owner)
+        if axis is None:
+            return None
+        cylinder = cast(Cylinder, owner)
+        start, end = cylinder.start_distance, cylinder.end_distance
+        anchor = cylinder.position + axis * _finite_midpoint(start, end)
+        if start is None or end is None:
+            return CSGFeatureExtent(anchor=anchor)
+        return CSGFeatureExtent(
+            anchor=anchor,
+            ends=(cylinder.position + axis * start, cylinder.position + axis * end),
+        )
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        """On the axis if it is on the LINE -- the ends are not checked here.
+
+        Same bargain every feature's unbounded test makes: a cap feature
+        answers for the cap's whole plane, and this answers for the whole line,
+        with the bounding coming from the node gates above it.
+        """
+        if not isinstance(owner, Cylinder):
+            return False
+        tolerance = DEFAULT_FEATURE_TEST_TOLERANCES.edge if test_tolerance is None else test_tolerance
+        _axial, radial = owner._axial_and_radial(point)
+        return safe_compare(radial, tolerance, Comparison.LE)
 
 
 @dataclass(frozen=True)
@@ -1562,30 +1888,51 @@ class CutCSG(ABC):
         test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> List['OwnedFeatureHit']:
         """Every feature at *point*: those declared in this subtree, plus the
-        edges they form with each other.
+        edges and points they form with each other.
 
-        Two gathers, because "near enough to count" means a different distance
+        Three gathers, because "near enough to count" means a different distance
         depending on what is being asked. The first collects features at the
         tolerance each one's type calls for. The second collects faces at the
         EDGE tolerance and pairs them, which is what makes an edge selectable
         from further away than either of its faces -- a face 1.5mm off cannot
         claim the point itself, but it can still form an edge that is
-        selectable there, because you cannot click exactly on a line.
+        selectable there, because you cannot click exactly on a line. The third
+        does the same again at the POINT tolerance, which is wider still, and
+        crosses the declared edges there with the faces.
+
+        DECLARED edges only, in that last stage. A derived edge is in
+        FeatureGroup.NONE and would be rejected anyway, but the reason it is not
+        offered is the stronger one: a derived point is named by its two
+        parents, and a parent that is itself derived has no name to be found
+        again by, so the reference could never resolve.
 
         Derivation happens here rather than inside collect_feature_hits, and so runs
         once, at whichever node the caller asked about. Putting it in the
         recursive gather would either recurse into itself or have every nested
         compound re-derive what its parent derives.
+
+        Derived duplicates come off at the end, once the ordering has settled
+        which of them was the preferred way of naming the geometry.
         """
         tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
         hits = self.collect_feature_hits(point, tolerances)
+
+        def of_type(gathered, feature_type):
+            return [hit for hit in gathered if hit.feature.feature_type() == feature_type]
+
         at_edge_tolerance = self.collect_feature_hits(
             point, FeatureTestTolerances.uniform(tolerances.edge))
-        faces = [
-            hit for hit in at_edge_tolerance
-            if hit.feature.feature_type() == CSGFeatureType.FACE
-        ]
-        return _sort_feature_hits(hits + derive_edge_hits(self, faces))
+        edges = derive_edge_hits(self, of_type(at_edge_tolerance, CSGFeatureType.FACE))
+
+        at_point_tolerance = self.collect_feature_hits(
+            point, FeatureTestTolerances.uniform(tolerances.point))
+        points = derive_point_hits(
+            self,
+            of_type(at_point_tolerance, CSGFeatureType.EDGE),
+            of_type(at_point_tolerance, CSGFeatureType.FACE),
+        )
+
+        return _drop_duplicate_derived(_sort_feature_hits(hits + edges + points))
 
     def find_first_feature(
         self,

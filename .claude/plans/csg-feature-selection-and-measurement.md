@@ -533,6 +533,29 @@ Non-real features must also be *rendered* as visible, pickable overlay geometry 
 knows they are there. Precedent: the `cylinderAxis` payload (`runner.py:566`) already drives
 camera-facing tangent silhouettes for round accessories (`viewer-app.js:4424`).
 
+**Status.** Selecting one is DONE and the rendering is NOT, so today a non-real feature can
+be picked and measured but nothing shows it is there -- you have to know to aim at it.
+
+What is there: `CylinderAxisFeature` (`cutcsg.py`) is the first non-real feature in the
+library, authored on the round peg hole of a mortise and tenon. Picking one needed the
+pointer's RAY rather than the hit point, which is now sent with every pick and hover and
+tested against non-real features in `_non_real_features_along_ray` (`runner.py`): a hit
+point is on a surface, and a bore's axis is the bore's whole radius from every surface the
+bore has, so no tolerance on the point could ever reach it. Once selected it draws as a
+line, from its own extent rather than cropped to the cut solid -- see
+`_non_real_highlight_segments`, and the cropping note above for why the cut solid yields
+nothing.
+
+What is not: the always-on overlay. It was built once (runner shipping a `nonRealFeatures`
+line list with each timber's geometry, viewer drawing them as dashed LineSegments2 shown
+only while the member is selected) and reverted because nothing appeared on screen -- the
+lines were in the scene and gated correctly in `setMemberAppearance`, so the fault is
+somewhere in the draw rather than in the plumbing, and it was not worth holding up the
+picking work to chase. Worth another go; start by checking whether a `LineSegments2` with
+`depthTest: false` and a cloned dashed edge material draws at all in this scene, since that
+material is shared per render profile and cloning it may not be enough to get `USE_DASH`
+compiled in.
+
 ### D6 — Reserved PTW and rough face names (`timber.py`)
 
 Split `_timber_face_tags()`:

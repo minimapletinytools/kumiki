@@ -75,6 +75,45 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
         mortise_depth=inches(7, 2),
     )
 
+def example_mortise_and_tenon_with_round_peg(position=None, use_round_timbers=False):
+    """
+    The basic blind mortise and tenon, pegged with one round peg.
+
+    Same joint as example_basic_mortise_and_tenon_on_face_aligned_timbers, with a
+    1/2" round peg driven 1" back from the shoulder, on the tenon centreline, and
+    drilled right through the mortise timber (depth=None).
+
+    The peg is drilled through the RIGHT face of the butt timber, which is the
+    canonical arrangement's front_face_on_butt_timber and points +Z -- so the
+    hole runs down the 4" axis of both timbers.
+
+    Both timbers carry a `peg_hole_axis` centreline down the bore. It is the only
+    thing on a round hole that can be measured to: the barrel is curved, so it has
+    no plane to measure against, and a hole is dimensioned from its centre anyway.
+    Select it inside the hole -- it is a non-real feature, so it is pickable in the
+    void the drill made rather than on any surface.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_butt_joint_timbers(
+        position,
+        timber_config=_maybe_round_timber_config(use_round_timbers),
+    )
+    return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        arrangement=arrangement,
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
+        tenon_length=inches(3),
+        mortise_depth=inches(7, 2),
+        peg_parameters=SimplePegParameters(
+            shape=PegShape.ROUND,
+            peg_positions=[(inches(1), scalar(0))],
+            size=inches(1, 2),
+        ),
+    )
+
+
 # TODO rename to example_mortise_and_tenon_with_round_tenon_on_face_aligned_timbers
 def example_round_mortise_and_tenon_on_face_aligned_timbers(position=None, use_round_timbers=False):
     """
@@ -982,6 +1021,7 @@ if __name__ == "__main__":
 
 patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/basic_face_aligned", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/round_peg", lambda_=make_pattern_from_joint(example_mortise_and_tenon_with_round_peg), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/round_face_aligned", lambda_=make_pattern_from_joint(example_round_mortise_and_tenon_on_face_aligned_timbers), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/basic_face_aligned_round_timbers", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_two_round_timbers), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/through_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon), pattern_type='frame'),

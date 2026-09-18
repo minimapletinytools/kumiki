@@ -983,6 +983,10 @@ class FrameViewSession {
             // has to be added here too -- which is how this arrived empty and
             // edges stopped being selectable while still highlighting.
             tolerances: message.tolerances || null,
+            // The line the pointer went along. A hit point is on a surface; a
+            // feature in a void -- a bore's axis -- is nowhere near one, so
+            // without the ray it cannot be found at all.
+            ray: message.ray || null,
             // Which feature at the point is wanted, and what would be measured
             // to it. With these the runner offers one that can finish the
             // measurement rather than the most specific one, says whether it
@@ -1024,6 +1028,10 @@ class FrameViewSession {
             // The same tolerances the click will use. Hover that answers by a
             // different rule lights things a click then refuses.
             tolerances: message.tolerances || null,
+            // The line the pointer went along. A hit point is on a surface; a
+            // feature in a void -- a bore's axis -- is nowhere near one, so
+            // without the ray it cannot be found at all.
+            ray: message.ray || null,
             // Which feature at the point is wanted, and what would be measured
             // to it. With these the runner offers one that can finish the
             // measurement rather than the most specific one, says whether it

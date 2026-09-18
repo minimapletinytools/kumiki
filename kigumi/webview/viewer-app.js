@@ -220,6 +220,33 @@ const PAINT_WAIT_FALLBACK_MS = 100;
 
 const DEFAULT_FOOTPRINT_COLOR = 'orange';
 
+/**
+ * Every feature the pick found, as one compact log field.
+ *
+ * The chosen one is marked, and each carries what the ordering sorted on, so
+ * the two questions worth asking of a pick -- why that one, and why is the one
+ * I want not here at all -- are both answerable from a single line.
+ */
+function describeCandidates(message) {
+    const candidates = Array.isArray(message && message.candidates) ? message.candidates : [];
+    if (!candidates.length) {
+        return { candidates: [] };
+    }
+    const chosen = message.candidateIndex;
+    return {
+        candidates: candidates.map((candidate, index) => [
+            index === chosen ? '>' : ' ',
+            candidate.type,
+            candidate.derived ? 'derived' : 'declared',
+            candidate.real ? 'real' : 'non-real',
+            candidate.group,
+            'p' + candidate.priority,
+            candidate.label,
+        ].join(' ')),
+    };
+}
+
+
 function normalizeViewerOptions(viewerOptions) {
     const opts = (viewerOptions && typeof viewerOptions === 'object') ? viewerOptions : {};
     const geometryMode = GeometryMode.VALID_MODES.has(opts.geometryMode) ? opts.geometryMode : GeometryMode.DEFAULT_MODE;
@@ -3123,10 +3150,23 @@ class KigumiViewerApp extends LitElement {
                 // last clicked in -- pick tolerances read from the active
                 // viewport instead of this one were computed at the wrong scale
                 // for every hover that had not been clicked in first.
-                return { hits, camera: resolved.viewport.camera };
+                //
+                // So does the RAY, copied out because the raycaster is reused
+                // on the next pointer move. A hit point is on a surface, and a
+                // feature in the void -- a bore's axis -- is nowhere near any
+                // surface, so the runner needs the line the pointer went along
+                // to find one at all.
+                return {
+                    hits,
+                    camera: resolved.viewport.camera,
+                    ray: {
+                        origin: this.navigationRaycaster.ray.origin.toArray(),
+                        direction: this.navigationRaycaster.ray.direction.clone().normalize().toArray(),
+                    },
+                };
             }
         }
-        return { hits: [], camera: this.camera };
+        return { hits: [], camera: this.camera, ray: null };
     }
 
     // The closest visible, unlocked member hit, or null. Used where only the
@@ -3224,6 +3264,9 @@ class KigumiViewerApp extends LitElement {
             // actually went through, which on a sheet need not be the active
             // viewport's.
             tolerances: this._pickTolerances(target.point, along.camera),
+            // The line the pointer went along, so features that lie in a void
+            // rather than on a surface can be found at all. See _findMembersAlongRay.
+            ray: along.ray,
             // The end already held, and which way we are looking. With these
             // the runner offers the feature that can finish the measurement
             // rather than the most specific one, and says whether it can.
@@ -3247,6 +3290,17 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this._hover.markDrawn(message);
+        // What the pointer is over, once per thing it comes to rest on rather
+        // than once per move -- wouldRedraw above has already dropped the
+        // repeats. Hover said nothing at all before, which made "why can I not
+        // hover that" a question with no evidence behind it.
+        this.emitViewerLog('csg-hover', {
+            memberKey: message.memberKey,
+            path: message.path,
+            featureLabel: message.featureLabel,
+            featureType: message.featureType,
+            ...describeCandidates(message),
+        });
         if (this.contextMenu.isOpen) {
             // The feature menu marks the row THIS answer came from, so a new
             // answer has to reach it. Tab changes the answer without the pointer
@@ -4034,7 +4088,7 @@ class KigumiViewerApp extends LitElement {
         if (!event) {
             return;
         }
-        const { hits, camera: pickCamera } = this._findMembersAlongRay(event.clientX, event.clientY);
+        const { hits, camera: pickCamera, ray: pickRay } = this._findMembersAlongRay(event.clientX, event.clientY);
         const decision = choosePickAction({
             hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
@@ -4075,6 +4129,9 @@ class KigumiViewerApp extends LitElement {
                     currentPath,
                     ctrlClick: !!event.ctrlKey || !!event.metaKey,
                     tolerances: this._pickTolerances(point, pickCamera),
+                    // See _findMembersAlongRay: a hit point is on a surface, and
+                    // a feature in a void is not near any surface.
+                    ray: pickRay,
                     // Whatever the hover is showing is what the click takes.
                     candidateIndex: this._hover ? this._hover.asking : null,
                     // The same question the hover asked, so the click resolves
@@ -4351,6 +4408,7 @@ class KigumiViewerApp extends LitElement {
                 meshWalkMs: stats.meshWalkMs,
                 trianglesMatched: stats.trianglesMatched,
                 totalTriangles: stats.totalTriangles,
+                ...describeCandidates(message),
             });
         }
 
