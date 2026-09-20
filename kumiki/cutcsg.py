@@ -688,20 +688,17 @@ class CSGFeature(ABC):
         """
         ...
 
+    # TODO rename to something like locate_simple_unbounded
     def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
         """The unbounded geometry this feature lies on, in the owner's space.
 
         A Plane for a planar face, a Line for an edge, a Point for a vertex.
 
-        None when the feature names a surface that is not one of those -- a
+        `None` when the feature names a surface that is not one of those -- a
         cylinder's barrel, a lofted side, an extrusion side that follows a
-        curved path segment. Those are perfectly good features to select and
-        highlight; there is just no single plane to measure against, so
-        measurement has to decline rather than invent one.
-
-        Note the space: the CSG tree is timber-local, so this is too. Anything
-        comparing features across timbers has to lift both through the timber
-        transform first.
+        curved path segment.
+        
+        The returned geometry is "global" in the space of `owner` which is likely local in some Timber's space.
         """
         return None
 
@@ -862,19 +859,6 @@ class DerivedEdgeFeature(CSGFeature):
         - their groups are not allowed to meet;
         - either names a face that is not THERE (e.g. the top of an infinite prism)
         - or their planes are parallel (which includes being the same plane -- coincident faces share a whole plane, not a line).
-
-        Not planar is a different thing from not there, and only the second
-        stops an edge existing. A cylinder's barrel and a lofted side are real
-        surfaces with no single plane, and the edge where one meets a flat face
-        is real too -- pickable, just not measurable as a line, which is what
-        locate() returning None means for it. The top of a prism extended to
-        infinity is not a surface at all, and an edge against it is nothing.
-
-        It takes both questions to tell those apart, because each alone gets
-        one of them wrong. A barrel has no plane but has an extent; a half
-        space has a plane but no extent, being unbounded; a face that is not
-        there has neither. So neither answer on its own means absent -- both
-        do.
         """
         if a.feature.feature_type() != CSGFeatureType.FACE:
             return None
@@ -892,6 +876,7 @@ class DerivedEdgeFeature(CSGFeature):
             if (hit.feature.locate(hit.owner) is None
                     and hit.feature.get_extent(hit.owner) is None):
                 return None
+            
         if planes_are_parallel(_as_plane(a.locate()), _as_plane(b.locate())):
             return None
 
@@ -924,22 +909,6 @@ class DerivedEdgeFeature(CSGFeature):
 class DerivedPointFeature(CSGFeature):
     """The point where an edge feature crosses a face feature.
 
-    The same bargain DerivedEdgeFeature makes, one dimension down: built rather
-    than authored, out of the two hits at a query point, and used only where the
-    point exists in no other form. A timber's own corners are its own to declare
-    -- see FeatureCategory.CORNER -- and a point that a primitive names beats
-    this wherever both could answer.
-
-    EDGE against FACE and nothing else. Three faces meeting also define a point,
-    and two edges crossing do too, but each of those is a second and third way
-    to name the vertex this already names, and the group rules are what keep it
-    to one: a derived edge is in FeatureGroup.NONE, so the only edge that can
-    pair here is one a primitive declared.
-
-    Parents are carried with their own owners, as an edge's are, because they
-    generally live on different primitives -- a timber's arris and a joint's
-    shoulder plane. The `owner` passed to this feature's methods is the compound
-    node containing both, and is unused: the geometry comes from the parents.
     """
     a: Optional['OwnedFeatureHit'] = None
     b: Optional['OwnedFeatureHit'] = None
@@ -985,12 +954,6 @@ class DerivedPointFeature(CSGFeature):
         return intersect_line_plane(line, plane)
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """The point itself, which is the whole of where it is.
-
-        No `ends` and no `aabb`: a point has no length to bound and no box worth
-        drawing. Where an edge has to work out how far its parents reach along
-        their shared line, a point either is somewhere or is nowhere.
-        """
         located = self.locate(owner)
         if not isinstance(located, Point):
             return None
@@ -1000,15 +963,11 @@ class DerivedPointFeature(CSGFeature):
     def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedPointFeature']:
         """The point where *a* and *b* cross, or None if they cross in none.
 
-        None when: they are not one EDGE and one FACE; their groups may not
-        meet; either names something that is not THERE; or the line does not
-        pierce the plane in a single point -- which includes the line LYING in
-        the plane, the case that would otherwise fire for every edge against
-        each of the faces that formed it.
-
-        The not-there test is the one DerivedEdgeFeature.derive explains at
-        length: a barrel has no plane but has an extent, a half space has a
-        plane but no extent, and only a feature with neither is absent.
+        None when: 
+        - they are not one EDGE and one FACE; 
+        - their groups may not meet; 
+        - either names something that is not THERE (e.g. top end of an infinite prism); 
+        - or the line does not pierce the plane in a single point -- which includes the line LYING in the plane
         """
         types = {a.feature.feature_type(), b.feature.feature_type()}
         if types != {CSGFeatureType.EDGE, CSGFeatureType.FACE}:
@@ -1050,8 +1009,6 @@ class DerivedPointFeature(CSGFeature):
 @dataclass(frozen=True)
 class HalfSpaceFeature(CSGFeature):
     """The entire boundary plane of a HalfSpace.
-
-    A half-space has exactly one face, so this needs no key to say which.
     """
 
     def feature_key(self) -> Optional[FeatureKey]:
@@ -1151,11 +1108,6 @@ class SimpleRectangularPrismFeature(CSGFeature):
 
     def corners(self, owner: 'CutCSG') -> Optional[Tuple[V3, V3, V3, V3]]:
         """The face's four corners, exactly, or None when it is unbounded.
-
-        Exact because the prism knows them: this is arithmetic on its size,
-        its length and its transform, not a clipping of one solid by another.
-        Everything measurement wants to know about where a face reaches comes
-        from here.
         """
         if not isinstance(owner, RectangularPrism):
             return None
@@ -1185,8 +1137,7 @@ class SimpleRectangularPrismFeature(CSGFeature):
         # edge carries its `ends` for exactly this reason; a face wants the same.
         # See docs/measurement-spec.md.
         if corners is None:
-            # Unbounded in one direction, so the prism's own box is the most
-            # that can be said.
+            # Unbounded in one direction, so the prism's own box is the most that can be said.
             return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
         return CSGFeatureExtent(anchor=centre, aabb=_box_around(corners))
 
@@ -1214,29 +1165,17 @@ class SimpleRectangularPrismFeature(CSGFeature):
 @dataclass(frozen=True)
 class SimpleRectangularPrismEdgeFeature(CSGFeature):
     """An arris of a RectangularPrism, named by the two faces it lies between.
-
-    Declared rather than derived, which is the difference that matters. A
-    derived edge exists only as the product of two face hits at a query point,
-    so it cannot be referred to afterwards by name and its identity depends on
-    both parents surviving. An arris a timber simply HAS is a thing to name
-    once, and then to measure to for as long as the timber has it.
-
-    The two faces must actually meet: opposite faces are parallel and share no
-    line, and asking for that pair gets None from locate() rather than an
-    invented answer.
     """
 
+    # TODO add validation so that this names a valid face.
+    # also add warning if the faces are not given in the canonical order
     faces: Tuple[PrismFace, PrismFace] = (PrismFace.FRONT, PrismFace.RIGHT)
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.EDGE
 
     def feature_key(self) -> Optional[FeatureKey]:
-        """The arris between two adjacent sides, or None between a side and a cap.
-
-        The low run of ARRIS is side n against side n+1, so only an adjacent
-        PAIR of sides has one there; a side against a cap lands further along
-        the same run, and opposite sides never meet at all.
+        """
         """
         first, second = self.faces
         if first in _PRISM_CAP_KEYS or second in _PRISM_CAP_KEYS:
@@ -1275,17 +1214,7 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
         return intersect_planes(_as_plane(first.locate(owner)), _as_plane(second.locate(owner)))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Where the arris sits, and where it ends.
-
-        Its two ends are the two corners of one face that also lie on the other:
-        an arris IS that pair of corners, so asking the faces for them is exact
-        and needs no clipping. A face that runs to infinity has no corners, and
-        then there is nothing to say but where the line is.
-
-        `ends` is what measurement wants. Without it the extent had to be found
-        by clipping the arris's infinite line to some enclosing solid, and an
-        arris lies exactly ON the surface of what declared it -- the one place
-        an inside test cannot be trusted.
+        """
         """
         line = self.locate(owner)
         if not isinstance(line, Line):
@@ -1305,26 +1234,6 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
 @dataclass(frozen=True)
 class CylinderAxisFeature(CSGFeature):
     """The centre line of a Cylinder, down the middle of the void it cuts.
-
-    NOT REAL, and that is the whole character of it. Every other feature names
-    a piece of the boundary a solid actually has; this names a line through the
-    middle of a bore, which is the material that ISN'T there. `real=False` is
-    what carries that: collect_feature_hits gates real features on the combined
-    solid's boundary, so gating this one would make it unselectable everywhere
-    it exists, and _sort_feature_hits puts non-real features ahead of real ones
-    because snapping to an axis is deliberate and the surface it passes through
-    should not steal the click.
-
-    An EDGE, because it is a line and measurement dispatches on the kind of
-    geometry rather than on how the geometry came about. It is authored, not a
-    default: a cylinder has one whether or not anyone cares, and the ones worth
-    naming are the ones a joint drills on purpose.
-
-    Left in FeatureGroup.NONE by default, which keeps it out of derivation. The
-    axis of a peg hole crosses the timber's faces, and pairing it with them
-    would derive a point at the centre of the hole on each face -- a real
-    enough place, and not one anybody asked for. A caller that wants those
-    points asks for them by choosing a group.
     """
 
     def feature_type(self) -> CSGFeatureType:
@@ -1332,13 +1241,6 @@ class CylinderAxisFeature(CSGFeature):
 
     @property
     def real(self) -> bool:
-        """Never. An axis names no surface, whatever properties it was given.
-
-        A constant rather than a default, for the reason feature_type() is a
-        method: an axis has no way to claim it is boundary, and a caller that
-        set real=True on one would get a feature that vanishes wherever it is
-        selectable and is selectable nowhere it exists.
-        """
         return False
 
     def _axis(self, owner: 'CutCSG') -> Optional[V3]:
@@ -1353,14 +1255,13 @@ class CylinderAxisFeature(CSGFeature):
         return Line(direction=axis, point=cast(Cylinder, owner).position)
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Where the axis runs, bounded by the cylinder's own two ends.
-
-        Unlike a derived edge, which has to ask its parents how far they reach,
-        a cylinder knows its own span outright.
+        """
         """
         axis = self._axis(owner)
         if axis is None:
             return None
+
+        # TODO add an isinstance check and output an error if fails
         cylinder = cast(Cylinder, owner)
         start, end = cylinder.start_distance, cylinder.end_distance
         anchor = cylinder.position + axis * _finite_midpoint(start, end)
@@ -1372,11 +1273,7 @@ class CylinderAxisFeature(CSGFeature):
         )
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        """On the axis if it is on the LINE -- the ends are not checked here.
-
-        Same bargain every feature's unbounded test makes: a cap feature
-        answers for the cap's whole plane, and this answers for the whole line,
-        with the bounding coming from the node gates above it.
+        """On the axis if it is on the LINE -- the ends are not checked here
         """
         if not isinstance(owner, Cylinder):
             return False
@@ -1398,6 +1295,7 @@ class SimpleCylinderFeature(CSGFeature):
         # A cylinder is an extrusion with one side, and that side is curved.
         return (FeatureCategory.SIDE, 0)
 
+    # TODO create new CURVED_FACE type for the barrel, and then CURVED_FACE should never have been a contender for derived edges or derived points (for now)
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
@@ -1537,11 +1435,10 @@ class SimpleLoftFeature(CSGFeature):
     def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
             return None
-        # Only the caps are reliably planar. A side is a ruled surface, planar
-        # only in the special case of a pure per-axis taper -- so decline
-        # rather than return a plane that is right for some lofts and wrong
-        # for others. Refining this to detect the planar case is worth doing
-        # when something actually needs to measure from a tapered side.
+        
+        # Only the caps are reliably planar. 
+        # TODO detect if sides are planar or just don't support non planar sides
+        # A side is a ruled surface, planar only in the special case of a pure per-axis taper 
         if self.key not in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
             return None
         orientation = owner.transform.orientation.matrix
@@ -1599,29 +1496,18 @@ class FeatureSource(Flag):
     BOTH = 3
 
 
+#TODO this should an ABC? or is that not allowed for dual inheritance or osemtihng?
 @dataclass(frozen=True)
 class HasFeatures:
     """Storage for the features a primitive names on its own boundary.
 
-    A mixin rather than a field on CutCSG, because a compound node names
-    nothing: a SolidUnion, Difference or Intersection has no surface of its
-    own, only the surfaces its children contribute. Only the primitives that
-    have a boundary of their own inherit this.
-
-    Six primitives carried an identical copy of the field and its accessor
-    before this existed. That is the whole reason it exists -- feature storage
-    is one idea, and the shapes that have features differ in their geometry,
-    not in how they hold a list.
-
-    Two layers, not one. A primitive names its own boundary through
-    default_features(), keyed by FeatureKey; an author overrides or adds to
-    that through `_features`. An authored feature whose key matches a default
-    REPLACES it, so naming a face does not leave the anonymous one behind to be
-    found twice.
+    inherited Mixin for CutCSG deriving classes that name their own features
     """
 
+    # named features overriding default features
     _features: Optional[List['CSGFeature']] = field(default=None, kw_only=True)
 
+    # TODO should probably make this an abstract method, or... this overrides the CutCSG one or osemthing? plesae update the comment explaniing if that's the case
     def default_features(self) -> Dict['FeatureKey', 'CSGFeature']:
         """What this primitive names on its own, keyed by where it sits.
 
@@ -1654,15 +1540,7 @@ class HasFeatures:
 
 @dataclass(frozen=True)
 class OwnedFeatureHit:
-    """A feature, paired with the primitive it belongs to.
-
-    A CSGFeature holds no reference to its owner, so anything handing one
-    around carries both. That covers two jobs with the same shape: what a query
-    hands back, and how a DerivedEdgeFeature refers to the two parents it was
-    built from -- which generally live on different primitives.
-
-    Anything needing the feature's geometry -- its plane, its extent -- needs
-    the owner too, so `locate` and `get_extent` are forwarded here.
+    """A feature, paired with the primitive it belongs to
     """
     feature: CSGFeature
     owner: 'CutCSG'
@@ -1688,14 +1566,6 @@ class OwnedFeatureHit:
 @dataclass(frozen=True)
 class CutCSGLabel:
     """The name a CSG node carries, if anyone gave it one.
-
-    A wrapper rather than a bare Optional[str] so that what a label carries can
-    grow -- provenance, namespacing, whatever naming turns out to need -- without
-    revisiting every node that constructs one.
-
-    An unnamed node gets NoLabel() rather than None, so `csg.label` is always a
-    CutCSGLabel and reading it never needs a None check first. Test for a name
-    with the label's truthiness or is_labeled(); read it with `.name`.
     """
 
     name: Optional[str] = None
@@ -1728,15 +1598,7 @@ class CutCSG(ABC):
 
     @classmethod
     def display_name(cls) -> str:
-        """What this kind of CSG is called where a person reads it.
-
-        Derived from the class name -- "path extrusion" -- so a new CSG type
-        names itself; subclasses override where a shorter word is the one
-        people actually use ("union", not "solid union").
-
-        Distinct from the class name, which stays the machine-readable kind:
-        the viewer keys structural decisions off that and must not follow
-        wording changes.
+        """
         """
         return re.sub(r"(?<!^)(?=[A-Z])", " ", cls.__name__).lower()
 
@@ -1748,8 +1610,7 @@ class CutCSG(ABC):
 
         Empty by default, and it stays empty for the compound nodes: a
         SolidUnion, Difference or Intersection has no surface of its own to
-        name, only the surfaces its children contribute. The primitives that do
-        have a boundary get this from HasFeatures instead.
+        name, only the surfaces its children contribute.
         """
         return []
 
@@ -1760,13 +1621,9 @@ class CutCSG(ABC):
     ) -> List['OwnedFeatureHit']:
         """collects every declared feature in this subtree that *point* lies on.
 
-        Each feature is tested at the tolerance its own type calls for, right
-        here -- a face at the face tolerance, a declared edge at the edge one.
-        Compound nodes extend this over their children; they declare nothing
-        themselves.
+        Each feature is tested at the tolerance its own type calls for.
 
-        Real and non-real features are gated differently, which is the whole
-        reason `real` exists:
+        Real and non-real features are gated differently:
 
         - A real feature names actual surface, so the point has to be on the
           boundary of the primitive declaring it. That gate is a surface
@@ -1774,10 +1631,6 @@ class CutCSG(ABC):
         - A non-real feature (a bore's centre axis, a reference plane) names
           nothing the CSG tree ever cut, so boolean operations cannot have
           removed it and the gate does not apply.
-
-        Takes a concrete FeatureTestTolerances, not an optional one: the
-        defaulting happens once, at the public entry point, so nothing on the
-        recursive path can quietly re-default.
         """
         declared = self.get_declared_features()
         if not declared:
@@ -1805,6 +1658,8 @@ class CutCSG(ABC):
         """Every feature at *point*: those declared in this subtree, plus the
         edges and points they form with each other.
 
+        
+        
         Three gathers, because "near enough to count" means a different distance
         depending on what is being asked. The first collects features at the
         tolerance each one's type calls for. The second collects faces at the
@@ -1835,6 +1690,13 @@ class CutCSG(ABC):
         def of_type(gathered, feature_type):
             return [hit for hit in gathered if hit.feature.feature_type() == feature_type]
 
+        # NOTE to get derived edge features at edge level tolerance we need to fetch faces at edge level tolerance
+        # the algorithm is inefficient, consider the following instead:
+        # 1. get everything at point tolerance
+        # 2. derive point and edge features
+        # 3. refine all resulting hits to their actual feature type tolerane
+        # I'm not sure if 3. is easily possible right now, look into what it would take to make it possible, if it's too much code bloat, then the current algo calling collect_feature_hits multiple times is fine.
+
         at_edge_tolerance = self.collect_feature_hits(
             point, FeatureTestTolerances.uniform(tolerances.edge))
 
@@ -1842,17 +1704,17 @@ class CutCSG(ABC):
         # the issue here is that derived features are attributed to the CSG that calls find_all_features 
         # instead, derived features should be determined attributed to the intersecation/difference/solidunion that produced it
         # NOTE for now we don't allow derivde features to produce more derived features
-        edges = derive_edge_hits(self, of_type(at_edge_tolerance, CSGFeatureType.FACE))
+        derived_edges = derive_edge_hits(self, of_type(at_edge_tolerance, CSGFeatureType.FACE))
 
         at_point_tolerance = self.collect_feature_hits(
             point, FeatureTestTolerances.uniform(tolerances.point))
-        points = derive_point_hits(
+        derived_points = derive_point_hits(
             self,
             of_type(at_point_tolerance, CSGFeatureType.EDGE),
             of_type(at_point_tolerance, CSGFeatureType.FACE),
         )
 
-        return _drop_duplicate_derived(_sort_feature_hits(hits + edges + points))
+        return _drop_duplicate_derived(_sort_feature_hits(hits + derived_edges + derived_points))
 
     def find_first_feature(
         self,
@@ -1861,10 +1723,7 @@ class CutCSG(ABC):
     ) -> Optional['OwnedFeatureHit']:
         """The best feature at *point*, or None. Uses default sorting rules.
 
-        Non-real features win outright over real ones. They are lines and
-        points inside or alongside the solid, so anything selecting one has
-        deliberately snapped to it, and a surface it happens to sit on should
-        not steal the click. Priority breaks ties within each of the two.
+        # TODO document sorting rulse here
         """
         hits = self.find_all_features(point, test_tolerances=test_tolerances)
         if not hits:
@@ -1960,9 +1819,7 @@ def csg_children_with_parity(
     """The nodes directly beneath *csg*, each with its own parity.
 
     The one statement of the rule: a Difference's subtract children invert,
-    and nothing else does. A union's children are each monotone-increasing in
-    the union, an intersection's operands in the intersection, and a
-    Difference's base in the difference -- so those all inherit.
+    and nothing else does.
 
     Children come back in csg_children order.
     """
@@ -1977,15 +1834,6 @@ def walk_csg_with_parity(
     parity: CSGParity = CSGParity.ADDITIVE,
 ) -> Iterator[Tuple[CutCSG, CSGParity]]:
     """Every node beneath *root*, including *root*, with its parity.
-
-    Parity belongs to a node's POSITION, not to the node: a node has no parent
-    pointer and cannot answer on its own, and the same subtree placed twice in
-    one tree can have a different answer each time. So this yields one entry
-    per occurrence and always starts from a root -- there is no way to ask a
-    node about itself.
-
-    Two subtract edges cancel: in ``A - (B - C)`` the C is ADDITIVE, and
-    indeed C restores material that B removed.
     """
     yield root, parity
     for child, child_parity in csg_children_with_parity(root, parity):
@@ -2107,6 +1955,8 @@ class HalfSpace(HasFeatures, CutCSG):
             stacklevel=2,
         )
         return BoundingBox(None, None, None, None, None, None)
+
+    
 @dataclass(frozen=True)
 class RectangularPrism(HasFeatures, CutCSG):
     """
@@ -2136,20 +1986,8 @@ class RectangularPrism(HasFeatures, CutCSG):
     """
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Every face and arris a prism has, named without anyone asking.
 
-        ALL DEFAULTS ARE IN FeatureGroup.NONE, AND THIS IS LOAD BEARING. The
-        group is what decides which features may pair to form a DERIVED edge,
-        and derived edges are found by pairing every face near a query point
-        with every other -- O(k^2) in k. Before defaults, a primitive nobody
-        had named contributed k = 0. Putting these in a pairing group instead
-        would set k to a dozen per primitive across the whole tree, and produce
-        a mass of derived edges that are geometrically real and mean nothing.
-
-        A default is a thing you can SELECT and MEASURE TO, not a thing that
-        combines. Anything wanting to combine is authored, with a group chosen
-        on purpose -- which is what _ptw_face_tags and the joint code do.
-        """
+        # TODO can/should this be made static? 
         features: Dict[FeatureKey, CSGFeature] = {}
 
         def named(key: FeatureKey, feature_for) -> None:
@@ -2370,7 +2208,7 @@ class RectangularPrism(HasFeatures, CutCSG):
         # Prioritize: length faces (top/bottom), then width faces, then height faces
         # This prioritization makes sense for typical CSG operations where end faces are often involved
 
-        # TODO you should check if point is on edges and return averages instead
+        # TODO consider checking if point is on edges/corners and return averages instead, probably not necessary for now
 
         # On length faces (top/bottom) - check these first
         if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance, eps=eps):
@@ -2423,6 +2261,7 @@ class RectangularPrism(HasFeatures, CutCSG):
         )
 
 
+# UNUSED, but seems like a nice to have so keep it around
 def make_finite_rectangular_prism_from_half_space(half_space: HalfSpace, size_of_space: Numeric, depth_of_space: Numeric) -> RectangularPrism:
     """
     Build a finite RectangularPrism that approximates ``half_space`` near its boundary.
@@ -2465,6 +2304,7 @@ def make_finite_rectangular_prism_from_half_space(half_space: HalfSpace, size_of
         start_distance=scalar(0),
         end_distance=depth_of_space,
     )
+
 @dataclass(frozen=True)
 class Cylinder(HasFeatures, CutCSG):
     """
@@ -2496,11 +2336,7 @@ class Cylinder(HasFeatures, CutCSG):
 
     # Features this primitive names on its own boundary. Private: read it
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Two caps and the barrel. See RectangularPrism for why the group is NONE.
-
-        No arrises: a cylinder's rims are circles, and there is no feature class
-        for one yet. Their slots are the two arrises against the caps, which
-        arris_against_cap names for a shape with a single side.
+        """Two caps and the barrel
         """
         parts = ((START_CAP, CylinderPart.BOTTOM),
                  (END_CAP, CylinderPart.TOP),
@@ -3001,6 +2837,7 @@ class Difference(CutCSG):
         # If point is strictly inside any subtract, it's not on the difference boundary
         if in_subtract_interior:
             return False
+
         
         # On a subtract's surface: the wall of the hole it made. That is this
         # solid's boundary only if the hole HAS a wall -- if there is material
@@ -3013,9 +2850,18 @@ class Difference(CutCSG):
         
         # Otherwise, check if it's on the base boundary
         return self.base.is_point_on_boundary(point, eps=eps)
+
     
     def _material_outside_the_hole(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """Whether this solid has material just outside a subtract's surface.
+
+        consider the difference A-B, if a point P is on the boundary of B, then P is on the boundary of (A-B) if
+        - P is NOT on the boundary of A
+        - P is on the boundary of A, and the outward normal of A and B do not match
+
+        TODO I think whats explained in the comment above is sufficient and simpler and more accurate, please switch over
+        TODO the current implementaion and what's explainde below is less reliable and more complicated than it needs to be
+
 
         For a point already known to be on some subtract's surface, and in the
         base. A hole's wall is boundary because there is something on the near
@@ -3108,7 +2954,7 @@ class Difference(CutCSG):
                 bbox = _clip_bbox_by_halfspace_complement(bbox, sub)
         return bbox
 
-# TODO come upw ith a cuter/better name for these
+# TODO come up with a cuter/better name for these
 Profile = List[V2]
 Profiles = List[Profile]
 
@@ -3512,6 +3358,8 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     instead of staying constant -- ConvexPolygonExtrusion is the degenerate case
     where bottom_points == top_points.
 
+    
+    **TODO don't allow twists**
     bottom_points and top_points must each independently be a valid convex polygon
     (same rules as ConvexPolygonExtrusion.is_valid()) with the SAME number of points
     wound in the SAME direction. Intermediate (lofted) cross-sections are NOT
@@ -3526,6 +3374,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     taper is a pure independent per-axis scale from one profile to the other (e.g.
     a rectangle-to-rectangle taper on the same axes); get_outward_normal accounts
     for this and is not necessarily constant across a side face.
+    **TODO don't allow twists**
 
     The polygons live in the local XY plane, with bottom_points at start_distance
     and top_points at end_distance along the local Z-axis, matching the
@@ -3559,10 +3408,14 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     @classmethod
     def display_name(cls) -> str:
         return "loft"
+
     bottom_points: Profile
     top_points: Profile
+
+    # TODO reanme to bottom/top_points_z_pos
     start_distance: Numeric
     end_distance: Numeric
+
     transform: Transform = field(default_factory=Transform.identity)
 
     # Features this primitive names on its own boundary. Private: read it
@@ -3590,6 +3443,9 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
         Does NOT check that intermediate (lofted) cross-sections stay convex or
         simple -- see class docstring.
+
+        TODO check that sides are actually planar, lets just not support non planar sides
+
         """
         if len(self.bottom_points) < 3 or len(self.top_points) < 3:
             return False
@@ -3756,6 +3612,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         face, the face is in general a ruled (non-planar) surface, so the normal
         is computed from the face's parametric partial derivatives at this point
         rather than being constant across the face.
+        TODO simplify the abvoe when we don't allow twisted faces
 
         Args:
             point: A point on the boundary

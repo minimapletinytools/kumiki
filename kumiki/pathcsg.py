@@ -847,6 +847,7 @@ class SimplePathExtrusionFeature(CSGFeature):
     """
     key: ExtrusionFeatureKey = ExtrusionCap.TOP
 
+    # TODO this is either FACE or CURVED_FACE, but we need some info to know if it's a curved face or not, so add some additional info to this class (that gets passed in by its owner) so we can know if the face is curved or not.
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 

@@ -23,7 +23,6 @@ from kumiki.cutcsg import (
     RectangularPrism,
     SolidUnion,
     adopt_csg,
-    make_finite_rectangular_prism_from_half_space,
     EmptyCSG,
 )
 from kumiki.measuring import Plane, get_center_point_on_face_global, locate_centerline, locate_plane_from_edge_in_direction
