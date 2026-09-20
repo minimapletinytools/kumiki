@@ -1,3 +1,56 @@
+
+:: 9/19/2026 kumiki next setps
+
+0. understand and cleanup csg code
+
+
+
+1. figure out feature "solving" story
+
+- prism
+  - faces defined by a plane, and then bound by 4 edges
+    - plane is defined by point and normal 
+    - edges defined by intersecting planes or lines
+    - face can be defined by 4 edges
+  - edges defined by a line, and then bound by 2 points
+    - line can be defined by a point and an orientation
+    - point can be defined by intersecting planes or points
+    - edge can be definde by 2 points
+  - points defined by position
+
+  - a prism can be solved by knowing all its faces as planes, knowing all its edges as lines, or knowning all its vertices
+    - so it's maybe better to define faces just as a point and orientation, lines as infinite lines, then given a set of planes, lines, vertices we can ask is this prism solved?
+  
+  - I think the general rule is that point fetaures are fundamental, and then they define edge features, and plane features. 
+    - solving plane/edge fetaures solved DOFs on vertex fetaures that define them.
+
+2. refactor features to support this. some stuff we maybe want
+  - add points to default features
+  - joints can name how specific features be solved (measured)
+
+3. finalize the derived feature priority rule
+  - non derivde features take precedence over derivde featuers
+  - do derived features "belong" to highest or lowest element in the tree?
+    - what if there's a tie? 
+    - maybe better just to say it belongs to "both" or "neither"?
+  - figure out why mortise and tenon joint doesn't produce inside edges between the shoulder plane and the tenon prism
+  - what happens when thehre are multiple overlapping derived features?
+    - note that they map overlap but may not be identical, in which case both need to be solved
+
+4. figure out the overlapping fetaure situation in general
+  - overlapping vertices lines and planes fully solve each other.
+  - you can go a little fineg rained too, but probably not worth the complexity
+    - a line/point on a plane is solved in 1 DOF if the plane is solved
+    - a point on a line is solved in 1 DOF if the line is solved
+
+5. determine which features need to be solved...
+  - face -> lines -> points
+  - if all lines of a foce, or all points of a line are not on the boundary, then that feature is internal and does not need to be solved
+  - the scary part is that the same rules apply for derived fetaures
+    - this is made easier if we say we don't support derived features further producing more derived features, I guess we can look into this in the future.
+  - derived features can be solved if both parent features are solved
+
+
 :: 9/12/2026 do kumiki vid 
 
 There's a hidden assembly solver in kumiki that allows you to dissamble your designs and make your own ikea assembly explosion animations
