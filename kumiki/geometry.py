@@ -118,6 +118,7 @@ class UnsignedPlane(Plane):
         return UnsignedPlane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
 
 
+# TODO DELETE, only used by locate_edge_on_face which is not implemented
 @dataclass(frozen=True)
 class LineOnPlane:
     """A line lying in a plane, with a direction to measure in.
@@ -173,6 +174,8 @@ def perpendicular_axes(direction: V3) -> Tuple[V3, V3]:
     return u, unit_vector(v)
 
 
+# TODO see if you can get rid of this class, it's only used by approximately_crop_plane_to_area_on_csg <- are we even using this function anymore?
+# DO NOT create new usages of this clas
 @dataclass(frozen=True)
 class PlaneFrame:
     """Two axes on a plane, for working in it as if it were flat."""
@@ -226,6 +229,7 @@ class LineSegment:
     orientation is the one that means something.
     """
 
+    # TODO do we need Line here? It's fully derived by start and end. maybe we can have a compute_line() function instead, 
     line: Line
     start: V3
     end: V3
@@ -273,10 +277,16 @@ class ConvexPlanarRegion:
     the outline is checked once here instead.
     """
 
+    # TODO this can be derived from boundary points. Either:
+    #  - specify the boundary is local V2 coordinates to the plane (although that requires the plane to have a coordinate system, which we kinda don't want)
+    #. - assert in __post__init__ that boundary points are in the plane
+    #. - delete the plane object and add a compute_plane() function that derives it
     plane: Plane
     boundary: Tuple[V3, ...]
 
     def __post_init__(self) -> None:
+        
+
         corners = self.boundary
         if len(corners) < 3:
             # Nothing to be concave about: empty, a point, or an edge.
