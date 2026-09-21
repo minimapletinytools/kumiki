@@ -1,42 +1,6 @@
 const {
-    projectedSeparation, dimensionLayout, DEGENERATE_PIXELS,
+    dimensionLayout, DEGENERATE_PIXELS,
 } = require('../webview/measurements.js');
-
-describe('projectedSeparation', () => {
-    // A drawing is a projection, so a dimension is the separation seen from the
-    // viewport, not the distance between the two features in space.
-    test('two points across the view are their full distance apart', () => {
-        expect(projectedSeparation([0, 0, 0], [3, 0, 0], [0, 0, -1])).toBeCloseTo(3, 9);
-    });
-
-    test('depth does not count toward it', () => {
-        // Two mortises at different depths, dimensioned on the front elevation,
-        // read as their separation across that face.
-        const flat = projectedSeparation([0, 0, 0], [3, 0, 0], [0, 1, 0]);
-        const deep = projectedSeparation([0, 0, 0], [3, 5, 0], [0, 1, 0]);
-
-        expect(deep).toBeCloseTo(flat, 9);
-    });
-
-    test('two points separated only in depth are zero apart', () => {
-        // The degenerate case: nothing to dimension in this view, and the
-        // viewport has to refuse rather than draw a number.
-        expect(projectedSeparation([0, 0, 0], [0, 4, 0], [0, 1, 0])).toBeCloseTo(0, 9);
-    });
-
-    test('it does not care which way round the two are', () => {
-        expect(projectedSeparation([1, 2, 3], [4, 6, 8], [0, 0, -1]))
-            .toBeCloseTo(projectedSeparation([4, 6, 8], [1, 2, 3], [0, 0, -1]), 9);
-    });
-
-    test('the direction of sight need not be a unit vector', () => {
-        expect(projectedSeparation([0, 0, 0], [3, 5, 0], [0, 7, 0])).toBeCloseTo(3, 9);
-    });
-
-    test('a diagonal run measures the diagonal, not its parts', () => {
-        expect(projectedSeparation([0, 0, 0], [3, 0, 4], [0, 1, 0])).toBeCloseTo(5, 9);
-    });
-});
 
 describe('dimensionLayout', () => {
     const from = { x: 100, y: 100 };
@@ -112,137 +76,13 @@ describe('dimensionLayout', () => {
     });
 });
 
-const { projectedForm, availableKinds, kindApplies, measureValue, angleLayout } =
-    require('../webview/measurements.js');
+const { angleLayout } = require('../webview/measurements.js');
 
 // A front elevation: looking north, x across the sheet and z up it.
 const FRONT = { look: [0, 1, 0], right: [1, 0, 0], up: [0, 0, 1] };
 
 const face = (normal) => ({ kind: 'plane', normal });
 const edge = (direction) => ({ kind: 'line', direction });
-
-describe('projectedForm', () => {
-    // What a feature looks like once projected is what decides the measurement,
-    // not what the feature is.
-    test('a face square to the view covers it, and an area has no distance', () => {
-        expect(projectedForm(face([0, 1, 0]), FRONT.look).form).toBe('area');
-    });
-
-    test('a face seen edge-on behaves as a line', () => {
-        expect(projectedForm(face([0, 0, 1]), FRONT.look).form).toBe('line');
-    });
-
-    test('an edge along the line of sight behaves as a point', () => {
-        expect(projectedForm(edge([0, 1, 0]), FRONT.look).form).toBe('point');
-    });
-
-    test('an edge across the view stays a line', () => {
-        expect(projectedForm(edge([1, 0, 0]), FRONT.look).form).toBe('line');
-    });
-
-    test('a point is a point however it is looked at', () => {
-        expect(projectedForm({ kind: 'point' }, FRONT.look).form).toBe('point');
-    });
-
-    test('an edge-on face draws along itself, not along its normal', () => {
-        const drawn = projectedForm(face([0, 0, 1]), FRONT.look).direction;
-
-        // Square to its own normal, and to the line of sight.
-        expect(drawn[2]).toBeCloseTo(0, 6);
-        expect(drawn[1]).toBeCloseTo(0, 6);
-    });
-});
-
-describe('availableKinds', () => {
-    const point = { form: 'point' };
-
-    test('two points admit the distance and either component', () => {
-        expect(availableKinds(point, point)).toEqual(['projected_perpendicular_distance', 'projected_horizontal_distance',
-             'projected_vertical_distance']);
-    });
-
-    test('a point and a line admit the perpendicular', () => {
-        expect(availableKinds(point, projectedForm(edge([1, 0, 0]), FRONT.look)))
-            .toEqual(['projected_perpendicular_distance']);
-    });
-
-    test('two perpendicular faces admit an angle and not a distance', () => {
-        // The case that started this: the distance between the middles of two
-        // faces that meet at a corner is a number about nothing.
-        const kinds = availableKinds(
-            projectedForm(face([0, 0, 1]), FRONT.look),
-            projectedForm(face([1, 0, 0]), FRONT.look),
-        );
-
-        expect(kinds).toEqual(['projected_angle']);
-    });
-
-    test('two parallel faces admit a separation and not an angle', () => {
-        const kinds = availableKinds(
-            projectedForm(face([0, 0, 1]), FRONT.look),
-            projectedForm(face([0, 0, -1]), FRONT.look),
-        );
-
-        expect(kinds).toContain('projected_perpendicular_distance');
-        expect(kinds).not.toContain('projected_angle');
-    });
-
-    test('a face that is not edge-on admits nothing at all', () => {
-        expect(availableKinds(projectedForm(face([0, 1, 0]), FRONT.look), point)).toEqual([]);
-    });
-
-    test('a measurement can ask whether its kind applies here', () => {
-        const a = projectedForm(face([0, 0, 1]), FRONT.look);
-        const b = projectedForm(face([1, 0, 0]), FRONT.look);
-
-        expect(kindApplies('projected_angle', a, b)).toBe(true);
-        expect(kindApplies('projected_perpendicular_distance', a, b)).toBe(false);
-        // The name it used to go by still resolves, for measurements already saved.
-        expect(kindApplies('angle', a, b)).toBe(true);
-    });
-});
-
-describe('measureValue', () => {
-    const a = projectedForm(face([0, 0, 1]), FRONT.look);
-    const b = projectedForm(face([1, 0, 0]), FRONT.look);
-
-    test('the angle between two perpendicular faces is a right angle', () => {
-        expect(measureValue('projected_angle', [0, 0, 0], [1, 0, 1], a, b, FRONT).value)
-            .toBeCloseTo(90, 6);
-    });
-
-    test('the components are taken along the sheet, not the world', () => {
-        const across = measureValue('projected_horizontal_distance', [0, 0, 0], [3, 9, 4], a, b, FRONT);
-        const up = measureValue('projected_vertical_distance', [0, 0, 0], [3, 9, 4], a, b, FRONT);
-
-        expect(across.value).toBeCloseTo(3, 9);
-        expect(up.value).toBeCloseTo(4, 9);
-    });
-
-    test('between two points it is the distance, with the depth dropped', () => {
-        // Nine units of depth, in this view. Two points have no line to be
-        // square to, so the perpendicular distance is simply the distance --
-        // which is why this and the old `aligned` are now one kind.
-        const point = { form: 'point' };
-
-        expect(measureValue(
-            'projected_perpendicular_distance', [0, 0, 0], [3, 9, 4], point, point, FRONT,
-        ).value).toBeCloseTo(5, 9);
-    });
-
-    test('a perpendicular is square to whichever of the two is a line', () => {
-        const line = projectedForm(edge([1, 0, 0]), FRONT.look);
-        const value = measureValue('projected_perpendicular_distance', [0, 0, 0], [7, 0, 2], { form: 'point' }, line, FRONT);
-
-        // Seven along the line does not count; two away from it does.
-        expect(value.value).toBeCloseTo(2, 9);
-    });
-
-    test('an angle comes back in degrees and a distance in world units', () => {
-        expect(measureValue('projected_angle', [0, 0, 0], [1, 0, 1], a, b, FRONT).unit).toBe('angle');
-        expect(measureValue('projected_perpendicular_distance', [0, 0, 0], [1, 0, 1], a, b, FRONT).unit).toBe('length');
-    });
-});
 
 describe('angleLayout', () => {
     test('the arc is drawn where the two lines cross', () => {
@@ -424,37 +264,6 @@ describe('anchorReference', () => {
 
         expect(anchorReference(reference)).toEqual(reference);
     });
-});
-
-describe('an angle says it is an angle', () => {
-    // The viewer decides whether to draw an arc or a dimension line from the
-    // status. It used to ask `status.kind === 'angle'` -- the bare legacy name
-    // -- and the kinds became composed, so every angle fell through and was
-    // drawn as a linear dimension: the right number, the wrong picture, and
-    // degrees labelled as a length.
-    //
-    // The value's unit is what the viewer asks now, so these pin that the two
-    // agree and that nothing answers to the old bare name.
-    const AXES = { look: [0, -1, 0], right: [1, 0, 0], up: [0, 0, 1] };
-    const crossing = {
-        a: { at: [0, 0, 0], geometry: { kind: 'line', direction: [1, 0, 0], at: [0, 0, 0] } },
-        b: { at: [1, 0, 1], geometry: { kind: 'line', direction: [0, 0, 1], at: [1, 0, 1] } },
-    };
-
-
-
-    test('no kind answers to the bare name the viewer used to look for', () => {
-        // If a kind is ever named plain 'angle' again, the two ways of asking
-        // stop agreeing and this is where it shows.
-        const kinds = availableKinds(
-            { form: 'line', direction: [1, 0, 0] },
-            { form: 'line', direction: [0, 0, 1] },
-        );
-
-        expect(kinds).not.toContain('angle');
-        expect(kinds).toContain('projected_angle');
-    });
-
 });
 
 const { measurementKey } = require('../webview/measurements.js');
@@ -645,51 +454,6 @@ describe('a derived edge is identified by the faces that form it', () => {
 
 const Measurements = require('../webview/measurements.js');
 
-describe('what the 3D view measures', () => {
-    // The 3D view's camera belongs to the reader and turns as they look around,
-    // so a feature there is classified as it IS. Projecting instead called
-    // every face not seen exactly edge-on an 'area' -- nothing to measure --
-    // which is nearly all of them, in every direction the camera can point.
-    const { solidForm, solidKinds, measurementStatus } = Measurements;
-    const face = (normal) => ({ kind: 'plane', normal });
-    const edge = (direction) => ({ kind: 'line', direction });
-    const solid = { orthographic: false };
-    const axes = { look: [-0.577, -0.577, -0.577], right: [1, 0, 0], up: [0, 0, 1] };
-
-    test('a face is a plane from wherever it is seen', () => {
-        expect(solidForm(face([0, 0, 1])).form).toBe('plane');
-    });
-
-    test('an edge is a line even when it points at you', () => {
-        expect(solidForm(edge([0, 0, 1])).form).toBe('line');
-    });
-
-    test('two faces meeting at a corner admit an angle', () => {
-        expect(solidKinds(solidForm(face([1, 0, 0])), solidForm(face([0, 0, 1]))))
-            .toEqual(['angle']);
-    });
-
-    test('two parallel faces admit the distance between them', () => {
-        expect(solidKinds(solidForm(face([1, 0, 0])), solidForm(face([-1, 0, 0]))))
-            .toEqual(['perpendicular_distance']);
-    });
-
-    test('an edge lying in a face is parallel to it, not crossing it', () => {
-        // A normal is not a direction: the line runs square to the normal
-        // exactly when it lies in the plane.
-        expect(solidKinds(solidForm(edge([0, 0, 1])), solidForm(face([1, 0, 0]))))
-            .toEqual(['perpendicular_distance']);
-    });
-
-    test('and one square to a face does cross it', () => {
-        expect(solidKinds(solidForm(edge([1, 0, 0])), solidForm(face([1, 0, 0]))))
-            .toEqual(['angle']);
-    });
-
-
-
-});
-
 describe('naming a kind, and writing one back', () => {
     const { kindName, kindWire, measurementStatus } = Measurements;
 
@@ -793,34 +557,16 @@ describe('the arc of an angle lies in the angle\'s own plane', () => {
 });
 
 describe('a frame is never stopped by one bad measurement', () => {
-    // measureValue runs for every measurement on every frame, inside the render
-    // loop. A throw there stops the frame -- which has happened: an arc built
-    // from a form that had no direction took the whole viewer down until a
-    // reload. A measurement that describes nothing should draw nothing, not
-    // stop everything.
-    const { measureValue, angleArcPoints, hasDirection } = Measurements;
-    const AXES = { look: [0, 0, -1], right: [1, 0, 0], up: [0, 0, 1] };
-    const FORMS = [{ form: 'plane' }, { form: 'line' }, { form: 'point' }, { form: 'area' }, {}];
-    const KINDS = [
-        'angle', 'perpendicular_distance', 'projected_angle',
-        'projected_perpendicular_distance', 'projected_horizontal_distance',
-        'projected_vertical_distance',
-    ];
-
-    test.each(KINDS)('%s answers for every shape of form, however empty', (kind) => {
-        for (const a of FORMS) {
-            for (const b of FORMS) {
-                const value = measureValue(kind, [0, 0, 0], [1, 2, 3], a, b, AXES);
-                expect(typeof value.value).toBe('number');
-                expect(Number.isNaN(value.value)).toBe(false);
-            }
-        }
-    });
-
-    test('an angle between nothing is zero, not an exception', () => {
-        expect(measureValue('projected_angle', [0, 0, 0], [1, 0, 0], {}, {}, AXES))
-            .toEqual({ unit: 'angle', value: 0 });
-    });
+    // The arc is built for every angle on every frame, inside the render loop.
+    // A throw there stops the frame -- which has happened: an arc built from a
+    // form that had no direction took the whole viewer down until a reload. A
+    // measurement that describes nothing should draw nothing, not stop
+    // everything.
+    //
+    // What a measurement comes to is the runner's now, so the value side of
+    // this lives with it -- see TestWhatTheRunnerSettles. What is still drawn
+    // from numbers here is the arc, and these are its edges.
+    const { angleArcPoints, hasDirection } = Measurements;
 
     test('rays of no length describe no corner, so no arc is drawn', () => {
         // Sweeping them would pile identical points on one spot, which reads as
@@ -874,39 +620,6 @@ describe('which space a measurement is judged in', () => {
         // Only the 3D view has no sheet to project onto.
         expect(measureSpace({}, {})).toBe('projected');
         expect(measureSpace(null, null)).toBe('projected');
-    });
-});
-
-describe('whether two solid features run together', () => {
-    // A normal is not a direction, and getting that backwards calls an edge
-    // lying in a face a crossing.
-    const { solidParallel, solidForm } = Measurements;
-    const face = (normal) => solidForm({ kind: 'plane', normal });
-    const edge = (direction) => solidForm({ kind: 'line', direction });
-
-    test('two faces are parallel when their NORMALS align', () => {
-        expect(solidParallel(face([0, 0, 1]), face([0, 0, -1]))).toBe(true);
-        expect(solidParallel(face([0, 0, 1]), face([1, 0, 0]))).toBe(false);
-    });
-
-    test('two edges when their DIRECTIONS do', () => {
-        expect(solidParallel(edge([1, 0, 0]), edge([-1, 0, 0]))).toBe(true);
-        expect(solidParallel(edge([1, 0, 0]), edge([0, 1, 0]))).toBe(false);
-    });
-
-    test('but an edge and a face when they are SQUARE to each other', () => {
-        // The edge lies in the plane exactly when it runs across the normal.
-        expect(solidParallel(edge([1, 0, 0]), face([0, 0, 1]))).toBe(true);
-        expect(solidParallel(edge([0, 0, 1]), face([0, 0, 1]))).toBe(false);
-    });
-
-    test('and the answer does not depend on which was picked first', () => {
-        expect(solidParallel(face([0, 0, 1]), edge([1, 0, 0])))
-            .toBe(solidParallel(edge([1, 0, 0]), face([0, 0, 1])));
-    });
-
-    test('a feature with no orientation cannot be compared', () => {
-        expect(solidParallel(solidForm({ kind: 'point' }), face([0, 0, 1]))).toBeNull();
     });
 });
 

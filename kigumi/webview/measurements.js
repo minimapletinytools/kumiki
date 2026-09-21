@@ -16,62 +16,9 @@
     //
     // Pure on purpose: the projecting is the viewer's, the arithmetic is here.
 
-    // How square something has to be to the view before it counts as square:
-    // an edge a hair off end-on still projects to a line, just a very short
-    // one, and calling it a point would refuse a dimension that is drawable.
-    const ALIGNMENT_EPSILON = 1e-3;
 
-    // Two projected lines within this of parallel are treated as parallel: the
-    // angle between them would be a number nobody wrote down deliberately, and
-    // their separation is what was meant.
-    const PARALLEL_EPSILON = 1e-2;
 
-    /**
-     * What a feature looks like once projected into a viewport.
-     *
-     * This, not what the feature is, decides what can be measured: a face seen
-     * edge-on behaves as a line, an edge seen end-on behaves as a point, and a
-     * face seen at any other angle covers the view and cannot be dimensioned at
-     * all.
-     */
-    function projectedForm(geometry, look) {
-        if (!geometry || !geometry.kind) {
-            return { form: 'none' };
-        }
-        const gaze = normalized(look);
-        if (geometry.kind === 'point') {
-            return { form: 'point' };
-        }
-        if (geometry.kind === 'line') {
-            const direction = normalized(geometry.direction || [0, 0, 0]);
-            const alongView = Math.abs(dot(direction, gaze));
-            return alongView > 1 - ALIGNMENT_EPSILON
-                ? { form: 'point' }
-                : { form: 'line', direction: flatten(direction, gaze) };
-        }
-        if (geometry.kind === 'plane') {
-            const normal = normalized(geometry.normal || [0, 0, 0]);
-            const facingView = Math.abs(dot(normal, gaze));
-            if (facingView > ALIGNMENT_EPSILON) {
-                // Not edge-on: it covers the view, and an area has no distance.
-                return { form: 'area' };
-            }
-            // Edge-on, so it draws as a line running along the plane, square to
-            // its normal and to the line of sight.
-            return { form: 'line', direction: cross(normal, gaze) };
-        }
-        return { form: 'none' };
-    }
 
-    /** The part of a direction that survives projection. */
-    function flatten(direction, gaze) {
-        const along = dot(direction, gaze);
-        return normalized([
-            direction[0] - gaze[0] * along,
-            direction[1] - gaze[1] * along,
-            direction[2] - gaze[2] * along,
-        ]);
-    }
 
     function cross(a, b) {
         return normalized([
@@ -86,23 +33,7 @@
         return size > 0 ? [v[0] / size, v[1] / size, v[2] / size] : [0, 0, 0];
     }
 
-    /**
-     * Which kinds each projected pair admits, best first.
-     *
-     * The same table kumiki.drawing.kinds_for holds, and it is checked against
-     * that one by a test -- two copies of a rule is how a rule drifts. Kept
-     * here as well because the projection itself needs a camera, so the viewer
-     * is the only place that knows which pair it is looking at.
-     *
-     * Names are composed from the kind's parts: space, then direction, then
-     * operation. Everything here is projected, since that is what a sheet has.
-     */
-    /**
-     * The older names, as kumiki.drawing reads them too.
-     *
-     * `aligned` and `perpendicular` both become one kind: between two points
-     * the shortest distance IS the distance, which is why the two collapsed.
-     */
+
     /** The kinds the solid admits, by their composed names. */
     const SOLID_KIND_NAMES = Object.freeze(['angle', 'perpendicular_distance']);
 
@@ -112,6 +43,12 @@
     /** How far past the arc the label sits, as a multiple of the radius. */
     const ANGLE_LABEL_REACH = 1.28;
 
+    /**
+     * The older names, as kumiki.drawing reads them too.
+     *
+     * `aligned` and `perpendicular` both become one kind: between two points
+     * the shortest distance IS the distance, which is why the two collapsed.
+     */
     const LEGACY_KINDS = Object.freeze({
         aligned: 'projected_perpendicular_distance',
         perpendicular: 'projected_perpendicular_distance',
@@ -205,124 +142,12 @@
         };
     }
 
-    const PROJECTED_RULES = Object.freeze({
-        'point-point': Object.freeze([
-            'projected_perpendicular_distance',
-            'projected_horizontal_distance',
-            'projected_vertical_distance',
-        ]),
-        'line-point': Object.freeze(['projected_perpendicular_distance']),
-        'line-line-parallel': Object.freeze(['projected_perpendicular_distance']),
-        'line-line-crossing': Object.freeze(['projected_angle']),
-    });
 
-    /**
-     * What a feature IS, with nothing projected away.
-     *
-     * The 3D view's camera belongs to the reader and turns as they look around,
-     * so a feature there cannot be classified by how it happens to appear: a
-     * face is a plane whatever angle it is seen from. Asking projectedForm
-     * there called every face not seen exactly edge-on an 'area' -- nothing to
-     * measure -- which is nearly all of them.
-     *
-     * PYTHON HAS A COPY OF THIS, as solid_form in drawing.py, and a test runs
-     * the two against each other.
-     */
-    function solidForm(geometry) {
-        if (!geometry || !geometry.kind) {
-            return { form: 'none' };
-        }
-        if (geometry.kind === 'point') {
-            return { form: 'point' };
-        }
-        if (geometry.kind === 'line') {
-            return { form: 'line', direction: normalized(geometry.direction || [0, 0, 0]) };
-        }
-        if (geometry.kind === 'plane') {
-            // The NORMAL, under its own name. It was carried as `direction`
-            // once, which is the field meaning "the way this feature runs as
-            // drawn" -- so an angle between two faces built its arc out of two
-            // normals and pointed at nothing.
-            return { form: 'plane', normal: normalized(geometry.normal || [0, 0, 0]) };
-        }
-        return { form: 'none' };
-    }
 
-    /** What a solid form is oriented by: a line's direction, a plane's normal. */
-    function orientationOf(form) {
-        return (form && (form.normal || form.direction)) || null;
-    }
 
-    /**
-     * Whether two solid features run together.
-     *
-     * Two planes are parallel when their NORMALS align and two lines when their
-     * DIRECTIONS do -- but a line is parallel to a plane when it runs square to
-     * the normal, the opposite test. One carries a normal and the other a
-     * direction, so comparing them as though both were directions would call a
-     * line lying in a plane a crossing.
-     */
-    function solidParallel(formA, formB) {
-        const one = orientationOf(formA);
-        const other = orientationOf(formB);
-        if (!one || !other) {
-            return null;
-        }
-        const alignment = Math.abs(dot(one, other));
-        return formA.form === formB.form
-            ? alignment > 1 - PARALLEL_EPSILON
-            : alignment < PARALLEL_EPSILON;
-    }
 
-    /**
-     * Which kinds this pair admits in the 3D view, best first.
-     *
-     * No camera comes into it: what a pair admits in the solid does not depend
-     * on where anyone is standing. Two flat features that cross admit an angle;
-     * anything else admits the distance between them.
-     */
-    function solidKinds(formA, formB) {
-        if (formA.form === 'none' || formB.form === 'none') {
-            return [];
-        }
-        const flat = (form) => form === 'line' || form === 'plane';
-        if (flat(formA.form) && flat(formB.form) && solidParallel(formA, formB) === false) {
-            return ['angle'];
-        }
-        return ['perpendicular_distance'];
-    }
 
-    /**
-     * Which kinds this pair admits in this viewport, best first.
-     *
-     * Empty when there is nothing to measure -- a face that is not edge-on, or
-     * two features that project onto each other. The caller says why rather
-     * than drawing nothing without explanation.
-     */
-    function availableKinds(formA, formB) {
-        if (formA.form === 'none' || formB.form === 'none') {
-            return [];
-        }
-        if (formA.form === 'area' || formB.form === 'area') {
-            // A face seen at an angle covers the view: there is no line to
-            // measure to, and its centre is a point about nothing.
-            return [];
-        }
-        const forms = [formA.form, formB.form].sort().join('-');
-        if (forms === 'line-line') {
-            // Parallel ones have a separation, crossing ones an angle.
-            const alignment = Math.abs(dot(formA.direction, formB.direction));
-            return alignment > 1 - PARALLEL_EPSILON
-                ? PROJECTED_RULES['line-line-parallel']
-                : PROJECTED_RULES['line-line-crossing'];
-        }
-        return PROJECTED_RULES[forms] || [];
-    }
 
-    /** Whether a measurement asking for `kind` can be drawn from these forms. */
-    function kindApplies(kind, formA, formB) {
-        return availableKinds(formA, formB).indexOf(normalizeKind(kind)) !== -1;
-    }
 
     /** a - b, as a plain triple. */
     function subtract(a, b) {
@@ -337,141 +162,7 @@
         return Math.sqrt(dot(v, v));
     }
 
-    /**
-     * How far apart two world points are, seen from a given direction.
-     *
-     * The component along the line of sight is dropped, because it is the part
-     * a projection does not show. Two points separated only in depth are zero
-     * apart here, which is the degenerate case a viewport has to refuse rather
-     * than dimension.
-     */
-    function projectedSeparation(a, b, look) {
-        const delta = subtract(b, a);
-        const gaze = length(look) > 0 ? look : [0, 0, 1];
-        const unit = length(gaze);
-        const along = dot(delta, gaze) / (unit * unit);
-        return length([
-            delta[0] - gaze[0] * along,
-            delta[1] - gaze[1] * along,
-            delta[2] - gaze[2] * along,
-        ]);
-    }
 
-    /**
-     * What one measurement comes to, in world units or degrees.
-     *
-     * Everything is computed with the depth taken out first, because a drawing
-     * is a projection and the number it carries is the one seen in the view.
-     */
-    function measureValue(kind, from, to, formA, formB, axes) {
-        const gaze = normalized(axes.look);
-        const delta = subtract(to, from);
-        const along = dot(delta, gaze);
-        const flat = [
-            delta[0] - gaze[0] * along,
-            delta[1] - gaze[1] * along,
-            delta[2] - gaze[2] * along,
-        ];
-
-        const named = kindName(kind, axes && axes.space);
-
-        if (named === 'angle') {
-            // From the RAYS when the measurement has them: they are the two
-            // ways the corner opens, so the number and the arc drawn from them
-            // are one answer. Normals alone cannot tell 45 degrees from 135 --
-            // they give the same absolute dot either way -- which is the whole
-            // reason the side has to be settled where the corner is.
-            if (axes && axes.rays
-                    && hasDirection(axes.rays.from) && hasDirection(axes.rays.to)) {
-                const facing = Math.max(-1, Math.min(1,
-                    dot(normalized(axes.rays.from), normalized(axes.rays.to))));
-                return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
-            }
-            // No rays: a pair that makes no corner, or an older measurement.
-            const one = orientationOf(formA);
-            const other = orientationOf(formB);
-            if (!hasDirection(one) || !hasDirection(other)) {
-                // Nothing to take an angle between. Answered rather than
-                // thrown: this runs for every measurement on every frame,
-                // inside the render loop, and a throw there stops the frame --
-                // which has happened, and froze the viewer until a reload.
-                return { unit: 'angle', value: 0 };
-            }
-            const facing = Math.min(1, Math.abs(dot(one, other)));
-            const between = Math.acos(facing) * 180 / Math.PI;
-            return {
-                unit: 'angle',
-                value: formA.form === formB.form ? between : 90 - between,
-            };
-        }
-        if (named === 'perpendicular_distance') {
-            // In the solid, so the whole separation rather than the part of it
-            // that survives a projection.
-            const plane = formA.form === 'plane' && hasDirection(formA.normal) ? formA
-                : (formB.form === 'plane' && hasDirection(formB.normal) ? formB : null);
-            if (plane) {
-                // To a plane, the distance is taken along its normal.
-                return {
-                    unit: 'length',
-                    value: Math.abs(dot(delta, normalized(plane.normal))),
-                };
-            }
-            const solidLine = formA.form === 'line' && hasDirection(formA.direction) ? formA
-                : (formB.form === 'line' && hasDirection(formB.direction) ? formB : null);
-            if (solidLine === null) {
-                return { unit: 'length', value: length(delta) };
-            }
-            const along = normalized(solidLine.direction);
-            const slide = dot(delta, along);
-            return {
-                unit: 'length',
-                value: length([
-                    delta[0] - along[0] * slide,
-                    delta[1] - along[1] * slide,
-                    delta[2] - along[2] * slide,
-                ]),
-            };
-        }
-        if (named === 'projected_angle') {
-            if (!hasDirection(formA.direction) || !hasDirection(formB.direction)) {
-                // Two lines with no direction subtend nothing. Answered rather
-                // than thrown: this runs for every measurement on every frame.
-                return { unit: 'angle', value: 0 };
-            }
-            const facing = Math.min(1, Math.abs(dot(formA.direction, formB.direction)));
-            return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
-        }
-        if (named === 'projected_horizontal_distance') {
-            return { unit: 'length', value: Math.abs(dot(flat, normalized(axes.right))) };
-        }
-        if (named === 'projected_vertical_distance') {
-            return { unit: 'length', value: Math.abs(dot(flat, normalized(axes.up))) };
-        }
-        if (named === 'projected_perpendicular_distance') {
-            // Between two points there is no line to be square to, and the
-            // shortest distance is just the distance -- which is what makes
-            // this one kind rather than the two it used to be.
-            const line = formA.form === 'line' && hasDirection(formA.direction) ? formA
-                : (formB.form === 'line' && hasDirection(formB.direction) ? formB : null);
-            if (line === null) {
-                return { unit: 'length', value: length(flat) };
-            }
-            // Square to whichever of the two is a line: for a point and a line
-            // that is the point's distance from it, and for two parallel lines
-            // the gap between them.
-            const direction = normalized(line.direction);
-            const slide = dot(flat, direction);
-            return {
-                unit: 'length',
-                value: length([
-                    flat[0] - direction[0] * slide,
-                    flat[1] - direction[1] * slide,
-                    flat[2] - direction[2] * slide,
-                ]),
-            };
-        }
-        return { unit: 'length', value: length(flat) };
-    }
 
     /**
      * The arc of an angle dimension, around where the two lines cross.
@@ -588,9 +279,6 @@
         };
     }
 
-    // Under this, in world units, the two have projected onto each other and
-    // there is nothing between them to dimension.
-    const DEGENERATE_WORLD = 1e-6;
 
     /**
      * Whether a measurement can be drawn in this viewport, and what it comes to.
@@ -883,38 +571,25 @@
     }
 
     const KigumiMeasurements = {
-        PROJECTED_RULES,
         BROKEN_REASONS,
         isBroken,
         measurementKey,
         offsetForPointer,
         anchorReference,
         normalizeKind,
-        projectedForm,
         measureSpace,
         kindName,
         kindWire,
-        solidForm,
-        orientationOf,
         hasDirection,
-        solidKinds,
-        solidParallel,
         measurementStatus,
         settledStatus,
         planeMatchesView,
         PLANE_MATCH_EPSILON,
-        availableKinds,
-        kindApplies,
-        projectedSeparation,
-        measureValue,
         dimensionLayout,
         angleLayout,
         angleArcPoints,
         angleLabelPoint,
         DEGENERATE_PIXELS,
-        DEGENERATE_WORLD,
-        ALIGNMENT_EPSILON,
-        PARALLEL_EPSILON,
     };
 
     if (typeof module !== 'undefined' && module.exports) {

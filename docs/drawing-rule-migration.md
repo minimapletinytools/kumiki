@@ -5,9 +5,8 @@ and about 120 lines of `for i in range(3)` -- instead of using the `Matrix`/`V3`
 types and helpers in `rule.py`, which every other file in the library uses. This
 is the plan for moving it over.
 
-Status: **Stages 0-4 are done, and both steps of the seam change.** What is
-left is one call: whether the now-unreached copy in measurements.js comes out.
-Baseline recorded below.
+Status: **done.** Stages 0-4, and both steps of the seam change. The viewer
+no longer keeps a copy of the measurement rules. Baseline recorded below.
 
 ## Why it is the way it is
 
@@ -647,21 +646,43 @@ second derivation of these rules, and three shipped bugs had come from it. There
 is no second derivation to disagree now, so what replaces it is structural. The
 reasoning is left as a comment where it was.
 
-### What is still duplicated
+### What was duplicated, and is not any more
 
-`projectedForm`, `solidForm`, `availableKinds`, `solidKinds`, `solidParallel`,
-`measureValue`, `projectedSeparation`, `kindApplies` and the three epsilons are
-**still in measurements.js**, still exported, still checked against python by
-the remaining parity tests -- and **no longer reached by the viewer**. The one
-live reference left is `status.available || (...)` in `_focusedMeasurement`,
-which cannot fire now that every settled answer carries `available`.
+Gone from `measurements.js`: `projectedForm`, `solidForm`, `availableKinds`,
+`solidKinds`, `solidParallel`, `kindApplies`, `projectedSeparation`,
+`measureValue`, `orientationOf`, `PROJECTED_RULES`, `ALIGNMENT_EPSILON`,
+`PARALLEL_EPSILON` and `DEGENERATE_WORLD` -- about 14k of the file. What stays
+is what the viewer alone can do: `planeMatchesView` (the one camera question),
+the page geometry (`dimensionLayout`, `angleArcPoints`, `angleLabelPoint`,
+`angleLayout`, `offsetForPointer`), and the wire plumbing (`kindName`,
+`kindWire`, `anchorReference`, `measurementKey`, `settledStatus`,
+`measurementStatus`, `isBroken`).
 
-Whether to delete them is a real question rather than a formality. They stopped
-being a second live copy that could drift, which is what the parity tests were
-for. But they are now a second *implementation* of the rules, written from the
-same spec, checked against python over a case matrix that deliberately straddles
-the epsilons -- and that is an independent check of python's tables which
-deleting would lose. Left in deliberately, pending that call.
+`hasDirection` and the small vector helpers stay too -- `angleArcPoints` sweeps
+an arc and needs them. `SOLID_KIND_NAMES` stays: `kindName` reads it to tell a
+solid `angle` from the projected one, which is naming rather than judging.
+
+Three things moved rather than vanished:
+
+- **The parity tests.** `TestTheViewerAgrees` ran python against the viewer's
+  copy over a case matrix that straddled the epsilons. There is no second copy,
+  so it is gone, with a note where it stood saying why.
+- **The i18n check.** `kigumi/__tests__/i18n.test.js` generated every kind name
+  the rules can produce, by running the viewer's rules, and asserted each has an
+  `en` and `ja` entry -- so a kind nobody translated shows the reader a key. It
+  is now `TestEveryKindHasANameAPersonWouldUse` in `test_measurement_kinds.py`,
+  reading the same locale files and still GENERATING the list rather than
+  hard-coding it, which was the whole point of it. Verified both ways: the six
+  kinds the rules produce and the six keys in `en.json` match exactly.
+- **The render-loop safety tests.** `a frame is never stopped by one bad
+  measurement` kept the three that exercise `angleArcPoints` and
+  `hasDirection`, which still run every frame. Its `measureValue` tests went;
+  the value is the runner's now.
+
+The one live reference left in the viewer, `status.available || (...)` in
+`_focusedMeasurement`, is gone with them -- every settled answer carries
+`available`, and a measurement the runner could not place offers none, which is
+the truth about it rather than a gap.
 
 This is **not** a performance problem -- a few dot products per measurement per
 frame is nothing. The cost is maintenance, and it is why `drawing.py` is written

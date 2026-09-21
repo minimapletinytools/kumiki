@@ -1,14 +1,14 @@
 """Measurement kinds: what a dimension is measuring (kumiki/drawing.py).
 
-The rules live here and in the viewer, because the projection needs a camera
-and only the viewer has one. So the last test in this file checks the viewer's
-copy against this one by running it -- two copies of a table is how a table
-drifts.
+The rules live here and only here. They used to live in the viewer as well,
+because the projection needs a camera and only the viewer has one -- and this
+file ended with a test that ran the two against each other, since two copies of
+a table is how a table drifts. The runner settles a measurement where it
+resolves it now and sends the answer, so there is one copy and nothing to
+compare it against.
 """
 
 import json
-import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -245,150 +245,21 @@ class TestWhatTheSolidAdmits:
                     assert kind.direction is MeasurementDirection.PERPENDICULAR
 
 
-class TestTheViewerAgrees:
-    """The viewer's copy of the table, checked against this one by running it."""
-
-    def _viewer_rules(self):
-        node = shutil.which("node")
-        if node is None:
-            pytest.skip("node is not available")
-        script = (
-            "const m = require(%s);"
-            "process.stdout.write(JSON.stringify(m.PROJECTED_RULES));"
-            % json.dumps(str(Path(__file__).resolve().parent.parent
-                             / "kigumi" / "webview" / "measurements.js"))
-        )
-        out = subprocess.run([present(node, "node on PATH"), "-e", script], capture_output=True, text=True, timeout=60)
-        assert out.returncode == 0, out.stderr
-        return json.loads(out.stdout)
-
-    #: Geometry to project, spanning every answer projected_form can give.
-    CASES = [
-        {"kind": "point", "at": [0, 0, 0]},
-        {"kind": "line", "direction": [1, 0, 0]},
-        {"kind": "line", "direction": [0, 1, 0]},          # end-on: a point
-        {"kind": "line", "direction": [0, 0.9995, 0.03]},  # a hair off end-on
-        # Straddling ALIGNMENT_EPSILON, so the two sides disagree the moment
-        # either moves its threshold. Without a case in the gap this comparison
-        # passes whatever the epsilons are, which is a test of nothing.
-        {"kind": "line", "direction": [0.0999, 0.995, 0]},
-        {"kind": "plane", "normal": [1, 0.005, 0]},
-        {"kind": "line", "direction": [1, 1, 0]},          # oblique
-        {"kind": "plane", "normal": [0, 0, 1]},            # edge-on: a line
-        {"kind": "plane", "normal": [0, 1, 0]},            # facing: an area
-        {"kind": "plane", "normal": [0, 1, 0.0005]},       # barely off facing
-        {"kind": "plane", "normal": [1, 1, 0]},            # oblique
-        None,                                              # nothing to measure
-    ]
-    LOOKS = [[0, 1, 0], [0, -1, 0], [1, 0, 0], [0.577, 0.577, 0.577]]
-
-    def _viewer_forms(self):
-        node = shutil.which("node")
-        if node is None:
-            pytest.skip("node is not available")
-        script = (
-            "const m = require(%s);"
-            "const cases = %s, looks = %s;"
-            "const out = [];"
-            "for (const look of looks) { for (const g of cases) {"
-            "  const f = m.projectedForm(g, look);"
-            "  out.push([f.form, f.direction || null]); } }"
-            "process.stdout.write(JSON.stringify(out));"
-            % (json.dumps(str(Path(__file__).resolve().parent.parent
-                              / "kigumi" / "webview" / "measurements.js")),
-               json.dumps(self.CASES), json.dumps(self.LOOKS))
-        )
-        out = subprocess.run([present(node, "node on PATH"), "-e", script],
-                             capture_output=True, text=True, timeout=60)
-        assert out.returncode == 0, out.stderr
-        return json.loads(out.stdout)
-
-    def _viewer_solid(self):
-        node = shutil.which("node")
-        if node is None:
-            pytest.skip("node is not available")
-        script = (
-            "const m = require(%s);"
-            "const cases = %s;"
-            "const out = [];"
-            "for (const a of cases) { for (const b of cases) {"
-            "  out.push(m.solidKinds(m.solidForm(a), m.solidForm(b))); } }"
-            "process.stdout.write(JSON.stringify(out));"
-            % (json.dumps(str(Path(__file__).resolve().parent.parent
-                              / "kigumi" / "webview" / "measurements.js")),
-               json.dumps(self.CASES))
-        )
-        out = subprocess.run([present(node, "node on PATH"), "-e", script],
-                             capture_output=True, text=True, timeout=60)
-        assert out.returncode == 0, out.stderr
-        return json.loads(out.stdout)
-
-    def test_the_two_solid_tables_say_the_same_thing(self):
-        """The 3D view's rule, in python and in the viewer's copy of it.
-
-        The same reason the projected pair are checked against each other: two
-        copies of a table is how a table drifts.
-        """
-        from kumiki.drawing import solid_kinds
-
-        theirs = self._viewer_solid()
-        mine = [[kind.name for kind in solid_kinds(geometry(a), geometry(b))]
-                for a in self.CASES for b in self.CASES]
-
-        assert theirs == mine
-
-    def test_the_two_projections_say_the_same_thing(self):
-        """The rule the runner prefers features by, and the one the viewer draws by.
-
-        The viewer keeps a copy because it projects on every pointer move and
-        cannot ask python each time. Two copies of a rule is how a rule drifts,
-        so they are run against each other here.
-        """
-        from kumiki.drawing import projected_form
-
-        mine = []
-        for look in self.LOOKS:
-            for case in self.CASES:
-                form, direction = projected_form(geometry(case), look)
-                mine.append([
-                    form.value if form is not None else "none",
-                    list(direction) if direction is not None else None,
-                ])
-
-        theirs = self._viewer_forms()
-        assert len(theirs) == len(mine)
-        for (form, direction), (their_form, their_direction) in zip(mine, theirs):
-            assert form == their_form
-            if direction is None or their_direction is None:
-                assert direction is None and their_direction is None
-            else:
-                assert direction == pytest.approx(their_direction, abs=1e-9)
-
-    # `test_a_written_measurement_is_judged_the_way_a_pick_is` lived here, and
-    # is gone with what it guarded. It ran measurementStatus over this case
-    # matrix because the viewer used to work out for itself what an already
-    # written measurement admitted -- a second derivation of these same rules,
-    # and the source of three shipped bugs: it judged in the wrong space, it
-    # upgraded a solid kind's name to the projected one, and it compared a
-    # structured kind against a list of names.
-    #
-    # The runner settles that now and sends it, so there is no second
-    # derivation left to disagree. What replaces the test is structural rather
-    # than another comparison: see TestWhatTheRunnerSettles in
-    # tests/test_measurement_end_to_end.py for the rules themselves, and
-    # "the runner settles what a measurement comes to" in
-    # kigumi/__tests__/measurements.test.js for the viewer reporting them
-    # unchanged.
-
-    def test_the_two_tables_say_the_same_thing(self):
-        expected = {
-            "point-point": [k.name for k in kinds_for(POINT, POINT, PROJECTED)],
-            "line-point": [k.name for k in kinds_for(POINT, LINE, PROJECTED)],
-            "line-line-parallel": [k.name for k in kinds_for(LINE, LINE, PROJECTED, parallel=True)],
-            "line-line-crossing": [k.name for k in kinds_for(LINE, LINE, PROJECTED, parallel=False)],
-        }
-
-        assert self._viewer_rules() == expected
+# `TestTheViewerAgrees` stood here, and is gone with the thing it watched.
+#
+# The viewer kept its own copy of these rules -- projectedForm, solidForm, the
+# kinds tables, measureValue and the epsilons -- because it projects on every
+# pointer move and could not ask python each time. Two copies of a rule is how
+# a rule drifts, so this class ran the two against each other over a case
+# matrix that deliberately straddled the epsilons.
+#
+# The runner settles a measurement where it resolves it now and sends the
+# answer, so measurements.js has no copy left to disagree with. What the tests
+# guarded is not a rule anyone still has to keep in two places; it is one
+# place. The case matrix they used lives on in this file's own tests, which is
+# where the rules are.
+#
+# See docs/drawing-rule-migration.md for how it got here.
 
 
 class TestAnchorsAreWrittenInOneOrder:
@@ -592,3 +463,66 @@ class TestMeasuringAFaceToAnEdge:
         other = Measure(self._face(), self._edge())
 
         assert one.anchor_a.identity() == other.anchor_a.identity()
+
+
+class TestEveryKindHasANameAPersonWouldUse:
+    """Each kind the rules can produce is translated, in every locale.
+
+    The kind dropdown labels each entry `viewer.measure.kind.<name>`, and a
+    missing key falls through as the key itself -- so a kind nobody translated
+    shows the reader a code reference. The solid kinds arrived without entries
+    and did exactly that.
+
+    This lived in kigumi/__tests__/i18n.test.js, which generated the list by
+    running the viewer's own copy of the rules. There is one copy now and it is
+    here, so the test is here: the point of it is that the list is GENERATED --
+    a kind nobody thought of is still checked -- and a hand-written list would
+    give that up.
+    """
+
+    #: Enough geometry to reach every kind the tables can name, in both spaces.
+    SHAPES = [
+        {"kind": "point", "at": [0, 0, 0]},
+        {"kind": "line", "at": [0, 0, 0], "direction": [1, 0, 0]},
+        {"kind": "line", "at": [0, 0, 0], "direction": [0, 1, 0]},
+        {"kind": "plane", "at": [0, 0, 0], "normal": [0, 0, 1]},
+        {"kind": "plane", "at": [0, 0, 0], "normal": [1, 0, 0]},
+        {"kind": "plane", "at": [0, 0, 0], "normal": [0, 0, -1]},
+    ]
+    LOOK = [0, 0, -1]
+
+    def _every_kind(self):
+        from kumiki.drawing import projected_kinds, solid_kinds
+
+        names = set()
+        for one in self.SHAPES:
+            for other in self.SHAPES:
+                a, b = geometry(one), geometry(other)
+                for kind in projected_kinds(a, b, self.LOOK):
+                    names.add(kind.name)
+                for kind in solid_kinds(a, b):
+                    names.add(kind.name)
+        return sorted(names)
+
+    def _catalogue(self, locale):
+        path = (Path(__file__).resolve().parent.parent
+                / "kigumi" / "i18n" / "locales" / f"{locale}.json")
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_the_rules_produce_kinds_to_check_in_both_spaces(self):
+        # Otherwise the two tests below check nothing at all.
+        assert set(self._every_kind()) >= {
+            "projected_perpendicular_distance", "projected_angle",
+            "perpendicular_distance", "angle",
+        }
+
+    @pytest.mark.parametrize("locale", ["en", "ja"])
+    def test_every_kind_is_named_in_this_locale(self, locale):
+        catalogue = self._catalogue(locale)
+
+        missing = [name for name in self._every_kind()
+                   if not isinstance(catalogue.get(f"viewer.measure.kind.{name}"), str)]
+
+        assert not missing, (
+            f"{locale}.json has no name for {missing} -- the dropdown would show "
+            f"the key itself")

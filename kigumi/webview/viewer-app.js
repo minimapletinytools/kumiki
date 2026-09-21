@@ -3545,18 +3545,12 @@ class KigumiViewerApp extends LitElement {
             status,
             // Every kind this pair admits here, refusals included: a measurement
             // whose kind this view cannot draw, or one that comes to zero, is
-            // the one most worth offering another kind for. measurementStatus
-            // carries them on some answers only, but carries the forms they are
-            // worked out from on every answer that got far enough to have any.
-            // In the space it was judged in: the forms carried on the status
-            // are solid ones for a 3D measurement, and asking the sheet's rule
-            // about a pair of PLANES gets nothing, since a sheet never has any.
-            available: status.available
-                || (status.formA && status.formB
-                    ? (status.space === '3d'
-                        ? KigumiMeasurements.solidKinds(status.formA, status.formB)
-                        : KigumiMeasurements.availableKinds(status.formA, status.formB))
-                    : []),
+            // the one most worth offering another kind for. The runner settles
+            // them and sends them with every answer, refusals included, so
+            // there is nothing to work out here and nothing to fall back to --
+            // a measurement it could not place offers none, which is the truth
+            // about it rather than a gap.
+            available: status.available || [],
         };
     }
 
