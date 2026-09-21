@@ -631,7 +631,10 @@ class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
         sys.modules["kigumi_runner_preview2"] = runner
         spec.loader.exec_module(runner)
 
-        nothing = {"anchors": None, "angle": None}
+        # `settled` rides along with the placement -- what the measurement
+        # would come to, so the preview shows the number the finished one will
+        # carry rather than working it out a second time in the viewer.
+        nothing = {"anchors": None, "angle": None, "settled": None}
         assert runner._pick_placement(None, None, None, {}, None) == nothing
         assert runner._pick_placement(
             None, None, None, {"heldReference": {"timber": "t"}}, None) == nothing

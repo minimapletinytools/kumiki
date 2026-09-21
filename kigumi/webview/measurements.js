@@ -649,6 +649,28 @@
         return (options && options.space) || 'projected';
     }
 
+    /**
+     * The runner's answer, in the shape this file has always returned.
+     *
+     * A translation and nothing else: no rule is applied here. `reason` arrives
+     * in the same words and the same order measurementStatus uses below, so a
+     * dimension that is not drawn and a row that says why cannot disagree --
+     * which two derivations of the same verdict eventually do.
+     */
+    function settledStatus(settled) {
+        const shared = {
+            kind: settled.kind ? kindName(settled.kind, settled.space) : null,
+            available: settled.available || [],
+            space: settled.space,
+            formA: settled.a || null,
+            formB: settled.b || null,
+        };
+        if (settled.reason) {
+            return Object.assign({ drawable: false, reason: settled.reason }, shared);
+        }
+        return Object.assign({ drawable: true, value: settled.value }, shared);
+    }
+
     function measurementStatus(measure, axes, options) {
         if (!measure || measure.unresolved || !measure.a || !measure.b
             || !measure.a.at || !measure.b.at) {
@@ -660,6 +682,17 @@
             // Not re-planed to match: that would quietly change the number
             // someone has already read off the sheet.
             return { drawable: false, reason: 'plane-mismatch', plane };
+        }
+        // Settled by the runner, which resolved the anchors and knows the rest.
+        // The value does not depend on the camera -- a measurement carries the
+        // plane it was taken on and is read against that -- so the only part
+        // left here is the question just asked above, which IS about the
+        // camera: does the view being drawn into show that plane.
+        //
+        // Everything past this point is the older path, for a measurement that
+        // reached the viewer without an answer attached.
+        if (measure.settled) {
+            return settledStatus(measure.settled);
         }
         const look = plane && plane.normal ? plane.normal : axes.look;
         // Which space this is judged in comes from the MEASUREMENT, not from
@@ -888,6 +921,7 @@
         solidKinds,
         solidParallel,
         measurementStatus,
+        settledStatus,
         planeMatchesView,
         PLANE_MATCH_EPSILON,
         availableKinds,

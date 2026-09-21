@@ -3789,6 +3789,8 @@ class KigumiViewerApp extends LitElement {
             plane: preview.plane || null,
             kind: preview.kind || null,
             angle: preview.angle || null,
+            // What it comes to, from the same verdict the picture came from.
+            settled: preview.settled || null,
         };
     }
 
@@ -3814,6 +3816,7 @@ class KigumiViewerApp extends LitElement {
             angle: verdict.angle || null,
             plane: verdict.plane || null,
             kind: verdict.kinds[0],
+            settled: verdict.settled || null,
         } : null;
         if (was || this._measurePreview) {
             this.renderMeasurements();

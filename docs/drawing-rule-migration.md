@@ -5,8 +5,8 @@ and about 120 lines of `for i in range(3)` -- instead of using the `Matrix`/`V3`
 types and helpers in `rule.py`, which every other file in the library uses. This
 is the plan for moving it over.
 
-Status: **Stage 0 and Stage 1 are done** (commit below). Stages 2-4 and the
-seam change in the appendix are not started. Baseline recorded below.
+Status: **Stage 0, Stage 1 and step A of the seam change are done.** Stages
+2-4 and step B of the seam change are not started. Baseline recorded below.
 
 ## Why it is the way it is
 
@@ -390,7 +390,7 @@ The seam change in the appendix is a separate track. Recommended order:
 | # | Work | Why here |
 | --- | --- | --- |
 | 1 | Stage 0 + Stage 1 | Fixes a live bug and a dead guard; behaviour-preserving otherwise, and the parity tests prove it |
-| 2 | Seam change (appendix) | Shrinks the mirrored surface from ~9 functions to ~1 |
+| 2 | Seam change, step A (appendix) | Makes python the one place the number is worked out |
 | 3 | Stage 2, Stage 3 | Much cheaper once little has to stay bit-compatible with JS |
 | 4 | Stage 4 | Cosmetic-ish; needs its own test |
 
@@ -522,14 +522,47 @@ recomputes the value beside them. `measuring-states.md` already states the rule
 this breaks: "The preview is drawn from the verdict, never from a second
 calculation."
 
-Proposed, separately from the stages above:
+### Step A -- done
 
-1. Push the settled `kind` and `value` into `_resolve_measurement`'s payload
-   (runner.py:2876). The viewer then needs `planeMatchesView` plus page layout.
-2. Same for the preview -- take the value from the verdict alongside the anchors
-   it already takes.
-3. What stays duplicated afterwards: `planeMatchesView` and its epsilon, and
-   whatever the viewer needs to keep drawing across a runner restart.
+`_resolve_measurement` now sends a `settled` block with every measurement:
+the kind it settled on, what it comes to, the kinds it admits, the space, the
+reason there is nothing to draw, and the two forms. `_pick_placement` sends the
+same block with the verdict, so the preview reads it too. `measurementStatus`
+asks its one camera question -- `planeMatchesView` -- and then returns what it
+was given.
+
+So the number the viewer draws is now the number python computed, for every
+measurement that gets drawn and for the preview. That closes the rule
+`measuring-states.md` already states and only half had: "the preview is drawn
+from the verdict, never from a second calculation" was true of the picture and
+not of the number beside it.
+
+Verified on the fixture: python's `settled` and the viewer's own derivation
+agree on value, kind and reason for all four measurements, and the kinds the
+change-kind menu offers are identical either way.
+
+### Step B -- not done
+
+**Nothing was deleted from measurements.js.** The evaluation path is still
+there, reached whenever a measurement arrives without a `settled` block, and
+that is a real case rather than mere caution: `settled` is set inside the
+`placeable` branch, so a measurement with no plane to be taken on -- no written
+one and no viewport camera -- has no answer python could compute, because
+classifying the ends needs a direction to look along.
+
+So the *correctness* win is banked (one derivation, not two) and the
+*maintenance* win is not (the second copy still exists). Retiring it needs that
+last case answered, one way or the other:
+
+- have the viewer refuse an un-placeable measurement outright rather than
+  evaluating it, which is arguably what "it could not be placed" already means; or
+- have python answer it, which means deciding what a measurement with no plane
+  comes to -- possibly "nothing", which is the same thing said in the other place.
+
+Only once that is settled can `projectedForm`, `solidForm`, `availableKinds`,
+`solidKinds`, `solidParallel`, `measureValue`, `projectedSeparation` and the
+three epsilons come out of measurements.js, along with the ~8 `describe` blocks
+covering them.
 
 This is **not** a performance problem -- a few dot products per measurement per
 frame is nothing. The cost is maintenance, and it is why `drawing.py` is written

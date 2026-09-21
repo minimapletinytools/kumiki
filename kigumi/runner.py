@@ -2097,7 +2097,7 @@ def _pick_placement(
     """
     from kumiki.drawing import (MeasurementSpace, angle_rays, distance_anchors)
 
-    empty = {"anchors": None, "angle": None}
+    empty = {"anchors": None, "angle": None, "settled": None}
     held = payload.get("heldReference")
     look = payload.get("look")
     if not held or not look or located_pick is None:
@@ -2126,11 +2126,22 @@ def _pick_placement(
     if not admitted:
         return empty
     kind = admitted[0]
-    if kind.operation.value == "angle":
-        return {"anchors": None, "angle": angle_rays(held_span, picked_span)}
     axes = {"look": look, "right": payload.get("right"), "up": payload.get("up")}
+    # The same answer a written measurement travels with, so the preview shows
+    # the number the finished one will carry rather than a second derivation of
+    # it. docs/measuring-states.md asks for exactly this and only half had it:
+    # the picture came from the verdict, the number was worked out again in the
+    # viewer.
+    ends = {"a": {"geometry": placed[0].get("geometry")}, "b": {"geometry": geometry}}
+    if kind.operation.value == "angle":
+        rays = angle_rays(held_span, picked_span)
+        settled = _settled_measurement(
+            {**ends, "angle": rays}, None, kind, admitted, solid, normal, axes)
+        return {"anchors": None, "angle": rays, "settled": settled}
     at_held, at_picked = distance_anchors(held_span, picked_span, kind, axes)
-    return {"anchors": {"a": list(at_held), "b": list(at_picked)}, "angle": None}
+    settled = _settled_measurement(ends, None, kind, admitted, solid, normal, axes)
+    return {"anchors": {"a": list(at_held), "b": list(at_picked)},
+            "angle": None, "settled": settled}
 
 
 def _root_csg_of(ss: Any, member_key: Optional[str]):
@@ -2892,10 +2903,11 @@ def _resolve_measurement(
     Only when the pair cannot be placed together does each fall back to a point
     of its own, which is what a feature that resolves to nothing else can offer.
     """
-    from kumiki.drawing import (MeasurementDirection, MeasurementKind,
-                               MeasurementOperation, MeasurementSpace,
-                               angle_rays, distance_anchors, projected_kinds,
-                               solid_kinds)
+    from kumiki.drawing import (DEGENERATE_SEPARATION, MeasurementDirection,
+                               MeasurementKind, MeasurementOperation,
+                               MeasurementSpace, angle_between, angle_rays,
+                               distance_anchors, pair_separation,
+                               projected_kinds, solid_kinds)
 
     resolved = dict(measure)
     broken = []
@@ -2955,7 +2967,92 @@ def _resolve_measurement(
             # two unrelated screen lines happened to cross -- often touching
             # neither of the features being measured.
             resolved["angle"] = angle_rays(spans["a"], spans["b"])
+        resolved["settled"] = _settled_measurement(
+            resolved, declared, kind, admitted, solid, plane, axes)
     return resolved
+
+
+def _settled_measurement(
+    resolved: Dict[str, Any], declared: Any, kind: Any, admitted: Any,
+    solid: bool, plane: Any, axes: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """What this measurement comes to, decided here and sent with it.
+
+    The viewer worked the same thing out for itself on every frame, from its own
+    copy of the rules in measurements.js. Two derivations of one number is how
+    the number drifts, and docs/measuring-states.md already asks for the other
+    one -- "the preview is drawn from the verdict, never from a second
+    calculation" -- which was true of the picture and not of the number beside
+    it.
+
+    It can be answered here because it does not depend on the camera: a
+    measurement carries the plane it was taken on, and the value is read against
+    that rather than against wherever the reader is standing. What the viewer
+    still decides for itself is whether the view it is drawing into IS that
+    plane, which is the one question a fixed answer cannot cover.
+
+    `reason` is why there is nothing to draw, in the same words and the same
+    order the viewer uses, so a row that says why and a dimension that is
+    missing cannot disagree.
+    """
+    from kumiki.drawing import (DEGENERATE_SEPARATION, MeasurementOperation,
+                                angle_between, pair_separation)
+
+    names = [one.name for one in admitted]
+    space = "3d" if solid else "projected"
+    settled = {"kind": kind.as_wire() if kind is not None else None,
+               "available": names, "space": space, "value": None, "reason": None,
+               "a": _settled_form(resolved["a"].get("geometry"), solid, plane),
+               "b": _settled_form(resolved["b"].get("geometry"), solid, plane)}
+    if not admitted:
+        settled["reason"] = "not-measurable"
+        return settled
+    if declared is not None and declared.name not in names:
+        settled["reason"] = "kind-unavailable"
+        return settled
+    if kind is None:
+        settled["reason"] = "not-measurable"
+        return settled
+
+    if kind.operation is MeasurementOperation.ANGLE:
+        # Off the RAYS, which are the two ways the corner opens -- so the number
+        # and the arc drawn from them are one answer. Normals alone give the
+        # same absolute dot for 45 degrees and 135.
+        value = angle_between(resolved.get("angle"))
+        settled["value"] = {"unit": "angle", "value": 0.0 if value is None else value}
+        return settled
+
+    # Against the measurement's own plane, not the viewport's: `plane` is
+    # already the one or the other, decided above.
+    length = pair_separation(
+        resolved["a"].get("geometry"), resolved["b"].get("geometry"), kind,
+        {**(axes or {}), "look": plane})
+    if length is None:
+        settled["reason"] = "not-measurable"
+        return settled
+    settled["value"] = {"unit": "length", "value": length}
+    if length < DEGENERATE_SEPARATION:
+        settled["reason"] = "degenerate"
+    return settled
+
+
+def _settled_form(geometry: Any, solid: bool, plane: Any) -> Dict[str, Any]:
+    """What one end behaves as, in the shape the viewer's own forms took.
+
+    Sent rather than classified there, so projected_form and solid_form stop
+    being two implementations of one rule. What crosses is the ANSWER -- a name
+    and the way the feature runs -- not the rule that reached it.
+    """
+    from kumiki.drawing import MeasurementFeature, projected_form, solid_form
+
+    form, run = solid_form(geometry) if solid else projected_form(geometry, plane)
+    if form is None:
+        return {"form": "none"}
+    if form is MeasurementFeature.PLANE:
+        return {"form": form.value, "normal": list(run) if run is not None else None}
+    if run is not None:
+        return {"form": form.value, "direction": list(run)}
+    return {"form": form.value}
 
 
 def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional[Dict[str, Any]]:

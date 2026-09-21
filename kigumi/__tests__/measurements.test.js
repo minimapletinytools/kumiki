@@ -992,3 +992,92 @@ describe('whether two solid features run together', () => {
         expect(solidParallel(solidForm({ kind: 'point' }), face([0, 0, 1]))).toBeNull();
     });
 });
+
+describe('the runner settles what a measurement comes to', () => {
+    // The value does not depend on the camera -- a measurement carries the
+    // plane it was taken on -- so it is worked out once, where the anchors are
+    // resolved, and sent with them. This file used to work it out again on
+    // every frame from its own copy of the rules, which is how two answers to
+    // one question drift apart.
+    const AXES = { look: [0, -1, 0], right: [1, 0, 0], up: [0, 0, 1] };
+    const ORTHO = { orthographic: true };
+    const point = (at) => ({ at, geometry: { kind: 'point', at } });
+
+    const settled = (over) => Object.assign({
+        kind: { operation: 'distance', space: 'projected', direction: 'perpendicular' },
+        available: ['projected_perpendicular_distance'],
+        space: 'projected',
+        value: { unit: 'length', value: 0.125 },
+        reason: null,
+        a: { form: 'point' },
+        b: { form: 'point' },
+    }, over || {});
+
+    const measure = (over) => Object.assign({
+        a: point([0, 0, 0]), b: point([1, 0, 1]), settled: settled(),
+    }, over || {});
+
+    test('the number drawn is the one the runner sent', () => {
+        // Deliberately not what this file would work out for the same two
+        // points, which is the diagonal. If the sent value did not win, this
+        // reads SQRT2.
+        const status = measurementStatus(measure(), AXES, ORTHO);
+
+        expect(status.drawable).toBe(true);
+        expect(status.value.value).toBe(0.125);
+    });
+
+    test('and so is the kind, by its composed name', () => {
+        expect(measurementStatus(measure(), AXES, ORTHO).kind)
+            .toBe('projected_perpendicular_distance');
+    });
+
+    test('and the kinds it offers to change to', () => {
+        const status = measurementStatus(
+            measure({ settled: settled({ available: ['projected_angle'] }) }), AXES, ORTHO);
+
+        expect(status.available).toEqual(['projected_angle']);
+    });
+
+    test('a refusal arrives with it, rather than being re-derived', () => {
+        const status = measurementStatus(
+            measure({ settled: settled({ reason: 'degenerate', value: null }) }), AXES, ORTHO);
+
+        expect(status.drawable).toBe(false);
+        expect(status.reason).toBe('degenerate');
+    });
+
+    test('the forms come across too, so nothing here classifies a feature', () => {
+        const status = measurementStatus(
+            measure({ settled: settled({ a: { form: 'plane', normal: [0, 0, 1] } }) }),
+            AXES, ORTHO);
+
+        expect(status.formA).toEqual({ form: 'plane', normal: [0, 0, 1] });
+    });
+
+    test('but whether THIS view shows that plane is still asked here', () => {
+        // The one question a settled answer cannot carry: it is about the
+        // camera, which belongs to the reader and moves.
+        const status = measurementStatus(
+            measure({ plane: { at: [0, 0, 0], normal: [1, 0, 0] } }), AXES, ORTHO);
+
+        expect(status.drawable).toBe(false);
+        expect(status.reason).toBe('plane-mismatch');
+    });
+
+    test('an unresolved measurement is still refused before anything else', () => {
+        const status = measurementStatus(
+            measure({ unresolved: ['a'] }), AXES, ORTHO);
+
+        expect(status.reason).toBe('unresolved');
+    });
+
+    test('without one, the older path still answers', () => {
+        // A measurement that reached the viewer with no answer attached.
+        const status = measurementStatus(
+            measure({ settled: undefined }), AXES, ORTHO);
+
+        expect(status.drawable).toBe(true);
+        expect(status.value.value).toBeCloseTo(Math.SQRT2, 9);
+    });
+});
