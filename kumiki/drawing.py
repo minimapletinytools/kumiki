@@ -7,9 +7,12 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
+from .geometry import Plane, intersect_planes
 from .identity import (DrawingId, FeaturePath, MeasurementId, TimberPath,
                        ViewportId, identity_order)
-from .rule import Numeric
+from .rule import (Matrix, Numeric, V3, are_vectors_parallel,
+                   are_vectors_perpendicular, create_v3, cross_product,
+                   safe_dot_product, safe_norm)
 
 
 class MeasurementSpace(Enum):
@@ -188,22 +191,39 @@ ALIGNMENT_EPSILON = 1e-3
 PARALLEL_EPSILON = 1e-2
 
 
-def _unit(vector: Sequence[float]) -> Tuple[float, float, float]:
-    size = math.sqrt(sum(float(part) * float(part) for part in vector))
-    if size == 0:
-        return (0.0, 0.0, 0.0)
-    return tuple(float(part) / size for part in vector)
+#: Anything that stands for a vector in here: a V3 already, or the lists and
+#: tuples a measurement arrives as off the wire. The helpers below take this so
+#: that a caller holding either does not have to say which.
+VectorLike = Union[V3, Sequence[float]]
 
 
-def _dot(a: Sequence[float], b: Sequence[float]) -> float:
-    return sum(float(x) * float(y) for x, y in zip(a, b))
+def _v3(vector: VectorLike) -> V3:
+    """Whatever arrived off the wire, as a vector. Lists, tuples and V3 alike."""
+    return vector if isinstance(vector, Matrix) else create_v3(*(float(p) for p in vector))
+
+
+def _unit(vector: VectorLike) -> V3:
+    """A unit vector, or a ZERO one where there is no direction to find.
+
+    Zero rather than the input, which is what safe_normalize_vector gives back:
+    four callers here test the result for zero to mean "no direction", and the
+    viewer's `normalized` returns [0, 0, 0] too (measurements.js). Returning the
+    input unchanged would make a zero direction look like a unit one.
+    """
+    found = _v3(vector)
+    size = safe_norm(found)
+    return found / size if size else create_v3(0, 0, 0)
+
+
+def _dot(a: VectorLike, b: VectorLike) -> float:
+    return safe_dot_product(_v3(a), _v3(b))
 
 
 # TODO rename look to normal probably
 # TODO use a real type for geometry. Why does this file have no types omg
 def projected_form(
-    geometry: Optional[Mapping], look: Sequence[float],
-) -> Tuple[MeasurementFeature, Optional[Tuple[float, float, float]]]:
+    geometry: Optional[Mapping], look: VectorLike,
+) -> Tuple[Optional[MeasurementFeature], Optional[V3]]:
     """What a feature behaves as once projected, and which way it runs.
 
     A point stays a point. An edge seen end-on becomes one, and otherwise stays
@@ -225,18 +245,19 @@ def projected_form(
     for the second one is that the viewer projects on every pointer move and
     cannot ask python each time.
     """
-    kind = (geometry or {}).get("kind")
+    geometry = geometry or {}
+    kind = geometry.get("kind")
     gaze = _unit(look)
     if kind == "point":
         return (MeasurementFeature.POINT, None)
     if kind == "line":
         direction = _unit(geometry.get("direction") or (0, 0, 0))
-        if abs(_dot(direction, gaze)) > 1 - ALIGNMENT_EPSILON:
+        if are_vectors_parallel(direction, gaze, eps=ALIGNMENT_EPSILON):
             return (MeasurementFeature.POINT, None)
         return (MeasurementFeature.LINE, _flatten(direction, gaze))
     if kind == "plane":
         normal = _unit(geometry.get("normal") or (0, 0, 0))
-        if abs(_dot(normal, gaze)) > ALIGNMENT_EPSILON:
+        if not are_vectors_perpendicular(normal, gaze, eps=ALIGNMENT_EPSILON):
             # Not edge-on: it covers the view, and an area has no distance.
             return (MeasurementFeature.AREA, None)
         # Edge-on, so it draws as a line along the plane, square to its normal
@@ -245,20 +266,25 @@ def projected_form(
     return (None, None)
 
 
-# TODO these all get replaced by rule.py
-def _flatten(direction: Sequence[float], gaze: Sequence[float]) -> Tuple[float, float, float]:
+def _flatten(direction: VectorLike, gaze: VectorLike) -> V3:
     """The part of a direction that survives projection."""
-    along = _dot(direction, gaze)
-    return _unit([direction[i] - gaze[i] * along for i in range(3)])
+    direction, gaze = _v3(direction), _v3(gaze)
+    return _unit(direction - gaze * _dot(direction, gaze))
 
 
-# TODO these all get replaced by rule.py
-def _cross(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float, float]:
-    return _unit([
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ])
+def _raw_cross(a: VectorLike, b: VectorLike) -> V3:
+    """The cross product at its own length, which is what magnitude tests want."""
+    return cross_product(_v3(a), _v3(b))
+
+
+def _cross(a: VectorLike, b: VectorLike) -> V3:
+    """The cross product as a DIRECTION, so length is thrown away.
+
+    Only for callers that want an axis. Anything dividing by the length, or
+    testing it for degeneracy, wants _raw_cross: this one answers a unit vector
+    for two barely-crossing inputs just as readily as for two square ones.
+    """
+    return _unit(_raw_cross(a, b))
 
 
 # TODO CONTINUE HERE
@@ -314,14 +340,14 @@ class MeasureSpan:
         """
         if self.is_point or self.is_plane:
             return (self.at,)
-        unit = _unit(self.direction)
+        at, unit = _v3(self.at), _unit(self.direction)
         return tuple(
-            tuple(self.at[i] + unit[i] * station for i in range(3))
+            tuple(at + unit * station)
             for station in (self.interval or (0.0, 0.0))
         )
 
 
-def _stations(span: MeasureSpan, along: Sequence[float]) -> Tuple[float, float]:
+def _stations(span: MeasureSpan, along: VectorLike) -> Tuple[float, float]:
     """How far a span reaches along a direction, as absolute stations.
 
     Absolute -- measured from the world origin rather than from the span's own
@@ -332,7 +358,7 @@ def _stations(span: MeasureSpan, along: Sequence[float]) -> Tuple[float, float]:
     return (min(reach), max(reach))
 
 
-def _at_station(span: MeasureSpan, along: Sequence[float], station: float):
+def _at_station(span: MeasureSpan, along: VectorLike, station: float):
     """The point on a span that sits at a given station along `along`."""
     if span.is_point:
         return span.at
@@ -341,18 +367,18 @@ def _at_station(span: MeasureSpan, along: Sequence[float], station: float):
     if abs(rate) < 1e-12:
         return span.at
     step = (station - _dot(span.at, along)) / rate
-    return tuple(span.at[i] + unit[i] * step for i in range(3))
+    return tuple(_v3(span.at) + unit * step)
 
 
-def _foot_on(span: MeasureSpan, point: Sequence[float]):
+def _foot_on(span: MeasureSpan, point: VectorLike):
     """Where a perpendicular from `point` meets a span, kept on the span."""
-    unit = _unit(span.direction)
-    station = _dot([point[i] - span.at[i] for i in range(3)], unit)
+    at, unit = _v3(span.at), _unit(span.direction)
+    station = _dot(_v3(point) - at, unit)
     low, high = span.interval or (station, station)
     # Clamped: a dimension whose end floats off the end of a short edge points
     # at nothing, and the nearest place on the feature is the honest answer.
     station = max(low, min(high, station))
-    return tuple(span.at[i] + unit[i] * station for i in range(3))
+    return tuple(at + unit * station)
 
 
 def _representative_point(span: MeasureSpan) -> Tuple[float, float, float]:
@@ -366,10 +392,10 @@ def _representative_point(span: MeasureSpan) -> Tuple[float, float, float]:
     low, high = span.interval or (0.0, 0.0)
     unit = _unit(span.direction)
     middle = (low + high) / 2
-    return tuple(span.at[i] + unit[i] * middle for i in range(3))
+    return tuple(_v3(span.at) + unit * middle)
 
 
-def _foot_on_plane(span: MeasureSpan, point: Sequence[float]):
+def _foot_on_plane(span: MeasureSpan, point: VectorLike):
     """Where a perpendicular from `point` meets a plane.
 
     NOT clamped to the face, unlike the foot on a line: a span carries a plane's
@@ -378,16 +404,16 @@ def _foot_on_plane(span: MeasureSpan, point: Sequence[float]):
     which is when the foot lands on the face anyway. Clamping properly wants the
     face's corners -- see the note in cutcsg about extents being an AABB.
     """
-    unit = _unit(span.normal)
-    gap = _dot([point[i] - span.at[i] for i in range(3)], unit)
-    return tuple(point[i] - unit[i] * gap for i in range(3))
+    point, unit = _v3(point), _unit(span.normal)
+    gap = _dot(point - _v3(span.at), unit)
+    return tuple(point - unit * gap)
 
 
 def _closest_on_line(point, at, direction):
     """Where a line comes nearest a point."""
-    unit = _unit(direction)
-    step = _dot([point[i] - at[i] for i in range(3)], unit)
-    return tuple(at[i] + unit[i] * step for i in range(3))
+    at, unit = _v3(at), _unit(direction)
+    step = _dot(_v3(point) - at, unit)
+    return tuple(at + unit * step)
 
 
 def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
@@ -397,20 +423,23 @@ def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
     distance rather than an angle anyway.
     """
     one, other = _unit(first.normal), _unit(second.normal)
-    along = _cross(one, other)
-    # The UNNORMALISED cross, because the closed form below divides by its
-    # square length. Normalising first and dividing by one puts the point out by
-    # a factor of the sine between the planes, which is right only when they
-    # happen to meet square.
-    scale = _dot(along, along)
-    if scale < PARALLEL_EPSILON:
+    # The UNNORMALISED cross, whose square length is the sine between the planes
+    # squared. This asked _cross, which normalises, so the length was always
+    # exactly one: the refusal below could only ever fire on two EXACTLY parallel
+    # planes, and the closed form that intersect_planes applies divided by one
+    # instead of by that sine -- putting the corner a factor of it toward the
+    # world origin, which is right only where the two happen to meet square.
+    along = _raw_cross(one, other)
+    if _dot(along, along) < PARALLEL_EPSILON:
         return None
-    reach_one, reach_other = _dot(one, first.at), _dot(other, second.at)
-    part_one, part_other = _cross(other, along), _cross(along, one)
-    point = tuple(
-        (reach_one * part_one[i] + reach_other * part_other[i]) / scale
-        for i in range(3))
-    return point, _unit(along)
+    # The arithmetic itself is geometry's, which has the same closed form and a
+    # test of its own. What stays here is the refusal above: how near parallel
+    # is too near to stand in is a question about dimensioning, not about planes.
+    crossing = intersect_planes(Plane(normal=one, point=_v3(first.at)),
+                                Plane(normal=other, point=_v3(second.at)))
+    if crossing is None:
+        return None
+    return tuple(crossing.point), _unit(crossing.direction)
 
 
 def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = None):
@@ -430,8 +459,7 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
     if not any(abs(part) > 1e-9 for part in unit):
         return None
     if span.is_line:
-        stations = [_dot([end[i] - vertex[i] for i in range(3)], unit)
-                    for end in span.ends()]
+        stations = [_dot(_v3(end) - _v3(vertex), unit) for end in span.ends()]
         low, high = min(stations), max(stations)
         straddles = low < -1e-9 < 1e-9 < high
         outward = other.outward if other is not None else None
@@ -441,8 +469,8 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
             # The longer side, which for an edge running off one way is that way.
             lean = high + low
     else:
-        lean = _dot(unit, [span.at[i] - vertex[i] for i in range(3)])
-    return tuple(-part for part in unit) if lean < 0 else unit
+        lean = _dot(unit, _v3(span.at) - _v3(vertex))
+    return -unit if lean < 0 else unit
 
 
 def pair_separation(
@@ -482,11 +510,10 @@ def pair_separation(
     if form_one is None or form_other is None:
         return None
 
-    gap = [at_other[i] - at_one[i] for i in range(3)]
+    gap = _v3(at_other) - _v3(at_one)
     if not solid:
         # On a sheet, only what survives the projection counts.
-        along = _dot(gap, look)
-        gap = [gap[i] - look[i] * along for i in range(3)]
+        gap = gap - look * _dot(gap, look)
 
     if kind.direction is MeasurementDirection.HORIZONTAL:
         return abs(_dot(gap, _unit((axes or {}).get("right") or (1, 0, 0))))
@@ -513,11 +540,9 @@ def pair_separation(
 
     line = constraining(MeasurementFeature.LINE)
     if line is None:
-        return math.sqrt(_dot(gap, gap))
+        return safe_norm(gap)
     unit = _unit(line)
-    slide = _dot(gap, unit)
-    across = [gap[i] - unit[i] * slide for i in range(3)]
-    return math.sqrt(_dot(across, across))
+    return safe_norm(gap - unit * _dot(gap, unit))
 
 
 def measures_nothing(
@@ -558,7 +583,7 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan):
         if crossing is None:
             return None
         point, along = crossing
-        middle = tuple((first.at[i] + second.at[i]) / 2 for i in range(3))
+        middle = (_v3(first.at) + _v3(second.at)) / 2
         vertex = _closest_on_line(middle, point, along)
         # Square to the shared corner, and lying in its own face.
         rays = (_ray_toward(_cross(along, _unit(first.normal)), vertex, first),
@@ -590,7 +615,14 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan):
     # they share. Carried so the arc can be swept in it rather than drawn flat
     # on the screen, where it shows the projected angle and agrees with the
     # number it labels only from the one direction.
-    upright = _cross(rays[0], rays[1])
+    # RAW, because what is being asked is how long it is: two rays that barely
+    # cross span no plane worth sweeping an arc in. Normalising first answered a
+    # unit vector made of rounding noise for exactly those, so the test below
+    # could only ever catch two rays that were bit-for-bit parallel. Nothing
+    # reaches it today -- every shape above refuses a near-parallel pair first,
+    # the closest at 0.57 degrees -- so this is the guard behind those, doing
+    # what it says rather than what it did.
+    upright = _raw_cross(rays[0], rays[1])
     if not any(abs(part) > 1e-9 for part in upright):
         return None
     return {
@@ -611,18 +643,24 @@ def _closest_between(first: MeasureSpan, second: MeasureSpan):
     """
     one, other = _unit(first.direction), _unit(second.direction)
     facing = _dot(one, other)
+    # SQUARED -- it is the sine between the two, squared -- and compared against
+    # a tolerance the rest of the file spends on a plain cosine. rule.py has
+    # safe_zero_test_sq for exactly this. Left alone rather than quietly
+    # retuned: at 1e-2 this refuses below 5.74 degrees while kinds_for has
+    # already called anything under 8.11 degrees parallel, so the two are
+    # ordered safely today and moving either alone would un-order them.
     spread = 1 - facing * facing
     if spread < PARALLEL_EPSILON:
         return None
-    gap = [first.at[i] - second.at[i] for i in range(3)]
+    gap = _v3(first.at) - _v3(second.at)
     lean_one, lean_other = _dot(one, gap), _dot(other, gap)
     station_one = (facing * lean_other - lean_one) / spread
     station_other = (lean_other - facing * lean_one) / spread
     station_one = _clamp_to(station_one, first.interval)
     station_other = _clamp_to(station_other, second.interval)
-    on_one = [first.at[i] + one[i] * station_one for i in range(3)]
-    on_other = [second.at[i] + other[i] * station_other for i in range(3)]
-    return tuple((on_one[i] + on_other[i]) / 2 for i in range(3))
+    on_one = _v3(first.at) + one * station_one
+    on_other = _v3(second.at) + other * station_other
+    return tuple((on_one + on_other) / 2)
 
 
 def _clamp_to(station: float, interval):
@@ -633,23 +671,30 @@ def _clamp_to(station: float, interval):
 
 
 def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan):
-    """Where a line crosses a plane, or its nearest point when it runs flat."""
+    """Where a line crosses a plane, or its nearest point when it runs flat.
+
+    Kept here rather than handed to geometry.intersect_line_plane, which is the
+    same arithmetic: what it answers is a POINT, and the station is what has to
+    be clamped to the edge's surviving extent. Going through it would mean
+    dropping the point back onto the line to recover the step it had just
+    worked out.
+    """
     unit, normal = _unit(line.direction), _unit(plane.normal)
     rate = _dot(unit, normal)
-    if abs(rate) < PARALLEL_EPSILON:
+    if are_vectors_perpendicular(unit, normal, eps=PARALLEL_EPSILON):
         # Running along the face: it never crosses, so stand where the edge is
         # and drop that onto the face.
         return _foot_on_plane(plane, _representative_point(line))
-    step = _dot([plane.at[i] - line.at[i] for i in range(3)], normal) / rate
+    at = _v3(line.at)
+    step = _dot(_v3(plane.at) - at, normal) / rate
     step = _clamp_to(step, line.interval)
-    return tuple(line.at[i] + unit[i] * step for i in range(3))
+    return tuple(at + unit * step)
 
 
 def _flatten_onto(direction, normal):
     """The part of a direction that lies in a plane."""
     unit, up = _unit(direction), _unit(normal)
-    along = _dot(unit, up)
-    flat = [unit[i] - up[i] * along for i in range(3)]
+    flat = unit - up * _dot(unit, up)
     if not any(abs(part) > 1e-9 for part in flat):
         return None
     return _unit(flat)
@@ -707,8 +752,9 @@ def distance_anchors(
     if named in ("projected_horizontal_distance", "projected_vertical_distance"):
         axis = _unit((axes or {}).get(
             "right" if named.endswith("horizontal_distance") else "up") or (1, 0, 0))
-        offset = _dot([second.at[i] - first.at[i] for i in range(3)], axis)
-        return (first.at, tuple(first.at[i] + axis[i] * offset for i in range(3)))
+        at = _v3(first.at)
+        offset = _dot(_v3(second.at) - at, axis)
+        return (first.at, tuple(at + axis * offset))
 
     # A PLANE is measured to by dropping a perpendicular onto it. The anchor is
     # chosen on whichever feature has less freedom -- a point has none, a line
@@ -750,7 +796,7 @@ def distance_anchors(
 
 
 def projected_kinds(
-    one: Optional[Mapping], other: Optional[Mapping], look: Sequence[float],
+    one: Optional[Mapping], other: Optional[Mapping], look: VectorLike,
 ) -> Tuple[MeasurementKind, ...]:
     """Which kinds this pair admits, seen from `look`. Empty when none.
 
@@ -764,13 +810,14 @@ def projected_kinds(
         return ()
     parallel = None
     if run_one is not None and run_other is not None:
-        parallel = abs(_dot(run_one, run_other)) > 1 - PARALLEL_EPSILON
+        parallel = are_vectors_parallel(_v3(run_one), _v3(run_other),
+                                        eps=PARALLEL_EPSILON)
     return kinds_for(form_one, form_other, MeasurementSpace.PROJECTED, parallel=parallel)
 
 
 def solid_form(
     geometry: Optional[Mapping],
-) -> Tuple[Optional[MeasurementFeature], Optional[Tuple[float, float, float]]]:
+) -> Tuple[Optional[MeasurementFeature], Optional[V3]]:
     """What a feature IS, with nothing projected away.
 
     The 3D view's camera belongs to the reader and turns as they look around, so
@@ -786,7 +833,8 @@ def solid_form(
     THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
     against each other.
     """
-    kind = (geometry or {}).get("kind")
+    geometry = geometry or {}
+    kind = geometry.get("kind")
     if kind == "point":
         return (MeasurementFeature.POINT, None)
     if kind == "line":
@@ -798,9 +846,9 @@ def solid_form(
 
 def _solid_parallel(
     form_one: MeasurementFeature,
-    run_one: Optional[Sequence[float]],
+    run_one: Optional[VectorLike],
     form_other: MeasurementFeature,
-    run_other: Optional[Sequence[float]],
+    run_other: Optional[VectorLike],
 ) -> Optional[bool]:
     """Whether two solid features run together.
 
@@ -812,10 +860,10 @@ def _solid_parallel(
     """
     if run_one is None or run_other is None:
         return None
-    alignment = abs(_dot(run_one, run_other))
+    one, other = _v3(run_one), _v3(run_other)
     if form_one is form_other:
-        return alignment > 1 - PARALLEL_EPSILON
-    return alignment < PARALLEL_EPSILON
+        return are_vectors_parallel(one, other, eps=PARALLEL_EPSILON)
+    return are_vectors_perpendicular(one, other, eps=PARALLEL_EPSILON)
 
 
 def solid_kinds(

@@ -9,6 +9,8 @@ and a number beside it that was neither its length nor its direction.
 See docs/measurement-spec.md.
 """
 
+import math
+
 import pytest
 
 from kumiki.drawing import (MeasureSpan, MeasurementDirection, MeasurementKind,
@@ -1091,3 +1093,69 @@ class TestAFeatureOnALabelledRoot:
             frame, {"timber": member, "csgPath": [], "feature": name}, [0, 0, 1])
 
         assert placed is not None
+
+
+class TestAnObliqueCornerIsStillTheCorner:
+    """The vertex lies on both faces, whatever angle they meet at.
+
+    TestWhereAnAngleSits only ever uses perpendicular planes through the z axis,
+    which is the one shape `_plane_crossing` got right: its closed form divides
+    by the SQUARED length of the cross of the two normals, and that is 1 only
+    when the two meet square. Off square, the corner came back scaled toward the
+    world origin by the sine between them -- so a braced joint two metres out had
+    its arc drawn a hundred millimetres off the timber.
+    """
+
+    #: Far enough from the origin that a scaled corner is plainly off the face.
+    CORNER = (2000.0, 0.0, 1500.0)
+
+    def _faces(self, degrees_apart):
+        from kumiki.drawing import MeasureSpan
+
+        # Two planes through CORNER, their normals `degrees_apart`. Each holds a
+        # point along its own face rather than the corner itself, which is what
+        # a cropped centroid is.
+        turn = math.radians(degrees_apart)
+        return (
+            MeasureSpan(at=(self.CORNER[0], 300.0, self.CORNER[2]), normal=(0, 1, 0)),
+            MeasureSpan(at=(self.CORNER[0], -100.0, self.CORNER[2]),
+                        normal=(0, math.cos(turn), math.sin(turn))),
+        )
+
+    def _off_the_faces(self, point, first, second):
+        """How far `point` sits off each plane. Zero on both means it is on the corner."""
+        from kumiki.drawing import _dot, _unit
+
+        return tuple(
+            abs(_dot(_unit(span.normal),
+                     [point[i] - span.at[i] for i in range(3)]))
+            for span in (first, second)
+        )
+
+    @pytest.mark.parametrize("degrees_apart", [90, 60, 45, 30, 15])
+    def test_the_vertex_lies_on_both_faces(self, degrees_apart):
+        from kumiki.drawing import angle_rays
+
+        first, second = self._faces(degrees_apart)
+
+        rays = angle_rays(first, second)
+
+        assert rays is not None
+        off_first, off_second = self._off_the_faces(rays["vertex"], first, second)
+        assert off_first == pytest.approx(0, abs=1e-6)
+        assert off_second == pytest.approx(0, abs=1e-6)
+
+    def test_and_it_sits_on_the_line_the_two_faces_share(self):
+        """Not merely on both planes: on their intersection, which runs along x."""
+        from kumiki.drawing import angle_rays
+
+        first, second = self._faces(45)
+
+        rays = angle_rays(first, second)
+
+        # Plane A is y == 300. Plane B through (2000, -100, 1500) with normal
+        # (0, cos45, sin45) is y + z == 1400. So the shared line is y == 300,
+        # z == 1100, running along x.
+        assert rays["vertex"][1] == pytest.approx(300.0, abs=1e-6)
+        assert rays["vertex"][2] == pytest.approx(1100.0, abs=1e-6)
+        assert abs(rays["normal"][0]) == pytest.approx(1.0, abs=1e-6)
