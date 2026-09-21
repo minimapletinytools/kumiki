@@ -2981,7 +2981,54 @@ def _resolve_measurement(
             {**resolved, "a": {"geometry": ends["a"]}, "b": {"geometry": ends["b"]},
              "angle": resolved.get("angle")},
             declared, kind, admitted, solid, plane, axes)
+    else:
+        resolved["settled"] = _unplaceable_measurement(measure, spans, plane)
     return resolved
+
+
+def _unplaceable_measurement(
+    measure: Dict[str, Any], spans: Dict[str, Any], plane: Any,
+) -> Dict[str, Any]:
+    """A measurement that resolved but cannot be worked out, and why.
+
+    Both ends were found -- an end that was not is `unresolved`, handled above
+    and shown differently -- and something else is missing, so there is no
+    number to send and the viewer is told not to draw it.
+
+    Said here rather than left to the viewer because the viewer cannot work it
+    out either, and its predecessor tried: with nothing sent, it fell back to
+    judging the pair against whatever camera happened to be showing. For a
+    measurement with no plane that is the drift MeasurementPlane exists to stop
+    -- the same two points read as their separation from one angle and their
+    diagonal from another -- so the honest answer is to refuse rather than to
+    show a number that changes when the reader turns.
+
+    Warned about because none of these should happen. A planeless measurement
+    predates planes (nothing written since carries none), and the other two mean
+    the timber's CSG would not render or a face would not crop -- all worth
+    seeing in the log rather than silently not drawing.
+    """
+    missing = [key for key in ("a", "b") if spans.get(key) is None]
+    if plane is None:
+        reason, why = "no-plane", (
+            "it carries no plane and its viewport declares no camera, so there "
+            "is no direction to judge it along")
+    else:
+        reason, why = "no-span", (
+            f"end {' and '.join(missing)} has no extent -- the timber's CSG did "
+            f"not render, or a face would not crop")
+    log_stderr(
+        f"Warning: not drawing the measurement between "
+        f"{_measure_end_name(measure, 'a')} and {_measure_end_name(measure, 'b')}: "
+        f"{why}.")
+    return {"kind": None, "available": [], "space": None, "value": None,
+            "reason": reason, "a": None, "b": None}
+
+
+def _measure_end_name(measure: Dict[str, Any], key: str) -> str:
+    """One end of a measurement, named the way a person would look for it."""
+    end = measure.get(key) or {}
+    return str(end.get("feature") or end.get("timber") or "?")
 
 
 def _settled_measurement(

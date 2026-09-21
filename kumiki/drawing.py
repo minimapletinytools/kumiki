@@ -1144,6 +1144,8 @@ class Measure:
     #: Where the dimension sits. Deliberately not part of identity: moving a
     #: dimension line is not measuring something else.
     placement: Optional[MeasurementPlacement] = None
+
+    # TODO remove Optional
     #: The plane this is taken and drawn on, or None to take the viewport's.
     #: Not part of identity either: the same two features measured on a
     #: different plane is the same measurement seen from elsewhere, and giving

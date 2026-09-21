@@ -512,3 +512,227 @@ class TestAMeasurementMadeOnASheet:
 
         assert sheet["verdict"]["kinds"][0]["space"] == "projected"
         assert solid["verdict"]["kinds"][0]["space"] == "3d"
+
+
+class TestWhatTheRunnerSettles:
+    """The answer sent with a measurement, which the viewer now only reports.
+
+    These rules were the viewer's until it stopped deriving them: what a pair
+    admits here, which kind is drawn when none was written, what the thing
+    comes to and in what unit, and why there is nothing to draw. They are
+    checked here because this is where they live.
+    """
+
+    def _runner(self):
+        from pathlib import Path
+        from tests.testing_shavings import load_module
+
+        root = Path(__file__).resolve().parent.parent
+        return load_module("kigumi_runner_settled", root / "kigumi" / "runner.py")
+
+    #: A sheet seen down -y, its across x and its up z.
+    AXES = {"look": [0, -1, 0], "right": [1, 0, 0], "up": [0, 0, 1]}
+
+    def _settle(self, one, other, written=None, solid=False, axes=None):
+        """What the runner would send for a pair, through its own code."""
+        from kumiki.drawing import (MeasurementKind, projected_kinds,
+                                    solid_kinds)
+
+        runner = self._runner()
+        axes = self.AXES if axes is None else axes
+        look = axes["look"]
+        declared = MeasurementKind.from_wire(written)
+        admitted = (solid_kinds(one, other) if solid
+                    else projected_kinds(one, other, look))
+        kind = declared or (admitted[0] if admitted else None)
+        return runner._settled_measurement(
+            {"a": {"geometry": one}, "b": {"geometry": other}, "angle": None},
+            declared, kind, admitted, solid, look, axes)
+
+    def test_two_points_admit_three_so_there_is_a_choice_to_offer(self):
+        settled = self._settle(at([0, 0, 0]), at([1, 0, 1]))
+
+        assert len(settled["available"]) == 3
+
+    def test_the_kind_drawn_is_the_first_when_none_was_written(self):
+        settled = self._settle(at([0, 0, 0]), at([1, 0, 1]))
+
+        from kumiki.drawing import MeasurementKind
+        from tests.testing_shavings import present
+
+        settled_kind = present(MeasurementKind.from_wire(settled["kind"]), "a settled kind")
+        assert settled_kind.name == settled["available"][0]
+
+    def test_a_written_kind_is_what_is_drawn_instead(self):
+        settled = self._settle(at([0, 0, 0]), at([1, 0, 1]),
+                               written="projected_vertical_distance")
+
+        from kumiki.drawing import MeasurementKind
+        from tests.testing_shavings import present
+
+        settled_kind = present(MeasurementKind.from_wire(settled["kind"]), "a settled kind")
+        assert settled_kind.name == "projected_vertical_distance"
+
+    def test_a_pair_in_line_is_degenerate_and_still_offers_the_others(self):
+        # Refused under the default kind, while horizontal or vertical between
+        # the same two points is a real number -- which is the point of
+        # carrying the available kinds on a refusal at all.
+        settled = self._settle(at([0, 0, 0]), at([0, 5, 0]))
+
+        assert settled["reason"] == "degenerate"
+        assert len(settled["available"]) == 3
+
+    def test_a_distance_calls_itself_a_length(self):
+        settled = self._settle(at([0, 0, 0]), at([1, 0, 1]))
+
+        assert settled["value"]["unit"] == "length"
+
+    def test_and_an_angle_calls_itself_an_angle(self):
+        # Two crossing faces, which admit an angle and nothing else.
+        settled = self._settle(plane([0, 0, 0], [0, 0, 1]),
+                               plane([0, 0, 0], [1, 0, 0]), solid=True)
+
+        assert settled["available"] == ["angle"]
+        assert settled["value"]["unit"] == "angle"
+
+    def test_a_corner_reads_its_angle_rather_than_a_length(self):
+        from kumiki.drawing import MeasureSpan, angle_rays
+
+        runner = self._runner()
+        first = plane([0, 0, 0], [0, 0, 1])
+        second = plane([0, 0, 0], [1, 0, 0])
+        from kumiki.drawing import projected_kinds, solid_kinds
+        admitted = solid_kinds(first, second)
+        rays = angle_rays(MeasureSpan(at=first.point, normal=first.normal),
+                          MeasureSpan(at=second.point, normal=second.normal))
+        settled = runner._settled_measurement(
+            {"a": {"geometry": first}, "b": {"geometry": second}, "angle": rays},
+            None, admitted[0], admitted, True, self.AXES["look"], self.AXES)
+
+        assert settled["value"] == {"unit": "angle", "value": pytest.approx(90.0)}
+
+    #: An oblique camera, which is what the 3D view always is: no face is seen
+    #: exactly edge-on from here.
+    OBLIQUE = {"look": [-0.577, -0.577, -0.577], "right": [1, 0, 0], "up": [0, 0, 1]}
+
+    def test_in_the_solid_a_slab_reads_its_whole_thickness(self):
+        # Not the part of it that survives a projection: in the solid nothing
+        # is projected away.
+        settled = self._settle(plane([0, 0, 0], [1, 0, 0]),
+                               plane([150, 0, 0], [-1, 0, 0]),
+                               solid=True, axes=self.OBLIQUE)
+
+        assert settled["value"] == {"unit": "length", "value": pytest.approx(150.0)}
+
+    def test_and_the_same_pair_judged_as_a_sheet_is_not_measurable(self):
+        # Which is what the 3D view used to do, and why a face went red: seen
+        # from anywhere oblique, a face is an AREA and covers the view.
+        settled = self._settle(plane([0, 0, 0], [1, 0, 0]),
+                               plane([0, 0, 0], [0, 0, 1]), axes=self.OBLIQUE)
+
+        assert settled["reason"] == "not-measurable"
+
+    def test_a_kind_this_view_cannot_draw_says_so(self):
+        settled = self._settle(at([0, 0, 0]), at([1, 0, 1]), written="projected_angle")
+
+        assert settled["reason"] == "kind-unavailable"
+
+
+class TestAMeasurementTheRunnerCannotWorkOut:
+    """Refused with a reason, and warned about, rather than left to the viewer.
+
+    The viewer used to work an unsettled measurement out for itself, and could
+    only judge it against whatever camera was showing: for one carrying no
+    plane the same two points then read as their separation from one angle and
+    their diagonal from another. That drift is what a measurement's own plane
+    exists to prevent, so there is nothing honest to draw and the runner says
+    so.
+
+    None of these should happen -- nothing written since planes existed lacks
+    one -- which is why each is warned about rather than quietly skipped.
+    """
+
+    def _runner(self):
+        from pathlib import Path
+        from tests.testing_shavings import load_module
+
+        root = Path(__file__).resolve().parent.parent
+        return load_module("kigumi_runner_unplaceable", root / "kigumi" / "runner.py")
+
+    def _frame(self):
+        from pathlib import Path
+        from tests.testing_shavings import load_module
+
+        root = Path(__file__).resolve().parent.parent
+        return load_module(
+            "unplaceable_fixture",
+            root / "kigumi" / "test-fixtures" / "measured_frame.py").build_frame()
+
+    def _a_resolvable_pair(self, runner, frame):
+        """Two ends known to resolve, stripped back to their references."""
+        for drawing in runner.collect_drawings(frame, None, []):
+            for viewport in drawing.get("viewports") or []:
+                for measure in viewport.get("measurements") or []:
+                    if measure.get("unresolved"):
+                        continue
+                    if (measure.get("settled") or {}).get("value") is None:
+                        continue
+                    return {
+                        key: {name: value
+                              for name, value in (measure.get(key) or {}).items()
+                              if name not in ("at", "geometry")}
+                        for key in ("a", "b")
+                    }
+        raise AssertionError("the fixture has no resolvable measurement")
+
+    def _resolve_without_a_plane(self):
+        import contextlib
+        import io
+
+        runner = self._runner()
+        frame = self._frame()
+        # No plane of its own, and no viewport camera to borrow one from --
+        # which is what a measurement in the reserved 3D drawing written before
+        # planes existed looks like.
+        bare = self._a_resolvable_pair(runner, frame)
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            resolved = runner._resolve_measurement(frame, bare, None)
+        return resolved, stderr.getvalue()
+
+    def test_both_ends_resolve_so_this_is_not_the_unresolved_case(self):
+        resolved, _ = self._resolve_without_a_plane()
+
+        assert resolved.get("unresolved") is None
+
+    def test_and_yet_it_is_refused_with_a_reason(self):
+        resolved, _ = self._resolve_without_a_plane()
+
+        assert resolved["settled"]["reason"] == "no-plane"
+        assert resolved["settled"]["value"] is None
+
+    def test_the_runner_warns_about_it(self):
+        _, warned = self._resolve_without_a_plane()
+
+        assert "Warning" in warned
+        assert "no plane" in warned
+
+    def test_and_names_the_two_ends_so_it_can_be_found(self):
+        resolved, warned = self._resolve_without_a_plane()
+
+        for key in ("a", "b"):
+            named = (resolved.get(key) or {}).get("feature")
+            if named:
+                assert named in warned
+
+    def test_a_measurement_it_can_place_is_not_warned_about(self):
+        import contextlib
+        import io
+
+        runner = self._runner()
+        frame = self._frame()
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            runner.collect_drawings(frame, None, [])
+
+        assert "not drawing the measurement" not in stderr.getvalue()

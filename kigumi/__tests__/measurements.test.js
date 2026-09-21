@@ -288,11 +288,23 @@ describe('a measurement is judged on its own plane', () => {
     const ORTHO = { orthographic: true };
     const PERSPECTIVE = { orthographic: false };
 
+    //: What the runner sends with it. The number is worked out there now, so
+    //: these check which views will draw it, not what it comes to.
+    const SETTLED = {
+        kind: { operation: 'distance', space: 'projected', direction: 'perpendicular' },
+        available: ['projected_perpendicular_distance'],
+        space: 'projected',
+        value: { unit: 'length', value: Math.SQRT2 },
+        reason: null,
+        a: { form: 'point' },
+        b: { form: 'point' },
+    };
+
     const pair = (plane) => ({
-        a: point([0, 0, 0]), b: point([1, 0, 1]), plane,
+        a: point([0, 0, 0]), b: point([1, 0, 1]), plane, settled: SETTLED,
     });
 
-    test('with no plane it falls back to the viewport, as it always did', () => {
+    test('with no plane there is nothing to refuse it for', () => {
         expect(measurementStatus(pair(undefined), AXES, ORTHO).drawable).toBe(true);
     });
 
@@ -329,17 +341,16 @@ describe('a measurement is judged on its own plane', () => {
         expect(status.reason).not.toBe('plane-mismatch');
     });
 
-    test('the value comes from the plane, not from the viewport', () => {
-        // Two points a unit apart in x and in z. Seen down y the separation is
-        // the diagonal; seen down x it is the z component alone. The plane
-        // decides which, whatever the viewport says.
-        const downY = measurementStatus(
-            pair({ at: [0, 0, 0], normal: [0, 1, 0] }), AXES, PERSPECTIVE);
-        const downX = measurementStatus(
-            pair({ at: [0, 0, 0], normal: [1, 0, 0] }), AXES, PERSPECTIVE);
+    test('the value is the runner\'s, so no camera can move it', () => {
+        // It used to be worked out here against axes.look, which for a
+        // measurement carrying no plane made the same two points read as their
+        // separation from one angle and their diagonal from another. Now the
+        // number arrives settled and every view reports the same one.
+        const seen = [AXES, { look: [1, 0, 0], right: [0, 1, 0], up: [0, 0, 1] },
+                      { look: [0, 0, 1], right: [1, 0, 0], up: [0, 1, 0] }]
+            .map((axes) => measurementStatus(pair(undefined), axes, PERSPECTIVE).value.value);
 
-        expect(downY.value.value).toBeCloseTo(Math.SQRT2, 9);
-        expect(downX.value.value).toBeCloseTo(1, 9);
+        expect(seen).toEqual([Math.SQRT2, Math.SQRT2, Math.SQRT2]);
     });
 });
 
@@ -415,46 +426,6 @@ describe('anchorReference', () => {
     });
 });
 
-describe('which kinds a focused measurement offers to change to', () => {
-    // What the info pane's dropdown is built from: the kinds this pair admits
-    // in this view, and the one currently being drawn.
-    const AXES = { look: [0, -1, 0], right: [1, 0, 0], up: [0, 0, 1] };
-    const point = (at) => ({ at, geometry: { kind: 'point', at } });
-
-    test('two points admit three, so there is a choice to offer', () => {
-        const status = measurementStatus({ a: point([0, 0, 0]), b: point([1, 0, 1]) }, AXES);
-
-        expect(status.available.length).toBe(3);
-    });
-
-    test('the default is the first, which is what a new one is written with', () => {
-        const status = measurementStatus({ a: point([0, 0, 0]), b: point([1, 0, 1]) }, AXES);
-
-        expect(status.kind).toBe(status.available[0]);
-    });
-
-    test('a written kind is what is drawn, not the default', () => {
-        const status = measurementStatus({
-            a: point([0, 0, 0]), b: point([1, 0, 1]),
-            kind: 'projected_vertical_distance',
-        }, AXES);
-
-        expect(status.kind).toBe('projected_vertical_distance');
-    });
-
-    test('two in line still admit the kinds that would not read zero', () => {
-        // Refused as degenerate under the default kind, and horizontal or
-        // vertical between the same two points is a real number -- so the
-        // dropdown has somewhere to go, which is the point of offering it on a
-        // refusal at all.
-        const status = measurementStatus({ a: point([0, 0, 0]), b: point([0, 5, 0]) }, AXES);
-
-        expect(status.drawable).toBe(false);
-        expect(status.reason).toBe('degenerate');
-        expect(availableKinds(status.formA, status.formB).length).toBe(3);
-    });
-});
-
 describe('an angle says it is an angle', () => {
     // The viewer decides whether to draw an arc or a dimension line from the
     // status. It used to ask `status.kind === 'angle'` -- the bare legacy name
@@ -470,13 +441,7 @@ describe('an angle says it is an angle', () => {
         b: { at: [1, 0, 1], geometry: { kind: 'line', direction: [0, 0, 1], at: [1, 0, 1] } },
     };
 
-    test('two crossing lines admit an angle and nothing else', () => {
-        expect(measurementStatus(crossing, AXES).kind).toBe('projected_angle');
-    });
 
-    test('and the value calls itself an angle', () => {
-        expect(measurementStatus(crossing, AXES).value.unit).toBe('angle');
-    });
 
     test('no kind answers to the bare name the viewer used to look for', () => {
         // If a kind is ever named plain 'angle' again, the two ways of asking
@@ -490,14 +455,6 @@ describe('an angle says it is an angle', () => {
         expect(kinds).toContain('projected_angle');
     });
 
-    test('a distance calls itself a length, so the two branches cannot blur', () => {
-        const apart = {
-            a: { at: [0, 0, 0], geometry: { kind: 'point', at: [0, 0, 0] } },
-            b: { at: [1, 0, 1], geometry: { kind: 'point', at: [1, 0, 1] } },
-        };
-
-        expect(measurementStatus(apart, AXES).value.unit).toBe('length');
-    });
 });
 
 const { measurementKey } = require('../webview/measurements.js');
@@ -729,37 +686,8 @@ describe('what the 3D view measures', () => {
             .toEqual(['angle']);
     });
 
-    test('a corner reads 90 degrees, not a length', () => {
-        const status = measurementStatus({
-            a: { at: [0, 0, 0], geometry: face([1, 0, 0]) },
-            b: { at: [0, 0, 0], geometry: face([0, 0, 1]) },
-            kind: { operation: 'angle', space: '3d' },
-        }, axes, solid);
 
-        expect(status.drawable).toBe(true);
-        expect(status.value).toEqual({ unit: 'angle', value: 90 });
-    });
 
-    test('a slab reads its whole thickness, not the projected part of it', () => {
-        const status = measurementStatus({
-            a: { at: [0, 0, 0], geometry: face([1, 0, 0]) },
-            b: { at: [150, 0, 0], geometry: face([-1, 0, 0]) },
-            kind: { operation: 'distance', space: '3d', direction: 'perpendicular' },
-        }, axes, solid);
-
-        expect(status.value).toEqual({ unit: 'length', value: 150 });
-    });
-
-    test('the same pair, judged as a sheet would, is not measurable at all', () => {
-        // Which is what the 3D view was doing, and why a face went red.
-        const status = measurementStatus({
-            a: { at: [0, 0, 0], geometry: face([1, 0, 0]) },
-            b: { at: [0, 0, 0], geometry: face([0, 0, 1]) },
-        }, axes, { orthographic: true });
-
-        expect(status.drawable).toBe(false);
-        expect(status.reason).toBe('not-measurable');
-    });
 });
 
 describe('naming a kind, and writing one back', () => {
@@ -771,17 +699,6 @@ describe('naming a kind, and writing one back', () => {
         expect(kindName({ operation: 'angle', space: '3d' })).toBe('angle');
     });
 
-    test('a measurement a python file declared is drawable', () => {
-        // Its kind arrives structured, and comparing that against a list of
-        // names matched nothing: every one read as kind-unavailable.
-        const status = measurementStatus({
-            a: { at: [0, 0, 0], geometry: { kind: 'plane', normal: [1, 0, 0] } },
-            b: { at: [100, 0, 0], geometry: { kind: 'plane', normal: [-1, 0, 0] } },
-            kind: { operation: 'distance', space: 'projected', direction: 'perpendicular' },
-        }, { look: [0, 0, -1], right: [1, 0, 0], up: [0, 1, 0] }, { orthographic: true });
-
-        expect(status.drawable).toBe(true);
-    });
 
     test('a solid angle is written structured, so it cannot be read back projected', () => {
         // `angle` is also what every measurement written before spaces existed
@@ -1072,12 +989,17 @@ describe('the runner settles what a measurement comes to', () => {
         expect(status.reason).toBe('unresolved');
     });
 
-    test('without one, the older path still answers', () => {
-        // A measurement that reached the viewer with no answer attached.
+    test('without one it is refused, not worked out here', () => {
+        // The runner sends an answer for every measurement it can place and a
+        // refusal for every one it cannot, warning on the latter. So a
+        // measurement with neither came from some path that predates that, and
+        // inventing a number for it is what this file stopped doing: it could
+        // only judge against whatever camera was showing, which is the drift
+        // a measurement's own plane exists to prevent.
         const status = measurementStatus(
             measure({ settled: undefined }), AXES, ORTHO);
 
-        expect(status.drawable).toBe(true);
-        expect(status.value.value).toBeCloseTo(Math.SQRT2, 9);
+        expect(status.drawable).toBe(false);
+        expect(status.reason).toBe('not-settled');
     });
 });

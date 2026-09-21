@@ -5,9 +5,9 @@ and about 120 lines of `for i in range(3)` -- instead of using the `Matrix`/`V3`
 types and helpers in `rule.py`, which every other file in the library uses. This
 is the plan for moving it over.
 
-Status: **Stages 0-4 are done, and step A of the seam change.** Step B of the
-seam change is the only piece left, and it is waiting on a decision. Baseline
-recorded below.
+Status: **Stages 0-4 are done, and both steps of the seam change.** What is
+left is one call: whether the now-unreached copy in measurements.js comes out.
+Baseline recorded below.
 
 ## Why it is the way it is
 
@@ -608,28 +608,60 @@ Verified on the fixture: python's `settled` and the viewer's own derivation
 agree on value, kind and reason for all four measurements, and the kinds the
 change-kind menu offers are identical either way.
 
-### Step B -- not done
+### Step B -- the viewer refuses, and the runner says so
 
-**Nothing was deleted from measurements.js.** The evaluation path is still
-there, reached whenever a measurement arrives without a `settled` block, and
-that is a real case rather than mere caution: `settled` is set inside the
-`placeable` branch, so a measurement with no plane to be taken on -- no written
-one and no viewport camera -- has no answer python could compute, because
-classifying the ends needs a direction to look along.
+Decided: **an unsettled measurement is not drawn.** The fallback that worked one
+out in the viewer is gone, because of what it could only ever do -- judge the
+pair against whatever camera happened to be showing. For a measurement carrying
+no plane that made the same two points read as their separation from one angle
+and their diagonal from another:
 
-So the *correctness* win is banked (one derivation, not two) and the
-*maintenance* win is not (the second copy still exists). Retiring it needs that
-last case answered, one way or the other:
+```
+one planeless measurement, three cameras:
+   seen down Y   -> 1.4142135623730951
+   seen down X   -> 1
+   seen down Z   -> 1
+```
 
-- have the viewer refuse an un-placeable measurement outright rather than
-  evaluating it, which is arguably what "it could not be placed" already means; or
-- have python answer it, which means deciding what a measurement with no plane
-  comes to -- possibly "nothing", which is the same thing said in the other place.
+which is the drift `MeasurementPlane` exists to prevent. Keeping the fallback
+kept that alive.
 
-Only once that is settled can `projectedForm`, `solidForm`, `availableKinds`,
-`solidKinds`, `solidParallel`, `measureValue`, `projectedSeparation` and the
-three epsilons come out of measurements.js, along with the ~8 `describe` blocks
-covering them.
+`_resolve_measurement` now sends a refusal with a reason for every measurement
+it cannot place -- `no-plane` when there is neither a written plane nor a
+viewport camera, `no-span` when an end has no extent because a timber's CSG
+would not render or a face would not crop -- and **warns on stderr**, naming
+both ends. None of these should ever happen: nothing written since planes
+existed lacks one, and the other two mean the CSG failed. `measurementStatus`
+returns `not-settled` for anything that arrives with no answer at all. All three
+are in `BROKEN_REASONS`: they are wrong wherever you look, so they shout.
+
+What moved rather than vanished: eleven tests in `measurements.test.js` asserted
+rules derived through `measurementStatus`, and those rules now live in the
+runner. They are covered by `TestWhatTheRunnerSettles` in
+`test_measurement_end_to_end.py`, case for case, with the same geometry. The
+refusal and the warning have their own tests there too.
+
+One parity test went with them: `test_a_written_measurement_is_judged_the_way_a_pick_is`
+ran `measurementStatus` over the case matrix precisely because the viewer had a
+second derivation of these rules, and three shipped bugs had come from it. There
+is no second derivation to disagree now, so what replaces it is structural. The
+reasoning is left as a comment where it was.
+
+### What is still duplicated
+
+`projectedForm`, `solidForm`, `availableKinds`, `solidKinds`, `solidParallel`,
+`measureValue`, `projectedSeparation`, `kindApplies` and the three epsilons are
+**still in measurements.js**, still exported, still checked against python by
+the remaining parity tests -- and **no longer reached by the viewer**. The one
+live reference left is `status.available || (...)` in `_focusedMeasurement`,
+which cannot fire now that every settled answer carries `available`.
+
+Whether to delete them is a real question rather than a formality. They stopped
+being a second live copy that could drift, which is what the parity tests were
+for. But they are now a second *implementation* of the rules, written from the
+same spec, checked against python over a case matrix that deliberately straddles
+the epsilons -- and that is an independent check of python's tables which
+deleting would lose. Left in deliberately, pending that call.
 
 This is **not** a performance problem -- a few dot products per measurement per
 frame is nothing. The cost is maintenance, and it is why `drawing.py` is written

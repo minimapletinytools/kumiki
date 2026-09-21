@@ -688,49 +688,22 @@
         // plane it was taken on and is read against that -- so the only part
         // left here is the question just asked above, which IS about the
         // camera: does the view being drawn into show that plane.
-        //
-        // Everything past this point is the older path, for a measurement that
-        // reached the viewer without an answer attached.
         if (measure.settled) {
             return settledStatus(measure.settled);
         }
-        const look = plane && plane.normal ? plane.normal : axes.look;
-        // Which space this is judged in comes from the MEASUREMENT, not from
-        // the camera: a drawing shown in perspective still projects onto its
-        // sheet, so "not orthographic" does not mean "solid". A kind says its
-        // own space; without one, the view says, and only the 3D view has no
-        // sheet to project onto.
-        const space = measureSpace(measure, options);
-        const solid = space === '3d';
-        const formA = solid
-            ? solidForm(measure.a.geometry)
-            : projectedForm(measure.a.geometry, look);
-        const formB = solid
-            ? solidForm(measure.b.geometry)
-            : projectedForm(measure.b.geometry, look);
-        const available = solid
-            ? solidKinds(formA, formB)
-            : availableKinds(formA, formB);
-        if (available.length === 0) {
-            return { drawable: false, reason: 'not-measurable', space, formA, formB };
-        }
-        const wanted = kindName(measure.kind, space);
-        if (wanted && available.indexOf(wanted) === -1) {
-            return {
-                drawable: false, reason: 'kind-unavailable',
-                kind: wanted, available, space, formA, formB,
-            };
-        }
-        const kind = wanted || available[0];
-        // The plane's look, not the viewport's, for the same reason the forms
-        // were taken with it: the two have to describe one projection.
-        const value = measureValue(
-            kind, measure.a.at, measure.b.at, formA, formB,
-            { ...axes, look, space, rays: measure.angle || null });
-        if (value.unit === 'length' && value.value < DEGENERATE_WORLD) {
-            return { drawable: false, reason: 'degenerate', kind, space, formA, formB };
-        }
-        return { drawable: true, kind, value, available, space, formA, formB };
+        // Nothing sent, so nothing drawn. This file used to work the answer out
+        // for itself here, and the reason that had to stop is that it could
+        // only judge the pair against whatever camera happened to be showing:
+        // for a measurement carrying no plane the same two points then read as
+        // their separation from one angle and their diagonal from another,
+        // which is the drift MeasurementPlane exists to prevent.
+        //
+        // The runner sends an answer for every measurement it can place and a
+        // refusal, with a reason, for every one it cannot -- and warns on the
+        // latter, since none of them should happen. So arriving here means a
+        // measurement from some path that predates that, and the honest thing
+        // is to say so rather than to invent a number.
+        return { drawable: false, reason: 'not-settled' };
     }
 
     // Below this the two anchors are on top of each other in this view, and
@@ -888,15 +861,21 @@
      *
      * An anchor that no longer resolves, and a plane that disagrees with the
      * viewport it is drawn in, are wrong wherever you look at them -- a rename
-     * away from being fixed, or a drawing whose python has moved. The other
-     * three refusals are about THIS view: the same measurement reads fine under
-     * one viewport and is refused by the next, which is information rather than
+     * away from being fixed, or a drawing whose python has moved. So are the
+     * three the runner sends when it cannot work a measurement out at all: no
+     * plane to judge it along, an end with no extent because a timber's CSG
+     * would not render, and no answer attached at all. It warns about each, and
+     * they are damage by the same test -- turning the camera will not help.
+     *
+     * The rest are about THIS view: the same measurement reads fine under one
+     * viewport and is refused by the next, which is information rather than
      * damage.
      *
      * Worth telling apart because only the first kind is something to go and
      * mend, and only the first kind should be shouting.
      */
-    const BROKEN_REASONS = Object.freeze(['unresolved', 'plane-mismatch']);
+    const BROKEN_REASONS = Object.freeze([
+        'unresolved', 'plane-mismatch', 'no-plane', 'no-span', 'not-settled']);
 
     function isBroken(status) {
         return Boolean(status) && !status.drawable
