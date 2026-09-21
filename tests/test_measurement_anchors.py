@@ -15,6 +15,12 @@ import pytest
 
 from kumiki.drawing import (MeasureSpan, MeasurementDirection, MeasurementKind,
                             MeasurementOperation, MeasurementSpace, distance_anchors)
+from kumiki.rule import create_v3
+
+
+def v(triple):
+    """A triple as the vector a span holds. Written out so the tests need not."""
+    return create_v3(*triple)
 
 
 def kind(direction):
@@ -31,11 +37,20 @@ AXES = {"right": (1, 0, 0), "up": (0, 0, 1), "look": (0, 1, 0)}
 
 
 def line(at, direction, interval):
-    return MeasureSpan(at=at, direction=direction, interval=interval)
+    return MeasureSpan(at=v(at), direction=v(direction), interval=interval)
 
 
 def point(at):
-    return MeasureSpan(at=at)
+    return MeasureSpan(at=v(at))
+
+
+def face_span(at, normal):
+    return MeasureSpan(at=v(at), normal=v(normal))
+
+
+def placed(anchor):
+    """An anchor as a plain triple. A span holds vectors; assertions read tuples."""
+    return tuple(anchor)
 
 
 def run(anchors):
@@ -142,7 +157,7 @@ class TestAPointAndALine:
         anchors = distance_anchors(
             point((3, 0, 7)), line((0, 0, 0), (1, 0, 0), (0, 10)), PERPENDICULAR)
 
-        assert anchors[0] == (3, 0, 7)
+        assert placed(anchors[0]) == (3, 0, 7)
         assert anchors[1] == pytest.approx((3, 0, 0))
 
     def test_whichever_way_round_the_pair_arrives(self):
@@ -150,7 +165,7 @@ class TestAPointAndALine:
             line((0, 0, 0), (1, 0, 0), (0, 10)), point((3, 0, 7)), PERPENDICULAR)
 
         assert anchors[0] == pytest.approx((3, 0, 0))
-        assert anchors[1] == (3, 0, 7)
+        assert placed(anchors[1]) == (3, 0, 7)
 
     def test_a_foot_past_the_end_is_brought_back_onto_the_feature(self):
         # A dimension whose end floats off the end of a short edge points at
@@ -174,7 +189,7 @@ class TestTwoPoints:
         # distance, and there is nowhere else for the ends to be.
         anchors = distance_anchors(point((1, 2, 3)), point((4, 5, 6)), PERPENDICULAR)
 
-        assert anchors == ((1, 2, 3), (4, 5, 6))
+        assert (placed(anchors[0]), placed(anchors[1])) == ((1, 2, 3), (4, 5, 6))
 
 
 class TestAlongTheSheetsOwnDirections:
@@ -183,7 +198,7 @@ class TestAlongTheSheetsOwnDirections:
     def test_horizontal_runs_across_the_sheet(self):
         anchors = distance_anchors(point((0, 0, 0)), point((4, 0, 9)), HORIZONTAL, AXES)
 
-        assert anchors[0] == (0, 0, 0)
+        assert placed(anchors[0]) == (0, 0, 0)
         assert anchors[1] == pytest.approx((4, 0, 0))
 
     def test_and_reads_the_separation_across_it(self):
@@ -353,7 +368,7 @@ class TestAFeatureSeenEndOn:
             PERPENDICULAR,
         )
 
-        assert anchors[0] == (0, -0.6, 0.05)
+        assert placed(anchors[0]) == (0, -0.6, 0.05)
         assert anchors[1][1] == pytest.approx(-0.6)
 
 
@@ -751,54 +766,44 @@ class TestDroppingAPerpendicularOntoAFace:
         return tuple(round(b[i] - a[i], 9) for i in range(3))
 
     def test_an_edge_parallel_to_a_face_measures_square_to_it(self):
-        from kumiki.drawing import MeasureSpan
-
-        face = MeasureSpan(at=(0, 0, 0), normal=(0, 0, 1))
+        face = face_span((0, 0, 0), (0, 0, 1))
         # Offset in x and in y, and the y offset is the one the two-lines rule
         # could not remove: it shares a station along x only.
-        edge = MeasureSpan(at=(500, 300, 100), direction=(1, 0, 0), interval=(0.0, 200.0))
+        edge = line((500, 300, 100), (1, 0, 0), (0.0, 200.0))
 
         at_face, at_edge = self._anchors(face, edge)
 
         assert self._along(at_face, at_edge) == (0.0, 0.0, 100.0)
 
     def test_and_the_same_the_other_way_round(self):
-        from kumiki.drawing import MeasureSpan
-
-        face = MeasureSpan(at=(0, 0, 0), normal=(0, 0, 1))
-        edge = MeasureSpan(at=(500, 300, 100), direction=(1, 0, 0), interval=(0.0, 200.0))
+        face = face_span((0, 0, 0), (0, 0, 1))
+        edge = line((500, 300, 100), (1, 0, 0), (0.0, 200.0))
 
         at_edge, at_face = self._anchors(edge, face)
 
         assert self._along(at_face, at_edge) == (0.0, 0.0, 100.0)
 
     def test_the_edge_anchor_is_on_the_edge(self):
-        from kumiki.drawing import MeasureSpan
-
-        face = MeasureSpan(at=(0, 0, 0), normal=(0, 0, 1))
-        edge = MeasureSpan(at=(500, 300, 100), direction=(1, 0, 0), interval=(0.0, 200.0))
+        face = face_span((0, 0, 0), (0, 0, 1))
+        edge = line((500, 300, 100), (1, 0, 0), (0.0, 200.0))
 
         _, at_edge = self._anchors(face, edge)
 
         # The middle of what survives of it, which is where a reader points.
-        assert at_edge == (600.0, 300.0, 100.0)
+        assert placed(at_edge) == (600.0, 300.0, 100.0)
 
     def test_a_point_and_a_face(self):
-        from kumiki.drawing import MeasureSpan
+        face = face_span((0, 0, 0), (0, 0, 1))
+        corner = point((120, -45, 70))
 
-        face = MeasureSpan(at=(0, 0, 0), normal=(0, 0, 1))
-        point = MeasureSpan(at=(120, -45, 70))
+        at_point, at_face = self._anchors(corner, face)
 
-        at_point, at_face = self._anchors(point, face)
-
-        assert at_point == (120, -45, 70)
+        assert placed(at_point) == (120, -45, 70)
         assert self._along(at_face, at_point) == (0.0, 0.0, 70.0)
 
     def test_two_parallel_faces(self):
-        from kumiki.drawing import MeasureSpan
-
-        near = MeasureSpan(at=(10, 20, 0), normal=(0, 0, 1))
-        far = MeasureSpan(at=(900, -400, 63.5), normal=(0, 0, 1))
+        near = face_span((10, 20, 0), (0, 0, 1))
+        far = face_span((900, -400, 63.5), (0, 0, 1))
 
         at_near, at_far = self._anchors(near, far)
 
@@ -807,10 +812,8 @@ class TestDroppingAPerpendicularOntoAFace:
     def test_two_edges_still_share_a_station(self):
         # The rule that was already right is left alone: neither end is a plane,
         # so nothing above applies.
-        from kumiki.drawing import MeasureSpan
-
-        one = MeasureSpan(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 100.0))
-        other = MeasureSpan(at=(0, 50, 0), direction=(1, 0, 0), interval=(0.0, 100.0))
+        one = line((0, 0, 0), (1, 0, 0), (0.0, 100.0))
+        other = line((0, 50, 0), (1, 0, 0), (0.0, 100.0))
 
         at_one, at_other = self._anchors(one, other)
 
@@ -872,7 +875,8 @@ class TestWhereAnAngleSits:
     def _span(self, **fields):
         from kumiki.drawing import MeasureSpan
 
-        return MeasureSpan(**fields)
+        return MeasureSpan(**{key: v(value) if key in ('at', 'normal', 'direction')
+                              else value for key, value in fields.items()})
 
     def _rays(self, first, second):
         from kumiki.drawing import angle_rays
@@ -1120,9 +1124,9 @@ class TestAnObliqueCornerIsStillTheCorner:
         # a cropped centroid is.
         turn = math.radians(degrees_apart)
         return (
-            MeasureSpan(at=(self.CORNER[0], 300.0, self.CORNER[2]), normal=(0, 1, 0)),
-            MeasureSpan(at=(self.CORNER[0], -100.0, self.CORNER[2]),
-                        normal=(0, math.cos(turn), math.sin(turn))),
+            face_span((self.CORNER[0], 300.0, self.CORNER[2]), (0, 1, 0)),
+            face_span((self.CORNER[0], -100.0, self.CORNER[2]),
+                      (0, math.cos(turn), math.sin(turn))),
         )
 
     def _off_the_faces(self, point, first, second):

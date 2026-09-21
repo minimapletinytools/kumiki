@@ -5,8 +5,9 @@ and about 120 lines of `for i in range(3)` -- instead of using the `Matrix`/`V3`
 types and helpers in `rule.py`, which every other file in the library uses. This
 is the plan for moving it over.
 
-Status: **Stage 0, Stage 1 and step A of the seam change are done.** Stages
-2-4 and step B of the seam change are not started. Baseline recorded below.
+Status: **Stages 0, 1 and 2 are done, and step A of the seam change.**
+Stage 3, Stage 4 and step B of the seam change are not started. Baseline
+recorded below.
 
 ## Why it is the way it is
 
@@ -358,6 +359,24 @@ Blast radius, counted:
 - **Serialisation**: audit every path to `json.dumps` (gotcha 7).
 
 `as_wire()` needs no change: `list(Matrix)` already yields `[x, y, z]`.
+
+**Done.** `MeasureSpan` and `MeasurementPlane` hold `V3`, coerced in
+`__post_init__` so callers may still write a triple -- which `runner.py` does in
+six places, unchanged. Two narrowing accessors, `span.along` and `span.facing`,
+give the rules for lines and planes a non-optional vector to work with and are
+what took `drawing.py` to **zero ty diagnostics**; `interval` stayed a pair of
+floats, being stations rather than a place. The anchors `distance_anchors`
+returns and the points `ends()` yields are vectors now too, so nothing converts
+back and forth mid-rule.
+
+The 17 span constructions in `test_measurement_anchors.py` went through three
+helpers (`point`, `line`, `face_span`) rather than being rewritten one by one,
+which is why only four `MeasureSpan(` calls are left in that file.
+
+Checked against the Stage 1 file imported side by side: `distance_anchors`
+(120,000 components) and `angle_rays` (158,520 components) over 20,000 random
+span pairs are **bit-identical**. Nothing reaches `json.dumps` as a raw
+`Matrix`: both fixtures' `collect_drawings` output serialises cleanly.
 
 ### Stage 3 -- real types for geometry
 

@@ -1,5 +1,17 @@
-"""
-TODO change this class to use rule.py type rather than rolling your own math types.
+"""Drawings: what a sheet shows, and the dimensions on it.
+
+Two halves. The LAYOUT half -- Drawing, Viewport, Subdivision and the sizes --
+is about where things sit on a page. The MEASURING half is about what a pair of
+features can be measured as and what the measurement comes to, and the viewer
+keeps a copy of some of it in kigumi/webview/measurements.js; the docstrings
+below say which, and a test runs the two against each other.
+
+Vectors here are rule.py's V3, as everywhere else in the library. The types a
+measurement arrives as off the wire -- lists and tuples out of JSON -- are taken
+at the edge and converted once; see VectorLike.
+
+See docs/measurement-spec.md, and docs/drawing-rule-migration.md for what is
+still to do.
 """
 
 import math
@@ -310,14 +322,29 @@ class MeasureSpan:
     set instead, for a plane. All three are None for a point.
     """
 
-    at: Tuple[float, float, float]
-    direction: Optional[Tuple[float, float, float]] = None
+    at: V3
+    direction: Optional[V3] = None
+    #: Stations along `direction`, not a place, so this stays a pair of numbers.
     interval: Optional[Tuple[float, float]] = None
-    normal: Optional[Tuple[float, float, float]] = None
+    normal: Optional[V3] = None
     #: For a LINE, the way out of the material across it -- an arris bisects the
     #: two faces that form it. Only used to decide which side an angle opens on,
     #: and absent whenever nothing could work it out.
-    outward: Optional[Tuple[float, float, float]] = None
+    outward: Optional[V3] = None
+
+    def __post_init__(self):
+        """Take a span however it is written, and hold it as vectors.
+
+        Callers build these from whatever they have -- a tuple off the wire, a
+        list from a cropped boundary -- and should not each have to convert.
+        """
+        for name in ("at", "direction", "normal", "outward"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, Matrix):
+                object.__setattr__(self, name, _v3(value))
+        if self.interval is not None:
+            object.__setattr__(
+                self, 'interval', tuple(float(end) for end in self.interval))
 
     @property
     def is_point(self) -> bool:
@@ -331,7 +358,26 @@ class MeasureSpan:
     def is_line(self) -> bool:
         return self.direction is not None
 
-    def ends(self) -> Tuple[Tuple[float, float, float], ...]:
+    @property
+    def along(self) -> V3:
+        """Which way this line runs, unit length. Ask only a line.
+
+        Here so that the rules for lines can say `span.along` and mean it: the
+        field is optional because a point has no direction, and every one of
+        those rules has already established it is not looking at a point.
+        """
+        if self.direction is None:
+            raise ValueError(f"{self!r} has no direction: only a line runs a way")
+        return _unit(self.direction)
+
+    @property
+    def facing(self) -> V3:
+        """Which way this plane faces, unit length. Ask only a plane."""
+        if self.normal is None:
+            raise ValueError(f"{self!r} has no normal: only a plane faces a way")
+        return _unit(self.normal)
+
+    def ends(self) -> Tuple[V3, ...]:
         """The two extremities, or the point itself.
 
         A plane has no extremities along any one direction, so it answers with
@@ -340,9 +386,9 @@ class MeasureSpan:
         """
         if self.is_point or self.is_plane:
             return (self.at,)
-        at, unit = _v3(self.at), _unit(self.direction)
+        at, unit = self.at, self.along
         return tuple(
-            tuple(at + unit * station)
+            at + unit * station
             for station in (self.interval or (0.0, 0.0))
         )
 
@@ -362,37 +408,37 @@ def _at_station(span: MeasureSpan, along: VectorLike, station: float):
     """The point on a span that sits at a given station along `along`."""
     if span.is_point:
         return span.at
-    unit = _unit(span.direction)
+    unit = span.along
     rate = _dot(unit, along)
     if abs(rate) < 1e-12:
         return span.at
     step = (station - _dot(span.at, along)) / rate
-    return tuple(_v3(span.at) + unit * step)
+    return span.at + unit * step
 
 
 def _foot_on(span: MeasureSpan, point: VectorLike):
     """Where a perpendicular from `point` meets a span, kept on the span."""
-    at, unit = _v3(span.at), _unit(span.direction)
+    at, unit = span.at, span.along
     station = _dot(_v3(point) - at, unit)
     low, high = span.interval or (station, station)
     # Clamped: a dimension whose end floats off the end of a short edge points
     # at nothing, and the nearest place on the feature is the honest answer.
     station = max(low, min(high, station))
-    return tuple(at + unit * station)
+    return at + unit * station
 
 
-def _representative_point(span: MeasureSpan) -> Tuple[float, float, float]:
+def _representative_point(span: MeasureSpan) -> V3:
     """The one point that stands for a span when something must be dropped onto it.
 
     A point is itself. A line offers the middle of its surviving extent, which is
     where a reader would put a finger on it.
     """
     if not span.is_line:
-        return tuple(span.at)
+        return span.at
     low, high = span.interval or (0.0, 0.0)
-    unit = _unit(span.direction)
+    unit = span.along
     middle = (low + high) / 2
-    return tuple(_v3(span.at) + unit * middle)
+    return span.at + unit * middle
 
 
 def _foot_on_plane(span: MeasureSpan, point: VectorLike):
@@ -404,16 +450,16 @@ def _foot_on_plane(span: MeasureSpan, point: VectorLike):
     which is when the foot lands on the face anyway. Clamping properly wants the
     face's corners -- see the note in cutcsg about extents being an AABB.
     """
-    point, unit = _v3(point), _unit(span.normal)
-    gap = _dot(point - _v3(span.at), unit)
-    return tuple(point - unit * gap)
+    point, unit = _v3(point), span.facing
+    gap = _dot(point - span.at, unit)
+    return point - unit * gap
 
 
 def _closest_on_line(point, at, direction):
     """Where a line comes nearest a point."""
     at, unit = _v3(at), _unit(direction)
     step = _dot(_v3(point) - at, unit)
-    return tuple(at + unit * step)
+    return at + unit * step
 
 
 def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
@@ -422,7 +468,7 @@ def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
     None when they are parallel, which has no corner to stand in -- and admits a
     distance rather than an angle anyway.
     """
-    one, other = _unit(first.normal), _unit(second.normal)
+    one, other = first.facing, second.facing
     # The UNNORMALISED cross, whose square length is the sine between the planes
     # squared. This asked _cross, which normalises, so the length was always
     # exactly one: the refusal below could only ever fire on two EXACTLY parallel
@@ -435,11 +481,11 @@ def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
     # The arithmetic itself is geometry's, which has the same closed form and a
     # test of its own. What stays here is the refusal above: how near parallel
     # is too near to stand in is a question about dimensioning, not about planes.
-    crossing = intersect_planes(Plane(normal=one, point=_v3(first.at)),
-                                Plane(normal=other, point=_v3(second.at)))
+    crossing = intersect_planes(Plane(normal=one, point=first.at),
+                                Plane(normal=other, point=second.at))
     if crossing is None:
         return None
-    return tuple(crossing.point), _unit(crossing.direction)
+    return crossing.point, _unit(crossing.direction)
 
 
 def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = None):
@@ -459,7 +505,7 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
     if not any(abs(part) > 1e-9 for part in unit):
         return None
     if span.is_line:
-        stations = [_dot(_v3(end) - _v3(vertex), unit) for end in span.ends()]
+        stations = [_dot(end - vertex, unit) for end in span.ends()]
         low, high = min(stations), max(stations)
         straddles = low < -1e-9 < 1e-9 < high
         outward = other.outward if other is not None else None
@@ -469,7 +515,7 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
             # The longer side, which for an edge running off one way is that way.
             lean = high + low
     else:
-        lean = _dot(unit, _v3(span.at) - _v3(vertex))
+        lean = _dot(unit, span.at - vertex)
     return -unit if lean < 0 else unit
 
 
@@ -583,11 +629,11 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan):
         if crossing is None:
             return None
         point, along = crossing
-        middle = (_v3(first.at) + _v3(second.at)) / 2
+        middle = (first.at + second.at) / 2
         vertex = _closest_on_line(middle, point, along)
         # Square to the shared corner, and lying in its own face.
-        rays = (_ray_toward(_cross(along, _unit(first.normal)), vertex, first),
-                _ray_toward(_cross(along, _unit(second.normal)), vertex, second))
+        rays = (_ray_toward(_cross(along, first.facing), vertex, first),
+                _ray_toward(_cross(along, second.facing), vertex, second))
     elif first.is_line and second.is_line:
         placed = _closest_between(first, second)
         if placed is None:
@@ -641,7 +687,7 @@ def _closest_between(first: MeasureSpan, second: MeasureSpan):
     place to stand, and each station is clamped to what survives of its edge so
     the arc lands on the timber rather than out past the end of it.
     """
-    one, other = _unit(first.direction), _unit(second.direction)
+    one, other = first.along, second.along
     facing = _dot(one, other)
     # SQUARED -- it is the sine between the two, squared -- and compared against
     # a tolerance the rest of the file spends on a plain cosine. rule.py has
@@ -652,15 +698,15 @@ def _closest_between(first: MeasureSpan, second: MeasureSpan):
     spread = 1 - facing * facing
     if spread < PARALLEL_EPSILON:
         return None
-    gap = _v3(first.at) - _v3(second.at)
+    gap = first.at - second.at
     lean_one, lean_other = _dot(one, gap), _dot(other, gap)
     station_one = (facing * lean_other - lean_one) / spread
     station_other = (lean_other - facing * lean_one) / spread
     station_one = _clamp_to(station_one, first.interval)
     station_other = _clamp_to(station_other, second.interval)
-    on_one = _v3(first.at) + one * station_one
-    on_other = _v3(second.at) + other * station_other
-    return tuple((on_one + on_other) / 2)
+    on_one = first.at + one * station_one
+    on_other = second.at + other * station_other
+    return (on_one + on_other) / 2
 
 
 def _clamp_to(station: float, interval):
@@ -679,16 +725,16 @@ def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan):
     dropping the point back onto the line to recover the step it had just
     worked out.
     """
-    unit, normal = _unit(line.direction), _unit(plane.normal)
+    unit, normal = line.along, plane.facing
     rate = _dot(unit, normal)
     if are_vectors_perpendicular(unit, normal, eps=PARALLEL_EPSILON):
         # Running along the face: it never crosses, so stand where the edge is
         # and drop that onto the face.
         return _foot_on_plane(plane, _representative_point(line))
-    at = _v3(line.at)
-    step = _dot(_v3(plane.at) - at, normal) / rate
+    at = line.at
+    step = _dot(plane.at - at, normal) / rate
     step = _clamp_to(step, line.interval)
-    return tuple(at + unit * step)
+    return at + unit * step
 
 
 def _flatten_onto(direction, normal):
@@ -752,8 +798,8 @@ def distance_anchors(
     if named in ("projected_horizontal_distance", "projected_vertical_distance"):
         axis = _unit((axes or {}).get(
             "right" if named.endswith("horizontal_distance") else "up") or (1, 0, 0))
-        at = _v3(first.at)
-        offset = _dot(_v3(second.at) - at, axis)
+        at = first.at
+        offset = _dot(second.at - at, axis)
         return (first.at, tuple(at + axis * offset))
 
     # A PLANE is measured to by dropping a perpendicular onto it. The anchor is
@@ -783,7 +829,7 @@ def distance_anchors(
     if second.is_point:
         return (_foot_on(first, second.at), second.at)
 
-    along = _unit(first.direction)
+    along = first.along
     first_low, first_high = _stations(first, along)
     second_low, second_high = _stations(second, along)
     low, high = max(first_low, second_low), min(first_high, second_high)
@@ -962,17 +1008,17 @@ class MeasurementPlane:
     """
 
     #: A point on the plane, in world space.
-    at: Tuple[float, float, float]
+    at: V3
     #: The plane's normal, in world space. Not required to be unit length on the
     #: way in; compared up to sign, since a plane has no front.
-    normal: Tuple[float, float, float]
+    normal: V3
 
     def __post_init__(self):
         for name in ("at", "normal"):
-            value = tuple(float(part) for part in getattr(self, name))
-            if len(value) != 3:
-                raise ValueError(f"A plane's {name} is [x, y, z], got {getattr(self, name)!r}")
-            object.__setattr__(self, name, value)
+            given = getattr(self, name)
+            if len(given) != 3:
+                raise ValueError(f"A plane's {name} is [x, y, z], got {given!r}")
+            object.__setattr__(self, name, _v3(given))
         if not any(self.normal):
             raise ValueError("A plane's normal cannot be zero length")
 
