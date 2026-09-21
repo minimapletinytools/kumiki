@@ -5,8 +5,9 @@ and about 120 lines of `for i in range(3)` -- instead of using the `Matrix`/`V3`
 types and helpers in `rule.py`, which every other file in the library uses. This
 is the plan for moving it over.
 
-Status: **Stages 0-3 are done, and step A of the seam change.** Stage 4 and
-step B of the seam change are not started. Baseline recorded below.
+Status: **Stages 0-4 are done, and step A of the seam change.** Step B of the
+seam change is the only piece left, and it is waiting on a decision. Baseline
+recorded below.
 
 ## Why it is the way it is
 
@@ -425,6 +426,29 @@ With the math in rule.py terms, make the remaining squared comparison use
 `safe_zero_test_sq` and state each threshold as an angle in the comment. Needs
 its own test pinning the ~5.74°/~8.11° ordering, which is currently load-bearing
 and accidental. Do not fold into Stage 1.
+
+**Done**, and there were two squared comparisons left, not one --
+`_plane_crossing`'s stopped being dead once Stage 1 gave it a raw cross. Both
+now use `safe_zero_test_sq`, which squares the tolerance rather than the value,
+so `PARALLEL_EPSILON` means a plain sine in all three corner rules:
+`_line_meets_plane` already read it that way, and the other two now agree at
+0.573° instead of 5.739°.
+
+The two readings of the one epsilon are now written down where it is defined.
+`kinds_for` asks it of a COSINE and calls a pair parallel below 8.110° -- the
+drafting rule, deciding whether an angle is offered at all. The three corner
+rules ask it of a SINE and refuse below 0.573° -- a conditioning guard standing
+behind the first. **The order is the invariant**: the guard must refuse a
+narrower band than the table, or a pair could be offered an angle and then be
+unable to say where its vertex is.
+
+`TestAPairOfferedAnAngleCanAlwaysSayWhereItIs` pins that behaviourally across
+all three shapes at thirteen angles either side of both thresholds. It was
+checked for teeth: widening the corner guard to ~12° fails it at 8.2° and 12°,
+which are exactly the angles the table admits and the guard would refuse.
+
+No live behaviour change. The band that moved, 0.58°-5.73°, is unreachable:
+`kinds_for` admits no angle below 8.110°, so nothing gets that far.
 
 ### Sequencing, across both tracks
 

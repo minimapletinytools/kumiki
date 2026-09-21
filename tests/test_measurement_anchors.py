@@ -1170,3 +1170,82 @@ class TestAnObliqueCornerIsStillTheCorner:
         assert rays["vertex"][1] == pytest.approx(300.0, abs=1e-6)
         assert rays["vertex"][2] == pytest.approx(1100.0, abs=1e-6)
         assert abs(rays["normal"][0]) == pytest.approx(1.0, abs=1e-6)
+
+
+class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
+    """The two readings of PARALLEL_EPSILON, and the order they have to keep.
+
+    `kinds_for` asks it of a COSINE and so calls a pair parallel below about 8.1
+    degrees: that is the drafting rule, and it decides whether an angle is
+    offered. The three rules that place a corner ask it of a SINE and refuse
+    below about 0.57: that is a conditioning guard, for a pair that reaches them
+    anyway.
+
+    If the guard ever refused a WIDER band than the drafting rule, a pair could
+    be offered an angle and then be unable to say where its vertex is -- the
+    viewer would light it, the click would take it, and nothing would draw. The
+    two were within 2.4 degrees of that once, and by accident rather than by
+    anyone having checked.
+    """
+
+    #: Angles either side of both thresholds, and well past them.
+    APART = [0.1, 0.5, 0.6, 1, 3, 5.7, 5.8, 8, 8.2, 12, 30, 45, 89]
+
+    def _turned(self, degrees_apart, shape):
+        from kumiki.drawing import MeasureSpan
+
+        turn = math.radians(degrees_apart)
+        second = v((0, math.cos(turn), math.sin(turn)))
+        if shape == "planes":
+            return (MeasureSpan(at=v((100, 0, 200)), normal=v((0, 1, 0))),
+                    MeasureSpan(at=v((100, -50, 200)), normal=second))
+        if shape == "lines":
+            return (MeasureSpan(at=v((100, 0, 200)), direction=v((0, 1, 0)),
+                                interval=(0.0, 300.0)),
+                    MeasureSpan(at=v((100, -50, 260)), direction=second,
+                                interval=(0.0, 300.0)))
+        # A line against a plane runs the other way round: it is parallel to the
+        # face when it lies IN it, so the pair crosses as the line tips out.
+        return (MeasureSpan(at=v((100, 0, 200)), direction=second,
+                            interval=(0.0, 300.0)),
+                MeasureSpan(at=v((100, -50, 200)), normal=v((0, 1, 0))))
+
+    @pytest.mark.parametrize("shape", ["planes", "lines", "line and plane"])
+    @pytest.mark.parametrize("degrees_apart", APART)
+    def test_whenever_an_angle_is_admitted_the_corner_can_be_placed(
+            self, shape, degrees_apart):
+        from kumiki.drawing import (MeasurementOperation, angle_rays,
+                                    solid_form, solid_kinds)
+
+        first, second = self._turned(degrees_apart, shape)
+        # Ask the table what this pair admits, through the same geometry the
+        # spans describe.
+        one = self._geometry(first)
+        other = self._geometry(second)
+        admits_angle = any(kind.operation is MeasurementOperation.ANGLE
+                           for kind in solid_kinds(one, other))
+
+        if not admits_angle:
+            return
+
+        assert angle_rays(first, second) is not None, (
+            f"{shape} {degrees_apart} degrees apart are offered an angle "
+            f"but cannot say where its corner is")
+
+    def _geometry(self, span):
+        from kumiki.geometry import Line, Plane
+
+        if span.is_plane:
+            return Plane(point=span.at, normal=span.normal)
+        return Line(point=span.at, direction=span.direction)
+
+    def test_and_the_guard_refuses_a_narrower_band_than_the_table(self):
+        """Stated as the numbers, so moving either epsilon fails here first."""
+        from kumiki.drawing import PARALLEL_EPSILON
+
+        # kinds_for asks it of a cosine; the corner guards ask it of a sine.
+        drafting = math.degrees(math.acos(1 - PARALLEL_EPSILON))
+        corner = math.degrees(math.asin(PARALLEL_EPSILON))
+
+        assert corner < drafting
+        assert (drafting, corner) == pytest.approx((8.110, 0.573), abs=1e-3)

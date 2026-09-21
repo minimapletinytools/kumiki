@@ -24,7 +24,7 @@ from .identity import (DrawingId, FeaturePath, MeasurementId, TimberPath,
                        ViewportId, identity_order)
 from .rule import (Matrix, Numeric, V3, are_vectors_parallel,
                    are_vectors_perpendicular, create_v3, cross_product,
-                   safe_dot_product, safe_norm)
+                   safe_dot_product, safe_norm, safe_zero_test_sq)
 
 
 class MeasurementSpace(Enum):
@@ -200,6 +200,17 @@ ALIGNMENT_EPSILON = 1e-3
 #: Two projected directions within this of parallel are treated as parallel: the
 #: angle between them would be a number nobody wrote down deliberately, and
 #: their separation is what was meant.
+#:
+#: It is read two ways, and the difference matters. `kinds_for` asks it of a
+#: COSINE, through are_vectors_parallel, and so calls a pair parallel below
+#: about 8.1 degrees -- that is the drafting rule, and it decides whether a pair
+#: is offered an angle at all. The three rules that place a corner ask it of a
+#: SINE, and refuse below about 0.57 degrees -- that is a conditioning guard,
+#: standing behind the first for a pair that somehow reaches them anyway.
+#:
+#: The order is what keeps them from arguing: the corner guards must refuse a
+#: NARROWER band than the drafting rule, or a pair could be offered an angle and
+#: then be unable to say where its vertex is. A test pins that.
 PARALLEL_EPSILON = 1e-2
 
 
@@ -498,7 +509,11 @@ def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
     # instead of by that sine -- putting the corner a factor of it toward the
     # world origin, which is right only where the two happen to meet square.
     along = _raw_cross(one, other)
-    if _dot(along, along) < PARALLEL_EPSILON:
+    # safe_zero_test_sq because that length is SQUARED: it squares the tolerance
+    # itself, so PARALLEL_EPSILON means here what it means everywhere else in
+    # this file -- a plain sine. Compared raw it read as a tolerance on the
+    # square and refused anything under 5.7 degrees instead of 0.57.
+    if safe_zero_test_sq(_dot(along, along), eps=PARALLEL_EPSILON):
         return None
     # The arithmetic itself is geometry's, which has the same closed form and a
     # test of its own. What stays here is the refusal above: how near parallel
@@ -710,14 +725,11 @@ def _closest_between(first: MeasureSpan, second: MeasureSpan):
     """
     one, other = first.along, second.along
     facing = _dot(one, other)
-    # SQUARED -- it is the sine between the two, squared -- and compared against
-    # a tolerance the rest of the file spends on a plain cosine. rule.py has
-    # safe_zero_test_sq for exactly this. Left alone rather than quietly
-    # retuned: at 1e-2 this refuses below 5.74 degrees while kinds_for has
-    # already called anything under 8.11 degrees parallel, so the two are
-    # ordered safely today and moving either alone would un-order them.
+    # The sine between the two, SQUARED, so safe_zero_test_sq -- which squares
+    # the tolerance rather than the value, leaving PARALLEL_EPSILON meaning a
+    # plain sine here as it does for a line against a plane just below.
     spread = 1 - facing * facing
-    if spread < PARALLEL_EPSILON:
+    if safe_zero_test_sq(spread, eps=PARALLEL_EPSILON):
         return None
     gap = first.at - second.at
     lean_one, lean_other = _dot(one, gap), _dot(other, gap)
