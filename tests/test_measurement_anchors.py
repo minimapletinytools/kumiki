@@ -253,8 +253,12 @@ class TestOnARealFrame:
                 for measure in viewport.get("measurements") or []:
                     if measure.get("unresolved") or not axes:
                         continue
+                    # The measurement carries the wire form, which is what
+                    # goes to the viewer; the rules take the primitive, so this
+                    # converts exactly as the runner does.
                     admitted = projected_kinds(
-                        measure["a"].get("geometry"), measure["b"].get("geometry"),
+                        runner._geometry_from_wire(measure["a"].get("geometry")),
+                        runner._geometry_from_wire(measure["b"].get("geometry")),
                         axes["look"])
                     yield measure, axes, admitted
 

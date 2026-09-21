@@ -28,7 +28,30 @@ from kumiki.drawing import (
 from kumiki.identity import (DerivedFeaturePath, FeatureRef, MeasurementId,
                              ResolvedTimberPath,
                              SingleFeaturePath)
+from kumiki.geometry import Line, Plane, Point
+from kumiki.rule import create_v3
 from tests.testing_shavings import load_module, present
+
+
+def geometry(wire):
+    """A wire-form geometry as the primitive kumiki.drawing takes.
+
+    The dicts in this file are the WIRE form on purpose: the same values go to
+    node, as JSON, for the parity tests below. Python stopped taking that shape
+    directly, so this converts it the way kigumi/runner.py does at the same
+    edge.
+    """
+    if wire is None:
+        return None
+    at = create_v3(*(wire.get("at") or (0, 0, 0)))
+    kind = wire.get("kind")
+    if kind == "point":
+        return Point(position=at)
+    if kind == "line":
+        return Line(point=at, direction=create_v3(*(wire.get("direction") or (0, 0, 0))))
+    if kind == "plane":
+        return Plane(point=at, normal=create_v3(*(wire.get("normal") or (0, 0, 0))))
+    return None
 
 def _feature_of(anchor) -> str:
     """The feature an anchor names.
@@ -167,28 +190,28 @@ class TestWhatTheSolidAdmits:
     def test_a_face_is_a_plane_from_wherever_it_is_seen(self):
         from kumiki.drawing import MeasurementFeature, solid_form
 
-        assert solid_form(self.TOP)[0] is MeasurementFeature.PLANE
+        assert solid_form(geometry(self.TOP))[0] is MeasurementFeature.PLANE
 
     def test_an_edge_is_a_line_even_when_it_points_at_you(self):
         from kumiki.drawing import MeasurementFeature, solid_form
 
-        assert solid_form(self.UPRIGHT)[0] is MeasurementFeature.LINE
+        assert solid_form(geometry(self.UPRIGHT))[0] is MeasurementFeature.LINE
 
     def test_two_faces_meeting_at_a_corner_admit_an_angle(self):
         from kumiki.drawing import solid_kinds
 
-        assert [k.name for k in solid_kinds(self.SIDE, self.TOP)] == ["angle"]
+        assert [k.name for k in solid_kinds(geometry(self.SIDE), geometry(self.TOP))] == ["angle"]
 
     def test_two_parallel_faces_admit_the_distance_between_them(self):
         from kumiki.drawing import solid_kinds
 
-        assert [k.name for k in solid_kinds(self.SIDE, self.FAR_SIDE)] == [
+        assert [k.name for k in solid_kinds(geometry(self.SIDE), geometry(self.FAR_SIDE))] == [
             "perpendicular_distance"]
 
     def test_crossing_edges_admit_an_angle(self):
         from kumiki.drawing import solid_kinds
 
-        assert [k.name for k in solid_kinds(self.UPRIGHT, self.ALONG)] == ["angle"]
+        assert [k.name for k in solid_kinds(geometry(self.UPRIGHT), geometry(self.ALONG))] == ["angle"]
 
     def test_an_edge_lying_in_a_face_is_parallel_to_it(self):
         """A normal is not a direction.
@@ -199,18 +222,18 @@ class TestWhatTheSolidAdmits:
         """
         from kumiki.drawing import solid_kinds
 
-        assert [k.name for k in solid_kinds(self.UPRIGHT, self.SIDE)] == [
+        assert [k.name for k in solid_kinds(geometry(self.UPRIGHT), geometry(self.SIDE))] == [
             "perpendicular_distance"]
 
     def test_an_edge_square_to_a_face_crosses_it(self):
         from kumiki.drawing import solid_kinds
 
-        assert [k.name for k in solid_kinds(self.ALONG, self.SIDE)] == ["angle"]
+        assert [k.name for k in solid_kinds(geometry(self.ALONG), geometry(self.SIDE))] == ["angle"]
 
     def test_a_feature_lying_on_nothing_admits_nothing(self):
         from kumiki.drawing import solid_kinds
 
-        assert solid_kinds({"kind": "barrel"}, self.SIDE) == ()
+        assert solid_kinds(geometry({"kind": "barrel"}), geometry(self.SIDE)) == ()
 
     def test_the_solid_never_offers_a_direction_of_the_sheet(self):
         """Horizontal and vertical are the page's, and the solid has no up."""
@@ -218,7 +241,7 @@ class TestWhatTheSolidAdmits:
 
         for a in (self.SIDE, self.TOP, self.UPRIGHT, self.ALONG):
             for b in (self.SIDE, self.TOP, self.UPRIGHT, self.ALONG):
-                for kind in solid_kinds(a, b):
+                for kind in solid_kinds(geometry(a), geometry(b)):
                     assert kind.direction is MeasurementDirection.PERPENDICULAR
 
 
@@ -309,7 +332,7 @@ class TestTheViewerAgrees:
         from kumiki.drawing import solid_kinds
 
         theirs = self._viewer_solid()
-        mine = [[kind.name for kind in solid_kinds(a, b)]
+        mine = [[kind.name for kind in solid_kinds(geometry(a), geometry(b))]
                 for a in self.CASES for b in self.CASES]
 
         assert theirs == mine
@@ -325,8 +348,8 @@ class TestTheViewerAgrees:
 
         mine = []
         for look in self.LOOKS:
-            for geometry in self.CASES:
-                form, direction = projected_form(geometry, look)
+            for case in self.CASES:
+                form, direction = projected_form(geometry(case), look)
                 mine.append([
                     form.value if form is not None else "none",
                     list(direction) if direction is not None else None,
@@ -427,9 +450,10 @@ class TestTheViewerAgrees:
                     # A None case is "nothing to measure", and stays None.
                     a = None if one is None else dict(one, at=self.A_AT)
                     b = None if other is None else dict(other, at=self.B_AT)
-                    admitted = (solid_kinds(a, b) if space == "3d"
-                                else projected_kinds(a, b, self.LOOKS[0]))
-                    mine.append([pair_separation(a, b, kind, axes)
+                    one_at, other_at = geometry(a), geometry(b)
+                    admitted = (solid_kinds(one_at, other_at) if space == "3d"
+                                else projected_kinds(one_at, other_at, self.LOOKS[0]))
+                    mine.append([pair_separation(one_at, other_at, kind, axes)
                                  for kind in admitted])
 
         theirs = self._viewer_values()
@@ -489,8 +513,10 @@ class TestTheViewerAgrees:
         for one in self.CASES:
             for other in self.CASES:
                 for space in ("projected", "3d"):
-                    admitted = (solid_kinds(one, other) if space == "3d"
-                                else projected_kinds(one, other, self.LOOKS[0]))
+                    admitted = (solid_kinds(geometry(one), geometry(other))
+                                if space == "3d"
+                                else projected_kinds(geometry(one), geometry(other),
+                                                     self.LOOKS[0]))
                     mine.append([kind.name for kind in admitted])
 
         assert self._viewer_status_kinds() == mine

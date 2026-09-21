@@ -2638,6 +2638,7 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
     """
 
     LOOK = [0, 1, 0]
+    #: The held end, in the wire form the viewer sends it as.
     HELD_FACE = {"kind": "plane", "normal": [0, 0, 1], "at": [0, 0, 0]}
 
     def _slot(self, frame, member):
@@ -2692,7 +2693,16 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
         _plain, held = self._where_the_default_is_an_edge(
             mortise_and_tenon_frame, "receiving_timber")
 
-        assert projected_kinds(self.HELD_FACE, held["geometry"], self.LOOK)
+        # Both ends as the rules take them. The wire form is what crosses to
+        # the viewer and back; kumiki.drawing works in the primitives.
+        from kumiki.geometry import Plane
+        from kumiki.rule import create_v3
+
+        wire = held["geometry"]
+        assert projected_kinds(
+            Plane(point=create_v3(0, 0, 0), normal=create_v3(0, 0, 1)),
+            Plane(point=create_v3(*wire["at"]), normal=create_v3(*wire["normal"])),
+            self.LOOK)
 
     def test_holding_nothing_leaves_the_ordinary_answer_standing(
             self, mortise_and_tenon_frame):

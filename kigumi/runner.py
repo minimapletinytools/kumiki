@@ -1955,15 +1955,17 @@ def _best_matching_candidate(
     if not held_geometry or not look or not feature_hits:
         return None
 
-    held_kind = held_geometry.get("kind")
+    held = _geometry_from_wire(held_geometry)
     best = None
     for index, hit in enumerate(feature_hits):
         located = hit.feature.locate(hit.owner)
-        geometry = _located_geometry_payload(located, timber)
-        if not geometry or not _kinds_for_pair(held_geometry, geometry, look, payload or {}):
+        geometry = _located_geometry(located, timber)
+        if not geometry or not _kinds_for_pair(held, geometry, look, payload or {}):
             continue
-        # Earlier is more specific, so among equals the first wins.
-        rank = (0 if geometry.get("kind") == held_kind else 1, index)
+        # Earlier is more specific, so among equals the first wins. Same TYPE as
+        # the held end breaks the tie -- an edge matching an edge -- which is
+        # now asked of the two primitives rather than of two "kind" strings.
+        rank = (0 if type(geometry) is type(held) else 1, index)
         if best is None or rank < best[0]:
             best = (rank, index)
     return None if best is None else best[1]
@@ -2000,20 +2002,23 @@ def _pick_verdict(
     if located_pick is None:
         return {"kinds": [], "plane": None, "anchors": None,
                 "reason": "nothing-under-pointer"}
-    geometry = _located_geometry_payload(located_pick[2], timber)
+    geometry = _located_geometry(located_pick[2], timber)
     if geometry is None:
         # A cylinder's barrel, a lofted side: good to select, nothing to
         # measure to.
         return {"kinds": [], "plane": None, "anchors": None,
                 "reason": "not-measurable"}
+    # The end already held comes back as the viewer stored it, so it is turned
+    # into the shape the rules take. This is the one edge that conversion
+    # happens at; everything past it works in primitives.
+    held = _geometry_from_wire(payload["heldGeometry"])
     # The plane comes first and stands whether or not a kind does: where a pair
     # would be measured is a property of the two features and the camera, not of
     # what the pair happens to admit.
     plane = _plane_for_pick(located_pick, timber, payload)
     # Structured, not named: `angle` composes for a solid angle and is also what
     # every measurement written before spaces called a projected one.
-    admitted = _kinds_for_pair(payload["heldGeometry"], geometry,
-                               payload["look"], payload)
+    admitted = _kinds_for_pair(held, geometry, payload["look"], payload)
     if not admitted:
         return {"kinds": [], "plane": plane, "anchors": None, "reason": "no-kind"}
     # A kind that comes to nothing is not a kind this pair admits. Asked of the
@@ -2028,7 +2033,7 @@ def _pick_verdict(
     axes = {"look": payload["look"], "right": payload.get("right"),
             "up": payload.get("up")}
     kinds = [kind.as_wire() for kind in admitted
-             if not measures_nothing(payload["heldGeometry"], geometry, kind, axes)]
+             if not measures_nothing(held, geometry, kind, axes)]
     if not kinds:
         # Refused here, so the hover paints it red and the click says why --
         # both following from the verdict without either knowing this rule.
@@ -2062,7 +2067,7 @@ def _pick_space(payload: Dict[str, Any]) -> Any:
 
 
 def _kinds_for_pair(
-    one: Optional[Dict[str, Any]], other: Optional[Dict[str, Any]],
+    one: Optional[Any], other: Optional[Any],
     look: Sequence[float], payload: Dict[str, Any],
 ) -> Tuple[Any, ...]:
     """What a pair admits, judged in whichever space the view is.
@@ -2121,8 +2126,9 @@ def _pick_placement(
     if picked_span is None:
         return empty
 
-    geometry = _located_geometry_payload(located_pick[2], timber)
-    admitted = _kinds_for_pair(placed[0].get("geometry"), geometry, normal, payload)
+    geometry = _located_geometry(located_pick[2], timber)
+    held_geometry = _geometry_from_wire(placed[0].get("geometry"))
+    admitted = _kinds_for_pair(held_geometry, geometry, normal, payload)
     if not admitted:
         return empty
     kind = admitted[0]
@@ -2132,7 +2138,7 @@ def _pick_placement(
     # it. docs/measuring-states.md asks for exactly this and only half had it:
     # the picture came from the verdict, the number was worked out again in the
     # viewer.
-    ends = {"a": {"geometry": placed[0].get("geometry")}, "b": {"geometry": geometry}}
+    ends = {"a": {"geometry": held_geometry}, "b": {"geometry": geometry}}
     if kind.operation.value == "angle":
         rays = angle_rays(held_span, picked_span)
         settled = _settled_measurement(
@@ -2856,7 +2862,8 @@ def _measure_span(
         if middle is None:
             return None
         at = to_world(middle)
-        normal = _normalize(_located_geometry_payload(located, timber)["normal"])
+        normal = _normalize(_vector3_to_floats(
+            _located_geometry(located, timber).normal))
         if solid_space:
             # A plane, not a line: measurable from anywhere rather than only
             # edge-on, and square to its normal in two directions rather than
@@ -2940,6 +2947,11 @@ def _resolve_measurement(
         resolved["unresolved"] = broken
         return resolved
 
+    # The resolved ends carry the wire form, since that is what goes to the
+    # viewer. The rules take primitives, so they are turned back once here
+    # rather than at each of the four places below that ask something of them.
+    ends = {key: _geometry_from_wire((resolved.get(key) or {}).get("geometry"))
+            for key in ("a", "b")}
     placeable = (
         spans.get("a") is not None and spans.get("b") is not None and plane is not None)
     if placeable:
@@ -2951,10 +2963,8 @@ def _resolve_measurement(
         # Judged in the same space, so what the pair admits and what its ends
         # came back as cannot disagree. Projecting a solid measurement here
         # called its faces AREAs and left it with no kind at all.
-        admitted = (
-            solid_kinds(resolved["a"].get("geometry"), resolved["b"].get("geometry"))
-            if solid else projected_kinds(
-                resolved["a"].get("geometry"), resolved["b"].get("geometry"), plane))
+        admitted = (solid_kinds(ends["a"], ends["b"]) if solid
+                    else projected_kinds(ends["a"], ends["b"], plane))
         kind = declared or (admitted[0] if admitted else None)
         if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
             at_a, at_b = distance_anchors(spans["a"], spans["b"], kind, axes)
@@ -2968,7 +2978,9 @@ def _resolve_measurement(
             # neither of the features being measured.
             resolved["angle"] = angle_rays(spans["a"], spans["b"])
         resolved["settled"] = _settled_measurement(
-            resolved, declared, kind, admitted, solid, plane, axes)
+            {**resolved, "a": {"geometry": ends["a"]}, "b": {"geometry": ends["b"]},
+             "angle": resolved.get("angle")},
+            declared, kind, admitted, solid, plane, axes)
     return resolved
 
 
@@ -3286,8 +3298,12 @@ def _csg_roots_of(cut_timber: Any) -> List[Any]:
     ]
 
 
-def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, Any]]:
-    """A feature's unbounded geometry, in world space, as the viewer wants it.
+def _located_geometry(located: Any, timber: Any) -> Optional[Any]:
+    """A feature's unbounded geometry, in world space.
+
+    The same Point, Line or Plane the CSG located, carried out of the timber's
+    frame into the world's. This is what python measures with; the mapping the
+    viewer reads is this, serialised -- see _located_geometry_payload.
 
     A plane keeps its normal and a line its direction, because those are what
     decide whether two features are parallel once projected -- which is what
@@ -3295,30 +3311,75 @@ def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, A
     """
     from kumiki.geometry import Line, Plane, Point
 
-    def to_world(point: Any) -> List[float]:
-        return _vector3_to_floats(timber.transform.local_to_global(point))
+    def to_world(point: Any) -> Any:
+        return timber.transform.local_to_global(point)
 
-    def direction_to_world(direction: Any) -> List[float]:
+    def direction_to_world(direction: Any) -> Any:
         # A direction is rotated but not translated.
-        origin = timber.transform.local_to_global(direction * 0)
-        moved = timber.transform.local_to_global(direction)
-        return [moved[i, 0] - origin[i, 0] for i in range(3)]
+        return (timber.transform.local_to_global(direction)
+                - timber.transform.local_to_global(direction * 0))
 
     if isinstance(located, Point):
-        return {"kind": "point", "at": to_world(located.position)}
+        return Point(position=to_world(located.position))
     if isinstance(located, Line):
-        return {
-            "kind": "line",
-            "at": to_world(located.point),
-            "direction": direction_to_world(located.direction),
-        }
+        return Line(point=to_world(located.point),
+                    direction=direction_to_world(located.direction))
     if isinstance(located, Plane):
-        return {
-            "kind": "plane",
-            "at": to_world(located.point),
-            "normal": direction_to_world(located.normal),
-        }
+        # Plane, not whatever subclass it arrived as: an UnsignedPlane means
+        # "ignore the sign of the normal", which is a fact about the cut that
+        # declared it and not about the geometry being measured to.
+        return Plane(point=to_world(located.point),
+                     normal=direction_to_world(located.normal))
     return None
+
+
+def _geometry_payload(geometry: Any) -> Optional[Dict[str, Any]]:
+    """One of those, in the shape the viewer reads.
+
+    The wire keeps the mapping form -- a "kind" and two lists -- because that is
+    what crosses to JavaScript. Python stopped taking it: kumiki.drawing works
+    in the primitives, and this is where the one becomes the other.
+    """
+    from kumiki.geometry import Line, Plane, Point
+
+    if isinstance(geometry, Point):
+        return {"kind": "point", "at": _vector3_to_floats(geometry.position)}
+    if isinstance(geometry, Line):
+        return {"kind": "line", "at": _vector3_to_floats(geometry.point),
+                "direction": _vector3_to_floats(geometry.direction)}
+    if isinstance(geometry, Plane):
+        return {"kind": "plane", "at": _vector3_to_floats(geometry.point),
+                "normal": _vector3_to_floats(geometry.normal)}
+    return None
+
+
+def _geometry_from_wire(value: Optional[Dict[str, Any]]) -> Optional[Any]:
+    """The other direction: what the viewer sent, as the primitive it describes.
+
+    The held end of a half-made measurement comes back this way -- the viewer
+    keeps the geometry it was given and hands it back with the next pick.
+    """
+    from kumiki.geometry import Line, Plane, Point
+    from kumiki.rule import create_v3
+
+    def vector(parts: Any) -> Any:
+        return create_v3(*(float(part) for part in parts))
+
+    kind = (value or {}).get("kind")
+    if kind == "point":
+        return Point(position=vector(value["at"]))
+    if kind == "line":
+        return Line(point=vector(value["at"]),
+                    direction=vector(value.get("direction") or (0, 0, 0)))
+    if kind == "plane":
+        return Plane(point=vector(value["at"]),
+                     normal=vector(value.get("normal") or (0, 0, 0)))
+    return None
+
+
+def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, Any]]:
+    """A feature's unbounded geometry, in world space, as the viewer wants it."""
+    return _geometry_payload(_located_geometry(located, timber))
 
 
 def _feature_anchor(

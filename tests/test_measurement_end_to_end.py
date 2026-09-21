@@ -19,6 +19,24 @@ import pytest
 from tests.testing_shavings import load_module
 
 
+from kumiki.geometry import Line, Plane, Point
+from kumiki.rule import create_v3
+
+
+def at(position):
+    """A point feature, where the tests used to write a `point` mapping."""
+    return Point(position=create_v3(*position))
+
+
+def edge(through, direction):
+    return Line(point=create_v3(*through), direction=create_v3(*direction))
+
+
+def plane(through, normal):
+    return Plane(point=create_v3(*through), normal=create_v3(*normal))
+
+
+
 def _load_runner():
     root = Path(__file__).resolve().parent.parent
     spec = importlib.util.spec_from_file_location(
@@ -359,10 +377,10 @@ class TestAPairWithNothingBetweenThem:
     def test_what_counts_as_nothing_between_them(self):
         from kumiki.drawing import DEGENERATE_SEPARATION, measures_nothing
 
-        face = {"kind": "plane", "at": [0, 0, 0], "normal": [0, 0, 1]}
-        touching = {"kind": "point", "at": [5, 7, 0]}
-        barely = {"kind": "point", "at": [5, 7, DEGENERATE_SEPARATION / 10]}
-        clear = {"kind": "point", "at": [5, 7, 50]}
+        face = plane([0, 0, 0], [0, 0, 1])
+        touching = at([5, 7, 0])
+        barely = at([5, 7, DEGENERATE_SEPARATION / 10])
+        clear = at([5, 7, 50])
 
         assert measures_nothing(face, touching, SOLID_DISTANCE) is True
         assert measures_nothing(face, barely, SOLID_DISTANCE) is True
@@ -378,10 +396,10 @@ class TestAPairWithNothingBetweenThem:
         """
         from kumiki.drawing import measures_nothing, pair_separation
 
-        face = {"kind": "plane", "at": [0, 0, 0], "normal": [0, 0, 1]}
-        # An arris lying IN that face, running off to one side. Its `at` is
+        face = plane([0, 0, 0], [0, 0, 1])
+        # An arris lying IN that face, running off to one side. Its own point is
         # nowhere near the face's, and the separation is still nothing.
-        lying_in_it = {"kind": "line", "at": [900, -40, 0], "direction": [1, 0, 0]}
+        lying_in_it = edge([900, -40, 0], [1, 0, 0])
 
         assert pair_separation(face, lying_in_it, SOLID_DISTANCE) == 0.0
         assert measures_nothing(face, lying_in_it, SOLID_DISTANCE) is True
@@ -391,8 +409,8 @@ class TestAPairWithNothingBetweenThem:
         from kumiki.drawing import measures_nothing, pair_separation
 
         angle = MeasurementKind(MeasurementOperation.ANGLE, MeasurementSpace.THREE_D)
-        face = {"kind": "plane", "at": [0, 0, 0], "normal": [0, 0, 1]}
-        lying_in_it = {"kind": "line", "at": [900, -40, 0], "direction": [1, 0, 0]}
+        face = plane([0, 0, 0], [0, 0, 1])
+        lying_in_it = edge([900, -40, 0], [1, 0, 0])
 
         assert pair_separation(face, lying_in_it, angle) is None
         assert measures_nothing(face, lying_in_it, angle) is False
@@ -404,8 +422,8 @@ class TestAPairWithNothingBetweenThem:
         from kumiki.drawing import measures_nothing
 
         axes = {"look": (0, -1, 0), "right": (1, 0, 0), "up": (0, 0, 1)}
-        below = {"kind": "point", "at": [0, 0, 0]}
-        above = {"kind": "point", "at": [0, 0, 50]}
+        below = at([0, 0, 0])
+        above = at([0, 0, 50])
 
         def kind(direction):
             return MeasurementKind(MeasurementOperation.DISTANCE,

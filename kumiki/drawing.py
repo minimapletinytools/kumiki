@@ -19,7 +19,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
-from .geometry import Plane, intersect_planes
+from .geometry import Line, Plane, Point, intersect_planes
 from .identity import (DrawingId, FeaturePath, MeasurementId, TimberPath,
                        ViewportId, identity_order)
 from .rule import (Matrix, Numeric, V3, are_vectors_parallel,
@@ -231,10 +231,34 @@ def _dot(a: VectorLike, b: VectorLike) -> float:
     return safe_dot_product(_v3(a), _v3(b))
 
 
+#: What a feature IS: unbounded, in world space, and one of three shapes. The
+#: same primitives the CSG layer locates features as -- see kumiki.geometry --
+#: rather than a mapping with a "kind" string, which was a sum type spelled out
+#: by hand and left every function here unable to say what it took.
+#:
+#: The wire still carries the mapping form, because the viewer reads it; turning
+#: one into the other happens once, at that edge, in kigumi/runner.py.
+Geometry = Union[Point, Line, Plane]
+
+
+def _anchor_of(geometry: Optional[Geometry]) -> Optional[V3]:
+    """Where a feature sits.
+
+    A point IS its position. A line and a plane pass through many points and
+    carry one of them, which is as good as any for measuring the gap to
+    something else: what a distance comes to is squared up to whichever of the
+    pair constrains it, so which point was kept does not change the answer.
+    """
+    if isinstance(geometry, Point):
+        return geometry.position
+    if isinstance(geometry, (Line, Plane)):
+        return geometry.point
+    return None
+
+
 # TODO rename look to normal probably
-# TODO use a real type for geometry. Why does this file have no types omg
 def projected_form(
-    geometry: Optional[Mapping], look: VectorLike,
+    geometry: Optional[Geometry], look: VectorLike,
 ) -> Tuple[Optional[MeasurementFeature], Optional[V3]]:
     """What a feature behaves as once projected, and which way it runs.
 
@@ -257,18 +281,16 @@ def projected_form(
     for the second one is that the viewer projects on every pointer move and
     cannot ask python each time.
     """
-    geometry = geometry or {}
-    kind = geometry.get("kind")
     gaze = _unit(look)
-    if kind == "point":
+    if isinstance(geometry, Point):
         return (MeasurementFeature.POINT, None)
-    if kind == "line":
-        direction = _unit(geometry.get("direction") or (0, 0, 0))
+    if isinstance(geometry, Line):
+        direction = _unit(geometry.direction)
         if are_vectors_parallel(direction, gaze, eps=ALIGNMENT_EPSILON):
             return (MeasurementFeature.POINT, None)
         return (MeasurementFeature.LINE, _flatten(direction, gaze))
-    if kind == "plane":
-        normal = _unit(geometry.get("normal") or (0, 0, 0))
+    if isinstance(geometry, Plane):
+        normal = _unit(geometry.normal)
         if not are_vectors_perpendicular(normal, gaze, eps=ALIGNMENT_EPSILON):
             # Not edge-on: it covers the view, and an area has no distance.
             return (MeasurementFeature.AREA, None)
@@ -520,7 +542,7 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
 
 
 def pair_separation(
-    one: Optional[Mapping], other: Optional[Mapping],
+    one: Optional[Geometry], other: Optional[Geometry],
     kind: MeasurementKind, axes: Optional[Mapping] = None,
 ) -> Optional[float]:
     """What a distance between these two comes to, FROM THE FEATURES ALONE.
@@ -540,9 +562,8 @@ def pair_separation(
     """
     if kind.operation is not MeasurementOperation.DISTANCE:
         return None
-    at_one = (one or {}).get("at")
-    at_other = (other or {}).get("at")
-    if not at_one or not at_other:
+    at_one, at_other = _anchor_of(one), _anchor_of(other)
+    if at_one is None or at_other is None:
         return None
 
     look = _unit((axes or {}).get("look") or (0, 0, -1))
@@ -592,7 +613,7 @@ def pair_separation(
 
 
 def measures_nothing(
-    one: Optional[Mapping], other: Optional[Mapping],
+    one: Optional[Geometry], other: Optional[Geometry],
     kind: MeasurementKind, axes: Optional[Mapping] = None,
 ) -> bool:
     """Whether this pair has nothing between them to dimension.
@@ -842,7 +863,7 @@ def distance_anchors(
 
 
 def projected_kinds(
-    one: Optional[Mapping], other: Optional[Mapping], look: VectorLike,
+    one: Optional[Geometry], other: Optional[Geometry], look: VectorLike,
 ) -> Tuple[MeasurementKind, ...]:
     """Which kinds this pair admits, seen from `look`. Empty when none.
 
@@ -862,7 +883,7 @@ def projected_kinds(
 
 
 def solid_form(
-    geometry: Optional[Mapping],
+    geometry: Optional[Geometry],
 ) -> Tuple[Optional[MeasurementFeature], Optional[V3]]:
     """What a feature IS, with nothing projected away.
 
@@ -879,14 +900,12 @@ def solid_form(
     THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
     against each other.
     """
-    geometry = geometry or {}
-    kind = geometry.get("kind")
-    if kind == "point":
+    if isinstance(geometry, Point):
         return (MeasurementFeature.POINT, None)
-    if kind == "line":
-        return (MeasurementFeature.LINE, _unit(geometry.get("direction") or (0, 0, 0)))
-    if kind == "plane":
-        return (MeasurementFeature.PLANE, _unit(geometry.get("normal") or (0, 0, 0)))
+    if isinstance(geometry, Line):
+        return (MeasurementFeature.LINE, _unit(geometry.direction))
+    if isinstance(geometry, Plane):
+        return (MeasurementFeature.PLANE, _unit(geometry.normal))
     return (None, None)
 
 
@@ -913,7 +932,7 @@ def _solid_parallel(
 
 
 def solid_kinds(
-    one: Optional[Mapping], other: Optional[Mapping],
+    one: Optional[Geometry], other: Optional[Geometry],
 ) -> Tuple[MeasurementKind, ...]:
     """Which kinds this pair admits in the 3D view. Empty when none.
 

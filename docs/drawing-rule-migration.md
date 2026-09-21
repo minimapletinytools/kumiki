@@ -5,9 +5,8 @@ and about 120 lines of `for i in range(3)` -- instead of using the `Matrix`/`V3`
 types and helpers in `rule.py`, which every other file in the library uses. This
 is the plan for moving it over.
 
-Status: **Stages 0, 1 and 2 are done, and step A of the seam change.**
-Stage 3, Stage 4 and step B of the seam change are not started. Baseline
-recorded below.
+Status: **Stages 0-3 are done, and step A of the seam change.** Stage 4 and
+step B of the seam change are not started. Baseline recorded below.
 
 ## Why it is the way it is
 
@@ -394,6 +393,31 @@ converts down to dicts and drawing.py reads them back up.
 This resolves the "use a real type for geometry" TODO. Hold it separate: it
 touches the runner's payload layer, not just `drawing.py`. Stages 1 and 2 are
 worth doing whether or not this happens.
+
+**Done.** The six functions take `Point | Line | Plane` and dispatch on
+`isinstance`. `runner.py` grew three functions at the edge:
+`_located_geometry` (a feature's geometry in world space, as a primitive),
+`_geometry_payload` (that, in the mapping the viewer reads) and
+`_geometry_from_wire` (the way back, for the held end the viewer sends). The
+old `_located_geometry_payload` is now the first two composed.
+
+`_anchor_of` was needed because the three primitives name their point
+differently -- `Point.position`, `Line.point`, `Plane.point` -- which the
+mapping form had flattened to one `"at"` key.
+
+Two behaviours moved with it. `_best_matching_candidate` broke its tie on
+`geometry.get("kind") == held_kind`; it now asks `type(geometry) is type(held)`.
+`_measure_span` read `["normal"]` off a payload it built only to read one field,
+and takes it from the primitive.
+
+The dicts in `test_measurement_kinds.py` stayed dicts -- the same values go to
+node as JSON for the parity tests -- with one `geometry()` converter in the
+test file doing what the runner does at the same edge. The end-to-end tests
+build the primitives directly, which reads better than the mappings did.
+
+Checked against the Stage 2 file imported side by side, each fed the form it
+takes: form directions (90 components), the kind tables (288 pairs) and
+`pair_separation` (188 values) are **bit-identical**.
 
 ### Stage 4 -- optional, deliberate epsilon cleanup
 
