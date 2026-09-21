@@ -1,16 +1,5 @@
-"""What a frame asks to have drawn.
-
-A drawing names itself and the timbers it is of, and never a layout: where the
-views go on the page, which way their cameras face and at what scale are worked
-out from the timbers themselves. So a frame says what it wants drawn and never
-how to draw it, and the same drawing is as right on a small sheet as on a large
-one.
-
-Measurements hang off the viewport they are drawn in, because a drawing is a
-projection and a dimension only means anything in the plane it is projected
-onto. The same two features measured in the front elevation and in the plan view
-are two dimensions with two numbers, and either may be meaningless while the
-other is fine.
+"""
+TODO change this class to use rule.py type rather than rolling your own math types.
 """
 
 import math
@@ -24,22 +13,13 @@ from .rule import Numeric
 
 
 class MeasurementSpace(Enum):
-    """Whether a measurement is taken on the sheet or in the solid.
-
-    A drawing is a projection, so a dimension on one measures what the viewport
-    shows. The same two features also have a relationship in three dimensions,
-    which is a different number and sometimes a different question entirely --
-    two faces at an angle have an angle between them in the solid, and cover
-    each other on the sheet.
+    """Whether a measurement is taken in the projected viewport or in 3d space
     """
-
     PROJECTED = "projected"
     THREE_D = "3d"
 
 
 class MeasurementOperation(Enum):
-    """What is being computed. RADIUS and ARC_LENGTH belong here when they come."""
-
     DISTANCE = "distance"
     ANGLE = "angle"
 
@@ -47,10 +27,7 @@ class MeasurementOperation(Enum):
 class MeasurementDirection(Enum):
     """Which direction a distance is taken along.
 
-    PERPENDICULAR is the shortest distance and means something in either space.
-    HORIZONTAL and VERTICAL are directions *of the sheet*, so they exist only
-    when projected -- the solid has no up. The three-dimensional counterpart is
-    a distance along a named direction, which does not exist yet.
+    TODO clarify comments on how these are interpreted
     """
 
     PERPENDICULAR = "perpendicular"
@@ -59,18 +36,7 @@ class MeasurementDirection(Enum):
 
 
 class MeasurementFeature(Enum):
-    """What a feature behaves as, for the purpose of measuring it.
-
-    Four members, but two of them belong to one space each. A face is a PLANE
-    in the solid and becomes either a LINE or an AREA once projected, depending
-    on whether it is seen edge-on. AREA is the projected dead end: a face seen
-    at an angle covers the view, and there is no distance between two things
-    that each cover the view.
-
-    That one distinction is the whole of the difference between the two spaces.
-    Face to face angle and perpendicular distance are perfectly good questions
-    in the solid, where both are planes, and meaningless on the sheet, where
-    both are areas.
+    """What a feature behaves as (after projection), for the purpose of measuring it.
     """
 
     POINT = "point"
@@ -95,16 +61,6 @@ PROJECTS_TO: Mapping[MeasurementFeature, Tuple[MeasurementFeature, ...]] = {
 @dataclass(frozen=True)
 class MeasurementKind:
     """What a dimension is measuring.
-
-    A structured value rather than one name per combination. The combinations
-    multiply -- every operation needs a projected form and a solid one, and a
-    distance needs a direction -- so spelling each out by hand means a name to
-    invent and keep in sync for each, and the list doubles again when RADIUS or
-    a distance along a named direction arrives.
-
-    The name is composed from the parts instead, which is why there is no
-    mapping to maintain: `projected_horizontal_distance` is exactly its three
-    fields, read out.
     """
 
     operation: MeasurementOperation
@@ -141,13 +97,6 @@ class MeasurementKind:
         return self.name
 
     def as_wire(self) -> dict:
-        """The form a file holds, which says each part rather than naming the whole.
-
-        Not the composed name, because one name is ambiguous: `angle` is what
-        this calls a solid angle, and is also what every measurement written
-        before spaces existed calls a projected one. Saying the space outright
-        costs a few characters and cannot be misread.
-        """
         return {
             "operation": self.operation.value,
             "space": self.space.value,
@@ -156,7 +105,6 @@ class MeasurementKind:
 
     @classmethod
     def from_wire(cls, value) -> Optional['MeasurementKind']:
-        """A kind as read from a file: the structured form, or an older name."""
         if value is None:
             return None
         if isinstance(value, Mapping):
@@ -167,10 +115,12 @@ class MeasurementKind:
             )
         return cls.parse(str(value))
 
+    # TODO why do we need as/from_wire when we have parse and name?
     @classmethod
     def parse(cls, text: str) -> 'MeasurementKind':
         """Read a kind back from its name, or from one of the older names.
 
+        # TODO remove these comments after removing legacy path
         The old names were all projected, and `aligned` and `perpendicular` both
         become a perpendicular distance: between two points the shortest
         distance IS the distance, which is why the two collapsed into one.
@@ -180,6 +130,7 @@ class MeasurementKind:
         contains the word was written meaning the old one. Solid kinds are
         written structured (see as_wire), so nothing needs the ambiguous form.
         """
+        # TODO no need to suport legacy path, just delete it
         legacy = _LEGACY_KIND_NAMES.get(str(text))
         if legacy is not None:
             return legacy
@@ -202,6 +153,7 @@ def _solid(operation) -> MeasurementKind:
     return MeasurementKind(operation, MeasurementSpace.THREE_D)
 
 
+# TODO DELETE
 #: The names measurements were written with before kinds had structure.
 _LEGACY_KIND_NAMES: Mapping[str, MeasurementKind] = {
     # Between two points, the direct distance and the perpendicular distance
@@ -213,6 +165,8 @@ _LEGACY_KIND_NAMES: Mapping[str, MeasurementKind] = {
     "angle": _projected(MeasurementOperation.ANGLE),
 }
 
+
+# TODO refine these 3 epsilons below? alginment and parallel seem especially big?
 
 #: How square something has to be to the view before it counts as square. An
 #: edge a hair off end-on still projects to a line, just a very short one, and
@@ -245,6 +199,8 @@ def _dot(a: Sequence[float], b: Sequence[float]) -> float:
     return sum(float(x) * float(y) for x, y in zip(a, b))
 
 
+# TODO rename look to normal probably
+# TODO use a real type for geometry. Why does this file have no types omg
 def projected_form(
     geometry: Optional[Mapping], look: Sequence[float],
 ) -> Tuple[MeasurementFeature, Optional[Tuple[float, float, float]]]:
@@ -255,6 +211,8 @@ def projected_form(
     an area covers the view, which is the whole of what PROJECTS_TO means by a
     face having two answers.
 
+    TODO what is this? it's just the normal (look) component of the un projected line, a little awkward to return it here sinec it only applies to lines.. is there a better way to do this?
+    TODO update comment to simply say this is the direction of the line in the plane defined by look
     The direction comes back with it because a pair of lines admits different
     kinds depending on whether they are parallel, and the caller would otherwise
     have to work the projection out a second time to find out.
@@ -287,12 +245,14 @@ def projected_form(
     return (None, None)
 
 
+# TODO these all get replaced by rule.py
 def _flatten(direction: Sequence[float], gaze: Sequence[float]) -> Tuple[float, float, float]:
     """The part of a direction that survives projection."""
     along = _dot(direction, gaze)
     return _unit([direction[i] - gaze[i] * along for i in range(3)])
 
 
+# TODO these all get replaced by rule.py
 def _cross(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float, float]:
     return _unit([
         a[1] * b[2] - a[2] * b[1],
@@ -301,6 +261,7 @@ def _cross(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float, float]
     ])
 
 
+# TODO CONTINUE HERE
 @dataclass(frozen=True)
 class MeasureSpan:
     """What a feature is, where a measurement is being taken.
