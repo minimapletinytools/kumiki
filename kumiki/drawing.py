@@ -399,8 +399,7 @@ class MeasureSpan:
             raise ValueError(f"{self!r} has no normal: only a plane faces a way")
         return _unit(self.normal)
 
-    # TODO thisis in global space right? rename to ends_global if so
-    def ends(self) -> Tuple[V3, ...]:
+    def ends_global(self) -> Tuple[V3, ...]:
         """The two extremities, or the point itself.
 
         A plane has no extremities along any one direction, so it answers with
@@ -416,7 +415,6 @@ class MeasureSpan:
         )
 
 
-# TODO rename to _stations_global
 def _stations_global(span: MeasureSpan, along: VectorLike) -> Tuple[float, float]:
     """How far a span reaches along a direction, as absolute stations.
 
@@ -424,7 +422,7 @@ def _stations_global(span: MeasureSpan, along: VectorLike) -> Tuple[float, float
     point -- because two features have two different points, and overlap is a
     question about one shared ruler.
     """
-    reach = [_dot(end, along) for end in span.ends()]
+    reach = [_dot(end, along) for end in span.ends_global()]
     return (min(reach), max(reach))
 
 
@@ -533,7 +531,7 @@ def _ray_toward(
     if not any(abs(part) > 1e-9 for part in unit):
         return None
     if span.is_line:
-        stations = [_dot(end - vertex, unit) for end in span.ends()]
+        stations = [_dot(end - vertex, unit) for end in span.ends_global()]
         low, high = min(stations), max(stations)
         straddles = low < -1e-9 < 1e-9 < high
         outward = other.outward if other is not None else None
@@ -1724,7 +1722,6 @@ class Drawing:
         """Every viewport that gets a camera, with its id. What renders."""
         return ((id, viewport) for id, viewport in self.walk() if viewport.is_leaf)
 
-    # TODO rename to get_viewport_id
     def get_viewport_id(self, viewport: 'Viewport') -> ViewportId:
         """Where this viewport sits, which is what identifies it.
         """
