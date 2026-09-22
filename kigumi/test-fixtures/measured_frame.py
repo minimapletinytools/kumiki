@@ -46,14 +46,14 @@ def build_frame():
             # shoulder, which is the length that has to be cut.
             Drawing(
                 name="tenon",
-                timber_paths=["butt_timber"],
+                timber_paths=[ResolvedTimberPath("butt_timber")],
                 measurements={ViewportId("0.0.0"): [Measure(anchor_a=tenon_top, anchor_b=shoulder)]},
             ),
             # The mortise it goes into, measured in two viewports, to show that
             # the same drawing carries different dimensions in different views.
             Drawing(
                 name="mortise",
-                timber_paths=["receiving_timber"],
+                timber_paths=[ResolvedTimberPath("receiving_timber")],
                 measurements={
                     # Keyed by viewport id, which is a POSITION in the layout --
                     # see kumiki/layout.py. "0.0.0" and "0.0.1" are the first two
@@ -73,7 +73,7 @@ def build_frame():
             # view shows the whole of it.
             Drawing(
                 name="the joint",
-                timber_paths=["butt_timber", "receiving_timber"],
+                timber_paths=[ResolvedTimberPath("butt_timber"), ResolvedTimberPath("receiving_timber")],
                 measurements={ViewportId("0.0.1"): [Measure(anchor_a=shoulder, anchor_b=mortise_bottom)]},
             ),
         ],

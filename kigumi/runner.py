@@ -2342,12 +2342,21 @@ def _read_drawings_file(path: Path) -> List[Dict[str, Any]]:
 def _member_keys_for_paths(frame: Any, paths: List[Any]) -> List[str]:
     """The member keys of the timbers a code drawing names.
 
-    Through the frame, since a name may match more than one timber and only the
-    frame knows -- and that is where the ambiguity is warned about.
+    A drawing holds ResolvedTimberPaths, so each one already names exactly one
+    timber -- it used to hold bare TimberPaths and ask the frame, because a name
+    can match several, which meant one entry could quietly become two while the
+    layout counted it as one.
+
+    Still checked against the frame, because naming a timber that is not there
+    is not an error: a drawing of a piece a later edit removed is worth keeping,
+    and it shows as empty rather than pointing the viewer at a member key that
+    resolves to nothing.
     """
     keys: List[str] = []
     for path in paths or []:
-        keys.extend(str(resolved) for resolved in frame.resolve_timber_path(path))
+        present = {str(found) for found in frame.resolve_timber_path(path.timber_path)}
+        if str(path) in present:
+            keys.append(str(path))
     return keys
 
 

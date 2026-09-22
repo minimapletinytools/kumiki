@@ -20,8 +20,9 @@ from enum import Enum
 from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
 from .geometry import Line, Plane, Point, intersect_planes
-from .identity import (DrawingId, FeaturePath, MeasurementId, TimberPath,
-                       ViewportId, identity_order)
+from .identity import (DrawingId, FeaturePath, MeasurementId,
+                       ResolvedTimberPath, TimberPath, ViewportId,
+                       identity_order)
 from .rule import (Matrix, Numeric, V3, are_vectors_parallel,
                    are_vectors_perpendicular, create_v3, cross_product,
                    safe_dot_product, safe_norm, safe_zero_test_sq)
@@ -1612,12 +1613,16 @@ class Drawing:
 
     name: str
 
-    # TODO shouldn't this be ResolvedTimebrPath?
-    #: Held as a tuple; any sequence may be given. The ELEMENTS are exact --
-    #: a TimberPath, not a string that looks like one. Wrapping a path is what
-    #: stops it being passed where a drawing's name was meant, and taking a
-    #: bare string here would give that away at the one moment it helps.
-    timber_paths: Sequence[TimberPath] = ()
+    #: Which timbers this is a drawing of, one entry per timber. Held as a
+    #: tuple; any sequence may be given, and a string is read as a member key
+    #: ("posts/fl#1"), which is the form the viewer already uses.
+    #:
+    #: RESOLVED, so each entry names one timber rather than a name that may
+    #: match several. A drawing is of particular pieces: it lays out their
+    #: faces, and "how many" decides the layout, so a bare TimberPath matching
+    #: two posts counted as one and got the single-piece shop drawing for what
+    #: was really a pair.
+    timber_paths: Sequence[ResolvedTimberPath] = ()
 
     # used for determining override behavior, defaults to the name if not provided 
     # TODO just create a ctor for Drawing where the id is optional, and then make this non optional, this lets you clean up some of the other weird stuff you're doing in post_init
@@ -1637,7 +1642,8 @@ class Drawing:
 
     def __post_init__(self):
         object.__setattr__(self, 'timber_paths', tuple(
-            TimberPath(path) if isinstance(path, str) else path
+            ResolvedTimberPath.parse(path) if isinstance(path, str)
+            else (ResolvedTimberPath(path=path.path) if isinstance(path, TimberPath) else path)
             for path in (self.timber_paths or ())
         ))
         if not self.drawing_id:

@@ -110,7 +110,7 @@ class TestCollectDrawings:
     def test_the_code_says_what_to_draw_and_the_runner_works_out_how(self, example):
         # A frame names a drawing and its timbers; the page, viewports and
         # cameras are none of its business.
-        frame = _frame([Drawing(name="front left post", timber_paths=[TimberPath("posts/fl")])])
+        frame = _frame([Drawing(name="front left post", timber_paths=[ResolvedTimberPath("posts/fl")])])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
@@ -122,7 +122,7 @@ class TestCollectDrawings:
 
     def test_the_file_overrides_a_drawing_the_code_asked_for(self, example):
         # By naming it, not by sharing its id.
-        frame = _frame([Drawing(name="post", timber_paths=[TimberPath("posts/fl")])])
+        frame = _frame([Drawing(name="post", timber_paths=[ResolvedTimberPath("posts/fl")])])
         _write_file(example, [_override("my post sheet", "post")])
 
         drawings = runner.collect_drawings(frame, example)
@@ -152,8 +152,8 @@ class TestCollectDrawings:
 
     def test_code_drawings_come_first_and_keep_their_order(self, example):
         frame = _frame([
-            Drawing(name="a", timber_paths=[TimberPath("posts/fl")]),
-            Drawing(name="b", timber_paths=[TimberPath("posts/fr")]),
+            Drawing(name="a", timber_paths=[ResolvedTimberPath("posts/fl")]),
+            Drawing(name="b", timber_paths=[ResolvedTimberPath("posts/fr")]),
         ])
         _write_file(example, [_sheet("z")])
 
@@ -170,7 +170,7 @@ class TestCollectDrawings:
 
     def test_a_drawing_of_a_timber_that_is_gone_is_still_a_drawing(self, example):
         # Raising the frame must not fail because a path stopped matching.
-        frame = _frame([Drawing(name="ghost", timber_paths=[TimberPath("posts/never")])])
+        frame = _frame([Drawing(name="ghost", timber_paths=[ResolvedTimberPath("posts/never")])])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
@@ -178,7 +178,7 @@ class TestCollectDrawings:
 
     def test_an_id_keeps_an_override_attached_across_a_rename(self, example):
         # drawing_id is what the override names, so the name can change.
-        frame = _frame([Drawing(name="new name", drawing_id=DrawingId("stable"), timber_paths=[TimberPath("posts/fl")])])
+        frame = _frame([Drawing(name="new name", drawing_id=DrawingId("stable"), timber_paths=[ResolvedTimberPath("posts/fl")])])
         _write_file(example, [_override("sheet", "stable")])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -191,7 +191,7 @@ class TestCollectDrawings:
         path = runner._drawings_file_path(example)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{ not json", encoding="utf-8")
-        frame = _frame([Drawing(name="post", timber_paths=[TimberPath("posts/fl")])])
+        frame = _frame([Drawing(name="post", timber_paths=[ResolvedTimberPath("posts/fl")])])
 
         drawings = runner.collect_drawings(frame, example)
 
@@ -344,7 +344,7 @@ class TestMeasurementsThroughADrawing:
 
     def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
         frame = _frame([Drawing(
-            name="post", timber_paths=[TimberPath("posts/fl")],
+            name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
             measurements={FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
         )])
 
@@ -359,7 +359,7 @@ class TestMeasurementsThroughADrawing:
     def test_the_same_pair_in_two_viewports_are_two_measurements(self, example):
         # Neither overrides the other; they have different numbers.
         frame = _frame([Drawing(
-            name="post", timber_paths=[TimberPath("posts/fl")],
+            name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
             measurements={
                 FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
                 RIGHT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
@@ -374,7 +374,7 @@ class TestMeasurementsThroughADrawing:
 
     def test_an_override_only_reaches_its_own_viewport(self, example):
         frame = _frame([Drawing(
-            name="post", timber_paths=[TimberPath("posts/fl")],
+            name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
             measurements={
                 FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
                 RIGHT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
@@ -394,7 +394,7 @@ class TestMeasurementsThroughADrawing:
         # The reason measurements merge where everything else replaces: an
         # override of the whole drawing would take its layout with it.
         frame = _frame([Drawing(
-            name="post", timber_paths=[TimberPath("posts/fl")],
+            name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
             measurements={FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
         )])
         _write_file(example, [_override("sheet", "post", [
@@ -410,7 +410,7 @@ class TestMeasurementsThroughADrawing:
 
     def test_a_measurement_for_a_viewport_that_is_gone_is_not_shown(self, example):
         # An override naming a viewport the code's layout does not produce.
-        frame = _frame([Drawing(name="post", timber_paths=[TimberPath("posts/fl")])])
+        frame = _frame([Drawing(name="post", timber_paths=[ResolvedTimberPath("posts/fl")])])
         _write_file(example, [_override("sheet", "post", [
             {"id": "nowhere", "measurements": [{"a": _ref("x"), "b": _ref("y")}]},
         ])])
@@ -651,8 +651,10 @@ class TestIdentifiers:
         assert Drawing(name="post 1").drawing_id == DrawingId("post 1")
 
     def test_a_drawing_takes_the_timber_names_as_names(self):
-        assert Drawing(name="d", timber_paths=[TimberPath("posts/fl")]).timber_paths == (
-            TimberPath("posts/fl"),
+        # A drawing holds RESOLVED paths -- one entry, one timber -- and reads a
+        # TimberPath or a bare string as occurrence 0 of that name.
+        assert Drawing(name="d", timber_paths=[ResolvedTimberPath("posts/fl")]).timber_paths == (
+            ResolvedTimberPath(path="posts/fl"),
         )
 
 
@@ -936,7 +938,7 @@ class TestChangingAndRemovingAMeasurement:
 
     def _frame(self):
         return Frame(cut_timbers=[], name="f",
-                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+                     drawings=[Drawing(name="plan", timber_paths=(ResolvedTimberPath("post"),))])
 
     def _measure(self, feature_b="right"):
         return {
@@ -1035,7 +1037,7 @@ class TestDeletingAMeasurementTheCodeAsksFor:
         )
         return Frame(cut_timbers=[], name="f", drawings=[Drawing(
             name="plan",
-            timber_paths=(TimberPath("post"),),
+            timber_paths=(ResolvedTimberPath("post"),),
             measurements={ViewportId(VIEWPORT): [
                 Measure(anchor_a=anchor("left"), anchor_b=anchor("right"))]},
         )])
@@ -1096,7 +1098,7 @@ class TestAddingAMeasurement:
         # No timbers: nothing here resolves an anchor, and a drawing is all the
         # measurement needs somewhere to live.
         return Frame(cut_timbers=[], name="f",
-                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+                     drawings=[Drawing(name="plan", timber_paths=(ResolvedTimberPath("post"),))])
 
     def _measure(self):
         return {
@@ -1245,7 +1247,7 @@ class TestTheReservedDrawingForTheThreeDView:
 
     def _frame(self):
         return Frame(cut_timbers=[], name="f",
-                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+                     drawings=[Drawing(name="plan", timber_paths=(ResolvedTimberPath("post"),))])
 
     def _measure(self):
         return {
@@ -1325,7 +1327,7 @@ class TestMovingAMeasurement:
 
     def _frame(self):
         return Frame(cut_timbers=[], name="f",
-                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+                     drawings=[Drawing(name="plan", timber_paths=(ResolvedTimberPath("post"),))])
 
     def _measure(self):
         return {
