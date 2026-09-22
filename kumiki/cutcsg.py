@@ -206,21 +206,14 @@ class CSGFeatureType(Enum):
     dispatches on this pair (two parallel faces measure like two parallel
     planes, a point and a face measure a projected distance, and so on).
 
-    FACE is a PLANAR face, and that is the whole difference from CURVED_FACE:
-    a curved one lies on no plane, so it is worth pointing at and cannot be
-    measured against or used to derive an edge. Saying so in the type is what
-    keeps those rules from having to ask the geometry -- see derive(), which
-    takes faces and now excludes curved ones by construction rather than by
-    locate() declining further downstream.
-
     EDGE arrives with features derived from intersecting face pairs; POINT with
     their vertices.
+
+    TODO consider adding DERIVED_POINT and DERIVED_FACE here
     """
     FACE = 1
     EDGE = 2
     POINT = 3
-    #: A face that lies on no plane -- a cylinder's barrel. Selectable, not
-    #: measurable, and never a parent of a derived edge or point.
     CURVED_FACE = 4
 
 
@@ -321,8 +314,6 @@ _FEATURE_TYPE_SPECIFICITY = {
     CSGFeatureType.POINT: 0,
     CSGFeatureType.EDGE: 1,
     CSGFeatureType.FACE: 2,
-    # As broad as a flat face: a click lands on one the same way, and nothing
-    # narrower is being passed over by preferring it.
     CSGFeatureType.CURVED_FACE: 2,
 }
 
@@ -539,6 +530,7 @@ def _drop_duplicate_derived(hits: List['OwnedFeatureHit']) -> List['OwnedFeature
     return kept
 
 
+# TODO get rid of root argument and return None if no shared ancestor
 def shared_ancestor(
     root: 'CutCSG',
     first: 'CutCSG',
@@ -587,32 +579,22 @@ def _trail_within(node: 'CutCSG', target: 'CutCSG') -> Optional[List['CutCSG']]:
 
 
 def derive_edge_hits(
+    # TODO rename to shared_root as owner is misleading, actually you don't need this argument at all after changing shared_ancestor
     owner: 'CutCSG',
     face_hits: List['OwnedFeatureHit'],
 ) -> List['OwnedFeatureHit']:
     """Every edge formed by a pair of *face_hits*.
 
-    Each is owned by the deepest node under *owner* holding BOTH its parents --
-    the node that put the two faces together -- rather than by *owner*, which is
-    only where the query started.
+    The resultant hits are owned by the first shared ancestor of the 2 features forming the derived edge.
 
-    The pairs come from a scan run at the edge tolerance, so if two faces both
-    turned up there, the conjunction that defines their edge holds at that
-    tolerance by construction -- no further point testing needed. That is what
-    makes this O(k^2) over the few faces near the point rather than over
-    everything the subtree declares.
-
-    Not deduplicated: derivation runs once, at whichever node the caller
-    queried, so nothing arrives here twice. Names are not unique enough to
-    dedupe by anyway -- two tenons on one timber legitimately declare the same
-    face names, which makes their edges share a name while being genuinely
-    different edges.
+    Careful, O(len(face_hits)^2), expected to be bounded by the fact that `len(face_hits)` should be reasonably bounded in well behaved cases.
     """
     hits: List['OwnedFeatureHit'] = []
     for i in range(len(face_hits)):
         for j in range(i + 1, len(face_hits)):
             edge = DerivedEdgeFeature.derive(face_hits[i], face_hits[j])
             if edge is not None:
+                # TODO after updating shared_ancestor if shared_ancestor returns None, log a warning here and skip the derivde feature
                 hits.append(OwnedFeatureHit(
                     feature=edge,
                     owner=shared_ancestor(owner, face_hits[i].owner, face_hits[j].owner)))
@@ -624,15 +606,9 @@ def derive_point_hits(
     edge_hits: List['OwnedFeatureHit'],
     face_hits: List['OwnedFeatureHit'],
 ) -> List['OwnedFeatureHit']:
-    """Every point where one of *edge_hits* crosses one of *face_hits*.
+    """Every point where one of *edge_hits* crosses one of *face_hits*. If edge lies in the face plane, nothing is returned (even if its acutally just 1 point of intersection due to line ending at the face boundary)
 
-    Owned the way a derived edge is: by the deepest node under *owner* holding
-    both parents, not by wherever the query started.
-
-    O(edges x faces) over the few of each near the query point, and both lists
-    come from a scan at the point tolerance, so a pair that turns up here meets
-    there by construction -- the same argument derive_edge_hits makes for not
-    testing the conjunction again.
+    The resultant hits are owned by the first shared ancestor of the 2 features forming the derived point
 
     An edge lies IN both faces that formed it, and those pairs cost a rejection
     each rather than needing filtering: intersect_line_plane declines a line in
@@ -806,12 +782,6 @@ class CSGFeature(ABC):
 
     def is_derived(self) -> bool:
         """Whether this feature was derived from others rather than declared.
-
-        The two are owned differently, which is worth knowing when reading an
-        OwnedFeatureHit. A DECLARED feature is owned by the node that declares
-        it. A DERIVED one is owned by the deepest node holding both its parents
-        -- see shared_ancestor -- so the same edge comes back with the same
-        owner whether you query that node or something above it.
         """
         return False
 
@@ -880,28 +850,17 @@ def _as_plane(geometry: Optional['LocatedFeatureGeometry']) -> Optional[Plane]:
 class DerivedEdgeFeature(CSGFeature):
     """The edge where two planar FACE features meet.
 
-    Only faces, and only planar ones: derive() takes CSGFeatureType.FACE, so an
-    EDGE parent is refused and so is a CURVED_FACE. An edge-plus-face pair makes
-    a POINT instead -- see DerivedPointFeature -- which is the only other
-    derivation there is.
-
-    The two parents generally live on different primitives (a tenon cheek and
-    the timber body, say), so each is carried with its own owner.
-
     The `owner` of the edge itself is the deepest node holding both of them --
-    see shared_ancestor. It used to be whichever node find_all_features was
-    called on, so the same edge changed owner depending on where you asked.
+    see shared_ancestor. 
     """
 
+    # TODO can we make these non optional and construct this object all at once?
     #: The two faces this edge is where-they-meet. Optional only because the
     #: dataclass needs defaults to be constructed field-by-field; derive() is
     #: the only thing that builds one and always sets both, and every method
     #: here declines when either is missing.
     #:
-    #: TODO they are guaranteed FACEs by derive() and the type cannot say so.
-    #: Saying it wants either a FaceFeature subclass to narrow to, or the split
-    #: by feature type that drawing.py's own note asks about -- the same
-    #: question in a second place, so worth answering once.
+    #: TODO consider refactoring OwnedFeatureHit to be split out by types so these can be typed to faces
     a: Optional['OwnedFeatureHit'] = None
     b: Optional['OwnedFeatureHit'] = None
 
@@ -1403,14 +1362,6 @@ class SimpleCylinderFeature(CSGFeature):
 
     def feature_type(self) -> CSGFeatureType:
         """A cap is planar; the barrel is not.
-
-        Saying so here is what keeps the barrel out of edge and point
-        derivation: those take FACEs, and it is no longer one. It used to be,
-        and what stopped it was an accident -- cylinder features default to
-        FeatureGroup.NONE, which meets nothing. Give a cap a real group, which
-        is a reasonable thing to want since its rim against a mortise wall is a
-        real arris, and the barrel came with it and derived edges that located
-        to nothing.
         """
         if self.part is CylinderPart.BARREL:
             return CSGFeatureType.CURVED_FACE

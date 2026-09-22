@@ -243,18 +243,7 @@ class SingleFeaturePath(FeaturePath):
         return f"{self.timber} > {trail}" if trail else str(self.timber)
 
 
-# A derived feature IS owned by a parent union/difference/intersection now --
-# cutcsg.shared_ancestor works it out, and the note that said otherwise is gone.
-# That does not collapse this to a single FeatureRef, though, and the reason is
-# resolution rather than ownership: a derived feature is built on demand and is
-# not among any node's declared features, so naming the owner would not let you
-# look it up. Resolving one means resolving both parents and deriving again,
-# which is what the two refs here are for.
-#
-# TODO the owner could be carried BESIDE the two parents, which is what
-# shared_ancestor would give: it would let a reader say where an edge belongs
-# without resolving it. Not done because nothing wants it yet, and a third
-# field that can disagree with the first two is a cost.
+
 @dataclass(frozen=True)
 class DerivedFeaturePath(FeaturePath):
     """An edge or a point, named by the two features that form it.
@@ -281,6 +270,9 @@ class DerivedFeaturePath(FeaturePath):
     """
 
     timber: ResolvedTimberPath
+
+    # A derived feature IS owned by the parent union/difference/intersection producing the derived feature as worked out by cutcsg.shared_ancestor
+    # TODO consider storing the actual owner featureref here as well, or update FeatuerRef so that it's able to support referencing derivedfeatures better so that only 1 ref is needed
     a: FeatureRef = field(default_factory=FeatureRef)
     b: FeatureRef = field(default_factory=FeatureRef)
     #: "EDGE" or "POINT". Carried rather than inferred from the parents: a

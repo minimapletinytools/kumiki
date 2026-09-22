@@ -850,21 +850,7 @@ class SimplePathExtrusionFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         """FACE, even when the key names a curved segment.
 
-        It should be CURVED_FACE there, and cannot be: whether a side is curved
-        is a property of owner.path.segments[key], and feature_type() is not
-        given the owner. Nor can the owner set it when the feature is built --
-        PathExtrusion declares no default_features at all, so these are only
-        ever constructed by an author naming a segment.
-
-        Nothing goes wrong today. A curved key never matches a point, so such a
-        feature never turns up in a hit, never reaches derivation, and locate()
-        declines -- the graceful-fail the class docstring describes. What is
-        lost is only that it cannot SAY what it is when asked directly.
-
-        TODO two ways out, and the choice is a design one rather than an
-        oversight: give feature_type() the owner, which is 14 definitions and
-        75 call sites, or carry a declared flag here, which lets an author
-        contradict the path. Neither is worth guessing at.
+        TODO we need to pass in some additional info from the owning SimplePathExtrusion so that the correct feature type can be determined
         """
         return CSGFeatureType.FACE
 
