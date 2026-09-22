@@ -1046,15 +1046,20 @@ class MeasurementPlane:
             raise ValueError("A plane's normal cannot be zero length")
 
     @classmethod
-    def from_wire(cls, value) -> Optional['MeasurementPlane']:
+    def from_wire(cls, value) -> 'MeasurementPlaneSpec':
         """A plane as read from a file, or one already built.
 
         The same shape as MeasurementKind.from_wire and MeasurementPlacement's,
-        and for the same reason: the field holds a MeasurementPlane, and saying
-        so is only true if the conversion from the file's form happens somewhere
-        that takes the file's form as its argument type.
+        and for the same reason: the field holds a plane, and saying so is only
+        true if the conversion from the file's form happens somewhere that takes
+        the file's form as its argument type.
+
+        Absent on the wire reads as FROM_VIEWPORT, which is what every
+        measurement written without one means.
         """
-        if value is None or isinstance(value, cls):
+        if value is None:
+            return FROM_VIEWPORT
+        if isinstance(value, (cls, FromViewport)):
             return value
         if isinstance(value, Mapping):
             return cls(at=value.get("at"), normal=value.get("normal"))
@@ -1062,6 +1067,35 @@ class MeasurementPlane:
 
     def as_wire(self) -> Dict[str, list]:
         return {"at": list(self.at), "normal": list(self.normal)}
+
+
+@dataclass(frozen=True)
+class FromViewport:
+    """Take the plane from the viewport this measurement is drawn in.
+
+    The other half of what a measurement's plane can be, and a named one. It was
+    None, which made the field Optional and left the reader to know that a
+    missing plane means something specific rather than nothing -- a drawing
+    viewport has a locked camera, and a measurement in one is entitled to be
+    read against it.
+
+    Whether a measurement should be ALLOWED to say this is a separate question.
+    A drawing viewport can always answer; the 3D view cannot, because its camera
+    belongs to the reader and turns. The runner refuses a measurement that
+    reaches it with neither -- see `no-plane` in _unplaceable_measurement.
+    """
+
+    def as_wire(self) -> None:
+        """Absent on the wire, which is what the viewer already reads as this."""
+        return None
+
+
+#: The one instance there needs to be: it carries nothing.
+FROM_VIEWPORT = FromViewport()
+
+#: What a measurement's plane can be. Never None -- "the viewport's" is a case
+#: with a name rather than a hole.
+MeasurementPlaneSpec = Union[MeasurementPlane, FromViewport]
 
 
 @dataclass(frozen=True)
@@ -1133,12 +1167,15 @@ class Measure:
     #: dimension line is not measuring something else.
     placement: Optional[MeasurementPlacement] = None
 
-    # TODO remove Optional
-    #: The plane this is taken and drawn on, or None to take the viewport's.
-    #: Not part of identity either: the same two features measured on a
-    #: different plane is the same measurement seen from elsewhere, and giving
-    #: it a second identity would let a file hold both and draw them twice.
-    plane: Optional[MeasurementPlane] = None
+    #: The plane this is taken and drawn on. Never None: taking the viewport's
+    #: is FROM_VIEWPORT, a case with a name, which is also the default because
+    #: an author writing a measurement has no plane to hand -- the anchors are
+    #: not resolved yet and the normal is the viewport's camera.
+    #:
+    #: Not part of identity: the same two features measured on a different plane
+    #: is the same measurement seen from elsewhere, and giving it a second
+    #: identity would let a file hold both and draw them twice.
+    plane: MeasurementPlaneSpec = FROM_VIEWPORT
 
     def __post_init__(self):
         self._canonicalise_anchors()

@@ -2193,9 +2193,9 @@ def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
         # projected one, so a bare name cannot carry both.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
         "placement": {"offset": placement.offset} if placement is not None else None,
-        # Likewise not identity. Absent means "take the viewport's plane",
-        # which is what an orthographic viewport's measurements may always
-        # mean and what everything written before planes existed does mean.
+        # Likewise not identity. Absent on the wire means "take the viewport's
+        # plane", which is what an orthographic viewport's measurements may
+        # always mean -- FromViewport.as_wire() is how the python side says it.
         "plane": plane.as_wire() if plane is not None else None,
         "origin": ORIGIN_CODE,
     }
