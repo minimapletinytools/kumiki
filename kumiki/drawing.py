@@ -1138,23 +1138,9 @@ class Measure:
     def _canonicalise_anchors(self) -> None:
         """Put the two anchors in one order, so a pair cannot be written twice.
 
-        Measuring A to B and measuring B to A are the same measurement, and
-        without this they are two: two entries in a viewport, two dimensions
-        drawn on top of each other, and a file override that matches neither.
-        Sorting at creation means there is only ever one way to write it down.
+        Measuring A to B and measuring B to A are the same measurement up to a sign. Sorting at creation means there is only ever one way to write it down.
 
-        Swapping is safe because every kind there is today is symmetric -- each
-        computes an absolute value or a length, so the number does not depend on
-        which anchor came first. The one thing that does is which SIDE the
-        dimension line sits on, since it is offset perpendicular to the run
-        between the anchors, and reversing the run reverses the perpendicular.
-        The offset is signed, so negating it puts the line back where it was.
-
-        WHEN AN ASYMMETRIC KIND ARRIVES -- one where A to B and B to A are
-        genuinely different measurements, rather than the same one drawn from
-        the other end -- this has to stop being unconditional and start asking
-        the kind. It is written here rather than left to be discovered because
-        by then the ordering will look like something nothing depends on.
+        NOTE Some day we may support asymmetric measurements.
         """
         if self.anchor_a is None or self.anchor_b is None:
             return
@@ -1170,11 +1156,7 @@ class Measure:
 
     @staticmethod
     def kind_identity(kind: Optional['MeasurementKind']) -> Tuple:
-        """A kind in a comparable form, or an empty one for "whichever is natural".
-
-        The parts rather than the name, because a name can arrive as an older
-        one -- `angle` and `projected_angle` are the same kind written years
-        apart, and must not read as two different measurements.
+        """
         """
         if kind is None:
             return ()
@@ -1182,26 +1164,12 @@ class Measure:
         return (wire["operation"], wire["space"], wire["direction"])
 
     def pair_identity(self) -> Tuple[Tuple, Tuple]:
-        """Just the two features, without saying what is measured between them."""
+        """
+        """
         return (self.anchor_a.identity(), self.anchor_b.identity())
 
     def identity(self) -> Tuple[Tuple, Tuple, Tuple, str]:
-        """What makes this measurement itself, within its viewport.
-
-        The anchors come already in one order (see _canonicalise_anchors), so
-        measuring A to B and measuring B to A are one measurement.
-
-        The kind is part of it, because two kinds between one pair are two
-        dimensions and both should show: the horizontal and the vertical
-        between the same two points is an ordinary thing to want. The
-        alternative was making the author mint a measure_id to tell them apart,
-        which is a chore for the common case.
-
-        The cost, which the editing flow has to know about: changing a
-        measurement's kind changes its identity. So an override cannot edit a
-        code measurement's kind in place -- it is a different measurement now.
-        Say it as suppressing the original and adding the new one, which is
-        what those two mechanisms are already for.
+        """
         """
         return (
             self.anchor_a.identity(),
@@ -1212,11 +1180,7 @@ class Measure:
 
 
 class MeasurementSource(Enum):
-    """Where a measurement came from, which decides what it may replace.
-
-    Three tiers, each able to replace the ones below it and nothing else. An
-    algorithm proposes, a person writing code decides, and the drawings file --
-    which is to say the viewer -- has the last word.
+    """Where a measurement came from, ordered by what replaces what
     """
 
     #: An algorithm produced it. Replaceable by anything.
@@ -1286,6 +1250,8 @@ def does_override_identities(
     return candidate_pair == existing_pair
 
 
+
+# TODO move these into a viewport.py file or prefix with Viewport to make it more clear
 # ============================================================================
 # Viewports: what a drawing shows, and how it divides the sheet
 # ============================================================================
@@ -1533,19 +1499,11 @@ def covering_page(subdivision_or_viewport: Union[Viewport, Subdivision],
 
 
 # ---------------------------------------------------------------------------
-# The layouts a drawing gets when it does not name one
+# default drawing layouts 
 # ---------------------------------------------------------------------------
-#
-# Here rather than in kigumi/runner.py because they are what a DRAWING is,
-# not what a viewer does with one -- and because Drawing reaches for them
-# itself when it is given no viewports of its own.
-#
-# The ids are spelled out beside each. They are positional, so they follow
-# from the shape and nothing else; writing them down is what lets code find a
-# view by what it is for without reading a label, and what makes a change to
-# either shape fail a test rather than move someone's measurements in silence.
 
-
+# TODO give a type alias for Tuple[Viewport, ...] (ViewportList)
+# aso what's th e difference between this and Sequence[Viewport]? oh I guess tuple has at least one?
 def shop_drawing_viewports() -> Tuple[Viewport, ...]:
     """One piece's four long faces down the left, a preview beside them.
 
@@ -1601,46 +1559,31 @@ def default_viewports_for(timber_count: int) -> Tuple[Viewport, ...]:
 @dataclass(frozen=True)
 class Drawing:
     """A drawing the frame asks for: a name, and which timbers it is of.
-
-    Timbers are named by path, the same name they carry everywhere else, and by
-    path alone -- which of two timbers sharing a path is not a question a name
-    can answer, and a drawing of "the front left post" should not have to know
-    whether one was made twice. A path naming no timber is not an error either:
-    a drawing of a timber a later edit removed is worth keeping and showing as
-    empty, rather than failing to raise the frame it belongs to.
-
-    `drawing_id` is what an override in the drawings file names, so it has to
-    survive editing the code around it. It defaults to the name, which is stable
-    as long as the name is.
     """
 
     name: str
+
+    # TODO shouldn't this be ResolvedTimebrPath?
     #: Held as a tuple; any sequence may be given. The ELEMENTS are exact --
     #: a TimberPath, not a string that looks like one. Wrapping a path is what
     #: stops it being passed where a drawing's name was meant, and taking a
     #: bare string here would give that away at the one moment it helps.
     timber_paths: Sequence[TimberPath] = ()
+
+    # used for determining override behavior, defaults to the name if not provided 
+    # TODO just create a ctor for Drawing where the id is optional, and then make this non optional, this lets you clean up some of the other weird stuff you're doing in post_init
     drawing_id: Optional[DrawingId] = None
+
     #: The floating viewports of this sheet, in the order they were written.
     #: That order is what numbers them -- see walk -- so it is part of what the
     #: drawing means. It is not the drawing order; z is.
     viewports: Sequence[Viewport] = ()
+
+    # TODO why is this optional?
     #: The sheet these sit on. A Length anywhere in the tree is measured
     #: against it.
     page: Optional[Page] = None
-    #: Dimensions named by the id of the view they are drawn in -- a position,
-    #: "0.0.1" being the second row of the first column of the first floating
-    #: viewport.
-    #:
-    #: For a drawing that took the default layout: it has viewports like any
-    #: other, but they were made for it, so there is no object in hand to put a
-    #: measurement on and an id is the only way to say which view is meant.
-    #: A drawing that writes its own viewports should put the measurement on
-    #: the viewport instead, where no counting is involved and moving the view
-    #: takes the dimension with it.
-    #:
-    #: Either way the runner reads measurements_by_viewport(), which is the two
-    #: together.
+
     measurements: Mapping[ViewportId, Sequence[Measure]] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -1656,10 +1599,8 @@ class Drawing:
             viewport: tuple(measures)
             for viewport, measures in dict(self.measurements or {}).items()
         })
-        # A drawing always has viewports. One that names only its timbers gets
-        # the default layout for what it draws, made here and held like any
-        # other -- so there is no second kind of drawing whose views exist only
-        # once something else has laid it out.
+
+        # TODO in the ctor just make viewports Optional{..} and then if it's none, use default viewports
         viewports = tuple(self.viewports) or default_viewports_for(len(self.timber_paths))
         object.__setattr__(self, 'viewports', viewports)
         self._check_placement()
@@ -1671,13 +1612,7 @@ class Drawing:
         """Every viewport of this drawing, with the id its position gives it.
 
         Depth first and in written order, so a parent comes before the views
-        inside it. An id is the index of its floating viewport, then the index
-        of each portion stepped through to reach it, joined with dots: the
-        second row of the first column of the first floating viewport is
-        "0.0.1", and an undivided floating viewport is just "2".
-
-        Containers are included. A caller wanting only the views that get a
-        camera wants `leaves`.
+        inside it.
         """
         def descend(viewport: 'Viewport', path: Tuple[int, ...]):
             yield (ViewportId(".".join(str(step) for step in path)), viewport)
@@ -1689,10 +1624,6 @@ class Drawing:
 
     def measurements_by_viewport(self) -> Dict[str, Tuple[Measure, ...]]:
         """Every dimension of this drawing, under the id of the view it is in.
-
-        The two ways of saying it, merged: the ones written on a viewport, and
-        the ones keyed by id for viewports the drawing did not build. A viewport
-        that has both gets both, its own first.
         """
         collected: Dict[str, Tuple[Measure, ...]] = {}
         for viewport_id, viewport in self.walk():
@@ -1707,12 +1638,9 @@ class Drawing:
         """Every viewport that gets a camera, with its id. What renders."""
         return ((id, viewport) for id, viewport in self.walk() if viewport.is_leaf)
 
+    # TODO rename to get_viewport_id
     def id_of(self, viewport: 'Viewport') -> ViewportId:
         """Where this viewport sits, which is what identifies it.
-
-        By identity rather than by value -- see the note on Viewport -- so the
-        viewport asked about must be one of THIS drawing's, not one that merely
-        looks like it.
         """
         for found, candidate in self.walk():
             if candidate is viewport:
