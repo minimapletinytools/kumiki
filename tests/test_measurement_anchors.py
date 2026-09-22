@@ -741,7 +741,7 @@ class TestAPlacedAnchorStaysPlaced:
 
 
 class TestDroppingAPerpendicularOntoAFace:
-    """In the solid a face is a PLANE, and a distance to one is square to it.
+    """In 3D a face is a PLANE, and a distance to one is square to it.
 
     On a sheet a face is only measurable seen edge-on, where it draws as a line,
     so the anchor rules had two shapes and both ends of any pair were lines. In
@@ -752,19 +752,19 @@ class TestDroppingAPerpendicularOntoAFace:
     two were offset in the other direction.
     """
 
-    SOLID = None  # built in setup_method, to keep the import local
+    THREE_D = None  # built in setup_method, to keep the import local
 
     def setup_method(self):
         from kumiki.drawing import (MeasurementKind, MeasurementOperation,
                                     MeasurementSpace)
 
-        self.SOLID = MeasurementKind(
+        self.THREE_D = MeasurementKind(
             MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
     def _anchors(self, first, second):
         from kumiki.drawing import distance_anchors
 
-        return distance_anchors(first, second, self.SOLID)
+        return distance_anchors(first, second, self.THREE_D)
 
     def _along(self, a, b):
         return tuple(round(b[i] - a[i], 9) for i in range(3))
@@ -832,7 +832,7 @@ class TestAFaceIsOnlyAPlaneInTheSolid:
     check was always true, and every face came back a plane in drawings too.
     """
 
-    def _span(self, solid_space):
+    def _span(self, in_three_d):
         import importlib.util
         import sys
         from pathlib import Path
@@ -855,14 +855,14 @@ class TestAFaceIsOnlyAPlaneInTheSolid:
                     if not measure.get("unresolved")]
         assert measures, "the fixture has no measurements to take a span from"
         placed = runner._resolve_anchor_placed(
-            frame, measures[0].get("a"), [0, 1, 0], solid_space)
+            frame, measures[0].get("a"), [0, 1, 0], in_three_d)
         assert placed is not None
         return placed[1]
 
     def test_on_a_sheet_a_face_is_not_a_plane(self):
         assert self._span(False).is_plane is False
 
-    def test_in_the_solid_it_is(self):
+    def test_in_three_d_it_is(self):
         assert self._span(True).is_plane is True
 
 
@@ -870,7 +870,7 @@ class TestWhereAnAngleSits:
     """A corner, and which of its two supplementary angles is meant.
 
     The arc used to be built in the viewer from each feature's own anchor and
-    its own `direction` -- which for a face in the solid was its NORMAL. The
+    its own `direction` -- which for a face in 3D was its NORMAL. The
     vertex was then wherever two unrelated screen lines happened to cross, often
     touching neither feature, and the value was acos of an absolute dot, which
     cannot tell 45 degrees from 135.
@@ -887,6 +887,12 @@ class TestWhereAnAngleSits:
 
         return angle_rays(first, second)
 
+    def _corner(self, first, second):
+        """The rays, insisting there are some. For the pairs that make a corner."""
+        from tests.testing_shavings import present
+
+        return present(self._rays(first, second), "rays for this pair")
+
     def _value(self, rays):
         from kumiki.drawing import angle_between
 
@@ -894,31 +900,31 @@ class TestWhereAnAngleSits:
 
     def test_the_vertex_sits_on_the_line_the_two_faces_share(self):
         # Both planes pass through the z axis, so the corner is the z axis.
-        rays = self._rays(
+        rays = self._corner(
             self._span(at=(-300, 0, 500), normal=(0, 1, 0)),
             self._span(at=(0, -300, 500), normal=(1, 0, 0)))
 
-        vertex = rays["vertex"]
+        vertex = rays.vertex
         assert abs(vertex[0]) < 1e-9 and abs(vertex[1]) < 1e-9
 
     def test_and_near_the_features_rather_than_anywhere_on_it(self):
         # The corner line runs the whole height of the frame; the arc belongs
         # beside the two faces, which sit at z = 500.
-        rays = self._rays(
+        rays = self._corner(
             self._span(at=(-300, 0, 500), normal=(0, 1, 0)),
             self._span(at=(0, -300, 500), normal=(1, 0, 0)))
 
-        assert abs(rays["vertex"][2] - 500) < 1e-9
+        assert abs(rays.vertex[2] - 500) < 1e-9
 
     def test_each_ray_lies_in_its_own_face(self):
         first = self._span(at=(-300, 0, 500), normal=(0, 1, 0))
         second = self._span(at=(0, -300, 500), normal=(1, 0, 0))
 
-        rays = self._rays(first, second)
+        rays = self._corner(first, second)
 
         # Square to the face's normal is what "in the face" means.
-        assert abs(sum(rays["from"][i] * first.normal[i] for i in range(3))) < 1e-9
-        assert abs(sum(rays["to"][i] * second.normal[i] for i in range(3))) < 1e-9
+        assert abs(sum(rays.opens_from[i] * first.normal[i] for i in range(3))) < 1e-9
+        assert abs(sum(rays.opens_to[i] * second.normal[i] for i in range(3))) < 1e-9
 
     def test_which_side_the_material_is_on_decides_the_angle(self):
         """The same two planes read 45 or 135 by where the faces actually are.
@@ -941,21 +947,21 @@ class TestWhereAnAngleSits:
         along = self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 400.0))
         up = self._span(at=(0, 0, 0), direction=(0, 1, 0), interval=(0.0, 400.0))
 
-        rays = self._rays(along, up)
+        rays = self._corner(along, up)
 
-        assert [round(v, 6) for v in rays["vertex"]] == [0.0, 0.0, 0.0]
+        assert [round(v, 6) for v in rays.vertex] == [0.0, 0.0, 0.0]
         # Each ray runs along its own edge, into the part that exists.
-        assert [round(v, 6) for v in rays["from"]] == [1.0, 0.0, 0.0]
-        assert [round(v, 6) for v in rays["to"]] == [0.0, 1.0, 0.0]
+        assert [round(v, 6) for v in rays.opens_from] == [1.0, 0.0, 0.0]
+        assert [round(v, 6) for v in rays.opens_to] == [0.0, 1.0, 0.0]
 
     def test_skew_edges_stand_between_them(self):
         # Two edges that never meet. The nearest approach is the honest place.
         along = self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 400.0))
         over = self._span(at=(0, 0, 400), direction=(0, 1, 0), interval=(0.0, 400.0))
 
-        rays = self._rays(along, over)
+        rays = self._corner(along, over)
 
-        assert [round(v, 6) for v in rays["vertex"]] == [0.0, 0.0, 200.0]
+        assert [round(v, 6) for v in rays.vertex] == [0.0, 0.0, 200.0]
 
     def test_the_vertex_is_kept_on_the_edges(self):
         """Clamped to what survives, so the arc lands on the timber.
@@ -965,10 +971,10 @@ class TestWhereAnAngleSits:
         along = self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 100.0))
         over = self._span(at=(900, 0, 50), direction=(0, 1, 0), interval=(0.0, 100.0))
 
-        rays = self._rays(along, over)
+        rays = self._corner(along, over)
 
         # x is clamped to the end of the first edge, not carried out to 900.
-        assert rays["vertex"][0] <= 900
+        assert rays.vertex[0] <= 900
 
     def test_an_edge_running_into_a_face(self):
         face = self._span(at=(0, 0, 0), normal=(0, 0, 1))
@@ -976,10 +982,10 @@ class TestWhereAnAngleSits:
                                                         -0.7071067811865476),
                           interval=(0.0, 500.0))
 
-        rays = self._rays(face, into)
+        rays = self._corner(face, into)
 
         # It crosses the face at z = 0.
-        assert abs(rays["vertex"][2]) < 1e-6
+        assert abs(rays.vertex[2]) < 1e-6
         assert round(self._value(rays), 4) == 45.0
 
     def test_parallel_faces_make_no_corner(self):
@@ -1011,9 +1017,9 @@ class TestWhereAnAngleSits:
         other = self._span(at=(0, -200, 0), direction=(0, 1, 0),
                            interval=(0.0, 400.0), outward=(1, 0, 0))
 
-        rays = self._rays(crossing, other)
+        rays = self._corner(crossing, other)
 
-        assert [round(v, 6) for v in rays["from"]] == [-1.0, 0.0, 0.0]
+        assert [round(v, 6) for v in rays.opens_from] == [-1.0, 0.0, 0.0]
 
     def test_and_with_no_normal_to_ask_it_takes_the_longer_side(self):
         # Nothing said which side the material is on, so the arc goes with the
@@ -1023,9 +1029,9 @@ class TestWhereAnAngleSits:
         other = self._span(at=(0, -200, 0), direction=(0, 1, 0),
                            interval=(0.0, 400.0))
 
-        rays = self._rays(crossing, other)
+        rays = self._corner(crossing, other)
 
-        assert [round(v, 6) for v in rays["from"]] == [1.0, 0.0, 0.0]
+        assert [round(v, 6) for v in rays.opens_from] == [1.0, 0.0, 0.0]
 
 
 class TestAFeatureOnALabelledRoot:
@@ -1146,30 +1152,31 @@ class TestAnObliqueCornerIsStillTheCorner:
     @pytest.mark.parametrize("degrees_apart", [90, 60, 45, 30, 15])
     def test_the_vertex_lies_on_both_faces(self, degrees_apart):
         from kumiki.drawing import angle_rays
+        from tests.testing_shavings import present
 
         first, second = self._faces(degrees_apart)
 
-        rays = angle_rays(first, second)
+        rays = present(angle_rays(first, second), "rays for two faces at an angle")
 
-        assert rays is not None
-        off_first, off_second = self._off_the_faces(rays["vertex"], first, second)
+        off_first, off_second = self._off_the_faces(rays.vertex, first, second)
         assert off_first == pytest.approx(0, abs=1e-6)
         assert off_second == pytest.approx(0, abs=1e-6)
 
     def test_and_it_sits_on_the_line_the_two_faces_share(self):
         """Not merely on both planes: on their intersection, which runs along x."""
         from kumiki.drawing import angle_rays
+        from tests.testing_shavings import present
 
         first, second = self._faces(45)
 
-        rays = angle_rays(first, second)
+        rays = present(angle_rays(first, second), "rays for two faces at 45 degrees")
 
         # Plane A is y == 300. Plane B through (2000, -100, 1500) with normal
         # (0, cos45, sin45) is y + z == 1400. So the shared line is y == 300,
         # z == 1100, running along x.
-        assert rays["vertex"][1] == pytest.approx(300.0, abs=1e-6)
-        assert rays["vertex"][2] == pytest.approx(1100.0, abs=1e-6)
-        assert abs(rays["normal"][0]) == pytest.approx(1.0, abs=1e-6)
+        assert rays.vertex[1] == pytest.approx(300.0, abs=1e-6)
+        assert rays.vertex[2] == pytest.approx(1100.0, abs=1e-6)
+        assert abs(rays.normal[0]) == pytest.approx(1.0, abs=1e-6)
 
 
 class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
@@ -1215,7 +1222,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
     def test_whenever_an_angle_is_admitted_the_corner_can_be_placed(
             self, shape, degrees_apart):
         from kumiki.drawing import (MeasurementOperation, angle_rays,
-                                    solid_form, solid_kinds)
+                                    three_d_form, three_d_kinds)
 
         first, second = self._turned(degrees_apart, shape)
         # Ask the table what this pair admits, through the same geometry the
@@ -1223,7 +1230,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
         one = self._geometry(first)
         other = self._geometry(second)
         admits_angle = any(kind.operation is MeasurementOperation.ANGLE
-                           for kind in solid_kinds(one, other))
+                           for kind in three_d_kinds(one, other))
 
         if not admits_angle:
             return

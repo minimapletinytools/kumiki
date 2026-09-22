@@ -56,8 +56,7 @@ class MeasurementFeature(Enum):
 
     POINT = "point"
     LINE = "line"
-    # TODO switch "solid" terminology to "3D"
-    #: Solid only. A face, before projection.
+    #: 3D only. A face, before projection.
     PLANE = "plane"
     #: Projected only. A face seen at an angle, which cannot be dimensioned.
     AREA = "area"
@@ -95,7 +94,7 @@ class MeasurementKind:
                 and self.direction is not MeasurementDirection.PERPENDICULAR):
             raise ValueError(
                 f"{self.direction.value} is a direction of the sheet, so it only exists "
-                "projected. The solid has no up."
+                "projected. Space itself has no up."
             )
 
     @property
@@ -142,7 +141,7 @@ class MeasurementKind:
         distance IS the distance, which is why the two collapsed into one.
 
         Where an old name and a new one collide -- `angle`, which now composes
-        for a SOLID angle -- the old reading wins, because every file that
+        for a 3D angle -- the old reading wins, because every file that
         contains the word was written meaning the old one. Solid kinds are
         written structured (see as_wire), so nothing needs the ambiguous form.
         """
@@ -165,7 +164,7 @@ def _projected(operation, direction=MeasurementDirection.PERPENDICULAR) -> Measu
     return MeasurementKind(operation, MeasurementSpace.PROJECTED, direction)
 
 
-def _solid(operation) -> MeasurementKind:
+def _three_d(operation) -> MeasurementKind:
     return MeasurementKind(operation, MeasurementSpace.THREE_D)
 
 
@@ -342,7 +341,7 @@ class MeasureSpan:
 
     ON A SHEET. point and edge only. faces projecting to areas are not measurable features.
 
-    IN THE SOLID. all supported.
+    IN 3D. all supported.
 
     `interval` is measured from `at` in `direction` marking the feature cropped to its parent.
     """
@@ -428,8 +427,7 @@ def _stations(span: MeasureSpan, along: VectorLike) -> Tuple[float, float]:
     return (min(reach), max(reach))
 
 
-# TODO add return type
-def _at_station(span: MeasureSpan, along: VectorLike, station: float):
+def _at_station(span: MeasureSpan, along: VectorLike, station: float) -> V3:
     """The point on a span that sits at a given station along `along`."""
     if span.is_point:
         return span.at
@@ -441,8 +439,7 @@ def _at_station(span: MeasureSpan, along: VectorLike, station: float):
     return span.at + unit * step
 
 
-# TODO add return type
-def _foot_on(span: MeasureSpan, point: VectorLike):
+def _foot_on(span: MeasureSpan, point: VectorLike) -> V3:
     """Where a perpendicular from `point` meets a span, kept on the span."""
     at, unit = span.at, span.along
     station = _dot(_v3(point) - at, unit)
@@ -467,7 +464,7 @@ def _representative_point(span: MeasureSpan) -> V3:
     return span.at + unit * middle
 
 
-def _foot_on_plane(span: MeasureSpan, point: VectorLike):
+def _foot_on_plane(span: MeasureSpan, point: VectorLike) -> V3:
     """Where a perpendicular from `point` meets a plane.
 
     NOT clamped to the face, unlike the foot on a line: a span carries a plane's
@@ -481,47 +478,54 @@ def _foot_on_plane(span: MeasureSpan, point: VectorLike):
     return point - unit * gap
 
 
-def _closest_on_line(point, at, direction):
+def _closest_on_line(point: VectorLike, at: VectorLike, direction: VectorLike) -> V3:
     """Where a line comes nearest a point."""
     at, unit = _v3(at), _unit(direction)
     step = _dot(_v3(point) - at, unit)
     return at + unit * step
 
 
-# TODO add return type
-# TODO should this return a Line object instead?
-def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
-    """The line two planes share: a point on it and its direction, or None.
+def _plane_crossing(first: MeasureSpan, second: MeasureSpan) -> Optional[Line]:
+    """The line two planes share, or None when they are too near parallel.
 
-    None when they are parallel, which has no corner to stand in -- and admits a
-    distance rather than an angle anyway.
+    Too near parallel has no corner to stand in -- and admits a distance rather
+    than an angle anyway.
     """
+    # BOTH UNIT, since they come from `facing`. That is what lets the length of
+    # their cross stand for the sine between the two planes, which is the only
+    # reason the raw cross is wanted below: nothing here is scale-dependent,
+    # because nothing here has a scale.
     one, other = first.facing, second.facing
-    # TODO cleanup this commen,t why are we using raw_cross here exactly? this will make angle check dependendent on vector size which seems wrong
-    # The UNNORMALISED cross, whose square length is the sine between the planes
-    # squared. This asked _cross, which normalises, so the length was always
-    # exactly one: the refusal below could only ever fire on two EXACTLY parallel
-    # planes, and the closed form that intersect_planes applies divided by one
-    # instead of by that sine -- putting the corner a factor of it toward the
-    # world origin, which is right only where the two happen to meet square.
-    along = _raw_cross(one, other)
+    # The cross at its own length, then. Asking _cross instead normalised it, so
+    # the length was always exactly one: the refusal below could only fire on
+    # two EXACTLY parallel planes, and intersect_planes divided by one rather
+    # than by that sine -- putting the corner a factor of it toward the world
+    # origin, which is right only where the two happen to meet square.
+    #
     # safe_zero_test_sq because that length is SQUARED: it squares the tolerance
     # itself, so PARALLEL_EPSILON means here what it means everywhere else in
     # this file -- a plain sine. Compared raw it read as a tolerance on the
     # square and refused anything under 5.7 degrees instead of 0.57.
+    along = _raw_cross(one, other)
     if safe_zero_test_sq(_dot(along, along), eps=PARALLEL_EPSILON):
         return None
 
-    # TODO why not just pass in an eps parameter to intersect_planes and remove the code above?    
+    # The refusal above is this file's, not geometry's: how near parallel is too
+    # near to stand a dimension in is a question about drafting. intersect_planes
+    # refuses only what it cannot compute, at EPSILON_GENERIC, and takes no eps
+    # of its own -- giving it one would put a drafting rule in the geometry
+    # layer, where the next caller would inherit a tolerance meant for this one.
     crossing = intersect_planes(Plane(normal=one, point=first.at),
                                 Plane(normal=other, point=second.at))
     if crossing is None:
         return None
-    return crossing.point, _unit(crossing.direction)
+    return Line(point=crossing.point, direction=_unit(crossing.direction))
 
 
-# TODO add types
-def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = None):
+def _ray_toward(
+    ray: VectorLike, vertex: VectorLike, span: MeasureSpan,
+    other: Optional[MeasureSpan] = None,
+) -> Optional[V3]:
     """A unit ray from `vertex`, turned to point at where the feature is. Used for determing how to draw an angle measurement
     """
     unit = _unit(ray)
@@ -542,7 +546,19 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
     return -unit if lean < 0 else unit
 
 
-# TODO give axes a real type, not just a mapping what?? give it a better name too
+# TODO NEXT PASS: `axes` is the last mapping-as-object here, and wants to be a
+# frozen ViewAxes(look, right, up) with a from_wire, and the parameter renamed
+# -- `view`, not `frame`, which is a timber frame everywhere else. Left for its
+# own pass because it is the awkward one:
+#   - it crosses the wire, built in runner from payload look/right/up
+#   - right and up are legitimately absent for a 3D pick, so it is Optional
+#     fields inside an Optional argument -- two levels that should be one
+#   - the three fallbacks ((0,0,-1), (1,0,0), (0,0,1)) live at the use sites
+#     here, not in the type; moving them in is a behaviour change and wants its
+#     own test
+#   - ~19 call sites and ~46 dict literals across drawing, runner and tests
+#   - the name is already overloaded: runner has a different `axes` for a
+#     timber's width/height directions
 def pair_separation(
     one: Optional[Geometry], other: Optional[Geometry],
     kind: MeasurementKind, axes: Optional[Mapping] = None,
@@ -566,10 +582,10 @@ def pair_separation(
         return None
 
     look = _unit((axes or {}).get("look") or (0, 0, -1))
-    solid = kind.space is MeasurementSpace.THREE_D
-    if solid:
-        form_one, run_one = solid_form(one)
-        form_other, run_other = solid_form(other)
+    in_three_d = kind.space is MeasurementSpace.THREE_D
+    if in_three_d:
+        form_one, run_one = three_d_form(one)
+        form_other, run_other = three_d_form(other)
     else:
         form_one, run_one = projected_form(one, look)
         form_other, run_other = projected_form(other, look)
@@ -577,7 +593,7 @@ def pair_separation(
         return None
 
     gap = _v3(at_other) - _v3(at_one)
-    if not solid:
+    if not in_three_d:
         # On a sheet, only what survives the projection counts.
         gap = gap - look * _dot(gap, look)
 
@@ -625,8 +641,37 @@ def measures_nothing(
     return gap is not None and gap < DEGENERATE_SEPARATION
 
 
-# TODO add return type
-def angle_rays(first: MeasureSpan, second: MeasureSpan):
+@dataclass(frozen=True)
+class AngleRays:
+    """Where an angle is, and which two ways it opens.
+
+    A corner, two unit rays from it, and the plane they span, in world space.
+    The viewer sweeps the arc in that plane and projects it, so the arc lies on
+    the work and foreshortens with it -- drawn flat on the screen instead it
+    shows the PROJECTED angle and agrees with its own label from one direction
+    only.
+
+    THE RAYS DECIDE THE VALUE. The angle a reader wants is the one the two
+    features actually subtend -- the corner they make, not its supplement -- so
+    it is read off these rather than off the features' normals, which give the
+    same absolute dot for 45 degrees and 135.
+    """
+
+    vertex: V3
+    #: `from` and `to` on the wire. Spelled out here because `from` is a
+    #: keyword, and a field cannot be called it.
+    opens_from: V3
+    opens_to: V3
+    #: The plane the angle is IN: for two faces, the one both are perpendicular
+    #: to, whose normal is the corner they share.
+    normal: V3
+
+    def as_wire(self) -> Dict[str, list]:
+        return {"vertex": list(self.vertex), "from": list(self.opens_from),
+                "to": list(self.opens_to), "normal": list(self.normal)}
+
+
+def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
     """Where an angle between two features is, and which two ways it opens.
 
     A vertex, two unit rays from it, and the plane they span, in world space,
@@ -639,9 +684,9 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan):
         crossing = _plane_crossing(first, second)
         if crossing is None:
             return None
-        point, along = crossing
+        along = crossing.direction
         middle = (first.at + second.at) / 2
-        vertex = _closest_on_line(middle, point, along)
+        vertex = _closest_on_line(middle, crossing.point, along)
         # Square to the shared corner, and lying in its own face.
         rays = (_ray_toward(_cross(along, first.facing), vertex, first),
                 _ray_toward(_cross(along, second.facing), vertex, second))
@@ -650,17 +695,19 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan):
         if placed is None:
             return None
         vertex = placed
-        rays = (_ray_toward(first.direction, vertex, first, second),
-                _ray_toward(second.direction, vertex, second, first))
+        rays = (_ray_toward(first.along, vertex, first, second),
+                _ray_toward(second.along, vertex, second, first))
     elif first.is_line or second.is_line:
         line, plane = (first, second) if first.is_line else (second, first)
+        # No None check: _line_meets_plane always answers, falling back to the
+        # nearest point when the line runs flat along the face. Whether it
+        # SHOULD refuse instead is the question in its own TODO -- if it ever
+        # does, this needs a guard again.
         vertex = _line_meets_plane(line, plane)
-        if vertex is None:
-            return None
-        in_plane = _flatten_onto(line.direction, plane.normal)
+        in_plane = _flatten_onto(line.along, plane.facing)
         if in_plane is None:
             return None
-        line_ray = _ray_toward(line.direction, vertex, line, plane)
+        line_ray = _ray_toward(line.along, vertex, line, plane)
         plane_ray = _ray_toward(in_plane, vertex, plane)
         rays = (line_ray, plane_ray) if first.is_line else (plane_ray, line_ray)
     else:
@@ -682,16 +729,15 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan):
     upright = _raw_cross(rays[0], rays[1])
     if not any(abs(part) > 1e-9 for part in upright):
         return None
-    return {
-        "vertex": list(vertex),
-        "from": list(rays[0]),
-        "to": list(rays[1]),
-        "normal": list(_unit(upright)),
-    }
+    return AngleRays(vertex=_v3(vertex), opens_from=rays[0], opens_to=rays[1],
+                     normal=_unit(upright))
 
-# TODO return type
-# TODO do I have something in measuring.py that already computes this?
-def _closest_between(first: MeasureSpan, second: MeasureSpan):
+# TODO measuring.py has this same closed form inside
+# mark_distance_from_corner_along_edge_by_finding_closest_point_on_line, wrapped
+# in timber/edge/end semantics. The shared core -- two Lines in, two stations
+# out -- belongs in geometry.py beside intersect_planes; this clamps to the
+# intervals and takes the midpoint, that one raises on parallel.
+def _closest_between(first: MeasureSpan, second: MeasureSpan) -> Optional[V3]:
     """Where two lines come nearest each other, kept on both.
     """
     one, other = first.along, second.along
@@ -712,16 +758,14 @@ def _closest_between(first: MeasureSpan, second: MeasureSpan):
     on_other = second.at + other * station_other
     return (on_one + on_other) / 2
 
-# TODO return type
-def _clamp_to(station: float, interval):
+def _clamp_to(station: float, interval: Optional[Tuple[float, float]]) -> float:
     if interval is None:
         return station
     low, high = interval
     return max(low, min(high, station))
 
 
-# TODO return type
-def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan):
+def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan) -> V3:
     """Where a line crosses a plane, or some nearest point if parallel
     
     # TODO why do we need to support the parallel case, could/should we just have this return None instead in the parallel cases?
@@ -738,8 +782,7 @@ def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan):
     return at + unit * step
 
 
-# TODO types
-def _flatten_onto(direction, normal):
+def _flatten_onto(direction: VectorLike, normal: VectorLike) -> Optional[V3]:
     """The part of a direction that lies in a plane."""
     unit, up = _unit(direction), _unit(normal)
     flat = unit - up * _dot(unit, up)
@@ -748,22 +791,22 @@ def _flatten_onto(direction, normal):
     return _unit(flat)
 
 
-def angle_between(rays) -> Optional[float]:
+def angle_between(rays: Optional[AngleRays]) -> Optional[float]:
     """The angle the rays open, in degrees. The value a reader sees."""
-    if not rays:
+    if rays is None:
         return None
-    facing = max(-1.0, min(1.0, _dot(_unit(rays["from"]), _unit(rays["to"]))))
+    facing = max(-1.0, min(1.0, _dot(_unit(rays.opens_from), _unit(rays.opens_to))))
     return math.degrees(math.acos(facing))
 
 
-# TODO return type
 def distance_anchors(
     first: MeasureSpan,
     second: MeasureSpan,
     kind: MeasurementKind,
-    # TODO use a real object here, give this a better name
+    # TODO give axes a real type and a better name -- see ViewAxes in
+    # docs/drawing-rule-migration.md.
     axes: Optional[Mapping] = None,
-):
+) -> Tuple[V3, V3]:
     """Where a distance between these two features attaches, at both ends.
 
     A property of the PAIR and the plane, not of either feature alone. An anchor
@@ -785,7 +828,7 @@ def distance_anchors(
     PERPENDICULAR, anything and a PLANE: the same rule one step further. The
     anchor is chosen on whichever feature has less freedom -- a point has none,
     a line one direction, a plane two -- and dropped onto the other square to
-    it. A face only IS a plane in the solid; on a sheet it is a line seen
+    it. A face only IS a plane in 3D; on a sheet it is a line seen
     edge-on and takes the rules above.
 
     PERPENDICULAR, two points: themselves. With no line to be square to, the
@@ -806,7 +849,7 @@ def distance_anchors(
             "right" if named.endswith("horizontal_distance") else "up") or (1, 0, 0))
         at = first.at
         offset = _dot(second.at - at, axis)
-        return (first.at, tuple(at + axis * offset))
+        return (first.at, at + axis * offset)
 
     # A PLANE is measured to by dropping a perpendicular onto it. The anchor is
     # chosen on whichever feature has less freedom -- a point has none, a line
@@ -816,7 +859,7 @@ def distance_anchors(
     # lines and put through the shared-station rule, which shares ONE direction,
     # and the dimension leaned by however far the two were offset in the other.
     #
-    # Only in the solid: on a sheet a face is a line and never gets here.
+    # Only in 3D: on a sheet a face is a line and never gets here.
     if first.is_plane or second.is_plane:
         if first.is_plane and second.is_plane:
             # Parallel faces. Either centroid will do, and the first is the one
@@ -867,9 +910,15 @@ def projected_kinds(
     return kinds_for(form_one, form_other, MeasurementSpace.PROJECTED, parallel=parallel)
 
 
-# TODO also we want to get rid of the term "solid" a mesaurement is just a measurement, it may or may not be in a projected plane. if we really need a term call it a 3D measurement and a projected measurement (only 2  exclusive choices)
-# TODO do we really need this? seems like it would be better just to process `geometry` directly at the callsite. It's just super weird that the second argument is interpreted differently depneding on the feature type
-def solid_form(
+# TODO NEXT PASS: there are only two spaces and they are exclusive, so this and
+# projected_form could be one `form_of(geometry, space, look=None)`, and
+# three_d_kinds/projected_kinds one `kinds_admitted(one, other, space,
+# look=None)`. That would also settle the complaint below -- _three_d_parallel
+# takes a second argument that means a normal for a plane and a direction for a
+# line, which is only tolerable because it is private and has one caller.
+# Held over: it changes call sites in runner and ~27 in the tests, and should
+# fail on its own if it is wrong.
+def three_d_form(
     geometry: Optional[Geometry],
 ) -> Tuple[Optional[MeasurementFeature], Optional[V3]]:
     """What a feature IS, with nothing projected away.
@@ -897,14 +946,17 @@ def solid_form(
 
 
 
-def _solid_parallel(
+def _three_d_parallel(
     form_one: MeasurementFeature,
     run_one: Optional[VectorLike],
     form_other: MeasurementFeature,
     run_other: Optional[VectorLike],
 ) -> Optional[bool]:
-    """Whether two solid features are parallel
+    """Whether two 3D features are parallel
     """
+    # TODO the second argument means different things by feature type -- a
+    # plane's normal, a line's direction -- which is what makes the test below
+    # read oddly. Folded into `form_of` next pass; see the note above.
     if run_one is None or run_other is None:
         return None
     one, other = _v3(run_one), _v3(run_other)
@@ -913,18 +965,18 @@ def _solid_parallel(
     return are_vectors_perpendicular(one, other, eps=PARALLEL_EPSILON)
 
 
-def solid_kinds(
+def three_d_kinds(
     one: Optional[Geometry], other: Optional[Geometry],
 ) -> Tuple[MeasurementKind, ...]:
     """Which kinds this pair admits in the 3D view. Empty when none.
     """
-    form_one, run_one = solid_form(one)
-    form_other, run_other = solid_form(other)
+    form_one, run_one = three_d_form(one)
+    form_other, run_other = three_d_form(other)
     if form_one is None or form_other is None:
         return ()
     return kinds_for(
         form_one, form_other, MeasurementSpace.THREE_D,
-        parallel=_solid_parallel(form_one, run_one, form_other, run_other),
+        parallel=_three_d_parallel(form_one, run_one, form_other, run_other),
     )
 
 
@@ -943,18 +995,18 @@ def kinds_for(
         # its middle is a point about nothing.
         return ()
     if MeasurementFeature.PLANE in pair and space is MeasurementSpace.PROJECTED:
-        raise ValueError("a plane is a solid-space feature; project it first")
+        raise ValueError("a plane is a 3D feature; project it first")
     if MeasurementFeature.AREA in pair and space is MeasurementSpace.THREE_D:
-        raise ValueError("an area is a projected feature; it has no solid counterpart")
+        raise ValueError("an area is a projected feature; it has no 3D counterpart")
 
     flat = {MeasurementFeature.LINE, MeasurementFeature.PLANE}
     both_flat = feature_a in flat and feature_b in flat
     if both_flat and parallel is False:
         return (_projected(MeasurementOperation.ANGLE) if space is MeasurementSpace.PROJECTED
-                else _solid(MeasurementOperation.ANGLE),)
+                else _three_d(MeasurementOperation.ANGLE),)
 
     if space is MeasurementSpace.THREE_D:
-        return (_solid(MeasurementOperation.DISTANCE),)
+        return (_three_d(MeasurementOperation.DISTANCE),)
 
     perpendicular = _projected(MeasurementOperation.DISTANCE)
     if pair == {MeasurementFeature.POINT}:

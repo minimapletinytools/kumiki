@@ -2016,7 +2016,7 @@ def _pick_verdict(
     # would be measured is a property of the two features and the camera, not of
     # what the pair happens to admit.
     plane = _plane_for_pick(located_pick, timber, payload)
-    # Structured, not named: `angle` composes for a solid angle and is also what
+    # Structured, not named: `angle` composes for a 3D angle and is also what
     # every measurement written before spaces called a projected one.
     admitted = _kinds_for_pair(held, geometry, payload["look"], payload)
     if not admitted:
@@ -2052,7 +2052,7 @@ def _pick_verdict(
 
 
 def _pick_space(payload: Dict[str, Any]) -> Any:
-    """Which space a pick is judged in: the sheet's, or the solid's.
+    """Which space a pick is judged in: the sheet's, or the model's.
 
     The viewer says, because it is the one that knows which view the pointer is
     in. A drawing's viewport has a declared camera and projects onto its sheet;
@@ -2077,10 +2077,10 @@ def _kinds_for_pair(
     parallel ones a distance. Projecting there instead called almost every face
     an AREA and refused it.
     """
-    from kumiki.drawing import MeasurementSpace, projected_kinds, solid_kinds
+    from kumiki.drawing import MeasurementSpace, projected_kinds, three_d_kinds
 
     if _pick_space(payload) is MeasurementSpace.THREE_D:
-        return solid_kinds(one, other)
+        return three_d_kinds(one, other)
     return projected_kinds(one, other, look)
 
 
@@ -2112,17 +2112,17 @@ def _pick_placement(
     if frame is None:
         return empty
 
-    solid = _pick_space(payload) is MeasurementSpace.THREE_D
+    in_three_d = _pick_space(payload) is MeasurementSpace.THREE_D
     plane = _plane_for_pick(located_pick, timber, payload)
     normal = (plane or {}).get("normal") or look
-    placed = _resolve_anchor_placed(frame, held, normal, solid)
+    placed = _resolve_anchor_placed(frame, held, normal, in_three_d)
     if placed is None or placed[1] is None:
         return empty
     held_span = placed[1]
 
     picked_span = _measure_span(
         located_pick[0], located_pick[1], timber, located_pick[2],
-        _root_csg_of(ss, payload.get("memberKey")), normal, solid)
+        _root_csg_of(ss, payload.get("memberKey")), normal, in_three_d)
     if picked_span is None:
         return empty
 
@@ -2142,10 +2142,12 @@ def _pick_placement(
     if kind.operation.value == "angle":
         rays = angle_rays(held_span, picked_span)
         settled = _settled_measurement(
-            {**ends, "angle": rays}, None, kind, admitted, solid, normal, axes)
-        return {"anchors": None, "angle": rays, "settled": settled}
+            {**ends, "angle": rays}, None, kind, admitted, in_three_d, normal, axes)
+        return {"anchors": None,
+                "angle": rays.as_wire() if rays is not None else None,
+                "settled": settled}
     at_held, at_picked = distance_anchors(held_span, picked_span, kind, axes)
-    settled = _settled_measurement(ends, None, kind, admitted, solid, normal, axes)
+    settled = _settled_measurement(ends, None, kind, admitted, in_three_d, normal, axes)
     return {"anchors": {"a": list(at_held), "b": list(at_picked)},
             "angle": None, "settled": settled}
 
@@ -2186,7 +2188,7 @@ def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
         # the line, is not measuring something else. They travel so that
         # overriding one in the file starts from what the code asked for.
         #
-        # Structured rather than named: `angle` composes for a solid angle and
+        # Structured rather than named: `angle` composes for a 3D angle and
         # is also what every measurement written before spaces called a
         # projected one, so a bare name cannot carry both.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
@@ -2784,9 +2786,7 @@ def _direction_to_world(direction: Any, timber: Any) -> List[float]:
 def _measure_span(
     feature: Any, node: Any, timber: Any, located: Any, root_csg: Any,
     plane_normal: Optional[Sequence[float]],
-    # NOT `solid`: that name is taken below, by the timber's own CSG. Shadowing
-    # it made this always true, and every face came back a plane on sheets too.
-    solid_space: bool = False,
+    in_three_d: bool = False,
 ) -> Optional[Any]:
     """What a feature is, where the measurement is being taken.
 
@@ -2842,7 +2842,7 @@ def _measure_span(
             start = to_world(located.point + located.direction * scalar_of(low))
             end = to_world(located.point + located.direction * scalar_of(high))
             direction = _normalize([end[i] - start[i] for i in range(3)])
-            if (not solid_space and plane_normal is not None
+            if (not in_three_d and plane_normal is not None
                     and _projects_to_a_point(direction, plane_normal)):
                 # Seen end-on it IS a point, and a point is what the rules have
                 # to be given: a line whose length is all depth has no direction
@@ -2864,7 +2864,7 @@ def _measure_span(
         at = to_world(middle)
         normal = _normalize(_vector3_to_floats(
             _located_geometry(located, timber).normal))
-        if solid_space:
+        if in_three_d:
             # A plane, not a line: measurable from anywhere rather than only
             # edge-on, and square to its normal in two directions rather than
             # one.
@@ -2914,7 +2914,7 @@ def _resolve_measurement(
                                MeasurementKind, MeasurementOperation,
                                MeasurementSpace, angle_between, angle_rays,
                                distance_anchors, pair_separation,
-                               projected_kinds, solid_kinds)
+                               projected_kinds, three_d_kinds)
 
     resolved = dict(measure)
     broken = []
@@ -2927,14 +2927,14 @@ def _resolve_measurement(
         plane = axes.get("look")
 
     # Which space this is taken in, needed before the ends are resolved: a face
-    # is a PLANE in the solid and a line on a sheet, and that is what each end's
+    # is a PLANE in 3D and a line on a sheet, and that is what each end's
     # span comes back as. A 3D measurement says so in its own kind; one still
     # being inferred is projected, since that is what a sheet has.
     declared = MeasurementKind.from_wire(measure.get("kind"))
-    solid = declared is not None and declared.space is MeasurementSpace.THREE_D
+    in_three_d = declared is not None and declared.space is MeasurementSpace.THREE_D
 
     for key in ("a", "b"):
-        placed = _resolve_anchor_placed(frame, measure.get(key), plane, solid)
+        placed = _resolve_anchor_placed(frame, measure.get(key), plane, in_three_d)
         if placed is None:
             broken.append(key)
             continue
@@ -2961,11 +2961,12 @@ def _resolve_measurement(
         # else -- through the parallel-line rule, and came out square to one of
         # them and not the other.
         # Judged in the same space, so what the pair admits and what its ends
-        # came back as cannot disagree. Projecting a solid measurement here
+        # came back as cannot disagree. Projecting a 3D measurement here
         # called its faces AREAs and left it with no kind at all.
-        admitted = (solid_kinds(ends["a"], ends["b"]) if solid
+        admitted = (three_d_kinds(ends["a"], ends["b"]) if in_three_d
                     else projected_kinds(ends["a"], ends["b"], plane))
         kind = declared or (admitted[0] if admitted else None)
+        rays = None
         if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
             at_a, at_b = distance_anchors(spans["a"], spans["b"], kind, axes)
             resolved["a"] = {**resolved["a"], "at": list(at_a)}
@@ -2976,11 +2977,14 @@ def _resolve_measurement(
             # feature's own anchor and its normal, which put the vertex wherever
             # two unrelated screen lines happened to cross -- often touching
             # neither of the features being measured.
-            resolved["angle"] = angle_rays(spans["a"], spans["b"])
+            rays = angle_rays(spans["a"], spans["b"])
+            resolved["angle"] = rays.as_wire() if rays is not None else None
         resolved["settled"] = _settled_measurement(
             {**resolved, "a": {"geometry": ends["a"]}, "b": {"geometry": ends["b"]},
-             "angle": resolved.get("angle")},
-            declared, kind, admitted, solid, plane, axes)
+             # The rays themselves, not the wire form just put on `resolved`:
+             # what comes to is read off them, and the wire is for the viewer.
+             "angle": rays},
+            declared, kind, admitted, in_three_d, plane, axes)
     else:
         resolved["settled"] = _unplaceable_measurement(measure, spans, plane)
     return resolved
@@ -3033,7 +3037,7 @@ def _measure_end_name(measure: Dict[str, Any], key: str) -> str:
 
 def _settled_measurement(
     resolved: Dict[str, Any], declared: Any, kind: Any, admitted: Any,
-    solid: bool, plane: Any, axes: Optional[Dict[str, Any]],
+    in_three_d: bool, plane: Any, axes: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """What this measurement comes to, decided here and sent with it.
 
@@ -3058,11 +3062,11 @@ def _settled_measurement(
                                 angle_between, pair_separation)
 
     names = [one.name for one in admitted]
-    space = "3d" if solid else "projected"
+    space = "3d" if in_three_d else "projected"
     settled = {"kind": kind.as_wire() if kind is not None else None,
                "available": names, "space": space, "value": None, "reason": None,
-               "a": _settled_form(resolved["a"].get("geometry"), solid, plane),
-               "b": _settled_form(resolved["b"].get("geometry"), solid, plane)}
+               "a": _settled_form(resolved["a"].get("geometry"), in_three_d, plane),
+               "b": _settled_form(resolved["b"].get("geometry"), in_three_d, plane)}
     if not admitted:
         settled["reason"] = "not-measurable"
         return settled
@@ -3095,16 +3099,16 @@ def _settled_measurement(
     return settled
 
 
-def _settled_form(geometry: Any, solid: bool, plane: Any) -> Dict[str, Any]:
+def _settled_form(geometry: Any, in_three_d: bool, plane: Any) -> Dict[str, Any]:
     """What one end behaves as, in the shape the viewer's own forms took.
 
-    Sent rather than classified there, so projected_form and solid_form stop
+    Sent rather than classified there, so projected_form and three_d_form stop
     being two implementations of one rule. What crosses is the ANSWER -- a name
     and the way the feature runs -- not the rule that reached it.
     """
-    from kumiki.drawing import MeasurementFeature, projected_form, solid_form
+    from kumiki.drawing import MeasurementFeature, projected_form, three_d_form
 
-    form, run = solid_form(geometry) if solid else projected_form(geometry, plane)
+    form, run = three_d_form(geometry) if in_three_d else projected_form(geometry, plane)
     if form is None:
         return {"form": "none"}
     if form is MeasurementFeature.PLANE:

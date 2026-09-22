@@ -104,7 +104,7 @@ class TestTheName:
 
 
 class TestSpacesAndDirections:
-    def test_the_sheets_directions_do_not_exist_in_the_solid(self):
+    def test_the_sheets_directions_do_not_exist_in_the_three_d(self):
         # HORIZONTAL and VERTICAL are directions of the page. The solid has no
         # up, so a distance along one is not a question that can be asked.
         with pytest.raises(ValueError, match="direction of the sheet"):
@@ -188,30 +188,30 @@ class TestWhatTheSolidAdmits:
     ALONG = {"kind": "line", "direction": [1, 0, 0]}
 
     def test_a_face_is_a_plane_from_wherever_it_is_seen(self):
-        from kumiki.drawing import MeasurementFeature, solid_form
+        from kumiki.drawing import MeasurementFeature, three_d_form
 
-        assert solid_form(geometry(self.TOP))[0] is MeasurementFeature.PLANE
+        assert three_d_form(geometry(self.TOP))[0] is MeasurementFeature.PLANE
 
     def test_an_edge_is_a_line_even_when_it_points_at_you(self):
-        from kumiki.drawing import MeasurementFeature, solid_form
+        from kumiki.drawing import MeasurementFeature, three_d_form
 
-        assert solid_form(geometry(self.UPRIGHT))[0] is MeasurementFeature.LINE
+        assert three_d_form(geometry(self.UPRIGHT))[0] is MeasurementFeature.LINE
 
     def test_two_faces_meeting_at_a_corner_admit_an_angle(self):
-        from kumiki.drawing import solid_kinds
+        from kumiki.drawing import three_d_kinds
 
-        assert [k.name for k in solid_kinds(geometry(self.SIDE), geometry(self.TOP))] == ["angle"]
+        assert [k.name for k in three_d_kinds(geometry(self.SIDE), geometry(self.TOP))] == ["angle"]
 
     def test_two_parallel_faces_admit_the_distance_between_them(self):
-        from kumiki.drawing import solid_kinds
+        from kumiki.drawing import three_d_kinds
 
-        assert [k.name for k in solid_kinds(geometry(self.SIDE), geometry(self.FAR_SIDE))] == [
+        assert [k.name for k in three_d_kinds(geometry(self.SIDE), geometry(self.FAR_SIDE))] == [
             "perpendicular_distance"]
 
     def test_crossing_edges_admit_an_angle(self):
-        from kumiki.drawing import solid_kinds
+        from kumiki.drawing import three_d_kinds
 
-        assert [k.name for k in solid_kinds(geometry(self.UPRIGHT), geometry(self.ALONG))] == ["angle"]
+        assert [k.name for k in three_d_kinds(geometry(self.UPRIGHT), geometry(self.ALONG))] == ["angle"]
 
     def test_an_edge_lying_in_a_face_is_parallel_to_it(self):
         """A normal is not a direction.
@@ -220,28 +220,28 @@ class TestWhatTheSolidAdmits:
         comparing the two as though both were directions would call this a
         crossing and offer an angle of nothing.
         """
-        from kumiki.drawing import solid_kinds
+        from kumiki.drawing import three_d_kinds
 
-        assert [k.name for k in solid_kinds(geometry(self.UPRIGHT), geometry(self.SIDE))] == [
+        assert [k.name for k in three_d_kinds(geometry(self.UPRIGHT), geometry(self.SIDE))] == [
             "perpendicular_distance"]
 
     def test_an_edge_square_to_a_face_crosses_it(self):
-        from kumiki.drawing import solid_kinds
+        from kumiki.drawing import three_d_kinds
 
-        assert [k.name for k in solid_kinds(geometry(self.ALONG), geometry(self.SIDE))] == ["angle"]
+        assert [k.name for k in three_d_kinds(geometry(self.ALONG), geometry(self.SIDE))] == ["angle"]
 
     def test_a_feature_lying_on_nothing_admits_nothing(self):
-        from kumiki.drawing import solid_kinds
+        from kumiki.drawing import three_d_kinds
 
-        assert solid_kinds(geometry({"kind": "barrel"}), geometry(self.SIDE)) == ()
+        assert three_d_kinds(geometry({"kind": "barrel"}), geometry(self.SIDE)) == ()
 
     def test_the_solid_never_offers_a_direction_of_the_sheet(self):
         """Horizontal and vertical are the page's, and the solid has no up."""
-        from kumiki.drawing import MeasurementDirection, solid_kinds
+        from kumiki.drawing import MeasurementDirection, three_d_kinds
 
         for a in (self.SIDE, self.TOP, self.UPRIGHT, self.ALONG):
             for b in (self.SIDE, self.TOP, self.UPRIGHT, self.ALONG):
-                for kind in solid_kinds(geometry(a), geometry(b)):
+                for kind in three_d_kinds(geometry(a), geometry(b)):
                     assert kind.direction is MeasurementDirection.PERPENDICULAR
 
 
@@ -492,7 +492,7 @@ class TestEveryKindHasANameAPersonWouldUse:
     LOOK = [0, 0, -1]
 
     def _every_kind(self):
-        from kumiki.drawing import projected_kinds, solid_kinds
+        from kumiki.drawing import projected_kinds, three_d_kinds
 
         names = set()
         for one in self.SHAPES:
@@ -500,7 +500,7 @@ class TestEveryKindHasANameAPersonWouldUse:
                 a, b = geometry(one), geometry(other)
                 for kind in projected_kinds(a, b, self.LOOK):
                     names.add(kind.name)
-                for kind in solid_kinds(a, b):
+                for kind in three_d_kinds(a, b):
                     names.add(kind.name)
         return sorted(names)
 

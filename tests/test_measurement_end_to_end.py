@@ -4,7 +4,7 @@ Every other test here checks a rule, a span or a payload on its own. These drive
 the whole chain the runner owns -- pick a feature, hold it, pick a second, read
 the verdict, write it, resolve it -- because that is where the parts have gone
 wrong together: a feature that picked and then would not resolve, a verdict
-judged in the wrong space, anchors placed by the rule for a sheet in the solid.
+judged in the wrong space, anchors placed by the rule for a sheet in 3D.
 
 The viewer's half cannot run here (it wants a browser), so this stops at what
 the runner answers. That is the half where the geometry lives.
@@ -163,17 +163,17 @@ THREE_D_VIEWPORT = "main"
 LOOK = [-0.577, -0.577, -0.577]
 
 
-def _solid_distance():
+def _three_d_distance():
     from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
 
     return MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
 
-SOLID_DISTANCE = _solid_distance()
+THREE_D_DISTANCE = _three_d_distance()
 
 
 class TestAMeasurementMadeInTheThreeDView:
-    """Two faces, in the solid, through the reserved drawing."""
+    """Two faces, in 3D, through the reserved drawing."""
 
     def test_two_parallel_faces_admit_a_distance(self, viewer):
         member = viewer.members[0]
@@ -266,7 +266,7 @@ class TestAMeasurementMadeInTheThreeDView:
         assert written["a"]["geometry"] and written["b"]["geometry"]
 
     def test_the_written_kind_is_the_one_the_pick_offered(self, viewer):
-        # Structured, and in the SOLID -- a bare name could not say which of the
+        # Structured, and in 3D -- a bare name could not say which of the
         # two angles it meant, and the space decides what the pair admits.
         member = viewer.members[0]
         first = viewer.pick(member, "rough.front")
@@ -382,9 +382,9 @@ class TestAPairWithNothingBetweenThem:
         barely = at([5, 7, DEGENERATE_SEPARATION / 10])
         clear = at([5, 7, 50])
 
-        assert measures_nothing(face, touching, SOLID_DISTANCE) is True
-        assert measures_nothing(face, barely, SOLID_DISTANCE) is True
-        assert measures_nothing(face, clear, SOLID_DISTANCE) is False
+        assert measures_nothing(face, touching, THREE_D_DISTANCE) is True
+        assert measures_nothing(face, barely, THREE_D_DISTANCE) is True
+        assert measures_nothing(face, clear, THREE_D_DISTANCE) is False
 
     def test_the_features_decide_and_no_anchor_is_computed(self):
         """What a distance comes to is a property of the two geometries.
@@ -401,8 +401,8 @@ class TestAPairWithNothingBetweenThem:
         # nowhere near the face's, and the separation is still nothing.
         lying_in_it = edge([900, -40, 0], [1, 0, 0])
 
-        assert pair_separation(face, lying_in_it, SOLID_DISTANCE) == 0.0
-        assert measures_nothing(face, lying_in_it, SOLID_DISTANCE) is True
+        assert pair_separation(face, lying_in_it, THREE_D_DISTANCE) == 0.0
+        assert measures_nothing(face, lying_in_it, THREE_D_DISTANCE) is True
 
     def test_an_angle_measures_no_length_so_the_rule_leaves_it_alone(self):
         from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
@@ -496,7 +496,7 @@ class TestAMeasurementMadeOnASheet:
         assert written["plane"] is not None
         assert len(written["plane"]["normal"]) == 3
 
-    def test_a_sheet_and_the_solid_disagree_about_the_same_pair(self, viewer):
+    def test_a_sheet_and_three_d_disagree_about_the_same_pair(self, viewer):
         """The two spaces are not the same question, and this is the proof.
 
         The same two features, asked about twice. Which space decides what a
@@ -536,13 +536,13 @@ class TestWhatTheRunnerSettles:
     def _settle(self, one, other, written=None, solid=False, axes=None):
         """What the runner would send for a pair, through its own code."""
         from kumiki.drawing import (MeasurementKind, projected_kinds,
-                                    solid_kinds)
+                                    three_d_kinds)
 
         runner = self._runner()
         axes = self.AXES if axes is None else axes
         look = axes["look"]
         declared = MeasurementKind.from_wire(written)
-        admitted = (solid_kinds(one, other) if solid
+        admitted = (three_d_kinds(one, other) if solid
                     else projected_kinds(one, other, look))
         kind = declared or (admitted[0] if admitted else None)
         return runner._settled_measurement(
@@ -601,8 +601,8 @@ class TestWhatTheRunnerSettles:
         runner = self._runner()
         first = plane([0, 0, 0], [0, 0, 1])
         second = plane([0, 0, 0], [1, 0, 0])
-        from kumiki.drawing import projected_kinds, solid_kinds
-        admitted = solid_kinds(first, second)
+        from kumiki.drawing import projected_kinds, three_d_kinds
+        admitted = three_d_kinds(first, second)
         rays = angle_rays(MeasureSpan(at=first.point, normal=first.normal),
                           MeasureSpan(at=second.point, normal=second.normal))
         settled = runner._settled_measurement(
