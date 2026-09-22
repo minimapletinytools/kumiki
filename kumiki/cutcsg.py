@@ -370,8 +370,11 @@ def feature_groups_intersect(a: FeatureGroup, b: FeatureGroup) -> bool:
 class FeatureMarkingStatus(Enum):
     """Whether a feature has to appear on a drawing.
 
-    TODO integrate: declared and carried on every feature, but nothing reads it
-    yet -- the drawing generator does not consult it when deciding what to mark.
+    DECLARED INTENT, NOT YET HONOURED. Every feature carries one and nothing
+    reads it: the drawing generator does not consult it when deciding what to
+    mark. Kept because the vocabulary is the part worth settling early -- a
+    joint that wants a face always dimensioned has somewhere to say so the day
+    the generator learns to ask.
     """
 
     OPTIONAL = 0
@@ -387,8 +390,8 @@ class FeatureMarkingSpec:
     which is how a drawing says "38mm from the shoulder" rather than giving an
     absolute position. None leaves that to whatever generates the drawing.
 
-    TODO integrate: nothing sets marking_override and nothing reads it, so a
-    joint cannot yet say how it wants to be dimensioned.
+    DECLARED INTENT, NOT YET HONOURED. Nothing sets marking_override and
+    nothing reads it, so a joint cannot yet say how it wants to be dimensioned.
     """
 
     mark: FeatureMarkingStatus = FeatureMarkingStatus.OPTIONAL
@@ -398,9 +401,10 @@ class FeatureMarkingSpec:
 class FeaturePurpose(Enum):
     """What purpose the feature serves.
 
-    TODO integrate: ROUGH_RELIEF is never set and never tested against, so
-    relief geometry is still indistinguishable from a joint's real surfaces
-    everywhere it matters -- picking, measuring and drawing alike.
+    DECLARED INTENT, NOT YET HONOURED for ROUGH_RELIEF: it is never set and
+    never tested against, so relief geometry is still indistinguishable from a
+    joint's real surfaces everywhere it matters -- picking, measuring and
+    drawing alike. That is the one of these with a visible cost.
     """
 
     NOT_SPECIFIED = 0
@@ -426,10 +430,11 @@ class FeatureProperties:
             non-real ones are unaffected by boolean operations.
         marking_override: how to mark this feature on a drawing, when the
             default for its kind is not what is wanted. None means the default.
-            TODO integrate: carried, never read.
+            Declared intent: carried, not yet read -- see FeatureMarkingSpec.
         purpose: what the feature is for, where that is worth recording --
             relief geometry is not a feature of the joint the way a tenon
-            cheek is. TODO integrate: carried, never read.
+            cheek is. Declared intent: carried, not yet read -- see
+            FeaturePurpose.
     """
 
     group: FeatureGroup = FeatureGroup.NONE

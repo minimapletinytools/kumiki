@@ -1624,18 +1624,33 @@ class Drawing:
     #: was really a pair.
     timber_paths: Sequence[ResolvedTimberPath] = ()
 
-    # used for determining override behavior, defaults to the name if not provided 
-    # TODO just create a ctor for Drawing where the id is optional, and then make this non optional, this lets you clean up some of the other weird stuff you're doing in post_init
+    #: What an override in the drawings file names, so it has to survive editing
+    #: the code around it. Optional only at CONSTRUCTION: leave it out and it
+    #: becomes DrawingId(name), which is stable as long as the name is, and it
+    #: is never None on a built Drawing.
+    #:
+    #: A classmethod taking the optional id would let this field be declared
+    #: non-optional, which is what the note asked for. Not done: it costs all 49
+    #: Drawing(...) sites a rename to buy one annotation, and the coercion below
+    #: would still have to exist for the string form.
     drawing_id: Optional[DrawingId] = None
 
     #: The floating viewports of this sheet, in the order they were written.
     #: That order is what numbers them -- see walk -- so it is part of what the
     #: drawing means. It is not the drawing order; z is.
-    viewports: Sequence[Viewport] = ()
+    #:
+    #: None asks for the default layout for what this draws. It was (), which
+    #: could not tell "I did not say" from "I said none": an explicitly empty
+    #: tuple was silently replaced by the defaults.
+    viewports: Optional[Sequence[Viewport]] = None
 
-    # TODO why is this optional?
-    #: The sheet these sit on. A Length anywhere in the tree is measured
-    #: against it.
+    #: The sheet these sit on, when this drawing lays itself out. A Length
+    #: anywhere in the tree is measured against it.
+    #:
+    #: None is the common case -- 31 of the drawings built in this repo -- and
+    #: means the sheet is not this drawing's to choose: the viewer lays it out
+    #: and supplies its own page. Only kumiki.layout.resolve_drawing needs one,
+    #: and it says so rather than inventing a size.
     page: Optional[Page] = None
 
     measurements: Mapping[ViewportId, Sequence[Measure]] = field(default_factory=dict)
@@ -1655,13 +1670,29 @@ class Drawing:
             for viewport, measures in dict(self.measurements or {}).items()
         })
 
-        # TODO in the ctor just make viewports Optional{..} and then if it's none, use default viewports
-        viewports = tuple(self.viewports) or default_viewports_for(len(self.timber_paths))
+        # A drawing always ends up with viewports. One that says nothing gets
+        # the default layout for what it draws, made here and held like any
+        # other -- so there is no second kind of drawing whose views exist only
+        # once something else has laid it out. Saying () means none, and is
+        # kept.
+        viewports = (default_viewports_for(len(self.timber_paths))
+                     if self.viewports is None else tuple(self.viewports))
         object.__setattr__(self, 'viewports', viewports)
         self._check_placement()
         self._check_each_viewport_appears_once()
 
     # ---------------------------------------------------------------- the tree
+
+    @property
+    def roots(self) -> ViewportList:
+        """The floating viewports, settled. Never None.
+
+        `viewports` is Optional because the CONSTRUCTOR takes None to mean "give
+        me the default layout for what this draws"; __post_init__ resolves that
+        and always leaves a tuple. This is that guarantee, said once, so the
+        rules below do not each carry an optionality that cannot happen.
+        """
+        return tuple(self.viewports or ())
 
     def walk(self) -> Iterator[Tuple[ViewportId, 'Viewport']]:
         """Every viewport of this drawing, with the id its position gives it.
@@ -1674,7 +1705,7 @@ class Drawing:
             for index, child in enumerate(viewport.children):
                 yield from descend(child, path + (index,))
 
-        for index, root in enumerate(self.viewports):
+        for index, root in enumerate(self.roots):
             yield from descend(root, (index,))
 
     def measurements_by_viewport(self) -> Dict[str, Tuple[Measure, ...]]:
@@ -1718,7 +1749,7 @@ class Drawing:
         Checked here because a viewport cannot check it: which of the two it is
         depends on where it sits, and not knowing that is the whole design.
         """
-        for index, root in enumerate(self.viewports):
+        for index, root in enumerate(self.roots):
             if root.rect is None:
                 raise ValueError(
                     f"Viewport {index} of drawing {self.drawing_id} floats on the page "
