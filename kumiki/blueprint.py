@@ -594,8 +594,8 @@ def _extrusion_to_ocp(ext: ConvexPolygonExtrusion) -> "TopoDS_Shape":
 
 
 def _loft_to_ocp(loft: ConvexPolygonSimpleLoft) -> "TopoDS_Shape":
-    start = _to_mm(loft.start_distance)
-    end = _to_mm(loft.end_distance)
+    start = _to_mm(loft.bottom_points_z_pos)
+    end = _to_mm(loft.top_points_z_pos)
 
     def _make_wire(points: list, z: float) -> "TopoDS_Shape":
         pts = [(_to_mm(p[0]), _to_mm(p[1])) for p in points]

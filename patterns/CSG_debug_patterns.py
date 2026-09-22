@@ -235,8 +235,8 @@ def example_asymmetric_frustum_loft():
     return ConvexPolygonSimpleLoft(
         bottom_points=bottom_points,
         top_points=top_points,
-        start_distance=scalar(0),
-        end_distance=scalar(3, 2),
+        bottom_points_z_pos=scalar(0),
+        top_points_z_pos=scalar(3, 2),
         transform=Transform.identity(),
     )
 

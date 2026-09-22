@@ -115,8 +115,8 @@ class TestTriangles:
             bottom_points=bottom,
             top_points=top,
             transform=Transform.identity(),
-            start_distance=scalar(0),
-            end_distance=scalar(2),
+            bottom_points_z_pos=scalar(0),
+            top_points_z_pos=scalar(2),
         )
 
         mesh = triangulate_cutcsg(loft).mesh
@@ -146,8 +146,8 @@ class TestTriangles:
             bottom_points=bottom,
             top_points=top,
             transform=Transform.identity(),
-            start_distance=scalar(0),
-            end_distance=scalar(4),
+            bottom_points_z_pos=scalar(0),
+            top_points_z_pos=scalar(4),
         )
 
         mesh = triangulate_cutcsg(loft).mesh

@@ -1036,8 +1036,8 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     loft_global = ConvexPolygonSimpleLoft(
         bottom_points=bottom_points,
         top_points=top_points,
-        start_distance=scalar(0),
-        end_distance=loft_depth,
+        bottom_points_z_pos=scalar(0),
+        top_points_z_pos=loft_depth,
         transform=loft_transform,
         label=CutCSGLabel("shoulder_notch_relief"),
     )
@@ -1270,8 +1270,8 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
     loft_global = ConvexPolygonSimpleLoft(
         bottom_points=bottom_points,
         top_points=top_points,
-        start_distance=scalar(0),
-        end_distance=loft_depth,
+        bottom_points_z_pos=scalar(0),
+        top_points_z_pos=loft_depth,
         transform=loft_transform,
         label=CutCSGLabel("shoulder_notch_relief"),
     )

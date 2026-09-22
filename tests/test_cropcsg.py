@@ -244,7 +244,7 @@ class TestLoftedSolids:
             bottom_points=bottom, top_points=top,
             transform=Transform(position=_v(0, 0, 0),
                                 orientation=Transform.identity().orientation),
-            start_distance=scalar(0), end_distance=scalar(1),
+            bottom_points_z_pos=scalar(0), top_points_z_pos=scalar(1),
         )
 
     def test_a_taper_is_bounded_by_four_sides_and_two_ends(self):
@@ -700,7 +700,7 @@ class TestWhatIsSolvedAndWhatIsBounded:
             bottom_points=bottom, top_points=top,
             transform=Transform(position=_v(0, 0, 0),
                                 orientation=Transform.identity().orientation),
-            start_distance=scalar(0), end_distance=scalar(1))
+            bottom_points_z_pos=scalar(0), top_points_z_pos=scalar(1))
 
     def test_the_shapes_that_are_their_own_half_spaces(self):
         from kumiki.cutcsg import ConvexPolygonExtrusion, HalfSpace

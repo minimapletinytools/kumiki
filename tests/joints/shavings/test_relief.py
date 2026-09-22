@@ -214,17 +214,17 @@ class TestChopButtJointShoulderNotchRelief4Sided:
             assert abs(float(point[1])) == pytest.approx(2.0)
 
         # Just past the tenon's own corner, mid-depth into the flare: inside the notch.
-        flare_point = loft.transform.local_to_global(Matrix([scalar(3), scalar(3), loft.end_distance / scalar(2)]))
+        flare_point = loft.transform.local_to_global(Matrix([scalar(3), scalar(3), loft.top_points_z_pos / scalar(2)]))
         assert notch.contains_point(flare_point)
 
         # Dead center of the tenon's own straight core: contained too (the notch is now the
         # raw loft, covering its whole cross-section from centerline outward, not just the
         # beyond-perfect shell -- the actual mortise hole is a separate, unioned prism).
-        core_point = loft.transform.local_to_global(Matrix([scalar(0), scalar(0), loft.end_distance / scalar(2)]))
+        core_point = loft.transform.local_to_global(Matrix([scalar(0), scalar(0), loft.top_points_z_pos / scalar(2)]))
         assert notch.contains_point(core_point)
 
         # Well outside the loft entirely.
-        outside_point = loft.transform.local_to_global(Matrix([scalar(20), scalar(20), loft.end_distance / scalar(2)]))
+        outside_point = loft.transform.local_to_global(Matrix([scalar(20), scalar(20), loft.top_points_z_pos / scalar(2)]))
         assert not notch.contains_point(outside_point)
 
     def test_raking_joint_relieves_faces_independently(self):
@@ -561,9 +561,9 @@ class TestChopButtJointShoulderNotchReliefOnPlaneAlignedTimbers2Sided:
         assert isinstance(loft_angled, ConvexPolygonSimpleLoft)
         assert isinstance(loft_tiny_angle, ConvexPolygonSimpleLoft)
 
-        default_depth = float(loft_default.end_distance)
-        angled_depth = float(loft_angled.end_distance)
-        tiny_angle_depth = float(loft_tiny_angle.end_distance)
+        default_depth = float(loft_default.top_points_z_pos)
+        angled_depth = float(loft_angled.top_points_z_pos)
+        tiny_angle_depth = float(loft_tiny_angle.top_points_z_pos)
 
         assert angled_depth < default_depth
         assert tiny_angle_depth == pytest.approx(default_depth)  # floor (below natural), not override

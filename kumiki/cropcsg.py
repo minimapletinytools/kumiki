@@ -289,8 +289,8 @@ def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
                 + across * scalar(float(point[0]))
                 + up * scalar(float(point[1])))
 
-    bottom = [lift(point, csg.start_distance) for point in csg.bottom_points]
-    top = [lift(point, csg.end_distance) for point in csg.top_points]
+    bottom = [lift(point, csg.bottom_points_z_pos) for point in csg.bottom_points]
+    top = [lift(point, csg.top_points_z_pos) for point in csg.top_points]
     # Profiles of different lengths are not a loft. The primitive says so and
     # is_valid() checks it, but nothing in the TYPE does -- both are just
     # profiles -- so this stays where a check against a state the dataclass
@@ -305,7 +305,7 @@ def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
     middle = middle / scalar(len(corners))
 
     faces: BoundingHalfSpaces = _extrusion_caps(
-        axis, origin, csg.start_distance, csg.end_distance)
+        axis, origin, csg.bottom_points_z_pos, csg.top_points_z_pos)
 
     for index in range(len(bottom)):
         following = (index + 1) % len(bottom)
@@ -675,7 +675,7 @@ def _loft_sides_are_planar(csg) -> bool:
     invisible on a 5m one.
     """
     bottom, top = csg.bottom_points, csg.top_points
-    if csg.start_distance is None or csg.end_distance is None:
+    if csg.bottom_points_z_pos is None or csg.top_points_z_pos is None:
         return False
     if len(bottom) < 3 or len(bottom) != len(top):
         return False
@@ -694,10 +694,10 @@ def _loft_sides_are_planar(csg) -> bool:
     for index in range(len(bottom)):
         following = (index + 1) % len(bottom)
         corners = [
-            lift(bottom[index], csg.start_distance),
-            lift(bottom[following], csg.start_distance),
-            lift(top[following], csg.end_distance),
-            lift(top[index], csg.end_distance),
+            lift(bottom[index], csg.bottom_points_z_pos),
+            lift(bottom[following], csg.bottom_points_z_pos),
+            lift(top[following], csg.top_points_z_pos),
+            lift(top[index], csg.top_points_z_pos),
         ]
         first = corners[1] - corners[0]
         second = corners[2] - corners[0]

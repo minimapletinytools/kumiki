@@ -1450,17 +1450,38 @@ class SimpleLoftFeature(CSGFeature):
         if not isinstance(owner, ConvexPolygonSimpleLoft):
             return None
         
-        # Only the caps are reliably planar. 
-        # TODO detect if sides are planar or just don't support non planar sides
-        # A side is a ruled surface, planar only in the special case of a pure per-axis taper 
-        if self.key not in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
-            return None
         orientation = owner.transform.orientation.matrix
         length_dir = safe_transform_vector(orientation, Matrix([scalar(0), scalar(0), scalar(1)]))
-        is_top = self.key == ExtrusionCap.TOP
-        distance = owner.end_distance if is_top else owner.start_distance
-        sign = scalar(1) if is_top else scalar(-1)
-        return Plane(normal=length_dir * sign, point=owner.transform.position + length_dir * distance)
+        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            is_top = self.key == ExtrusionCap.TOP
+            distance = owner.top_points_z_pos if is_top else owner.bottom_points_z_pos
+            sign = scalar(1) if is_top else scalar(-1)
+            return Plane(normal=length_dir * sign,
+                         point=owner.transform.position + length_dir * distance)
+
+        # A side, which is planar because is_valid refuses a twisted loft -- see
+        # ConvexPolygonSimpleLoft._sides_are_planar. It used to decline here
+        # whatever the shape, since a twist COULD make it a ruled surface, and
+        # that cost every tapered cheek the ability to be measured to.
+        index = int(self.key)
+        count = len(owner.bottom_points)
+        if index >= count:
+            return None
+        following = (index + 1) % count
+        def placed(profile_point, z_pos):
+            local = Matrix([profile_point[0], profile_point[1], z_pos])
+            return owner.transform.position + safe_transform_vector(orientation, local)
+
+        corners = [
+            placed(owner.bottom_points[index], owner.bottom_points_z_pos),
+            placed(owner.bottom_points[following], owner.bottom_points_z_pos),
+            placed(owner.top_points[index], owner.top_points_z_pos),
+        ]
+        normal = cross_product(corners[1] - corners[0], corners[2] - corners[0])
+        if safe_zero_test(giraffe_norm(normal)):
+            # A degenerate side -- three corners in line -- lies on no one plane.
+            return None
+        return Plane(normal=safe_normalize_vector(normal), point=corners[0])
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
@@ -1469,10 +1490,10 @@ class SimpleLoftFeature(CSGFeature):
         if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
             is_top = self.key == ExtrusionCap.TOP
             profile = owner.top_points if is_top else owner.bottom_points
-            distance = owner.end_distance if is_top else owner.start_distance
+            distance = owner.top_points_z_pos if is_top else owner.bottom_points_z_pos
         else:
             profile = [(b + t) / scalar(2) for b, t in zip(owner.bottom_points, owner.top_points)]
-            distance = _finite_midpoint(owner.start_distance, owner.end_distance)
+            distance = _finite_midpoint(owner.bottom_points_z_pos, owner.top_points_z_pos)
         if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
             centroid_2d = sum(profile[1:], profile[0]) / scalar(len(profile))
         else:
@@ -1490,9 +1511,9 @@ class SimpleLoftFeature(CSGFeature):
             return False
         x, y, z = owner._local_coords(point)
         if self.key == ExtrusionCap.TOP:
-            return safe_equality_test(z, owner.end_distance, eps=test_tolerance)
+            return safe_equality_test(z, owner.top_points_z_pos, eps=test_tolerance)
         if self.key == ExtrusionCap.BOTTOM:
-            return safe_equality_test(z, owner.start_distance, eps=test_tolerance)
+            return safe_equality_test(z, owner.bottom_points_z_pos, eps=test_tolerance)
         return owner._point_on_side(self.key, x, y, z, eps=test_tolerance)
 
 
@@ -3362,6 +3383,12 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         )
 
 
+#: How far out of plane a loft's side may sit before it counts as twisted, as a
+#: fraction of that side's own size. Generous: it is separating a pure taper,
+#: which is flat to float precision, from a rotation, which is off by tenths.
+_SIDE_PLANARITY_EPSILON = scalar('1e-6')
+
+
 @dataclass(frozen=True)
 class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     """
@@ -3372,36 +3399,35 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     instead of staying constant -- ConvexPolygonExtrusion is the degenerate case
     where bottom_points == top_points.
 
-    
-    **TODO don't allow twists**
+
     bottom_points and top_points must each independently be a valid convex polygon
     (same rules as ConvexPolygonExtrusion.is_valid()) with the SAME number of points
-    wound in the SAME direction. Intermediate (lofted) cross-sections are NOT
-    checked for convexity or simplicity -- if the correspondence between the two
-    profiles is "twisted" enough (e.g. a profile rotated relative to the other),
-    an intermediate cross-section can become non-convex or self-intersecting, which
-    is undefined behavior for this primitive. This is safe for tapers/relief pockets
-    where each vertex moves along a roughly-monotonic path (the common case for
-    joinery), but this is NOT a general-purpose polygon morph.
+    wound in the SAME direction.
 
-    Side faces are ruled surfaces and are only planar in the special case where the
-    taper is a pure independent per-axis scale from one profile to the other (e.g.
-    a rectangle-to-rectangle taper on the same axes); get_outward_normal accounts
-    for this and is not necessarily constant across a side face.
-    **TODO don't allow twists**
+    NO TWISTS. The correspondence between the two profiles must leave every side
+    planar, which is_valid checks -- see _sides_are_planar. Rotating one profile
+    against the other turns each side into a saddle, and an intermediate
+    cross-section can then go non-convex or self-intersecting, which this
+    primitive has no meaning for.
 
-    The polygons live in the local XY plane, with bottom_points at start_distance
-    and top_points at end_distance along the local Z-axis, matching the
+    Refusing that is what lets a side be a real face rather than a ruled surface:
+    it locates to a Plane, so a tapered cheek can be measured to, and its outward
+    normal is constant across it. A taper that scales each axis independently, or
+    leans the top profile sideways, stays planar and stays allowed -- which is
+    every taper and relief pocket joinery actually cuts.
+
+    The polygons live in the local XY plane, with bottom_points at bottom_points_z_pos
+    and top_points at top_points_z_pos along the local Z-axis, matching the
     position/orientation conventions of RectangularPrism and ConvexPolygonExtrusion.
-    Unlike those two, start_distance/end_distance must both be finite -- an
+    Unlike those two, bottom_points_z_pos/top_points_z_pos must both be finite -- an
     infinite loft has no meaningful cross-section to loft towards.
 
     Args:
-        bottom_points: convex polygon at start_distance (local XY plane)
-        top_points: convex polygon at end_distance (local XY plane), same point
+        bottom_points: convex polygon at bottom_points_z_pos (local XY plane)
+        top_points: convex polygon at top_points_z_pos (local XY plane), same point
             count and winding direction as bottom_points
-        start_distance: distance from position along Z-axis to bottom_points
-        end_distance: distance from position along Z-axis to top_points
+        bottom_points_z_pos: distance from position along Z-axis to bottom_points
+        top_points_z_pos: distance from position along Z-axis to top_points
         transform: Transform (position and orientation) in global coordinates (default: identity)
     """
 
@@ -3427,23 +3453,23 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     top_points: Profile
 
     # TODO reanme to bottom/top_points_z_pos
-    start_distance: Numeric
-    end_distance: Numeric
+    bottom_points_z_pos: Numeric
+    top_points_z_pos: Numeric
 
     transform: Transform = field(default_factory=Transform.identity)
 
     # Features this primitive names on its own boundary. Private: read it
     def get_bottom_position(self) -> V3:
-        """Get the position of the bottom of the loft (at start_distance)."""
-        return self.transform.position - safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.start_distance]))
+        """Get the position of the bottom of the loft (at bottom_points_z_pos)."""
+        return self.transform.position - safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.bottom_points_z_pos]))
 
     def get_top_position(self) -> V3:
-        """Get the position of the top of the loft (at end_distance)."""
-        return self.transform.position + safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.end_distance]))
+        """Get the position of the top of the loft (at top_points_z_pos)."""
+        return self.transform.position + safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.top_points_z_pos]))
 
     def __repr__(self) -> str:
         return (f"ConvexPolygonSimpleLoft({len(self.bottom_points)}->{len(self.top_points)} points, "
-                f"transform={self.transform}, start={self.start_distance}, end={self.end_distance})")
+                f"transform={self.transform}, start={self.bottom_points_z_pos}, end={self.top_points_z_pos})")
 
     def is_valid(self) -> bool:
         """
@@ -3452,20 +3478,20 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         Checks:
         1. bottom_points and top_points each have at least 3 points
         2. bottom_points and top_points have the same number of points
-        3. end_distance > start_distance
+        3. top_points_z_pos > bottom_points_z_pos
         4. bottom_points and top_points are each individually convex
+        5. every side comes out PLANAR -- see _sides_are_planar
 
         Does NOT check that intermediate (lofted) cross-sections stay convex or
-        simple -- see class docstring.
-
-        TODO check that sides are actually planar, lets just not support non planar sides
-
+        simple. With 5 in place they cannot go non-convex from a twist, which
+        was the way that happened; a profile that is convex at both ends and
+        joined by flat sides stays convex between them.
         """
         if len(self.bottom_points) < 3 or len(self.top_points) < 3:
             return False
         if len(self.bottom_points) != len(self.top_points):
             return False
-        if safe_compare(self.end_distance, self.start_distance, Comparison.LE):
+        if safe_compare(self.top_points_z_pos, self.bottom_points_z_pos, Comparison.LE):
             return False
 
         def winding_sign(points: Profile) -> Optional[int]:
@@ -3492,7 +3518,54 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         # Both must be individually convex AND wound the same direction -- the
         # index-to-index correspondence between bottom_points and top_points only
         # means what it's documented to mean (a straight-line loft) if they agree.
-        return bottom_winding is not None and bottom_winding == top_winding
+        if bottom_winding is None or bottom_winding != top_winding:
+            return False
+        return self._sides_are_planar()
+
+    def _sides_are_planar(self) -> bool:
+        """Whether every side comes out flat, rather than twisted into a saddle.
+
+        A side joins bottom[i]-bottom[i+1] to top[i]-top[i+1] with straight
+        lines, so it is a quadrilateral in space, and a quadrilateral is planar
+        only when its four corners are coplanar. Rotate one profile against the
+        other and they stop being: the side becomes a ruled surface, and a
+        surface that is not flat has no single normal and lies on no plane.
+
+        Refused rather than supported. Everything downstream wants a face to BE
+        a plane -- locate() hands one back for measuring against, and
+        get_outward_normal is a constant per face -- and a taper that scales
+        each axis independently, which is what joinery actually cuts, stays
+        planar anyway. Twisting was never reachable from a joint; it was
+        reachable from this constructor.
+
+        Measured against the side's own size, so it means the same thing on a
+        two-millimetre relief pocket and a two-metre post.
+        """
+        bottom, top = self.bottom_points, self.top_points
+        count = len(bottom)
+        low, high = self.bottom_points_z_pos, self.top_points_z_pos
+        for index in range(count):
+            following = (index + 1) % count
+            corners = [
+                create_v3(bottom[index][0], bottom[index][1], low),
+                create_v3(bottom[following][0], bottom[following][1], low),
+                create_v3(top[following][0], top[following][1], high),
+                create_v3(top[index][0], top[index][1], high),
+            ]
+            spanning = cross_product(corners[1] - corners[0], corners[3] - corners[0])
+            reach = giraffe_norm(spanning)
+            if safe_zero_test(reach):
+                # Three of the four corners are in line, so there is no plane to
+                # be off. A degenerate side, not a twisted one.
+                continue
+            away = safe_dot_product(spanning / reach, corners[2] - corners[0])
+            size = max(giraffe_norm(corners[1] - corners[0]),
+                       giraffe_norm(corners[3] - corners[0]))
+            if safe_zero_test(size):
+                continue
+            if not safe_zero_test(away / size, eps=_SIDE_PLANARITY_EPSILON):
+                return False
+        return True
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
         """Project a global point onto this loft's local (x, y, z) axes."""
@@ -3501,8 +3574,8 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         return local_coords[0], local_coords[1], local_coords[2]
 
     def _height_fraction(self, z_coord: Numeric) -> Numeric:
-        """Fraction along the loft (0 at start_distance, 1 at end_distance) for a local Z coordinate."""
-        return (z_coord - self.start_distance) / (self.end_distance - self.start_distance)
+        """Fraction along the loft (0 at bottom_points_z_pos, 1 at top_points_z_pos) for a local Z coordinate."""
+        return (z_coord - self.bottom_points_z_pos) / (self.top_points_z_pos - self.bottom_points_z_pos)
 
     def _cross_section_at(self, t: Numeric) -> Profile:
         """The (index-matched, linearly interpolated) polygon at height-fraction t."""
@@ -3545,9 +3618,9 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         """
         x_coord, y_coord, z_coord = self._local_coords(point)
 
-        if safe_compare(z_coord - self.start_distance, 0, Comparison.LT, eps=eps):
+        if safe_compare(z_coord - self.bottom_points_z_pos, 0, Comparison.LT, eps=eps):
             return False
-        if safe_compare(z_coord - self.end_distance, 0, Comparison.GT, eps=eps):
+        if safe_compare(z_coord - self.top_points_z_pos, 0, Comparison.GT, eps=eps):
             return False
 
         cross_section = self._cross_section_at(self._height_fraction(z_coord))
@@ -3579,9 +3652,9 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
         x_coord, y_coord, z_coord = self._local_coords(point)
 
-        if safe_zero_test(z_coord - self.start_distance, eps=eps):
+        if safe_zero_test(z_coord - self.bottom_points_z_pos, eps=eps):
             return True
-        if safe_zero_test(z_coord - self.end_distance, eps=eps):
+        if safe_zero_test(z_coord - self.top_points_z_pos, eps=eps):
             return True
 
         cross_section = self._cross_section_at(self._height_fraction(z_coord))
@@ -3622,11 +3695,17 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         """
         Get the outward normal vector at a boundary point.
 
-        For the top/bottom caps this is the (constant) local ±Z axis. For a side
-        face, the face is in general a ruled (non-planar) surface, so the normal
-        is computed from the face's parametric partial derivatives at this point
-        rather than being constant across the face.
-        TODO simplify the abvoe when we don't allow twisted faces
+        For the top/bottom caps this is the (constant) local ±Z axis.
+
+        A side is planar now that is_valid refuses a twisted loft, so its normal
+        is constant across it. The parametric partial derivatives below still
+        compute it, and still give the right answer -- they just do more work
+        than a flat face needs.
+
+        TODO the derivative path could collapse to one cross product per side
+        now that a side cannot be a saddle. Left alone because it is an
+        optimisation rather than a fix: this feeds picking and CSG containment,
+        and the current form is already correct for a plane.
 
         Args:
             point: A point on the boundary
@@ -3636,11 +3715,11 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         """
         x_coord, y_coord, z_coord = self._local_coords(point)
 
-        if safe_zero_test(z_coord - self.end_distance, eps=eps):
+        if safe_zero_test(z_coord - self.top_points_z_pos, eps=eps):
             local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
-        if safe_zero_test(z_coord - self.start_distance, eps=eps):
+        if safe_zero_test(z_coord - self.bottom_points_z_pos, eps=eps):
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
@@ -3676,7 +3755,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
             # and take dP/du x dP/dt as the (unnormalized, not-yet-oriented) normal.
             bottom_i, bottom_i1 = self.bottom_points[i], self.bottom_points[(i + 1) % n]
             top_i, top_i1 = self.top_points[i], self.top_points[(i + 1) % n]
-            length = self.end_distance - self.start_distance
+            length = self.top_points_z_pos - self.bottom_points_z_pos
 
             d_edge = (scalar(1) - t_height) * (bottom_i1 - bottom_i) + t_height * (top_i1 - top_i)
             d_height_xy = (top_i - bottom_i) + u * ((top_i1 - top_i) - (bottom_i1 - bottom_i))
@@ -3700,8 +3779,8 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         corners_global = (
-            [self.transform.local_to_global(Matrix([pt[0], pt[1], self.start_distance])) for pt in self.bottom_points] +
-            [self.transform.local_to_global(Matrix([pt[0], pt[1], self.end_distance])) for pt in self.top_points]
+            [self.transform.local_to_global(Matrix([pt[0], pt[1], self.bottom_points_z_pos])) for pt in self.bottom_points] +
+            [self.transform.local_to_global(Matrix([pt[0], pt[1], self.top_points_z_pos])) for pt in self.top_points]
         )
 
         xs = [p[0] for p in corners_global]

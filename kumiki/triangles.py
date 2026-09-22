@@ -458,8 +458,8 @@ def _mesh_convex_polygon_loft(loft: ConvexPolygonSimpleLoft) -> trimesh.Trimesh:
 
     bottom_points, top_points = _polygon_point_pairs_ccw(loft.bottom_points, loft.top_points)
     point_count = len(bottom_points)
-    bottom_z = _numeric_to_float(loft.start_distance)
-    top_z = _numeric_to_float(loft.end_distance)
+    bottom_z = _numeric_to_float(loft.bottom_points_z_pos)
+    top_z = _numeric_to_float(loft.top_points_z_pos)
 
     vertices: list[list[float]] = []
     for point in bottom_points:
