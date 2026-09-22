@@ -845,17 +845,9 @@ class SimplePathExtrusionFeature(CSGFeature):
     planar face there to name. That is the graceful-fail behaviour, not a
     special case -- the feature simply stays unmatched.
     """
+    # TODO create a new key type for just SimplePathExtrusionFeature that combines the declared type
     key: ExtrusionFeatureKey = ExtrusionCap.TOP
-
-    #: FACE or CURVED_FACE, said at construction because it cannot be worked
-    #: out here: whether a side is curved is a property of
-    #: owner.path.segments[key], and feature_type() is given no owner.
-    #:
-    #: Defaults to FACE, which is right for both caps and for a straight
-    #: segment. An author naming an ArcSegment passes CURVED_FACE. Use
-    #: PathExtrusion.feature_type_for to have the path answer instead of
-    #: remembering -- that is the version that cannot disagree with the
-    #: geometry.
+    # side faces can be either curved or flat so we need store it here
     declared_type: CSGFeatureType = CSGFeatureType.FACE
 
     def feature_type(self) -> CSGFeatureType:

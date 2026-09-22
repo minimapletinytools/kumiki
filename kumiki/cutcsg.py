@@ -531,29 +531,13 @@ def _drop_duplicate_derived(hits: List['OwnedFeatureHit']) -> List['OwnedFeature
 
 
 def shared_ancestor(
-    within: 'CutCSG',
+    some_common_ancestor: 'CutCSG',
     first: 'CutCSG',
     second: 'CutCSG',
 ) -> Optional['CutCSG']:
-    """The deepest node under *within* holding both *first* and *second*.
-
-    What a derived feature is owned BY. An edge where a shoulder crosses a body
-    belongs to whatever node put the two together -- the difference that cut one
-    from the other -- not to whichever node someone happened to query. Ask that
-    node or ask something above it and it is the same edge, so its owner should
-    be the same too.
-
-    None when either is not under *within*, which nothing should be able to
-    reach through find_all_features: the parents came out of its own gather.
-    The caller warns rather than inventing an owner, which is what falling back
-    to *within* used to do -- the same wrong answer the argument name `root`
-    invited, since this searches whatever tree it is handed and not THE root.
-
-    *within* cannot go away, though it reads like a parameter that should: a
-    CutCSG node holds no reference to its parent, so there is nothing to walk
-    up from and a tree has to be handed in to search downward.
+    """The deepest node under *some_common_ancestor* holding both *first* and *second*, or None if there is none.
     """
-    here, there = _trail_within(within, first), _trail_within(within, second)
+    here, there = _trail_within(some_common_ancestor, first), _trail_within(some_common_ancestor, second)
     if here is None or there is None:
         return None
     deepest = None
@@ -576,10 +560,7 @@ def _trail_within(node: 'CutCSG', target: 'CutCSG') -> Optional[List['CutCSG']]:
 
 
 def derive_edge_hits(
-    #: The tree to find each edge's owner within, NOT the owner itself -- a
-    #: CutCSG node holds no reference to its parent, so shared_ancestor has to
-    #: be handed something to search downward through.
-    within: 'CutCSG',
+    some_common_ancestor: 'CutCSG',
     face_hits: List['OwnedFeatureHit'],
 ) -> List['OwnedFeatureHit']:
     """Every edge formed by a pair of *face_hits*.
@@ -594,9 +575,9 @@ def derive_edge_hits(
             edge = DerivedEdgeFeature.derive(face_hits[i], face_hits[j])
             if edge is None:
                 continue
-            owner = shared_ancestor(within, face_hits[i].owner, face_hits[j].owner)
+            owner = shared_ancestor(some_common_ancestor, face_hits[i].owner, face_hits[j].owner)
             if owner is None:
-                # Both parents came out of a gather on `within`, so both are
+                # Both parents came out of one gather, so both are
                 # under it and this cannot happen. Said out loud rather than
                 # guessed at: an edge owned by the wrong node is worse than one
                 # that is missing and complained about.
@@ -610,8 +591,7 @@ def derive_edge_hits(
 
 
 def derive_point_hits(
-    #: As derive_edge_hits: the tree to search, not the owner.
-    within: 'CutCSG',
+    some_common_ancestor: 'CutCSG',
     edge_hits: List['OwnedFeatureHit'],
     face_hits: List['OwnedFeatureHit'],
 ) -> List['OwnedFeatureHit']:
@@ -629,7 +609,7 @@ def derive_point_hits(
             point = DerivedPointFeature.derive(edge_hit, face_hit)
             if point is None:
                 continue
-            owner = shared_ancestor(within, edge_hit.owner, face_hit.owner)
+            owner = shared_ancestor(some_common_ancestor, edge_hit.owner, face_hit.owner)
             if owner is None:
                 warnings.warn(
                     f"Skipping the derived point {point.name}: its parents are not "
@@ -869,12 +849,7 @@ class DerivedEdgeFeature(CSGFeature):
     see shared_ancestor. 
     """
 
-    #: The two faces this edge is where-they-meet. Required: derive() is the
-    #: only thing that builds one, and an edge without both parents is not an
-    #: edge -- every method here had to decline for a case that never happened.
-    #:
-    #: kw_only so they can be required at all: CSGFeature.properties has a
-    #: default, and a field without one cannot follow it positionally.
+    #: The two faces forming this edge
     #:
     #: TODO consider refactoring OwnedFeatureHit to be split out by types so these can be typed to faces
     a: 'OwnedFeatureHit' = field(kw_only=True)
