@@ -243,10 +243,18 @@ class SingleFeaturePath(FeaturePath):
         return f"{self.timber} > {trail}" if trail else str(self.timber)
 
 
-# TODO derived features are actually owned by some parent union/difference/intersection 
-# so a single FeatureRef should be sufficient ot reach it
-# having said that, maybe it's useful to carry references to the 2 constituent features? If not, just remove it.
-# it migh be better to enhance FeatureRef class to allow it to carry 2 features for derived fetaures instead though! (and the parent union/difference/intersection can be determined from teh 2 features by finding their shared ancestor)
+# A derived feature IS owned by a parent union/difference/intersection now --
+# cutcsg.shared_ancestor works it out, and the note that said otherwise is gone.
+# That does not collapse this to a single FeatureRef, though, and the reason is
+# resolution rather than ownership: a derived feature is built on demand and is
+# not among any node's declared features, so naming the owner would not let you
+# look it up. Resolving one means resolving both parents and deriving again,
+# which is what the two refs here are for.
+#
+# TODO the owner could be carried BESIDE the two parents, which is what
+# shared_ancestor would give: it would let a reader say where an edge belongs
+# without resolving it. Not done because nothing wants it yet, and a third
+# field that can disagree with the first two is a cost.
 @dataclass(frozen=True)
 class DerivedFeaturePath(FeaturePath):
     """An edge or a point, named by the two features that form it.

@@ -10,6 +10,7 @@ from kumiki.geometry import (Line, Plane, Point, intersect_line_plane, intersect
                              lines_are_coincident, planes_are_coincident, planes_are_parallel,
                              points_are_coincident)
 from kumiki.cutcsg import (
+    shared_ancestor,
     CutCSGLabel,
     HalfSpace,
     RectangularPrism,
@@ -5002,3 +5003,77 @@ class TestALoftMayNotTwist:
                    if key[0] is FeatureCategory.SIDE]
 
         assert located and all(isinstance(where, Plane) for where in located)
+
+
+class TestADerivedFeatureIsOwnedByWhatMadeIt:
+    """Not by whichever node was asked.
+
+    A derived edge belongs to the node that put its two parents together -- the
+    difference that cut a shoulder across a body, say. Ask that node or ask
+    something above it and it is the same edge, so it should come back with the
+    same owner. It did not: derivation ran at whichever node find_all_features
+    was called on and stamped that node onto everything it made, so the owner
+    changed with the question.
+
+    Nothing read it, which is why this went unnoticed -- locate, get_extent and
+    test_point_unbounded all ignore the owner they are handed and reach through
+    to each parent's own, and the runner serialises a derived reference from the
+    parents too. The field was simply untrue.
+    """
+
+    def _cut(self):
+        body = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[SimpleRectangularPrismFeature(
+                "rough.right", face=PrismFace.RIGHT,
+                properties=FeatureProperties(group=FeatureGroup.B2))],
+        )
+        shoulder = HalfSpace(
+            normal=create_v3(0, 0, 1), offset=scalar(5),
+            _features=[HalfSpaceFeature(
+                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+        )
+        return Difference(base=body, subtract=[shoulder])
+
+    #: On the right face, where the shoulder crosses it.
+    ON_EDGE = (scalar(2), scalar(0), scalar(5))
+
+    def _derived_at(self, node, queried):
+        hits = queried.find_all_features(create_v3(*self.ON_EDGE))
+        return [hit for hit in hits if hit.feature.is_derived()]
+
+    def test_the_owner_is_the_node_that_put_the_parents_together(self):
+        cut = self._cut()
+
+        derived = self._derived_at(cut, cut)
+
+        assert derived and all(hit.owner is cut for hit in derived)
+
+    def test_and_does_not_change_when_something_above_is_asked(self):
+        cut = self._cut()
+        outer = SolidUnion(children=[cut])
+
+        from_cut = self._derived_at(cut, cut)
+        from_outer = self._derived_at(cut, outer)
+
+        assert from_cut and from_outer
+        # Same edge, asked two ways round, so the same owner both times.
+        assert all(hit.owner is cut for hit in from_outer)
+
+    def test_shared_ancestor_finds_the_deepest_node_holding_both(self):
+        cut = self._cut()
+        outer = SolidUnion(children=[cut])
+        body, shoulder = cut.base, cut.subtract[0]
+
+        assert shared_ancestor(outer, body, shoulder) is cut
+        assert shared_ancestor(outer, cut, cut) is cut
+        assert shared_ancestor(cut, body, shoulder) is cut
+
+    def test_and_falls_back_to_the_root_for_a_node_that_is_not_under_it(self):
+        cut = self._cut()
+        stranger = HalfSpace(normal=create_v3(1, 0, 0), offset=scalar(0))
+
+        assert shared_ancestor(cut, cut.base, stranger) is cut
