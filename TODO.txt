@@ -233,9 +233,14 @@ DONE-do code review
   DONE-drawing
   DONE-identity
 
+-do measuring features doc
+  -explain CSG fetaure system
+  -explain fetaure hit priority system
+  -explain feture solving system
+  -leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
 -maybe review runner.py ;__;
 -add types to runner.py
--leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
+
 
 
 

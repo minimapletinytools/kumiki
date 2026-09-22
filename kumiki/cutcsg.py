@@ -3401,8 +3401,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     planes, connected index-to-index (vertex i of bottom_points connects by a
     straight line to vertex i of top_points). Generalizes ConvexPolygonExtrusion
     to the case where the cross-section changes shape/size/offset along the length
-    instead of staying constant -- ConvexPolygonExtrusion is the degenerate case
-    where bottom_points == top_points.
+    instead of staying constant -- ConvexPolygonExtrusion can be expressed where bottom_points == top_points (could probably be combined with this class but it doesn't relaly matter)
 
 
     bottom_points and top_points must each independently be a valid convex polygon
@@ -3410,16 +3409,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     wound in the SAME direction.
 
     NO TWISTS. The correspondence between the two profiles must leave every side
-    planar, which is_valid checks -- see _sides_are_planar. Rotating one profile
-    against the other turns each side into a saddle, and an intermediate
-    cross-section can then go non-convex or self-intersecting, which this
-    primitive has no meaning for.
-
-    Refusing that is what lets a side be a real face rather than a ruled surface:
-    it locates to a Plane, so a tapered cheek can be measured to, and its outward
-    normal is constant across it. A taper that scales each axis independently, or
-    leans the top profile sideways, stays planar and stays allowed -- which is
-    every taper and relief pocket joinery actually cuts.
+    planar, which is_valid checks -- see _sides_are_planar. 
 
     The polygons live in the local XY plane, with bottom_points at bottom_points_z_pos
     and top_points at top_points_z_pos along the local Z-axis, matching the
@@ -3486,11 +3476,6 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         3. top_points_z_pos > bottom_points_z_pos
         4. bottom_points and top_points are each individually convex
         5. every side comes out PLANAR -- see _sides_are_planar
-
-        Does NOT check that intermediate (lofted) cross-sections stay convex or
-        simple. With 5 in place they cannot go non-convex from a twist, which
-        was the way that happened; a profile that is convex at both ends and
-        joined by flat sides stays convex between them.
         """
         if len(self.bottom_points) < 3 or len(self.top_points) < 3:
             return False
@@ -3532,19 +3517,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
         A side joins bottom[i]-bottom[i+1] to top[i]-top[i+1] with straight
         lines, so it is a quadrilateral in space, and a quadrilateral is planar
-        only when its four corners are coplanar. Rotate one profile against the
-        other and they stop being: the side becomes a ruled surface, and a
-        surface that is not flat has no single normal and lies on no plane.
-
-        Refused rather than supported. Everything downstream wants a face to BE
-        a plane -- locate() hands one back for measuring against, and
-        get_outward_normal is a constant per face -- and a taper that scales
-        each axis independently, which is what joinery actually cuts, stays
-        planar anyway. Twisting was never reachable from a joint; it was
-        reachable from this constructor.
-
-        Measured against the side's own size, so it means the same thing on a
-        two-millimetre relief pocket and a two-metre post.
+        only when its four corners are coplanar.
         """
         bottom, top = self.bottom_points, self.top_points
         count = len(bottom)
@@ -3700,17 +3673,9 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         """
         Get the outward normal vector at a boundary point.
 
-        For the top/bottom caps this is the (constant) local ±Z axis.
+        Sides are checked for planar in is_valid so normals are constant across faces.
 
-        A side is planar now that is_valid refuses a twisted loft, so its normal
-        is constant across it. The parametric partial derivatives below still
-        compute it, and still give the right answer -- they just do more work
-        than a flat face needs.
-
-        TODO the derivative path could collapse to one cross product per side
-        now that a side cannot be a saddle. Left alone because it is an
-        optimisation rather than a fix: this feeds picking and CSG containment,
-        and the current form is already correct for a plane.
+        Edges/vertices currentyl returns normals of one of its adjacent faces. NOTE we can consider making it average instead but there's no need right now.
 
         Args:
             point: A point on the boundary

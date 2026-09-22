@@ -651,8 +651,6 @@ class TestIdentifiers:
         assert Drawing(name="post 1").drawing_id == DrawingId("post 1")
 
     def test_a_drawing_takes_the_timber_names_as_names(self):
-        # A drawing holds RESOLVED paths -- one entry, one timber -- and reads a
-        # TimberPath or a bare string as occurrence 0 of that name.
         assert Drawing(name="d", timber_paths=[ResolvedTimberPath("posts/fl")]).timber_paths == (
             ResolvedTimberPath(path="posts/fl"),
         )
