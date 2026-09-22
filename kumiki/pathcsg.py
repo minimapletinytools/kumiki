@@ -847,12 +847,19 @@ class SimplePathExtrusionFeature(CSGFeature):
     """
     key: ExtrusionFeatureKey = ExtrusionCap.TOP
 
-    def feature_type(self) -> CSGFeatureType:
-        """FACE, even when the key names a curved segment.
+    #: FACE or CURVED_FACE, said at construction because it cannot be worked
+    #: out here: whether a side is curved is a property of
+    #: owner.path.segments[key], and feature_type() is given no owner.
+    #:
+    #: Defaults to FACE, which is right for both caps and for a straight
+    #: segment. An author naming an ArcSegment passes CURVED_FACE. Use
+    #: PathExtrusion.feature_type_for to have the path answer instead of
+    #: remembering -- that is the version that cannot disagree with the
+    #: geometry.
+    declared_type: CSGFeatureType = CSGFeatureType.FACE
 
-        TODO we need to pass in some additional info from the owning SimplePathExtrusion so that the correct feature type can be determined
-        """
-        return CSGFeatureType.FACE
+    def feature_type(self) -> CSGFeatureType:
+        return self.declared_type
 
     def _midpoint_2d(self, owner: 'PathExtrusion') -> Optional[V2]:
         """Centre of this face's footprint in the path's own 2D plane."""
@@ -942,6 +949,38 @@ class PathExtrusion(HasFeatures, CutCSG):
     def __repr__(self) -> str:
         return (f"PathExtrusion({len(self.path.segments)} segments, "
                 f"transform={self.transform}, start={self.start_distance}, end={self.end_distance})")
+
+    def feature_type_for(self, key: ExtrusionFeatureKey) -> CSGFeatureType:
+        """What a feature naming *key* on this extrusion is: FACE or CURVED_FACE.
+
+        The path is the only thing that knows -- a side is curved exactly when
+        the segment it is extruded from is not planar -- and a feature is handed
+        the answer at construction rather than asking, because feature_type()
+        is given no owner.
+
+        Both caps are flat whatever the path does: they are the path's own
+        footprint, and the footprint is a closed region however curved its
+        boundary.
+
+        Use this rather than passing declared_type by hand. An author who says
+        FACE of an ArcSegment gets a feature that claims to lie on a plane it
+        does not, and nothing checks.
+        """
+        if key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            return CSGFeatureType.FACE
+        segment = self.path.segments[key]
+        return (CSGFeatureType.FACE if segment.is_planar()
+                else CSGFeatureType.CURVED_FACE)
+
+    def feature(self, name: str, key: ExtrusionFeatureKey,
+                **rest) -> 'SimplePathExtrusionFeature':
+        """A feature on this extrusion, typed by asking the path.
+
+        The way to name one without having to know whether the segment under it
+        curves.
+        """
+        return SimplePathExtrusionFeature(
+            name, key=key, declared_type=self.feature_type_for(key), **rest)
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
         local_point = point - self.transform.position

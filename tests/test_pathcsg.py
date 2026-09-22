@@ -6,7 +6,7 @@ primitive, including decompose_path_into_convex_pieces.
 import pytest
 
 from kumiki.rule import create_v2, create_v3, Transform, scalar, pi
-from kumiki.cutcsg import ExtrusionCap
+from kumiki.cutcsg import CSGFeatureType, ExtrusionCap
 from kumiki.geometry import Plane
 from kumiki.pathcsg import (
     ArcSegment, StraightSegment, FancyPath, Path, PathExtrusion,
@@ -177,8 +177,11 @@ class TestPathCSG:
             path=path, transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(1, 25),
             _features=[
+                # Typed by asking the path, so the knee says CURVED_FACE
+                # without anyone having to remember that it bends.
                 SimplePathExtrusionFeature("foot", key=0),        # line_foot: planar, should resolve
-                SimplePathExtrusionFeature("knee_bulge", key=1),  # knee: curved (ArcSegment), never matches
+                SimplePathExtrusionFeature("knee_bulge", key=1,   # knee: curved (ArcSegment), never matches
+                                           declared_type=CSGFeatureType.CURVED_FACE),
                 SimplePathExtrusionFeature("top", key=ExtrusionCap.TOP),
             ],
         )
@@ -318,3 +321,49 @@ class TestPathExtrusionLocate:
         assert extent is not None
         assert float(extent.anchor[0]) == pytest.approx(0.1)
         assert float(extent.anchor[2]) == pytest.approx(0.05)
+
+
+class TestAPathFeatureSaysWhetherItIsCurved:
+    """A side is curved exactly when the segment under it is not planar.
+
+    The feature cannot work that out: curvature lives on
+    owner.path.segments[key], and feature_type() is given no owner. So the type
+    is said at construction -- and `PathExtrusion.feature` says it by asking the
+    path, rather than the author having to remember which segments bend.
+    """
+
+    def _extrusion(self):
+        # A straight foot (0), a curved knee (1), and the rest of the profile.
+        path = TestPathCSG()._leg_profile_path()
+        return PathExtrusion(
+            path=path, transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(1, 25))
+
+    def test_a_straight_segment_is_a_flat_face(self):
+        assert self._extrusion().feature_type_for(0) == CSGFeatureType.FACE
+
+    def test_a_curved_segment_is_a_curved_face(self):
+        assert self._extrusion().feature_type_for(1) == CSGFeatureType.CURVED_FACE
+
+    def test_both_caps_are_flat_whatever_the_path_does(self):
+        """They are the path's own footprint, and a footprint is a closed
+        region however curved its boundary."""
+        extrusion = self._extrusion()
+
+        assert extrusion.feature_type_for(ExtrusionCap.TOP) == CSGFeatureType.FACE
+        assert extrusion.feature_type_for(ExtrusionCap.BOTTOM) == CSGFeatureType.FACE
+
+    def test_the_helper_types_a_feature_by_asking_the_path(self):
+        extrusion = self._extrusion()
+
+        foot = extrusion.feature("foot", key=0)
+        knee = extrusion.feature("knee_bulge", key=1)
+
+        assert foot.feature_type() == CSGFeatureType.FACE
+        assert knee.feature_type() == CSGFeatureType.CURVED_FACE
+
+    def test_a_feature_built_by_hand_still_defaults_to_face(self):
+        """Which is right for a cap and for a straight segment, and is what
+        every one of these said before there was anything else to say."""
+        assert (SimplePathExtrusionFeature("plain", key=0).feature_type()
+                == CSGFeatureType.FACE)

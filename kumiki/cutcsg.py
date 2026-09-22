@@ -530,13 +530,12 @@ def _drop_duplicate_derived(hits: List['OwnedFeatureHit']) -> List['OwnedFeature
     return kept
 
 
-# TODO get rid of root argument and return None if no shared ancestor
 def shared_ancestor(
-    root: 'CutCSG',
+    within: 'CutCSG',
     first: 'CutCSG',
     second: 'CutCSG',
-) -> 'CutCSG':
-    """The deepest node under *root* holding both *first* and *second*.
+) -> Optional['CutCSG']:
+    """The deepest node under *within* holding both *first* and *second*.
 
     What a derived feature is owned BY. An edge where a shoulder crosses a body
     belongs to whatever node put the two together -- the difference that cut one
@@ -544,22 +543,20 @@ def shared_ancestor(
     node or ask something above it and it is the same edge, so its owner should
     be the same too.
 
-    Falls back to *root* when either is not under it, which find_all_features
-    cannot reach: the parents came out of its own gather.
-    """
-    def trail(target: 'CutCSG') -> Optional[List['CutCSG']]:
-        if target is root:
-            return [root]
-        for child in csg_children(root):
-            found = _trail_within(child, target)
-            if found is not None:
-                return [root] + found
-        return None
+    None when either is not under *within*, which nothing should be able to
+    reach through find_all_features: the parents came out of its own gather.
+    The caller warns rather than inventing an owner, which is what falling back
+    to *within* used to do -- the same wrong answer the argument name `root`
+    invited, since this searches whatever tree it is handed and not THE root.
 
-    here, there = trail(first), trail(second)
+    *within* cannot go away, though it reads like a parameter that should: a
+    CutCSG node holds no reference to its parent, so there is nothing to walk
+    up from and a tree has to be handed in to search downward.
+    """
+    here, there = _trail_within(within, first), _trail_within(within, second)
     if here is None or there is None:
-        return root
-    deepest = root
+        return None
+    deepest = None
     for one, other in zip(here, there):
         if one is not other:
             break
@@ -579,8 +576,10 @@ def _trail_within(node: 'CutCSG', target: 'CutCSG') -> Optional[List['CutCSG']]:
 
 
 def derive_edge_hits(
-    # TODO rename to shared_root as owner is misleading, actually you don't need this argument at all after changing shared_ancestor
-    owner: 'CutCSG',
+    #: The tree to find each edge's owner within, NOT the owner itself -- a
+    #: CutCSG node holds no reference to its parent, so shared_ancestor has to
+    #: be handed something to search downward through.
+    within: 'CutCSG',
     face_hits: List['OwnedFeatureHit'],
 ) -> List['OwnedFeatureHit']:
     """Every edge formed by a pair of *face_hits*.
@@ -593,16 +592,26 @@ def derive_edge_hits(
     for i in range(len(face_hits)):
         for j in range(i + 1, len(face_hits)):
             edge = DerivedEdgeFeature.derive(face_hits[i], face_hits[j])
-            if edge is not None:
-                # TODO after updating shared_ancestor if shared_ancestor returns None, log a warning here and skip the derivde feature
-                hits.append(OwnedFeatureHit(
-                    feature=edge,
-                    owner=shared_ancestor(owner, face_hits[i].owner, face_hits[j].owner)))
+            if edge is None:
+                continue
+            owner = shared_ancestor(within, face_hits[i].owner, face_hits[j].owner)
+            if owner is None:
+                # Both parents came out of a gather on `within`, so both are
+                # under it and this cannot happen. Said out loud rather than
+                # guessed at: an edge owned by the wrong node is worse than one
+                # that is missing and complained about.
+                warnings.warn(
+                    f"Skipping the derived edge {edge.name}: its parents are not "
+                    f"both under the node being searched, so there is no node to "
+                    f"own it.")
+                continue
+            hits.append(OwnedFeatureHit(feature=edge, owner=owner))
     return hits
 
 
 def derive_point_hits(
-    owner: 'CutCSG',
+    #: As derive_edge_hits: the tree to search, not the owner.
+    within: 'CutCSG',
     edge_hits: List['OwnedFeatureHit'],
     face_hits: List['OwnedFeatureHit'],
 ) -> List['OwnedFeatureHit']:
@@ -618,10 +627,16 @@ def derive_point_hits(
     for edge_hit in edge_hits:
         for face_hit in face_hits:
             point = DerivedPointFeature.derive(edge_hit, face_hit)
-            if point is not None:
-                hits.append(OwnedFeatureHit(
-                    feature=point,
-                    owner=shared_ancestor(owner, edge_hit.owner, face_hit.owner)))
+            if point is None:
+                continue
+            owner = shared_ancestor(within, edge_hit.owner, face_hit.owner)
+            if owner is None:
+                warnings.warn(
+                    f"Skipping the derived point {point.name}: its parents are not "
+                    f"both under the node being searched, so there is no node to "
+                    f"own it.")
+                continue
+            hits.append(OwnedFeatureHit(feature=point, owner=owner))
     return hits
 
 
@@ -854,28 +869,25 @@ class DerivedEdgeFeature(CSGFeature):
     see shared_ancestor. 
     """
 
-    # TODO can we make these non optional and construct this object all at once?
-    #: The two faces this edge is where-they-meet. Optional only because the
-    #: dataclass needs defaults to be constructed field-by-field; derive() is
-    #: the only thing that builds one and always sets both, and every method
-    #: here declines when either is missing.
+    #: The two faces this edge is where-they-meet. Required: derive() is the
+    #: only thing that builds one, and an edge without both parents is not an
+    #: edge -- every method here had to decline for a case that never happened.
+    #:
+    #: kw_only so they can be required at all: CSGFeature.properties has a
+    #: default, and a field without one cannot follow it positionally.
     #:
     #: TODO consider refactoring OwnedFeatureHit to be split out by types so these can be typed to faces
-    a: Optional['OwnedFeatureHit'] = None
-    b: Optional['OwnedFeatureHit'] = None
+    a: 'OwnedFeatureHit' = field(kw_only=True)
+    b: 'OwnedFeatureHit' = field(kw_only=True)
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.EDGE
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        if self.a is None or self.b is None:
-            return False
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
     def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
-        if self.a is None or self.b is None:
-            return None
         # None if either parent is a surface with no plane -- a cylinder
         # barrel, a lofted side. The edge is still pickable; it just cannot be
         # measured against, the same decline locate() makes elsewhere.
@@ -897,8 +909,6 @@ class DerivedEdgeFeature(CSGFeature):
         the point on the INFINITE line closest to the origin, which need not be
         anywhere near the stretch that exists.
         """
-        if self.a is None or self.b is None:
-            return None
         line = self.locate(owner)
         if not isinstance(line, Line):
             return None
@@ -975,8 +985,9 @@ class DerivedPointFeature(CSGFeature):
     """The point where an edge feature crosses a face feature.
 
     """
-    a: Optional['OwnedFeatureHit'] = None
-    b: Optional['OwnedFeatureHit'] = None
+    #: The edge and the face that cross here. Required, as on DerivedEdgeFeature.
+    a: 'OwnedFeatureHit' = field(kw_only=True)
+    b: 'OwnedFeatureHit' = field(kw_only=True)
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.POINT
@@ -990,8 +1001,6 @@ class DerivedPointFeature(CSGFeature):
         return min(ranks) if ranks else FeatureGroup.NONE.value
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        if self.a is None or self.b is None:
-            return False
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 

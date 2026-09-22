@@ -5072,8 +5072,13 @@ class TestADerivedFeatureIsOwnedByWhatMadeIt:
         assert shared_ancestor(outer, cut, cut) is cut
         assert shared_ancestor(cut, body, shoulder) is cut
 
-    def test_and_falls_back_to_the_root_for_a_node_that_is_not_under_it(self):
+    def test_and_answers_None_for_a_node_that_is_not_under_it(self):
+        """Rather than falling back to the tree it was handed.
+
+        There is no node that owns a pair it does not both contain, and saying
+        so lets the caller warn instead of stamping a wrong owner on.
+        """
         cut = self._cut()
         stranger = HalfSpace(normal=create_v3(1, 0, 0), offset=scalar(0))
 
-        assert shared_ancestor(cut, cut.base, stranger) is cut
+        assert shared_ancestor(cut, cut.base, stranger) is None
