@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence, Tuple
 
 
+# TODO you don't need this ABC, just have a value field in each of the Ids that inherit this...
 @dataclass(frozen=True)
 class Identifier:
     """A name someone chose, wrapped so it cannot be confused with another kind.
@@ -52,13 +53,13 @@ class MeasurementId(Identifier):
 
 @dataclass(frozen=True)
 class TimberPath:
-    """What the author calls a timber, before there is a frame to look in.
-
-    A name and nothing more. It cannot say *which* timber when a frame holds two
-    of them, because that is not a question a name can answer on its own -- ask
-    a frame, with Frame.resolve_timber_path, and get back the ones it matched.
+    """
+    Timbers are named by path so that they can be stored hierarchically. The hierchy is purely for organization on the user's end.
+    No mechanisms to prevent name conflicts. Use ResolvedTimberPath to refer to timbers on a frame unambiguously.
+    There should not be duplicate names but we can't really trust the user not to do so.
     """
 
+    # TODO create a PathName object that is just a wrapper around a string with some validators and helpres for extracting part sof the path
     path: str
 
     def __str__(self) -> str:
@@ -67,17 +68,9 @@ class TimberPath:
 
 @dataclass(frozen=True)
 class ResolvedTimberPath:
-    """One particular timber in one particular frame.
-
-    Only obtainable by resolving a TimberPath against a frame, or by parsing the
-    form the viewer already uses, because `occurrence` has no meaning until
-    there is a frame to count within.
-
-    `occurrence` is the fallback, and the only order-dependent thing here: it
-    says which of the timbers sharing a path this is, in the order the frame
-    built them. A frame whose timber paths are all distinct never has an
-    ambiguous one, which is why a duplicated path is worth warning about -- it
-    is the moment a stable reference turns into an order-dependent one.
+    """One particular timber in one particular frame. Attained by resolving a TimberPath against a frame. 
+    
+    Disambiguates duplicate path names using `occurrence`
     """
 
     path: str
@@ -107,12 +100,7 @@ class ResolvedTimberPath:
 
 @dataclass(frozen=True)
 class JointPath:
-    """What a joint is called, before there is a timber to look in.
-
-    The same split as TimberPath, for the same reason: a joint cannot say which
-    of two identical joints it is, because it does not know the order it was cut
-    in -- only the timber holding the cuts does. Ask one, with
-    CutTimber.resolve_joint_path.
+    """Joints are named by path so that they can be stored hierarchically. The hierchy is purely for organization on the user's end.
     """
 
     path: str
@@ -124,15 +112,6 @@ class JointPath:
 @dataclass(frozen=True)
 class ResolvedJointPath:
     """One particular joint on one particular timber.
-
-    `occurrence` says which of the same-named joints on that timber this is, in
-    the order the timber's cuts were applied. Scoped to the timber rather than
-    the frame, so a joint added on another timber renumbers nothing here.
-
-    As with a timber, this is the fallback and the only order-dependent thing:
-    a timber whose joints are all named differently never has an ambiguous one.
-    Two identical joints on one timber -- both ends of a brace, say -- are the
-    case it exists for.
     """
 
     path: str
@@ -159,6 +138,7 @@ class ResolvedJointPath:
         return cls(path=str(text))
 
 
+# TODO delete this, this is silly, just type stuff properly and compare using the actual property
 def identity_order(identity: Tuple) -> str:
     """A sortable key for any identity tuple, whatever shape it is.
 
@@ -176,12 +156,7 @@ def identity_order(identity: Tuple) -> str:
 
 @dataclass(frozen=True)
 class FeatureRef:
-    """Where a feature is within one timber's CSG, without saying which timber.
-
-    Half of a reference on purpose. A path of node labels and a feature name on
-    the last of them mean nothing until there is a timber to read them against,
-    which is why this carries no timber of its own -- the path types below hold
-    exactly one between them, however many features they name.
+    """A reference to specific feature on a CSG tree. Must be resolved against an actual CSG tree to find the feature. Does not guarantee that the feature exists.
     """
 
     #: Held as a tuple; any sequence may be given, which is what reading one
@@ -268,6 +243,10 @@ class SingleFeaturePath(FeaturePath):
         return f"{self.timber} > {trail}" if trail else str(self.timber)
 
 
+# TODO derived features are actually owned by some parent union/difference/intersection 
+# so a single FeatureRef should be sufficient ot reach it
+# having said that, maybe it's useful to carry references to the 2 constituent features? If not, just remove it.
+# it migh be better to enhance FeatureRef class to allow it to carry 2 features for derived fetaures instead though! (and the parent union/difference/intersection can be determined from teh 2 features by finding their shared ancestor)
 @dataclass(frozen=True)
 class DerivedFeaturePath(FeaturePath):
     """An edge or a point, named by the two features that form it.
