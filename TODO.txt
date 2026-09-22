@@ -235,6 +235,7 @@ DONE-add center axis feature to peg hole
   -drawing
   -identity
 
+-leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
 -add types to runner.py
 
 
