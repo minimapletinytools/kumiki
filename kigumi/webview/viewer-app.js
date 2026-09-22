@@ -445,6 +445,7 @@ function createTheme(theme) {
 // than a constant so the strings follow the active language.
 const FEATURE_TYPE_NOUNS = () => ({
     FACE: t('viewer.selection.kind.face'),
+    CURVED_FACE: t('viewer.selection.kind.curved_face'),
     EDGE: t('viewer.selection.kind.edge'),
     POINT: t('viewer.selection.kind.point'),
 });

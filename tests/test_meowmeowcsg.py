@@ -3282,7 +3282,14 @@ class TestCSGFeatureType:
         """Faces are all a primitive can name directly."""
         assert HalfSpaceFeature("shoulder").feature_type() == CSGFeatureType.FACE
         assert SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT).feature_type() == CSGFeatureType.FACE
-        assert SimpleCylinderFeature("w", part=CylinderPart.BARREL).feature_type() == CSGFeatureType.FACE
+        assert (SimpleCylinderFeature("cap", part=CylinderPart.TOP).feature_type()
+                == CSGFeatureType.FACE)
+
+    def test_but_a_barrel_says_it_is_curved(self):
+        """A cap lies on a plane and the barrel does not, which is the whole
+        difference between the two types."""
+        assert (SimpleCylinderFeature("wall", part=CylinderPart.BARREL).feature_type()
+                == CSGFeatureType.CURVED_FACE)
         assert SimpleLoftFeature("s", key=0).feature_type() == CSGFeatureType.FACE
 
     def test_a_face_feature_cannot_be_told_it_is_something_else(self):
@@ -3953,8 +3960,20 @@ class TestDerivedEdges:
         edge = DerivedEdgeFeature.derive(self._owned(prism, "right"), self._owned(prism, "front"))
         assert edge is not None and edge.real is False
 
-    def test_a_non_planar_parent_leaves_the_edge_unlocatable(self):
-        """A barrel has no plane, so the edge is pickable but not measurable."""
+    def test_a_curved_parent_forms_no_edge_at_all(self):
+        """It used to form one that located to nothing.
+
+        A barrel lies on no plane, so where it meets a flat face is a circle
+        rather than a line -- there is no edge to name. This pair was accepted
+        anyway and the edge then declined to locate, which reads downstream as
+        "cannot say" rather than "not an edge".
+
+        Note the group: cylinder features default to FeatureGroup.NONE, which
+        meets nothing, and that is the only reason this did not happen in
+        practice. Give one a real group -- as this does, and as a cap deserves,
+        since its rim against a mortise wall is a real arris -- and the barrel
+        came with it. Being CURVED_FACE is what stops it now.
+        """
         bore = Cylinder(
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             radius=scalar(2), position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -3963,11 +3982,30 @@ class TestDerivedEdges:
                                              properties=FeatureProperties(group=FeatureGroup.A))],
         )
         prism = self._prism(self._face("right", PrismFace.RIGHT))
+
         edge = DerivedEdgeFeature.derive(
             OwnedFeatureHit(feature=bore.get_declared_features()[0], owner=bore),
             self._owned(prism, "right"))
+
+        assert edge is None
+
+    def test_and_a_cap_still_does(self):
+        """The planar half of a cylinder is a face like any other."""
+        bore = Cylinder(
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            radius=scalar(2), position=create_v3(scalar(0), scalar(0), scalar(0)),
+            start_distance=scalar(0), end_distance=scalar(10),
+            _features=[SimpleCylinderFeature("lid", part=CylinderPart.TOP,
+                                             properties=FeatureProperties(group=FeatureGroup.A))],
+        )
+        prism = self._prism(self._face("right", PrismFace.RIGHT))
+
+        edge = DerivedEdgeFeature.derive(
+            OwnedFeatureHit(feature=bore.get_declared_features()[0], owner=bore),
+            self._owned(prism, "right"))
+
         assert edge is not None
-        assert edge.locate(prism) is None
+        assert edge.locate(prism) is not None
 
     def test_test_point_is_the_conjunction_of_both_faces(self):
         prism = self._prism(self._face("right", PrismFace.RIGHT),

@@ -216,6 +216,7 @@
   "viewer.selection.measureCancel.title": "Stop measuring and release the held feature",
   "viewer.selection.counts": "timbers ({selectedTimbers}/{timbers})  accessories ({selectedAccessories}/{accessories})",
   "viewer.selection.kind.face": "face",
+  "viewer.selection.kind.curved_face": "curved face",
   "viewer.selection.kind.edge": "edge",
   "viewer.selection.kind.point": "point",
   "viewer.selection.featureType": "feature",

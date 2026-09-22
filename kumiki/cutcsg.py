@@ -202,16 +202,26 @@ class CylinderPart(Enum):
 class CSGFeatureType(Enum):
     """What kind of geometry a feature names.
 
-    The three cases measurement cares about: measuring between two features
+    The cases measurement cares about: measuring between two features
     dispatches on this pair (two parallel faces measure like two parallel
     planes, a point and a face measure a projected distance, and so on).
 
-    Everything nameable on a primitive today is a FACE. EDGE arrives with
-    features derived from intersecting face pairs; POINT with their vertices.
+    FACE is a PLANAR face, and that is the whole difference from CURVED_FACE:
+    a curved one lies on no plane, so it is worth pointing at and cannot be
+    measured against or used to derive an edge. Saying so in the type is what
+    keeps those rules from having to ask the geometry -- see derive(), which
+    takes faces and now excludes curved ones by construction rather than by
+    locate() declining further downstream.
+
+    EDGE arrives with features derived from intersecting face pairs; POINT with
+    their vertices.
     """
     FACE = 1
     EDGE = 2
     POINT = 3
+    #: A face that lies on no plane -- a cylinder's barrel. Selectable, not
+    #: measurable, and never a parent of a derived edge or point.
+    CURVED_FACE = 4
 
 
 # Default tolerances for deciding whether a point is on a feature. Units are
@@ -311,6 +321,9 @@ _FEATURE_TYPE_SPECIFICITY = {
     CSGFeatureType.POINT: 0,
     CSGFeatureType.EDGE: 1,
     CSGFeatureType.FACE: 2,
+    # As broad as a flat face: a click lands on one the same way, and nothing
+    # narrower is being passed over by preferring it.
+    CSGFeatureType.CURVED_FACE: 2,
 }
 
 
@@ -1314,8 +1327,19 @@ class SimpleCylinderFeature(CSGFeature):
         # A cylinder is an extrusion with one side, and that side is curved.
         return (FeatureCategory.SIDE, 0)
 
-    # TODO create new CURVED_FACE type for the barrel, and then CURVED_FACE should never have been a contender for derived edges or derived points (for now)
     def feature_type(self) -> CSGFeatureType:
+        """A cap is planar; the barrel is not.
+
+        Saying so here is what keeps the barrel out of edge and point
+        derivation: those take FACEs, and it is no longer one. It used to be,
+        and what stopped it was an accident -- cylinder features default to
+        FeatureGroup.NONE, which meets nothing. Give a cap a real group, which
+        is a reasonable thing to want since its rim against a mortise wall is a
+        real arris, and the barrel came with it and derived edges that located
+        to nothing.
+        """
+        if self.part is CylinderPart.BARREL:
+            return CSGFeatureType.CURVED_FACE
         return CSGFeatureType.FACE
 
     def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
