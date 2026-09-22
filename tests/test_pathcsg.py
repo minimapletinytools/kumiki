@@ -9,6 +9,9 @@ from kumiki.rule import create_v2, create_v3, Transform, scalar, pi
 from kumiki.cutcsg import CSGFeatureType, ExtrusionCap
 from kumiki.geometry import Plane
 from kumiki.pathcsg import (
+    FlatSide,
+    CurvedSide,
+    side_index,
     ArcSegment, StraightSegment, FancyPath, Path, PathExtrusion,
     SimplePathExtrusionFeature,
 )
@@ -177,11 +180,10 @@ class TestPathCSG:
             path=path, transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(1, 25),
             _features=[
-                # Typed by asking the path, so the knee says CURVED_FACE
-                # without anyone having to remember that it bends.
-                SimplePathExtrusionFeature("foot", key=0),        # line_foot: planar, should resolve
-                SimplePathExtrusionFeature("knee_bulge", key=1,   # knee: curved (ArcSegment), never matches
-                                           declared_type=CSGFeatureType.CURVED_FACE),
+                # The key says which kind of side it is, so the knee cannot be
+                # written down as flat.
+                SimplePathExtrusionFeature("foot", key=FlatSide(0)),
+                SimplePathExtrusionFeature("knee_bulge", key=CurvedSide(1)),
                 SimplePathExtrusionFeature("top", key=ExtrusionCap.TOP),
             ],
         )
@@ -293,7 +295,7 @@ class TestPathExtrusionLocate:
     def test_a_straight_side_locates_as_an_outward_plane(self):
         extrusion = self._extrusion(self._square())
         # segment 1 runs (0.1, 0) -> (0.1, 0.1), so it faces +X
-        plane = SimplePathExtrusionFeature("east", key=1).locate(extrusion)
+        plane = SimplePathExtrusionFeature("east", key=FlatSide(1)).locate(extrusion)
         assert isinstance(plane, Plane)
         assert float(plane.normal[0]) == pytest.approx(1.0)
         assert float(plane.point[0]) == pytest.approx(0.1)
@@ -313,11 +315,11 @@ class TestPathExtrusionLocate:
             ArcSegment(center=centre, radius=radius, start_angle=scalar(0), sweep_angle=pi),
             ArcSegment(center=centre, radius=radius, start_angle=pi, sweep_angle=pi),
         ])
-        assert SimplePathExtrusionFeature("wall", key=0).locate(self._extrusion(circle)) is None
+        assert SimplePathExtrusionFeature("wall", key=FlatSide(0)).locate(self._extrusion(circle)) is None
 
     def test_extent_anchors_on_the_face(self):
         extrusion = self._extrusion(self._square())
-        extent = SimplePathExtrusionFeature("east", key=1).get_extent(extrusion)
+        extent = SimplePathExtrusionFeature("east", key=FlatSide(1)).get_extent(extrusion)
         assert extent is not None
         assert float(extent.anchor[0]) == pytest.approx(0.1)
         assert float(extent.anchor[2]) == pytest.approx(0.05)
@@ -339,31 +341,55 @@ class TestAPathFeatureSaysWhetherItIsCurved:
             path=path, transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(1, 25))
 
-    def test_a_straight_segment_is_a_flat_face(self):
-        assert self._extrusion().feature_type_for(0) == CSGFeatureType.FACE
+    def test_the_path_names_a_straight_segment_a_flat_side(self):
+        assert self._extrusion().side(0) == FlatSide(0)
 
-    def test_a_curved_segment_is_a_curved_face(self):
-        assert self._extrusion().feature_type_for(1) == CSGFeatureType.CURVED_FACE
+    def test_and_an_arc_a_curved_one(self):
+        assert self._extrusion().side(1) == CurvedSide(1)
 
-    def test_both_caps_are_flat_whatever_the_path_does(self):
+    def test_a_flat_side_is_a_face(self):
+        assert (SimplePathExtrusionFeature("foot", key=FlatSide(0)).feature_type()
+                == CSGFeatureType.FACE)
+
+    def test_a_curved_side_is_a_curved_face(self):
+        assert (SimplePathExtrusionFeature("knee", key=CurvedSide(1)).feature_type()
+                == CSGFeatureType.CURVED_FACE)
+
+    def test_both_caps_are_faces_whatever_the_path_does(self):
         """They are the path's own footprint, and a footprint is a closed
         region however curved its boundary."""
+        for cap in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            assert (SimplePathExtrusionFeature("cap", key=cap).feature_type()
+                    == CSGFeatureType.FACE)
+
+    def test_the_helper_builds_one_with_the_key_the_path_gives(self):
         extrusion = self._extrusion()
 
-        assert extrusion.feature_type_for(ExtrusionCap.TOP) == CSGFeatureType.FACE
-        assert extrusion.feature_type_for(ExtrusionCap.BOTTOM) == CSGFeatureType.FACE
-
-    def test_the_helper_types_a_feature_by_asking_the_path(self):
-        extrusion = self._extrusion()
-
-        foot = extrusion.feature("foot", key=0)
-        knee = extrusion.feature("knee_bulge", key=1)
+        foot = extrusion.feature("foot", extrusion.side(0))
+        knee = extrusion.feature("knee_bulge", extrusion.side(1))
 
         assert foot.feature_type() == CSGFeatureType.FACE
         assert knee.feature_type() == CSGFeatureType.CURVED_FACE
 
-    def test_a_feature_built_by_hand_still_defaults_to_face(self):
-        """Which is right for a cap and for a straight segment, and is what
-        every one of these said before there was anything else to say."""
-        assert (SimplePathExtrusionFeature("plain", key=0).feature_type()
-                == CSGFeatureType.FACE)
+    def test_side_index_insists_it_is_looking_at_a_side(self):
+        """Every rule that indexes the path has already checked for a cap, so
+        answering None there would be an optionality that cannot happen."""
+        assert side_index(FlatSide(3)) == 3
+        assert side_index(CurvedSide(4)) == 4
+        with pytest.raises(ValueError):
+            side_index(ExtrusionCap.TOP)
+
+    def test_a_curved_side_still_declines_to_locate(self):
+        """Saying it is curved does not make it measurable -- it still lies on
+        no plane. The type is what keeps it out of derivation; this is what
+        keeps it out of measurement."""
+        extrusion = self._extrusion()
+
+        assert SimplePathExtrusionFeature("knee", key=CurvedSide(1)).locate(extrusion) is None
+        assert SimplePathExtrusionFeature("foot", key=FlatSide(0)).locate(extrusion) is not None
+
+    def test_the_kind_travels_with_the_key_and_cannot_be_set_apart_from_it(self):
+        """Which is the point. There is no second field to disagree with the
+        first -- naming a side flat or curved IS saying what kind of face it is.
+        """
+        assert "declared_type" not in SimplePathExtrusionFeature.__dataclass_fields__

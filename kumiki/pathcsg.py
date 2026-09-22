@@ -838,27 +838,76 @@ def decompose_path_into_convex_pieces(path: FancyPath, tolerance: float) -> List
 # ============================================================================
 
 @dataclass(frozen=True)
-class SimplePathExtrusionFeature(CSGFeature):
-    """One side face (key = segment index) or end cap of a PathExtrusion.
+class FlatSide:
+    """The side extruded from a straight segment. A plane, so measurable."""
 
-    A key pointing at a curved segment never matches any point: there is no
-    planar face there to name. That is the graceful-fail behaviour, not a
-    special case -- the feature simply stays unmatched.
+    index: int
+
+
+@dataclass(frozen=True)
+class CurvedSide:
+    """The side extruded from an arc. Lies on no plane.
+
+    Worth naming and pointing at; never measurable, and never a parent of a
+    derived edge -- see CSGFeatureType.CURVED_FACE.
     """
-    # TODO create a new key type for just SimplePathExtrusionFeature that combines the declared type
-    key: ExtrusionFeatureKey = ExtrusionCap.TOP
-    # side faces can be either curved or flat so we need store it here
-    declared_type: CSGFeatureType = CSGFeatureType.FACE
+
+    index: int
+
+
+#: Where a PathExtrusion feature sits, AND what kind of face that makes it.
+#:
+#: A path's own key type rather than the shared ExtrusionFeatureKey, because a
+#: path is the only extrusion whose sides are not all flat: a
+#: ConvexPolygonExtrusion or a loft has a straight edge under every side, and a
+#: bare int says everything there is to say. Here it does not.
+#:
+#: The two used to be separate -- a bare index plus a declared_type beside it --
+#: which let an author name an ArcSegment and call it FACE, claiming a plane the
+#: geometry has not got. Naming the side as flat or curved is the same
+#: information with no way to write it down wrong.
+PathExtrusionFeatureKey = Union[ExtrusionCap, FlatSide, CurvedSide]
+
+
+def is_cap(key: PathExtrusionFeatureKey) -> bool:
+    """Whether a key names one of the flat ends rather than a side."""
+    return isinstance(key, ExtrusionCap)
+
+
+def side_index(key: PathExtrusionFeatureKey) -> int:
+    """Which segment a key names. Ask only a side.
+
+    Insists rather than answering None, so the rules below can index the path
+    with it. Every one of them has already established it is not looking at a
+    cap, and carrying an optional through them would be an optionality that
+    cannot happen -- the same reason MeasureSpan.along insists in drawing.py.
+    """
+    if isinstance(key, (FlatSide, CurvedSide)):
+        return key.index
+    raise ValueError(f"{key!r} names a cap, not a side, so it indexes no segment")
+
+
+@dataclass(frozen=True)
+class SimplePathExtrusionFeature(CSGFeature):
+    """One side face or end cap of a PathExtrusion.
+
+    A key naming a curved side never matches any point: there is no planar face
+    there to name. That is the graceful-fail behaviour, not a special case --
+    the feature simply stays unmatched.
+    """
+    key: PathExtrusionFeatureKey = ExtrusionCap.TOP
 
     def feature_type(self) -> CSGFeatureType:
-        return self.declared_type
+        """Read off the key, which is the point of the key carrying it."""
+        return (CSGFeatureType.CURVED_FACE if isinstance(self.key, CurvedSide)
+                else CSGFeatureType.FACE)
 
     def _midpoint_2d(self, owner: 'PathExtrusion') -> Optional[V2]:
         """Centre of this face's footprint in the path's own 2D plane."""
         if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
             low, high = owner.path.bounds()
             return (low + high) / scalar(2)
-        segment = owner.path.segments[self.key]
+        segment = owner.path.segments[side_index(self.key)]
         return (segment.start + segment.end) / scalar(2)
 
     def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
@@ -875,7 +924,7 @@ class SimplePathExtrusionFeature(CSGFeature):
         # A side is planar only if its path segment is straight. An arc's wall
         # is curved, so there is no plane to give -- the same graceful decline
         # test_point_unbounded already makes for curved segments.
-        segment = owner.path.segments[self.key]
+        segment = owner.path.segments[side_index(self.key)]
         if not segment.is_planar():
             return None
         midpoint_2d = self._midpoint_2d(owner)
@@ -914,10 +963,11 @@ class SimplePathExtrusionFeature(CSGFeature):
             return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=test_tolerance)
         if self.key == ExtrusionCap.BOTTOM:
             return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=test_tolerance)
-        if not owner.path.segments[self.key].is_planar():
+        index = side_index(self.key)
+        if not owner.path.segments[index].is_planar():
             return False
         located = owner.path.locate_boundary_segment(create_v2(x, y), eps=test_tolerance)
-        return located is not None and located[0] == self.key
+        return located is not None and located[0] == index
 
 
 @dataclass(frozen=True)
@@ -942,37 +992,29 @@ class PathExtrusion(HasFeatures, CutCSG):
         return (f"PathExtrusion({len(self.path.segments)} segments, "
                 f"transform={self.transform}, start={self.start_distance}, end={self.end_distance})")
 
-    def feature_type_for(self, key: ExtrusionFeatureKey) -> CSGFeatureType:
-        """What a feature naming *key* on this extrusion is: FACE or CURVED_FACE.
+    def side(self, index: int) -> PathExtrusionFeatureKey:
+        """The key for side *index*, flat or curved as the path actually is.
 
         The path is the only thing that knows -- a side is curved exactly when
-        the segment it is extruded from is not planar -- and a feature is handed
-        the answer at construction rather than asking, because feature_type()
-        is given no owner.
+        the segment it is extruded from is not planar -- and the key is what
+        carries that to the feature, which gets no owner to ask.
 
-        Both caps are flat whatever the path does: they are the path's own
-        footprint, and the footprint is a closed region however curved its
-        boundary.
-
-        Use this rather than passing declared_type by hand. An author who says
-        FACE of an ArcSegment gets a feature that claims to lie on a plane it
-        does not, and nothing checks.
+        Use this rather than writing FlatSide or CurvedSide by hand. Naming an
+        ArcSegment FlatSide claims a plane the geometry has not got, and nothing
+        checks.
         """
-        if key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
-            return CSGFeatureType.FACE
-        segment = self.path.segments[key]
-        return (CSGFeatureType.FACE if segment.is_planar()
-                else CSGFeatureType.CURVED_FACE)
+        segment = self.path.segments[index]
+        return FlatSide(index) if segment.is_planar() else CurvedSide(index)
 
-    def feature(self, name: str, key: ExtrusionFeatureKey,
+    def feature(self, name: str, key: PathExtrusionFeatureKey,
                 **rest) -> 'SimplePathExtrusionFeature':
-        """A feature on this extrusion, typed by asking the path.
+        """A feature on this extrusion. Pass `extrusion.side(n)` for a side.
 
-        The way to name one without having to know whether the segment under it
-        curves.
+        Both caps are flat whatever the path does -- they are its own footprint,
+        and a footprint is a closed region however curved its boundary -- so
+        ExtrusionCap.TOP and BOTTOM need nothing worked out.
         """
-        return SimplePathExtrusionFeature(
-            name, key=key, declared_type=self.feature_type_for(key), **rest)
+        return SimplePathExtrusionFeature(name, key=key, **rest)
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
         local_point = point - self.transform.position
