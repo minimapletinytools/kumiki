@@ -1140,12 +1140,12 @@ class TestAddingAMeasurement:
         pending = []
         runner.add_measurement(frame, None, pending, "plan", "front", self._measure())
 
-        second = dict(self._measure(), kind="horizontal")
+        second = dict(self._measure(), kind="projected_horizontal_distance")
         holder = runner.add_measurement(frame, None, pending, "plan", "front", second)
 
         measures = holder["viewports"][0]["measurements"]
         assert len(measures) == 1
-        assert measures[0]["kind"] == "horizontal"
+        assert measures[0]["kind"] == "projected_horizontal_distance"
 
     def test_a_different_pair_sits_beside_it(self):
         runner = _load_runner()

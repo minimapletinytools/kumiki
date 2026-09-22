@@ -15,6 +15,7 @@ still to do.
 """
 
 import math
+import warnings
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
@@ -129,27 +130,18 @@ class MeasurementKind:
                 MeasurementSpace(value.get("space", "projected")),
                 MeasurementDirection(value.get("direction", "perpendicular")),
             )
-        return cls.parse(str(value))
+        try:
+            return cls.parse(str(value))
+        except ValueError:
+            # The drawings file is meant to be hand-edited, so a name nobody
+            # can read falls back to the default kind rather than taking the
+            # frame down with it.
+            warnings.warn(f"Ignoring an unreadable measurement kind: {value!r}")
+            return None
 
-    # TODO why do we need as/from_wire when we have parse and name?
     @classmethod
     def parse(cls, text: str) -> 'MeasurementKind':
-        """Read a kind back from its name, or from one of the older names.
-
-        # TODO remove these comments after removing legacy path
-        The old names were all projected, and `aligned` and `perpendicular` both
-        become a perpendicular distance: between two points the shortest
-        distance IS the distance, which is why the two collapsed into one.
-
-        Where an old name and a new one collide -- `angle`, which now composes
-        for a 3D angle -- the old reading wins, because every file that
-        contains the word was written meaning the old one. Solid kinds are
-        written structured (see as_wire), so nothing needs the ambiguous form.
-        """
-        # TODO no need to suport legacy path, just delete it
-        legacy = _LEGACY_KIND_NAMES.get(str(text))
-        if legacy is not None:
-            return legacy
+        """Read a kind back from its composed name."""
         parts = str(text).split("_")
         space = MeasurementSpace.PROJECTED if parts[:1] == ["projected"] else MeasurementSpace.THREE_D
         if space is MeasurementSpace.PROJECTED:
@@ -167,19 +159,6 @@ def _projected(operation, direction=MeasurementDirection.PERPENDICULAR) -> Measu
 
 def _three_d(operation) -> MeasurementKind:
     return MeasurementKind(operation, MeasurementSpace.THREE_D)
-
-
-# TODO DELETE
-#: The names measurements were written with before kinds had structure.
-_LEGACY_KIND_NAMES: Mapping[str, MeasurementKind] = {
-    # Between two points, the direct distance and the perpendicular distance
-    # are the same number, so these two are now one kind.
-    "aligned": _projected(MeasurementOperation.DISTANCE),
-    "perpendicular": _projected(MeasurementOperation.DISTANCE),
-    "horizontal": _projected(MeasurementOperation.DISTANCE, MeasurementDirection.HORIZONTAL),
-    "vertical": _projected(MeasurementOperation.DISTANCE, MeasurementDirection.VERTICAL),
-    "angle": _projected(MeasurementOperation.ANGLE),
-}
 
 
 # TODO refine these 3 epsilons below? alginment and parallel seem especially big?

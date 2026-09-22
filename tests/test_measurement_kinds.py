@@ -111,28 +111,15 @@ class TestSpacesAndDirections:
             MeasurementKind(DISTANCE, SOLID, MeasurementDirection.HORIZONTAL)
 
     def test_the_wire_form_says_the_space_outright(self):
-        # `angle` is a solid angle by composition and a projected one by
-        # history, so a bare name cannot carry both.
         solid = MeasurementKind(ANGLE, SOLID)
 
         assert MeasurementKind.from_wire(solid.as_wire()) == solid
-        assert MeasurementKind.from_wire("angle") == MeasurementKind(ANGLE, PROJECTED)
 
-
-class TestOlderNames:
-    @pytest.mark.parametrize("older,expected", [
-        ("aligned", MeasurementKind(DISTANCE, PROJECTED)),
-        ("perpendicular", MeasurementKind(DISTANCE, PROJECTED)),
-        ("horizontal", MeasurementKind(DISTANCE, PROJECTED, MeasurementDirection.HORIZONTAL)),
-        ("vertical", MeasurementKind(DISTANCE, PROJECTED, MeasurementDirection.VERTICAL)),
-        ("angle", MeasurementKind(ANGLE, PROJECTED)),
-    ])
-    def test_a_measurement_written_before_still_reads(self, older, expected):
-        assert MeasurementKind.parse(older) == expected
-
-    def test_aligned_and_perpendicular_became_one_kind(self):
-        # Between two points the shortest distance is the distance.
-        assert MeasurementKind.parse("aligned") == MeasurementKind.parse("perpendicular")
+    def test_a_bare_name_now_composes_rather_than_reading_as_history(self):
+        # `angle` used to mean the projected one, because that is what every
+        # file containing the word meant. It composes for 3D now.
+        assert MeasurementKind.from_wire("angle") == MeasurementKind(ANGLE, SOLID)
+        assert MeasurementKind.from_wire("projected_angle") == MeasurementKind(ANGLE, PROJECTED)
 
 
 class TestWhatAPairAdmits:
@@ -325,22 +312,22 @@ class TestKindTellsTwoMeasurementsApart:
         # an id to say they are different.
         first, second = self._pair()
 
-        across = Measure(first, second, kind=MeasurementKind.parse("horizontal"))
-        up = Measure(first, second, kind=MeasurementKind.parse("vertical"))
+        across = Measure(first, second, kind=MeasurementKind.parse("projected_horizontal_distance"))
+        up = Measure(first, second, kind=MeasurementKind.parse("projected_vertical_distance"))
 
         assert across.identity() != up.identity()
 
     def test_the_same_kind_written_twice_is_one_measurement(self):
         first, second = self._pair()
 
-        assert (Measure(first, second, kind=MeasurementKind.parse("horizontal")).identity()
-                == Measure(second, first, kind=MeasurementKind.parse("horizontal")).identity())
+        assert (Measure(first, second, kind=MeasurementKind.parse("projected_horizontal_distance")).identity()
+                == Measure(second, first, kind=MeasurementKind.parse("projected_horizontal_distance")).identity())
 
     def test_an_older_name_matches_the_kind_it_became(self):
         # A file written before kinds had structure has to keep overriding the
         # code measurement it always overrode.
         first, second = self._pair()
-        older = Measure(first, second, kind=MeasurementKind.parse("angle"))
+        older = Measure(first, second, kind=MeasurementKind.parse("projected_angle"))
         newer = Measure(first, second,
                         kind=MeasurementKind.from_wire(
                             {"operation": "angle", "space": "projected",
@@ -354,7 +341,7 @@ class TestKindTellsTwoMeasurementsApart:
         first, second = self._pair()
 
         assert Measure(first, second).identity() != Measure(
-            first, second, kind=MeasurementKind.parse("horizontal")).identity()
+            first, second, kind=MeasurementKind.parse("projected_horizontal_distance")).identity()
 
     def test_the_viewer_and_the_library_build_the_same_identity(self):
         # A file measurement overrides a code one by matching this tuple, so
@@ -363,7 +350,7 @@ class TestKindTellsTwoMeasurementsApart:
         runner = load_module("kigumi_runner_kinds", runner_path)
 
         first, second = self._pair()
-        measure = Measure(first, second, kind=MeasurementKind.parse("horizontal"))
+        measure = Measure(first, second, kind=MeasurementKind.parse("projected_horizontal_distance"))
         on_the_wire = {
             "a": runner.serialize_feature_path(measure.anchor_a),
             "b": runner.serialize_feature_path(measure.anchor_b),
@@ -395,8 +382,8 @@ class TestWhatReplacesWhat:
     def test_a_file_override_must_match_the_kind_too(self):
         # It was written against a particular dimension. The vertical between
         # the same two features is one it was never about.
-        across = self._measure("horizontal")
-        up = self._measure("vertical")
+        across = self._measure("projected_horizontal_distance")
+        up = self._measure("projected_vertical_distance")
 
         assert does_override(across, across, self.FILE, self.CODED)
         assert not does_override(up, across, self.FILE, self.CODED)
@@ -404,27 +391,27 @@ class TestWhatReplacesWhat:
     def test_code_overrules_an_algorithm_whatever_kind_it_chose(self):
         # Otherwise you would have to guess the generated kind to replace it,
         # which stops working the next time the algorithm changes.
-        across = self._measure("horizontal")
-        up = self._measure("vertical")
+        across = self._measure("projected_horizontal_distance")
+        up = self._measure("projected_vertical_distance")
 
         assert does_override(up, across, self.CODED, self.GENERATED)
 
     def test_a_different_pair_is_never_the_same_measurement(self):
-        one = self._measure("horizontal")
-        other = Measure(self._anchor("aaa"), self._anchor("mmm"), kind=MeasurementKind.parse("horizontal"))
+        one = self._measure("projected_horizontal_distance")
+        other = Measure(self._anchor("aaa"), self._anchor("mmm"), kind=MeasurementKind.parse("projected_horizontal_distance"))
 
         assert not does_override(other, one, self.FILE, self.CODED)
         assert not does_override(other, one, self.CODED, self.GENERATED)
 
     def test_two_of_the_same_tier_sit_beside_each_other(self):
         # However alike. Two coded measurements are two measurements.
-        measure = self._measure("horizontal")
+        measure = self._measure("projected_horizontal_distance")
 
         assert not does_override(measure, measure, self.CODED, self.CODED)
         assert not does_override(measure, measure, self.FILE, self.FILE)
 
     def test_a_lower_tier_never_displaces_a_higher_one(self):
-        measure = self._measure("horizontal")
+        measure = self._measure("projected_horizontal_distance")
 
         assert not does_override(measure, measure, self.CODED, self.FILE)
         assert not does_override(measure, measure, self.GENERATED, self.FILE)
@@ -526,3 +513,15 @@ class TestEveryKindHasANameAPersonWouldUse:
         assert not missing, (
             f"{locale}.json has no name for {missing} -- the dropdown would show "
             f"the key itself")
+
+
+class TestAnUnreadableKind:
+    def test_falls_back_to_the_default_rather_than_raising(self):
+        # The drawings file is hand-edited, so a name nobody can read must not
+        # take the frame down.
+        with pytest.warns(UserWarning):
+            assert MeasurementKind.from_wire("horizontal") is None
+
+    def test_a_composed_name_still_reads(self):
+        assert (MeasurementKind.from_wire("projected_horizontal_distance")
+                == MeasurementKind(DISTANCE, PROJECTED, MeasurementDirection.HORIZONTAL))
