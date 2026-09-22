@@ -128,8 +128,8 @@ class TestAViewportDoesNotKnowWhereItIs:
         drawing = Drawing(name="d", page=A3,
                           viewports=[covering_page(columns(rows(front), preview))])
 
-        assert str(drawing.id_of(front)) == "0.0.0"
-        assert str(drawing.id_of(preview)) == "0.1"
+        assert str(drawing.get_viewport_id(front)) == "0.0.0"
+        assert str(drawing.get_viewport_id(preview)) == "0.1"
         assert drawing.viewport_at(ViewportId("0.1")) is preview
 
     def test_a_viewport_from_another_drawing_is_not_found(self):
@@ -137,7 +137,7 @@ class TestAViewportDoesNotKnowWhereItIs:
         drawing = Drawing(name="d", page=A3, viewports=[covering_page(rows(_view("Front")))])
 
         with pytest.raises(KeyError):
-            drawing.id_of(stranger)
+            drawing.get_viewport_id(stranger)
 
     def test_containers_are_walked_and_only_leaves_render(self):
         drawing = Drawing(name="d", page=A3, viewports=[covering_page(
@@ -152,7 +152,7 @@ class TestAViewportDoesNotKnowWhereItIs:
 class TestViewportsAreComparedByObject:
     def test_two_viewports_with_the_same_label_are_different_viewports(self):
         # The whole reason ids are positional: what a view IS, to a drawing, is
-        # the cell it occupies. Value equality would make id_of a coin toss
+        # the cell it occupies. Value equality would make get_viewport_id a coin toss
         # between two cells that happen to be described alike.
         assert _view("Front") != _view("Front")
 
@@ -347,7 +347,7 @@ class TestWhereAMeasurementIsWritten:
             covering_page(columns(rows(front, _view("Right")), _view("Preview")))])
 
         assert list(drawing.measurements_by_viewport()) == ["0.0.0"]
-        assert str(drawing.id_of(front)) == "0.0.0"
+        assert str(drawing.get_viewport_id(front)) == "0.0.0"
 
     def test_by_id_when_the_layout_is_not_the_drawings(self):
         # A drawing that names only its timbers has its viewports chosen for

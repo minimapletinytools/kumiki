@@ -20,8 +20,8 @@ from .assembly import (
     Ordering,
     solve_assembly,
 )
-# Aliased: cutcsg (wildcard-imported above) also exports a BoundingBox.
-from .assembly import BoundingBox as AssemblyBoundingBox
+# Aliased: cutcsg (wildcard-imported above) also exports a AxisAlignedBoundingBox.
+from .assembly import AxisAlignedBoundingBox as AssemblyBoundingBox
 from enum import Enum
 from typing import Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
 from dataclasses import dataclass, field, replace

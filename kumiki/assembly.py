@@ -167,7 +167,7 @@ class Ordering:
 
 
 @dataclass(frozen=True)
-class BoundingBox:
+class AxisAlignedBoundingBox:
     """Axis-aligned box in GLOBAL space; used only by the Phase 4 clear-out."""
 
     min_x: float
@@ -191,7 +191,7 @@ class AssemblyMember:
     # (the adapter uses the timber centroid).
     position: V3
     # Optional global-space bounds for the Phase 4 clear-out pass.
-    bbox: Optional[BoundingBox] = None
+    bbox: Optional[AxisAlignedBoundingBox] = None
 
 
 @dataclass(frozen=True)
@@ -1511,7 +1511,7 @@ def solve_assembly(
 # ============================================================================
 
 
-def _bbox_at(bbox: BoundingBox, offset: _Float3) -> Tuple[float, float, float, float, float, float]:
+def _bbox_at(bbox: AxisAlignedBoundingBox, offset: _Float3) -> Tuple[float, float, float, float, float, float]:
     return (bbox.min_x + offset[0], bbox.max_x + offset[0],
             bbox.min_y + offset[1], bbox.max_y + offset[1],
             bbox.min_z + offset[2], bbox.max_z + offset[2])

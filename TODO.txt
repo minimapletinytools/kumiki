@@ -227,16 +227,16 @@ IGNORE-create a header for the are below the 3d view main panel in kigumi so it 
 DONE-overlap priority is: non derived features first -> order by highest priority within derived group (derived group priority = enum index) -> feature priority -> feature name -> feature order
 DONE-you'll need line / face -> point derived features tooo
 DONE-add center axis feature to peg hole
-
-
--do code review
+DONE-do code review
   DONE-cutcsg/pathcsg
   DONE-geometry
   DONE-drawing
   DONE-identity
 
--leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
+-maybe review runner.py ;__;
 -add types to runner.py
+-leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
+
 
 
 -tenon square peg holes need to intersect with the tenon prism for derived edges

@@ -54,7 +54,7 @@ def _numeric_max(*vals):
 
 # TODO rename to AxisAlignedBoundingBox
 @dataclass(frozen=True)
-class BoundingBox:
+class AxisAlignedBoundingBox:
     """
     Axis-aligned bounding box (AABB) for a CSG object.
 
@@ -498,10 +498,24 @@ def _drop_duplicate_derived(hits: List['OwnedFeatureHit']) -> List['OwnedFeature
     """removes derived features that coincide with non derived fetarues, expects _sort_feature_hits order.
     """
     kept: List['OwnedFeatureHit'] = []
-    # TODO confirm this is correct, this assumes that non derived features show up first in the list so they get "kept" first and then any derived features will map against them?
-    # a little sus but a reasonably optimization, maybe add an assert to check that they are in fact ordered
+    # It is NOT true in general that declared features come first: _sort_feature_hits
+    # ranks specificity above declaredness on purpose, so a derived EDGE sorts ahead
+    # of the declared FACE it was made from.
+    #
+    # What makes this correct is narrower. _names_same_geometry only ever matches a
+    # pair of the same kind -- Point to Point, Line to Line, Plane to Plane -- and
+    # within one kind the specificity key ties, so declaredness is what decides.
+    # A derived hit therefore always meets its declared twin already in `kept`.
     for hit in hits:
-        if hit.feature.is_derived() and any(_names_same_geometry(hit, other) for other in kept):
+        twin = next((other for other in kept if _names_same_geometry(hit, other)), None)
+        if hit.feature.is_derived() and twin is not None:
+            # The precondition above, checked rather than assumed: the thing it is
+            # a duplicate of must be the declared one, not another derived hit that
+            # happened to sort first.
+            assert not twin.feature.is_derived(), (
+                f"{hit.feature.name} was dropped against {twin.feature.name}, which is "
+                f"itself derived -- _sort_feature_hits no longer puts declared first "
+                f"within a kind, so this dedup is picking an arbitrary winner")
             continue
         kept.append(hit)
     return kept
@@ -561,7 +575,7 @@ def derive_point_hits(
 
 # TODO rename to _drop_real_hits_if_not_on_boundary
 # TODO would it make sense to combine this function with `collect_feature_hits`? maybe create a new `collect_feature_hits_with_boundary_testing` method?
-def _drop_real_hits_off_boundary(
+def _drop_real_hits_if_not_on_boundary(
     node: 'CutCSG',
     hits: List['OwnedFeatureHit'],
     point: V3,
@@ -610,10 +624,10 @@ def _corner_span_on_line(hit: 'OwnedFeatureHit', line: Line) -> Optional[Tuple[f
     return (min(reach), max(reach))
 
 
-def _box_around(points: Sequence[V3]) -> 'BoundingBox':
+def _box_around(points: Sequence[V3]) -> 'AxisAlignedBoundingBox':
     """The smallest axis-aligned box holding these points."""
     reach = [[float(point[axis, 0]) for point in points] for axis in range(3)]
-    return BoundingBox(
+    return AxisAlignedBoundingBox(
         min_x=scalar(repr(min(reach[0]))), min_y=scalar(repr(min(reach[1]))),
         min_z=scalar(repr(min(reach[2]))), max_x=scalar(repr(max(reach[0]))),
         max_y=scalar(repr(max(reach[1]))), max_z=scalar(repr(max(reach[2]))))
@@ -636,7 +650,7 @@ def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeri
 # What locate() can hand back. Unbounded on purpose: measurement between two
 # features works on infinite lines and planes, and bounds travel separately in
 # CSGFeatureExtent.
-LocatedGeometry = Union[Point, Line, Plane]
+LocatedFeatureGeometry = Union[Point, Line, Plane]
 
 
 # NOTE this class is a little weird but it's fine for now I guess, maybe think of less weird way to do this
@@ -658,7 +672,7 @@ class CSGFeatureExtent:
     """
     anchor: V3
     ends: Optional[Tuple[V3, V3]] = None
-    aabb: Optional['BoundingBox'] = None
+    aabb: Optional['AxisAlignedBoundingBox'] = None
 
 
 @dataclass(frozen=True)
@@ -689,7 +703,7 @@ class CSGFeature(ABC):
         ...
 
     # TODO rename to something like locate_simple_unbounded
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         """The unbounded geometry this feature lies on, in the owner's space.
 
         A Plane for a planar face, a Line for an edge, a Point for a vertex.
@@ -773,7 +787,7 @@ class ProgrammableCSGFeature(CSGFeature):
         return self.predicate(owner, point, test_tolerance)
 
 
-def _as_plane(geometry: Optional['LocatedGeometry']) -> Optional[Plane]:
+def _as_plane(geometry: Optional['LocatedFeatureGeometry']) -> Optional[Plane]:
     """Narrow a located geometry to a Plane, or None if it is not one.
 
     locate() can hand back a Point or a Line as well, and a face that declines
@@ -808,7 +822,7 @@ class DerivedEdgeFeature(CSGFeature):
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if self.a is None or self.b is None:
             return None
         # None if either parent is a surface with no plane -- a cylinder
@@ -949,7 +963,7 @@ class DerivedPointFeature(CSGFeature):
                 plane = located
         return line, plane
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         line, plane = self._line_and_plane()
         return intersect_line_plane(line, plane)
 
@@ -1018,7 +1032,7 @@ class HalfSpaceFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, HalfSpace):
             return None
         # The solid is dot(normal, p) >= offset, so the boundary plane is
@@ -1073,7 +1087,7 @@ class SimpleRectangularPrismFeature(CSGFeature):
             return -height_dir, base - height_dir * half_height
         return None
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, RectangularPrism):
             return None
         frame = self._face_frame(owner)
@@ -1208,7 +1222,7 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
         return (first.test_point_unbounded(owner, point, test_tolerance)
                 and second.test_point_unbounded(owner, point, test_tolerance))
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         """The line the two faces meet in, or None if they never do."""
         first, second = self._sides()
         return intersect_planes(_as_plane(first.locate(owner)), _as_plane(second.locate(owner)))
@@ -1248,7 +1262,7 @@ class CylinderAxisFeature(CSGFeature):
             return None
         return safe_normalize_vector(owner.axis_direction)
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         axis = self._axis(owner)
         if axis is None:
             return None
@@ -1299,7 +1313,7 @@ class SimpleCylinderFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, Cylinder):
             return None
         # The barrel is curved: no single plane describes it, so decline rather
@@ -1383,7 +1397,7 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
         local_mid = Matrix([midpoint_2d[0], midpoint_2d[1], mid_length])
         return normal, owner.transform.position + safe_transform_vector(orientation, local_mid)
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, ConvexPolygonExtrusion):
             return None
         frame = self._frame(owner)
@@ -1432,7 +1446,7 @@ class SimpleLoftFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
             return None
         
@@ -1556,7 +1570,7 @@ class OwnedFeatureHit:
     def properties(self) -> FeatureProperties:
         return self.feature.properties
 
-    def locate(self) -> Optional['LocatedGeometry']:
+    def locate(self) -> Optional['LocatedFeatureGeometry']:
         return self.feature.locate(self.owner)
 
     def get_extent(self) -> Optional['CSGFeatureExtent']:
@@ -1774,7 +1788,7 @@ class CutCSG(ABC):
         pass
 
     @abstractmethod
-    def get_aabb(self) -> 'BoundingBox':
+    def get_aabb(self) -> 'AxisAlignedBoundingBox':
         """
         Return the axis-aligned bounding box (AABB) of this CSG object.
 
@@ -1782,7 +1796,7 @@ class CutCSG(ABC):
 
         Primitives with infinite extent (HalfSpace, or prisms/cylinders with
         start_distance or end_distance set to None) cannot produce a finite AABB.
-        They emit a UserWarning and return a BoundingBox with all fields set to None.
+        They emit a UserWarning and return a AxisAlignedBoundingBox with all fields set to None.
         """
         pass
 
@@ -1860,8 +1874,8 @@ class EmptyCSG(CutCSG):
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         return None
 
-    def get_aabb(self) -> 'BoundingBox':
-        return BoundingBox(
+    def get_aabb(self) -> 'AxisAlignedBoundingBox':
+        return AxisAlignedBoundingBox(
             min_x=0,
             min_y=0,
             min_z=0,
@@ -1948,13 +1962,13 @@ class HalfSpace(HasFeatures, CutCSG):
         """
         return -self.normal
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         warnings.warn(
             "get_aabb() called on HalfSpace, which has infinite extent — result is unbounded",
             UserWarning,
             stacklevel=2,
         )
-        return BoundingBox(None, None, None, None, None, None)
+        return AxisAlignedBoundingBox(None, None, None, None, None, None)
 
     
 @dataclass(frozen=True)
@@ -2233,14 +2247,14 @@ class RectangularPrism(HasFeatures, CutCSG):
         # Should not reach here if point is actually on boundary
         return None
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:
             warnings.warn(
                 "get_aabb() called on an infinite RectangularPrism — result is unbounded",
                 UserWarning,
                 stacklevel=2,
             )
-            return BoundingBox(None, None, None, None, None, None)
+            return AxisAlignedBoundingBox(None, None, None, None, None, None)
 
         half_w = self.size[0] / scalar(2)
         half_h = self.size[1] / scalar(2)
@@ -2255,7 +2269,7 @@ class RectangularPrism(HasFeatures, CutCSG):
         xs = [p[0] for p in corners_global]
         ys = [p[1] for p in corners_global]
         zs = [p[2] for p in corners_global]
-        return BoundingBox(
+        return AxisAlignedBoundingBox(
             _numeric_min(*xs), _numeric_min(*ys), _numeric_min(*zs),
             _numeric_max(*xs), _numeric_max(*ys), _numeric_max(*zs),
         )
@@ -2485,14 +2499,14 @@ class Cylinder(HasFeatures, CutCSG):
         # Should not reach here if point is on boundary
         return None
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:
             warnings.warn(
                 "get_aabb() called on an infinite Cylinder — result is unbounded",
                 UserWarning,
                 stacklevel=2,
             )
-            return BoundingBox(None, None, None, None, None, None)
+            return AxisAlignedBoundingBox(None, None, None, None, None, None)
 
         axis_norm = self.axis_direction / safe_norm(self.axis_direction)
         p1 = self.position + axis_norm * self.start_distance
@@ -2506,7 +2520,7 @@ class Cylinder(HasFeatures, CutCSG):
             hi = _numeric_max(p1[i], p2[i]) + radial_i
             bounds.append((lo, hi))
 
-        return BoundingBox(
+        return AxisAlignedBoundingBox(
             bounds[0][0], bounds[1][0], bounds[2][0],
             bounds[0][1], bounds[1][1], bounds[2][1],
         )
@@ -2616,15 +2630,15 @@ class SolidUnion(CutCSG):
             hits.extend(child.collect_feature_hits(point, tolerances))
         # A child's face can be buried inside a sibling, which is surface the
         # union does not have. is_point_on_boundary rejects exactly that case.
-        return _drop_real_hits_off_boundary(self, hits, point, tolerances)
+        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         # Empty children contribute no points to the union, so they're excluded
         # before combining bounds — otherwise their degenerate zero-box would
         # incorrectly pull the union's bounds toward the origin.
         bboxes = [b for b in (child.get_aabb() for child in self.children) if not b.is_empty]
         if not bboxes:
-            return BoundingBox(None, None, None, None, None, None, is_empty=True)
+            return AxisAlignedBoundingBox(None, None, None, None, None, None, is_empty=True)
 
         def union_min(vals):
             if any(v is None for v in vals):
@@ -2636,7 +2650,7 @@ class SolidUnion(CutCSG):
                 return None
             return _numeric_max(*vals)
 
-        return BoundingBox(
+        return AxisAlignedBoundingBox(
             union_min([b.min_x for b in bboxes]),
             union_min([b.min_y for b in bboxes]),
             union_min([b.min_z for b in bboxes]),
@@ -2698,15 +2712,15 @@ class Intersection(CutCSG):
         hits = super().collect_feature_hits(point, tolerances)
         hits.extend(self.left.collect_feature_hits(point, tolerances))
         hits.extend(self.right.collect_feature_hits(point, tolerances))
-        return _drop_real_hits_off_boundary(self, hits, point, tolerances)
+        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         left_bbox = self.left.get_aabb()
         right_bbox = self.right.get_aabb()
 
         # If either side is empty, their intersection has no points either.
         if left_bbox.is_empty or right_bbox.is_empty:
-            return BoundingBox(None, None, None, None, None, None, is_empty=True)
+            return AxisAlignedBoundingBox(None, None, None, None, None, None, is_empty=True)
 
         def intersect_min(a: Optional[Numeric], b: Optional[Numeric]) -> Optional[Numeric]:
             if a is None:
@@ -2722,7 +2736,7 @@ class Intersection(CutCSG):
                 return a
             return _numeric_min(a, b)
 
-        return BoundingBox(
+        return AxisAlignedBoundingBox(
             intersect_min(left_bbox.min_x, right_bbox.min_x),
             intersect_min(left_bbox.min_y, right_bbox.min_y),
             intersect_min(left_bbox.min_z, right_bbox.min_z),
@@ -2943,9 +2957,9 @@ class Difference(CutCSG):
         hits.extend(self.base.collect_feature_hits(point, tolerances))
         for sub_csg in self.subtract:
             hits.extend(sub_csg.collect_feature_hits(point, tolerances))
-        return _drop_real_hits_off_boundary(self, hits, point, tolerances)
+        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         bbox = self.base.get_aabb()
         if bbox.is_empty:
             return bbox
@@ -3324,14 +3338,14 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
         return safe_zero_test_sq(distance_sq, eps)
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:
             warnings.warn(
                 "get_aabb() called on an infinite ConvexPolygonExtrusion — result is unbounded",
                 UserWarning,
                 stacklevel=2,
             )
-            return BoundingBox(None, None, None, None, None, None)
+            return AxisAlignedBoundingBox(None, None, None, None, None, None)
 
         corners_global = [
             self.transform.local_to_global(Matrix([pt[0], pt[1], z]))
@@ -3342,7 +3356,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         xs = [p[0] for p in corners_global]
         ys = [p[1] for p in corners_global]
         zs = [p[2] for p in corners_global]
-        return BoundingBox(
+        return AxisAlignedBoundingBox(
             _numeric_min(*xs), _numeric_min(*ys), _numeric_min(*zs),
             _numeric_max(*xs), _numeric_max(*ys), _numeric_max(*zs),
         )
@@ -3684,7 +3698,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
         return None
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         corners_global = (
             [self.transform.local_to_global(Matrix([pt[0], pt[1], self.start_distance])) for pt in self.bottom_points] +
             [self.transform.local_to_global(Matrix([pt[0], pt[1], self.end_distance])) for pt in self.top_points]
@@ -3693,7 +3707,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         xs = [p[0] for p in corners_global]
         ys = [p[1] for p in corners_global]
         zs = [p[2] for p in corners_global]
-        return BoundingBox(
+        return AxisAlignedBoundingBox(
             _numeric_min(*xs), _numeric_min(*ys), _numeric_min(*zs),
             _numeric_max(*xs), _numeric_max(*ys), _numeric_max(*zs),
         )
@@ -3793,7 +3807,7 @@ def decompose_simple_polygon_into_convex_pieces(points: Profile) -> List[Profile
 # AABB clipping utility
 # ============================================================================
 
-def _clip_bbox_by_halfspace_complement(bbox: BoundingBox, hs: HalfSpace) -> BoundingBox:
+def _clip_bbox_by_halfspace_complement(bbox: AxisAlignedBoundingBox, hs: HalfSpace) -> AxisAlignedBoundingBox:
     """
     Tighten a bounding box by removing the region inside ``hs``.
 
@@ -3858,12 +3872,12 @@ def _clip_bbox_by_halfspace_complement(bbox: BoundingBox, hs: HalfSpace) -> Boun
 
     if not valid_points:
         # The entire bbox is consumed by the halfspace — nothing remains
-        return BoundingBox(0, 0, 0, 0, 0, 0, is_empty=True)
+        return AxisAlignedBoundingBox(0, 0, 0, 0, 0, 0, is_empty=True)
 
     xs = [p[0] for p in valid_points]
     ys = [p[1] for p in valid_points]
     zs = [p[2] for p in valid_points]
-    return BoundingBox(
+    return AxisAlignedBoundingBox(
         _numeric_min(*xs), _numeric_min(*ys), _numeric_min(*zs),
         _numeric_max(*xs), _numeric_max(*ys), _numeric_max(*zs),
     )

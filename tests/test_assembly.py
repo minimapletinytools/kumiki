@@ -12,7 +12,7 @@ from kumiki.assembly import (
     AssemblyFreedom,
     AssemblyJoint,
     AssemblyMember,
-    BoundingBox,
+    AxisAlignedBoundingBox,
     JointMemberSpec,
     Ordering,
     RotationDof,
@@ -920,9 +920,9 @@ class TestClearOut:
     def test_parked_member_in_swept_path_is_pushed_clear(self):
         # The peg pops +Y and parks right in the beam's +Y escape path; when
         # the beam slides at order 2 the parked peg is pushed ahead of it.
-        peg_bbox = BoundingBox(min_x=-0.1, max_x=0.1, min_y=1.0, max_y=1.2, min_z=-0.1, max_z=0.1)
-        beam_bbox = BoundingBox(min_x=-0.5, max_x=0.5, min_y=-1.0, max_y=0.0, min_z=-0.5, max_z=0.5)
-        seat_bbox = BoundingBox(min_x=-0.5, max_x=0.5, min_y=-3.0, max_y=-1.5, min_z=-0.5, max_z=0.5)
+        peg_bbox = AxisAlignedBoundingBox(min_x=-0.1, max_x=0.1, min_y=1.0, max_y=1.2, min_z=-0.1, max_z=0.1)
+        beam_bbox = AxisAlignedBoundingBox(min_x=-0.5, max_x=0.5, min_y=-1.0, max_y=0.0, min_z=-0.5, max_z=0.5)
+        seat_bbox = AxisAlignedBoundingBox(min_x=-0.5, max_x=0.5, min_y=-3.0, max_y=-1.5, min_z=-0.5, max_z=0.5)
         members = [
             member(1, "peg", y=1, bbox=peg_bbox),
             member(2, "beam", bbox=beam_bbox),
@@ -955,9 +955,9 @@ class TestClearOut:
 
     def test_members_behind_the_motion_are_not_pushed(self):
         # The seat is behind the beam's motion: it must not be disturbed.
-        peg_bbox = BoundingBox(min_x=-0.1, max_x=0.1, min_y=1.0, max_y=1.2, min_z=-0.1, max_z=0.1)
-        beam_bbox = BoundingBox(min_x=-0.5, max_x=0.5, min_y=-1.0, max_y=0.0, min_z=-0.5, max_z=0.5)
-        seat_bbox = BoundingBox(min_x=-0.5, max_x=0.5, min_y=-3.0, max_y=-1.5, min_z=-0.5, max_z=0.5)
+        peg_bbox = AxisAlignedBoundingBox(min_x=-0.1, max_x=0.1, min_y=1.0, max_y=1.2, min_z=-0.1, max_z=0.1)
+        beam_bbox = AxisAlignedBoundingBox(min_x=-0.5, max_x=0.5, min_y=-1.0, max_y=0.0, min_z=-0.5, max_z=0.5)
+        seat_bbox = AxisAlignedBoundingBox(min_x=-0.5, max_x=0.5, min_y=-3.0, max_y=-1.5, min_z=-0.5, max_z=0.5)
         members = [
             member(1, "peg", y=1, bbox=peg_bbox),
             member(2, "beam", bbox=beam_bbox),

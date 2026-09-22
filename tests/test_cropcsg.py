@@ -9,7 +9,7 @@ import pytest
 
 from dataclasses import dataclass
 
-from kumiki.cutcsg import BoundingBox, CutCSG, HalfSpace, RectangularPrism
+from kumiki.cutcsg import AxisAlignedBoundingBox, CutCSG, HalfSpace, RectangularPrism
 from kumiki.geometry import (
     ConvexPlanarRegion, Line, LineSegment, Plane, frame_for_plane,
 )
@@ -307,7 +307,7 @@ class _UnknownShape(CutCSG):
         return None
 
     def get_aabb(self):
-        return BoundingBox(min_x=0, min_y=0, min_z=0, max_x=1, max_y=1, max_z=1)
+        return AxisAlignedBoundingBox(min_x=0, min_y=0, min_z=0, max_x=1, max_y=1, max_z=1)
 
 
 def _undescribable():

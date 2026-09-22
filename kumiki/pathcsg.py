@@ -25,13 +25,13 @@ from .rule import sqrt as sym_sqrt
 from .rule import *
 from .geometry import Plane
 from .cutcsg import (
-    BoundingBox,
+    AxisAlignedBoundingBox,
     CSGFeature,
     CSGFeatureExtent,
     CSGFeatureType,
     CutCSG,
     HasFeatures,
-    LocatedGeometry,
+    LocatedFeatureGeometry,
     _finite_midpoint,
     ExtrusionCap,
     ExtrusionFeatureKey,
@@ -859,7 +859,7 @@ class SimplePathExtrusionFeature(CSGFeature):
         segment = owner.path.segments[self.key]
         return (segment.start + segment.end) / scalar(2)
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, PathExtrusion):
             return None
         orientation = owner.transform.orientation.matrix
@@ -978,14 +978,14 @@ class PathExtrusion(HasFeatures, CutCSG):
         local_normal = Matrix([n2[0], n2[1], scalar(0)])
         return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
-    def get_aabb(self) -> BoundingBox:
+    def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:
             warnings.warn(
                 "get_aabb() called on an infinite PathExtrusion — result is unbounded",
                 UserWarning,
                 stacklevel=2,
             )
-            return BoundingBox(None, None, None, None, None, None)
+            return AxisAlignedBoundingBox(None, None, None, None, None, None)
 
         mins, maxs = self.path.bounds()
         corners_global = [
@@ -1012,4 +1012,4 @@ class PathExtrusion(HasFeatures, CutCSG):
                     result = v
             return result
 
-        return BoundingBox(_min(*xs), _min(*ys), _min(*zs), _max(*xs), _max(*ys), _max(*zs))
+        return AxisAlignedBoundingBox(_min(*xs), _min(*ys), _min(*zs), _max(*xs), _max(*ys), _max(*zs))

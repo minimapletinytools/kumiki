@@ -22,7 +22,7 @@ from kumiki.cutcsg import (
     Difference,
     ConvexPolygonExtrusion,
     ConvexPolygonSimpleLoft,
-    BoundingBox,
+    AxisAlignedBoundingBox,
     EmptyCSG,
     PrismFace,
     CSGFeature,
