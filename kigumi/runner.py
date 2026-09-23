@@ -1995,7 +1995,7 @@ def _pick_verdict(
     and a refusal derived separately will eventually disagree, and the
     disagreement is invisible until someone clicks.
     """
-    from kumiki.drawing import measures_nothing
+    from kumiki.drawing import ViewAxes, measures_nothing
 
     if not payload.get("heldGeometry") or not payload.get("look"):
         return None
@@ -2030,10 +2030,9 @@ def _pick_verdict(
     # Per kind, because they do not fail together: two points one above the
     # other have a vertical distance worth measuring and a horizontal one that
     # is nothing at all.
-    axes = {"look": payload["look"], "right": payload.get("right"),
-            "up": payload.get("up")}
+    view = ViewAxes.from_wire(payload)
     kinds = [kind.as_wire() for kind in admitted
-             if not measures_nothing(held, geometry, kind, axes)]
+             if not measures_nothing(held, geometry, kind, view)]
     if not kinds:
         # Refused here, so the hover paints it red and the click says why --
         # both following from the verdict without either knowing this rule.
@@ -2100,7 +2099,8 @@ def _pick_placement(
     and the two drifted: a half-made measurement was drawn at each feature's own
     middle while the finished one went to the middle of their overlap.
     """
-    from kumiki.drawing import (MeasurementSpace, angle_rays, distance_anchors)
+    from kumiki.drawing import (MeasurementSpace, ViewAxes, angle_rays,
+                                distance_anchors)
 
     empty = {"anchors": None, "angle": None, "settled": None}
     held = payload.get("heldReference")
@@ -2132,7 +2132,7 @@ def _pick_placement(
     if not admitted:
         return empty
     kind = admitted[0]
-    axes = {"look": look, "right": payload.get("right"), "up": payload.get("up")}
+    view = ViewAxes.from_wire({**payload, "look": look})
     # The same answer a written measurement travels with, so the preview shows
     # the number the finished one will carry rather than a second derivation of
     # it. docs/measuring-states.md asks for exactly this and only half had it:
@@ -2142,12 +2142,12 @@ def _pick_placement(
     if kind.operation.value == "angle":
         rays = angle_rays(held_span, picked_span)
         settled = _settled_measurement(
-            {**ends, "angle": rays}, None, kind, admitted, in_three_d, normal, axes)
+            {**ends, "angle": rays}, None, kind, admitted, in_three_d, normal, view)
         return {"anchors": None,
                 "angle": rays.as_wire() if rays is not None else None,
                 "settled": settled}
-    at_held, at_picked = distance_anchors(held_span, picked_span, kind, axes)
-    settled = _settled_measurement(ends, None, kind, admitted, in_three_d, normal, axes)
+    at_held, at_picked = distance_anchors(held_span, picked_span, kind, view)
+    settled = _settled_measurement(ends, None, kind, admitted, in_three_d, normal, view)
     return {"anchors": {"a": list(at_held), "b": list(at_picked)},
             "angle": None, "settled": settled}
 
@@ -2903,7 +2903,7 @@ def _measure_span(
 
 
 def _resolve_measurement(
-    frame: Any, measure: Dict[str, Any], axes: Optional[Dict[str, Any]] = None,
+    frame: Any, measure: Dict[str, Any], view: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """A measurement with its anchors found, or marked as not findable.
 
@@ -2921,8 +2921,8 @@ def _resolve_measurement(
     """
     from kumiki.drawing import (DEGENERATE_SEPARATION, MeasurementDirection,
                                MeasurementKind, MeasurementOperation,
-                               MeasurementSpace, angle_between, angle_rays,
-                               distance_anchors, pair_separation,
+                               MeasurementSpace, ViewAxes, angle_between,
+                               angle_rays, distance_anchors, pair_separation,
                                projected_kinds, three_d_kinds)
 
     resolved = dict(measure)
@@ -2930,10 +2930,11 @@ def _resolve_measurement(
     found = {}
     spans = {}
     plane = (measure.get("plane") or {}).get("normal")
-    if plane is None and axes is not None:
+    view = ViewAxes.from_wire(view) if view is not None else None
+    if plane is None and view is not None:
         # No plane written means the viewport's, which is the invariant an
         # orthographic viewport's measurements are entitled to rely on.
-        plane = axes.get("look")
+        plane = view.look
 
     # Which space this is taken in, needed before the ends are resolved: a face
     # is a PLANE in 3D and a line on a sheet, and that is what each end's
@@ -2977,7 +2978,7 @@ def _resolve_measurement(
         kind = declared or (admitted[0] if admitted else None)
         rays = None
         if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
-            at_a, at_b = distance_anchors(spans["a"], spans["b"], kind, axes)
+            at_a, at_b = distance_anchors(spans["a"], spans["b"], kind, view)
             resolved["a"] = {**resolved["a"], "at": list(at_a)}
             resolved["b"] = {**resolved["b"], "at": list(at_b)}
         elif kind is not None and kind.operation is MeasurementOperation.ANGLE:
@@ -2993,7 +2994,7 @@ def _resolve_measurement(
              # The rays themselves, not the wire form just put on `resolved`:
              # what comes to is read off them, and the wire is for the viewer.
              "angle": rays},
-            declared, kind, admitted, in_three_d, plane, axes)
+            declared, kind, admitted, in_three_d, plane, view)
     else:
         resolved["settled"] = _unplaceable_measurement(measure, spans, plane)
     return resolved
@@ -3046,7 +3047,7 @@ def _measure_end_name(measure: Dict[str, Any], key: str) -> str:
 
 def _settled_measurement(
     resolved: Dict[str, Any], declared: Any, kind: Any, admitted: Any,
-    in_three_d: bool, plane: Any, axes: Optional[Dict[str, Any]],
+    in_three_d: bool, plane: Any, view: Optional[Any],
 ) -> Dict[str, Any]:
     """What this measurement comes to, decided here and sent with it.
 
@@ -3067,8 +3068,11 @@ def _settled_measurement(
     order the viewer uses, so a row that says why and a dimension that is
     missing cannot disagree.
     """
+    from dataclasses import replace
+
     from kumiki.drawing import (DEGENERATE_SEPARATION, MeasurementOperation,
-                                angle_between, pair_separation)
+                                ViewAxes, angle_between, pair_separation)
+    from kumiki.rule import create_v3
 
     names = [one.name for one in admitted]
     space = "3d" if in_three_d else "projected"
@@ -3098,7 +3102,7 @@ def _settled_measurement(
     # already the one or the other, decided above.
     length = pair_separation(
         resolved["a"].get("geometry"), resolved["b"].get("geometry"), kind,
-        {**(axes or {}), "look": plane})
+        replace(ViewAxes.from_wire(view), look=create_v3(*plane)))
     if length is None:
         settled["reason"] = "not-measurable"
         return settled
@@ -3127,16 +3131,17 @@ def _settled_form(geometry: Any, in_three_d: bool, plane: Any) -> Dict[str, Any]
     return {"form": form.value}
 
 
-def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional[Dict[str, Any]]:
+def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional[Any]:
     """A viewport's camera frame, as the measurement code wants it."""
+    from kumiki.drawing import ViewAxes
+
     for viewport in scene.get("viewports") or []:
         if viewport.get("id") != viewport_id:
             continue
         camera = viewport.get("camera")
         if not camera:
             return None
-        return {"look": camera.get("look"), "right": camera.get("right"),
-                "up": camera.get("up")}
+        return ViewAxes.from_wire(camera)
     return None
 
 

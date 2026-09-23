@@ -174,6 +174,12 @@ DEGENERATE_SEPARATION = 1e-6
 
 ALIGNMENT_EPSILON = 1e-3
 
+#: The camera frame a measurement is judged against when none is given.
+DEFAULT_LOOK = create_v3(0, 0, -1)
+DEFAULT_RIGHT = create_v3(1, 0, 0)
+DEFAULT_UP = create_v3(0, 0, 1)
+
+
 #: Two projected directions within this of parallel are treated as parallel: the
 #: angle between them would be a number nobody wrote down deliberately, and
 #: their separation is what was meant.
@@ -521,22 +527,44 @@ def _ray_toward(
     return -unit if lean < 0 else unit
 
 
-# TODO NEXT PASS: `axes` is the last mapping-as-object here, and wants to be a
-# frozen ViewAxes(look, right, up) with a from_wire, and the parameter renamed
-# -- `view`, not `frame`, which is a timber frame everywhere else. Left for its
-# own pass because it is the awkward one:
-#   - it crosses the wire, built in runner from payload look/right/up
-#   - right and up are legitimately absent for a 3D pick, so it is Optional
-#     fields inside an Optional argument -- two levels that should be one
-#   - the three fallbacks ((0,0,-1), (1,0,0), (0,0,1)) live at the use sites
-#     here, not in the type; moving them in is a behaviour change and wants its
-#     own test
-#   - ~19 call sites and ~46 dict literals across drawing, runner and tests
-#   - the name is already overloaded: runner has a different `axes` for a
-#     timber's width/height directions
+@dataclass(frozen=True)
+class ViewAxes:
+    """Which way a sheet is seen, and which way is across it and up it.
+
+    A camera frame. `right` and `up` are only consulted by a horizontal or
+    vertical distance, so a 3D pick passes neither and gets the defaults.
+    """
+
+    look: V3 = DEFAULT_LOOK
+    right: V3 = DEFAULT_RIGHT
+    up: V3 = DEFAULT_UP
+
+    def __post_init__(self):
+        for name, fallback in (("look", DEFAULT_LOOK), ("right", DEFAULT_RIGHT),
+                               ("up", DEFAULT_UP)):
+            given = getattr(self, name)
+            object.__setattr__(self, name, fallback if given is None else _v3(given))
+
+    @classmethod
+    def from_wire(cls, value) -> 'ViewAxes':
+        """A camera frame as the viewer sends it, or one already built."""
+        if value is None:
+            return DEFAULT_VIEW
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, Mapping):
+            return cls(look=value.get("look"), right=value.get("right"),
+                       up=value.get("up"))
+        raise TypeError(f"Expected view axes or a mapping, got {type(value).__name__}")
+
+
+#: What a measurement is judged against when no camera is given.
+DEFAULT_VIEW = ViewAxes()
+
+
 def pair_separation(
     one: Optional[Geometry], other: Optional[Geometry],
-    kind: MeasurementKind, axes: Optional[Mapping] = None,
+    kind: MeasurementKind, view: Optional[ViewAxes] = None,
 ) -> Optional[float]:
     """What a distance between these two comes to, FROM THE FEATURES ALONE.
 
@@ -556,7 +584,8 @@ def pair_separation(
     if at_one is None or at_other is None:
         return None
 
-    look = _unit((axes or {}).get("look") or (0, 0, -1))
+    view = ViewAxes.from_wire(view)
+    look = _unit(view.look)
     in_three_d = kind.space is MeasurementSpace.THREE_D
     if in_three_d:
         form_one, run_one = three_d_form(one)
@@ -573,9 +602,9 @@ def pair_separation(
         gap = gap - look * _dot(gap, look)
 
     if kind.direction is MeasurementDirection.HORIZONTAL:
-        return abs(_dot(gap, _unit((axes or {}).get("right") or (1, 0, 0))))
+        return abs(_dot(gap, _unit(view.right)))
     if kind.direction is MeasurementDirection.VERTICAL:
-        return abs(_dot(gap, _unit((axes or {}).get("up") or (0, 0, 1))))
+        return abs(_dot(gap, _unit(view.up)))
 
     # Square to whichever of the two constrains it most. A plane leaves one
     # direction to measure along, a line leaves two, and two points leave the
@@ -604,7 +633,7 @@ def pair_separation(
 
 def measures_nothing(
     one: Optional[Geometry], other: Optional[Geometry],
-    kind: MeasurementKind, axes: Optional[Mapping] = None,
+    kind: MeasurementKind, view: Optional[ViewAxes] = None,
 ) -> bool:
     """Whether this pair has nothing between them to dimension.
 
@@ -612,7 +641,7 @@ def measures_nothing(
     depend on where it is drawn. An arris lying ON a face is the ordinary way
     to reach this.
     """
-    gap = pair_separation(one, other, kind, axes)
+    gap = pair_separation(one, other, kind, view)
     return gap is not None and gap < DEGENERATE_SEPARATION
 
 
@@ -778,9 +807,7 @@ def distance_anchors(
     first: MeasureSpan,
     second: MeasureSpan,
     kind: MeasurementKind,
-    # TODO give axes a real type and a better name -- see ViewAxes in
-    # docs/drawing-rule-migration.md.
-    axes: Optional[Mapping] = None,
+    view: Optional[ViewAxes] = None,
 ) -> Tuple[V3, V3]:
     """Where a distance between these two features attaches, at both ends.
 
@@ -820,8 +847,8 @@ def distance_anchors(
     named = kind.name if hasattr(kind, "name") else str(kind)
 
     if named in ("projected_horizontal_distance", "projected_vertical_distance"):
-        axis = _unit((axes or {}).get(
-            "right" if named.endswith("horizontal_distance") else "up") or (1, 0, 0))
+        view = ViewAxes.from_wire(view)
+        axis = _unit(view.right if named.endswith("horizontal_distance") else view.up)
         at = first.at
         offset = _dot(second.at - at, axis)
         return (first.at, at + axis * offset)

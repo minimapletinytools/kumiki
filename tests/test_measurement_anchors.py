@@ -14,6 +14,7 @@ import math
 import pytest
 
 from kumiki.drawing import (MeasureSpan, MeasurementDirection, MeasurementKind,
+                            ViewAxes,
                             MeasurementOperation, MeasurementSpace, distance_anchors)
 from kumiki.rule import create_v3
 
@@ -33,7 +34,8 @@ HORIZONTAL = kind(MeasurementDirection.HORIZONTAL)
 VERTICAL = kind(MeasurementDirection.VERTICAL)
 
 #: A sheet whose across is X and whose up is Z, seen down Y.
-AXES = {"right": (1, 0, 0), "up": (0, 0, 1), "look": (0, 1, 0)}
+AXES = ViewAxes(right=create_v3(1, 0, 0), up=create_v3(0, 0, 1),
+                look=create_v3(0, 1, 0))
 
 
 def line(at, direction, interval):
@@ -205,22 +207,22 @@ class TestAlongTheSheetsOwnDirections:
         anchors = distance_anchors(point((0, 0, 0)), point((4, 0, 9)), HORIZONTAL, AXES)
         span = run(anchors)
 
-        assert dot(span, AXES["up"]) == pytest.approx(0)
-        assert abs(dot(span, AXES["right"])) == pytest.approx(4)
+        assert dot(span, AXES.up) == pytest.approx(0)
+        assert abs(dot(span, AXES.right)) == pytest.approx(4)
 
     def test_vertical_runs_up_the_sheet(self):
         anchors = distance_anchors(point((0, 0, 0)), point((4, 0, 9)), VERTICAL, AXES)
         span = run(anchors)
 
-        assert dot(span, AXES["right"]) == pytest.approx(0)
-        assert abs(dot(span, AXES["up"])) == pytest.approx(9)
+        assert dot(span, AXES.right) == pytest.approx(0)
+        assert abs(dot(span, AXES.up)) == pytest.approx(9)
 
     def test_the_depth_between_them_is_not_part_of_it(self):
         # A drawing is a projection: what separates two features along the line
         # of sight is not what the sheet shows.
         anchors = distance_anchors(point((0, 5, 0)), point((4, -5, 9)), HORIZONTAL, AXES)
 
-        assert abs(dot(run(anchors), AXES["right"])) == pytest.approx(4)
+        assert abs(dot(run(anchors), AXES.right)) == pytest.approx(4)
 
 
 class TestOnARealFrame:
@@ -259,7 +261,7 @@ class TestOnARealFrame:
                     admitted = projected_kinds(
                         runner._geometry_from_wire(measure["a"].get("geometry")),
                         runner._geometry_from_wire(measure["b"].get("geometry")),
-                        axes["look"])
+                        axes.look)
                     yield measure, axes, admitted
 
     def _square_to(self, measure, end, look):
@@ -298,7 +300,7 @@ class TestOnARealFrame:
             if not admitted or admitted[0].name != "projected_perpendicular_distance":
                 continue
             for end in ("a", "b"):
-                askew = self._square_to(measure, end, axes["look"])
+                askew = self._square_to(measure, end, axes.look)
                 if askew is None:
                     continue
                 checked += 1
@@ -1256,3 +1258,28 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
 
         assert corner < drafting
         assert (drafting, corner) == pytest.approx((8.110, 0.573), abs=1e-3)
+
+
+class TestAViewWithNothingSaidAboutIt:
+    """ViewAxes supplies the defaults, so each one is written down once.
+
+    They used to live at the three use sites, and one was wrong: the fallback
+    for a missing `up` was the same (1, 0, 0) as for a missing `right`, so a
+    vertical distance with no up axis ran along X.
+    """
+
+    def test_a_vertical_distance_runs_up_z(self):
+        anchors = distance_anchors(point((0, 0, 0)), point((4, 0, 9)), VERTICAL)
+
+        assert placed(anchors[1]) == (0.0, 0.0, 9.0)
+
+    def test_a_horizontal_one_runs_along_x(self):
+        anchors = distance_anchors(point((0, 0, 0)), point((4, 0, 9)), HORIZONTAL)
+
+        assert placed(anchors[1]) == (4.0, 0.0, 0.0)
+
+    def test_every_shape_of_missing_axis_reads_the_same(self):
+        from kumiki.drawing import DEFAULT_VIEW, ViewAxes
+
+        for given in (None, {}, {"look": None, "right": None, "up": None}):
+            assert ViewAxes.from_wire(given) == DEFAULT_VIEW

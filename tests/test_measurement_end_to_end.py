@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+from kumiki.drawing import ViewAxes
+
 from tests.testing_shavings import load_module
 
 
@@ -164,7 +166,7 @@ LOOK = [-0.577, -0.577, -0.577]
 
 
 def _three_d_distance():
-    from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
+    from kumiki.drawing import ViewAxes, MeasurementKind, MeasurementOperation, MeasurementSpace
 
     return MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
@@ -421,7 +423,8 @@ class TestAPairWithNothingBetweenThem:
         from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
         from kumiki.drawing import measures_nothing
 
-        axes = {"look": (0, -1, 0), "right": (1, 0, 0), "up": (0, 0, 1)}
+        axes = ViewAxes(look=create_v3(0, -1, 0), right=create_v3(1, 0, 0),
+                        up=create_v3(0, 0, 1))
         below = at([0, 0, 0])
         above = at([0, 0, 50])
 
@@ -531,7 +534,8 @@ class TestWhatTheRunnerSettles:
         return load_module("kigumi_runner_settled", root / "kigumi" / "runner.py")
 
     #: A sheet seen down -y, its across x and its up z.
-    AXES = {"look": [0, -1, 0], "right": [1, 0, 0], "up": [0, 0, 1]}
+    AXES = ViewAxes(look=create_v3(0, -1, 0), right=create_v3(1, 0, 0),
+                    up=create_v3(0, 0, 1))
 
     def _settle(self, one, other, written=None, solid=False, axes=None):
         """What the runner would send for a pair, through its own code."""
@@ -540,7 +544,7 @@ class TestWhatTheRunnerSettles:
 
         runner = self._runner()
         axes = self.AXES if axes is None else axes
-        look = axes["look"]
+        look = axes.look
         declared = MeasurementKind.from_wire(written)
         admitted = (three_d_kinds(one, other) if solid
                     else projected_kinds(one, other, look))
@@ -607,13 +611,14 @@ class TestWhatTheRunnerSettles:
                           MeasureSpan(at=second.point, normal=second.normal))
         settled = runner._settled_measurement(
             {"a": {"geometry": first}, "b": {"geometry": second}, "angle": rays},
-            None, admitted[0], admitted, True, self.AXES["look"], self.AXES)
+            None, admitted[0], admitted, True, self.AXES.look, self.AXES)
 
         assert settled["value"] == {"unit": "angle", "value": pytest.approx(90.0)}
 
     #: An oblique camera, which is what the 3D view always is: no face is seen
     #: exactly edge-on from here.
-    OBLIQUE = {"look": [-0.577, -0.577, -0.577], "right": [1, 0, 0], "up": [0, 0, 1]}
+    OBLIQUE = ViewAxes(look=create_v3(-0.577, -0.577, -0.577),
+                       right=create_v3(1, 0, 0), up=create_v3(0, 0, 1))
 
     def test_in_the_solid_a_slab_reads_its_whole_thickness(self):
         # Not the part of it that survives a projection: in the solid nothing
