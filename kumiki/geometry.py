@@ -118,31 +118,6 @@ class UnsignedPlane(Plane):
         return UnsignedPlane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
 
 
-# TODO DELETE, only used by locate_edge_on_face which is not implemented
-@dataclass(frozen=True)
-class LineOnPlane:
-    """A line lying in a plane, with a direction to measure in.
-
-    Three things, not two: the line itself (a point on it and its direction),
-    and the plane's normal, which says which way is positive for anything
-    measured from the line. What locate_edge_on_face gives back -- an edge as
-    seen ON one of the faces that meets there, which is how a mark gets
-    squared across a piece.
-
-    Called LineOnPlane once, which named the wrong thing: a half plane is a 2D
-    REGION bounded by a line, and this is the line and an orientation, with no
-    region at all.
-    """
-
-    normal: Direction3D  # this is the + direction of any measurements
-    point_on_line: V3
-    line_direction: Direction3D  # MUST be perpendicular to the normal
-
-    def __repr__(self) -> str:
-        return (f"LineOnPlane(normal={self.normal}, point_on_line={self.point_on_line}, "
-                f"line_direction={self.line_direction})")
-
-
 def unit_vector(vector: V3) -> V3:
     """A vector scaled to length one, or left alone if it has barely any.
 
@@ -174,7 +149,9 @@ def perpendicular_axes(direction: V3) -> Tuple[V3, V3]:
     return u, unit_vector(v)
 
 
-# TODO see if you can get rid of this class, it's only used by approximately_crop_plane_to_area_on_csg <- are we even using this function anymore?
+# Only used by approximately_crop_plane_to_area_on_csg, and that IS still in
+# use: the runner crops a plane to a solid at two points when it resolves a
+# face, and test_cropcsg covers it. So this stays until that does.
 # DO NOT create new usages of this clas
 @dataclass(frozen=True)
 class PlaneFrame:

@@ -492,7 +492,7 @@ def _names_same_geometry(one: 'OwnedFeatureHit', other: 'OwnedFeatureHit') -> bo
     locate never matches anything -- a cylinder's barrel is not comparable to
     another, so it is never dropped as a duplicate of one.
     """
-    here, there = one.locate(), other.locate()
+    here, there = one.locate_simple_unbounded(), other.locate_simple_unbounded()
     if isinstance(here, Point) and isinstance(there, Point):
         return points_are_coincident(here, there)
     if isinstance(here, Line) and isinstance(there, Line):
@@ -644,28 +644,6 @@ def _drop_real_hits_if_not_on_boundary(
     return [hit for hit in hits if not hit.feature.real]
 
 
-# TODO only used by get_extent so maybe make it a function local to that scope
-# TODO just pass in corners directly I think that's better
-def _corner_span_on_line(hit: 'OwnedFeatureHit', line: Line) -> Optional[Tuple[float, float]]:
-    """crop a line to fit on the face defined by `hit` returns results relative to `line.point/direction`.
-
-    `hit` is expected to be a face feature with corners, silently fails otherwise
-
-    None when the face cannot say where its corners are -- one that runs to
-    infinity, or a shape that does not work them out yet.
-    """
-
-    corners = getattr(hit.feature, "corners", None)
-    if corners is None:
-        return None
-    found = corners(hit.owner)
-    if not found:
-        return None
-    reach = [float(((corner - line.point).T * line.direction)[0, 0])
-             for corner in found]
-    return (min(reach), max(reach))
-
-
 def _box_around(points: Sequence[V3]) -> 'AxisAlignedBoundingBox':
     """The smallest axis-aligned box holding these points."""
     reach = [[float(point[axis, 0]) for point in points] for axis in range(3)]
@@ -743,8 +721,7 @@ class CSGFeature(ABC):
         """
         ...
 
-    # TODO rename to something like locate_simple_unbounded
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         """The unbounded geometry this feature lies on, in the owner's space.
 
         A Plane for a planar face, a Line for an edge, a Point for a vertex.
@@ -857,11 +834,11 @@ class DerivedEdgeFeature(CSGFeature):
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         # None if either parent is a surface with no plane -- a cylinder
         # barrel, a lofted side. The edge is still pickable; it just cannot be
         # measured against, the same decline locate() makes elsewhere.
-        return intersect_planes(_as_plane(self.a.locate()), _as_plane(self.b.locate()))
+        return intersect_planes(_as_plane(self.a.locate_simple_unbounded()), _as_plane(self.b.locate_simple_unbounded()))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
         """Where this edge sits, and where it ends when its parents can say.
@@ -879,21 +856,35 @@ class DerivedEdgeFeature(CSGFeature):
         the point on the INFINITE line closest to the origin, which need not be
         anywhere near the stretch that exists.
         """
-        line = self.locate(owner)
+        line = self.locate_simple_unbounded(owner)
         if not isinstance(line, Line):
             return None
-        bounds = [span for span in
-                  (_corner_span_on_line(hit, line) for hit in (self.a, self.b))
-                  if span is not None]
+        start, along = line.point, line.direction
+
+        def reach_along_the_line(corners: Sequence[V3]) -> Tuple[float, float]:
+            """How far along the line those corners reach, either way."""
+            stations = [float(((corner - start).T * along)[0, 0]) for corner in corners]
+            return (min(stations), max(stations))
+
+        def at(station: float) -> V3:
+            return start + along * scalar(repr(station))
+
+        bounds = []
+        for hit in (self.a, self.b):
+            # Nothing for a face that cannot say where its corners are: one
+            # running to infinity, or a shape that does not work them out yet.
+            corners = getattr(hit.feature, "corners", None)
+            found = corners(hit.owner) if corners is not None else None
+            if found:
+                bounds.append(reach_along_the_line(found))
+
         if bounds:
             low = max(span[0] for span in bounds)
             high = min(span[1] for span in bounds)
             if low < high:
-                def at(station):
-                    return line.point + line.direction * scalar(repr(station))
                 return CSGFeatureExtent(
                     anchor=at((low + high) / 2), ends=(at(low), at(high)))
-        return CSGFeatureExtent(anchor=line.point)
+        return CSGFeatureExtent(anchor=start)
 
     @staticmethod
     def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedEdgeFeature']:
@@ -918,11 +909,11 @@ class DerivedEdgeFeature(CSGFeature):
         # the edge then located to nothing, which reads downstream as "cannot
         # say" rather than "not an edge".
         for hit in (a, b):
-            if (hit.feature.locate(hit.owner) is None
+            if (hit.feature.locate_simple_unbounded(hit.owner) is None
                     and hit.feature.get_extent(hit.owner) is None):
                 return None
             
-        if planes_are_parallel(_as_plane(a.locate()), _as_plane(b.locate())):
+        if planes_are_parallel(_as_plane(a.locate_simple_unbounded()), _as_plane(b.locate_simple_unbounded())):
             return None
 
         # Deterministic order, so the same edge gets the same identity however traversal reached it.
@@ -986,19 +977,19 @@ class DerivedPointFeature(CSGFeature):
         for hit in (self.a, self.b):
             if hit is None:
                 continue
-            located = hit.locate()
+            located = hit.locate_simple_unbounded()
             if isinstance(located, Line) and line is None:
                 line = located
             elif isinstance(located, Plane) and plane is None:
                 plane = located
         return line, plane
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         line, plane = self._line_and_plane()
         return intersect_line_plane(line, plane)
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        located = self.locate(owner)
+        located = self.locate_simple_unbounded(owner)
         if not isinstance(located, Point):
             return None
         return CSGFeatureExtent(anchor=located.position)
@@ -1020,12 +1011,12 @@ class DerivedPointFeature(CSGFeature):
             return None
 
         for hit in (a, b):
-            if (hit.feature.locate(hit.owner) is None
+            if (hit.feature.locate_simple_unbounded(hit.owner) is None
                     and hit.feature.get_extent(hit.owner) is None):
                 return None
 
         edge, face = ((a, b) if a.feature.feature_type() == CSGFeatureType.EDGE else (b, a))
-        located_edge, located_face = edge.locate(), face.locate()
+        located_edge, located_face = edge.locate_simple_unbounded(), face.locate_simple_unbounded()
         if not isinstance(located_edge, Line):
             return None
         if intersect_line_plane(located_edge, _as_plane(located_face)) is None:
@@ -1062,7 +1053,7 @@ class HalfSpaceFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, HalfSpace):
             return None
         # The solid is dot(normal, p) >= offset, so the boundary plane is
@@ -1117,7 +1108,7 @@ class SimpleRectangularPrismFeature(CSGFeature):
             return -height_dir, base - height_dir * half_height
         return None
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, RectangularPrism):
             return None
         frame = self._face_frame(owner)
@@ -1294,15 +1285,15 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
         return (first.test_point_unbounded(owner, point, test_tolerance)
                 and second.test_point_unbounded(owner, point, test_tolerance))
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         """The line the two faces meet in, or None if they never do."""
         first, second = self._sides()
-        return intersect_planes(_as_plane(first.locate(owner)), _as_plane(second.locate(owner)))
+        return intersect_planes(_as_plane(first.locate_simple_unbounded(owner)), _as_plane(second.locate_simple_unbounded(owner)))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
         """
         """
-        line = self.locate(owner)
+        line = self.locate_simple_unbounded(owner)
         if not isinstance(line, Line):
             return None
         first, second = self._sides()
@@ -1342,7 +1333,7 @@ class CylinderAxisFeature(CSGFeature):
             f"{type(owner).__name__}, which has no axis")
         return None
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         cylinder = self._cylinder(owner)
         if cylinder is None:
             return None
@@ -1395,7 +1386,7 @@ class SimpleCylinderFeature(CSGFeature):
             return CSGFeatureType.CURVED_FACE
         return CSGFeatureType.FACE
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, Cylinder):
             return None
         # The barrel is curved: no single plane describes it, so decline rather
@@ -1479,7 +1470,7 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
         local_mid = Matrix([midpoint_2d[0], midpoint_2d[1], mid_length])
         return normal, owner.transform.position + safe_transform_vector(orientation, local_mid)
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, ConvexPolygonExtrusion):
             return None
         frame = self._frame(owner)
@@ -1528,7 +1519,7 @@ class SimpleLoftFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
             return None
         
@@ -1673,8 +1664,8 @@ class OwnedFeatureHit:
     def properties(self) -> FeatureProperties:
         return self.feature.properties
 
-    def locate(self) -> Optional['LocatedFeatureGeometry']:
-        return self.feature.locate(self.owner)
+    def locate_simple_unbounded(self) -> Optional['LocatedFeatureGeometry']:
+        return self.feature.locate_simple_unbounded(self.owner)
 
     def get_extent(self) -> Optional['CSGFeatureExtent']:
         return self.feature.get_extent(self.owner)

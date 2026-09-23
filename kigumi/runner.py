@@ -1891,11 +1891,11 @@ def _picked_located(
     if feature_label is None:
         return None
     if edge is not None:
-        return (edge, owner, edge.locate(owner))
+        return (edge, owner, edge.locate_simple_unbounded(owner))
     hit = next((h for h in feature_hits if h.feature.name == feature_label), None)
     if hit is None:
         return None
-    return (hit.feature, hit.owner, hit.feature.locate(hit.owner))
+    return (hit.feature, hit.owner, hit.feature.locate_simple_unbounded(hit.owner))
 
 
 def _pick_from_candidate(local_csg: Any, hit: Any):
@@ -1959,7 +1959,7 @@ def _best_matching_candidate(
     held = _geometry_from_wire(held_geometry)
     best = None
     for index, hit in enumerate(feature_hits):
-        located = hit.feature.locate(hit.owner)
+        located = hit.feature.locate_simple_unbounded(hit.owner)
         geometry = _located_geometry(located, timber)
         if not geometry or not _kinds_for_pair(held, geometry, look, payload or {}):
             continue
@@ -2765,10 +2765,10 @@ def _edge_outward_normal(feature: Any, node: Any, timber: Any) -> Optional[Tuple
     if isinstance(feature, DerivedEdgeFeature):
         for parent in (feature.a, feature.b):
             if parent is not None:
-                located.append(parent.locate())
+                located.append(parent.locate_simple_unbounded())
     elif isinstance(feature, SimpleRectangularPrismEdgeFeature):
         for face in feature.faces:
-            located.append(SimpleRectangularPrismFeature(name=feature.name, face=face).locate(node))
+            located.append(SimpleRectangularPrismFeature(name=feature.name, face=face).locate_simple_unbounded(node))
     else:
         return None
 
@@ -3645,14 +3645,14 @@ def _resolve_anchor_placed(
             # or put in groups that do not meet. Broken, honestly.
             return None
         owner = first[1]
-        located = derived.locate(owner)
+        located = derived.locate_simple_unbounded(owner)
         return _anchor_payload(derived, owner, timber, located, root_csg, plane)
 
     found = _find_declared_feature(entry["cutTimber"], path.ref)
     if found is None:
         return None
     feature, node = found
-    located = feature.locate(node)
+    located = feature.locate_simple_unbounded(node)
     return _anchor_payload(feature, node, timber, located, root_csg, plane, solid_space)
 
 
@@ -5080,7 +5080,7 @@ def _edge_highlight_segments(
     """
     from kumiki.geometry import Line
 
-    line = edge_feature.locate(owner)
+    line = edge_feature.locate_simple_unbounded(owner)
     if timber is None or root_csg is None or not isinstance(line, Line):
         return (None, False)
     if not edge_feature.real:
@@ -5179,7 +5179,7 @@ def _non_real_features_along_ray(root, local_ray, tolerances):
     def consider(feature, owner):
         # A non-real POINT would want a point-to-ray distance; nothing declares
         # one yet, so there is nothing here to guess at.
-        if not isinstance(feature.locate(owner), Line):
+        if not isinstance(feature.locate_simple_unbounded(owner), Line):
             return
         extent = feature.get_extent(owner)
         if extent is None or extent.ends is None:

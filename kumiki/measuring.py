@@ -71,13 +71,12 @@ EdgeOrCenterline = Union[TimberEdge, TimberCenterline]
 
 # Type alias for all measurable geometric features on timbers
 # We may also refer to these as `Locations` 
-LocatedTimberFeature = Union['Point', 'Line', 'Plane', 'UnsignedPlane', 'LineOnPlane', 'Space']
+LocatedTimberFeature = Union['Point', 'Line', 'Plane', 'UnsignedPlane', 'Space']
 
 # The unbounded geometric primitives live in geometry.py so that cutcsg.py can
 # use them too (measuring -> timber -> cutcsg, so cutcsg cannot import from
 # here). Re-exported so `from kumiki.measuring import Plane` keeps working.
 from .geometry import (
-    LineOnPlane,
     Line,
     Plane,
     Point,
@@ -95,7 +94,7 @@ from .geometry import (
 @dataclass(frozen=True)
 class Marking(ABC):
     @abstractmethod
-    def locate(self) -> Union[UnsignedPlane, Plane, Line, Point, LineOnPlane, Space]:
+    def locate(self) -> Union[UnsignedPlane, Plane, Line, Point, Space]:
         pass
 
 @dataclass(frozen=True)
@@ -308,14 +307,12 @@ def get_center_point_on_face_global(face: SomeTimberFace, timber: PerfectTimberW
     return timber_center + timber.get_face_direction_global(face) * timber.get_size_in_face_normal_axis(face) / 2
 
 
-def get_point_on_feature(feature: Union[UnsignedPlane, Plane, Line, Point, LineOnPlane], timber: PerfectTimberWithin) -> V3:
+def get_point_on_feature(feature: Union[UnsignedPlane, Plane, Line, Point], timber: PerfectTimberWithin) -> V3:
     """
     Get a point on a feature.
     """
 
-    if isinstance(feature, LineOnPlane):
-        return feature.point_on_line
-    elif isinstance(feature, UnsignedPlane):
+    if isinstance(feature, UnsignedPlane):
         return feature.point
     elif isinstance(feature, Plane):
         return feature.point
@@ -431,10 +428,6 @@ def locate_center_plane(timber: PerfectTimberWithin, plane: TimberCenterplane) -
     return UnsignedPlane(normal, locate_centerline(timber).point)
 
 
-def locate_edge_on_face(timber: PerfectTimberWithin, edge: TimberLongEdge, face: TimberFace) -> LineOnPlane:
-    # TODO: Implement this function
-    raise NotImplementedError("locate_edge_on_face is not yet implemented")
-
 def locate_position_on_centerline_from_bottom(timber: PerfectTimberWithin, distance: Numeric) -> Point:
     """
     Measure a position at a specific point along the timber's centerline, measured from the bottom.
@@ -536,7 +529,7 @@ def locate_plane_from_centerline_in_direction(timber: PerfectTimberWithin, direc
 # Marking functions
 # ============================================================================
 
-def mark_distance_from_face_in_normal_direction(feature: Union[UnsignedPlane, Plane, Line, Point, LineOnPlane], timber: PerfectTimberWithin, face: SomeTimberFace) -> DistanceFromFace:
+def mark_distance_from_face_in_normal_direction(feature: Union[UnsignedPlane, Plane, Line, Point], timber: PerfectTimberWithin, face: SomeTimberFace) -> DistanceFromFace:
     """
     Mark a feature onto a face on a timber.
 
@@ -548,7 +541,7 @@ def mark_distance_from_face_in_normal_direction(feature: Union[UnsignedPlane, Pl
     If feature = locate_into_face(d, face, timber), then mark_distance_from_face_in_normal_direction(feature, timber, face).distance = d
     """
 
-    if isinstance(feature, UnsignedPlane) or isinstance(feature, Plane) or isinstance(feature, LineOnPlane):
+    if isinstance(feature, UnsignedPlane) or isinstance(feature, Plane):
         assert are_vectors_parallel(feature.normal, timber.get_face_direction_global(face)), \
             f"Feature must be parallel to the face. Feature {feature} is not parallel to face {face} on timber {timber}"
     elif isinstance(feature, Line):
@@ -657,8 +650,8 @@ def mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(line: 
         end=end,
     )
 
-# TODO DELETE?
-def mark_distance_from_end_along_centerline(feature: Union[UnsignedPlane, Plane, Line, Point, LineOnPlane], timber: PerfectTimberWithin, end: TimberEnd = TimberEnd.BOTTOM) -> DistanceFromPointIntoFace:
+# Not dead: ten joint modules mark a shoulder from an end through this.
+def mark_distance_from_end_along_centerline(feature: Union[UnsignedPlane, Plane, Line, Point], timber: PerfectTimberWithin, end: TimberEnd = TimberEnd.BOTTOM) -> DistanceFromPointIntoFace:
     """
     Mark a feature onto the centerline of a timber.
 
@@ -700,7 +693,7 @@ def mark_distance_from_end_along_centerline(feature: Union[UnsignedPlane, Plane,
     )
 
 
-def mark_plane_from_edge_in_direction(plane: Union[UnsignedPlane, Plane, LineOnPlane], timber: PerfectTimberWithin, edge: EdgeOrCenterline) -> PlaneFromEdgeInDirection:
+def mark_plane_from_edge_in_direction(plane: Union[UnsignedPlane, Plane], timber: PerfectTimberWithin, edge: EdgeOrCenterline) -> PlaneFromEdgeInDirection:
     """
     Mark a plane onto a timber edge, returning the direction and signed distance
     from the edge to the plane.
@@ -716,7 +709,7 @@ def mark_plane_from_edge_in_direction(plane: Union[UnsignedPlane, Plane, LineOnP
     """
     edge_line = locate_edge(timber, edge)
     direction = plane.normal
-    plane_point = plane.point_on_line if isinstance(plane, LineOnPlane) else plane.point
+    plane_point = plane.point
     distance = safe_dot_product(direction, plane_point - edge_line.point)
     return PlaneFromEdgeInDirection(
         timber=timber,

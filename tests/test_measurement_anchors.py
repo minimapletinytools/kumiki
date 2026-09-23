@@ -434,7 +434,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
                 if hit.feature.feature_type() != CSGFeatureType.EDGE:
                     continue
                 found.setdefault(hit.feature.name, runner._measure_span(
-                    hit.feature, hit.owner, timber, hit.feature.locate(hit.owner),
+                    hit.feature, hit.owner, timber, hit.feature.locate_simple_unbounded(hit.owner),
                     root, look))
         return found, float(timber.length)
 
@@ -579,7 +579,7 @@ class TestAFeatureKnowsItsOwnEnds:
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
-        span = runner._declared_line_span(arris, box, arris.locate(box))
+        span = runner._declared_line_span(arris, box, arris.locate_simple_unbounded(box))
 
         assert span is not None
         assert span[1] - span[0] == pytest.approx(0.4)
@@ -607,7 +607,7 @@ class TestAFeatureKnowsItsOwnEnds:
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
-        assert runner._declared_line_span(arris, endless, arris.locate(endless)) is None
+        assert runner._declared_line_span(arris, endless, arris.locate_simple_unbounded(endless)) is None
 
 
 class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:

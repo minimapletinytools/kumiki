@@ -1661,7 +1661,7 @@ class TestPickingAlongTheRay:
 
         vertices = []
         nearest = None
-        line = axis.locate(owner)
+        line = axis.locate_simple_unbounded(owner)
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 local_point = [float(vertex[i]) for i in range(3)]

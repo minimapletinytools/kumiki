@@ -1255,7 +1255,7 @@ class TestThePegHoleCentreline:
         from kumiki.geometry import Line
 
         axis, bore = self._axes(self._rendered(simple_T_configuration)["tenon_timber"])[0]
-        located, extent = axis.locate(bore), axis.get_extent(bore)
+        located, extent = axis.locate_simple_unbounded(bore), axis.get_extent(bore)
 
         assert isinstance(located, Line)
         assert extent is not None and extent.ends is not None

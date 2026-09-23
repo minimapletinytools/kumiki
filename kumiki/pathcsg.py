@@ -910,7 +910,7 @@ class SimplePathExtrusionFeature(CSGFeature):
         segment = owner.path.segments[side_index(self.key)]
         return (segment.start + segment.end) / scalar(2)
 
-    def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
         if not isinstance(owner, PathExtrusion):
             return None
         orientation = owner.transform.orientation.matrix

@@ -3354,7 +3354,7 @@ class TestFeatureLocate:
     def test_a_prism_face_locates_as_an_outward_plane(self):
         face = SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT)
         prism = self._prism(_features=[face])
-        plane = face.locate(prism)
+        plane = face.locate_simple_unbounded(prism)
         assert isinstance(plane, Plane)
         # +X outward, anchored at the centre of that face
         assert float(plane.normal[0]) == pytest.approx(1.0)
@@ -3363,8 +3363,8 @@ class TestFeatureLocate:
 
     def test_opposite_faces_locate_with_opposite_normals(self):
         prism = self._prism()
-        right = SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT).locate(prism)
-        left = SimpleRectangularPrismFeature("l", face=PrismFace.LEFT).locate(prism)
+        right = SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT).locate_simple_unbounded(prism)
+        left = SimpleRectangularPrismFeature("l", face=PrismFace.LEFT).locate_simple_unbounded(prism)
         assert isinstance(right, Plane) and isinstance(left, Plane)
         assert float(right.normal[0]) == pytest.approx(-float(left.normal[0]))
         assert float(right.point[0]) == pytest.approx(2.0)
@@ -3372,7 +3372,7 @@ class TestFeatureLocate:
 
     def test_end_faces_locate_along_the_length_axis(self):
         prism = self._prism()
-        top = SimpleRectangularPrismFeature("t", face=PrismFace.TOP).locate(prism)
+        top = SimpleRectangularPrismFeature("t", face=PrismFace.TOP).locate_simple_unbounded(prism)
         assert isinstance(top, Plane)
         assert float(top.normal[2]) == pytest.approx(1.0)
         assert float(top.point[2]) == pytest.approx(10.0)
@@ -3384,11 +3384,11 @@ class TestFeatureLocate:
             start_distance=scalar(0),
             end_distance=None,
         )
-        assert SimpleRectangularPrismFeature("t", face=PrismFace.TOP).locate(open_ended) is None
+        assert SimpleRectangularPrismFeature("t", face=PrismFace.TOP).locate_simple_unbounded(open_ended) is None
 
     def test_a_half_space_locates_as_its_boundary_plane(self):
         hs = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(5))
-        plane = HalfSpaceFeature("shoulder").locate(hs)
+        plane = HalfSpaceFeature("shoulder").locate_simple_unbounded(hs)
         assert isinstance(plane, Plane)
         assert float(plane.point[2]) == pytest.approx(5.0)
         # outward = out of the solid, i.e. opposite the half-space normal
@@ -3402,11 +3402,11 @@ class TestFeatureLocate:
             start_distance=scalar(0),
             end_distance=scalar(10),
         )
-        cap = SimpleCylinderFeature("top", part=CylinderPart.TOP).locate(bore)
+        cap = SimpleCylinderFeature("top", part=CylinderPart.TOP).locate_simple_unbounded(bore)
         assert isinstance(cap, Plane)
         assert float(cap.point[2]) == pytest.approx(10.0)
         # A curved surface has no single plane; declining beats inventing one.
-        assert SimpleCylinderFeature("wall", part=CylinderPart.BARREL).locate(bore) is None
+        assert SimpleCylinderFeature("wall", part=CylinderPart.BARREL).locate_simple_unbounded(bore) is None
 
     def test_an_extrusion_side_locates_with_an_outward_normal(self):
         extrusion = ConvexPolygonExtrusion(
@@ -3421,7 +3421,7 @@ class TestFeatureLocate:
             end_distance=scalar(10),
         )
         # side 1 runs (4,0) -> (4,4), so it faces +X
-        plane = SimpleConvexPolygonExtrusionFeature("east", key=1).locate(extrusion)
+        plane = SimpleConvexPolygonExtrusionFeature("east", key=1).locate_simple_unbounded(extrusion)
         assert isinstance(plane, Plane)
         assert float(plane.normal[0]) == pytest.approx(1.0)
         assert float(plane.point[0]) == pytest.approx(4.0)
@@ -3444,13 +3444,13 @@ class TestFeatureLocate:
         is flat -- and a tapered cheek can be measured to."""
         taper = self._taper()
 
-        plane = SimpleLoftFeature("side", key=0).locate(taper)
+        plane = SimpleLoftFeature("side", key=0).locate_simple_unbounded(taper)
 
         assert isinstance(plane, Plane)
 
     def test_and_that_plane_contains_the_corners_of_its_side(self):
         taper = self._taper()
-        plane = SimpleLoftFeature("side", key=0).locate(taper)
+        plane = SimpleLoftFeature("side", key=0).locate_simple_unbounded(taper)
         assert isinstance(plane, Plane)
 
         # Side 0 joins bottom[0]-bottom[1] to top[0]-top[1].
@@ -3463,14 +3463,14 @@ class TestFeatureLocate:
             assert off == pytest.approx(0, abs=1e-9)
 
     def test_its_caps_still_locate_too(self):
-        cap = SimpleLoftFeature("wide", key=ExtrusionCap.BOTTOM).locate(self._taper())
+        cap = SimpleLoftFeature("wide", key=ExtrusionCap.BOTTOM).locate_simple_unbounded(self._taper())
 
         assert isinstance(cap, Plane)
         assert float(cap.normal[2]) == pytest.approx(-1.0)
 
     def test_a_feature_asked_about_the_wrong_owner_declines(self):
         prism = self._prism()
-        assert SimpleCylinderFeature("w", part=CylinderPart.TOP).locate(prism) is None
+        assert SimpleCylinderFeature("w", part=CylinderPart.TOP).locate_simple_unbounded(prism) is None
 
 
 class TestFeatureExtent:
@@ -3958,7 +3958,7 @@ class TestDerivedEdges:
                                          self._owned(prism, "front"))
         assert edge is not None
         assert edge.feature_type() == CSGFeatureType.EDGE
-        line = edge.locate(prism)
+        line = edge.locate_simple_unbounded(prism)
         assert isinstance(line, Line)
         # the arris at x=+2, y=+3, running along the length axis
         assert float(line.point[0]) == pytest.approx(2.0)
@@ -4050,7 +4050,7 @@ class TestDerivedEdges:
             self._owned(prism, "right"))
 
         assert edge is not None
-        assert edge.locate(prism) is not None
+        assert edge.locate_simple_unbounded(prism) is not None
 
     def test_test_point_is_the_conjunction_of_both_faces(self):
         prism = self._prism(self._face("right", PrismFace.RIGHT),
@@ -4238,7 +4238,7 @@ class TestACylindersAxis:
 
     def test_it_runs_down_the_middle(self):
         bore = self._bore()
-        located = self._axis(bore).locate(bore)
+        located = self._axis(bore).locate_simple_unbounded(bore)
         assert isinstance(located, Line)
         assert lines_are_coincident(located, Line(
             direction=create_v3(scalar(0), scalar(0), scalar(1)),
@@ -4269,7 +4269,7 @@ class TestACylindersAxis:
             start_distance=scalar(0), end_distance=scalar(20))
 
         with pytest.warns(UserWarning, match="which has no axis"):
-            assert axis.locate(prism) is None
+            assert axis.locate_simple_unbounded(prism) is None
         with pytest.warns(UserWarning, match="which has no axis"):
             assert axis.get_extent(prism) is None
 
@@ -4358,7 +4358,7 @@ class TestDerivedPoints:
         the signature asks for a node.
         """
         assert feature is not None
-        located = feature.locate(self._body())
+        located = feature.locate_simple_unbounded(self._body())
         assert isinstance(located, Point)
         return located
 
@@ -5159,7 +5159,7 @@ class TestANamedArris:
         # merely pickable.
         arris = self._arris()
 
-        line = arris.locate(self._prism(arris))
+        line = arris.locate_simple_unbounded(self._prism(arris))
 
         assert isinstance(line, Line)
         assert [round(float(line.point[i, 0]), 6) for i in range(3)] == [2.0, 3.0, 0.0]
@@ -5171,7 +5171,7 @@ class TestANamedArris:
         with pytest.warns(UserWarning, match="meet in no arris"):
             opposite = self._arris("nope", faces=(PrismFace.FRONT, PrismFace.BACK))
 
-        assert opposite.locate(self._prism(opposite)) is None
+        assert opposite.locate_simple_unbounded(self._prism(opposite)) is None
 
     def test_a_point_is_on_it_only_when_it_is_on_both_faces(self):
         arris = self._arris()
@@ -5290,7 +5290,7 @@ class TestALoftMayNotTwist:
         # The point of refusing: what is left can be measured to.
         loft = self._loft(self.SQUARE, [(1, 1), (-1, 1), (-1, -1), (1, -1)])
 
-        located = [feature.locate(loft) for key, feature in loft.default_features().items()
+        located = [feature.locate_simple_unbounded(loft) for key, feature in loft.default_features().items()
                    if key[0] is FeatureCategory.SIDE]
 
         assert located and all(isinstance(where, Plane) for where in located)

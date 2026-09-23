@@ -295,14 +295,14 @@ class TestPathExtrusionLocate:
     def test_a_straight_side_locates_as_an_outward_plane(self):
         extrusion = self._extrusion(self._square())
         # segment 1 runs (0.1, 0) -> (0.1, 0.1), so it faces +X
-        plane = SimplePathExtrusionFeature("east", key=FlatSide(1)).locate(extrusion)
+        plane = SimplePathExtrusionFeature("east", key=FlatSide(1)).locate_simple_unbounded(extrusion)
         assert isinstance(plane, Plane)
         assert float(plane.normal[0]) == pytest.approx(1.0)
         assert float(plane.point[0]) == pytest.approx(0.1)
 
     def test_a_cap_locates_along_the_extrusion_axis(self):
         extrusion = self._extrusion(self._square())
-        plane = SimplePathExtrusionFeature("top", key=ExtrusionCap.TOP).locate(extrusion)
+        plane = SimplePathExtrusionFeature("top", key=ExtrusionCap.TOP).locate_simple_unbounded(extrusion)
         assert isinstance(plane, Plane)
         assert float(plane.normal[2]) == pytest.approx(1.0)
         assert float(plane.point[2]) == pytest.approx(0.1)
@@ -315,7 +315,7 @@ class TestPathExtrusionLocate:
             ArcSegment(center=centre, radius=radius, start_angle=scalar(0), sweep_angle=pi),
             ArcSegment(center=centre, radius=radius, start_angle=pi, sweep_angle=pi),
         ])
-        assert SimplePathExtrusionFeature("wall", key=FlatSide(0)).locate(self._extrusion(circle)) is None
+        assert SimplePathExtrusionFeature("wall", key=FlatSide(0)).locate_simple_unbounded(self._extrusion(circle)) is None
 
     def test_extent_anchors_on_the_face(self):
         extrusion = self._extrusion(self._square())
@@ -385,8 +385,8 @@ class TestAPathFeatureSaysWhetherItIsCurved:
         keeps it out of measurement."""
         extrusion = self._extrusion()
 
-        assert SimplePathExtrusionFeature("knee", key=CurvedSide(1)).locate(extrusion) is None
-        assert SimplePathExtrusionFeature("foot", key=FlatSide(0)).locate(extrusion) is not None
+        assert SimplePathExtrusionFeature("knee", key=CurvedSide(1)).locate_simple_unbounded(extrusion) is None
+        assert SimplePathExtrusionFeature("foot", key=FlatSide(0)).locate_simple_unbounded(extrusion) is not None
 
     def test_the_kind_travels_with_the_key_and_cannot_be_set_apart_from_it(self):
         """Which is the point. There is no second field to disagree with the
