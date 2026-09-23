@@ -1743,16 +1743,10 @@ class CutCSG(ABC):
         Real and non-real features are gated differently:
 
         - A real feature names actual surface, so the point has to be on the
-          boundary of THIS node. The gate is a surface question, hence the face
-          tolerance whatever the feature's own type. It is asked again at every
-          node on the way up, which is what drops a child's face buried inside
-          a sibling: on the child's own boundary, not on the union's.
+          boundary of THIS node.
         - A non-real feature (a bore's centre axis, a reference plane) names
           nothing the CSG tree ever cut, so boolean operations cannot have
           removed it and the gate does not apply.
-
-        One implementation for every node. An operator adds nothing but its
-        children, which csg_children already knows how to name.
         """
         hits: List['OwnedFeatureHit'] = [
             OwnedFeatureHit(feature=feature, owner=self)
