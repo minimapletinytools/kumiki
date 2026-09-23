@@ -4760,6 +4760,36 @@ class TestBuriedFacesAreNotReported:
         assert {"small.right", "small.front"} <= names
         assert any(h.feature_type() == CSGFeatureType.EDGE for h in hits)
 
+    def test_every_level_asks_again_not_just_the_outermost(self):
+        """The gate is per node, so burying a face deeper does not smuggle it out.
+
+        The inner union is happy: nothing there swallows the small member. Only
+        the outer one can see that something does.
+        """
+        inner = SolidUnion(children=[self._small()])
+        buried = create_v3(scalar(2), scalar(3), scalar(5))
+        assert inner.find_all_features(buried) != []
+
+        outer = SolidUnion(children=[inner, self._swallowing()])
+        assert outer.find_all_features(buried) == []
+
+    def test_no_node_type_can_forget_the_gate(self):
+        """One implementation, so an operator added later inherits it.
+
+        This used to be four: the base collected a node's own features, and
+        SolidUnion, Intersection and Difference each re-gated after recursing.
+        The union was written last and was written wrong, which is the
+        regression this class is named for.
+        """
+        from kumiki import cutcsg
+        from kumiki.cutcsg import CutCSG
+
+        defining = [cls.__name__ for cls in vars(cutcsg).values()
+                    if isinstance(cls, type) and issubclass(cls, CutCSG)
+                    and "collect_feature_hits" in cls.__dict__]
+
+        assert defining == ["CutCSG"]
+
 
 class TestCutCSGLabel:
     """The name a CSG node carries.

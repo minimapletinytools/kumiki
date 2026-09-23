@@ -619,12 +619,11 @@ def derive_point_hits(
     return hits
 
 
-# TODO would it make sense to combine this function with `collect_feature_hits`? maybe create a new `collect_feature_hits_with_boundary_testing` method?
 def _drop_real_hits_if_not_on_boundary(
     node: 'CutCSG',
     hits: List['OwnedFeatureHit'],
     point: V3,
-    test_tolerances: Optional['FeatureTestTolerances'],
+    tolerances: 'FeatureTestTolerances',
 ) -> List['OwnedFeatureHit']:
     """checks if the test `point` (from `collect_feature_hits` call) is on the boundary. If it is, return all feature hits. If it's not, return only the non real ones (e.g. cylinder centerline is not on the boundary usually)
 
@@ -632,12 +631,10 @@ def _drop_real_hits_if_not_on_boundary(
     """
     if not hits:
         return hits
-    
+
     # early exit if all fetaures are non real
     if not any(hit.feature.real for hit in hits):
         return hits
-    
-    tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
 
     # if the tested point is on the boundary, then all feature hits are OK
     if node.is_point_on_boundary(point, eps=tolerances.face):
@@ -1746,29 +1743,26 @@ class CutCSG(ABC):
         Real and non-real features are gated differently:
 
         - A real feature names actual surface, so the point has to be on the
-          boundary of the primitive declaring it. That gate is a surface
-          question, hence the face tolerance whatever the feature's own type.
+          boundary of THIS node. The gate is a surface question, hence the face
+          tolerance whatever the feature's own type. It is asked again at every
+          node on the way up, which is what drops a child's face buried inside
+          a sibling: on the child's own boundary, not on the union's.
         - A non-real feature (a bore's centre axis, a reference plane) names
           nothing the CSG tree ever cut, so boolean operations cannot have
           removed it and the gate does not apply.
+
+        One implementation for every node. An operator adds nothing but its
+        children, which csg_children already knows how to name.
         """
-        declared = self.get_declared_features()
-        if not declared:
-            return []
-        on_boundary: Optional[bool] = None  # computed at most once, only if needed
-        hits: List['OwnedFeatureHit'] = []
-        for feature in declared:
-            if not feature.test_point_unbounded(
-                self, point, tolerances.for_type(feature.feature_type())
-            ):
-                continue
-            if feature.real:
-                if on_boundary is None:
-                    on_boundary = self.is_point_on_boundary(point, eps=tolerances.face)
-                if not on_boundary:
-                    continue
-            hits.append(OwnedFeatureHit(feature=feature, owner=self))
-        return hits
+        hits: List['OwnedFeatureHit'] = [
+            OwnedFeatureHit(feature=feature, owner=self)
+            for feature in self.get_declared_features()
+            if feature.test_point_unbounded(
+                self, point, tolerances.for_type(feature.feature_type()))
+        ]
+        for child in csg_children(self):
+            hits.extend(child.collect_feature_hits(point, tolerances))
+        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
 
     def find_all_features(
         self,
@@ -2736,14 +2730,6 @@ class SolidUnion(CutCSG):
                 return None
             return avg_normal / norm
 
-    def collect_feature_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
-        hits = super().collect_feature_hits(point, tolerances)
-        for child in self.children:
-            hits.extend(child.collect_feature_hits(point, tolerances))
-        # A child's face can be buried inside a sibling, which is surface the
-        # union does not have. is_point_on_boundary rejects exactly that case.
-        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
-
     def get_aabb(self) -> AxisAlignedBoundingBox:
         # Empty children contribute no points to the union, so they're excluded
         # before combining bounds — otherwise their degenerate zero-box would
@@ -2819,12 +2805,6 @@ class Intersection(CutCSG):
             return avg_normal / norm
 
         return None
-
-    def collect_feature_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
-        hits = super().collect_feature_hits(point, tolerances)
-        hits.extend(self.left.collect_feature_hits(point, tolerances))
-        hits.extend(self.right.collect_feature_hits(point, tolerances))
-        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         left_bbox = self.left.get_aabb()
@@ -3063,13 +3043,6 @@ class Difference(CutCSG):
             if safe_zero_test(norm, eps=eps):
                 return None
             return avg_normal / norm
-
-    def collect_feature_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
-        hits = super().collect_feature_hits(point, tolerances)
-        hits.extend(self.base.collect_feature_hits(point, tolerances))
-        for sub_csg in self.subtract:
-            hits.extend(sub_csg.collect_feature_hits(point, tolerances))
-        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         bbox = self.base.get_aabb()
