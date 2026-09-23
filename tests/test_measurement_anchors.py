@@ -534,8 +534,11 @@ class TestAFeatureKnowsItsOwnEnds:
     def test_opposite_faces_form_no_arris_and_are_not_invented(self):
         from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
-        assert SimpleRectangularPrismEdgeFeature(
-            name="a", faces=(PrismFace.LEFT, PrismFace.RIGHT)).get_extent(self._box()) is None
+        with pytest.warns(UserWarning, match="meet in no arris"):
+            arris = SimpleRectangularPrismEdgeFeature(
+                name="a", faces=(PrismFace.LEFT, PrismFace.RIGHT))
+
+        assert arris.get_extent(self._box()) is None
 
     def test_a_derived_edge_reaches_as_far_as_both_its_parents(self):
         from kumiki.cutcsg import (DerivedEdgeFeature, FeatureGroup, FeatureProperties,

@@ -4260,6 +4260,18 @@ class TestACylindersAxis:
         extent = self._axis(bore).get_extent(bore)
         assert extent is not None and extent.ends is None
 
+    def test_an_axis_on_a_shape_with_no_axis_says_so(self):
+        """It used to cast the owner to a Cylinder and trust the caller."""
+        axis = CylinderAxisFeature("peg_hole_axis")
+        prism = RectangularPrism(
+            size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(20))
+
+        with pytest.warns(UserWarning, match="which has no axis"):
+            assert axis.locate(prism) is None
+        with pytest.warns(UserWarning, match="which has no axis"):
+            assert axis.get_extent(prism) is None
+
     def test_the_point_test_is_unbounded_like_every_other(self):
         bore = self._bore()
         axis = self._axis(bore)
@@ -4963,8 +4975,10 @@ class TestANamedArris:
 
     def test_two_faces_that_never_meet_locate_to_nothing(self):
         # Opposite faces are parallel and share no line. Better to say so than
-        # to invent an answer.
-        opposite = self._arris("nope", faces=(PrismFace.FRONT, PrismFace.BACK))
+        # to invent an answer -- and to say it at construction, rather than
+        # leaving the author to find out when nothing draws.
+        with pytest.warns(UserWarning, match="meet in no arris"):
+            opposite = self._arris("nope", faces=(PrismFace.FRONT, PrismFace.BACK))
 
         assert opposite.locate(self._prism(opposite)) is None
 

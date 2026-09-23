@@ -52,7 +52,6 @@ def _numeric_max(*vals):
     return result
 
 
-# TODO rename to AxisAlignedBoundingBox
 @dataclass(frozen=True)
 class AxisAlignedBoundingBox:
     """
@@ -620,7 +619,6 @@ def derive_point_hits(
     return hits
 
 
-# TODO rename to _drop_real_hits_if_not_on_boundary
 # TODO would it make sense to combine this function with `collect_feature_hits`? maybe create a new `collect_feature_hits_with_boundary_testing` method?
 def _drop_real_hits_if_not_on_boundary(
     node: 'CutCSG',
@@ -693,7 +691,6 @@ def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeri
     return (start + end) / scalar(2)
 
 
-# TODO rename to LocatedFeatureGeometry
 # What locate() can hand back. Unbounded on purpose: measurement between two
 # features works on infinite lines and planes, and bounds travel separately in
 # CSGFeatureExtent.
@@ -782,7 +779,9 @@ class CSGFeature(ABC):
 
     def group_rank(self) -> int:
         """Where this feature's collision group sits in the preference order. Used only for sorting features.
-        TODO consider removing this
+
+        Not `group.value` inlined at the sort: a derived feature overrides this
+        to take the better rank of its two parents.
         """
         return self.group.value
 
@@ -1211,14 +1210,49 @@ class SimpleRectangularPrismFeature(CSGFeature):
         return False
 
 
+def _canonical_arris_faces(
+    first: 'PrismFace', second: 'PrismFace',
+) -> Optional[Tuple['PrismFace', 'PrismFace']]:
+    """The order default_features names this arris in.
+
+    None for a pair that meets in no arris: one face twice, two caps, or two
+    opposite sides.
+    """
+    if not isinstance(first, PrismFace) or not isinstance(second, PrismFace):
+        return None
+    if first is second:
+        return None
+    first_is_cap, second_is_cap = first in _PRISM_CAP_KEYS, second in _PRISM_CAP_KEYS
+    if first_is_cap or second_is_cap:
+        if first_is_cap and second_is_cap:
+            return None
+        return (first, second) if first_is_cap else (second, first)
+    low, high = sorted((_PRISM_SIDE_ORDER.index(first), _PRISM_SIDE_ORDER.index(second)))
+    if high - low == 1:
+        return (_PRISM_SIDE_ORDER[low], _PRISM_SIDE_ORDER[high])
+    if low == 0 and high == len(_PRISM_SIDE_ORDER) - 1:
+        return (_PRISM_SIDE_ORDER[high], _PRISM_SIDE_ORDER[low])  # the wrap-around join
+    return None
+
+
 @dataclass(frozen=True)
 class SimpleRectangularPrismEdgeFeature(CSGFeature):
     """An arris of a RectangularPrism, named by the two faces it lies between.
     """
 
-    # TODO add validation so that this names a valid face.
-    # also add warning if the faces are not given in the canonical order
+    # TODO the two producers disagree on which order to name a pair in --
+    # default_features writes (RIGHT, FRONT), timber.py's _TIMBER_LONG_ARRISES
+    # writes (FRONT, RIGHT) under the name "front_right". Until one of them is
+    # the canonical one there is nothing to warn against. Note that the order
+    # flips the sign of the direction locate() comes back with.
     faces: Tuple[PrismFace, PrismFace] = (PrismFace.FRONT, PrismFace.RIGHT)
+
+    def __post_init__(self):
+        first, second = self.faces
+        if _canonical_arris_faces(first, second) is None:
+            warnings.warn(
+                f"{first} and {second} meet in no arris, so {self.name!r} locates "
+                "to nothing")
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.EDGE
@@ -1292,26 +1326,33 @@ class CylinderAxisFeature(CSGFeature):
     def real(self) -> bool:
         return False
 
-    def _axis(self, owner: 'CutCSG') -> Optional[V3]:
-        if not isinstance(owner, Cylinder):
-            return None
-        return safe_normalize_vector(owner.axis_direction)
+    def _cylinder(self, owner: 'CutCSG') -> Optional['Cylinder']:
+        """The owner, as the Cylinder this feature is the axis of.
+
+        None, with a warning, for anything else: an axis feature on a shape
+        with no axis is a mistake in whatever named it.
+        """
+        if isinstance(owner, Cylinder):
+            return owner
+        warnings.warn(
+            f"{self.name!r} is a cylinder axis, but its owner is a "
+            f"{type(owner).__name__}, which has no axis")
+        return None
 
     def locate(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
-        axis = self._axis(owner)
-        if axis is None:
+        cylinder = self._cylinder(owner)
+        if cylinder is None:
             return None
-        return Line(direction=axis, point=cast(Cylinder, owner).position)
+        return Line(direction=safe_normalize_vector(cylinder.axis_direction),
+                    point=cylinder.position)
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
         """
         """
-        axis = self._axis(owner)
-        if axis is None:
+        cylinder = self._cylinder(owner)
+        if cylinder is None:
             return None
-
-        # TODO add an isinstance check and output an error if fails
-        cylinder = cast(Cylinder, owner)
+        axis = safe_normalize_vector(cylinder.axis_direction)
         start, end = cylinder.start_distance, cylinder.end_distance
         anchor = cylinder.position + axis * _finite_midpoint(start, end)
         if start is None or end is None:
@@ -2060,7 +2101,8 @@ class RectangularPrism(HasFeatures, CutCSG):
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
 
-        # TODO can/should this be made static? 
+        # Not static, though this one needs no instance: ConvexPolygonExtrusion
+        # and ConvexPolygonSimpleLoft read their own shape to build theirs.
         features: Dict[FeatureKey, CSGFeature] = {}
 
         def named(key: FeatureKey, feature_for) -> None:
@@ -3480,7 +3522,6 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     bottom_points: Profile
     top_points: Profile
 
-    # TODO reanme to bottom/top_points_z_pos
     bottom_points_z_pos: Numeric
     top_points_z_pos: Numeric
 
