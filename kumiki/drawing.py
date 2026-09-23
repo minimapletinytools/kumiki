@@ -133,9 +133,6 @@ class MeasurementKind:
         try:
             return cls.parse(str(value))
         except ValueError:
-            # The drawings file is meant to be hand-edited, so a name nobody
-            # can read falls back to the default kind rather than taking the
-            # frame down with it.
             warnings.warn(f"Ignoring an unreadable measurement kind: {value!r}")
             return None
 
