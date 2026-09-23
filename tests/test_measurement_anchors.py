@@ -515,7 +515,7 @@ class TestAFeatureKnowsItsOwnEnds:
         from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
         arris = SimpleRectangularPrismEdgeFeature(
-            name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT))
+            name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
         extent = arris.get_extent(self._box())
 
@@ -527,7 +527,7 @@ class TestAFeatureKnowsItsOwnEnds:
         from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
         extent = SimpleRectangularPrismEdgeFeature(
-            name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT)).get_extent(self._box())
+            name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT)).get_extent(self._box())
 
         assert float(extent.anchor[2, 0]) == pytest.approx(0.2)
 
@@ -577,7 +577,7 @@ class TestAFeatureKnowsItsOwnEnds:
 
         box = self._box()
         arris = SimpleRectangularPrismEdgeFeature(
-            name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT))
+            name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
         span = runner._declared_line_span(arris, box, arris.locate(box))
 
@@ -605,7 +605,7 @@ class TestAFeatureKnowsItsOwnEnds:
             size=create_v2(scalar("0.1"), scalar("0.2")),
             start_distance=scalar("0"), end_distance=None)
         arris = SimpleRectangularPrismEdgeFeature(
-            name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT))
+            name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
         assert runner._declared_line_span(arris, endless, arris.locate(endless)) is None
 

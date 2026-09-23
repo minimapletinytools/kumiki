@@ -5006,6 +5006,49 @@ class TestANamedArris:
         assert arris.name in [hit.feature.name for hit in hits]
 
 
+class TestAnArrisIsNamedTheSameWayWhoeverNamesIt:
+    """timber.py decides which of an arris's two faces is written first.
+
+    RectangularPrism.default_features names the same twelve arrises. If the two
+    drift apart, the same physical edge gets its line running opposite ways
+    depending on which of them named it -- locate() is the cross product of the
+    two faces' normals, so the order sets the sign.
+    """
+
+    def _timber_order(self):
+        from kumiki.timber import _TIMBER_LONG_ARRISES, _TIMBER_SHORT_ARRISES
+
+        return {frozenset((first, second)): (first, second)
+                for _, first, second in (*_TIMBER_LONG_ARRISES, *_TIMBER_SHORT_ARRISES)}
+
+    def _prism_arrises(self):
+        prism = RectangularPrism(
+            size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10))
+        return [feature for feature in prism.default_features().values()
+                if isinstance(feature, SimpleRectangularPrismEdgeFeature)]
+
+    def test_both_name_the_same_twelve_arrises(self):
+        assert len(self._prism_arrises()) == 12
+        assert {frozenset(arris.faces) for arris in self._prism_arrises()} \
+            == set(self._timber_order())
+
+    def test_and_write_each_pair_the_same_way_round(self):
+        timber_order = self._timber_order()
+
+        for arris in self._prism_arrises():
+            assert arris.faces == timber_order[frozenset(arris.faces)], (
+                f"default_features names {arris.faces}, timber.py names "
+                f"{timber_order[frozenset(arris.faces)]}")
+
+    def test_and_that_is_the_order_the_arris_itself_calls_canonical(self):
+        """So the warning on a hand-written arris agrees with both."""
+        from kumiki.cutcsg import _canonical_arris_faces
+
+        for pair in self._timber_order().values():
+            assert _canonical_arris_faces(*pair) == pair
+
+
 class TestALoftMayNotTwist:
     """A side joins two profile edges with straight lines, so it is a quad in
     space -- planar only when its four corners are coplanar. Rotate one profile

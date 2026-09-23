@@ -780,8 +780,7 @@ class CSGFeature(ABC):
     def group_rank(self) -> int:
         """Where this feature's collision group sits in the preference order. Used only for sorting features.
 
-        Not `group.value` inlined at the sort: a derived feature overrides this
-        to take the better rank of its two parents.
+        A derived feature will override this to take the better rank of its 2 parents.
         """
         return self.group.value
 
@@ -1213,7 +1212,11 @@ class SimpleRectangularPrismFeature(CSGFeature):
 def _canonical_arris_faces(
     first: 'PrismFace', second: 'PrismFace',
 ) -> Optional[Tuple['PrismFace', 'PrismFace']]:
-    """The order default_features names this arris in.
+    """The one order an arris between these two faces is named in.
+
+    timber.py is the authority, since it names the arrises of every timber:
+    a cap first, then the side (bottom_right); otherwise FRONT or BACK first,
+    then RIGHT or LEFT (front_right, back_left).
 
     None for a pair that meets in no arris: one face twice, two caps, or two
     opposite sides.
@@ -1227,12 +1230,13 @@ def _canonical_arris_faces(
         if first_is_cap and second_is_cap:
             return None
         return (first, second) if first_is_cap else (second, first)
-    low, high = sorted((_PRISM_SIDE_ORDER.index(first), _PRISM_SIDE_ORDER.index(second)))
-    if high - low == 1:
-        return (_PRISM_SIDE_ORDER[low], _PRISM_SIDE_ORDER[high])
-    if low == 0 and high == len(_PRISM_SIDE_ORDER) - 1:
-        return (_PRISM_SIDE_ORDER[high], _PRISM_SIDE_ORDER[low])  # the wrap-around join
-    return None
+    one, other = _PRISM_SIDE_ORDER.index(first), _PRISM_SIDE_ORDER.index(second)
+    gap = (one - other) % len(_PRISM_SIDE_ORDER)
+    if gap not in (1, len(_PRISM_SIDE_ORDER) - 1):
+        return None  # opposite sides: parallel, no arris
+    # Consecutive sides are always one odd index and one even, and the odd ones
+    # are FRONT and BACK.
+    return (first, second) if one % 2 else (second, first)
 
 
 @dataclass(frozen=True)
@@ -1240,19 +1244,21 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
     """An arris of a RectangularPrism, named by the two faces it lies between.
     """
 
-    # TODO the two producers disagree on which order to name a pair in --
-    # default_features writes (RIGHT, FRONT), timber.py's _TIMBER_LONG_ARRISES
-    # writes (FRONT, RIGHT) under the name "front_right". Until one of them is
-    # the canonical one there is nothing to warn against. Note that the order
-    # flips the sign of the direction locate() comes back with.
     faces: Tuple[PrismFace, PrismFace] = (PrismFace.FRONT, PrismFace.RIGHT)
 
     def __post_init__(self):
         first, second = self.faces
-        if _canonical_arris_faces(first, second) is None:
+        canonical = _canonical_arris_faces(first, second)
+        if canonical is None:
             warnings.warn(
                 f"{first} and {second} meet in no arris, so {self.name!r} locates "
                 "to nothing")
+        elif (first, second) != canonical:
+            # Not cosmetic: the order decides which way round locate() runs the
+            # line, since it is the cross product of the two faces' normals.
+            warnings.warn(
+                f"{self.name!r} names its faces {first}, {second}; the canonical "
+                f"order is {canonical[0]}, {canonical[1]}")
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.EDGE
@@ -2116,14 +2122,19 @@ class RectangularPrism(HasFeatures, CutCSG):
                   lambda name, face=face: SimpleRectangularPrismFeature(
                       name=name, face=face, properties=_DEFAULT_FEATURE_PROPERTIES))
 
+        # Through _canonical_arris_faces, so these are named the way timber.py
+        # names the same arrises rather than in a second order of their own.
         sides = len(_PRISM_SIDE_ORDER)
         for index in range(sides):
-            pair = (_PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides])
+            pair = _canonical_arris_faces(
+                _PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides])
+            assert pair is not None, "consecutive sides meet in an arris"
             named((FeatureCategory.ARRIS, index),
                   lambda name, pair=pair: SimpleRectangularPrismEdgeFeature(
                       name=name, faces=pair, properties=_DEFAULT_FEATURE_PROPERTIES))
             for cap in (PrismFace.BOTTOM, PrismFace.TOP):
-                ends = (cap, _PRISM_SIDE_ORDER[index])
+                ends = _canonical_arris_faces(cap, _PRISM_SIDE_ORDER[index])
+                assert ends is not None, "a cap meets every side"
                 named(arris_against_cap(index, sides, end=cap is PrismFace.TOP),
                       lambda name, ends=ends: SimpleRectangularPrismEdgeFeature(
                           name=name, faces=ends, properties=_DEFAULT_FEATURE_PROPERTIES))
