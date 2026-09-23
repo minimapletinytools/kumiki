@@ -2967,6 +2967,17 @@ class Difference(CutCSG):
         True when a normal cannot be had, which excludes the point: the same
         conservative answer this has always given.
         """
+        # TODO one normal from each side is not enough, and it now costs a real
+        # surface. A normal at an edge or a corner is whichever face the shape
+        # happened to check first, so where a cut's own corner sits on the
+        # base's face both sides answer with the same prioritised face, this
+        # calls the cut flush, and the face surrounding the cut is dropped --
+        # see TestAFlushCutIsOnlyFlushWhereItIsFlat, which has the case waiting.
+        #
+        # It does not need a working normal on every shape to be worth fixing.
+        # Knowing whether the point sits on a SMOOTH patch or on an edge is most
+        # of the value: a point that is not smooth can refuse to claim flushness
+        # and be right, whatever its normal says.
         base_normal = self.base.get_outward_normal(point, eps=eps)
         for sub_normal in removed.outward_normals():
             if base_normal is None or sub_normal is None:

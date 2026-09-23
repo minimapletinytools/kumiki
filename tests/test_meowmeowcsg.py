@@ -4896,6 +4896,62 @@ class TestAbuttingSolidsDoNotReportTheFaceTheyShare:
             assert cavity.is_point_on_boundary(point), label
 
 
+class TestAFlushCutIsOnlyFlushWhereItIsFlat:
+    """A cut lying in the base's own face takes that face -- over its own
+    footprint, and not a millimetre further.
+
+    The last case here FAILS today, and is written now so the fix has a test
+    waiting. At the cut's corner three of its faces meet, and a prism answers
+    for a corner with whichever face it checks first -- its top. The base
+    answers with its top too, the two match, and the cut is called flush at a
+    point where the face around it plainly survives. See the TODO on
+    _cut_is_flush_with_the_base.
+    """
+
+    #: A short arm, x 2..6, y -3..3, z 0..50.
+    def _arm(self):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform(position=create_v3(scalar(4), scalar(0), scalar(0)),
+                                orientation=Orientation.identity()),
+            start_distance=scalar(0), end_distance=scalar(50))
+
+    #: A shallow cut in its top, x 3..5, y -1..1, z 45..50.
+    def _cut(self):
+        return RectangularPrism(
+            size=Matrix([scalar(2), scalar(2)]),
+            transform=Transform(position=create_v3(scalar(4), scalar(0), scalar(0)),
+                                orientation=Orientation.identity()),
+            start_distance=scalar(45), end_distance=scalar(50))
+
+    def _stepped(self):
+        return Difference(base=self._arm(), subtract=[self._cut()])
+
+    def test_the_middle_of_the_cut_is_taken(self):
+        middle = create_v3(scalar(4), scalar(0), scalar(50))
+
+        assert not self._stepped().is_point_on_boundary(middle)
+
+    def test_the_face_beside_the_cut_survives(self):
+        beside = create_v3(scalar(5.5), scalar(0), scalar(50))
+
+        assert self._stepped().is_point_on_boundary(beside)
+
+    def test_there_is_material_just_outside_the_cut_at_that_height(self):
+        """Which is what makes the corner a surface rather than a hole."""
+        just_outside = create_v3(scalar(5.01), scalar(-1), scalar(49.99))
+
+        assert self._stepped().contains_point(just_outside)
+
+    @pytest.mark.xfail(strict=True, reason=(
+        "the cut's corner and the base both answer with their top face, so the "
+        "cut reads as flush there -- see the TODO on _cut_is_flush_with_the_base"))
+    def test_and_so_does_the_face_at_the_cuts_corner(self):
+        corner = create_v3(scalar(5), scalar(-1), scalar(50))
+
+        assert self._stepped().is_point_on_boundary(corner)
+
+
 class TestCutCSGLabel:
     """The name a CSG node carries.
 
