@@ -160,6 +160,61 @@ class TestWhatAPairAdmits:
             kinds_for(PLANE, POINT, PROJECTED)
 
 
+class TestWhatAFeatureLooksLikeOnTheSheet:
+    """project(), which answers with geometry rather than a name and a vector.
+
+    The three shapes going in are the three coming out, so what a caller gets
+    back can be asked what it is instead of being told.
+    """
+
+    #: Looking down -Y, so X is across the sheet and Z is up it.
+    GAZE = create_v3(0, -1, 0)
+
+    def test_a_point_stays_where_it_is(self):
+        from kumiki.drawing import project
+
+        at = Point(position=create_v3(1, 2, 3))
+        assert project(at, self.GAZE) is at
+
+    def test_an_edge_seen_end_on_becomes_a_point(self):
+        from kumiki.drawing import project
+
+        end_on = Line(direction=create_v3(0, 1, 0), point=create_v3(1, 2, 3))
+        seen = project(end_on, self.GAZE)
+        assert isinstance(seen, Point)
+        assert list(seen.position) == pytest.approx([1, 2, 3])
+
+    def test_an_edge_seen_across_stays_a_line_flattened_onto_the_sheet(self):
+        from kumiki.drawing import project
+
+        leaning = Line(direction=create_v3(0, 1, 1), point=create_v3(0, 0, 0))
+        seen = project(leaning, self.GAZE)
+        assert isinstance(seen, Line)
+        # The Y that ran into the sheet is gone; only the Z is left.
+        assert list(seen.direction) == pytest.approx([0, 0, 1])
+
+    def test_a_face_seen_edge_on_draws_as_a_line_along_itself(self):
+        from kumiki.drawing import project
+
+        upright = Plane(normal=create_v3(0, 0, 1), point=create_v3(0, 0, 5))
+        seen = project(upright, self.GAZE)
+        assert isinstance(seen, Line)
+        # Square to both the face's normal and the line of sight.
+        assert abs(float(seen.direction[0])) == pytest.approx(1.0)
+
+    def test_a_face_seen_at_an_angle_covers_the_view_and_projects_to_nothing(self):
+        from kumiki.drawing import project
+
+        facing_you = Plane(normal=create_v3(0, 1, 0), point=create_v3(0, 0, 0))
+        assert project(facing_you, self.GAZE) is None
+
+    def test_a_feature_lying_on_no_plane_or_line_projects_to_nothing(self):
+        """A cylinder's barrel: good to select, never located."""
+        from kumiki.drawing import project
+
+        assert project(None, self.GAZE) is None
+
+
 class TestWhatTheSolidAdmits:
     """The 3D view classifies features as they ARE, projecting nothing.
 
@@ -175,14 +230,14 @@ class TestWhatTheSolidAdmits:
     ALONG = {"kind": "line", "direction": [1, 0, 0]}
 
     def test_a_face_is_a_plane_from_wherever_it_is_seen(self):
-        from kumiki.drawing import MeasurementFeature, three_d_form
+        from kumiki.drawing import MeasurementFeature, form_of
 
-        assert three_d_form(geometry(self.TOP))[0] is MeasurementFeature.PLANE
+        assert form_of(geometry(self.TOP)) is MeasurementFeature.PLANE
 
     def test_an_edge_is_a_line_even_when_it_points_at_you(self):
-        from kumiki.drawing import MeasurementFeature, three_d_form
+        from kumiki.drawing import MeasurementFeature, form_of
 
-        assert three_d_form(geometry(self.UPRIGHT))[0] is MeasurementFeature.LINE
+        assert form_of(geometry(self.UPRIGHT)) is MeasurementFeature.LINE
 
     def test_two_faces_meeting_at_a_corner_admit_an_angle(self):
         from kumiki.drawing import three_d_kinds

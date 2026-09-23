@@ -3115,20 +3115,29 @@ def _settled_measurement(
 def _settled_form(geometry: Any, in_three_d: bool, plane: Any) -> Dict[str, Any]:
     """What one end behaves as, in the shape the viewer's own forms took.
 
-    Sent rather than classified there, so projected_form and three_d_form stop
-    being two implementations of one rule. What crosses is the ANSWER -- a name
-    and the way the feature runs -- not the rule that reached it.
-    """
-    from kumiki.drawing import MeasurementFeature, projected_form, three_d_form
+    Sent rather than classified there, so the rule has one implementation. What
+    crosses is the ANSWER -- a name and the way the feature runs -- not the rule
+    that reached it.
 
-    form, run = three_d_form(geometry) if in_three_d else projected_form(geometry, plane)
-    if form is None:
-        return {"form": "none"}
-    if form is MeasurementFeature.PLANE:
-        return {"form": form.value, "normal": list(run) if run is not None else None}
-    if run is not None:
-        return {"form": form.value, "direction": list(run)}
-    return {"form": form.value}
+    "area" and "none" are the two ways a feature can have nothing to measure to,
+    and only this edge tells them apart: a face covering the view, against a
+    curved side that was never located at all.
+    """
+    from kumiki.drawing import project
+    from kumiki.geometry import Line, Plane, Point, unit_vector
+
+    if not in_three_d:
+        seen = project(geometry, plane)
+        if seen is None:
+            return {"form": "area" if isinstance(geometry, Plane) else "none"}
+        geometry = seen
+    if isinstance(geometry, Plane):
+        return {"form": "plane", "normal": list(unit_vector(geometry.normal))}
+    if isinstance(geometry, Line):
+        return {"form": "line", "direction": list(unit_vector(geometry.direction))}
+    if isinstance(geometry, Point):
+        return {"form": "point"}
+    return {"form": "none"}
 
 
 def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional[Any]:

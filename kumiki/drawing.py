@@ -65,17 +65,6 @@ class MeasurementFeature(Enum):
     AREA = "area"
 
 
-#: What a feature can project to. A point stays a point; an edge seen end-on
-#: becomes one; a face is a line edge-on and an area otherwise. Which of the two
-#: it is depends on the viewing direction, so only the viewport can say -- this
-#: says what the possibilities are.
-PROJECTS_TO: Mapping[MeasurementFeature, Tuple[MeasurementFeature, ...]] = {
-    MeasurementFeature.POINT: (MeasurementFeature.POINT,),
-    MeasurementFeature.LINE: (MeasurementFeature.POINT, MeasurementFeature.LINE),
-    MeasurementFeature.PLANE: (MeasurementFeature.LINE, MeasurementFeature.AREA),
-}
-
-
 @dataclass(frozen=True)
 class MeasurementKind:
     """What a dimension is measuring.
@@ -248,41 +237,72 @@ def _anchor_of(geometry: Optional[Geometry]) -> Optional[V3]:
     return None
 
 
-def projected_form(
-    geometry: Optional[Geometry], normal: VectorLike,
-) -> Tuple[Optional[MeasurementFeature], Optional[V3]]:
-    """What a feature behaves as once projected onto the plane *normal* defines,
-    and which way it runs in that plane.
+def project(geometry: Optional[Geometry], normal: VectorLike) -> Optional[Geometry]:
+    """A feature as it is seen on the sheet that *normal* faces out of.
 
     A point stays a point. An edge seen end-on becomes one, and otherwise stays
-    a line. A face is a LINE seen edge-on and an AREA at any other angle -- and
-    an area covers the view, which is the whole of what PROJECTS_TO means by a
-    face having two answers.
+    a line, flattened onto the sheet. A face is a line edge-on.
 
-    The direction is None for anything but a LINE. It comes back here because a
-    pair of lines admits different kinds depending on whether they are parallel,
-    and the caller would otherwise project a second time to find out.
-
-    None for `geometry` is a feature lying on no plane or line -- a cylinder's
-    barrel, a lofted side -- which is good to select and cannot be measured to.
+    None is everything with nothing left to measure to: a face at any other
+    angle, which covers the view, and a feature lying on no plane or line at all
+    -- a cylinder's barrel, a lofted side -- which is good to select and was
+    never located. The runner tells those two apart when it names the form for
+    the viewer; nothing here needs to.
     """
     gaze = _unit(normal)
     if isinstance(geometry, Point):
-        return (MeasurementFeature.POINT, None)
+        return geometry
     if isinstance(geometry, Line):
         direction = _unit(geometry.direction)
         if are_vectors_parallel(direction, gaze, eps=ALIGNMENT_EPSILON):
-            return (MeasurementFeature.POINT, None)
-        return (MeasurementFeature.LINE, _flatten(direction, gaze))
+            return Point(position=geometry.point)
+        return Line(direction=_flatten(direction, gaze), point=geometry.point)
     if isinstance(geometry, Plane):
         facing = _unit(geometry.normal)
         if not are_vectors_perpendicular(facing, gaze, eps=ALIGNMENT_EPSILON):
-            # Not edge-on: it covers the view, and an area has no distance.
-            return (MeasurementFeature.AREA, None)
-        # Edge-on, so it draws as a line along the plane, square to its normal
+            return None
+        # Edge-on, so it draws as a line along the face, square to its normal
         # and to the line of sight.
-        return (MeasurementFeature.LINE, _cross(facing, gaze))
-    return (None, None)
+        return Line(direction=_cross(facing, gaze), point=geometry.point)
+    return None
+
+
+def form_of(geometry: Optional[Geometry]) -> Optional[MeasurementFeature]:
+    """Which of the three shapes a feature is, for asking the table.
+
+    Nothing is projected away: in the 3D view the camera belongs to the reader
+    and turns as they look around, so a face is a plane whatever angle it is
+    seen from. Project first to ask the same question of a sheet.
+    """
+    if isinstance(geometry, Point):
+        return MeasurementFeature.POINT
+    if isinstance(geometry, Line):
+        return MeasurementFeature.LINE
+    if isinstance(geometry, Plane):
+        return MeasurementFeature.PLANE
+    return None
+
+
+def _are_parallel(
+    one: Optional[Geometry], other: Optional[Geometry],
+) -> Optional[bool]:
+    """Whether two features run together. None when either has no way to run.
+
+    A plane is parallel to a plane when their normals are, and to a line when
+    the line is SQUARE to its normal -- which is why this asks the geometry
+    rather than being handed one vector per side.
+    """
+    if isinstance(one, Plane) and isinstance(other, Plane):
+        return are_vectors_parallel(_unit(one.normal), _unit(other.normal),
+                                    eps=PARALLEL_EPSILON)
+    if isinstance(one, Line) and isinstance(other, Line):
+        return are_vectors_parallel(_unit(one.direction), _unit(other.direction),
+                                    eps=PARALLEL_EPSILON)
+    line, plane = (one, other) if isinstance(one, Line) else (other, one)
+    if isinstance(line, Line) and isinstance(plane, Plane):
+        return are_vectors_perpendicular(_unit(line.direction), _unit(plane.normal),
+                                         eps=PARALLEL_EPSILON)
+    return None
 
 
 def _flatten(direction: VectorLike, gaze: VectorLike) -> V3:
@@ -573,19 +593,13 @@ def pair_separation(
     view = ViewAxes.from_wire(view)
     look = _unit(view.look)
     in_three_d = kind.space is MeasurementSpace.THREE_D
-    if in_three_d:
-        form_one, run_one = three_d_form(one)
-        form_other, run_other = three_d_form(other)
-    else:
-        form_one, run_one = projected_form(one, look)
-        form_other, run_other = projected_form(other, look)
-    if form_one is None or form_other is None:
-        return None
 
     gap = _v3(at_other) - _v3(at_one)
     if not in_three_d:
-        # On a sheet, only what survives the projection counts.
+        # On a sheet, only what survives the projection counts -- of the gap,
+        # and of the two features it runs between.
         gap = gap - look * _dot(gap, look)
+        one, other = project(one, look), project(other, look)
 
     if kind.direction is MeasurementDirection.HORIZONTAL:
         return abs(_dot(gap, _unit(view.right)))
@@ -595,25 +609,25 @@ def pair_separation(
     # Square to whichever of the two constrains it most. A plane leaves one
     # direction to measure along, a line leaves two, and two points leave the
     # distance itself.
-    def constraining(form):
-        # A form with no way to run constrains nothing, so it is passed over --
-        # as the viewer's copy passes it over. Squaring to a zero direction
-        # would call every such pair nothing at all.
-        one_run = run_one if form_one is form else None
-        other_run = run_other if form_other is form else None
-        for run in (one_run, other_run):
-            if run is not None and any(part for part in run):
+    def constraining(shape):
+        # A feature with no way to run constrains nothing, so it is passed over.
+        # Squaring to a zero direction would call every such pair nothing at all.
+        for geometry in (one, other):
+            if not isinstance(geometry, shape):
+                continue
+            run = geometry.normal if shape is Plane else geometry.direction
+            if any(part for part in run):
                 return run
         return None
 
-    plane = constraining(MeasurementFeature.PLANE)
-    if plane is not None:
-        return abs(_dot(gap, _unit(plane)))
+    facing = constraining(Plane)
+    if facing is not None:
+        return abs(_dot(gap, _unit(facing)))
 
-    line = constraining(MeasurementFeature.LINE)
-    if line is None:
+    along = constraining(Line)
+    if along is None:
         return safe_norm(gap)
-    unit = _unit(line)
+    unit = _unit(along)
     return safe_norm(gap - unit * _dot(gap, unit))
 
 
@@ -870,85 +884,30 @@ def projected_kinds(
     question "could these two be measured against each other from here", which
     is what decides whether a feature is worth preferring under the pointer.
     """
-    form_one, run_one = projected_form(one, look)
-    form_other, run_other = projected_form(other, look)
-    if form_one is None or form_other is None:
-        return ()
-    parallel = None
-    if run_one is not None and run_other is not None:
-        parallel = are_vectors_parallel(_v3(run_one), _v3(run_other),
-                                        eps=PARALLEL_EPSILON)
-    return kinds_for(form_one, form_other, MeasurementSpace.PROJECTED, parallel=parallel)
-
-
-# TODO NEXT PASS: there are only two spaces and they are exclusive, so this and
-# projected_form could be one `form_of(geometry, space, look=None)`, and
-# three_d_kinds/projected_kinds one `kinds_admitted(one, other, space,
-# look=None)`. That would also settle the complaint below -- _three_d_parallel
-# takes a second argument that means a normal for a plane and a direction for a
-# line, which is only tolerable because it is private and has one caller.
-# Held over: it changes call sites in runner and ~27 in the tests, and should
-# fail on its own if it is wrong.
-def three_d_form(
-    geometry: Optional[Geometry],
-) -> Tuple[Optional[MeasurementFeature], Optional[V3]]:
-    """What a feature IS, with nothing projected away.
-
-    The 3D view's camera belongs to the reader and turns as they look around, so
-    a feature there cannot be classified by how it happens to appear from where
-    they are standing: a face is a plane whatever angle it is seen from. Asking
-    `projected_form` there said a face was an AREA -- covering the view, nothing
-    to measure -- for every face not seen exactly edge-on, which is nearly all
-    of them.
-
-    The direction that comes back is the line's own, or the plane's normal, for
-    deciding whether a pair runs together.
-
-    THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
-    against each other.
-    """
-    if isinstance(geometry, Point):
-        return (MeasurementFeature.POINT, None)
-    if isinstance(geometry, Line):
-        return (MeasurementFeature.LINE, _unit(geometry.direction))
-    if isinstance(geometry, Plane):
-        return (MeasurementFeature.PLANE, _unit(geometry.normal))
-    return (None, None)
-
-
-
-def _three_d_parallel(
-    form_one: MeasurementFeature,
-    run_one: Optional[VectorLike],
-    form_other: MeasurementFeature,
-    run_other: Optional[VectorLike],
-) -> Optional[bool]:
-    """Whether two 3D features are parallel
-    """
-    # TODO the second argument means different things by feature type -- a
-    # plane's normal, a line's direction -- which is what makes the test below
-    # read oddly. Folded into `form_of` next pass; see the note above.
-    if run_one is None or run_other is None:
-        return None
-    one, other = _v3(run_one), _v3(run_other)
-    if form_one is form_other:
-        return are_vectors_parallel(one, other, eps=PARALLEL_EPSILON)
-    return are_vectors_perpendicular(one, other, eps=PARALLEL_EPSILON)
+    return _kinds_admitted(project(one, look), project(other, look),
+                           MeasurementSpace.PROJECTED)
 
 
 def three_d_kinds(
     one: Optional[Geometry], other: Optional[Geometry],
 ) -> Tuple[MeasurementKind, ...]:
     """Which kinds this pair admits in the 3D view. Empty when none.
+
+    Nothing is projected first, which is the whole difference: the 3D camera
+    belongs to the reader, so a face there is a plane however it is being seen.
     """
-    form_one, run_one = three_d_form(one)
-    form_other, run_other = three_d_form(other)
+    return _kinds_admitted(one, other, MeasurementSpace.THREE_D)
+
+
+def _kinds_admitted(
+    one: Optional[Geometry], other: Optional[Geometry], space: MeasurementSpace,
+) -> Tuple[MeasurementKind, ...]:
+    """The table, asked about a pair that is already in the space it is asked in."""
+    form_one, form_other = form_of(one), form_of(other)
     if form_one is None or form_other is None:
         return ()
-    return kinds_for(
-        form_one, form_other, MeasurementSpace.THREE_D,
-        parallel=_three_d_parallel(form_one, run_one, form_other, run_other),
-    )
+    return kinds_for(form_one, form_other, space,
+                     parallel=_are_parallel(one, other))
 
 
 def kinds_for(

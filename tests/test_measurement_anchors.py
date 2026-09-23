@@ -1224,7 +1224,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
     def test_whenever_an_angle_is_admitted_the_corner_can_be_placed(
             self, shape, degrees_apart):
         from kumiki.drawing import (MeasurementOperation, angle_rays,
-                                    three_d_form, three_d_kinds)
+                                    three_d_kinds)
 
         first, second = self._turned(degrees_apart, shape)
         # Ask the table what this pair admits, through the same geometry the
