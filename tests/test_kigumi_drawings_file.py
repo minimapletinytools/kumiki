@@ -656,6 +656,57 @@ class TestIdentifiers:
         )
 
 
+class TestPuttingAPairInOneOrder:
+    """sort_key, which exists so A to B and B to A are one measurement.
+
+    identity() nests differently per shape -- a face's third element is a
+    feature's name, a derived edge's is a whole parent reference -- so Python
+    will not order one against the other. This is flat strings instead.
+    """
+
+    def _single(self, feature, *csg_path):
+        from kumiki.identity import FeatureRef, ResolvedTimberPath, SingleFeaturePath
+
+        return SingleFeaturePath(timber=ResolvedTimberPath("posts/fl"),
+                                 ref=FeatureRef(csg_path=csg_path, feature=feature))
+
+    def _derived(self, one, other):
+        from kumiki.identity import DerivedFeaturePath, FeatureRef, ResolvedTimberPath
+
+        return DerivedFeaturePath(timber=ResolvedTimberPath("posts/fl"),
+                                  a=FeatureRef(csg_path=("cut",), feature=one),
+                                  b=FeatureRef(csg_path=("cut",), feature=other))
+
+    def test_a_face_and_a_derived_edge_can_be_ordered_against_each_other(self):
+        """The pair that raised: a dimension from a face to an edge."""
+        face, edge = self._single("top", "cut"), self._derived("a", "b")
+
+        assert sorted((face, edge), key=lambda p: p.sort_key) == \
+               sorted((edge, face), key=lambda p: p.sort_key)
+
+    def test_a_longer_path_cannot_read_as_a_shorter_one_plus_a_feature(self):
+        """What the length prefix is for: these two would otherwise flatten alike."""
+        deep = self._single(None, "a", "b", "c")
+        shallow = self._single("c", "a", "b")
+
+        assert deep.identity() != shallow.identity()
+        assert deep.sort_key != shallow.sort_key
+
+    def test_measuring_a_to_b_is_measuring_b_to_a(self):
+        from kumiki.drawing import Measure, MeasurementKind, MeasurementPlacement
+
+        face, edge = self._single("top", "cut"), self._derived("a", "b")
+        kind = MeasurementKind.parse("projected_perpendicular_distance")
+
+        one = Measure(face, edge, kind=kind, placement=MeasurementPlacement(offset=12.0))
+        other = Measure(edge, face, kind=kind, placement=MeasurementPlacement(offset=-12.0))
+
+        assert one.identity() == other.identity()
+        # The offset follows the swap, so both name the same line on the sheet.
+        assert (present(one.placement, "a placement").offset
+                == present(other.placement, "a placement").offset)
+
+
 class TestResolvingAnchors:
     """Finding the feature a measurement names, and where it is."""
 

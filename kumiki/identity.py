@@ -16,16 +16,12 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence, Tuple
 
 
-# TODO you don't need this ABC, just have a value field in each of the Ids that inherit this...
+# Three names someone chose, each its own type so a drawing's name cannot be
+# passed where a viewport's was meant. No shared base: one they all satisfy
+# would hand that back.
 @dataclass(frozen=True)
-class Identifier:
-    """A name someone chose, wrapped so it cannot be confused with another kind.
-
-    A string today. The wrapper is what lets it grow later without every caller
-    changing, and what stops a drawing's name being passed where a viewport's
-    was meant -- both are strings, and nothing but a type says they are not
-    interchangeable.
-    """
+class DrawingId:
+    """Which drawing. What an override in the drawings file names."""
 
     value: str
 
@@ -37,18 +33,29 @@ class Identifier:
 
 
 @dataclass(frozen=True)
-class DrawingId(Identifier):
-    """Which drawing. What an override in the drawings file names."""
-
-
-@dataclass(frozen=True)
-class ViewportId(Identifier):
+class ViewportId:
     """Which viewport of a drawing -- 'front', 'top', the ones a layout produces."""
 
+    value: str
+
+    def __str__(self) -> str:
+        return self.value
+
+    def __bool__(self) -> bool:
+        return bool(self.value)
+
 
 @dataclass(frozen=True)
-class MeasurementId(Identifier):
+class MeasurementId:
     """Which of several measurements between the same two features."""
+
+    value: str
+
+    def __str__(self) -> str:
+        return self.value
+
+    def __bool__(self) -> bool:
+        return bool(self.value)
 
 
 @dataclass(frozen=True)
@@ -138,22 +145,6 @@ class ResolvedJointPath:
         return cls(path=str(text))
 
 
-# TODO delete this, this is silly, just type stuff properly and compare using the actual property
-def identity_order(identity: Tuple) -> str:
-    """A sortable key for any identity tuple, whatever shape it is.
-
-    Identities are compared to put a pair in one order, and the shapes differ:
-    a face's third element is a feature's name, a derived edge's is a whole
-    parent reference. Python will not order a string against a tuple, so a pair
-    made of one of each -- a dimension from a face to an edge, which is an
-    ordinary thing to want -- raised instead of sorting.
-
-    The key only has to be total and stable, not meaningful: nothing reads the
-    order, it exists so that A to B and B to A come out the same way round.
-    """
-    return repr(identity)
-
-
 @dataclass(frozen=True)
 class FeatureRef:
     """A reference to specific feature on a CSG tree. Must be resolved against an actual CSG tree to find the feature. Does not guarantee that the feature exists.
@@ -170,6 +161,12 @@ class FeatureRef:
 
     def identity(self) -> Tuple[Tuple[str, ...], str]:
         return (tuple(self.csg_path), self.feature or "")
+
+    @property
+    def sort_key(self) -> Tuple[str, ...]:
+        """Flat, and self-delimiting: the path's length comes before the path,
+        so a longer path cannot read as a shorter one plus a feature name."""
+        return (str(len(self.csg_path)), *self.csg_path, self.feature or "")
 
     def describe(self) -> str:
         trail = " > ".join(self.csg_path)
@@ -206,6 +203,21 @@ class FeaturePath(ABC):
         """
         ...
 
+    @property
+    @abstractmethod
+    def sort_key(self) -> Tuple[str, ...]:
+        """For putting a pair in one order, so A to B and B to A agree.
+
+        Not `identity`, which nests differently per shape -- a face's third
+        element is a feature's name, a derived edge's is a whole parent
+        reference -- and Python will not order a string against a tuple. This
+        is flat strings, which order against each other whatever the shapes.
+
+        Distinct references must get distinct keys, or a pair of them would
+        sort by whichever was written first. Nothing reads the order itself.
+        """
+        ...
+
     @abstractmethod
     def describe(self) -> str:
         """For a person to read -- a log line, or a broken reference in a list."""
@@ -237,6 +249,11 @@ class SingleFeaturePath(FeaturePath):
     def identity(self) -> Tuple[Any, ...]:
         csg_path, feature = self.ref.identity()
         return (str(self.timber), csg_path, feature, self.feature_type or "")
+
+    @property
+    def sort_key(self) -> Tuple[str, ...]:
+        return ("single", str(self.timber), *self.ref.sort_key,
+                self.feature_type or "")
 
     def describe(self) -> str:
         trail = self.ref.describe()
@@ -291,6 +308,11 @@ class DerivedFeaturePath(FeaturePath):
 
     def identity(self) -> Tuple[Any, ...]:
         return (str(self.timber), self.a.identity(), self.b.identity(), self.kind)
+
+    @property
+    def sort_key(self) -> Tuple[str, ...]:
+        return ("derived", str(self.timber), self.kind,
+                *self.a.sort_key, *self.b.sort_key)
 
     def describe(self) -> str:
         return f"{self.timber} > {self.a.describe()} x {self.b.describe()}"

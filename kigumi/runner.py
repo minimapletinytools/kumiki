@@ -1670,14 +1670,20 @@ def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]
     return path.identity()
 
 
+def _anchor_sort_key(anchor: Any) -> Tuple[str, ...]:
+    """Where one anchor falls in the order a pair is written in.
+
+    On the path, not on its identity: identity nests differently per shape and
+    will not order against itself. A missing anchor sorts before any real one.
+    """
+    path = deserialize_feature_path(anchor)
+    return ("",) if path is None else path.sort_key
+
+
 def _measure_pair_identity(measure: Dict[str, Any]) -> Tuple[Any, Any]:
     """Just the two features of a measurement, without what is measured between."""
-    from kumiki.identity import identity_order
-
-    return tuple(sorted((
-        _feature_path_identity(measure.get("a")),
-        _feature_path_identity(measure.get("b")),
-    ), key=identity_order))
+    first, second = sorted((measure.get("a"), measure.get("b")), key=_anchor_sort_key)
+    return (_feature_path_identity(first), _feature_path_identity(second))
 
 
 def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
@@ -1697,12 +1703,7 @@ def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
     """
     from kumiki.drawing import Measure, MeasurementKind
 
-    from kumiki.identity import identity_order
-
-    first, second = sorted((
-        _feature_path_identity(measure.get("a")),
-        _feature_path_identity(measure.get("b")),
-    ), key=identity_order)
+    first, second = _measure_pair_identity(measure)
     kind = measure.get("kind")
     return (
         first, second,

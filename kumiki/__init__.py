@@ -29,7 +29,6 @@ from .identity import (
     DrawingId,
     FeaturePath,
     FeatureRef,
-    Identifier,
     MeasurementId,
     ResolvedTimberPath,
     SingleFeaturePath,

@@ -22,8 +22,7 @@ from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
 from .geometry import Line, Plane, Point, closest_stations, intersect_planes
 from .identity import (DrawingId, FeaturePath, MeasurementId,
-                       ResolvedTimberPath, TimberPath, ViewportId,
-                       identity_order)
+                       ResolvedTimberPath, TimberPath, ViewportId)
 from .rule import (Matrix, Numeric, V3, are_vectors_parallel,
                    are_vectors_perpendicular, create_v3, cross_product,
                    safe_dot_product, safe_norm, safe_zero_test_sq)
@@ -1121,7 +1120,7 @@ class Measure:
         if self.anchor_a is None or self.anchor_b is None:
             return
         first, second = self.anchor_a, self.anchor_b
-        if identity_order(first.identity()) <= identity_order(second.identity()):
+        if first.sort_key <= second.sort_key:
             return
         object.__setattr__(self, 'anchor_a', second)
         object.__setattr__(self, 'anchor_b', first)
