@@ -2629,10 +2629,18 @@ class Cylinder(HasFeatures, CutCSG):
 class SolidsAtPoint:
     """Where a point stands against a list of solids, worked out once.
 
-    Every boolean node asks the same handful of questions of its children --
-    which hold the point, which have it on their surface, and whether those
-    close around it -- so they ask them here instead of each spelling out its
-    own loop over contains_point and is_point_on_boundary.
+    Each solid is asked twice -- does it hold the point, and is the point on
+    its surface -- and every question below reads off that:
+
+    - `any_holds`: does any of them hold the point at all?
+    - `any_encloses`: does any hold it strictly inside, off its surface?
+    - `any_on_surface`: does any have it on its surface?
+    - `outward_normals`: which way does each of those surfaces face?
+    - `average_outward_normal`: which way do they face together?
+    - `close_around_it`: do they leave the point no way out?
+
+    Every boolean node asked some of these of its children, each spelling out
+    its own loop over contains_point and is_point_on_boundary.
     """
 
     def __init__(
@@ -2694,9 +2702,9 @@ class SolidsAtPoint:
         """Whether the surfaces meeting at the point leave no way out.
 
         A point can be on the boundary of every solid holding it and still be
-        deep inside what they make together: two mortises stacked share a face
-        that is the middle of one cavity, and neither alone holds it inside.
-        Asking each solid in turn never sees that.
+        contained within what they make together: two prisms side by side share
+        a face, and a point on that face is on the boundary of both solids but
+        contained within the union. Asking each solid in turn never sees that.
 
         Analytic, not a step into space. Leaving every surface at once means a
         direction d with d . n > 0 for each outward normal n, so they close
@@ -2787,10 +2795,14 @@ class SolidUnion(CutCSG):
         
         For a union, we check all children that have the point on their boundary
         and return the average of their outward normals. The reason we do this is because this method is used to check if a point is on the boundary through Differences and using an average normal here tends to behave better on weird non-convex geometry.
-        
+
+        AVERAGED, so where several children meet at the point the answer
+        bisects them and is perpendicular to none of them. Anything reading it
+        as one surface's own normal is reading it wrong.
+
         Args:
             point: A point on the boundary
-            
+
         Returns:
             The average outward normal vector, or None if cannot be determined
         """
@@ -2849,6 +2861,13 @@ class Intersection(CutCSG):
         return self.left.is_point_on_boundary(point, eps=eps) or self.right.is_point_on_boundary(point, eps=eps)
 
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+        """The outward normal at a boundary point.
+
+        AVERAGED where both sides meet at the point, as in SolidUnion and
+        Difference: the answer then bisects them and is perpendicular to
+        neither. Anything reading it as one surface's own normal is reading it
+        wrong.
+        """
         at = SolidsAtPoint([self.left, self.right], point, eps=eps)
         average = at.average_outward_normal()
         if average is not None:
@@ -2976,10 +2995,14 @@ class Difference(CutCSG):
         
         For a difference, if the point is on the boundary of the base CSG, return that normal.
         Otherwise, go through the subtract CSGs and return the average of their normals (negated).
-        
+
+        AVERAGED, so where several subtracts meet at the point the answer
+        bisects them and is perpendicular to none of them. Anything reading it
+        as one surface's own normal is reading it wrong.
+
         Args:
             point: A point on the boundary
-            
+
         Returns:
             The outward normal vector, or None if cannot be determined
         """
