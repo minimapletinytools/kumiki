@@ -161,7 +161,8 @@ class TestWhatAPairAdmits:
 
 
 class TestWhatAFeatureLooksLikeOnTheSheet:
-    """project(), which answers with geometry rather than a name and a vector.
+    """project_geometry_for_measuring(), which answers with geometry rather
+    than a name and a vector.
 
     The three shapes going in are the three coming out, so what a caller gets
     back can be asked what it is instead of being told.
@@ -171,13 +172,13 @@ class TestWhatAFeatureLooksLikeOnTheSheet:
     GAZE = create_v3(0, -1, 0)
 
     def test_a_point_stays_where_it_is(self):
-        from kumiki.drawing import project
+        from kumiki.drawing import project_geometry_for_measuring as project
 
         at = Point(position=create_v3(1, 2, 3))
         assert project(at, self.GAZE) is at
 
     def test_an_edge_seen_end_on_becomes_a_point(self):
-        from kumiki.drawing import project
+        from kumiki.drawing import project_geometry_for_measuring as project
 
         end_on = Line(direction=create_v3(0, 1, 0), point=create_v3(1, 2, 3))
         seen = project(end_on, self.GAZE)
@@ -185,7 +186,7 @@ class TestWhatAFeatureLooksLikeOnTheSheet:
         assert list(seen.position) == pytest.approx([1, 2, 3])
 
     def test_an_edge_seen_across_stays_a_line_flattened_onto_the_sheet(self):
-        from kumiki.drawing import project
+        from kumiki.drawing import project_geometry_for_measuring as project
 
         leaning = Line(direction=create_v3(0, 1, 1), point=create_v3(0, 0, 0))
         seen = project(leaning, self.GAZE)
@@ -194,7 +195,7 @@ class TestWhatAFeatureLooksLikeOnTheSheet:
         assert list(seen.direction) == pytest.approx([0, 0, 1])
 
     def test_a_face_seen_edge_on_draws_as_a_line_along_itself(self):
-        from kumiki.drawing import project
+        from kumiki.drawing import project_geometry_for_measuring as project
 
         upright = Plane(normal=create_v3(0, 0, 1), point=create_v3(0, 0, 5))
         seen = project(upright, self.GAZE)
@@ -203,14 +204,14 @@ class TestWhatAFeatureLooksLikeOnTheSheet:
         assert abs(float(seen.direction[0])) == pytest.approx(1.0)
 
     def test_a_face_seen_at_an_angle_covers_the_view_and_projects_to_nothing(self):
-        from kumiki.drawing import project
+        from kumiki.drawing import project_geometry_for_measuring as project
 
         facing_you = Plane(normal=create_v3(0, 1, 0), point=create_v3(0, 0, 0))
         assert project(facing_you, self.GAZE) is None
 
     def test_a_feature_lying_on_no_plane_or_line_projects_to_nothing(self):
         """A cylinder's barrel: good to select, never located."""
-        from kumiki.drawing import project
+        from kumiki.drawing import project_geometry_for_measuring as project
 
         assert project(None, self.GAZE) is None
 

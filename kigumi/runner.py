@@ -3115,19 +3115,15 @@ def _settled_measurement(
 def _settled_form(geometry: Any, in_three_d: bool, plane: Any) -> Dict[str, Any]:
     """What one end behaves as, in the shape the viewer's own forms took.
 
-    Sent rather than classified there, so the rule has one implementation. What
-    crosses is the ANSWER -- a name and the way the feature runs -- not the rule
-    that reached it.
-
-    "area" and "none" are the two ways a feature can have nothing to measure to,
-    and only this edge tells them apart: a face covering the view, against a
-    curved side that was never located at all.
+    Settled here so the rule has one implementation; what crosses is the answer.
+    "area" and "none" both mean nothing to measure to, and only this edge tells
+    them apart.
     """
-    from kumiki.drawing import project
+    from kumiki.drawing import project_geometry_for_measuring
     from kumiki.geometry import Line, Plane, Point, unit_vector
 
     if not in_three_d:
-        seen = project(geometry, plane)
+        seen = project_geometry_for_measuring(geometry, plane)
         if seen is None:
             return {"form": "area" if isinstance(geometry, Plane) else "none"}
         geometry = seen

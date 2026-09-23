@@ -237,17 +237,17 @@ def _anchor_of(geometry: Optional[Geometry]) -> Optional[V3]:
     return None
 
 
-def project(geometry: Optional[Geometry], normal: VectorLike) -> Optional[Geometry]:
+def project_geometry_for_measuring(
+    geometry: Optional[Geometry], normal: VectorLike,
+) -> Optional[Geometry]:
     """A feature as it is seen on the sheet that *normal* faces out of.
 
     A point stays a point. An edge seen end-on becomes one, and otherwise stays
     a line, flattened onto the sheet. A face is a line edge-on.
 
-    None is everything with nothing left to measure to: a face at any other
-    angle, which covers the view, and a feature lying on no plane or line at all
-    -- a cylinder's barrel, a lofted side -- which is good to select and was
-    never located. The runner tells those two apart when it names the form for
-    the viewer; nothing here needs to.
+    None if it does not project to a line -- a face seen at any other angle
+    projects to an area -- or if it is not a recognized piece of projectable
+    geometry.
     """
     gaze = _unit(normal)
     if isinstance(geometry, Point):
@@ -599,7 +599,8 @@ def pair_separation(
         # On a sheet, only what survives the projection counts -- of the gap,
         # and of the two features it runs between.
         gap = gap - look * _dot(gap, look)
-        one, other = project(one, look), project(other, look)
+        one = project_geometry_for_measuring(one, look)
+        other = project_geometry_for_measuring(other, look)
 
     if kind.direction is MeasurementDirection.HORIZONTAL:
         return abs(_dot(gap, _unit(view.right)))
@@ -884,7 +885,8 @@ def projected_kinds(
     question "could these two be measured against each other from here", which
     is what decides whether a feature is worth preferring under the pointer.
     """
-    return _kinds_admitted(project(one, look), project(other, look),
+    return _kinds_admitted(project_geometry_for_measuring(one, look),
+                           project_geometry_for_measuring(other, look),
                            MeasurementSpace.PROJECTED)
 
 
