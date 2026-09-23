@@ -2626,6 +2626,108 @@ class Cylinder(HasFeatures, CutCSG):
         )
 
 
+class SolidsAtPoint:
+    """Where a point stands against a list of solids, worked out once.
+
+    Every boolean node asks the same handful of questions of its children --
+    which hold the point, which have it on their surface, and whether those
+    close around it -- so they ask them here instead of each spelling out its
+    own loop over contains_point and is_point_on_boundary.
+    """
+
+    def __init__(
+        self,
+        solids: Sequence['CutCSG'],
+        point: V3,
+        eps: Optional[Numeric] = None,
+    ) -> None:
+        self.point = point
+        self.eps = eps
+        self.on_surface: List['CutCSG'] = []
+        self.enclosing: List['CutCSG'] = []
+        for solid in solids:
+            if not solid.contains_point(point, eps=eps):
+                continue
+            if solid.is_point_on_boundary(point, eps=eps):
+                self.on_surface.append(solid)
+            else:
+                self.enclosing.append(solid)
+        self.holding = [*self.on_surface, *self.enclosing]
+
+    def any_holds(self) -> bool:
+        """Whether any of them has the point, on its surface or within."""
+        return bool(self.holding)
+
+    def any_encloses(self) -> bool:
+        """Whether any holds the point strictly inside, off its surface."""
+        return bool(self.enclosing)
+
+    def any_on_surface(self) -> bool:
+        return bool(self.on_surface)
+
+    def outward_normals(self) -> List[Optional[Direction3D]]:
+        """Each surface's outward normal at the point, in on_surface order."""
+        return [solid.get_outward_normal(self.point, eps=self.eps)
+                for solid in self.on_surface]
+
+    def average_outward_normal(self, negated: bool = False) -> Optional[Direction3D]:
+        """The mean of those normals, or None when they cancel or none can say.
+
+        A mean rather than the first: this feeds the boundary tests through
+        Difference, where averaging behaves better on non-convex corners.
+        *negated* for the wall of a hole, whose outward faces into the material.
+        """
+        normals = [normal for normal in self.outward_normals() if normal is not None]
+        if negated:
+            normals = [-normal for normal in normals]
+        if not normals:
+            return None
+        if len(normals) == 1:
+            return normals[0]
+        total = sum(normals[1:], normals[0])
+        size = safe_norm(total)
+        if safe_zero_test(size, eps=self.eps):
+            return None
+        return total / size
+
+    def close_around_it(self) -> bool:
+        """Whether the surfaces meeting at the point leave no way out.
+
+        A point can be on the boundary of every solid holding it and still be
+        deep inside what they make together: two mortises stacked share a face
+        that is the middle of one cavity, and neither alone holds it inside.
+        Asking each solid in turn never sees that.
+
+        Analytic, not a step into space. Leaving every surface at once means a
+        direction d with d . n > 0 for each outward normal n, so they close
+        around the point exactly when no such direction exists. Exact for one
+        surface and for two -- two close only when they face opposite ways --
+        and a good-faith answer for more.
+
+        False when any surface cannot say which way it faces: calling a real
+        wall interior is the more damaging way to be wrong.
+        """
+        normals = [normal for normal in self.outward_normals() if normal is not None]
+        if len(normals) < 2 or len(normals) != len(self.on_surface):
+            return False
+
+        units = [safe_normalize_vector(normal) for normal in normals]
+        candidates = [sum(units[1:], units[0])]
+        candidates.extend(units)
+        candidates.extend(one + other
+                          for index, one in enumerate(units)
+                          for other in units[index + 1:])
+        for candidate in candidates:
+            size = safe_norm(candidate)
+            if safe_zero_test(size):
+                continue
+            direction = candidate / size
+            if all(safe_compare(safe_dot_product(direction, unit), 0, Comparison.GT)
+                   for unit in units):
+                return False
+        return True
+
+
 @dataclass(frozen=True)
 class SolidUnion(CutCSG):
     """
@@ -2672,21 +2774,12 @@ class SolidUnion(CutCSG):
         Returns:
             True if the point is on the boundary of the union, False otherwise
         """
-        # Point must be contained in the union
-        if not self.contains_point(point, eps=eps):
+        at = SolidsAtPoint(self.children, point, eps=eps)
+        if not at.any_holds() or at.any_encloses():
             return False
-        
-        # Check if on boundary of any child and not strictly inside all others
-        on_any_boundary = False
-        for child in self.children:
-            if child.contains_point(point, eps=eps):
-                if child.is_point_on_boundary(point, eps=eps):
-                    on_any_boundary = True
-                else:
-                    # Point is strictly inside this child, so not on union boundary
-                    return False
-        
-        return on_any_boundary
+        # Two children can share a face with neither holding the point inside,
+        # and that face is the middle of the union rather than its surface.
+        return at.any_on_surface() and not at.close_around_it()
     
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
@@ -2701,28 +2794,7 @@ class SolidUnion(CutCSG):
         Returns:
             The average outward normal vector, or None if cannot be determined
         """
-        normals = []
-        
-        for child in self.children:
-            if child.is_point_on_boundary(point, eps=eps):
-                normal = child.get_outward_normal(point, eps=eps)
-                if normal is not None:
-                    normals.append(normal)
-        
-        if len(normals) == 0:
-            return None
-        elif len(normals) == 1:
-            return normals[0]
-        else:
-            # Average the normals
-            avg_normal = normals[0]
-            for n in normals[1:]:
-                avg_normal = avg_normal + n
-            # Normalize
-            norm = safe_norm(avg_normal)
-            if safe_zero_test(norm, eps=eps):
-                return None
-            return avg_normal / norm
+        return SolidsAtPoint(self.children, point, eps=eps).average_outward_normal()
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         # Empty children contribute no points to the union, so they're excluded
@@ -2777,27 +2849,15 @@ class Intersection(CutCSG):
         return self.left.is_point_on_boundary(point, eps=eps) or self.right.is_point_on_boundary(point, eps=eps)
 
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
-        left_on_boundary = self.left.is_point_on_boundary(point, eps=eps)
-        right_on_boundary = self.right.is_point_on_boundary(point, eps=eps)
-
-        if left_on_boundary and not right_on_boundary:
-            return self.left.get_outward_normal(point, eps=eps)
-        if right_on_boundary and not left_on_boundary:
-            return self.right.get_outward_normal(point, eps=eps)
-
-        if left_on_boundary and right_on_boundary:
-            left_normal = self.left.get_outward_normal(point, eps=eps)
-            right_normal = self.right.get_outward_normal(point, eps=eps)
-            if left_normal is None:
-                return right_normal
-            if right_normal is None:
-                return left_normal
-            avg_normal = left_normal + right_normal
-            norm = safe_norm(avg_normal)
-            if safe_zero_test(norm, eps=eps):
-                return left_normal
-            return avg_normal / norm
-
+        at = SolidsAtPoint([self.left, self.right], point, eps=eps)
+        average = at.average_outward_normal()
+        if average is not None:
+            return average
+        # Two surfaces facing opposite ways average to nothing. Either one
+        # describes the corner as well as the other, so take the first.
+        for normal in at.outward_normals():
+            if normal is not None:
+                return normal
         return None
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
@@ -2863,137 +2923,52 @@ class Difference(CutCSG):
         Returns:
             True if the point is in base but not in any subtract objects, False otherwise
         """
-        # Point must be in base
         if not self.base.contains_point(point, eps=eps):
             return False
-        
-        # Check if on base boundary
-        on_base_boundary = self.base.is_point_on_boundary(point, eps=eps)
-        
-        # Point must not be strictly inside any subtract object
-        # If point is on boundary of both base and subtract, check normals
-        for sub in self.subtract:
-            if sub.contains_point(point, eps=eps):
-                if not sub.is_point_on_boundary(point, eps=eps):
-                    # Point is strictly inside a subtract object
-                    return False
-                elif on_base_boundary:
-                    # Point is on boundary of both base and subtract
-                    # Check the outward normals
-                    base_normal = self.base.get_outward_normal(point, eps=eps)
-                    sub_normal = sub.get_outward_normal(point, eps=eps)
-                    
-                    if base_normal is not None and sub_normal is not None:
-                        # Compute dot product of normals
-                        dot_product = safe_dot_product(base_normal, sub_normal)
-                        
-                        # If dot product == 1, surfaces overlap, exclude the point
-                        # TODO what were really wanting to chec khere is that the surfaces are the same locally which may not be the case if the normal was on an edge with this condition. To fix this you should introduce an is_on_edge function HOWEVER this also won't work in the case of stuff like cylinders, so to fix that you probably really need a surface_derivative (curvature) function...
-                        if safe_equality_test(dot_product, 1, eps=eps):
-                            return False
-                    else:
-                        # Cannot determine normals, use conservative approach: exclude
-                        return False
-        
-        return True
+
+        removed = SolidsAtPoint(self.subtract, point, eps=eps)
+        if removed.any_encloses():
+            return False
+        # Several subtracts can close around a point none of them holds inside
+        # -- two mortises meeting share a face in the middle of one cavity.
+        if removed.close_around_it():
+            return False
+        if not removed.any_on_surface():
+            return True
+        if not self.base.is_point_on_boundary(point, eps=eps):
+            return True
+        return not self._cut_is_flush_with_the_base(removed, point, eps=eps)
+
+    def _cut_is_flush_with_the_base(
+        self, removed: 'SolidsAtPoint', point: V3, eps: Optional[Numeric] = None,
+    ) -> bool:
+        """Whether a subtract's surface lies along the base's own, facing the
+        same way, so the cut takes the very material that face was.
+
+        True when a normal cannot be had, which excludes the point: the same
+        conservative answer this has always given.
+        """
+        base_normal = self.base.get_outward_normal(point, eps=eps)
+        for sub_normal in removed.outward_normals():
+            if base_normal is None or sub_normal is None:
+                return True
+            # TODO what were really wanting to chec khere is that the surfaces are the same locally which may not be the case if the normal was on an edge with this condition. To fix this you should introduce an is_on_edge function HOWEVER this also won't work in the case of stuff like cylinders, so to fix that you probably really need a surface_derivative (curvature) function...
+            if safe_equality_test(safe_dot_product(base_normal, sub_normal), 1, eps=eps):
+                return True
+        return False
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the difference.
-        
-        A point is on the boundary if:
-        1. It's contained in the difference (base - subtract), AND
-        2. Either:
-           a. It's on the boundary of the base, OR
-           b. It's strictly inside the base but on the boundary of at least one subtract object
-        
-        Note: For case 2b, the point creates a new boundary surface (the "hole" surface).
-        The point must be on the subtract boundary but NOT inside the subtract (i.e., on the
-        surface of the hole facing the remaining material).
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is on the boundary of the difference, False otherwise
+
+        A point is on the boundary if it is in the difference at all and some
+        surface passes through it: the base's own, or the wall of a hole.
         """
-        # Point must be contained in base
-        if not self.base.contains_point(point, eps=eps):
+        if not self.contains_point(point, eps=eps):
             return False
-        
-        # Check if point is in any subtract region (strictly inside, not just boundary)
-        in_subtract_interior = False
-        on_subtract_boundary = False
-        
-        for sub in self.subtract:
-            if sub.contains_point(point, eps=eps):
-                if sub.is_point_on_boundary(point, eps=eps):
-                    on_subtract_boundary = True
-                else:
-                    # Point is strictly inside a subtract object
-                    in_subtract_interior = True
-                    break
-        
-        # If point is strictly inside any subtract, it's not on the difference boundary
-        if in_subtract_interior:
-            return False
-
-        
-        # On a subtract's surface: the wall of the hole it made. That is this
-        # solid's boundary only if the hole HAS a wall -- if there is material
-        # of this difference on the near side of it. Two cases say otherwise:
-        # a subtract that only touches the base, taking nothing, and a cut made
-        # flush with the base's own surface, whose "wall" is the open mouth of
-        # the cut with nothing behind it.
-        if on_subtract_boundary:
-            return self._material_outside_the_hole(point, eps=eps)
-        
-        # Otherwise, check if it's on the base boundary
-        return self.base.is_point_on_boundary(point, eps=eps)
-
-    
-    def _material_outside_the_hole(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """Whether this solid has material just outside a subtract's surface.
-
-        consider the difference A-B, if a point P is on the boundary of B, then P is on the boundary of (A-B) if
-        - P is NOT on the boundary of A
-        - P is on the boundary of A, and the outward normal of A and B do not match
-
-        TODO I think whats explained in the comment above is sufficient and simpler and more accurate, please switch over
-        TODO the current implementaion and what's explainde below is less reliable and more complicated than it needs to be
-
-
-        For a point already known to be on some subtract's surface, and in the
-        base. A hole's wall is boundary because there is something on the near
-        side of it; step out of the subtract along its own outward normal and
-        ask whether that is still in this difference.
-
-        - A mortise wall inside a timber: outside the mortise is timber, so the
-          wall is boundary.
-        - A cut flush with the base's face: outside the cut is outside the piece
-          as well, so the "wall" is the mouth of the cut and holds nothing.
-        - A subtract that only touches the base: outside it is the base's own
-          interior, so the base's face survives and is still boundary.
-
-        The step is a micron at least -- smaller than any joint feature, large
-        enough to leave the surface it started on -- because a step scaled to
-        eps alone lands back on the boundary it was trying to leave.
-
-        With no normal to step along, the answer stays True: refusing to call a
-        real wall boundary is the more damaging way to be wrong.
-        """
-        step = max(float(eps) * 10 if eps is not None else 0.0, 1e-6)
-        for sub in self.subtract:
-            if not sub.contains_point(point, eps=eps):
-                continue
-            if not sub.is_point_on_boundary(point, eps=eps):
-                continue
-            outward = sub.get_outward_normal(point, eps=eps)
-            if outward is None:
-                return True
-            if self.contains_point(point + outward * scalar(step), eps=eps):
-                return True
-        return False
+        if self.base.is_point_on_boundary(point, eps=eps):
+            return True
+        return SolidsAtPoint(self.subtract, point, eps=eps).any_on_surface()
 
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
@@ -3015,28 +2990,7 @@ class Difference(CutCSG):
         # Otherwise, point must be on subtract boundary (creating a "hole")
         # The normal should point inward to the subtract (which is outward from the difference)
         # So we negate the subtract's outward normal
-        normals = []
-        for sub in self.subtract:
-            if sub.is_point_on_boundary(point, eps=eps):
-                normal = sub.get_outward_normal(point, eps=eps)
-                if normal is not None:
-                    # Negate because we want the normal pointing into the remaining material
-                    normals.append(-normal)
-        
-        if len(normals) == 0:
-            return None
-        elif len(normals) == 1:
-            return normals[0]
-        else:
-            # Average the normals
-            avg_normal = normals[0]
-            for n in normals[1:]:
-                avg_normal = avg_normal + n
-            # Normalize
-            norm = safe_norm(avg_normal)
-            if safe_zero_test(norm, eps=eps):
-                return None
-            return avg_normal / norm
+        return SolidsAtPoint(self.subtract, point, eps=eps).average_outward_normal(negated=True)
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         bbox = self.base.get_aabb()

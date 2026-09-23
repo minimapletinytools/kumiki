@@ -16,6 +16,7 @@ from kumiki.cutcsg import (
     RectangularPrism,
     Cylinder,
     SolidUnion,
+    SolidsAtPoint,
     Intersection,
     CSGParity,
     walk_csg_with_parity,
@@ -4789,6 +4790,110 @@ class TestBuriedFacesAreNotReported:
                     and "collect_feature_hits" in cls.__dict__]
 
         assert defining == ["CutCSG"]
+
+
+class TestSolidsThatCloseAroundAPoint:
+    """Abutting solids swallow the face they share, and no per-solid test sees it.
+
+    A point can be on the boundary of every solid holding it and still be deep
+    inside what they make together. Asking each in turn never finds that out:
+    none of them holds it inside.
+
+    Answered from the outward normals rather than by stepping into space.
+    Leaving every surface at once means a direction d with d . n > 0 for each
+    normal n, so they close around the point exactly when there is no such d.
+    """
+
+    def _box(self, z0, z1, across=0):
+        return RectangularPrism(
+            size=Matrix([scalar(2), scalar(2)]),
+            transform=Transform(position=create_v3(scalar(across), scalar(0), scalar(0)),
+                                orientation=Orientation.identity()),
+            start_distance=scalar(z0), end_distance=scalar(z1))
+
+    def test_one_surface_never_closes_around_anything(self):
+        lone = self._box(40, 50)
+
+        at = SolidsAtPoint([lone], create_v3(scalar(0), scalar(0), scalar(50)))
+
+        assert len(at.on_surface) == 1
+        assert not at.close_around_it()
+
+    def test_two_facing_opposite_ways_leave_no_way_out(self):
+        stacked = [self._box(40, 50), self._box(50, 60)]
+
+        at = SolidsAtPoint(stacked, create_v3(scalar(0), scalar(0), scalar(50)))
+
+        # On the boundary of both, inside neither -- which is the whole trap.
+        assert len(at.on_surface) == 2
+        assert not at.any_encloses()
+        assert at.close_around_it()
+
+    def test_but_their_outer_faces_are_still_surface(self):
+        stacked = [self._box(40, 50), self._box(50, 60)]
+
+        at = SolidsAtPoint(stacked, create_v3(scalar(0), scalar(0), scalar(40)))
+
+        assert at.close_around_it() is False
+
+    def test_a_corner_of_one_solid_is_not_closed_around(self):
+        """Two faces of the SAME solid meet there, and it is one solid."""
+        lone = self._box(40, 50)
+
+        at = SolidsAtPoint([lone], create_v3(scalar(1), scalar(1), scalar(50)))
+
+        assert not at.close_around_it()
+
+
+class TestAbuttingSolidsDoNotReportTheFaceTheyShare:
+    """The same trap, through the two nodes that used to fall into it."""
+
+    def _post(self, z0, z1, name=None):
+        features = [SimpleRectangularPrismFeature(
+            name, face=PrismFace.TOP,
+            properties=FeatureProperties(group=FeatureGroup.B1))] if name else []
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
+            start_distance=scalar(z0), end_distance=scalar(z1), _features=features)
+
+    def _mortise(self, z0, z1):
+        return RectangularPrism(
+            size=Matrix([scalar(2), scalar(2)]), transform=Transform.identity(),
+            start_distance=scalar(z0), end_distance=scalar(z1))
+
+    def test_two_members_butted_end_to_end_have_no_face_between_them(self):
+        butted = SolidUnion(children=[self._post(0, 50, "lower.top"),
+                                      self._post(50, 100, "upper.top")])
+        shared = create_v3(scalar(0), scalar(0), scalar(50))
+
+        assert not butted.is_point_on_boundary(shared)
+        assert butted.find_all_features(shared) == []
+
+    def test_and_the_assembly_still_has_its_real_top(self):
+        butted = SolidUnion(children=[self._post(0, 50, "lower.top"),
+                                      self._post(50, 100, "upper.top")])
+        top = create_v3(scalar(0), scalar(0), scalar(100))
+
+        assert butted.is_point_on_boundary(top)
+        assert "upper.top" in [hit.name for hit in butted.find_all_features(top)]
+
+    def test_two_mortises_meeting_make_one_cavity_not_a_face(self):
+        cavity = Difference(base=self._post(0, 100),
+                            subtract=[self._mortise(40, 50), self._mortise(50, 60)])
+        shared = create_v3(scalar(0), scalar(0), scalar(50))
+
+        # In the middle of the removed material, so not in the solid at all.
+        assert not cavity.contains_point(shared)
+        assert not cavity.is_point_on_boundary(shared)
+
+    def test_while_the_walls_of_that_cavity_are_still_walls(self):
+        cavity = Difference(base=self._post(0, 100),
+                            subtract=[self._mortise(40, 50), self._mortise(50, 60)])
+
+        for label, point in (("side wall", create_v3(scalar(1), scalar(0), scalar(45))),
+                             ("floor", create_v3(scalar(0), scalar(0), scalar(40))),
+                             ("ceiling", create_v3(scalar(0), scalar(0), scalar(60)))):
+            assert cavity.is_point_on_boundary(point), label
 
 
 class TestCutCSGLabel:
