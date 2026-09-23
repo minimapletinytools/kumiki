@@ -16,9 +16,6 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence, Tuple
 
 
-# Three names someone chose, each its own type so a drawing's name cannot be
-# passed where a viewport's was meant. No shared base: one they all satisfy
-# would hand that back.
 @dataclass(frozen=True)
 class DrawingId:
     """Which drawing. What an override in the drawings file names."""
@@ -164,8 +161,7 @@ class FeatureRef:
 
     @property
     def sort_key(self) -> Tuple[str, ...]:
-        """Flat, and self-delimiting: the path's length comes before the path,
-        so a longer path cannot read as a shorter one plus a feature name."""
+        """The path's length, then the path, then the feature."""
         return (str(len(self.csg_path)), *self.csg_path, self.feature or "")
 
     def describe(self) -> str:
@@ -206,16 +202,6 @@ class FeaturePath(ABC):
     @property
     @abstractmethod
     def sort_key(self) -> Tuple[str, ...]:
-        """For putting a pair in one order, so A to B and B to A agree.
-
-        Not `identity`, which nests differently per shape -- a face's third
-        element is a feature's name, a derived edge's is a whole parent
-        reference -- and Python will not order a string against a tuple. This
-        is flat strings, which order against each other whatever the shapes.
-
-        Distinct references must get distinct keys, or a pair of them would
-        sort by whichever was written first. Nothing reads the order itself.
-        """
         ...
 
     @abstractmethod
