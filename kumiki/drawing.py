@@ -20,7 +20,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
-from .geometry import Line, Plane, Point, intersect_planes
+from .geometry import Line, Plane, Point, closest_stations, intersect_planes
 from .identity import (DrawingId, FeaturePath, MeasurementId,
                        ResolvedTimberPath, TimberPath, ViewportId,
                        identity_order)
@@ -42,13 +42,14 @@ class MeasurementOperation(Enum):
 
 
 class MeasurementDirection(Enum):
-    """Which direction a distance is taken along.
+    """Which direction a distance is taken along."""
 
-    TODO clarify comments on how these are interpreted
-    """
-
+    #: Square to whichever of the pair constrains it most: along a plane's
+    #: normal, across a line, and straight between two points.
     PERPENDICULAR = "perpendicular"
+    #: Along the view's right axis.
     HORIZONTAL = "horizontal"
+    #: Along the view's up axis.
     VERTICAL = "vertical"
 
 
@@ -160,25 +161,16 @@ def _three_d(operation) -> MeasurementKind:
 
 # TODO refine these 3 epsilons below? alginment and parallel seem especially big?
 
-#: How square something has to be to the view before it counts as square. An
-#: edge a hair off end-on still projects to a line, just a very short one, and
-#: calling it a point would refuse a dimension that is drawable.
 #: Below this, in world units, two features are in the same place and there is
 #: nothing between them to dimension. A measurement that comes to zero draws as
 #: nothing, which reads as a measurement that failed rather than one that was
 #: never worth making -- so a pair this close is refused at the pick instead.
-#:
-#: THE VIEWER HAS A COPY, as DEGENERATE_WORLD in measurements.js, for judging a
-#: measurement already written. A test runs the two against each other.
 DEGENERATE_SEPARATION = 1e-6
 
+#: How square something has to be to the view before it counts as square. An
+#: edge a hair off end-on still projects to a line, just a very short one, and
+#: calling it a point would refuse a dimension that is drawable.
 ALIGNMENT_EPSILON = 1e-3
-
-#: The camera frame a measurement is judged against when none is given.
-DEFAULT_LOOK = create_v3(0, 0, -1)
-DEFAULT_RIGHT = create_v3(1, 0, 0)
-DEFAULT_UP = create_v3(0, 0, 1)
-
 
 #: Two projected directions within this of parallel are treated as parallel: the
 #: angle between them would be a number nobody wrote down deliberately, and
@@ -195,6 +187,12 @@ DEFAULT_UP = create_v3(0, 0, 1)
 #: NARROWER band than the drafting rule, or a pair could be offered an angle and
 #: then be unable to say where its vertex is. A test pins that.
 PARALLEL_EPSILON = 1e-2
+
+
+#: The camera frame a measurement is judged against when none is given.
+DEFAULT_LOOK = create_v3(0, 0, -1)
+DEFAULT_RIGHT = create_v3(1, 0, 0)
+DEFAULT_UP = create_v3(0, 0, 1)
 
 
 #: Anything that stands for a vector in here: a V3 already, or the lists and
@@ -250,32 +248,25 @@ def _anchor_of(geometry: Optional[Geometry]) -> Optional[V3]:
     return None
 
 
-# TODO rename look to normal probably
 def projected_form(
-    geometry: Optional[Geometry], look: VectorLike,
+    geometry: Optional[Geometry], normal: VectorLike,
 ) -> Tuple[Optional[MeasurementFeature], Optional[V3]]:
-    """What a feature behaves as once projected, and which way it runs.
+    """What a feature behaves as once projected onto the plane *normal* defines,
+    and which way it runs in that plane.
 
     A point stays a point. An edge seen end-on becomes one, and otherwise stays
     a line. A face is a LINE seen edge-on and an AREA at any other angle -- and
     an area covers the view, which is the whole of what PROJECTS_TO means by a
     face having two answers.
 
-    TODO what is this? it's just the normal (look) component of the un projected line, a little awkward to return it here sinec it only applies to lines.. is there a better way to do this?
-    TODO update comment to simply say this is the direction of the line in the plane defined by look
-    The direction comes back with it because a pair of lines admits different
-    kinds depending on whether they are parallel, and the caller would otherwise
-    have to work the projection out a second time to find out.
+    The direction is None for anything but a LINE. It comes back here because a
+    pair of lines admits different kinds depending on whether they are parallel,
+    and the caller would otherwise project a second time to find out.
 
     None for `geometry` is a feature lying on no plane or line -- a cylinder's
     barrel, a lofted side -- which is good to select and cannot be measured to.
-
-    THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
-    against each other. Two copies of a rule is how a rule drifts; the reason
-    for the second one is that the viewer projects on every pointer move and
-    cannot ask python each time.
     """
-    gaze = _unit(look)
+    gaze = _unit(normal)
     if isinstance(geometry, Point):
         return (MeasurementFeature.POINT, None)
     if isinstance(geometry, Line):
@@ -284,13 +275,13 @@ def projected_form(
             return (MeasurementFeature.POINT, None)
         return (MeasurementFeature.LINE, _flatten(direction, gaze))
     if isinstance(geometry, Plane):
-        normal = _unit(geometry.normal)
-        if not are_vectors_perpendicular(normal, gaze, eps=ALIGNMENT_EPSILON):
+        facing = _unit(geometry.normal)
+        if not are_vectors_perpendicular(facing, gaze, eps=ALIGNMENT_EPSILON):
             # Not edge-on: it covers the view, and an area has no distance.
             return (MeasurementFeature.AREA, None)
         # Edge-on, so it draws as a line along the plane, square to its normal
         # and to the line of sight.
-        return (MeasurementFeature.LINE, _cross(normal, gaze))
+        return (MeasurementFeature.LINE, _cross(facing, gaze))
     return (None, None)
 
 
@@ -572,11 +563,6 @@ def pair_separation(
 
     None when the pair measures no length -- an angle, or a pair that admits
     nothing.
-
-    TODO cleanup all these comments. I think we deleted the mesaurements.js copy
-    THE VIEWER HAS A COPY, as measureValue in measurements.js, because it needs
-    the number on every frame and cannot ask python for it. A test runs the two
-    against each other.
     """
     if kind.operation is not MeasurementOperation.DISTANCE:
         return None
@@ -703,11 +689,9 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
                 _ray_toward(second.along, vertex, second, first))
     elif first.is_line or second.is_line:
         line, plane = (first, second) if first.is_line else (second, first)
-        # No None check: _line_meets_plane always answers, falling back to the
-        # nearest point when the line runs flat along the face. Whether it
-        # SHOULD refuse instead is the question in its own TODO -- if it ever
-        # does, this needs a guard again.
         vertex = _line_meets_plane(line, plane)
+        if vertex is None:
+            return None
         in_plane = _flatten_onto(line.along, plane.facing)
         if in_plane is None:
             return None
@@ -736,30 +720,17 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
     return AngleRays(vertex=_v3(vertex), opens_from=rays[0], opens_to=rays[1],
                      normal=_unit(upright))
 
-# TODO measuring.py has this same closed form inside
-# mark_distance_from_corner_along_edge_by_finding_closest_point_on_line, wrapped
-# in timber/edge/end semantics. The shared core -- two Lines in, two stations
-# out -- belongs in geometry.py beside intersect_planes; this clamps to the
-# intervals and takes the midpoint, that one raises on parallel.
 def _closest_between(first: MeasureSpan, second: MeasureSpan) -> Optional[V3]:
     """Where two lines come nearest each other, kept on both.
     """
     one, other = first.along, second.along
-    facing = _dot(one, other)
-    # The sine between the two, SQUARED, so safe_zero_test_sq -- which squares
-    # the tolerance rather than the value, leaving PARALLEL_EPSILON meaning a
-    # plain sine here as it does for a line against a plane just below.
-    spread = 1 - facing * facing
-    if safe_zero_test_sq(spread, eps=PARALLEL_EPSILON):
+    stations = closest_stations(Line(direction=one, point=first.at),
+                                Line(direction=other, point=second.at),
+                                eps=PARALLEL_EPSILON)
+    if stations is None:
         return None
-    gap = first.at - second.at
-    lean_one, lean_other = _dot(one, gap), _dot(other, gap)
-    station_one = (facing * lean_other - lean_one) / spread
-    station_other = (lean_other - facing * lean_one) / spread
-    station_one = _clamp_to(station_one, first.interval)
-    station_other = _clamp_to(station_other, second.interval)
-    on_one = first.at + one * station_one
-    on_other = second.at + other * station_other
+    on_one = first.at + one * _clamp_to(stations[0], first.interval)
+    on_other = second.at + other * _clamp_to(stations[1], second.interval)
     return (on_one + on_other) / 2
 
 def _clamp_to(station: float, interval: Optional[Tuple[float, float]]) -> float:
@@ -769,19 +740,17 @@ def _clamp_to(station: float, interval: Optional[Tuple[float, float]]) -> float:
     return max(low, min(high, station))
 
 
-def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan) -> V3:
-    """Where a line crosses a plane, or some nearest point if parallel
-    
-    # TODO why do we need to support the parallel case, could/should we just have this return None instead in the parallel cases?
+def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan) -> Optional[V3]:
+    """Where a line crosses a plane, kept within the line's interval.
+
+    None when it runs flat along the face and so never crosses -- the same
+    contract as geometry.intersect_line_plane.
     """
     unit, normal = line.along, plane.facing
-    rate = _dot(unit, normal)
     if are_vectors_perpendicular(unit, normal, eps=PARALLEL_EPSILON):
-        # Running along the face: it never crosses, so stand where the edge is
-        # and drop that onto the face.
-        return _foot_on_plane(plane, _representative_point(line))
+        return None
     at = line.at
-    step = _dot(plane.at - at, normal) / rate
+    step = _dot(plane.at - at, normal) / _dot(unit, normal)
     step = _clamp_to(step, line.interval)
     return at + unit * step
 
@@ -1133,7 +1102,6 @@ class MeasurementPlacement:
         raise TypeError(f"Expected a placement or a mapping, got {type(value).__name__}")
 
 
-# CONTINUE HERE
 @dataclass(frozen=True)
 class Measure:
     """A dimension between two features, drawn in one viewport.

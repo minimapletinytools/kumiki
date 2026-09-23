@@ -83,6 +83,7 @@ from .geometry import (
     Point,
     Space,
     UnsignedPlane,
+    closest_stations,
 )
 
 
@@ -641,25 +642,12 @@ def mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(line: 
     else:  # BOTTOM
         edge_end_position = edge_line.point - edge_line.direction * (timber.length / scalar(2))
     
-    # Solve for closest points on two 3D lines using the standard formula
-    # Line 1 (given line): line.point + s * line.direction
-    # Line 2 (edge): edge_end_position + t * edge_line.direction
-    # We need to find s and t such that the connecting vector is perpendicular to both directions
-    
-    w = line.point - edge_end_position  # Vector between starting points
-    
-    a = safe_dot_product(line.direction, line.direction)  # Should be 1 for normalized directions
-    b = safe_dot_product(line.direction, edge_line.direction)
-    c = safe_dot_product(edge_line.direction, edge_line.direction)  # Should be 1 for normalized directions
-    d = safe_dot_product(w, line.direction)
-    e = safe_dot_product(w, edge_line.direction)
-    
-    denominator = a * c - b * b
-    
-    if safe_zero_test(denominator):
-        t = scalar(0)
-    else:
-        t = (a * e - b * d) / denominator
+    # How far along the edge, from the end, the two lines come nearest. Never
+    # None: the parallel case is refused above.
+    stations = closest_stations(
+        line, Line(direction=edge_line.direction, point=edge_end_position))
+    assert stations is not None, "parallel lines are refused above"
+    t = stations[1]
 
     resolved_edge: EdgeOrCenterline = TimberEdge(edge.value) if isinstance(edge, (TimberLongEdge, TimberShortEdge)) else edge
     return DistanceFromCornerAlongEdge(

@@ -441,6 +441,37 @@ def intersect_line_plane(line: Optional[Line], plane: Optional[Plane]) -> Option
     return Point(position=line.point + direction * distance)
 
 
+def closest_stations(
+    a: Optional[Line], b: Optional[Line], eps: Optional[float] = None,
+) -> Optional[Tuple[float, float]]:
+    """How far along each line the two come nearest each other.
+
+    Two stations, one per line, each a signed distance from that line's point
+    along its direction. None when either argument is missing or the lines are
+    parallel, which includes the same line twice -- parallel lines come nearest
+    everywhere at once, so no one pair of stations describes it.
+    """
+    if a is None or b is None:
+        return None
+
+    one, other = _unit_or_none(a.direction), _unit_or_none(b.direction)
+    if one is None or other is None:
+        return None
+
+    facing = safe_dot_product(one, other)
+    # The sine between the two, SQUARED, hence safe_zero_test_sq -- which
+    # squares the tolerance rather than the value, so *eps* stays a plain sine.
+    spread = 1 - facing * facing
+    if safe_zero_test_sq(spread, eps=eps):
+        return None
+
+    gap = a.point - b.point
+    lean_one = safe_dot_product(one, gap)
+    lean_other = safe_dot_product(other, gap)
+    return ((facing * lean_other - lean_one) / spread,
+            (lean_other - facing * lean_one) / spread)
+
+
 def _unit_or_none(vector: V3) -> Optional[V3]:
     """*vector* normalised, or None if it has no direction to normalise."""
     if safe_zero_test_sq(safe_dot_product(vector, vector)):

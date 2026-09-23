@@ -1260,6 +1260,34 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
         assert (drafting, corner) == pytest.approx((8.110, 0.573), abs=1e-3)
 
 
+class TestALineLyingFlatAlongAFaceTurnsNoCorner:
+    """It never crosses the face, so there is no vertex to put an angle on.
+
+    Nor is the pair offered one -- the table calls it parallel and admits only a
+    perpendicular distance -- so refusing here agrees with what was on offer.
+    """
+
+    FLAT = MeasureSpan(at=v((100, 0, 200)), direction=v((1, 0, 0)),
+                       interval=(0.0, 300.0))
+    FACE = MeasureSpan(at=v((100, -50, 200)), normal=v((0, 1, 0)))
+
+    def test_the_table_admits_no_angle(self):
+        from kumiki.drawing import MeasurementOperation, three_d_kinds
+        from kumiki.geometry import Line, Plane
+
+        kinds = three_d_kinds(
+            Line(point=self.FLAT.at, direction=self.FLAT.along),
+            Plane(point=self.FACE.at, normal=self.FACE.facing))
+        assert not any(k.operation is MeasurementOperation.ANGLE for k in kinds)
+
+    @pytest.mark.parametrize("swapped", [False, True])
+    def test_and_no_rays_are_placed_either_way_round(self, swapped):
+        from kumiki.drawing import angle_rays
+
+        pair = (self.FACE, self.FLAT) if swapped else (self.FLAT, self.FACE)
+        assert angle_rays(*pair) is None
+
+
 class TestAViewWithNothingSaidAboutIt:
     """ViewAxes supplies the defaults, so each one is written down once.
 

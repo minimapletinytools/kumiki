@@ -6,9 +6,9 @@ This module contains tests for the CSG primitives and operations.
 
 import pytest
 from kumiki.rule import safe_dot_product, Orientation, Transform, create_v3, radians, scalar, Matrix, simplify, sqrt, cos, sin, pi, safe_zero_test, safe_equality_test, safe_compare, Comparison
-from kumiki.geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
-                             lines_are_coincident, planes_are_coincident, planes_are_parallel,
-                             points_are_coincident)
+from kumiki.geometry import (Line, Plane, Point, closest_stations, intersect_line_plane,
+                             intersect_planes, lines_are_coincident, planes_are_coincident,
+                             planes_are_parallel, points_are_coincident)
 from kumiki.cutcsg import (
     shared_ancestor,
     CutCSGLabel,
@@ -3846,6 +3846,49 @@ class TestLinePlaneIntersection:
         assert intersect_line_plane(
             self._line((scalar(0), scalar(0), scalar(1)), (scalar(0), scalar(0), scalar(0))),
             None) is None
+
+
+class TestWhereTwoLinesComeNearest:
+    """closest_stations, the core shared by drawing.py and measuring.py."""
+
+    def _line(self, direction, point):
+        return Line(direction=create_v3(*direction), point=create_v3(*point))
+
+    def test_two_crossing_lines_come_nearest_where_they_cross(self):
+        across = self._line((scalar(1), scalar(0), scalar(0)), (scalar(0), scalar(5), scalar(0)))
+        along = self._line((scalar(0), scalar(1), scalar(0)), (scalar(7), scalar(0), scalar(0)))
+        stations = closest_stations(across, along)
+        assert stations is not None
+        assert float(stations[0]) == pytest.approx(7.0)
+        assert float(stations[1]) == pytest.approx(5.0)
+
+    def test_two_skew_lines_come_nearest_on_their_common_perpendicular(self):
+        across = self._line((scalar(1), scalar(0), scalar(0)), (scalar(0), scalar(0), scalar(0)))
+        above = self._line((scalar(0), scalar(1), scalar(0)), (scalar(4), scalar(0), scalar(9)))
+        stations = closest_stations(across, above)
+        assert stations is not None
+        # Straight up the z gap: each line is at its own crossing station.
+        assert float(stations[0]) == pytest.approx(4.0)
+        assert float(stations[1]) == pytest.approx(0.0)
+
+    def test_parallel_lines_come_nearest_everywhere_and_so_nowhere(self):
+        across = self._line((scalar(1), scalar(0), scalar(0)), (scalar(0), scalar(0), scalar(0)))
+        beside = self._line((scalar(1), scalar(0), scalar(0)), (scalar(0), scalar(3), scalar(0)))
+        assert closest_stations(across, beside) is None
+        assert closest_stations(across, across) is None
+
+    def test_a_missing_line_has_no_stations(self):
+        across = self._line((scalar(1), scalar(0), scalar(0)), (scalar(0), scalar(0), scalar(0)))
+        assert closest_stations(across, None) is None
+        assert closest_stations(None, across) is None
+
+    def test_the_stations_are_distances_whatever_length_the_directions_are(self):
+        """Non-unit directions are normalised, so a station is always a distance."""
+        across = self._line((scalar(6), scalar(0), scalar(0)), (scalar(0), scalar(5), scalar(0)))
+        along = self._line((scalar(0), scalar(4), scalar(0)), (scalar(7), scalar(0), scalar(0)))
+        stations = closest_stations(across, along)
+        assert stations is not None
+        assert (float(stations[0]), float(stations[1])) == pytest.approx((7.0, 5.0))
 
 
 class TestNamingTheSameGeometry:
