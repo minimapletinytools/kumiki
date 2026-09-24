@@ -37,6 +37,7 @@ from .cutcsg import (
     ExtrusionFeatureKey,
     OwnedFeatureHit,
     Profile,
+    SurfacePatch,
 )
 
 
@@ -106,6 +107,12 @@ class PathSegment(ABC):
         2D outward normal at `point`, assumed to lie on this segment and
         assumed the Path is CCW-wound (Path.is_valid() checks this).
         """
+
+    def local_curvature(self, eps: Optional[Numeric] = None) -> Numeric:
+        """How sharply this segment bends: 1/radius, signed the way the outward
+        normal is -- positive where it bulges out of the material, negative
+        where it bites into it. Zero for anything straight."""
+        return scalar(0)
 
     @abstractmethod
     def bounds(self) -> Tuple[V2, V2]:
@@ -456,6 +463,12 @@ class ArcSegment(PathSegment):
             radial = -radial
         return safe_normalize_vector(radial)
 
+    def local_curvature(self, eps: Optional[Numeric] = None) -> Numeric:
+        """1/radius, negative for a concave bite -- the same sign convention
+        outward_local_normal follows, and for the same reason."""
+        bend = scalar(1) / self.radius
+        return -bend if safe_compare(self.sweep_angle, 0, Comparison.LT, eps=eps) else bend
+
     def bounds(self) -> Tuple[V2, V2]:
         xs = [self.start[0], self.end[0]]
         ys = [self.start[1], self.end[1]]
@@ -634,11 +647,18 @@ class FancyPath:
         boundary at all. At a shared vertex between two segments this is an
         arbitrary but consistent choice, same ambiguity RectangularPrism's
         get_outward_normal already accepts at its own edges/corners."""
+        found = self.locate_boundary_segments(point, eps=eps)
+        return found[0] if found else None
+
+    def locate_boundary_segments(self, point: V2, eps: Optional[Numeric] = None) -> List[Tuple[int, 'PathSegment']]:
+        """Every segment `point` lies on, in order. Two at a shared vertex,
+        where locate_boundary_segment has to pick one."""
+        found: List[Tuple[int, 'PathSegment']] = []
         for index, seg in enumerate(self.segments):
             closest = seg.closest_point(point, eps=eps)
             if safe_zero_test_sq((closest[0] - point[0]) ** 2 + (closest[1] - point[1]) ** 2, eps):
-                return index, seg
-        return None
+                found.append((index, seg))
+        return found
 
     def is_point_on_boundary_2d(self, point: V2, eps: Optional[Numeric] = None) -> bool:
         return self.locate_boundary_segment(point, eps=eps) is not None
@@ -1053,6 +1073,36 @@ class PathExtrusion(HasFeatures, CutCSG):
         n2 = seg.outward_local_normal(create_v2(x, y), eps=eps)
         local_normal = Matrix([n2[0], n2[1], scalar(0)])
         return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+
+    def get_surface_information(self, point: V3, eps: Optional[Numeric] = None) -> List[SurfacePatch]:
+        """The caps, flat, and every side the point lies on.
+
+        A side is flat where its segment is straight and bends one way where
+        the segment is an arc -- around the profile, never along the
+        extrusion, which is what makes one curvature enough to say it.
+        """
+        x, y, z = self._local_coords(point)
+
+        def facing(local: Matrix) -> Direction3D:
+            return safe_transform_vector(self.transform.orientation.matrix, local)
+
+        patches: List[SurfacePatch] = []
+        if self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps):
+            patches.append(SurfacePatch(normal=facing(Matrix([scalar(0), scalar(0), scalar(1)]))))
+        if self.start_distance is not None and safe_equality_test(z, self.start_distance, eps=eps):
+            patches.append(SurfacePatch(normal=facing(Matrix([scalar(0), scalar(0), scalar(-1)]))))
+
+        here = create_v2(x, y)
+        for _, seg in self.path.locate_boundary_segments(here, eps=eps):
+            n2 = seg.outward_local_normal(here, eps=eps)
+            normal = facing(Matrix([n2[0], n2[1], scalar(0)]))
+            curvature = seg.local_curvature(eps=eps)
+            # It bends around the profile, so the way it bends is square to
+            # both the extrusion's axis and the way out.
+            bends = None if safe_zero_test(curvature, eps=eps) else cross_product(
+                facing(Matrix([scalar(0), scalar(0), scalar(1)])), normal)
+            patches.append(SurfacePatch(normal=normal, curvature=curvature, bends=bends))
+        return patches
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:

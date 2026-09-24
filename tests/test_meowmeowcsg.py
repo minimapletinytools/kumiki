@@ -4908,6 +4908,81 @@ class TestAbuttingSolidsDoNotReportTheFaceTheyShare:
             assert cavity.is_point_on_boundary(point), label
 
 
+class TestWhatSurfacesMeetAtAPoint:
+    """get_surface_information: one patch on a smooth surface, more at an edge.
+
+    The count is the part that matters -- a normal at a corner is whichever
+    face the shape happened to check first, and that is what has no way of
+    saying "several meet here".
+    """
+
+    def _prism(self):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(100))
+
+    def _cylinder(self, radius=2):
+        return Cylinder(axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                        radius=scalar(radius),
+                        position=create_v3(scalar(0), scalar(0), scalar(0)),
+                        start_distance=scalar(0), end_distance=scalar(10))
+
+    def test_a_face_is_one_surface(self):
+        assert len(self._prism().get_surface_information(
+            create_v3(scalar(0), scalar(0), scalar(100)))) == 1
+
+    def test_an_arris_is_two(self):
+        assert len(self._prism().get_surface_information(
+            create_v3(scalar(2), scalar(0), scalar(100)))) == 2
+
+    def test_a_corner_is_three(self):
+        assert len(self._prism().get_surface_information(
+            create_v3(scalar(2), scalar(3), scalar(100)))) == 3
+
+    def test_a_flat_face_does_not_bend(self):
+        patch, = self._prism().get_surface_information(
+            create_v3(scalar(0), scalar(0), scalar(100)))
+
+        assert patch.is_flat()
+        assert patch.bends is None
+
+    def test_a_barrel_is_one_surface_that_bends_by_one_over_its_radius(self):
+        """Curved and smooth are different things: a barrel has no crease."""
+        patch, = self._cylinder(radius=2).get_surface_information(
+            create_v3(scalar(2), scalar(0), scalar(5)))
+
+        assert not patch.is_flat()
+        assert float(patch.curvature) == pytest.approx(0.5)
+        # It bends around the axis, so not along it.
+        assert abs(float(safe_dot_product(patch.bends, create_v3(scalar(0), scalar(0), scalar(1))))) \
+            == pytest.approx(0)
+
+    def test_a_rim_is_the_barrel_and_the_cap_together(self):
+        patches = self._cylinder().get_surface_information(
+            create_v3(scalar(2), scalar(0), scalar(10)))
+
+        assert len(patches) == 2
+        assert sorted(bool(p.is_flat()) for p in patches) == [False, True]
+
+    def test_a_bore_grazing_a_flat_face_is_not_that_face(self):
+        """Sharing a normal is not being the same surface -- what curvature is for."""
+        face, = self._prism().get_surface_information(
+            create_v3(scalar(2), scalar(0), scalar(50)))
+        barrel, = Cylinder(
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)), radius=scalar(1),
+            position=create_v3(scalar(1), scalar(0), scalar(0)),
+            start_distance=scalar(0), end_distance=scalar(100),
+        ).get_surface_information(create_v3(scalar(2), scalar(0), scalar(50)))
+
+        # They face the same way at the tangent line...
+        assert float(safe_dot_product(face.normal, barrel.normal)) == pytest.approx(1)
+        # ...and are still not one surface.
+        assert not face.is_the_same_surface_as(barrel)
+
+    def test_a_shape_that_has_not_been_taught_says_nothing(self):
+        assert EmptyCSG().get_surface_information(create_v3(scalar(0), scalar(0), scalar(0))) == []
+
+
 class TestADerivedEdgeIsAskedAboutItself:
     """Near two faces is not near the edge they make, and the shallower the
     joint the less near it is.

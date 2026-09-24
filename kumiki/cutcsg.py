@@ -708,6 +708,49 @@ class CSGFeatureExtent:
 
 
 @dataclass(frozen=True)
+class SurfacePatch:
+    """One surface passing through a point: which way it faces, and how it bends.
+
+    FIRST ORDER ONLY. `curvature` is the first-order change in the normal
+    across the surface, and nothing beyond that is described -- two surfaces
+    agreeing on both that differ further out read as the same here. Nothing in
+    this library can make such a pair, every surface in it being either flat or
+    bent one way only, but the limit is the type's and not the geometry's.
+
+    That one-way bending is why a single number will do. A cylinder's barrel
+    bends around the axis and not along it; an arc-segment side does the same;
+    everything else is flat. There is no sphere or torus here to need a second.
+    """
+
+    normal: Direction3D
+    #: 1/radius where the surface bends, zero where it is flat.
+    curvature: Numeric = field(default_factory=lambda: scalar(0))
+    #: Which way it bends. None where it is flat, there being nothing to point at.
+    bends: Optional[Direction3D] = None
+
+    def is_flat(self, eps: Optional[Numeric] = None) -> bool:
+        return safe_zero_test(self.curvature, eps=eps)
+
+    def is_the_same_surface_as(
+        self, other: 'SurfacePatch', eps: Optional[Numeric] = None,
+    ) -> bool:
+        """Whether the two are locally one surface, to first order.
+
+        Facing the same way is not enough: a bore grazing a flat face shares a
+        normal with it along the tangent line and is not that face.
+        """
+        if not safe_equality_test(safe_dot_product(self.normal, other.normal), 1, eps=eps):
+            return False
+        if not safe_equality_test(self.curvature, other.curvature, eps=eps):
+            return False
+        if self.is_flat(eps) or self.bends is None or other.bends is None:
+            return self.is_flat(eps) and other.is_flat(eps)
+        # Bending equally but in different directions is two surfaces crossing,
+        # not one -- two equal bores meeting at a right angle, say.
+        return are_vectors_parallel(self.bends, other.bends, eps=eps)
+
+
+@dataclass(frozen=True)
 class CSGFeature(ABC):
     """An ABC representing a feature on the CutCSG's boundary or a non-real feature of the CutCSG (e.g. the axis of a cylinder)
     
@@ -1928,6 +1971,20 @@ class CutCSG(ABC):
         """
         pass
 
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """Every surface passing through *point*.
+
+        One patch where the surface is smooth, several where surfaces meet --
+        an edge gives two, a corner three -- and an empty list where the shape
+        cannot say, which is also what a point off the boundary gets.
+
+        Not abstract: a shape that has not been taught this says nothing rather
+        than guessing, and callers treat saying nothing as "do not know".
+        """
+        return []
+
     @abstractmethod
     def get_aabb(self) -> 'AxisAlignedBoundingBox':
         """
@@ -2102,6 +2159,12 @@ class HalfSpace(HasFeatures, CutCSG):
             The outward normal vector (the HalfSpace's normal)
         """
         return -self.normal
+
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """One flat surface, everywhere. A half space has no edges to meet at."""
+        return [SurfacePatch(normal=-self.normal)]
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         warnings.warn(
@@ -2394,6 +2457,36 @@ class RectangularPrism(HasFeatures, CutCSG):
         # Should not reach here if point is actually on boundary
         return None
 
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """Every face the point lies on. All six are flat, so one on a face,
+        two along an arris, three at a corner.
+
+        The same six tests get_outward_normal makes, without stopping at the
+        first -- which is what stopping loses.
+        """
+        x_coord, y_coord, z_coord = self._local_coords(point)
+        width_dir, height_dir, length_dir = self._local_axes()
+        half_width, half_height = self.size[0] / 2, self.size[1] / 2
+
+        patches: List['SurfacePatch'] = []
+        if self.start_distance is not None and safe_equality_test(
+                z_coord, self.start_distance, eps=eps):
+            patches.append(SurfacePatch(normal=-length_dir))
+        if self.end_distance is not None and safe_equality_test(
+                z_coord, self.end_distance, eps=eps):
+            patches.append(SurfacePatch(normal=length_dir))
+        if safe_equality_test(Abs(x_coord), half_width, eps=eps):
+            patches.append(SurfacePatch(
+                normal=width_dir if safe_compare(x_coord, 0, Comparison.GT, eps=eps)
+                else -width_dir))
+        if safe_equality_test(Abs(y_coord), half_height, eps=eps):
+            patches.append(SurfacePatch(
+                normal=height_dir if safe_compare(y_coord, 0, Comparison.GT, eps=eps)
+                else -height_dir))
+        return patches
+
     def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:
             warnings.warn(
@@ -2646,6 +2739,38 @@ class Cylinder(HasFeatures, CutCSG):
         # Should not reach here if point is on boundary
         return None
 
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """The barrel, the caps, and both together at a rim.
+
+        The barrel is the one curved surface a cylinder has, and it bends only
+        around the axis -- 1/radius that way, straight along it.
+        """
+        local_point = point - self.position
+        axis = self.axis_direction / safe_norm(self.axis_direction)
+        axial_coord = safe_dot_product(local_point, axis)
+        radial_vector = local_point - axis * axial_coord
+        radial_distance = safe_norm(radial_vector)
+
+        patches: List['SurfacePatch'] = []
+        if (safe_equality_test(radial_distance, self.radius, eps=eps)
+                and not safe_zero_test(radial_distance, eps=eps)):
+            outward = radial_vector / radial_distance
+            patches.append(SurfacePatch(
+                normal=outward,
+                curvature=scalar(1) / self.radius,
+                # It bends around the axis, so the way it bends is square to
+                # both the axis and the way out.
+                bends=cross_product(axis, outward)))
+        if self.start_distance is not None and safe_equality_test(
+                axial_coord, self.start_distance, eps=eps):
+            patches.append(SurfacePatch(normal=-axis))
+        if self.end_distance is not None and safe_equality_test(
+                axial_coord, self.end_distance, eps=eps):
+            patches.append(SurfacePatch(normal=axis))
+        return patches
+
     def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:
             warnings.warn(
@@ -2855,6 +2980,20 @@ class SolidUnion(CutCSG):
         """
         return SolidsAtPoint(self.children, point, eps=eps).average_outward_normal()
 
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """Every surface of every child the point is on, gathered.
+
+        A child holding the point INSIDE contributes nothing: that surface is
+        buried in the union and is not the union's.
+        """
+        at = SolidsAtPoint(self.children, point, eps=eps)
+        patches: List['SurfacePatch'] = []
+        for child in at.on_surface:
+            patches.extend(child.get_surface_information(point, eps=eps))
+        return patches
+
     def get_aabb(self) -> AxisAlignedBoundingBox:
         # Empty children contribute no points to the union, so they're excluded
         # before combining bounds — otherwise their degenerate zero-box would
@@ -2925,6 +3064,17 @@ class Intersection(CutCSG):
             if normal is not None:
                 return normal
         return None
+
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """Every surface of either side the point is on. Both sides bound an
+        intersection, so both contribute where the point is on both."""
+        at = SolidsAtPoint([self.left, self.right], point, eps=eps)
+        patches: List['SurfacePatch'] = []
+        for side in at.on_surface:
+            patches.extend(side.get_surface_information(point, eps=eps))
+        return patches
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         left_bbox = self.left.get_aabb()
@@ -3021,10 +3171,28 @@ class Difference(CutCSG):
         # calls the cut flush, and the face surrounding the cut is dropped --
         # see TestAFlushCutIsOnlyFlushWhereItIsFlat, which has the case waiting.
         #
-        # It does not need a working normal on every shape to be worth fixing.
-        # Knowing whether the point sits on a SMOOTH patch or on an edge is most
-        # of the value: a point that is not smooth can refuse to claim flushness
-        # and be right, whatever its normal says.
+        # get_surface_information now says what surfaces meet here, which is
+        # what this needs -- but "both sides smooth, and the same surface" is
+        # NOT the rule. Tried and reverted: it keeps a corner of a shape minus
+        # itself, and the sharp corner a roundover takes off, both of which
+        # must go. The question is not whether two surfaces match, it is
+        # whether any material survives, and these five cases fix it:
+        #
+        #   shape minus itself, at a corner      exclude
+        #   the sharp corner a roundover removes exclude
+        #   a cut's own corner on the base face  keep   (the xfail)
+        #   the middle of a flush cut            exclude
+        #   a bore grazing a face from inside    keep
+        #
+        # What satisfies the first four: a direction d survives when it points
+        # INTO the base -- d . n < 0 for every one of the base's patches -- and
+        # OUT OF each subtract, which needs d . n > 0 for only ONE of that
+        # subtract's patches, since leaving a convex solid means leaving
+        # through any one of its faces. Exclude the point when no such d
+        # exists. The fifth case is why curvature is on SurfacePatch: a bore
+        # curves away from the face it grazes, so it is escaped just off the
+        # tangent line even though the tangent planes coincide, and a
+        # first-order test alone will always call that flush.
         base_normal = self.base.get_outward_normal(point, eps=eps)
         for sub_normal in removed.outward_normals():
             if base_normal is None or sub_normal is None:
@@ -3067,10 +3235,36 @@ class Difference(CutCSG):
         # If point is on base boundary, return base's normal
         if self.base.is_point_on_boundary(point, eps=eps):
             return self.base.get_outward_normal(point, eps=eps)
-        
-        # Otherwise, point must be on subtract boundary (creating a "hole")
-        # The normal should point inward to the subtract (which is outward from the difference)
-        # So we negate the subtract's outward normal
+        return self._surfaces_of_the_holes(point, eps=eps)
+
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """The base's own surfaces here, and the walls of any hole reaching it.
+
+        A hole's wall faces the other way from the subtract that made it -- out
+        of the remaining material, into the void -- so its normal is negated
+        and its curvature with it: a bore is convex as a cylinder and concave
+        as the hole it leaves.
+        """
+        patches: List['SurfacePatch'] = []
+        if self.base.is_point_on_boundary(point, eps=eps):
+            patches.extend(self.base.get_surface_information(point, eps=eps))
+        for sub in SolidsAtPoint(self.subtract, point, eps=eps).on_surface:
+            for patch in sub.get_surface_information(point, eps=eps):
+                patches.append(SurfacePatch(
+                    normal=-patch.normal, curvature=-patch.curvature, bends=patch.bends))
+        return patches
+
+    def _surfaces_of_the_holes(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> Optional[Direction3D]:
+        """The wall of whatever hole reaches this point, as one averaged normal.
+
+        Point is on a subtract boundary, creating a "hole". The normal should
+        point inward to the subtract, which is outward from the difference, so
+        the subtract's own outward normal is negated.
+        """
         return SolidsAtPoint(self.subtract, point, eps=eps).average_outward_normal(negated=True)
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
@@ -3378,8 +3572,21 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
         # Otherwise, point is on a side face (edge of polygon extruded)
-        # Find which edge it's on and compute the normal
-        point_2d = Matrix([x_coord, y_coord])
+        sides = self._outward_normals_of_sides_at(Matrix([x_coord, y_coord]), eps=eps)
+        return sides[0] if sides else None
+
+    def _outward_normals_of_sides_at(
+        self, point_2d: Matrix, eps: Optional[Numeric] = None,
+    ) -> List[Direction3D]:
+        """The outward normal of every side the 2D point lies on, in global space.
+
+        More than one where the point is on a polygon vertex, which is where
+        two sides meet -- an arris running the length of the extrusion.
+        """
+        found: List[Direction3D] = []
+        # Calculate polygon center, to tell outward from inward.
+        center = Matrix([sum(p[0] for p in self.points) / len(self.points),
+                         sum(p[1] for p in self.points) / len(self.points)])
 
         for i in range(len(self.points)):
             p1 = self.points[i]
@@ -3407,12 +3614,6 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
                     edge_normal_2d = Matrix([-edge[1], edge[0]])
                     edge_normal_2d = edge_normal_2d / sqrt(edge_normal_2d[0]**2 + edge_normal_2d[1]**2)
 
-                    # Check if this normal points outward (away from polygon center)
-                    # Calculate polygon center
-                    center_x = sum(p[0] for p in self.points) / len(self.points)
-                    center_y = sum(p[1] for p in self.points) / len(self.points)
-                    center = Matrix([center_x, center_y])
-
                     # Vector from center to point on edge
                     to_edge = closest_point - center
 
@@ -3424,9 +3625,34 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
                     local_normal = Matrix([edge_normal_2d[0], edge_normal_2d[1], 0])
 
                     # Transform to global coordinates
-                    return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+                    found.append(safe_transform_vector(self.transform.orientation.matrix, local_normal))
 
-        return None
+        return found
+
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """The caps and every side the point lies on. All of them flat: an
+        extrusion's sides are planes and its caps are planes.
+        """
+        local_point = point - self.transform.position
+        local_coords = safe_transform_vector(
+            self.transform.orientation.invert().matrix, local_point)
+        z_coord = local_coords[2]
+
+        def facing(z: Numeric) -> Direction3D:
+            return safe_transform_vector(
+                self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), z]))
+
+        patches: List['SurfacePatch'] = []
+        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance, eps=eps):
+            patches.append(SurfacePatch(normal=facing(scalar(1))))
+        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance, eps=eps):
+            patches.append(SurfacePatch(normal=facing(scalar(-1))))
+        patches.extend(
+            SurfacePatch(normal=normal) for normal in self._outward_normals_of_sides_at(
+                Matrix([local_coords[0], local_coords[1]]), eps=eps))
+        return patches
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
         local_point = point - self.transform.position
@@ -3780,6 +4006,19 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
+        sides = self._outward_normals_of_sides_at(x_coord, y_coord, z_coord, eps=eps)
+        return sides[0] if sides else None
+
+    def _outward_normals_of_sides_at(
+        self, x_coord: Numeric, y_coord: Numeric, z_coord: Numeric,
+        eps: Optional[Numeric] = None,
+    ) -> List[Direction3D]:
+        """The outward normal of every side the point lies on, in global space.
+
+        More than one where two sides meet, which is an arris running the
+        height of the loft.
+        """
+        found: List[Direction3D] = []
         t_height = self._height_fraction(z_coord)
         cross_section = self._cross_section_at(t_height)
         point_2d = Matrix([x_coord, y_coord])
@@ -3830,9 +4069,34 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
             if safe_compare(outward_dot, 0, Comparison.LT, eps=eps):
                 local_normal = -local_normal
 
-            return safe_normalize_vector(safe_transform_vector(self.transform.orientation.matrix, local_normal))
+            found.append(safe_normalize_vector(
+                safe_transform_vector(self.transform.orientation.matrix, local_normal)))
 
-        return None
+        return found
+
+    def get_surface_information(
+        self, point: V3, eps: Optional[Numeric] = None,
+    ) -> List['SurfacePatch']:
+        """The caps and every side the point lies on, all of them flat.
+
+        A loft's sides are quads in space and planar only when their corners
+        are coplanar, which is why a twist is refused outright -- see
+        _sides_are_planar. Refusing it is what lets these be flat.
+        """
+        x_coord, y_coord, z_coord = self._local_coords(point)
+
+        def facing(z: Numeric) -> Direction3D:
+            return safe_transform_vector(
+                self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), z]))
+
+        patches: List['SurfacePatch'] = []
+        if safe_zero_test(z_coord - self.top_points_z_pos, eps=eps):
+            patches.append(SurfacePatch(normal=facing(scalar(1))))
+        if safe_zero_test(z_coord - self.bottom_points_z_pos, eps=eps):
+            patches.append(SurfacePatch(normal=facing(scalar(-1))))
+        patches.extend(SurfacePatch(normal=normal) for normal in
+                       self._outward_normals_of_sides_at(x_coord, y_coord, z_coord, eps=eps))
+        return patches
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         corners_global = (
