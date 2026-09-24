@@ -687,6 +687,7 @@ LocatedFeatureGeometry = Union[Point, Line, Plane]
 # NOTE this class is used for 2 things
 # 1. as a simple broad phase test on individual nodes
 # 2. to determine where the measurement anchors for 
+# TODO consider splitting this class into different ones for each feature type
 # TODO consider getting rid of this becasue:
 # 1. I don't think we cache extents + and there is no KD/oct tree so this is not really doing much for perf
 # 2. measurement anchor position should have its own function
@@ -702,6 +703,7 @@ class CSGFeatureExtent:
     """
     anchor: V3
     ends: Optional[Tuple[V3, V3]] = None
+    # TODO replace with ConvexPlanarRegion
     aabb: Optional['AxisAlignedBoundingBox'] = None
 
 
