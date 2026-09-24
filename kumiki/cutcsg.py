@@ -856,18 +856,15 @@ class DerivedEdgeFeature(CSGFeature):
         return CSGFeatureType.EDGE
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        """Whether *point* is on the edge itself, not merely on both its faces.
-
-        Near both faces is a far weaker thing to be, and the shallower the
-        joint the weaker: 2mm from two faces meeting at 5 degrees is 46mm from
-        the edge they make. Asking the line keeps the answer to what was asked.
-
-        Falls back to the faces when there is no line to ask -- a parent that
-        is a cylinder's barrel or a lofted side locates to nothing.
+        """Test the point against the analytic edge itself. Testing against both
+        faces alone will return bad results when the two faces are almost parallel.
         """
         line = self.locate_simple_unbounded(owner)
         if isinstance(line, Line):
             return _point_is_on_line(point, line, test_tolerance)
+        # debatable if this is the right behavior. In any case, this code path
+        # should never get hit since DerivedEdges are only created when there
+        # is an actual line.
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
@@ -1000,14 +997,14 @@ class DerivedPointFeature(CSGFeature):
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         """Whether *point* is on the vertex itself, not merely on the edge and
-        the face that cross there -- see DerivedEdgeFeature for why that is a
-        far weaker thing to be.
-
-        Falls back to the parents when there is no vertex to ask for.
+        the face that cross there.
         """
         vertex = self.locate_simple_unbounded(owner)
         if isinstance(vertex, Point):
             return _point_is_near(point, vertex.position, test_tolerance)
+        # debatable if this is the right behavior. In any case, this falls back
+        # to the parents only when locate_simple_unbounded returns no vertex,
+        # which should never happen.
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
@@ -1836,7 +1833,7 @@ class CutCSG(ABC):
             return [hit for hit in gathered if hit.feature.feature_type() == feature_type]
 
         # One gather for both derivations, at the widest tolerance either of
-        # them could want, since each derived feature is then asked directly
+        # them could want, since derived features are then asked directly
         # whether the point is on IT. Gathering narrower would only rule out
         # parents whose child is about to be asked a stricter question anyway.
         #
@@ -1868,12 +1865,18 @@ class CutCSG(ABC):
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> Optional['OwnedFeatureHit']:
-        """The best feature at *point*, or None.
+        """The best feature at *point*, or None. Best is, in order:
 
-        Best is: a non-real feature before a real one, then the more specific
-        kind, then a declared feature before a derived one, then the pairing
-        group, then author-set priority, then the name. _sort_feature_hits
-        holds the order and says why each step is where it is.
+        - a non-real feature before a real one;
+        - the more specific kind: a point, then an edge, then a face;
+        - a declared feature before a derived one;
+        - the pairing group, best rank first;
+        - author-set priority;
+        - the name;
+        - and last, the order they were gathered in.
+
+        _sort_feature_hits holds the order and says why each step is where it
+        is -- in particular why specificity sits above declaredness.
         """
         hits = self.find_all_features(point, test_tolerances=test_tolerances)
         if not hits:
