@@ -4,6 +4,8 @@ Tests for cutcsg.py module.
 This module contains tests for the CSG primitives and operations.
 """
 
+import math
+
 import pytest
 from kumiki.rule import safe_dot_product, Orientation, Transform, create_v3, radians, scalar, Matrix, simplify, sqrt, cos, sin, pi, safe_zero_test, safe_equality_test, safe_compare, Comparison
 from kumiki.geometry import (Line, Plane, Point, closest_stations, intersect_line_plane,
@@ -3094,9 +3096,11 @@ class TestProgrammableCSGFeature:
     def test_it_is_tested_at_the_tolerance_its_own_type_calls_for(self):
         """A feature is refined to its own type's tolerance.
 
-        A face is additionally tested at the EDGE tolerance, because faces get
-        paired into derived edges there -- so the assertion is about which
-        tolerances each feature does and does not see, not about a single call.
+        Every feature is additionally offered to derivation at the POINT
+        tolerance, the widest of the three -- one gather serves both
+        derivations, and what a derived feature admits is then decided by
+        asking IT, not its parents. So the assertion is about which tolerances
+        each feature does and does not see, not about a single call.
         """
         recorded = []
 
@@ -3108,21 +3112,29 @@ class TestProgrammableCSGFeature:
             )
 
         face_tolerance, edge_tolerance = scalar(1, 1000), scalar(1, 100)
+        point_tolerance = scalar(1, 50)
         prism = self._prism(spy("f", CSGFeatureType.FACE), spy("e", CSGFeatureType.EDGE))
         prism.find_all_features(
             create_v3(scalar(2), scalar(0), scalar(5)),
-            FeatureTestTolerances(face=face_tolerance, edge=edge_tolerance),
+            FeatureTestTolerances(face=face_tolerance, edge=edge_tolerance,
+                                  point=point_tolerance),
         )
         seen = {name: {tolerance for n, tolerance in recorded if n == name}
                 for name in ("f", "e")}
 
-        # The face is refined to the face tolerance, and also offered to edge
-        # derivation at the edge tolerance.
+        # Each is refined to its own type's tolerance...
         assert face_tolerance in seen["f"]
-        assert edge_tolerance in seen["f"]
-        # The declared edge is refined to the edge tolerance, and never
-        # narrowed to the face one -- that would defeat snapping.
         assert edge_tolerance in seen["e"]
+        # ...and each is offered to derivation at the widest one.
+        assert point_tolerance in seen["f"]
+        assert point_tolerance in seen["e"]
+        # The face is no longer gathered at the EDGE tolerance to be paired
+        # into an edge. Being near two faces is not being near the edge they
+        # make, so the derived edge is asked instead -- see
+        # DerivedEdgeFeature.test_point_unbounded.
+        assert edge_tolerance not in seen["f"]
+        # And the declared edge is never narrowed to the face tolerance, which
+        # would defeat snapping.
         assert face_tolerance not in seen["e"]
 
     def test_a_predicateless_feature_matches_nothing(self):
@@ -4894,6 +4906,72 @@ class TestAbuttingSolidsDoNotReportTheFaceTheyShare:
                              ("floor", create_v3(scalar(0), scalar(0), scalar(40))),
                              ("ceiling", create_v3(scalar(0), scalar(0), scalar(60)))):
             assert cavity.is_point_on_boundary(point), label
+
+
+class TestADerivedEdgeIsAskedAboutItself:
+    """Near two faces is not near the edge they make, and the shallower the
+    joint the less near it is.
+
+    The test used to be "is the point on both parents", which at a 5 degree
+    scarf offers an edge to a click 40mm away from it. Distance to the line is
+    never less than distance to either plane, so asking the line is strictly
+    tighter as well as being the question actually asked.
+    """
+
+    TOLERANCE = scalar(2, 1000)   # 2mm, the edge tolerance
+
+    def _scarf(self, degrees):
+        """Two faces meeting at *degrees*, and the edge they form."""
+        turn = math.radians(degrees)
+        flat = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(0))
+        tipped = HalfSpace(
+            normal=create_v3(scalar(0), scalar(math.sin(turn)), scalar(math.cos(turn))),
+            offset=scalar(0))
+        edge = DerivedEdgeFeature(
+            name="scarf",
+            a=OwnedFeatureHit(feature=flat.get_declared_features()[0], owner=flat),
+            b=OwnedFeatureHit(feature=tipped.get_declared_features()[0], owner=tipped))
+        return edge, flat
+
+    def _click_near_both_faces(self, degrees, distance=0.0018):
+        """A point *distance* from each face, which is far from their edge."""
+        turn = math.radians(degrees)
+        across = distance * (1 + math.cos(turn)) / math.sin(turn)
+        return create_v3(scalar(0), scalar(repr(across)), scalar(repr(-distance)))
+
+    @pytest.mark.parametrize("degrees,away_mm", [(90, 2.5), (45, 4.7), (10, 20.7), (5, 41.3)])
+    def test_a_click_near_both_faces_is_not_near_the_edge(self, degrees, away_mm):
+        edge, owner = self._scarf(degrees)
+        click = self._click_near_both_faces(degrees)
+
+        # Both parents would admit it: it is 1.8mm from each, inside the 2mm.
+        assert edge.a.feature.test_point_unbounded(edge.a.owner, click, self.TOLERANCE)
+        assert edge.b.feature.test_point_unbounded(edge.b.owner, click, self.TOLERANCE)
+        # The edge itself does not, being the thing actually being asked about.
+        assert not edge.test_point_unbounded(owner, click, self.TOLERANCE)
+
+    def test_but_a_click_on_the_edge_still_is(self):
+        edge, owner = self._scarf(5)
+        on_it = create_v3(scalar(3), scalar(0), scalar(0))
+
+        assert edge.test_point_unbounded(owner, on_it, self.TOLERANCE)
+
+    def test_and_a_parent_that_locates_to_nothing_falls_back_to_the_parents(self):
+        """A cylinder's barrel has no plane, so there is no line to ask."""
+        barrel = Cylinder(axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                          radius=scalar(2), position=create_v3(scalar(0), scalar(0), scalar(0)),
+                          start_distance=scalar(0), end_distance=scalar(10))
+        flat = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(0))
+        edge = DerivedEdgeFeature(
+            name="round",
+            a=OwnedFeatureHit(feature=barrel.get_declared_features()[0], owner=barrel),
+            b=OwnedFeatureHit(feature=flat.get_declared_features()[0], owner=flat))
+
+        assert edge.locate_simple_unbounded(barrel) is None
+        # Still answers, from its parents, rather than refusing outright.
+        assert isinstance(
+            edge.test_point_unbounded(barrel, create_v3(scalar(2), scalar(0), scalar(0)),
+                                      self.TOLERANCE), bool)
 
 
 class TestAFlushCutIsOnlyFlushWhereItIsFlat:

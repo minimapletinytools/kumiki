@@ -456,6 +456,17 @@ _DEFAULT_FEATURE_PROPERTIES = FeatureProperties(
     group=FeatureGroup.NONE, priority=_DEFAULT_FEATURE_PRIORITY)
 
 
+def _within_tolerance(
+    hits: List['OwnedFeatureHit'],
+    point: V3,
+    tolerances: 'FeatureTestTolerances',
+) -> List['OwnedFeatureHit']:
+    """Those hits the point is actually on, each judged at its own type's tolerance."""
+    return [hit for hit in hits
+            if hit.feature.test_point_unbounded(
+                hit.owner, point, tolerances.for_type(hit.feature.feature_type()))]
+
+
 def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
     """Best answer first.
 
@@ -813,6 +824,20 @@ def _as_plane(geometry: Optional['LocatedFeatureGeometry']) -> Optional[Plane]:
     return geometry if isinstance(geometry, Plane) else None
 
 
+def _point_is_near(point: V3, other: V3, tolerance: Optional[Numeric] = None) -> bool:
+    """Whether two points are within *tolerance* of each other."""
+    gap = point - other
+    return safe_zero_test_sq(safe_dot_product(gap, gap), eps=tolerance)
+
+
+def _point_is_on_line(point: V3, line: Line, tolerance: Optional[Numeric] = None) -> bool:
+    """Whether *point* lies within *tolerance* of an infinite line."""
+    along = safe_normalize_vector(line.direction)
+    from_start = point - line.point
+    across = from_start - along * safe_dot_product(from_start, along)
+    return safe_zero_test_sq(safe_dot_product(across, across), eps=tolerance)
+
+
 @dataclass(frozen=True)
 class DerivedEdgeFeature(CSGFeature):
     """The edge where two planar FACE features meet.
@@ -831,6 +856,18 @@ class DerivedEdgeFeature(CSGFeature):
         return CSGFeatureType.EDGE
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        """Whether *point* is on the edge itself, not merely on both its faces.
+
+        Near both faces is a far weaker thing to be, and the shallower the
+        joint the weaker: 2mm from two faces meeting at 5 degrees is 46mm from
+        the edge they make. Asking the line keeps the answer to what was asked.
+
+        Falls back to the faces when there is no line to ask -- a parent that
+        is a cylinder's barrel or a lofted side locates to nothing.
+        """
+        line = self.locate_simple_unbounded(owner)
+        if isinstance(line, Line):
+            return _point_is_on_line(point, line, test_tolerance)
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
@@ -962,6 +999,15 @@ class DerivedPointFeature(CSGFeature):
         return min(ranks) if ranks else FeatureGroup.NONE.value
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        """Whether *point* is on the vertex itself, not merely on the edge and
+        the face that cross there -- see DerivedEdgeFeature for why that is a
+        far weaker thing to be.
+
+        Falls back to the parents when there is no vertex to ask for.
+        """
+        vertex = self.locate_simple_unbounded(owner)
+        if isinstance(vertex, Point):
+            return _point_is_near(point, vertex.position, test_tolerance)
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
@@ -1789,29 +1835,31 @@ class CutCSG(ABC):
         def of_type(gathered, feature_type):
             return [hit for hit in gathered if hit.feature.feature_type() == feature_type]
 
-        # NOTE to get derived edge features at edge level tolerance we need to fetch faces at edge level tolerance
-        # the algorithm is inefficient, consider the following instead:
-        # 1. get everything at point tolerance
-        # 2. derive point and edge features
-        # 3. refine all resulting hits to their actual feature type tolerane
-        # I'm not sure if 3. is easily possible right now, look into what it would take to make it possible, if it's too much code bloat, then the current algo calling collect_feature_hits multiple times is fine.
-
-        at_edge_tolerance = self.collect_feature_hits(
-            point, FeatureTestTolerances.uniform(tolerances.edge))
-
-        # TODO I think this is probably the wrong way to do it, and find_all_fetaures needs to be refactored in general
-        # the issue here is that derived features are attributed to the CSG that calls find_all_features 
-        # instead, derived features should be determined attributed to the intersecation/difference/solidunion that produced it
-        # NOTE for now we don't allow derivde features to produce more derived features
-        derived_edges = derive_edge_hits(self, of_type(at_edge_tolerance, CSGFeatureType.FACE))
-
-        at_point_tolerance = self.collect_feature_hits(
+        # One gather for both derivations, at the widest tolerance either of
+        # them could want, since each derived feature is then asked directly
+        # whether the point is on IT. Gathering narrower would only rule out
+        # parents whose child is about to be asked a stricter question anyway.
+        #
+        # TODO two walks of the tree rather than one, because the gather above
+        # also applies the boundary gate at `tolerances.face`, and widening the
+        # tolerances here widens that with it. Separating "near the feature"
+        # from "on the boundary" would let both derivations and the direct hits
+        # come out of a single walk. Worth doing for the pick path, which runs
+        # this per pointer move; not worth doing blind.
+        candidates = self.collect_feature_hits(
             point, FeatureTestTolerances.uniform(tolerances.point))
-        derived_points = derive_point_hits(
-            self,
-            of_type(at_point_tolerance, CSGFeatureType.EDGE),
-            of_type(at_point_tolerance, CSGFeatureType.FACE),
-        )
+
+        # NOTE for now we don't allow derived features to produce more derived features
+        derived_edges = _within_tolerance(
+            derive_edge_hits(self, of_type(candidates, CSGFeatureType.FACE)),
+            point, tolerances)
+        derived_points = _within_tolerance(
+            derive_point_hits(
+                self,
+                of_type(candidates, CSGFeatureType.EDGE),
+                of_type(candidates, CSGFeatureType.FACE),
+            ),
+            point, tolerances)
 
         return _drop_duplicate_derived(_sort_feature_hits(hits + derived_edges + derived_points))
 
@@ -1820,9 +1868,12 @@ class CutCSG(ABC):
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> Optional['OwnedFeatureHit']:
-        """The best feature at *point*, or None. Uses default sorting rules.
+        """The best feature at *point*, or None.
 
-        # TODO document sorting rulse here
+        Best is: a non-real feature before a real one, then the more specific
+        kind, then a declared feature before a derived one, then the pairing
+        group, then author-set priority, then the name. _sort_feature_hits
+        holds the order and says why each step is where it is.
         """
         hits = self.find_all_features(point, test_tolerances=test_tolerances)
         if not hits:
