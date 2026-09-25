@@ -47,6 +47,7 @@ from kumiki.cutcsg import (
     SimpleCylinderFeature,
     SimpleLoftFeature,
     SimpleRectangularPrismEdgeFeature,
+    SimpleRectangularPrismVertexFeature,
     SimpleRectangularPrismFeature,
     FeatureGroup,
     CylinderPart,
@@ -3220,6 +3221,49 @@ class TestDefaultOrderFollowsTimberFeature:
 
         assert indices == list(range(4))
 
+    def test_every_corner_index_ascends_with_the_enum(self):
+        from kumiki.timber import TimberCorner
+
+        by_faces = {
+            frozenset(feature.faces): key[1]
+            for key, feature in self._prism().default_features().items()
+            if isinstance(feature, SimpleRectangularPrismVertexFeature)
+        }
+
+        indices = [by_faces[self._faces_named_in_corner(member)] for member in TimberCorner]
+
+        assert indices == list(range(8)), dict(
+            zip([m.name for m in TimberCorner], indices))
+
+    def test_and_each_corner_sits_where_its_three_faces_are(self):
+        """Read off the name rather than the code: a 4x6 prism running 0..10 has
+        RIGHT at x=+2, FRONT at y=+3, BOTTOM at z=0, and so on."""
+        from kumiki.timber import TimberCorner
+
+        where = {"RIGHT": (0, 2.0), "LEFT": (0, -2.0), "FRONT": (1, 3.0),
+                 "BACK": (1, -3.0), "BOTTOM": (2, 0.0), "TOP": (2, 10.0)}
+        prism = self._prism()
+        by_faces = {
+            frozenset(feature.faces): feature.locate_simple_unbounded(prism).position
+            for feature in prism.default_features().values()
+            if isinstance(feature, SimpleRectangularPrismVertexFeature)
+        }
+
+        for member in TimberCorner:
+            faces = self._faces_named_in_corner(member)
+            expected = [0.0, 0.0, 0.0]
+            for face in faces:
+                axis, value = where[face.name]
+                expected[axis] = value
+            at = by_faces[faces]
+
+            assert [float(at[i, 0]) for i in range(3)] == pytest.approx(expected), member.name
+
+    def _faces_named_in_corner(self, member):
+        """The PrismFaces a corner member's own name mentions."""
+        words = member.name.replace("BOT_", "BOTTOM_").split("_")
+        return frozenset(PrismFace[word] for word in words)
+
     def test_the_caps_are_the_one_place_it_cannot_follow(self):
         """TimberFeature lists TOP before BOTTOM; a CAP index cannot.
 
@@ -3271,9 +3315,9 @@ class TestDeclaredFeatures:
         )
 
         assert prism.get_declared_features(FeatureSource.OVERRIDES) == []
-        # Six faces, four long arrises, and four at each end.
-        assert len(prism.get_declared_features(FeatureSource.DEFAULTS)) == 18
-        assert len(prism.get_declared_features()) == 18
+        # Six faces, four long arrises, four at each end, and eight corners.
+        assert len(prism.get_declared_features(FeatureSource.DEFAULTS)) == 26
+        assert len(prism.get_declared_features()) == 26
 
 
 class TestCSGFeatureType:
@@ -5273,6 +5317,110 @@ class TestANamedArris:
         hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
 
         assert arris.name in [hit.feature.name for hit in hits]
+
+
+class TestANamedCorner:
+    """A prism's vertex: the most specific thing there is to point at."""
+
+    def _prism(self, *features):
+        return RectangularPrism(
+            size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10), _features=list(features))
+
+    def _corner(self, name="corner", faces=(PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT)):
+        return SimpleRectangularPrismVertexFeature(name, faces=faces)
+
+    def test_it_is_a_point(self):
+        assert self._corner().feature_type() == CSGFeatureType.POINT
+
+    def test_it_locates_to_where_its_three_faces_meet(self):
+        corner = self._corner()
+
+        located = corner.locate_simple_unbounded(self._prism(corner))
+
+        assert isinstance(located, Point)
+        assert points_are_coincident(
+            located, Point(create_v3(scalar(2), scalar(3), scalar(0))))
+
+    def test_a_point_is_on_it_only_at_that_corner(self):
+        corner = self._corner()
+        prism = self._prism(corner)
+
+        assert corner.test_point_unbounded(prism, create_v3(scalar(2), scalar(3), scalar(0)))
+        # Along an arris leading to it, but not at it.
+        assert not corner.test_point_unbounded(prism, create_v3(scalar(2), scalar(3), scalar(5)))
+
+    def test_its_extent_is_the_point_itself(self):
+        corner = self._corner()
+
+        extent = corner.get_extent(self._prism(corner))
+
+        assert extent is not None and extent.ends is None
+        assert points_are_coincident(
+            Point(extent.anchor), Point(create_v3(scalar(2), scalar(3), scalar(0))))
+
+    def test_an_end_that_runs_to_infinity_has_no_corner_there(self):
+        endless = RectangularPrism(
+            size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
+            start_distance=None, end_distance=scalar(10))
+
+        assert self._corner().locate_simple_unbounded(endless) is None
+
+    def test_it_beats_the_edges_and_faces_that_meet_there(self):
+        """Which is the whole point: a point sits on an edge sits on a face."""
+        prism = self._prism()
+        at = create_v3(scalar(2), scalar(3), scalar(10))
+
+        best = prism.find_first_feature(at)
+
+        assert best.feature.feature_type() == CSGFeatureType.POINT
+        assert best.name == "corner.4"      # top profile, first vertex
+
+    def test_three_faces_that_meet_at_no_corner_say_so(self):
+        with pytest.warns(UserWarning, match="meet at no corner"):
+            SimpleRectangularPrismVertexFeature(
+                "nope", faces=(PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.LEFT))
+
+    def test_and_naming_them_out_of_order_says_so_too(self):
+        with pytest.warns(UserWarning, match="canonical order"):
+            SimpleRectangularPrismVertexFeature(
+                "backwards", faces=(PrismFace.FRONT, PrismFace.RIGHT, PrismFace.BOTTOM))
+
+
+class TestACornerIsNamedTheSameWayWhoeverNamesIt:
+    """timber.py decides the order, as it does for the arrises."""
+
+    def _prism_corners(self):
+        prism = RectangularPrism(
+            size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10))
+        return [feature for feature in prism.default_features().values()
+                if isinstance(feature, SimpleRectangularPrismVertexFeature)]
+
+    def _timber_order(self):
+        from kumiki.timber import _TIMBER_CORNERS
+
+        return {frozenset((cap, first, second)): (cap, first, second)
+                for _, cap, first, second in _TIMBER_CORNERS}
+
+    def test_both_name_the_same_eight_corners(self):
+        assert len(self._prism_corners()) == 8
+        assert {frozenset(c.faces) for c in self._prism_corners()} == set(self._timber_order())
+
+    def test_and_write_each_one_the_same_way_round(self):
+        order = self._timber_order()
+
+        for corner in self._prism_corners():
+            assert tuple(corner.faces) == order[frozenset(corner.faces)]
+
+    def test_and_a_timber_tag_replaces_the_default_rather_than_joining_it(self):
+        from kumiki.timber import _corner_tags
+
+        tags = _corner_tags("ptw.")
+
+        assert len(tags) == 8
+        assert {tag.feature_key() for tag in tags} == {
+            key for key, _ in ((c.feature_key(), c) for c in self._prism_corners())}
 
 
 class TestAnArrisIsNamedTheSameWayWhoeverNamesIt:

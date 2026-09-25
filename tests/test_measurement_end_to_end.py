@@ -70,7 +70,14 @@ class Viewer:
             for triangle in triangulate_cutcsg(local).mesh.triangles:
                 corners = [[float(triangle[k][i]) for i in range(3)] for k in range(3)]
                 middle = [sum(corner[i] for corner in corners) / 3 for i in range(3)]
-                for local_point in corners + [middle]:
+                # Edge midpoints as well as the corners: a corner resolves to
+                # the prism's own vertex feature, which is the most specific
+                # thing there, so an arris is only reachable away from its ends.
+                halfway = [[(a[i] + b[i]) / 2 for i in range(3)]
+                           for a, b in ((corners[0], corners[1]),
+                                        (corners[1], corners[2]),
+                                        (corners[2], corners[0]))]
+                for local_point in corners + halfway + [middle]:
                     world = cut_timber.timber.transform.local_to_global(
                         runner._to_v3(local_point))
                     points.append([float(world[i, 0]) for i in range(3)])

@@ -1353,6 +1353,115 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
         return CSGFeatureExtent(anchor=line.point)
 
 
+def _canonical_corner_faces(
+    faces: Sequence['PrismFace'],
+) -> Optional[Tuple['PrismFace', 'PrismFace', 'PrismFace']]:
+    """The one order a corner between these three faces is named in.
+
+    timber.py is the authority, as it is for the arrises: the cap first, then
+    the two sides in the order they come round the prism -- bot_right_front,
+    top_back_right. TimberCorner is that list.
+
+    None for three faces that meet at no corner: a repeat, no cap or two, or
+    two opposite sides.
+    """
+    if len(faces) != 3 or not all(isinstance(face, PrismFace) for face in faces):
+        return None
+    if len(set(faces)) != 3:
+        return None
+    caps = [face for face in faces if face in _PRISM_CAP_KEYS]
+    sides = [face for face in faces if face not in _PRISM_CAP_KEYS]
+    if len(caps) != 1:
+        return None
+    ordered = _canonical_arris_faces(*sides)
+    if ordered is None:
+        return None  # opposite sides, which meet in no arris and so in no corner
+    # The arris order puts FRONT or BACK first; a corner reads the sides the way
+    # they come round the prism, which is RIGHT before FRONT.
+    first, second = ordered
+    if (_PRISM_SIDE_ORDER.index(second) - _PRISM_SIDE_ORDER.index(first)) % len(
+            _PRISM_SIDE_ORDER) != 1:
+        first, second = second, first
+    return (caps[0], first, second)
+
+
+@dataclass(frozen=True)
+class SimpleRectangularPrismVertexFeature(CSGFeature):
+    """A corner of a RectangularPrism, named by the three faces meeting there.
+
+    The counterpart of TimberCorner, and numbered to match it: see
+    FeatureCategory.CORNER for the run, and TestDefaultOrderFollowsTimberFeature
+    for the correspondence stated from the test side.
+    """
+
+    faces: Tuple[PrismFace, PrismFace, PrismFace] = (
+        PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT)
+
+    #: `faces` in canonical order, worked out once. Out of init, repr and
+    #: equality: it is a restatement of `faces` and not a second thing to set.
+    _canonical: Optional[Tuple[PrismFace, PrismFace, PrismFace]] = field(
+        default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self):
+        canonical = _canonical_corner_faces(self.faces)
+        # Kept, not recomputed: every question below needs it, and a point test
+        # runs once per feature per pick.
+        object.__setattr__(self, '_canonical', canonical)
+        if canonical is None:
+            warnings.warn(
+                f"{', '.join(face.name for face in self.faces)} meet at no corner, "
+                f"so {self.name!r} locates to nothing")
+        elif tuple(self.faces) != canonical:
+            warnings.warn(
+                f"{self.name!r} names its faces {', '.join(f.name for f in self.faces)}; "
+                f"the canonical order is {', '.join(f.name for f in canonical)}")
+
+    def feature_key(self) -> Optional[FeatureKey]:
+        canonical = self._canonical
+        if canonical is None:
+            return None
+        cap, first, _ = canonical
+        return corner_on_cap(_PRISM_SIDE_ORDER.index(first), len(_PRISM_SIDE_ORDER),
+                             end=cap is PrismFace.TOP)
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.POINT
+
+    def _position(self, owner: 'CutCSG') -> Optional[V3]:
+        """Where the corner is, in the owner's space.
+
+        Out to the cap, then out along each side's own half size -- the same
+        walk timber.get_corner_position_global makes over its three faces.
+        """
+        canonical = self._canonical
+        if canonical is None or not isinstance(owner, RectangularPrism):
+            return None
+        cap, first, second = canonical
+        width_dir, height_dir, length_dir = owner._local_axes()
+        distance = owner.end_distance if cap is PrismFace.TOP else owner.start_distance
+        if distance is None:
+            return None  # that end runs to infinity; no corner there
+        at = owner.transform.position + length_dir * distance
+        reach = {PrismFace.RIGHT: width_dir * (owner.size[0] / 2),
+                 PrismFace.LEFT: -width_dir * (owner.size[0] / 2),
+                 PrismFace.FRONT: height_dir * (owner.size[1] / 2),
+                 PrismFace.BACK: -height_dir * (owner.size[1] / 2)}
+        return at + reach[first] + reach[second]
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+        at = self._position(owner)
+        return None if at is None else Point(position=at)
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3,
+                             test_tolerance: Optional[Numeric] = None) -> bool:
+        at = self._position(owner)
+        return False if at is None else _point_is_near(point, at, test_tolerance)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        at = self._position(owner)
+        return None if at is None else CSGFeatureExtent(anchor=at)
+
+
 @dataclass(frozen=True)
 class CylinderAxisFeature(CSGFeature):
     """The centre line of a Cylinder, down the middle of the void it cuts.
@@ -2173,6 +2282,12 @@ class RectangularPrism(HasFeatures, CutCSG):
                 named(arris_against_cap(index, sides, end=cap is PrismFace.TOP),
                       lambda name, ends=ends: SimpleRectangularPrismEdgeFeature(
                           name=name, faces=ends, properties=_DEFAULT_FEATURE_PROPERTIES))
+                corner = _canonical_corner_faces(
+                    (cap, _PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides]))
+                assert corner is not None, "a cap and two neighbouring sides meet at a corner"
+                named(corner_on_cap(index, sides, end=cap is PrismFace.TOP),
+                      lambda name, corner=corner: SimpleRectangularPrismVertexFeature(
+                          name=name, faces=corner, properties=_DEFAULT_FEATURE_PROPERTIES))
         return features
 
     @classmethod

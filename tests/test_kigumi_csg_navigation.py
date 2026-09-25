@@ -218,9 +218,10 @@ class TestCSGTreeSerialization:
         # B1: they meet joint geometry and not each other, since the arrises
         # they used to make by meeting are named outright now.
         assert all(f["group"] == "B1" for f in base["features"])
-        # Six faces, four long arrises, eight at the ends: every slot the prism
-        # offers, so none of its anonymous defaults survive the override.
-        assert len(base["features"]) == 18
+        # Six faces, four long arrises, eight at the ends, eight corners: every
+        # slot the prism offers, so none of its anonymous defaults survive the
+        # override.
+        assert len(base["features"]) == 26
         assert not [f for f in base["features"] if f["name"].startswith(
             ("cap.", "side.", "arris.", "corner."))]
 
@@ -2071,16 +2072,28 @@ class TestHoveringOverAFeature:
         return State(), Slot(), local, cut_timber
 
     def _a_point_on(self, local, cut_timber, predicate):
+        """A surface point where the wanted kind of feature is the best answer.
+
+        Least specific place first -- a triangle's centroid is on a face and
+        nothing else, a midpoint on an arris is on an edge, and only a mesh
+        vertex is on a corner. Asking in that order is what makes the point
+        found also the point where that kind ANSWERS: every feature at a corner
+        includes a face and an edge, but a corner answers with its vertex.
+        """
         from kumiki.triangles import triangulate_cutcsg
 
         timber = cut_timber.timber
         for triangle in triangulate_cutcsg(local).mesh.triangles:
-            for vertex in triangle:
-                local_pt = [float(vertex[i]) for i in range(3)]
-                for hit in local.find_all_features(runner._to_v3(local_pt)):
-                    if predicate(hit.feature):
-                        world = timber.transform.local_to_global(runner._to_v3(local_pt))
-                        return [float(world[i, 0]) for i in range(3)]
+            corners = [[float(vertex[i]) for i in range(3)] for vertex in triangle]
+            centroid = [sum(c[i] for c in corners) / 3.0 for i in range(3)]
+            halfway = [[(a[i] + b[i]) / 2 for i in range(3)]
+                       for a, b in ((corners[0], corners[1]), (corners[1], corners[2]),
+                                    (corners[2], corners[0]))]
+            for local_pt in [centroid] + halfway + corners:
+                found = local.find_all_features(runner._to_v3(local_pt))
+                if found and predicate(found[0].feature):
+                    world = timber.transform.local_to_global(runner._to_v3(local_pt))
+                    return [float(world[i, 0]) for i in range(3)]
         raise AssertionError("no such feature on the surface")
 
     def _hover(self, frame, member, predicate, **extra):
@@ -2107,11 +2120,20 @@ class TestHoveringOverAFeature:
             # a corner always answers EDGE -- correctly, but it means a caller
             # after a FACE would never find one. A centroid is interior to its
             # triangle and so on a face and nothing else.
+            #
+            # And edge midpoints, for the same reason one step further: a prism
+            # names its CORNERS too, so a mesh vertex now answers POINT, and a
+            # caller after an EDGE needs somewhere along an arris rather than at
+            # either end of it.
             centroid = [
                 sum(float(vertex[axis]) for vertex in triangle) / 3.0
                 for axis in range(3)
             ]
-            for vertex in list(triangle) + [centroid]:
+            corners = [[float(vertex[i]) for i in range(3)] for vertex in triangle]
+            halfway = [[(a[i] + b[i]) / 2 for i in range(3)]
+                       for a, b in ((corners[0], corners[1]), (corners[1], corners[2]),
+                                    (corners[2], corners[0]))]
+            for vertex in corners + halfway + [centroid]:
                 world = timber.transform.local_to_global(
                     runner._to_v3([float(vertex[i]) for i in range(3)]))
                 payload = {"memberKey": member,
@@ -2219,7 +2241,11 @@ class TestHoveringOverAFeature:
         assert hovered["path"] == clicked["path"]
         assert hovered["featureLabel"] == clicked["featureLabel"]
         assert hovered["highlightMesh"] == clicked["highlightMesh"]
-        assert hovered["highlightEdgeSegments"] == clicked["highlightEdgeSegments"]
+        # .get, because which of these a feature carries depends on its kind: a
+        # face answers with triangles and no segments. Asking for both outright
+        # only worked while the point found for a FACE was a mesh vertex, where
+        # an edge was the real answer.
+        assert hovered.get("highlightEdgeSegments") == clicked.get("highlightEdgeSegments")
 
     def test_an_edge_comes_back_as_a_line_to_draw(self, mortise_and_tenon_frame):
         from kumiki.cutcsg import CSGFeatureType
@@ -2470,13 +2496,27 @@ class TestChoosingAmongTheFeaturesAtAPoint:
 
     def _at_an_edge(self, frame, member):
         state, slot, vertices = self._slot(frame, member)
-        for index in range(0, len(vertices), 3):
-            payload = {"memberKey": member, "point": vertices[index:index + 3],
+        for point in self._places_to_try(vertices):
+            payload = {"memberKey": member, "point": point,
                        "currentPath": [], "ctrlClick": False}
             first = runner._handle_find_csg_at_point(state, dict(payload), slot)
             if first.get("featureType") == "EDGE" and first.get("candidateCount", 0) > 1:
                 return state, slot, payload, first
         raise AssertionError("no point offered an edge and something else")
+
+    def _places_to_try(self, vertices):
+        """Mesh vertices, then the midpoints between them.
+
+        The vertices alone will not do: a mesh vertex is a CORNER of the solid,
+        and a prism names its corners, so the most specific feature there is the
+        point and not an edge. A midpoint along an arris is on the edge and not
+        at either end of it.
+        """
+        points = [vertices[i:i + 3] for i in range(0, len(vertices), 3)]
+        for point in points:
+            yield point
+        for one, other in zip(points, points[1:]):
+            yield [(a + b) / 2 for a, b in zip(one, other)]
 
     def test_a_plain_pick_takes_the_most_specific_feature(self, mortise_and_tenon_frame):
         _state, _slot, _payload, first = self._at_an_edge(
@@ -2664,10 +2704,18 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
         return State(), Slot(), vertices
 
     def _where_the_default_is_an_edge(self, frame, member):
-        """A point whose plain answer is an edge, with a face also on offer."""
+        """A point whose plain answer is an edge, with a face also on offer.
+
+        Midpoints as well as mesh vertices: a prism names its corners, so a
+        vertex answers POINT and an edge is only the plain answer away from the
+        ends of one.
+        """
         state, slot, vertices = self._slot(frame, member)
-        for index in range(0, len(vertices), 3):
-            base = {"memberKey": member, "point": vertices[index:index + 3],
+        points = [vertices[i:i + 3] for i in range(0, len(vertices), 3)]
+        midpoints = [[(a + b) / 2 for a, b in zip(one, other)]
+                     for one, other in zip(points, points[1:])]
+        for point in points + midpoints:
+            base = {"memberKey": member, "point": point,
                     "currentPath": [], "ctrlClick": False}
             plain = runner._handle_find_csg_at_point(state, dict(base), slot)
             if plain.get("featureType") != "EDGE" or plain.get("candidateCount", 0) < 2:

@@ -1452,6 +1452,39 @@ def _short_arris_tags(prefix: str) -> List[CSGFeature]:
     ]
 
 
+
+#: The eight corners of a timber, named and ordered as TimberCorner has them --
+#: BOT_RIGHT_FRONT through TOP_BACK_RIGHT -- so the two vocabularies line up.
+_TIMBER_CORNERS: List[Tuple[str, PrismFace, PrismFace, PrismFace]] = [
+    ("bot_right_front", PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT),
+    ("bot_front_left",  PrismFace.BOTTOM, PrismFace.FRONT, PrismFace.LEFT),
+    ("bot_left_back",   PrismFace.BOTTOM, PrismFace.LEFT,  PrismFace.BACK),
+    ("bot_back_right",  PrismFace.BOTTOM, PrismFace.BACK,  PrismFace.RIGHT),
+    ("top_right_front", PrismFace.TOP,    PrismFace.RIGHT, PrismFace.FRONT),
+    ("top_front_left",  PrismFace.TOP,    PrismFace.FRONT, PrismFace.LEFT),
+    ("top_left_back",   PrismFace.TOP,    PrismFace.LEFT,  PrismFace.BACK),
+    ("top_back_right",  PrismFace.TOP,    PrismFace.BACK,  PrismFace.RIGHT),
+]
+
+
+def _corner_tags(prefix: str) -> List[CSGFeature]:
+    """Named features for a timber's eight corners.
+
+    The same argument as the arrises: the prism underneath names them too, as
+    corner.0 through corner.7, and an override at the same key replaces the
+    default rather than joining it -- so naming them here is what turns
+    "corner.4" into "ptw.top_right_front" without leaving both.
+    """
+    return [
+        SimpleRectangularPrismVertexFeature(
+            name=f"{prefix}{name}",
+            faces=(cap, first, second),
+            properties=FeatureProperties(group=FeatureGroup.B1),
+        )
+        for name, cap, first, second in _TIMBER_CORNERS
+    ]
+
+
 def _ptw_face_tags() -> List[CSGFeature]:
     """Named features for the 6 faces of a timber's perfect-timber-within prism.
 
@@ -1473,7 +1506,7 @@ def _ptw_face_tags() -> List[CSGFeature]:
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(PTW_FACE_PREFIX) + _short_arris_tags(PTW_FACE_PREFIX)
+    ] + _long_arris_tags(PTW_FACE_PREFIX) + _short_arris_tags(PTW_FACE_PREFIX) + _corner_tags(PTW_FACE_PREFIX)
 
 
 def _rough_face_tags() -> List[CSGFeature]:
@@ -1491,7 +1524,7 @@ def _rough_face_tags() -> List[CSGFeature]:
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(ROUGH_FACE_PREFIX) + _short_arris_tags(ROUGH_FACE_PREFIX)
+    ] + _long_arris_tags(ROUGH_FACE_PREFIX) + _short_arris_tags(ROUGH_FACE_PREFIX) + _corner_tags(ROUGH_FACE_PREFIX)
 
 
 def _create_extended_rectangular_prism(
