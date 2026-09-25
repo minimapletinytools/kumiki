@@ -3,13 +3,12 @@
  */
 
 const path = require('path');
-const fs = require('fs');
 const { requestWebviewRoundTrip } = require('./webview-request');
 const { resolveLocale, loadCatalog, createTranslator } = require('./i18n');
 const { getHost } = require('./host');
+const { webviewDir, buildWebviewPage } = require('./webview-html');
 
 const initializedPanels = new WeakSet();
-const webviewDir = path.join(__dirname, 'webview');
 let screenshotRequestCounter = 1;
 const VIEWER_APP_VERSION = '2026.03.17.4';
 // Template placeholder → file under webview/.
@@ -61,24 +60,6 @@ const ViewerPhase = Object.freeze({
 
 function normalizeViewerOptions(viewerOptions) {
     return (viewerOptions && typeof viewerOptions === 'object') ? viewerOptions : {};
-}
-
-function getNonce() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let index = 0; index < 32; index += 1) {
-        result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-}
-
-function escapeScriptJson(value) {
-    return value
-        .replace(/</g, '\\u003c')
-        .replace(/>/g, '\\u003e')
-        .replace(/&/g, '\\u0026')
-        .replace(/\u2028/g, '\\u2028')
-        .replace(/\u2029/g, '\\u2029');
 }
 
 function createFrameViewer(filePath, frameName = null, isLocalDev = false, openInSplitView = true) {
@@ -172,36 +153,26 @@ function getViewerTitle(filePath, frameName = null, isLocalDev = false) {
 }
 
 function getWebviewContent(surface, frameData, geometryData, profiling, uiState = null, viewerOptions = null, viewerSettings = null) {
-    const templatePath = path.join(webviewDir, 'viewer.html');
-    const template = fs.readFileSync(templatePath, 'utf8');
-
-    const nonce = getNonce();
     // Follows the host's display language; falls back to 'en'.
     const locale = resolveLocale(getHost().locale);
-
-    const payloadJson = escapeScriptJson(JSON.stringify({
-        frame: frameData,
-        geometry: geometryData,
-        profiling: profiling || null,
-        uiState: uiState || null,
-        viewerOptions: normalizeViewerOptions(viewerOptions),
-        viewerSettings: (viewerSettings && typeof viewerSettings === 'object') ? viewerSettings : null,
-        // User setting for the assembly preview timeline; the webview combines
-        // it with the package-time FEATURE_FLAGS.assemblyPreview master switch.
-        assemblyPreviewSetting: getHost().getConfig('viewer.assemblyPreview', false) === true,
-        drawingBetaSetting: getHost().getConfig('viewer.drawingBeta', false) === true,
-        i18n: { locale, strings: loadCatalog(locale) },
-    }));
-
-    let html = template
-        .replace(/__CSP_SOURCE__/g, surface.cspSource)
-        .replace(/__NONCE__/g, nonce)
-        .replace('__LOCALE__', locale)
-        .replace('__INITIAL_PAYLOAD_JSON__', payloadJson);
-    for (const [placeholder, relativePath] of WEBVIEW_ASSETS) {
-        html = html.replace(placeholder, surface.resourceUri(path.join(webviewDir, ...relativePath.split('/'))));
-    }
-    return html;
+    return buildWebviewPage(surface, {
+        templateName: 'viewer.html',
+        assets: WEBVIEW_ASSETS,
+        locale,
+        payload: {
+            frame: frameData,
+            geometry: geometryData,
+            profiling: profiling || null,
+            uiState: uiState || null,
+            viewerOptions: normalizeViewerOptions(viewerOptions),
+            viewerSettings: (viewerSettings && typeof viewerSettings === 'object') ? viewerSettings : null,
+            // User setting for the assembly preview timeline; the webview combines
+            // it with the package-time FEATURE_FLAGS.assemblyPreview master switch.
+            assemblyPreviewSetting: getHost().getConfig('viewer.assemblyPreview', false) === true,
+            drawingBetaSetting: getHost().getConfig('viewer.drawingBeta', false) === true,
+            i18n: { locale, strings: loadCatalog(locale) },
+        },
+    });
 }
 
 function requestViewerScreenshot(panel, options = {}) {

@@ -47,6 +47,24 @@ const TARGETS = [
         note: 'lit 3.2.0 self-contained ESM bundle',
         minBytes: 10_000,
     },
+    {
+        file: 'codicon.css',
+        url: 'https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.46-24/dist/codicon.css',
+        note: 'VS Code codicons 0.0.46-24 stylesheet (MIT), for the sidebar',
+        minBytes: 10_000,
+    },
+    {
+        file: 'codicon.ttf',
+        url: 'https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.46-24/dist/codicon.ttf',
+        note: 'VS Code codicons 0.0.46-24 font (CC-BY-4.0, Microsoft)',
+        minBytes: 10_000,
+    },
+    {
+        file: 'codicon.LICENSE',
+        url: 'https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.46-24/LICENSE',
+        note: 'codicons license (CC-BY-4.0 attribution for the font)',
+        minBytes: 1_000,
+    },
 ];
 
 function download(url, redirectsLeft = 5) {

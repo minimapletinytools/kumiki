@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="__LOCALE__">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src __CSP_SOURCE__ data:; script-src 'nonce-__NONCE__'; style-src __CSP_SOURCE__; font-src __CSP_SOURCE__;">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kigumi Explorer</title>
+    <link rel="stylesheet" href="__CODICON_CSS_URI__">
+    <link rel="stylesheet" href="__SIDEBAR_CSS_URI__">
+</head>
+<body>
+    <kigumi-sidebar></kigumi-sidebar>
+    <script nonce="__NONCE__">
+        window.__KIGUMI_INITIAL_PAYLOAD__ = __INITIAL_PAYLOAD_JSON__;
+    </script>
+    <script type="importmap" nonce="__NONCE__">
+    { "imports": { "lit": "__LIT_JS_URI__" } }
+    </script>
+    <script nonce="__NONCE__" src="__I18N_JS_URI__"></script>
+    <script nonce="__NONCE__" src="__CONTEXT_MENU_JS_URI__"></script>
+    <script nonce="__NONCE__" src="__SIDEBAR_TREE_JS_URI__"></script>
+    <script nonce="__NONCE__" type="module" src="__SIDEBAR_APP_JS_URI__"></script>
+</body>
+</html>

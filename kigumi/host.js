@@ -5,7 +5,8 @@
  * @typedef {object} Disposable
  * @property {() => void} dispose
  *
- * @typedef {object} ViewerSurface  One viewer page (a VS Code webview panel).
+ * @typedef {object} ViewerSurface  One webview page. The sidebar's surface has
+ *   only setHtml, resourceUri, cspSource, postMessage, onMessage and onDispose.
  * @property {string} title
  * @property {boolean} active
  * @property {boolean} visible
@@ -27,6 +28,7 @@
  * @property {(filePath: string, line?: number) => Promise<void>} openFileAt  1-based line
  * @property {(filePath: string) => Promise<{isDirty: boolean, version: number, save: () => Promise<boolean>}>} getDocumentState
  * @property {(baseDir: string, glob: string, handlers: {onCreate?, onChange?, onDelete?}) => Disposable} watchFiles
+ * @property {(command: string, ...args: any[]) => Promise<any>} runCommand  a Kigumi command by id
  * @property {(options: {title: string, beside: boolean, resourceRoot: string}) => ViewerSurface} createViewerSurface
  */
 

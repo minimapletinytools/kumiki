@@ -3,7 +3,8 @@ const fs = require('fs');
 const vscode = require('vscode');
 const { FrameViewSession } = require('./frame-view-session');
 const { PythonRunnerSession } = require('./runner-session');
-const { KigumiSidebarProvider } = require('./sidebar-provider');
+const { SidebarModel } = require('./sidebar-model');
+const { SidebarController } = require('./sidebar-controller');
 const { NewPythonFileWatcher } = require('./new-python-file-watcher');
 const { normalizeRetentionDays, pruneOldLogFiles } = require('./log-retention');
 const {
@@ -15,7 +16,8 @@ const {
 } = require('./project-initializer');
 const { configureToolchain, UV_VERSION } = require('./python-toolchain');
 const { setHost } = require('./host');
-const { createVscodeHost } = require('./hosts/vscode');
+const { createVscodeHost, registerSidebarView } = require('./hosts/vscode');
+const { webviewDir } = require('./webview-html');
 const { createTranslator } = require('./i18n');
 
 // Resolved once from VS Code's own display language (no user override yet).
@@ -26,7 +28,8 @@ const frameSessions = new Map();       // filePath → FrameViewSession (main se
 const patternSessions = new Map();     // slotName → FrameViewSession (pattern sessions)
 const standaloneRunners = new Set();   // PythonRunnerSession instances not owned by any session
 let patternSlotCounter = 0;
-let sidebarProvider = null;
+let sidebarModel = null;
+let sidebarController = null;
 let openInSplitView = false;
 let autoRefreshOnFileChange = false;
 let logRetentionDays = 15;
@@ -196,7 +199,7 @@ function activate(context) {
         updateSessionSourceChangeState(document, { sourceChanged: true });
     }));
 
-    sidebarProvider = new KigumiSidebarProvider(context, {
+    sidebarModel = new SidebarModel({
         getPythonCommand: () => {
             const mainSession = _findAnyAliveMainSession();
             if (!mainSession || !mainSession.runnerSession || !mainSession.runnerSession.isAlive()) {
@@ -217,21 +220,18 @@ function activate(context) {
         },
     });
 
-    const explorerTreeView = vscode.window.createTreeView('kigumi.explorer', {
-        treeDataProvider: sidebarProvider,
-        showCollapseAll: true,
+    sidebarController = new SidebarController(sidebarModel, {
+        runCommand: (command, ...args) => vscode.commands.executeCommand(command, ...args),
+        log: (message) => outputChannel.appendLine(`[kigumi] ${message}`),
     });
-    context.subscriptions.push(explorerTreeView.onDidChangeSelection((event) => {
-        const selected = event.selection && event.selection.length > 0 ? event.selection[0] : null;
-        sidebarProvider.setSelectedElementData(selected);
-    }));
-    context.subscriptions.push(sidebarProvider, explorerTreeView);
+    registerSidebarView(context, 'kigumi.explorer', webviewDir, (surface) => sidebarController.attach(surface));
+    context.subscriptions.push(sidebarController, sidebarModel);
 
     newPythonFileWatcher = new NewPythonFileWatcher(
         getWorkspaceRoot(),
         () => {
-            if (sidebarProvider) {
-                void sidebarProvider.refresh(true);
+            if (sidebarModel) {
+                void sidebarModel.refresh(true);
             }
         },
         (message) => outputChannel.appendLine(`[kigumi] [sidebar-watch] ${message}`),
@@ -283,14 +283,14 @@ function activate(context) {
     });
 
     register(context, 'kigumi.refreshSidebar', async () => {
-        if (sidebarProvider) {
-            await sidebarProvider.refresh(true);
+        if (sidebarModel) {
+            await sidebarModel.refresh(true);
         }
     });
 
     register(context, 'kigumi.refreshPatterns', async () => {
-        if (sidebarProvider) {
-            await sidebarProvider.refreshPatterns(true);
+        if (sidebarModel) {
+            await sidebarModel.refresh(true);
         }
     });
 
@@ -467,7 +467,7 @@ function activate(context) {
     });
 
     register(context, 'kigumi.openPatternInNewWindow', async (element) => {
-        // Context menu passes the SidebarNode tree item; data lives in element.data
+        // The sidebar row menu passes the row node; data lives in element.data
         const data = element && (element.data || element);
         const sourceFile = data && data.sourceFile;
         const patternName = data && data.patternName;
@@ -499,8 +499,8 @@ function activate(context) {
 
     // --- Toggle Group by Patternbook ---
     register(context, 'kigumi.toggleGroupByPatternbook', async () => {
-        if (sidebarProvider) {
-            sidebarProvider.toggleGroupByPatternbook();
+        if (sidebarModel) {
+            sidebarModel.toggleGroupByPatternbook();
         }
     });
 
@@ -530,7 +530,7 @@ function activate(context) {
 
     // --- View Pattern Source ---
     register(context, 'kigumi.viewPatternSource', async (elementArg) => {
-        const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
+        const selectedElement = elementArg || sidebarController?.getSelectedElementData();
         const sourcePath = _extractSourcePathFromSidebarElement(selectedElement);
 
         if (!selectedElement || !sourcePath) {
@@ -571,7 +571,7 @@ function activate(context) {
 
     // --- Duplicate Pattern to Workspace ---
     register(context, 'kigumi.duplicatePatternToWorkspace', async (elementArg) => {
-        const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
+        const selectedElement = elementArg || sidebarController?.getSelectedElementData();
         if (!_isDuplicableLibraryElement(selectedElement)) {
             vscode.window.showErrorMessage(t('message.duplicateToWorkspaceUnavailable'));
             return;
@@ -600,8 +600,8 @@ function activate(context) {
             vscode.window.showInformationMessage(t('message.patternDuplicatedTo', { path: path.relative(workspaceRoot, newPath) }));
             
             // Refresh sidebar to show the new pattern
-            if (sidebarProvider) {
-                await sidebarProvider.refreshPatterns(true);
+            if (sidebarModel) {
+                await sidebarModel.refresh(true);
             }
         } catch (error) {
             outputChannel.appendLine(`Duplicate pattern error: ${error.message}\n${error.stack}`);
@@ -719,10 +719,10 @@ function activate(context) {
         const sidebarSnapshotDisposable = vscode.commands.registerCommand(
             'kigumi.testGetSidebarSnapshot',
             async (options = {}) => {
-                if (!sidebarProvider) {
+                if (!sidebarModel) {
                     return null;
                 }
-                return sidebarProvider.getTestSnapshot(options);
+                return sidebarModel.getTestSnapshot(options);
             }
         );
 
@@ -799,16 +799,16 @@ function activate(context) {
         const initStatus = getInitializationStatus(rootHint, activeFilePath);
         if (initStatus.projectStatus === 'local-dev') {
             vscode.window.showInformationMessage(t('message.localDevModeInitDisabled'));
-            if (sidebarProvider) {
-                await sidebarProvider.refresh(true);
+            if (sidebarModel) {
+                await sidebarModel.refresh(true);
             }
             return;
         }
 
         if (initStatus.isInitialized) {
             vscode.window.showInformationMessage(t('message.projectAlreadyInitialized'));
-            if (sidebarProvider) {
-                await sidebarProvider.refresh(true);
+            if (sidebarModel) {
+                await sidebarModel.refresh(true);
             }
             return;
         }
@@ -821,10 +821,10 @@ function activate(context) {
                 cancellable: false,
             }, async () => {
                 const initializePromise = initializeWorkspaceProject(rootHint, activeFilePath);
-                if (sidebarProvider) {
+                if (sidebarModel) {
                     // initializeWorkspaceProject flips in-progress state synchronously,
                     // so this refresh exposes the transient "Initializing project..." row.
-                    await sidebarProvider.refresh(true);
+                    await sidebarModel.refresh(true);
                 }
                 initializeResult = await initializePromise;
                 logKumikiInstallResult('initialize', initializeResult);
@@ -844,8 +844,8 @@ function activate(context) {
                 vscode.window.showErrorMessage(t('message.initializeProjectFailed', { error: error.message || error }));
             }
         } finally {
-            if (sidebarProvider) {
-                await sidebarProvider.refresh(true);
+            if (sidebarModel) {
+                await sidebarModel.refresh(true);
             }
         }
     }
@@ -883,8 +883,8 @@ function activate(context) {
                 vscode.window.showErrorMessage(t('message.updateKumikiFailed', { error: error.message || error }));
             }
         } finally {
-            if (sidebarProvider) {
-                await sidebarProvider.refresh(true);
+            if (sidebarModel) {
+                await sidebarModel.refresh(true);
             }
         }
     }

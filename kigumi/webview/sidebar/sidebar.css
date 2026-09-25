@@ -1,0 +1,356 @@
+/* Kigumi explorer. Colours follow the VS Code theme; the fallbacks are for
+   hosts without --vscode-* variables. */
+
+:root {
+    --ks-font: var(--vscode-font-family, system-ui, -apple-system, "Segoe UI", sans-serif);
+    --ks-font-size: var(--vscode-font-size, 13px);
+    --ks-bg: var(--vscode-sideBar-background, #f8f8f8);
+    --ks-fg: var(--vscode-sideBar-foreground, var(--vscode-foreground, #3b3b3b));
+    --ks-muted: var(--vscode-descriptionForeground, #717171);
+    --ks-icon: var(--vscode-icon-foreground, #424242);
+    --ks-hover: var(--vscode-list-hoverBackground, #e8e8e8);
+    --ks-selected-bg: var(--vscode-list-inactiveSelectionBackground, #e4e6f1);
+    --ks-selected-fg: var(--vscode-list-inactiveSelectionForeground, var(--ks-fg));
+    --ks-active-bg: var(--vscode-list-activeSelectionBackground, #0060c0);
+    --ks-active-fg: var(--vscode-list-activeSelectionForeground, #ffffff);
+    --ks-focus: var(--vscode-focusBorder, #0090f1);
+    --ks-highlight: var(--vscode-list-highlightForeground, #0066bf);
+    --ks-input-bg: var(--vscode-input-background, #ffffff);
+    --ks-input-fg: var(--vscode-input-foreground, var(--ks-fg));
+    --ks-input-border: var(--vscode-input-border, #cecece);
+    --ks-placeholder: var(--vscode-input-placeholderForeground, #767676);
+    --ks-toolbar-hover: var(--vscode-toolbar-hoverBackground, rgba(184, 184, 184, 0.31));
+    --ks-toggle-on-bg: var(--vscode-inputOption-activeBackground, rgba(0, 144, 241, 0.2));
+    --ks-toggle-on-border: var(--vscode-inputOption-activeBorder, #007acc);
+    --ks-separator: var(--vscode-sideBarSectionHeader-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
+    --ks-menu-bg: var(--vscode-menu-background, #ffffff);
+    --ks-menu-fg: var(--vscode-menu-foreground, var(--ks-fg));
+    --ks-menu-hover-bg: var(--vscode-menu-selectionBackground, var(--ks-active-bg));
+    --ks-menu-hover-fg: var(--vscode-menu-selectionForeground, var(--ks-active-fg));
+    --ks-menu-border: var(--vscode-menu-border, #d4d4d4);
+    --ks-shadow: var(--vscode-widget-shadow, rgba(0, 0, 0, 0.16));
+    --ks-row-height: 22px;
+    --ks-indent: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ks-bg: var(--vscode-sideBar-background, #181818);
+        --ks-fg: var(--vscode-sideBar-foreground, var(--vscode-foreground, #cccccc));
+        --ks-muted: var(--vscode-descriptionForeground, #9d9d9d);
+        --ks-icon: var(--vscode-icon-foreground, #c5c5c5);
+        --ks-hover: var(--vscode-list-hoverBackground, #2a2d2e);
+        --ks-selected-bg: var(--vscode-list-inactiveSelectionBackground, #37373d);
+        --ks-active-bg: var(--vscode-list-activeSelectionBackground, #04395e);
+        --ks-highlight: var(--vscode-list-highlightForeground, #2aaaff);
+        --ks-input-bg: var(--vscode-input-background, #313131);
+        --ks-input-border: var(--vscode-input-border, #3c3c3c);
+        --ks-placeholder: var(--vscode-input-placeholderForeground, #989898);
+        --ks-toolbar-hover: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+        --ks-menu-bg: var(--vscode-menu-background, #1f1f1f);
+        --ks-menu-border: var(--vscode-menu-border, #454545);
+        --ks-shadow: var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+body {
+    background: var(--ks-bg);
+    color: var(--ks-fg);
+    font-family: var(--ks-font);
+    font-size: var(--ks-font-size);
+    overflow: hidden;
+}
+
+kigumi-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+}
+
+.codicon {
+    flex: none;
+    color: var(--ks-icon);
+}
+
+.codicon-blank {
+    display: inline-block;
+    width: 16px;
+}
+
+/* Project status card */
+
+.ks-status {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px 8px 8px;
+    border-bottom: 1px solid var(--ks-separator);
+}
+
+.ks-status-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    width: 100%;
+    padding: 3px 6px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: none;
+    text-align: left;
+}
+
+.ks-status-row .codicon {
+    margin-top: 1px;
+}
+
+.ks-status-action {
+    cursor: pointer;
+}
+
+.ks-status-action:hover {
+    background: var(--ks-hover);
+}
+
+.ks-status-action:focus-visible {
+    outline: 1px solid var(--ks-focus);
+    outline-offset: -1px;
+}
+
+.ks-status-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.ks-status-label,
+.ks-status-text .ks-description {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Toolbar */
+
+.ks-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 8px;
+}
+
+.ks-filter {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: 24px;
+    padding: 0 2px 0 6px;
+    border: 1px solid var(--ks-input-border);
+    border-radius: 2px;
+    background: var(--ks-input-bg);
+}
+
+.ks-filter:focus-within {
+    border-color: var(--ks-focus);
+}
+
+.ks-filter .codicon {
+    color: var(--ks-placeholder);
+}
+
+.ks-filter input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--ks-input-fg);
+    font: inherit;
+}
+
+.ks-filter input::placeholder {
+    color: var(--ks-placeholder);
+}
+
+.ks-filter input::-webkit-search-cancel-button {
+    display: none;
+}
+
+.ks-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+}
+
+.ks-icon-button:hover:not(:disabled) {
+    background: var(--ks-toolbar-hover);
+}
+
+.ks-icon-button:focus-visible {
+    outline: 1px solid var(--ks-focus);
+    outline-offset: -1px;
+}
+
+.ks-icon-button:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.ks-icon-button.is-on {
+    background: var(--ks-toggle-on-bg);
+    border-color: var(--ks-toggle-on-border);
+}
+
+/* Tree */
+
+.ks-tree {
+    flex: 1;
+    overflow: auto;
+    outline: none;
+    padding-bottom: 8px;
+}
+
+.ks-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: var(--ks-row-height);
+    padding-left: calc(4px + var(--ks-depth, 0) * var(--ks-indent));
+    padding-right: 8px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ks-row:hover {
+    background: var(--ks-hover);
+}
+
+.ks-row.is-selected {
+    background: var(--ks-selected-bg);
+    color: var(--ks-selected-fg);
+}
+
+.ks-tree:focus .ks-row.is-selected {
+    background: var(--ks-active-bg);
+    color: var(--ks-active-fg);
+}
+
+.ks-tree:focus .ks-row.is-selected .codicon,
+.ks-tree:focus .ks-row.is-selected .ks-description {
+    color: inherit;
+}
+
+.ks-tree:focus .ks-row.is-focused {
+    border-color: var(--ks-focus);
+}
+
+.ks-row.is-muted .ks-label {
+    color: var(--ks-muted);
+}
+
+.ks-twistie {
+    margin-right: -4px;
+}
+
+.ks-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ks-label mark {
+    background: none;
+    color: var(--ks-highlight);
+    font-weight: 600;
+}
+
+.ks-description {
+    overflow: hidden;
+    color: var(--ks-muted);
+    font-size: 0.92em;
+    text-overflow: ellipsis;
+}
+
+.ks-row-actions {
+    display: none;
+    gap: 2px;
+    margin-left: auto;
+}
+
+.ks-row:hover .ks-row-actions,
+.ks-row.is-selected .ks-row-actions {
+    display: inline-flex;
+}
+
+.ks-row-actions .codicon {
+    color: inherit;
+}
+
+.ks-empty {
+    padding: 8px 12px;
+    color: var(--ks-muted);
+}
+
+/* Context menu */
+
+.ks-menu {
+    position: fixed;
+    z-index: 10;
+    min-width: 180px;
+    padding: 4px 0;
+    border: 1px solid var(--ks-menu-border);
+    border-radius: 5px;
+    background: var(--ks-menu-bg);
+    box-shadow: 0 2px 8px var(--ks-shadow);
+    color: var(--ks-menu-fg);
+}
+
+.ks-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 4px 12px;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+.ks-menu-item:hover,
+.ks-menu-item:focus-visible {
+    background: var(--ks-menu-hover-bg);
+    color: var(--ks-menu-hover-fg);
+    outline: none;
+}
+
+.ks-menu-item:hover .codicon,
+.ks-menu-item:focus-visible .codicon {
+    color: inherit;
+}

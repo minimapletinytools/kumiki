@@ -95,12 +95,12 @@ describe('Kigumi initialization workflow', () => {
         if (!snapshot || !Array.isArray(snapshot.roots) || snapshot.roots.length === 0) {
           return null;
         }
-        const hasInitializeAction = snapshot.roots.some((root) => root.label === '[ Initialize Project ] 🖱️');
+        const hasInitializeAction = snapshot.roots.some((root) => root.label === 'Initialize Project');
         return hasInitializeAction ? snapshot : null;
       }, 30000, 200);
 
       assert.ok(
-        beforeInitSidebar.roots.some((root) => root.label === '[ Initialize Project ] 🖱️'),
+        beforeInitSidebar.roots.some((root) => root.label === 'Initialize Project'),
         'Expected fresh workspace sidebar to show initialize action before project setup'
       );
 

@@ -49,4 +49,13 @@ const TO_EXTENSION_REPLIES = Object.freeze([
     'captureScreenshotResult',
 ]);
 
-module.exports = { TO_EXTENSION, TO_EXTENSION_REPLIES };
+/** Sidebar page to host. Handled in sidebar-controller's handleMessage. */
+const SIDEBAR_TO_HOST = Object.freeze([
+    'sidebarReady',
+    'sidebarRefresh',
+    'sidebarRun',
+    'sidebarSelect',
+    'sidebarToggleGroup',
+]);
+
+module.exports = { TO_EXTENSION, TO_EXTENSION_REPLIES, SIDEBAR_TO_HOST };

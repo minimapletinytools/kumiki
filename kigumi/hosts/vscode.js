@@ -14,6 +14,18 @@ function existingWorkspaceFolders() {
     return (vscode.workspace.workspaceFolders || []).filter((folder) => folder && folder.uri);
 }
 
+// The parts of a surface every VS Code webview shares.
+function webviewSurface(webview, owner) {
+    return {
+        get cspSource() { return webview.cspSource; },
+        setHtml(html) { webview.html = html; },
+        resourceUri(absPath) { return webview.asWebviewUri(vscode.Uri.file(absPath)).toString(); },
+        postMessage(message) { return Promise.resolve(webview.postMessage(message)); },
+        onMessage(callback) { return webview.onDidReceiveMessage(callback); },
+        onDispose(callback) { return owner.onDidDispose(callback); },
+    };
+}
+
 function createViewerSurface({ title, beside, resourceRoot }) {
     const panel = vscode.window.createWebviewPanel(
         'kigumiViewer',
@@ -25,20 +37,30 @@ function createViewerSurface({ title, beside, resourceRoot }) {
             localResourceRoots: [vscode.Uri.file(resourceRoot)],
         }
     );
-    return {
-        get title() { return panel.title; },
-        set title(value) { panel.title = value; },
-        get active() { return panel.active; },
-        get visible() { return panel.visible; },
-        get cspSource() { return panel.webview.cspSource; },
-        setHtml(html) { panel.webview.html = html; },
-        resourceUri(absPath) { return panel.webview.asWebviewUri(vscode.Uri.file(absPath)).toString(); },
-        postMessage(message) { return Promise.resolve(panel.webview.postMessage(message)); },
-        onMessage(callback) { return panel.webview.onDidReceiveMessage(callback); },
-        onDispose(callback) { return panel.onDidDispose(callback); },
-        reveal() { panel.reveal(panel.viewColumn, false); },
-        dispose() { panel.dispose(); },
+    return Object.defineProperties(webviewSurface(panel.webview, panel), {
+        title: { get: () => panel.title, set: (value) => { panel.title = value; } },
+        active: { get: () => panel.active },
+        visible: { get: () => panel.visible },
+        reveal: { value: () => panel.reveal(panel.viewColumn, false) },
+        dispose: { value: () => panel.dispose() },
+    });
+}
+
+// Registers the sidebar webview view; `onSurface` gets a surface each time
+// VS Code resolves it.
+function registerSidebarView(context, viewId, resourceRoot, onSurface) {
+    const provider = {
+        resolveWebviewView(view) {
+            view.webview.options = {
+                enableScripts: true,
+                localResourceRoots: [vscode.Uri.file(resourceRoot)],
+            };
+            onSurface(webviewSurface(view.webview, view));
+        },
     };
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(viewId, provider, {
+        webviewOptions: { retainContextWhenHidden: true },
+    }));
 }
 
 function createVscodeHost() {
@@ -96,8 +118,12 @@ function createVscodeHost() {
             return watcher;
         },
 
+        runCommand(command, ...args) {
+            return Promise.resolve(vscode.commands.executeCommand(command, ...args));
+        },
+
         createViewerSurface,
     };
 }
 
-module.exports = { createVscodeHost };
+module.exports = { createVscodeHost, registerSidebarView };

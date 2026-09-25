@@ -47,6 +47,7 @@
     "views": {
       "kigumi": [
         {
+          "type": "webview",
           "id": "kigumi.explorer",
           "name": "Kigumi Explorer 🐘",
           "icon": "templogo.png"
@@ -141,18 +142,6 @@
       }
     ],
     "menus": {
-      "view/title": [
-        {
-          "command": "kigumi.toggleGroupByPatternbook",
-          "when": "view == kigumi.explorer",
-          "group": "navigation@2"
-        },
-        {
-          "command": "kigumi.refreshSidebar",
-          "when": "view == kigumi.explorer",
-          "group": "navigation@3"
-        }
-      ],
       "commandPalette": [
         {
           "command": "kigumi.refreshSidebar",
@@ -185,23 +174,6 @@
         {
           "command": "kigumi.openPatternInNewWindow",
           "when": "false"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "kigumi.viewPatternSource",
-          "when": "view == kigumi.explorer && (viewItem == frameFile || viewItem == patternItem || viewItem == patternItemWorkspace || viewItem == workspacePatternbook || viewItem == patternbookGroupItem)",
-          "group": "inline@1"
-        },
-        {
-          "command": "kigumi.duplicatePatternToWorkspace",
-          "when": "view == kigumi.explorer && (viewItem == patternItem || viewItem == patternbookGroupItem)",
-          "group": "inline@2"
-        },
-        {
-          "command": "kigumi.openPatternInNewWindow",
-          "when": "view == kigumi.explorer && (viewItem == patternItem || viewItem == patternItemWorkspace)",
-          "group": "navigation@1"
         }
       ]
     },
