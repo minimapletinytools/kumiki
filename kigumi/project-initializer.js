@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
-const os = require('os');
 const {
     ensureKigumiYaml,
     resolveProjectEnvironment,
@@ -15,6 +14,7 @@ const {
     kumikiCompatiblePipSpec,
     getMissingDependencies,
 } = require('./python-env');
+const { ensureProjectVenv, pipInstall } = require('./python-toolchain');
 
 const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '.kigumi', 'docs');
 const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', 'docs');
@@ -179,7 +179,6 @@ function ensureGitignore(workspaceRoot) {
         '.venv/',
         'kigumi_exports/',
         '.kigumi/logs/',
-        '.kigumi/uv-bootstrap/',
     ];
 
     if (!fs.existsSync(gitignorePath)) {
@@ -216,157 +215,8 @@ function ensureGitignore(workspaceRoot) {
     };
 }
 
-function getBootstrapPythonLaunchers() {
-    if (process.platform === 'win32') {
-        return [
-            { command: 'py', prefixArgs: ['-3.13'] },
-            { command: 'py', prefixArgs: ['-3'] },
-            { command: 'python3.13', prefixArgs: [] },
-            { command: 'python3', prefixArgs: [] },
-            { command: 'python', prefixArgs: [] },
-        ];
-    }
-
-    return [
-        { command: 'python3.13', prefixArgs: [] },
-        { command: 'python3', prefixArgs: [] },
-        { command: 'python', prefixArgs: [] },
-    ];
-}
-
 function runCommand(command, args, cwd) {
     return spawnProcess(command, args, { cwd });
-}
-
-async function canRunCommand(command, args, cwd) {
-    try {
-        await runCommand(command, args, cwd);
-        return true;
-    } catch (_error) {
-        return false;
-    }
-}
-
-async function findBootstrapPythonLauncher(workspaceRoot) {
-    for (const launcher of getBootstrapPythonLaunchers()) {
-        const probeArgs = [...launcher.prefixArgs, '--version'];
-        if (await canRunCommand(launcher.command, probeArgs, workspaceRoot)) {
-            return launcher;
-        }
-    }
-    return null;
-}
-
-// Throwaway virtual environment used only to run uv when the machine has no uv
-// of its own; see bootstrapUvIntoVenv.
-const UV_BOOTSTRAP_VENV_RELATIVE_PATH = path.join('.kigumi', 'uv-bootstrap');
-
-function getUvBootstrapVenvRoot(workspaceRoot) {
-    return path.join(workspaceRoot, UV_BOOTSTRAP_VENV_RELATIVE_PATH);
-}
-
-function getUvBootstrapVenvPython(workspaceRoot) {
-    const venvRoot = getUvBootstrapVenvRoot(workspaceRoot);
-    return process.platform === 'win32'
-        ? path.join(venvRoot, 'Scripts', 'python.exe')
-        : path.join(venvRoot, 'bin', 'python');
-}
-
-// A GUI-launched editor does not always inherit the shell PATH that uv installs
-// itself onto, so an installed uv can be invisible to a plain `uv` probe.
-function getWellKnownUvPaths() {
-    const home = os.homedir();
-    if (!home) {
-        return [];
-    }
-
-    if (process.platform === 'win32') {
-        return [
-            path.join(home, '.local', 'bin', 'uv.exe'),
-            path.join(home, '.cargo', 'bin', 'uv.exe'),
-        ];
-    }
-
-    return [
-        path.join(home, '.local', 'bin', 'uv'),
-        path.join(home, '.cargo', 'bin', 'uv'),
-        '/opt/homebrew/bin/uv',
-        '/usr/local/bin/uv',
-    ];
-}
-
-// Last-resort bootstrap: install uv into a virtual environment of its own under
-// .kigumi/. Installing into the interpreter that runs it is not an option --
-// Homebrew and distro Pythons are marked externally managed (PEP 668), so both
-// `pip install --user` and `ensurepip` fail there. A venv is never externally
-// managed and already carries pip, so this path works on those Pythons.
-async function bootstrapUvIntoVenv(workspaceRoot, pythonLauncher) {
-    const uvArgs = ['-m', 'uv'];
-    const venvPython = getUvBootstrapVenvPython(workspaceRoot);
-
-    if (!fs.existsSync(venvPython)) {
-        const venvRoot = getUvBootstrapVenvRoot(workspaceRoot);
-        fs.mkdirSync(path.dirname(venvRoot), { recursive: true });
-        try {
-            await runCommand(
-                pythonLauncher.command,
-                [...pythonLauncher.prefixArgs, '-m', 'venv', venvRoot],
-                workspaceRoot,
-            );
-        } catch (error) {
-            throw new Error(
-                'Unable to create the virtual environment used to bootstrap uv. Install uv manually ' +
-                `(https://docs.astral.sh/uv/getting-started/installation/) and retry initialization. Original error: ${error.message}`
-            );
-        }
-    }
-
-    if (await canRunCommand(venvPython, [...uvArgs, '--version'], workspaceRoot)) {
-        return { command: venvPython, prefixArgs: uvArgs };
-    }
-
-    try {
-        await runCommand(venvPython, ['-m', 'pip', 'install', '--upgrade', 'uv'], workspaceRoot);
-    } catch (error) {
-        throw new Error(
-            'Unable to install uv into the bootstrap virtual environment. Install uv manually ' +
-            `(https://docs.astral.sh/uv/getting-started/installation/) and retry initialization. Original error: ${error.message}`
-        );
-    }
-
-    if (await canRunCommand(venvPython, [...uvArgs, '--version'], workspaceRoot)) {
-        return { command: venvPython, prefixArgs: uvArgs };
-    }
-
-    throw new Error(
-        'Unable to bootstrap uv automatically. Install uv manually (https://docs.astral.sh/uv/getting-started/installation/) and retry initialization.'
-    );
-}
-
-async function ensureUvLauncher(workspaceRoot) {
-    if (await canRunCommand('uv', ['--version'], workspaceRoot)) {
-        return { command: 'uv', prefixArgs: [] };
-    }
-
-    for (const uvPath of getWellKnownUvPaths()) {
-        if (fs.existsSync(uvPath) && await canRunCommand(uvPath, ['--version'], workspaceRoot)) {
-            return { command: uvPath, prefixArgs: [] };
-        }
-    }
-
-    const pythonLauncher = await findBootstrapPythonLauncher(workspaceRoot);
-    if (!pythonLauncher) {
-        throw new Error(
-            'uv was not found and Python was not found. Install uv (https://docs.astral.sh/uv/getting-started/installation/) or install Python 3.10+ and retry initialization.'
-        );
-    }
-
-    const pythonUvArgs = [...pythonLauncher.prefixArgs, '-m', 'uv', '--version'];
-    if (await canRunCommand(pythonLauncher.command, pythonUvArgs, workspaceRoot)) {
-        return { command: pythonLauncher.command, prefixArgs: [...pythonLauncher.prefixArgs, '-m', 'uv'] };
-    }
-
-    return bootstrapUvIntoVenv(workspaceRoot, pythonLauncher);
 }
 
 function yamlQuote(value) {
@@ -531,22 +381,6 @@ function ensureExampleFrame(workspaceRoot) {
     return { filePath, created: true };
 }
 
-async function createVenv(workspaceRoot) {
-    const venvPython = getVenvPython(workspaceRoot);
-    if (fs.existsSync(venvPython)) {
-        return { createdVenv: false, pythonPath: venvPython };
-    }
-
-    const uvLauncher = await ensureUvLauncher(workspaceRoot);
-    await runCommand(
-        uvLauncher.command,
-        [...uvLauncher.prefixArgs, 'venv', '--python', '3.13', '.venv'],
-        workspaceRoot,
-    );
-
-    return { createdVenv: true, pythonPath: venvPython };
-}
-
 async function getMissingViewerDependencies(workspaceRoot, pythonPath) {
     // The initializer omits "kumiki" from the required list (it is installed
     // separately in installOrUpdateKumiki); see python-env.js.
@@ -554,18 +388,6 @@ async function getMissingViewerDependencies(workspaceRoot, pythonPath) {
         cwd: workspaceRoot,
         required: ['sympy', 'numpy', 'trimesh', 'manifold3d'],
     });
-}
-
-async function ensurePipAvailable(workspaceRoot, pythonPath) {
-    try {
-        await runCommand(pythonPath, ['-m', 'pip', '--version'], workspaceRoot);
-        return;
-    } catch (_error) {
-        // Fall through to ensurepip repair path.
-    }
-
-    await runCommand(pythonPath, ['-m', 'ensurepip', '--upgrade'], workspaceRoot);
-    await runCommand(pythonPath, ['-m', 'pip', '--version'], workspaceRoot);
 }
 
 async function getInstalledKumikiVersion(workspaceRoot, pythonPath) {
@@ -642,18 +464,12 @@ async function installOrUpdateKumiki(workspaceRoot, pythonPath, isLocalDev) {
     const missingBefore = await getMissingViewerDependencies(workspaceRoot, pythonPath);
     const summary = [];
 
-    await ensurePipAvailable(workspaceRoot, pythonPath);
-    summary.push('Ensured pip is available in the virtual environment.');
-
-    await runCommand(pythonPath, ['-m', 'pip', 'install', '--upgrade', 'pip'], workspaceRoot);
-    summary.push('Upgraded pip to the latest available version.');
-
     const pipSpec = kumikiCompatiblePipSpec();
     if (isLocalDev && fs.existsSync(path.join(workspaceRoot, 'pyproject.toml'))) {
-        await runCommand(pythonPath, ['-m', 'pip', 'install', '--upgrade', '-e', workspaceRoot], workspaceRoot);
+        await pipInstall(workspaceRoot, pythonPath, ['--upgrade', '-e', workspaceRoot]);
         summary.push('Installed local editable Kumiki package from workspace source.');
     } else {
-        await runCommand(pythonPath, ['-m', 'pip', 'install', '--upgrade', pipSpec], workspaceRoot);
+        await pipInstall(workspaceRoot, pythonPath, ['--upgrade', pipSpec]);
         summary.push(`Installed/upgraded Kumiki from PyPI (${pipSpec}).`);
     }
 
@@ -756,7 +572,7 @@ async function initializeWorkspaceProject(workspaceRoot, filePath) {
         const resolvedRoot = env.projectRoot || workspaceRoot;
 
         ensureKigumiYaml(resolvedRoot);
-        const envResult = await createVenv(resolvedRoot);
+        const envResult = await ensureProjectVenv(resolvedRoot);
         const installResult = await installOrUpdateKumiki(resolvedRoot, envResult.pythonPath, env.isLocalDev);
 
         writeProjectYaml(resolvedRoot, envResult.pythonPath, {
@@ -808,7 +624,7 @@ async function updateWorkspaceKumiki(workspaceRoot, filePath) {
         const resolvedRoot = env.projectRoot || workspaceRoot;
 
         ensureKigumiYaml(resolvedRoot);
-        const envResult = await createVenv(resolvedRoot);
+        const envResult = await ensureProjectVenv(resolvedRoot);
         const installResult = await installOrUpdateKumiki(resolvedRoot, envResult.pythonPath, env.isLocalDev);
 
         writeProjectYaml(resolvedRoot, envResult.pythonPath, {

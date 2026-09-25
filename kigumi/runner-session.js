@@ -10,11 +10,11 @@ const { resolveProjectEnvironment } = require('./project-root');
 const {
     runCommand: spawnProcess,
     getVenvPythonCandidates,
-    getVenvPython,
     getKigumiVersion,
     kumikiCompatiblePipSpec,
     getMissingDependencies,
 } = require('./python-env');
+const { ensureProjectVenv, pipInstall } = require('./python-toolchain');
 
 const ENV_SETUP_CACHE = new Map();
 
@@ -126,60 +126,6 @@ class PythonRunnerSession {
         });
     }
 
-    async canRunCommand(command, args = ['--version']) {
-        try {
-            await this.runCommand(command, args);
-            return true;
-        } catch (error) {
-            const code = error && (error.code || error.errno);
-            if (code === 'ENOENT') {
-                return false;
-            }
-
-            // Some commands can return non-zero for --version in unusual setups,
-            // but command existence is enough for bootstrap purposes.
-            if (error && typeof error.message === 'string' && error.message.includes('Command failed')) {
-                return true;
-            }
-            return false;
-        }
-    }
-
-    async findBootstrapPythonLauncher() {
-        const launchers = process.platform === 'win32'
-            ? [
-                { command: 'py', prefixArgs: ['-3'] },
-                { command: 'python', prefixArgs: [] },
-                { command: 'python3', prefixArgs: [] },
-            ]
-            : [
-                { command: 'python3', prefixArgs: [] },
-                { command: 'python', prefixArgs: [] },
-            ];
-
-        for (const launcher of launchers) {
-            const probeArgs = launcher.prefixArgs.length > 0
-                ? [...launcher.prefixArgs, '--version']
-                : ['--version'];
-            if (await this.canRunCommand(launcher.command, probeArgs)) {
-                return launcher;
-            }
-        }
-
-        return null;
-    }
-
-    getPythonInstallHelpMessage() {
-        return [
-            'Python was not found on this machine, so Kumiki cannot create a project virtual environment.',
-            'Install Python 3.10+ and then run Render Kigumi again.',
-            'Download: https://www.python.org/downloads/',
-            process.platform === 'darwin' ? 'macOS (Homebrew): brew install python' : null,
-            process.platform === 'win32' ? 'Windows: install Python from python.org and enable "Add python.exe to PATH".' : null,
-            process.platform !== 'darwin' && process.platform !== 'win32' ? 'Linux: install python3 and python3-venv from your distro package manager.' : null,
-        ].filter(Boolean).join(' ');
-    }
-
     async getMissingViewerDependencies(pythonCmd) {
         // Default required list includes "kumiki" (see python-env.js).
         return getMissingDependencies(pythonCmd, { cwd: this.projectRoot });
@@ -201,28 +147,8 @@ class PythonRunnerSession {
         await this.ensurePythonEnvironment();
         const pythonCmd = this.getPythonCommand();
         this.channel.appendLine('[env] Installing cadquery-ocp for STEP export...');
-        await this.ensurePipAvailable(pythonCmd);
-        await this.runCommand(pythonCmd, ['-m', 'pip', 'install', 'cadquery-ocp']);
+        await pipInstall(this.projectRoot, pythonCmd, ['cadquery-ocp']);
         this.channel.appendLine('[env] cadquery-ocp installation finished.');
-    }
-
-    async ensurePipAvailable(pythonCmd) {
-        try {
-            await this.runCommand(pythonCmd, ['-m', 'pip', '--version']);
-            return;
-        } catch (_error) {
-            this.channel.appendLine('[env] pip missing in virtual environment; repairing with ensurepip...');
-        }
-
-        try {
-            await this.runCommand(pythonCmd, ['-m', 'ensurepip', '--upgrade']);
-            await this.runCommand(pythonCmd, ['-m', 'pip', '--version']);
-        } catch (error) {
-            throw new Error(
-                `Failed to bootstrap pip for ${pythonCmd}. ` +
-                `Try recreating the virtual environment. Original error: ${error.message}`
-            );
-        }
     }
 
     yamlQuote(value) {
@@ -276,33 +202,8 @@ class PythonRunnerSession {
     }
 
     async ensurePythonEnvironmentInternal() {
-        const venvDir = path.join(this.projectRoot, '.venv');
-        const expectedVenvPython = getVenvPython(this.projectRoot);
-        let createdVenv = false;
-
         fs.mkdirSync(path.join(this.projectRoot, '.kigumi'), { recursive: true });
-
-        if (!fs.existsSync(expectedVenvPython)) {
-            this.channel.appendLine(`[env] Creating virtual environment at ${venvDir}`);
-
-            const bootstrapLauncher = await this.findBootstrapPythonLauncher();
-            if (!bootstrapLauncher) {
-                const helpMessage = this.getPythonInstallHelpMessage();
-                this.channel.appendLine(`[env] ${helpMessage}`);
-                throw new Error(helpMessage);
-            }
-
-            const createArgs = [...bootstrapLauncher.prefixArgs, '-m', 'venv', venvDir];
-            try {
-                await this.runCommand(bootstrapLauncher.command, createArgs, { cwd: this.projectRoot });
-            } catch (error) {
-                const helpMessage = this.getPythonInstallHelpMessage();
-                this.channel.appendLine(`[env] Failed to create virtual environment: ${error.message}`);
-                this.channel.appendLine(`[env] ${helpMessage}`);
-                throw new Error(`${helpMessage} Original error: ${error.message}`);
-            }
-            createdVenv = true;
-        }
+        const { createdVenv } = await ensureProjectVenv(this.projectRoot);
 
         const pythonCmd = this.getPythonCommand();
         const missingBefore = await this.getMissingViewerDependencies(pythonCmd);
@@ -310,15 +211,12 @@ class PythonRunnerSession {
         let installedViewerDeps = false;
         if (missingBefore.length > 0) {
             this.channel.appendLine(`[env] Missing viewer deps: ${missingBefore.join(', ')}; installing...`);
-            await this.ensurePipAvailable(pythonCmd);
-            await this.runCommand(pythonCmd, ['-m', 'pip', 'install', '--upgrade', 'pip']);
-
             if (this.isLocalDev && fs.existsSync(path.join(this.projectRoot, 'pyproject.toml'))) {
-                await this.runCommand(pythonCmd, ['-m', 'pip', 'install', '-e', this.projectRoot]);
+                await pipInstall(this.projectRoot, pythonCmd, ['-e', this.projectRoot]);
             } else {
                 const spec = kumikiCompatiblePipSpec(getKigumiVersion(this.context.extensionPath));
                 this.channel.appendLine(`[env] Installing ${spec}`);
-                await this.runCommand(pythonCmd, ['-m', 'pip', 'install', spec]);
+                await pipInstall(this.projectRoot, pythonCmd, [spec]);
             }
             installedViewerDeps = true;
         }

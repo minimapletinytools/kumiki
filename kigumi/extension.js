@@ -13,6 +13,7 @@ const {
     isInitializationInProgress,
     getWorkspaceKumikiVersionInfo,
 } = require('./project-initializer');
+const { configureToolchain, UV_VERSION } = require('./python-toolchain');
 const { createTranslator } = require('./i18n');
 
 // Resolved once from VS Code's own display language (no user override yet).
@@ -106,6 +107,24 @@ function activate(context) {
     logRetentionDays = normalizeRetentionDays(vscode.workspace.getConfiguration('kigumi').get('viewer.logRetentionDays', 15));
     autoRefreshSidebarOnNewFile = vscode.workspace.getConfiguration('kigumi').get('sidebar.autoRefreshOnNewFile', true);
     pruneWorkspaceLogs(outputChannel, logRetentionDays);
+    configureToolchain({
+        toolsDir: context.globalStorageUri.fsPath,
+        log: (line) => outputChannel.appendLine(`[toolchain] ${line}`),
+        confirmInstallUv: async () => {
+            const install = t('message.installUvAction');
+            const choice = await vscode.window.showInformationMessage(
+                t('message.installUvPrompt'),
+                { modal: true, detail: t('message.installUvDetail', { version: UV_VERSION }) },
+                install,
+            );
+            return choice === install;
+        },
+        withProgress: (task) => vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: t('message.installingUvProgress'),
+            cancellable: false,
+        }, task),
+    });
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('kigumi.viewer.openInSplitView')) {
             openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', false);

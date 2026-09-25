@@ -111,7 +111,6 @@ describe('project-initializer', () => {
     expect(gitignoreContent).toContain('.venv/');
     expect(gitignoreContent).toContain('kigumi_exports/');
     expect(gitignoreContent).toContain('.kigumi/logs/');
-    expect(gitignoreContent).toContain('.kigumi/uv-bootstrap/');
     expect(gitignoreContent).not.toMatch(/^\.kigumi\/$/m);
     expect(gitignoreContent).not.toContain('.kigumi.yaml');
     expect(gitignoreContent).not.toContain('.kigumi_readonly_sources/');
@@ -121,7 +120,7 @@ describe('project-initializer', () => {
     expect(result.copiedWorkspaceUsageInstructionsFile).toBe(true);
     expect(result.instructionWarnings).toEqual([]);
     expect(result.createdGitignoreFile).toBe(true);
-    expect(result.addedGitignoreEntries).toEqual(['.venv/', 'kigumi_exports/', '.kigumi/logs/', '.kigumi/uv-bootstrap/']);
+    expect(result.addedGitignoreEntries).toEqual(['.venv/', 'kigumi_exports/', '.kigumi/logs/']);
 
     const uvVersionProbe = spawn.mock.calls.some(
       ([command, args]) => command === 'uv' && Array.isArray(args) && args.join(' ') === '--version'
@@ -136,66 +135,45 @@ describe('project-initializer', () => {
     expect(uvVenvCreate).toBe(true);
   });
 
-  test('initializeWorkspaceProject bootstraps uv into its own venv instead of the system Python', async () => {
-    const bootstrapVenvRoot = path.join(tmpRoot, '.kigumi', 'uv-bootstrap');
-    const bootstrapPython = process.platform === 'win32'
-      ? path.join(bootstrapVenvRoot, 'Scripts', 'python.exe')
-      : path.join(bootstrapVenvRoot, 'bin', 'python');
-
-    let uvInstalledInBootstrapVenv = false;
+  test('initializeWorkspaceProject uses the system Python for the venv and pip when uv is missing', async () => {
+    const binDir = path.join(tmpRoot, 'bin');
+    fs.mkdirSync(binDir);
+    for (const name of ['python3', 'python3.exe']) {
+      fs.writeFileSync(path.join(binDir, name), '');
+    }
+    const originalPath = process.env.PATH;
+    process.env.PATH = binDir;
+    const homedirSpy = jest.spyOn(os, 'homedir').mockReturnValue(path.join(tmpRoot, 'home'));
 
     spawn.mockImplementation((command, args) => {
       const argv = Array.isArray(args) ? args : [];
-      const joined = argv.join(' ');
       const snippet = argv[0] === '-c' ? String(argv[1] || '') : '';
 
-      if (snippet.includes('required = ["sympy", "numpy", "trimesh", "manifold3d"]')) {
-        return createMockChildProcess({ stdoutText: '' });
+      if (path.basename(command).replace(/\.exe$/, '') === 'uv') {
+        return createMockChildProcess({ exitCode: 127 });
+      }
+      if (snippet.includes('sys.version_info')) {
+        return command === 'python3'
+          ? createMockChildProcess({ stdoutText: '3.12\n' })
+          : createMockChildProcess({ exitCode: 1 });
       }
       if (snippet.includes('m.version("kumiki")')) {
         return createMockChildProcess({ stdoutText: '0.6.0\n' });
       }
-
-      // No uv executable anywhere on this machine.
-      if (path.basename(command).replace(/\.exe$/, '') === 'uv') {
-        return createMockChildProcess({ exitCode: 127 });
-      }
-
-      if (argv[0] === '-m' && argv[1] === 'uv') {
-        const importable = command === bootstrapPython && uvInstalledInBootstrapVenv;
-        return createMockChildProcess({ exitCode: importable ? 0 : 1 });
-      }
-
-      // A Homebrew/distro Python refuses to install into itself (PEP 668).
-      if (joined.includes('-m ensurepip') || joined.includes('install --user')) {
-        return createMockChildProcess({
-          exitCode: 1,
-          stderrText: 'error: externally-managed-environment',
-        });
-      }
-
-      if (command === bootstrapPython && joined === '-m pip install --upgrade uv') {
-        uvInstalledInBootstrapVenv = true;
-        return createMockChildProcess();
-      }
-
       return createMockChildProcess();
     });
 
-    const result = await initializeWorkspaceProject(tmpRoot, null);
+    try {
+      await initializeWorkspaceProject(tmpRoot, null);
+    } finally {
+      process.env.PATH = originalPath;
+      homedirSpy.mockRestore();
+    }
 
     const calls = spawn.mock.calls.map(([command, args]) => [command, (args || []).join(' ')]);
-
-    // The bootstrap venv is built with the system Python, which is the only
-    // thing that Python is asked to do -- uv itself is installed inside it.
-    expect(calls).toContainEqual(['python3.13', `-m venv ${bootstrapVenvRoot}`]);
-    expect(calls).toContainEqual([bootstrapPython, '-m pip install --upgrade uv']);
-    expect(calls).toContainEqual([bootstrapPython, '-m uv venv --python 3.13 .venv']);
-
-    expect(calls.some(([, args]) => args.includes('-m ensurepip'))).toBe(false);
-    expect(calls.some(([, args]) => args.includes('install --user'))).toBe(false);
-
-    expect(result.addedGitignoreEntries).toContain('.kigumi/uv-bootstrap/');
+    expect(calls).toContainEqual(['python3', '-m venv .venv']);
+    expect(calls.some(([, args]) => args.includes('-m pip install --upgrade kumiki~='))).toBe(true);
+    expect(calls.some(([, args]) => args.includes('install --upgrade uv'))).toBe(false);
   });
 
   test('initializeWorkspaceProject appends to existing AGENTS.md and outputs warning', async () => {

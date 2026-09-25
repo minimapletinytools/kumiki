@@ -10,10 +10,10 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { getVenvPythonCandidates } = require('./python-env');
+const { systemPythonCommands } = require('./python-toolchain');
 
 function getPythonCandidates(workspaceRoot) {
-    const fallbacks = process.platform === 'win32' ? ['python'] : ['python3', 'python'];
-    return [...getVenvPythonCandidates(workspaceRoot), ...fallbacks];
+    return [...getVenvPythonCandidates(workspaceRoot), ...systemPythonCommands()];
 }
 
 function runLibrarianCli(pythonCommand, workspaceRoot, timeoutMs) {

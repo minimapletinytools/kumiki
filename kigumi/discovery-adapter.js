@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { getVenvPythonCandidates } = require('./python-env');
+const { systemPythonCommands } = require('./python-toolchain');
 
 const DISCOVERY_SCRIPT_PATH = path.join(__dirname, 'dependency-discovery.py');
 
@@ -95,8 +96,7 @@ async function listPythonFiles(rootDir) {
 }
 
 function getPythonCandidates(workspaceRoot) {
-    const fallbacks = process.platform === 'win32' ? ['python', 'py'] : ['python3', 'python'];
-    return [...getVenvPythonCandidates(workspaceRoot), ...fallbacks];
+    return [...getVenvPythonCandidates(workspaceRoot), ...systemPythonCommands()];
 }
 
 function runPythonJson(pythonCommand, scriptPath, workspaceRoot, timeoutMs) {
