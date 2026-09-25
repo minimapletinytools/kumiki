@@ -39,6 +39,7 @@ jest.mock('vscode', () => ({
   },
 }), { virtual: true });
 
+require('../host').setHost(require('../hosts/vscode').createVscodeHost());
 const { FileWatcher } = require('../file-watcher');
 
 // Helper to simulate fs checks when needed

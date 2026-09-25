@@ -2,16 +2,58 @@
  * Viewer — Manages the webview panel for displaying timber frame data and 3D geometry.
  */
 
-const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const { requestWebviewRoundTrip } = require('./webview-request');
 const { resolveLocale, loadCatalog, createTranslator } = require('./i18n');
+const { getHost } = require('./host');
 
 const initializedPanels = new WeakSet();
 const webviewDir = path.join(__dirname, 'webview');
 let screenshotRequestCounter = 1;
 const VIEWER_APP_VERSION = '2026.03.17.4';
+// Template placeholder → file under webview/.
+const WEBVIEW_ASSETS = [
+    ['__BOOT_DIAGNOSTICS_JS_URI__', 'boot-diagnostics.js'],
+    ['__I18N_JS_URI__', 'i18n.js'],
+    ['__SELECTION_STORE_JS_URI__', 'selection-store.js'],
+    ['__SELECTION_VISUALS_JS_URI__', 'selection-visuals.js'],
+    ['__HIGHLIGHTS_JS_URI__', 'highlights.js'],
+    ['__LAYER_STATE_STORE_JS_URI__', 'layer-state-store.js'],
+    ['__LAYERS_PANEL_JS_URI__', 'layers-panel.js'],
+    ['__ASSEMBLY_TIMELINE_JS_URI__', 'assembly-timeline.js'],
+    ['__FEATURE_FLAGS_JS_URI__', 'feature-flags.js'],
+    ['__CAMERA_CONTROLLER_JS_URI__', 'camera-controller.js'],
+    ['__CAMERA_CONTROLS_JS_URI__', 'camera-controls.js'],
+    ['__SCENE_MANAGER_JS_URI__', 'scene-manager.js'],
+    ['__INPUT_CONTROLLER_JS_URI__', 'input-controller.js'],
+    ['__MEASUREMENTS_JS_URI__', 'measurements.js'],
+    ['__MEASURE_DRAFT_JS_URI__', 'measure-draft.js'],
+    ['__UNDO_STACKS_JS_URI__', 'undo-stacks.js'],
+    ['__CONTEXT_MENU_JS_URI__', 'context-menu.js'],
+    ['__HOVER_STATE_JS_URI__', 'hover-state.js'],
+    ['__PICK_TOLERANCES_JS_URI__', 'pick-tolerances.js'],
+    ['__RENDER_MODE_JS_URI__', 'render-mode.js'],
+    ['__DRAWING_PANEL_JS_URI__', 'drawing-panel.js'],
+    ['__GEOMETRY_MODE_JS_URI__', 'geometry-mode.js'],
+    ['__CSG_TREE_VIEW_JS_URI__', 'csg-tree-view.js'],
+    ['__TAGS_JS_URI__', 'tags.js'],
+    ['__TAG_INDEX_JS_URI__', 'tag-index.js'],
+    ['__UNITS_JS_URI__', 'units.js'],
+    ['__DIMENSION_TEXT_JS_URI__', 'dimension-text.js'],
+    ['__KIWARI_VALUES_JS_URI__', 'kiwari-values.js'],
+    ['__DISPLAY_OPTIONS_JS_URI__', 'display-options-store.js'],
+    ['__SCENE_STORE_JS_URI__', 'scene-store.js'],
+    ['__APP_JS_URI__', 'viewer-app.js'],
+    ['__STYLES_CSS_URI__', 'viewer.css'],
+    ['__THREE_JS_URI__', 'vendor/three.min.js'],
+    ['__REFLECTOR_JS_URI__', 'vendor/Reflector.js'],
+    ['__LINE_SEGMENTS_GEOMETRY_JS_URI__', 'vendor/LineSegmentsGeometry.js'],
+    ['__LINE_MATERIAL_JS_URI__', 'vendor/LineMaterial.js'],
+    ['__LINE_SEGMENTS2_JS_URI__', 'vendor/LineSegments2.js'],
+    ['__LIT_JS_URI__', 'vendor/lit.min.js'],
+];
+
 const ViewerPhase = Object.freeze({
     WAITING_FOR_RUNNER: 'waiting_for_runner',
     READY: 'ready',
@@ -40,17 +82,11 @@ function escapeScriptJson(value) {
 }
 
 function createFrameViewer(filePath, frameName = null, isLocalDev = false, openInSplitView = true) {
-    const targetColumn = openInSplitView ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active;
-    return vscode.window.createWebviewPanel(
-        'kigumiViewer',
-        getViewerTitle(filePath, frameName, isLocalDev),
-        targetColumn,
-        {
-            enableScripts: true,
-            retainContextWhenHidden: true,
-            localResourceRoots: [vscode.Uri.file(webviewDir)],
-        }
-    );
+    return getHost().createViewerSurface({
+        title: getViewerTitle(filePath, frameName, isLocalDev),
+        beside: openInSplitView,
+        resourceRoot: webviewDir,
+    });
 }
 
 function initializeFrameViewer(panel, filePath, options = {}, isLocalDev = false) {
@@ -60,15 +96,15 @@ function initializeFrameViewer(panel, filePath, options = {}, isLocalDev = false
 
     const loadingText = typeof options.loadingText === 'string' && options.loadingText
         ? options.loadingText
-        : createTranslator(vscode.env.language)('viewer.chrome.loading.initialCreation');
+        : createTranslator(getHost().locale)('viewer.chrome.loading.initialCreation');
     const viewerOptions = normalizeViewerOptions(options.viewerOptions);
     const viewerSettings = (options.viewerSettings && typeof options.viewerSettings === 'object')
         ? options.viewerSettings
         : null;
 
     panel.title = getViewerTitle(filePath, null, isLocalDev);
-    panel.webview.html = getWebviewContent(
-        panel.webview,
+    panel.setHtml(getWebviewContent(
+        panel,
         {
             name: null,
             timber_count: 0,
@@ -97,7 +133,7 @@ function initializeFrameViewer(panel, filePath, options = {}, isLocalDev = false
         },
         viewerOptions,
         viewerSettings
-    );
+    ));
     initializedPanels.add(panel);
 }
 
@@ -111,10 +147,10 @@ function renderFrameViewer(panel, filePath, frameData, geometryData, profiling, 
     };
     const nextViewerOptions = normalizeViewerOptions(viewerOptions);
     if (!initializedPanels.has(panel)) {
-        panel.webview.html = getWebviewContent(panel.webview, frameData, geometryData, profiling, nextUiState, nextViewerOptions, viewerSettings);
+        panel.setHtml(getWebviewContent(panel, frameData, geometryData, profiling, nextUiState, nextViewerOptions, viewerSettings));
         initializedPanels.add(panel);
     } else {
-        panel.webview.postMessage({
+        panel.postMessage({
             type: 'viewerState',
             frame: frameData,
             geometry: geometryData,
@@ -135,53 +171,13 @@ function getViewerTitle(filePath, frameName = null, isLocalDev = false) {
     return `Kigumi: ${fileName}${devTag} · v${VIEWER_APP_VERSION}`;
 }
 
-function getWebviewContent(webview, frameData, geometryData, profiling, uiState = null, viewerOptions = null, viewerSettings = null) {
+function getWebviewContent(surface, frameData, geometryData, profiling, uiState = null, viewerOptions = null, viewerSettings = null) {
     const templatePath = path.join(webviewDir, 'viewer.html');
     const template = fs.readFileSync(templatePath, 'utf8');
 
-    const appJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer-app.js'))).toString();
-    const bootDiagnosticsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'boot-diagnostics.js'))).toString();
-    const i18nJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'i18n.js'))).toString();
-    const selectionStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-store.js'))).toString();
-    const selectionVisualsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-visuals.js'))).toString();
-    const highlightsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'highlights.js'))).toString();
-    const layerStateStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layer-state-store.js'))).toString();
-    const layersPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layers-panel.js'))).toString();
-    const assemblyTimelineJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'assembly-timeline.js'))).toString();
-    const featureFlagsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'feature-flags.js'))).toString();
-    const cameraControllerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'camera-controller.js'))).toString();
-    const cameraControlsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'camera-controls.js'))).toString();
-    const sceneManagerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'scene-manager.js'))).toString();
-    const inputControllerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'input-controller.js'))).toString();
-    const measurementsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measurements.js'))).toString();
-    const measureDraftJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measure-draft.js'))).toString();
-    const undoStacksJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'undo-stacks.js'))).toString();
-    const contextMenuJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'context-menu.js'))).toString();
-    const hoverStateJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'hover-state.js'))).toString();
-    const pickTolerancesJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'pick-tolerances.js'))).toString();
-    const renderModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'render-mode.js'))).toString();
-    const drawingPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'drawing-panel.js'))).toString();
-    const geometryModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'geometry-mode.js'))).toString();
-    const csgTreeViewJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'csg-tree-view.js'))).toString();
-    const tagsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'tags.js'))).toString();
-    const tagIndexJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'tag-index.js'))).toString();
-    const unitsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'units.js'))).toString();
-    const dimensionTextJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'dimension-text.js'))).toString();
-    const kiwariValuesJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'kiwari-values.js'))).toString();
-    const displayOptionsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'display-options-store.js'))).toString();
-    const sceneStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'scene-store.js'))).toString();
-    const stylesCssUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer.css'))).toString();
-    const threeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'three.min.js'))).toString();
-    const reflectorJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'Reflector.js'))).toString();
-    const lineSegmentsGeometryJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'LineSegmentsGeometry.js'))).toString();
-    const lineMaterialJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'LineMaterial.js'))).toString();
-    const lineSegments2JsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'LineSegments2.js'))).toString();
-    const litJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'lit.min.js'))).toString();
     const nonce = getNonce();
-    // Locale is resolved once, server-side, from VS Code's own display
-    // language — no user-facing override yet, this purely auto-follows
-    // vscode.env.language (falls back to 'en' if unsupported/unset).
-    const locale = resolveLocale(vscode.env.language);
+    // Follows the host's display language; falls back to 'en'.
+    const locale = resolveLocale(getHost().locale);
 
     const payloadJson = escapeScriptJson(JSON.stringify({
         frame: frameData,
@@ -192,54 +188,20 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         viewerSettings: (viewerSettings && typeof viewerSettings === 'object') ? viewerSettings : null,
         // User setting for the assembly preview timeline; the webview combines
         // it with the package-time FEATURE_FLAGS.assemblyPreview master switch.
-        assemblyPreviewSetting: vscode.workspace.getConfiguration('kigumi').get('viewer.assemblyPreview', false) === true,
-        drawingBetaSetting: vscode.workspace.getConfiguration('kigumi').get('viewer.drawingBeta', false) === true,
+        assemblyPreviewSetting: getHost().getConfig('viewer.assemblyPreview', false) === true,
+        drawingBetaSetting: getHost().getConfig('viewer.drawingBeta', false) === true,
         i18n: { locale, strings: loadCatalog(locale) },
     }));
 
-    return template
-        .replace(/__CSP_SOURCE__/g, webview.cspSource)
+    let html = template
+        .replace(/__CSP_SOURCE__/g, surface.cspSource)
         .replace(/__NONCE__/g, nonce)
         .replace('__LOCALE__', locale)
-        .replace('__INITIAL_PAYLOAD_JSON__', payloadJson)
-        .replace('__BOOT_DIAGNOSTICS_JS_URI__', bootDiagnosticsJsUri)
-        .replace('__I18N_JS_URI__', i18nJsUri)
-        .replace('__SELECTION_STORE_JS_URI__', selectionStoreJsUri)
-        .replace('__SELECTION_VISUALS_JS_URI__', selectionVisualsJsUri)
-        .replace('__HIGHLIGHTS_JS_URI__', highlightsJsUri)
-        .replace('__LAYER_STATE_STORE_JS_URI__', layerStateStoreJsUri)
-        .replace('__LAYERS_PANEL_JS_URI__', layersPanelJsUri)
-        .replace('__ASSEMBLY_TIMELINE_JS_URI__', assemblyTimelineJsUri)
-        .replace('__FEATURE_FLAGS_JS_URI__', featureFlagsJsUri)
-        .replace('__CAMERA_CONTROLLER_JS_URI__', cameraControllerJsUri)
-        .replace('__CAMERA_CONTROLS_JS_URI__', cameraControlsJsUri)
-        .replace('__SCENE_MANAGER_JS_URI__', sceneManagerJsUri)
-        .replace('__INPUT_CONTROLLER_JS_URI__', inputControllerJsUri)
-        .replace('__MEASUREMENTS_JS_URI__', measurementsJsUri)
-        .replace('__MEASURE_DRAFT_JS_URI__', measureDraftJsUri)
-        .replace('__UNDO_STACKS_JS_URI__', undoStacksJsUri)
-        .replace('__CONTEXT_MENU_JS_URI__', contextMenuJsUri)
-        .replace('__HOVER_STATE_JS_URI__', hoverStateJsUri)
-        .replace('__PICK_TOLERANCES_JS_URI__', pickTolerancesJsUri)
-        .replace('__RENDER_MODE_JS_URI__', renderModeJsUri)
-        .replace('__DRAWING_PANEL_JS_URI__', drawingPanelJsUri)
-        .replace('__GEOMETRY_MODE_JS_URI__', geometryModeJsUri)
-        .replace('__CSG_TREE_VIEW_JS_URI__', csgTreeViewJsUri)
-        .replace('__TAGS_JS_URI__', tagsJsUri)
-        .replace('__TAG_INDEX_JS_URI__', tagIndexJsUri)
-        .replace('__UNITS_JS_URI__', unitsJsUri)
-        .replace('__DIMENSION_TEXT_JS_URI__', dimensionTextJsUri)
-        .replace('__KIWARI_VALUES_JS_URI__', kiwariValuesJsUri)
-        .replace('__DISPLAY_OPTIONS_JS_URI__', displayOptionsJsUri)
-        .replace('__SCENE_STORE_JS_URI__', sceneStoreJsUri)
-        .replace('__APP_JS_URI__', appJsUri)
-        .replace('__STYLES_CSS_URI__', stylesCssUri)
-        .replace('__THREE_JS_URI__', threeJsUri)
-        .replace('__REFLECTOR_JS_URI__', reflectorJsUri)
-        .replace('__LINE_SEGMENTS_GEOMETRY_JS_URI__', lineSegmentsGeometryJsUri)
-        .replace('__LINE_MATERIAL_JS_URI__', lineMaterialJsUri)
-        .replace('__LINE_SEGMENTS2_JS_URI__', lineSegments2JsUri)
-        .replace('__LIT_JS_URI__', litJsUri);
+        .replace('__INITIAL_PAYLOAD_JSON__', payloadJson);
+    for (const [placeholder, relativePath] of WEBVIEW_ASSETS) {
+        html = html.replace(placeholder, surface.resourceUri(path.join(webviewDir, ...relativePath.split('/'))));
+    }
+    return html;
 }
 
 function requestViewerScreenshot(panel, options = {}) {
@@ -251,7 +213,7 @@ function requestViewerScreenshot(panel, options = {}) {
     const requestId = `capture-${Date.now()}-${screenshotRequestCounter}`;
     screenshotRequestCounter += 1;
 
-    return requestWebviewRoundTrip(panel.webview, {
+    return requestWebviewRoundTrip(panel, {
         requestType: 'captureScreenshotRequest',
         resultType: 'captureScreenshotResult',
         requestId,

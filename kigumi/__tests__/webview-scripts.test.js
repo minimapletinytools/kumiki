@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-// The webview loads its modules as plain scripts, wired in three places at
-// once: a <script> placeholder in viewer.html, a URI built in viewer.js, and a
-// .replace() joining them. Miss any one and the module simply is not there --
+// The webview loads its modules as plain scripts, wired in two places at
+// once: a <script> placeholder in viewer.html and a row of WEBVIEW_ASSETS in
+// viewer.js. Miss either one and the module simply is not there --
 // and because viewer-app.js reaches for these globals in its CONSTRUCTOR, a
 // missing one throws before anything renders and the viewer comes up blank,
 // with nothing on screen to say why.
@@ -57,25 +57,10 @@ const viewerJs = fs.readFileSync(path.join(__dirname, '..', 'viewer.js'), 'utf8'
 /** Every `__X_JS_URI__` the template asks for, in load order. */
 const placeholders = [...html.matchAll(/src="(__[A-Z0-9_]+_URI__)"/g)].map((m) => m[1]);
 
-/** Every placeholder viewer.js fills in, and the variable it fills it with. */
+/** Every placeholder viewer.js fills in, mapped to its path relative to webview/. */
 const filled = new Map(
-    [...viewerJs.matchAll(/\.replace\('(__[A-Z0-9_]+_URI__)',\s*([A-Za-z0-9_]+)\)/g)]
-        .map((m) => [m[1], m[2]]),
-);
-
-/**
- * Every `const someJsUri = ... path.join(webviewDir, ...) ...` viewer.js builds,
- * mapped to the path relative to webview/.
- *
- * Every quoted segment, not just the filename: the vendor scripts live a
- * directory down, and taking the last one alone loses where they are.
- */
-const built = new Map(
-    [...viewerJs.matchAll(/const\s+([A-Za-z0-9_]+)\s*=\s*webview\.asWebviewUri\([^;]*?path\.join\(webviewDir,([^)]*)\)/g)]
-        .map(([, variable, args]) => [
-            variable,
-            path.join(...[...args.matchAll(/'([^']+)'/g)].map((m) => m[1])),
-        ]),
+    [...viewerJs.matchAll(/\['(__[A-Z0-9_]+_URI__)',\s*'([^']+)'\]/g)]
+        .map(([, placeholder, file]) => [placeholder, path.join(...file.split('/'))]),
 );
 
 describe('every script the template asks for is actually wired', () => {
@@ -84,14 +69,14 @@ describe('every script the template asks for is actually wired', () => {
     });
 
     test.each(placeholders)('%s resolves to a file that exists', (placeholder) => {
-        const file = built.get(filled.get(placeholder));
+        const file = filled.get(placeholder);
 
         expect(file).toBeDefined();
         expect(fs.existsSync(path.join(webviewDir, file))).toBe(true);
     });
 
     test('no placeholder is filled in that the template never asks for', () => {
-        // A dead .replace() is the other half of the same mistake: the module
+        // A dead table row is the other half of the same mistake: the module
         // is built and never loaded.
         const asked = new Set(placeholders);
         const dead = [...filled.keys()].filter(
@@ -116,7 +101,7 @@ describe('every global the webview reaches for is loaded before it is used', () 
 
     /** The webview files loaded by the template, in order. */
     const loaded = placeholders
-        .map((placeholder) => built.get(filled.get(placeholder)))
+        .map((placeholder) => filled.get(placeholder))
         .filter(Boolean);
 
     // Every `window.Kigumi*` or known store the app and its panels use.

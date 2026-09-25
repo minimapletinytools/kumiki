@@ -32,6 +32,7 @@ jest.mock('vscode', () => ({
   },
 }), { virtual: true });
 
+require('../host').setHost(require('../hosts/vscode').createVscodeHost());
 const { NewPythonFileWatcher, shouldIgnorePath } = require('../new-python-file-watcher');
 
 describe('shouldIgnorePath', () => {

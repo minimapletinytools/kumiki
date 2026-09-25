@@ -1,5 +1,5 @@
 /**
- * Shared request/response round-trip over a VS Code webview.
+ * Shared request/response round-trip over a viewer surface (see host.js).
  *
  * Posts `{ type: requestType, requestId, ...payload }` to the webview and
  * resolves when a matching `{ type: resultType, requestId, ok, ... }` message
@@ -8,7 +8,7 @@
  * across FrameViewSession._requestWebviewAction, capturePanelSnapshot, and
  * viewer.js requestViewerScreenshot.
  *
- * @param {{ onDidReceiveMessage: Function, postMessage: Function }} webview
+ * @param {{ onMessage: Function, postMessage: Function }} surface
  * @param {object} options
  * @param {string} options.requestType   message type to post
  * @param {string} options.resultType    message type to await
@@ -20,7 +20,7 @@
  * @param {string} [options.failMessage] reject message when ok is false
  * @param {string} [options.postFailMessage] reject message when the post fails
  */
-function requestWebviewRoundTrip(webview, options = {}) {
+function requestWebviewRoundTrip(surface, options = {}) {
     const {
         requestType,
         resultType,
@@ -54,7 +54,7 @@ function requestWebviewRoundTrip(webview, options = {}) {
             fn();
         };
 
-        const listener = webview.onDidReceiveMessage((message) => {
+        const listener = surface.onMessage((message) => {
             if (!message || message.type !== resultType || message.requestId !== requestId) {
                 return;
             }
@@ -73,7 +73,7 @@ function requestWebviewRoundTrip(webview, options = {}) {
             }, timeoutMs);
         }
 
-        webview.postMessage({ type: requestType, requestId, ...payload }).then((posted) => {
+        surface.postMessage({ type: requestType, requestId, ...payload }).then((posted) => {
             if (!posted) {
                 settle(() => reject(new Error(postFailMessage)));
             }

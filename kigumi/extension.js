@@ -14,6 +14,8 @@ const {
     getWorkspaceKumikiVersionInfo,
 } = require('./project-initializer');
 const { configureToolchain, UV_VERSION } = require('./python-toolchain');
+const { setHost } = require('./host');
+const { createVscodeHost } = require('./hosts/vscode');
 const { createTranslator } = require('./i18n');
 
 // Resolved once from VS Code's own display language (no user override yet).
@@ -96,6 +98,7 @@ function withSession(options, fn, notFoundExtra = {}) {
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
+    setHost(createVscodeHost());
     outputChannel = vscode.window.createOutputChannel('Kigumi');
     context.subscriptions.push(outputChannel);
     const extensionVersion = (context.extension && context.extension.packageJSON && context.extension.packageJSON.version)

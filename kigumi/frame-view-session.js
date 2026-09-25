@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const vscode = require('vscode');
+const { getHost } = require('./host');
 const { PythonRunnerSession } = require('./runner-session');
 const { FileWatcher } = require('./file-watcher');
 const { RefreshProfiler } = require('./refresh-profiler');
@@ -10,7 +10,7 @@ const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 const { createTranslator } = require('./i18n');
 
 // Resolved once from VS Code's own display language (no user override yet).
-const t = createTranslator(vscode.env && vscode.env.language);
+const t = (key, params) => createTranslator(getHost().locale)(key, params);
 
 const VIEWER_LOG_LEVEL_ORDER = {
     debug: 10,
@@ -23,7 +23,7 @@ const VIEWER_LOG_LEVEL_ORDER = {
 // FEATURE_FLAGS.assemblyPreview stays the master switch on top of this).
 // Read fresh at each use so toggling applies on the next refresh.
 function assemblyPreviewSettingEnabled() {
-    return vscode.workspace.getConfiguration('kigumi').get('viewer.assemblyPreview', false) === true;
+    return getHost().getConfig('viewer.assemblyPreview', false) === true;
 }
 
 function normalizeViewerLogLevel(level) {
@@ -47,8 +47,8 @@ function sanitizeLogPathSegment(value, fallback) {
 class FrameViewSession {
     /**
      * @param {string} filePath
-     * @param {vscode.ExtensionContext} context
-     * @param {vscode.OutputChannel} channel
+     * @param {{extensionPath: string}} context
+     * @param {{appendLine: Function, append: Function, show: Function}} channel
      * @param {Function} onDispose
      * @param {object} [options]
      * @param {string} [options.slotName]      - runner slot name (default: 'main')
@@ -103,17 +103,14 @@ class FrameViewSession {
     // Post a message to the webview if the panel is still live.
     _postToWebview(message) {
         if (this.panel && !this.isDisposed) {
-            this.panel.webview.postMessage(message);
+            this.panel.postMessage(message);
         }
     }
 
     getViewerSettingsPath() {
-        const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.filePath));
-        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
-            ? this.runnerSession.projectRoot
-            : workspaceFolder && workspaceFolder.uri && workspaceFolder.uri.fsPath
-                ? workspaceFolder.uri.fsPath
-                : path.dirname(this.filePath);
+        const projectRoot = (this.runnerSession && this.runnerSession.projectRoot)
+            || getHost().workspaceRootFor(this.filePath)
+            || path.dirname(this.filePath);
         return path.join(projectRoot, '.kigumi', 'kigumi-settings.json');
     }
 
@@ -160,7 +157,7 @@ class FrameViewSession {
         if (!this.panel) {
             return;
         }
-        this.panel.webview.postMessage({
+        this.panel.postMessage({
             type: 'viewerState',
             viewerOptions: this.refreshOptions,
             viewerSettings: this.viewerSettings,
@@ -218,7 +215,7 @@ class FrameViewSession {
             viewerSettings: this.viewerSettings,
         }, this.runnerSession.isLocalDev);
         this.profiler.markTiming(initTiming, 'initialize.webviewHtml.end');
-        this.panel.onDidDispose(() => {
+        this.panel.onDispose(() => {
             this.panel = null;
             this.log(`[panel] Panel closed, disposing session for slot '${this.slotName}'`);
             void this.dispose();
@@ -270,7 +267,7 @@ class FrameViewSession {
         if (!this.panel) {
             return;
         }
-        this.panel.webview.onDidReceiveMessage((message) => {
+        this.panel.onMessage((message) => {
             if (!message) {
                 return;
             }
@@ -290,9 +287,7 @@ class FrameViewSession {
                 }
                 this.saveParameters().catch((error) => {
                     this.log(`[parameters] Save failed: ${error.message || error}`);
-                    vscode.window.showErrorMessage(
-                        t('message.saveParametersFailed', { error: error.message || error }),
-                    );
+                    getHost().showMessage('error', t('message.saveParametersFailed', { error: error.message || error }));
                 });
                 return;
             }
@@ -497,7 +492,7 @@ class FrameViewSession {
     }
 
     async refreshOnceIfDirty(options = {}) {
-        const textDocument = await vscode.workspace.openTextDocument(vscode.Uri.file(this.filePath));
+        const textDocument = await getHost().getDocumentState(this.filePath);
         if (!textDocument.isDirty) {
             this.lastDirtyRefreshVersion = null;
             return {
@@ -553,7 +548,7 @@ class FrameViewSession {
         const result = await this.runnerSession.slotRequest('save_parameters', this.slotName, {});
         const written = (result && result.path) ? path.basename(result.path) : 'parameters';
         this.log(`[parameters] Saved ${written}`);
-        vscode.window.showInformationMessage(t('message.parametersSaved', { file: written }));
+        getHost().showMessage('info', t('message.parametersSaved', { file: written }));
         return result;
     }
 
@@ -576,7 +571,7 @@ class FrameViewSession {
         const timeoutMs = Number.isFinite(options.timeoutMs) ? Number(options.timeoutMs) : 6000;
         const requestId = `${requestPrefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
-        return requestWebviewRoundTrip(this.panel.webview, {
+        return requestWebviewRoundTrip(this.panel, {
             requestType: `${type}Request`,
             resultType: `${type}Result`,
             requestId,
@@ -602,7 +597,7 @@ class FrameViewSession {
 
         const isLocalDev = this.runnerSession.isLocalDev;
         this.panel = createFrameViewer(this.filePath, this.patternName, isLocalDev, this.openInSplitView);
-        this.panel.onDidDispose(() => {
+        this.panel.onDispose(() => {
             this.panel = null;
             this.log(`[panel] Panel closed, disposing session for slot '${this.slotName}'`);
             void this.dispose();
@@ -618,7 +613,7 @@ class FrameViewSession {
                 keepLoading: false,
             }, this.refreshOptions, this.viewerSettings);
             if (this._lastLayersData) {
-                this.panel.webview.postMessage({
+                this.panel.postMessage({
                     type: 'layersTree',
                     payload: this._lastLayersData,
                 }).catch((err) => {
@@ -832,7 +827,7 @@ class FrameViewSession {
             this._lastProfiling = profiling;
             this._lastLayersData = layersData;
             if (layersData && this.panel && !this.isDisposed) {
-                this.panel.webview.postMessage({
+                this.panel.postMessage({
                     type: 'layersTree',
                     payload: layersData,
                 }).catch((err) => {
@@ -885,7 +880,7 @@ class FrameViewSession {
         // automation test is running), rAF can still be suspended and this can hang
         // regardless — keep the window foregrounded while running automation tests
         // interactively.
-        this.panel.reveal(this.panel.viewColumn, false);
+        this.panel.reveal();
 
         const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 8000;
         const result = await requestViewerScreenshot(this.panel, { timeoutMs });
@@ -919,7 +914,7 @@ class FrameViewSession {
         const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 3000;
         const requestId = `panel-snapshot-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
-        return requestWebviewRoundTrip(this.panel.webview, {
+        return requestWebviewRoundTrip(this.panel, {
             requestType: 'capturePanelSnapshotRequest',
             resultType: 'capturePanelSnapshotResult',
             requestId,
@@ -1241,7 +1236,8 @@ class FrameViewSession {
                 : normalizedFormat === '3mf' && details.message.includes('3MF export requires')
                     ? ' Install 3MF support with: pip install lxml networkx'
                 : '';
-            const choice = await vscode.window.showErrorMessage(
+            const choice = await getHost().showMessage(
+                'error',
                 `Kigumi ${formatLabel} export failed: ${details.message}${installHint}`,
                 openOutputAction
             );
@@ -1259,7 +1255,7 @@ class FrameViewSession {
             .filter((entry) => entry === 'stl' || entry === '3mf' || entry === 'obj' || entry === 'step'))];
 
         if (formats.length === 0) {
-            void vscode.window.showWarningMessage(t('message.selectExportFormat'));
+            void getHost().showMessage('warning', t('message.selectExportFormat'));
             return;
         }
 
@@ -1268,7 +1264,7 @@ class FrameViewSession {
         const includeAccessories = message.includeAccessories !== false;
 
         if (!includeCombined && !includeIndividuals) {
-            void vscode.window.showWarningMessage(t('message.enableExportMode'));
+            void getHost().showMessage('warning', t('message.enableExportMode'));
             return;
         }
 
@@ -1298,9 +1294,9 @@ class FrameViewSession {
         this.log(`[export] ${summary}`);
 
         if (failedFormats.length > 0) {
-            void vscode.window.showWarningMessage(`${summary}. Failed: ${failedFormats.join(', ')}`);
+            void getHost().showMessage('warning', `${summary}. Failed: ${failedFormats.join(', ')}`);
         } else {
-            void vscode.window.showInformationMessage(summary);
+            void getHost().showMessage('info', summary);
         }
     }
 
@@ -1334,7 +1330,7 @@ class FrameViewSession {
             const writtenFiles = Array.isArray(result && result.files) ? result.files : [];
             const summary = `Kigumi exported ${formatLabel} for '${memberKey}' to ${writtenFiles[0] || outputDir}`;
             this.log(`[export] ${summary}`);
-            void vscode.window.showInformationMessage(summary);
+            void getHost().showMessage('info', summary);
             return { format, memberKey, writtenFiles, outputDir };
         } catch (error) {
             const details = this.extractRunnerErrorDetails(error);
@@ -1344,7 +1340,8 @@ class FrameViewSession {
             const installHint = format === 'step' && details.message.includes('cadquery-ocp')
                 ? ' Install STEP support with: pip install cadquery-ocp'
                 : '';
-            const choice = await vscode.window.showErrorMessage(
+            const choice = await getHost().showMessage(
+                'error',
                 `Kigumi ${formatLabel} export of '${memberKey}' failed: ${details.message}${installHint}`,
                 openOutputAction
             );
@@ -1381,7 +1378,7 @@ class FrameViewSession {
         this.log(`[settings] Saved viewer settings to ${settingsPath}`);
 
         if (this.panel && !this.isDisposed) {
-            this.panel.webview.postMessage({
+            this.panel.postMessage({
                 type: 'viewerSettingsSaved',
                 ok: true,
                 path: settingsPath,
@@ -1404,7 +1401,7 @@ class FrameViewSession {
             this.log(`[export] Failed to detect cadquery-ocp: ${error.message || error}`);
         }
 
-        this.panel.webview.postMessage({
+        this.panel.postMessage({
             type: 'dependencyStatus',
             payload: {
                 cadqueryOcpInstalled: installed,
@@ -1432,12 +1429,13 @@ class FrameViewSession {
             }
 
             await this._pushCadqueryStatus();
-            void vscode.window.showInformationMessage(t('message.cadqueryInstalled'));
+            void getHost().showMessage('info', t('message.cadqueryInstalled'));
         } catch (error) {
             const details = this.extractRunnerErrorDetails(error);
             this.log(`[export] cadquery-ocp install failed: ${details.message}`);
             const openOutputAction = t('message.action.openKigumiOutput');
-            const choice = await vscode.window.showErrorMessage(
+            const choice = await getHost().showMessage(
+                'error',
                 `Failed to install cadquery-ocp: ${details.message}`,
                 openOutputAction
             );
@@ -1454,7 +1452,7 @@ class FrameViewSession {
             return;
         }
 
-        this.panel.webview.postMessage({
+        this.panel.postMessage({
             type: 'dependencyInstallStatus',
             payload: {
                 installingCadqueryOcp: Boolean(isInstalling),
@@ -1497,7 +1495,7 @@ class FrameViewSession {
         if (!this.panel) {
             return;
         }
-        this.panel.webview.postMessage({
+        this.panel.postMessage({
             type: 'sourceChangeState',
             payload: {
                 sourceHasPendingChanges: this.sourceHasPendingChanges,
@@ -1567,7 +1565,7 @@ class FrameViewSession {
 
         const refreshToken = this.refreshSequence;
         const loadingText = this.deriveViewerErrorMessage(details);
-        this.panel.webview.postMessage({
+        this.panel.postMessage({
             type: 'viewerState',
             uiState: {
                 phase: 'error',
@@ -1588,7 +1586,7 @@ class FrameViewSession {
         }
 
         const refreshToken = this.refreshSequence;
-        this.panel.webview.postMessage({
+        this.panel.postMessage({
             type: 'viewerState',
             uiState: {
                 phase: 'error',
@@ -1608,13 +1606,7 @@ class FrameViewSession {
             return;
         }
         try {
-            const uri = vscode.Uri.file(location.filePath);
-            const document = await vscode.workspace.openTextDocument(uri);
-            const editor = await vscode.window.showTextDocument(document, { preview: false });
-            const lineIndex = Math.max(0, location.lineNumber - 1);
-            const range = new vscode.Range(lineIndex, 0, lineIndex, 0);
-            editor.selection = new vscode.Selection(range.start, range.end);
-            editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+            await getHost().openFileAt(location.filePath, location.lineNumber);
         } catch (openError) {
             this.log(`[error] Failed to open traceback location: ${openError.message || openError}`);
         }
@@ -1643,7 +1635,8 @@ class FrameViewSession {
             actions.push(goToErrorAction);
         }
 
-        const choice = await vscode.window.showErrorMessage(
+        const choice = await getHost().showMessage(
+            'error',
             `Kigumi Python error: ${details.message}`,
             ...actions
         );
@@ -1721,7 +1714,7 @@ class FrameViewSession {
         }
         this.channel.appendLine(formatted);
         if (this.panel) {
-            this.panel.webview.postMessage({ type: 'logEntry', text: formatted }).catch(() => {});
+            this.panel.postMessage({ type: 'logEntry', text: formatted }).catch(() => {});
         }
     }
 

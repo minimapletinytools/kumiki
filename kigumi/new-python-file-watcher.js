@@ -13,7 +13,7 @@
  * concern, not a correctness one.
  */
 
-const vscode = require('vscode');
+const { getHost } = require('./host');
 
 const IGNORED_PATH_SEGMENTS = ['.venv', 'venv', 'node_modules', '__pycache__', '.git'];
 
@@ -49,17 +49,14 @@ class NewPythonFileWatcher {
         if (this.isDisposed || this.watcher || !this.workspaceRoot) {
             return;
         }
-        const pattern = new vscode.RelativePattern(this.workspaceRoot, '**/*.py');
-        // ignoreChangeEvents=true, ignoreDeleteEvents=true: only new files should
-        // trigger a sidebar refresh here.
-        this.watcher = vscode.workspace.createFileSystemWatcher(pattern, false, true, true);
-        this.watcher.onDidCreate((uri) => {
-            const fsPath = uri && uri.fsPath;
-            if (shouldIgnorePath(fsPath)) {
-                return;
-            }
-            this.log(`Detected new .py file: ${fsPath || 'unknown path'}`);
-            this.debounceRefresh();
+        this.watcher = getHost().watchFiles(this.workspaceRoot, '**/*.py', {
+            onCreate: (fsPath) => {
+                if (shouldIgnorePath(fsPath)) {
+                    return;
+                }
+                this.log(`Detected new .py file: ${fsPath || 'unknown path'}`);
+                this.debounceRefresh();
+            },
         });
     }
 

@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { resolveProjectEnvironment } = require('./project-root');
+const { getHost } = require('./host');
 const {
     runCommand: spawnProcess,
     getVenvPythonCandidates,
@@ -38,12 +39,7 @@ class PythonRunnerSession {
 
 
     resolveEnvironment(filePath) {
-        const vscode = require('vscode');
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        const existingWorkspaceFolder = workspaceFolders && workspaceFolders.length > 0
-            ? workspaceFolders.find((folder) => folder && folder.uri && fs.existsSync(folder.uri.fsPath))
-            : null;
-        const workspaceRoot = existingWorkspaceFolder ? existingWorkspaceFolder.uri.fsPath : null;
+        const workspaceRoot = getHost().workspaceRoots().find((root) => fs.existsSync(root)) || null;
 
         const resolved = resolveProjectEnvironment({
             filePath,
@@ -92,18 +88,8 @@ class PythonRunnerSession {
             return configuredPython;
         }
 
-        const searchRoots = [];
-
-        // First: workspace folders (most reliable — VS Code knows the open project)
-        const vscode = require('vscode');
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders) {
-            for (const folder of workspaceFolders) {
-                searchRoots.push(folder.uri.fsPath);
-            }
-        }
-
-        // Second: project root derived from the target file path
+        // Workspace folders first, then the project root derived from the file.
+        const searchRoots = [...getHost().workspaceRoots()];
         if (this.projectRoot) {
             searchRoots.push(this.projectRoot);
         }

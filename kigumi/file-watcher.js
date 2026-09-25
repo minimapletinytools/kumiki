@@ -8,7 +8,7 @@
  * Debounces rapid file changes and notifies via callback.
  */
 
-const vscode = require('vscode');
+const { getHost } = require('./host');
 const path = require('path');
 const fs = require('fs');
 
@@ -96,27 +96,24 @@ class FileWatcher {
      * Create a watcher for the example file.
      */
     watchExampleFile() {
-        const pattern = new vscode.RelativePattern(
+        const watcher = getHost().watchFiles(
             path.dirname(this.exampleFilePath),
-            path.basename(this.exampleFilePath)
+            path.basename(this.exampleFilePath),
+            {
+                onChange: (fsPath) => {
+                    this.logChange(`Detected example file change: ${fsPath || this.exampleFilePath}`);
+                    this.debounceReload('example file');
+                },
+                onCreate: (fsPath) => {
+                    this.logChange(`Detected example file creation: ${fsPath || this.exampleFilePath}`);
+                    this.debounceReload('example file');
+                },
+                onDelete: (fsPath) => {
+                    this.logChange(`Detected example file deletion: ${fsPath || this.exampleFilePath}`);
+                    this.debounceReload('example file');
+                },
+            }
         );
-        const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-
-        watcher.onDidChange((uri) => {
-            this.logChange(`Detected example file change: ${uri?.fsPath || this.exampleFilePath}`);
-            this.debounceReload('example file');
-        });
-
-        watcher.onDidCreate((uri) => {
-            this.logChange(`Detected example file creation: ${uri?.fsPath || this.exampleFilePath}`);
-            this.debounceReload('example file');
-        });
-
-        watcher.onDidDelete((uri) => {
-            this.logChange(`Detected example file deletion: ${uri?.fsPath || this.exampleFilePath}`);
-            this.debounceReload('example file');
-        });
-
         this.watchers.push(watcher);
     }
 
@@ -124,24 +121,20 @@ class FileWatcher {
      * Create a watcher for the kumiki library tree.
      */
     watchLibrary() {
-        const pattern = new vscode.RelativePattern(this.projectRoot, 'kumiki/**/*.py');
-        const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-
-        watcher.onDidChange((uri) => {
-            this.logChange(`Detected library file change: ${uri?.fsPath || 'unknown path'}`);
-            this.debounceReload('library file');
+        const watcher = getHost().watchFiles(this.projectRoot, 'kumiki/**/*.py', {
+            onChange: (fsPath) => {
+                this.logChange(`Detected library file change: ${fsPath || 'unknown path'}`);
+                this.debounceReload('library file');
+            },
+            onCreate: (fsPath) => {
+                this.logChange(`Detected library file creation: ${fsPath || 'unknown path'}`);
+                this.debounceReload('library file');
+            },
+            onDelete: (fsPath) => {
+                this.logChange(`Detected library file deletion: ${fsPath || 'unknown path'}`);
+                this.debounceReload('library file');
+            },
         });
-
-        watcher.onDidCreate((uri) => {
-            this.logChange(`Detected library file creation: ${uri?.fsPath || 'unknown path'}`);
-            this.debounceReload('library file');
-        });
-
-        watcher.onDidDelete((uri) => {
-            this.logChange(`Detected library file deletion: ${uri?.fsPath || 'unknown path'}`);
-            this.debounceReload('library file');
-        });
-
         this.watchers.push(watcher);
     }
 
