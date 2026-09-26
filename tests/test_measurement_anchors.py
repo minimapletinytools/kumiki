@@ -6,7 +6,7 @@ a given pair: two parallel edges each anchoring at their own midpoint gave a
 dimension that leaned whenever those midpoints were offset along their length,
 and a number beside it that was neither its length nor its direction.
 
-See docs/measurement-spec.md.
+See .claude/plans/measurement-spec.md.
 """
 
 import math

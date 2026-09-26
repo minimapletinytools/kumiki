@@ -2,7 +2,7 @@
 
 The solver is timber-agnostic, so these tests build tiny abstract graphs of
 AssemblyMember / AssemblyJoint records directly — no timbers involved. See
-docs/plans/assembly-solver-v2.md for the phase vocabulary used in the class
+.claude/plans/assembly-solver-v2.md for the phase vocabulary used in the class
 names below (closure, ring escape, centering, compaction, clear-out).
 """
 

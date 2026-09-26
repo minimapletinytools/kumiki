@@ -20,7 +20,7 @@
     // could be looked at before being committed to -- but looking at it is what
     // hovering does, so it was a second way to see one thing, with its own
     // state to keep consistent, and that state is where the bugs lived. See
-    // docs/measuring-states.md.
+    // .claude/plans/measuring-states.md.
     //
     // NOTHING IS WRITTEN UNTIL THE CLICK. Confirm hands back what to write;
     // this module never talks to the runner.

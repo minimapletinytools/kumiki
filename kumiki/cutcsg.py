@@ -1215,7 +1215,7 @@ class SimpleRectangularPrismFeature(CSGFeature):
         # larger than the face and never smaller -- which is fine for hinting
         # where to put an annotation and not good enough to measure against. An
         # edge carries its `ends` for exactly this reason; a face wants the same.
-        # See docs/measurement-spec.md.
+        # See .claude/plans/measurement-spec.md.
         if corners is None:
             # Unbounded in one direction, so the prism's own box is the most that can be said.
             return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())

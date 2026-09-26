@@ -214,7 +214,7 @@
 
     // Where a drawing came from. 'code' is what the frame asked for, 'file' is
     // the drawings file alone, and 'overridden' is a code drawing the file has
-    // replaced -- see docs/drawing-mode-plan.md.
+    // replaced -- see .claude/plans/drawing-mode-plan.md.
     const ORIGINS = ['code', 'overridden', 'file'];
 
     const ORBIT_MODES = ['free', 'axis'];

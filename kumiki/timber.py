@@ -2472,7 +2472,7 @@ class Frame:
     source_joints: Optional[List] = field(default=None, compare=False, hash=False, repr=False)
     footprints: List[Footprint] = field(default_factory=list)
     # Drawings the frame asks for. The drawings file may override these and add
-    # its own; see docs/drawing-mode-plan.md.
+    # its own; see .claude/plans/drawing-mode-plan.md.
     drawings: List[Drawing] = field(default_factory=list)
     # The numbers this frame was built from, if it was built from any. Declared
     # inside the builder and handed back here, which is how kigumi learns what

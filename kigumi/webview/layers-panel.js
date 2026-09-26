@@ -1,6 +1,6 @@
 (function (globalScope) {
     // The reserved drawing that holds the 3D view's measurements. Not a drawing
-    // you open -- see docs/measurement-spec.md.
+    // you open -- see .claude/plans/measurement-spec.md.
     const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
 
     // LayersPanel renders a collapsible overlay tree on the left edge of the viewport.

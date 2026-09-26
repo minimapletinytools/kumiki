@@ -1772,7 +1772,7 @@ def deserialize_feature_path(source: Any) -> Optional[Any]:
 
 # --- the plane a measurement is taken on -------------------------------------
 #
-# A measurement's own, not the viewport's. See docs/measurement-spec.md: a
+# A measurement's own, not the viewport's. See .claude/plans/measurement-spec.md: a
 # drawing viewport is locked so either would do, but the 3D view's camera
 # orbits, and a measurement evaluated against it would read a different number
 # from one moment to the next.
@@ -2136,7 +2136,7 @@ def _pick_placement(
     view = ViewAxes.from_wire({**payload, "look": look})
     # The same answer a written measurement travels with, so the preview shows
     # the number the finished one will carry rather than a second derivation of
-    # it. docs/measuring-states.md asks for exactly this and only half had it:
+    # it. .claude/plans/measuring-states.md asks for exactly this and only half had it:
     # the picture came from the verdict, the number was worked out again in the
     # viewer.
     ends = {"a": {"geometry": held_geometry}, "b": {"geometry": geometry}}
@@ -3054,7 +3054,7 @@ def _settled_measurement(
 
     The viewer worked the same thing out for itself on every frame, from its own
     copy of the rules in measurements.js. Two derivations of one number is how
-    the number drifts, and docs/measuring-states.md already asks for the other
+    the number drifts, and .claude/plans/measuring-states.md already asks for the other
     one -- "the preview is drawn from the verdict, never from a second
     calculation" -- which was true of the picture and not of the number beside
     it.
@@ -6076,7 +6076,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
                if located_pick is not None else None),
         # What a measurement to this pick would BE: one answer, asked once, and
         # read by the hover colour, the preview and the click alike. See
-        # docs/measuring-states.md -- three readers deriving it separately is
+        # .claude/plans/measuring-states.md -- three readers deriving it separately is
         # what every measurement bug on this branch came down to.
         "verdict": _pick_verdict(state, located_pick, timber, payload, slot_state),
         # What was selected, and the feature within it if navigation resolved

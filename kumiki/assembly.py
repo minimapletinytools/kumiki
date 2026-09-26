@@ -10,7 +10,7 @@ expresses sequencing REQUIRED within a joint (locking accessories are authored
 at suborder -1 so they pop before the members slide at suborder 0); the order
 is the frame-level plan, assigned afterwards via Joint.with_order.
 
-The solver follows docs/plans/assembly-solver-v2.md: it separates JOINTS by
+The solver follows .claude/plans/assembly-solver-v2.md: it separates JOINTS by
 moving GROUPS.
 
 - Phase 1: per ordering, repeatedly pick a (target member, escape direction),

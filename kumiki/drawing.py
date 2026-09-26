@@ -10,7 +10,7 @@ Vectors here are rule.py's V3, as everywhere else in the library. The types a
 measurement arrives as off the wire -- lists and tuples out of JSON -- are taken
 at the edge and converted once; see VectorLike.
 
-See docs/measurement-spec.md, and docs/drawing-rule-migration.md for what is
+See .claude/plans/measurement-spec.md, and .claude/plans/drawing-rule-migration.md for what is
 still to do.
 """
 

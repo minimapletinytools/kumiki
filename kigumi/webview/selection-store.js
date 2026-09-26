@@ -22,7 +22,7 @@
     // and a pick should reveal itself where the user is already looking.
 
     // Picking a timber is something you do in the model. A drawing has no
-    // concept of a selected timber -- see docs/measurement-spec.md -- so the
+    // concept of a selected timber -- see .claude/plans/measurement-spec.md -- so the
     // mode is held here and the timber-selecting methods refuse in it, rather
     // than every caller checking first and one of them forgetting.
     const MODEL = 'model';

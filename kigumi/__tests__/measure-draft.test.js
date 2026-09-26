@@ -44,7 +44,7 @@ describe('making a measurement', () => {
 
     test('there is no state between holding and written', () => {
         // The pending measurement is gone: what is under the pointer IS the
-        // measurement, and clicking writes it. See docs/measuring-states.md.
+        // measurement, and clicking writes it. See .claude/plans/measuring-states.md.
         expect(Object.keys(STATES).sort()).toEqual(['HOLDING', 'IDLE']);
     });
 

@@ -302,7 +302,7 @@ class TestWhatTheSolidAdmits:
 # place. The case matrix they used lives on in this file's own tests, which is
 # where the rules are.
 #
-# See docs/drawing-rule-migration.md for how it got here.
+# See .claude/plans/drawing-rule-migration.md for how it got here.
 
 
 class TestAnchorsAreWrittenInOneOrder:

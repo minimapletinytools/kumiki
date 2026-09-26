@@ -3,7 +3,7 @@
 Its own property rather than the viewport's, because the 3D view's camera
 orbits: a measurement evaluated against whatever the camera happens to be doing
 reads a different number from one moment to the next. See
-docs/measurement-spec.md.
+.claude/plans/measurement-spec.md.
 
 The rules, in priority order: the plane contains any point being measured, is
 perpendicular to any face, is parallel to any edge, and of whatever is left

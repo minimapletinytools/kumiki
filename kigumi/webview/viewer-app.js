@@ -33,7 +33,7 @@ const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 // The one reserved drawing that holds the 3D view's measurements. A drawing
 // like any other, so the file merge, saving, identity and the panel all apply
 // to it without a second implementation; reserved so nothing in python declares
-// one. See docs/measurement-spec.md.
+// one. See .claude/plans/measurement-spec.md.
 const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
 // Only a measurement the file owns can be deleted here. 'code' and 'overridden'
 // both mean the frame's python is still asking for it, and an override is
@@ -3382,7 +3382,7 @@ class KigumiViewerApp extends LitElement {
     _anchorFromPick(message) {
         // One object, from the runner, read by the colour, the preview and the
         // click alike. Null when no measurement is being made; kinds empty when
-        // this pair admits nothing from here. See docs/measuring-states.md.
+        // this pair admits nothing from here. See .claude/plans/measuring-states.md.
         const verdict = message.verdict || null;
         return {
             reference: message.reference || null,
@@ -3406,7 +3406,7 @@ class KigumiViewerApp extends LitElement {
      *
      * There is no confirm step: the preview under the pointer was already what
      * this writes, so clicking it IS the confirmation. See
-     * docs/measuring-states.md.
+     * .claude/plans/measuring-states.md.
      *
      * The kind is the first the pair admits from here, which the runner worked
      * out while judging the pick. Written rather than left blank: no kind reads
@@ -3763,7 +3763,7 @@ class KigumiViewerApp extends LitElement {
      * Drawn from the HOVER, not from any state of its own: while an end is
      * held, whatever is under the pointer is shown as the measurement it would
      * make, and clicking writes exactly that. There is nothing pending in
-     * between, and so nothing to keep in step. See docs/measuring-states.md.
+     * between, and so nothing to keep in step. See .claude/plans/measuring-states.md.
      *
      * Both ends carry their resolved geometry already -- the hover brought it
      * back -- and the anchors are the ones the runner placed for the pair, so
@@ -6825,7 +6825,7 @@ class KigumiViewerApp extends LitElement {
         // whatever its projection toggle says: the 3D view's angle is wherever
         // the reader last left it. Checking a measurement's plane against the
         // fallback look turned every 3D measurement red the moment the view was
-        // switched to orthographic. See docs/measurement-spec.md, which says
+        // switched to orthographic. See .claude/plans/measurement-spec.md, which says
         // the invariant does not apply there.
         const declared = Boolean(viewport && viewport.spec && viewport.spec.camera);
         return {
