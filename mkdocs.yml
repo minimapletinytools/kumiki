@@ -8,6 +8,7 @@ docs_dir: docs
 
 exclude_docs: |
   agent_usage_instructions.md
+  internal/
 
 theme:
   name: material

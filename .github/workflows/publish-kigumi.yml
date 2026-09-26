@@ -114,7 +114,12 @@ jobs:
       - name: Stage bundled docs
         run: |
           mkdir -p .kigumi/docs
-          rsync -a --delete ../docs/ .kigumi/docs/
+          # Everything staged here ships in the package and is copied again into
+          # every project the initializer sets up. docs/internal/ is ours rather
+          # than a user's -- kept out here, in kigumi/scripts/bundle-docs.js
+          # which does the same for the app build, and in mkdocs.yml which would
+          # otherwise put it on the public site.
+          rsync -a --delete --exclude 'internal/' ../docs/ .kigumi/docs/
 
       - name: Run unit tests
         run: npm run test:unit
