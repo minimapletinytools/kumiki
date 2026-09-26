@@ -1769,6 +1769,18 @@ class HasFeatures:
     # named features overriding default features
     _features: Optional[List['CSGFeature']] = field(default=None, kw_only=True)
 
+    #: What get_declared_features last worked out, per source. Out of init, repr
+    #: and equality: it is a restatement of the fields above and not a second
+    #: thing to set.
+    #:
+    #: Safe because a shape is frozen and nothing appends to `_features` after
+    #: construction, so the answer cannot change. NOT safe as a class attribute,
+    #: which is the shape this first took: ConvexPolygonExtrusion and
+    #: ConvexPolygonSimpleLoft read their own profiles to build their defaults,
+    #: so two of them with different profiles have different features.
+    _declared_cache: Dict['FeatureSource', List['CSGFeature']] = field(
+        default_factory=dict, init=False, repr=False, compare=False)
+
     # TODO should probably make this an abstract method, or... this overrides the CutCSG one or osemthing? plesae update the comment explaniing if that's the case
     def default_features(self) -> Dict['FeatureKey', 'CSGFeature']:
         """What this primitive names on its own, keyed by where it sits.
@@ -1784,7 +1796,22 @@ class HasFeatures:
     ) -> List['CSGFeature']:
         """Features this node names on its own boundary, whether or not any
         point lies on them.
+
+        Worked out once per shape. Rebuilding the defaults cost some 40us --
+        twenty-six objects for a prism, each validating itself -- and
+        collect_feature_hits asks for them at every node of every gather, so a
+        pick paid it over and over for an answer that cannot change.
+
+        A copy each time, cheap next to building them, so a caller that does
+        mutate what it gets back cannot reach into the cache.
         """
+        found = self._declared_cache.get(source)
+        if found is None:
+            found = self._build_declared_features(source)
+            self._declared_cache[source] = found
+        return list(found)
+
+    def _build_declared_features(self, source: 'FeatureSource') -> List['CSGFeature']:
         authored = list(self._features or ())
         if source is FeatureSource.OVERRIDES:
             return authored

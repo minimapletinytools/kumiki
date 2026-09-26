@@ -3285,6 +3285,71 @@ class TestDefaultOrderFollowsTimberFeature:
         assert TimberFeature.TOP_FACE.value < TimberFeature.BOTTOM_FACE.value
 
 
+class TestDeclaredFeaturesAreWorkedOutOnce:
+    """The answer is cached per shape, since a frozen shape cannot change it.
+
+    Per SHAPE and not per class, which is the trap: ConvexPolygonExtrusion and
+    ConvexPolygonSimpleLoft read their own profiles to build their defaults, so
+    one cache shared between them would hand a triangle a hexagon's features.
+    """
+
+    def _extrusion(self, sides):
+        import math
+
+        return ConvexPolygonExtrusion(
+            points=[create_v2(scalar(repr(math.cos(2 * math.pi * i / sides))),
+                              scalar(repr(math.sin(2 * math.pi * i / sides))))
+                    for i in range(sides)],
+            transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10))
+
+    def test_two_shapes_of_different_profiles_keep_their_own(self):
+        triangle, hexagon = self._extrusion(3), self._extrusion(6)
+
+        # Asked in this order, so the triangle is the one that warms first.
+        first = len(triangle.get_declared_features())
+        second = len(hexagon.get_declared_features())
+
+        assert first != second
+        assert len(triangle.get_declared_features()) == first
+
+    def test_and_asking_the_other_way_round_agrees(self):
+        triangle, hexagon = self._extrusion(3), self._extrusion(6)
+
+        second = len(hexagon.get_declared_features())
+        first = len(triangle.get_declared_features())
+
+        assert (first, second) == (len(self._extrusion(3).get_declared_features()),
+                                  len(self._extrusion(6).get_declared_features()))
+
+    def test_each_source_is_cached_apart_from_the_others(self):
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10),
+            _features=[SimpleRectangularPrismFeature("mine", face=PrismFace.TOP)])
+
+        overrides = prism.get_declared_features(FeatureSource.OVERRIDES)
+        defaults = prism.get_declared_features(FeatureSource.DEFAULTS)
+        both = prism.get_declared_features(FeatureSource.BOTH)
+
+        assert [f.name for f in overrides] == ["mine"]
+        assert len(defaults) == 26
+        # The authored one replaces the default at its key rather than joining it.
+        assert len(both) == 26
+        assert overrides == prism.get_declared_features(FeatureSource.OVERRIDES)
+
+    def test_what_a_caller_gets_back_cannot_reach_the_cache(self):
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10))
+
+        found = prism.get_declared_features()
+        before = len(found)
+        found.clear()
+
+        assert len(prism.get_declared_features()) == before
+
+
 class TestDeclaredFeatures:
     def test_lists_features_without_needing_a_point(self):
         prism = RectangularPrism(
