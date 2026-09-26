@@ -56,28 +56,22 @@ After taking a screenshot, always make sure to show it to the user in the agent 
 
 ## Key Files
 
-### kumiki/timber.py
-Core immutable types: `Timber`, `TimberFace`, `TimberLongFace`, `TimberEnd`, etc. All timber-related geometric operations (axes, size, position). All timber-related core APIs and types live here.
-
-### kumiki/construction.py
-Core construction logic and timber joinery helpers: joining timbers, computing join positions, projecting axes, relationships between multiple members. Canonical location for geometry construction logic beyond simple data definition.
-
-### kumiki/footprint.py
-`Footprint` — key utility class for positioning timbers and cuts.
-
-### kumiki/joints/*_joints.py
-Joints are split into separate files by group.
-
-### kumiki/rule.py
-Math types, units, and math-related utilities. All math code must use these types and helpers.
-
-### kumiki/measuring.py
-Measure/mark pattern for locating features on timbers and marking things relative to features.
-
-### kumiki/kiwari.py
-`Kiwari` — the numbers a frame or pattern may be adjusted by in Kigumi: what
-they are, what they default to, and what they are allowed to be. Declared
-inside the builder and handed back on the `Frame`, or declared on a `Pattern`.
+- `kumiki/timber.py` — Core immutable types: `Timber`, `TimberFace`, `TimberLongFace`, `TimberEnd`, etc. All timber-related geometric operations (axes, size, position). All timber-related core APIs and types live here.
+- `kumiki/construction.py` — Core construction logic and timber joinery helpers: joining timbers, computing join positions, projecting axes, relationships between multiple members. Canonical location for geometry construction logic beyond simple data definition.
+- `kumiki/footprint.py` — `Footprint`, key utility class for positioning timbers and cuts.
+- `kumiki/joints/*_joints.py` — Joints are split into separate files by group.
+- `kumiki/rule.py` — Math types, units, and math-related utilities. All math code must use these types and helpers.
+- `kumiki/measuring.py` — Measure/mark pattern for locating features on timbers and marking things relative to features.
+- `kumiki/kiwari.py` — `Kiwari`, the numbers a frame or pattern may be adjusted by in Kigumi: what they are, what they default to, and what they are allowed to be. Declared inside the builder and handed back on the `Frame`, or declared on a `Pattern`.
+- `kumiki/cutcsg.py` — `CutCSG`: the solid a timber and its cuts make, as primitives and boolean operations, plus the feature system on their boundaries — what can be named, selected and measured to.
+- `kumiki/geometry.py` — The unbounded primitives `Point`, `Line` and `Plane`, and their bounded counterparts. Below `cutcsg.py` in the import chain so both the CSG and measuring layers can share them; depends on nothing but `rule.py`.
+- `kumiki/identity.py` — How things are named and how much a name can be trusted. Keeps authored names apart from positions, which move whenever something is inserted above them.
+- `kumiki/drawing.py` — Two halves: the layout of a sheet (`Drawing`, `Viewport`, `Subdivision`), and what a pair of features can be measured as and what that measurement comes to.
+- `kumiki/assembly.py` — Assembly constraints and the disassembly solver: which way each member can escape each joint, and in what order the frame comes apart.
+- `kumiki/ticket.py` — `Ticket` and friends: immutable labels carrying hierarchy and metadata for timbers, joints and accessories. The `/` in a path becomes a folder in the layer view.
+- `kumiki/librarian.py` — Discovery and loading of frame examples and pattern books. Reached through the librarian CLI rather than directly.
+- `kumiki/triangles.py` — Triangle meshing and raycasting for `CutCSG`, and the one place exact model values become floats for trimesh.
+- `kumiki/blueprint.py` — Export to STL (trimesh) and STEP (exact B-rep via OCP).
 
 ## Understanding Kumiki
 
