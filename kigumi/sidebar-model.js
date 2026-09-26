@@ -463,7 +463,7 @@ class SidebarModel {
             key,
             type: 'frameFile',
             label,
-            icon: 'file-code',
+            icon: 'fish2-very-sad',
             action: open('kigumi.openFrameFromSidebar', filePath),
             rowActions: ['viewSource'],
             data,
