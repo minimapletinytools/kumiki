@@ -4,7 +4,7 @@ const path = require('path');
 const { createMatcher } = require('../hosts/electron/glob-match');
 const { SettingsStore, defaultsFromPackageJson } = require('../hosts/electron/settings-store');
 const { TabList } = require('../hosts/electron/tab-list');
-const { LogChannel } = require('../hosts/electron/log-channel');
+const { LogChannel, rotateIfLarge } = require('../hosts/electron/log-channel');
 
 describe('glob matching for file watches', () => {
   test.each([
@@ -46,6 +46,28 @@ describe('settings', () => {
     expect(store.get('app.editorCommand', 'fallback')).toBe('fallback');
   });
 
+  test('reload reports exactly the keys edited on disk', () => {
+    const file = path.join(dir, 'settings.json');
+    const store = new SettingsStore(file, { a: 1 });
+    store.set('b', 2);
+    const changed = [];
+    store.onChange((key) => changed.push(key));
+    fs.writeFileSync(file, JSON.stringify({ b: 2, a: 5 }));
+    store.reload();
+
+    expect(changed).toEqual(['a']);
+    expect(store.get('a')).toBe(5);
+  });
+
+  test('seeding writes every default without touching set values', () => {
+    const file = path.join(dir, 'settings.json');
+    const store = new SettingsStore(file, { a: 1, b: 2 });
+    store.set('a', 9);
+    store.seedDefaults({ c: 3 });
+
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ a: 9, b: 2, c: 3 });
+  });
+
   test('a corrupt settings file starts empty', () => {
     const file = path.join(dir, 'settings.json');
     fs.writeFileSync(file, '{ nope');
@@ -80,6 +102,19 @@ describe('tab list', () => {
 });
 
 describe('log channel', () => {
+  test('an oversized log is moved aside at start, replacing the older one', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-log-'));
+    const file = path.join(dir, 'kigumi.log');
+    fs.writeFileSync(path.join(dir, 'kigumi.1.log'), 'old');
+    fs.writeFileSync(file, 'x'.repeat(20));
+
+    expect(rotateIfLarge(file, 100)).toBeNull();
+    expect(rotateIfLarge(file, 10)).toBe(path.join(dir, 'kigumi.1.log'));
+    expect(fs.existsSync(file)).toBe(false);
+    expect(fs.readFileSync(path.join(dir, 'kigumi.1.log'), 'utf8')).toBe('x'.repeat(20));
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   test('splits appended text into lines, keeps them, and writes them to the file', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-log-'));
     const file = path.join(dir, 'logs', 'kigumi.log');

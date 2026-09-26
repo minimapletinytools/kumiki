@@ -11,6 +11,8 @@ const { TabList } = require('./tab-list');
 const PAGE_PRELOAD = path.join(__dirname, 'preload.js');
 const SHELL_PRELOAD = path.join(__dirname, 'shell-preload.js');
 const ORIGIN = 'kigumi://app';
+const CRASH_WINDOW_MS = 60000;
+const MAX_CRASH_RELOADS = 3;
 
 // HTML handed to surfaces, served at kigumi://app/page/<id>.
 const pages = new Map();
@@ -48,6 +50,9 @@ class ViewSurface {
         this._queue = [];
         this._ready = false;
         this._disposed = false;
+        this._url = null;
+        this._crashes = [];
+        this._recovering = false;
         this.state = undefined;
         this.view = new WebContentsView({
             webPreferences: { preload: PAGE_PRELOAD, contextIsolation: true, backgroundThrottling: false },
@@ -58,7 +63,29 @@ class ViewSurface {
             for (const message of this._queue.splice(0)) {
                 this.view.webContents.send('kigumi:message', message);
             }
+            if (this._recovering) {
+                this._recovering = false;
+                // The reloaded viewer starts empty; have its session draw it again.
+                if (this.kind === 'viewer') this.deliver({ type: 'requestRefresh' });
+            }
         });
+        this.view.webContents.on('render-process-gone', (_event, details) => this._onCrash(details));
+    }
+
+    // Reloads a crashed page, unless it keeps crashing.
+    _onCrash(details) {
+        if (this._disposed || details.reason === 'clean-exit') return;
+        const now = Date.now();
+        this._crashes = this._crashes.filter((at) => now - at < CRASH_WINDOW_MS);
+        this._crashes.push(now);
+        const giveUp = this._crashes.length > MAX_CRASH_RELOADS;
+        this.shell.log(`[window] ${this.kind} page "${this._title || this.id}" crashed (${details.reason}); ${giveUp ? 'not reloading again' : 'reloading'}`);
+        if (giveUp || !this._url) {
+            this.shell.onSurfaceCrashed(this, giveUp);
+            return;
+        }
+        this._recovering = true;
+        this.loadUrl(this._url);
     }
 
     get title() { return this._title; }
@@ -81,6 +108,7 @@ class ViewSurface {
     }
 
     loadUrl(url) {
+        this._url = url;
         this._ready = false;
         void this.view.webContents.loadURL(url);
     }
@@ -142,9 +170,13 @@ class Shell {
      * @param {(absPath: string) => string} options.resourceUri
      * @param {() => object} options.status  extra state for the shell page
      * @param {(id: string, ...args: any[]) => void} options.onShellCommand
+     * @param {(line: string) => void} [options.log]
+     * @param {(surface: ViewSurface, gaveUp: boolean) => void} [options.onSurfaceCrashed]
      */
-    constructor({ resourceUri, status, onShellCommand }) {
+    constructor({ resourceUri, status, onShellCommand, log = () => {}, onSurfaceCrashed = () => {} }) {
         this.resourceUri = resourceUri;
+        this.log = log;
+        this.onSurfaceCrashed = onSurfaceCrashed;
         this.status = status;
         this.onShellCommand = onShellCommand;
         this.tabs = new TabList();
@@ -164,6 +196,11 @@ class Shell {
             webPreferences: { preload: SHELL_PRELOAD, contextIsolation: true },
         });
         lockDown(this.window.webContents);
+        this.window.webContents.on('render-process-gone', (_event, details) => {
+            if (details.reason === 'clean-exit' || this.window.isDestroyed()) return;
+            this.log(`[window] shell page crashed (${details.reason}); reloading`);
+            void this.window.loadURL(`${ORIGIN}/shell/shell.html`);
+        });
         // A scripted test run shouldn't take focus from whoever is at the keyboard.
         this.window.once('ready-to-show', () => (process.env.KIGUMI_TEST_SCRIPT ? this.window.showInactive() : this.window.show()));
         this.window.on('focus', () => this.pushState());

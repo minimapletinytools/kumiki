@@ -156,6 +156,7 @@
 
         $('status-workspace').addEventListener('click', () => api.send('shell:command', 'openFolder'));
         $('status-log').addEventListener('click', () => api.send('shell:command', 'openLog'));
+        $('status-settings').addEventListener('click', () => api.send('shell:command', 'openSettings'));
         $('status-autorefresh').addEventListener('click', () => api.send('shell:command', 'run', 'kigumi.toggleAutoRefreshOnFileChange'));
         setupSplitter();
 

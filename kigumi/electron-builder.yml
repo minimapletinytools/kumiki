@@ -14,6 +14,10 @@ directories:
   buildResources: build-app
 extraMetadata:
   main: hosts/electron/main.js
+  homepage: https://github.com/minimapletinytools/kumiki
+  author:
+    name: minimaple
+    email: minimapletinytools@gmail.com
 # Off so Python can run runner.py and the scanners straight from the app folder.
 asar: false
 files:
@@ -55,6 +59,7 @@ nsis:
   allowToChangeInstallationDirectory: true
 linux:
   category: Graphics
+  maintainer: minimaple <minimapletinytools@gmail.com>
   target:
     - target: AppImage
       arch: [x64, arm64]

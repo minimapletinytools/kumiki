@@ -20,6 +20,13 @@ const PAGES_DIR = path.join(__dirname, 'pages');
 const packageJson = JSON.parse(fs.readFileSync(path.join(KIGUMI_DIR, 'package.json'), 'utf8'));
 const STATUS_CLEAR_MS = 10000;
 
+// Where the app's defaults differ from the extension's, plus app-only settings.
+// Auto refresh is on because the app has no editor whose unsaved state matters.
+const APP_DEFAULTS = {
+    'viewer.autoRefreshOnFileChange': true,
+    'app.editorCommand': '',
+};
+
 const CONTENT_TYPES = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8',
@@ -205,10 +212,20 @@ function openLogTab() {
     surface.loadUrl(`${ORIGIN}/shell/log.html`);
 }
 
+// Opens settings.json, listing every setting with its current value.
+async function openSettingsFile() {
+    settings.seedDefaults();
+    const error = await electronShell.openPath(settings.filePath);
+    if (error) {
+        electronShell.showItemInFolder(settings.filePath);
+    }
+}
+
 function onShellCommand(id, ...args) {
     if (id === 'openFolder') return chooseWorkspaceFolder();
     if (id === 'openFrameFile') return chooseFrameFile();
     if (id === 'openLog') return openLogTab();
+    if (id === 'openSettings') return openSettingsFile();
     if (id === 'run' && typeof args[0] === 'string') return runAppCommand(args[0], ...args.slice(1));
     return undefined;
 }
@@ -253,6 +270,7 @@ function buildMenu() {
                     click: () => runAppCommand('kigumi.toggleAutoRefreshOnFileChange'),
                 },
                 { type: 'separator' },
+                { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
                 { label: 'Show Log', accelerator: 'CmdOrCtrl+Shift+U', click: () => openLogTab() },
             ],
         },
@@ -286,7 +304,8 @@ async function start() {
     protocol.handle('kigumi', handleProtocol);
 
     const userData = app.getPath('userData');
-    settings = new SettingsStore(path.join(userData, 'settings.json'), defaultsFromPackageJson(packageJson));
+    settings = new SettingsStore(path.join(userData, 'settings.json'), { ...defaultsFromPackageJson(packageJson), ...APP_DEFAULTS });
+    settings.watch();
     workspaceFolder = resolveWorkspaceFolder();
     if (workspaceFolder) {
         settings.set('app.workspaceFolder', workspaceFolder);
@@ -300,7 +319,15 @@ async function start() {
     logChannel.appendLine(`[app] Kigumi ${packageJson.version} (Electron ${process.versions.electron})`);
     logChannel.appendLine(`[app] Workspace: ${workspaceFolder || '(none)'}`);
 
-    shell = new Shell({ resourceUri, status: shellStatus, onShellCommand });
+    shell = new Shell({
+        resourceUri,
+        status: shellStatus,
+        onShellCommand,
+        log: (line) => logChannel.appendLine(line),
+        onSurfaceCrashed: (surface, gaveUp) => {
+            if (gaveUp) setStatus('error', `"${surface.title || 'A view'}" keeps crashing. Close its tab and open it again.`);
+        },
+    });
 
     setHost(createElectronHost({
         shell,
@@ -332,12 +359,13 @@ async function start() {
         const current = kigumiApp;
         kigumiApp = null;
         shell = null;
+        settings.dispose();
         if (current) await current.dispose();
         app.quit();
     });
 
     if (process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1') {
-        global.__kigumi = { runAppCommand, shell: () => shell, logLines: () => logChannel.lines, onShellCommand };
+        global.__kigumi = { runAppCommand, shell: () => shell, logLines: () => logChannel.lines, onShellCommand, settings };
         // A test driver run against the live app; its result sets the exit code.
         if (process.env.KIGUMI_TEST_SCRIPT) {
             const driver = require(path.resolve(process.env.KIGUMI_TEST_SCRIPT));
@@ -351,5 +379,19 @@ async function start() {
     }
 }
 
-app.whenReady().then(start);
+// One Kigumi at a time: a second launch focuses the running window.
+if (!app.requestSingleInstanceLock()) {
+    app.quit();
+} else {
+    app.on('second-instance', (_event, argv) => {
+        if (!shell || shell.window.isDestroyed()) return;
+        if (shell.window.isMinimized()) shell.window.restore();
+        shell.window.focus();
+        const requested = argv.slice(1).find((arg) => !arg.startsWith('-') && fs.existsSync(arg) && fs.statSync(arg).isDirectory());
+        if (requested && path.resolve(requested) !== workspaceFolder) {
+            setStatus('info', `Kigumi is already open on ${path.basename(workspaceFolder || '')}. Use File > Open Folder… to switch to ${path.basename(requested)}.`);
+        }
+    });
+    app.whenReady().then(start);
+}
 app.on('window-all-closed', () => app.quit());

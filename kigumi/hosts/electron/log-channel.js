@@ -7,6 +7,22 @@ const fs = require('fs');
 const path = require('path');
 
 const MAX_LINES = 5000;
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+
+// Moves an oversized log aside as kigumi.1.log, replacing the previous one.
+function rotateIfLarge(filePath, maxBytes = MAX_FILE_BYTES) {
+    try {
+        if (fs.statSync(filePath).size > maxBytes) {
+            const rotated = filePath.replace(/\.log$/, '.1.log');
+            fs.rmSync(rotated, { force: true });
+            fs.renameSync(filePath, rotated);
+            return rotated;
+        }
+    } catch (_error) {
+        // No log yet.
+    }
+    return null;
+}
 
 class LogChannel {
     constructor(filePath, { onShow = () => {} } = {}) {
@@ -16,6 +32,7 @@ class LogChannel {
         this.partial = '';
         this.listeners = new Set();
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        rotateIfLarge(filePath);
     }
 
     append(text) {
@@ -60,4 +77,4 @@ class LogChannel {
     }
 }
 
-module.exports = { LogChannel };
+module.exports = { LogChannel, rotateIfLarge };

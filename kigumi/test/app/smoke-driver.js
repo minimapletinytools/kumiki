@@ -23,7 +23,7 @@ async function waitFor(check, { timeoutMs = 60000, intervalMs = 250 } = {}) {
     }
 }
 
-module.exports = async function smoke({ runAppCommand, shell, logLines, onShellCommand }) {
+module.exports = async function smoke({ runAppCommand, shell, logLines, onShellCommand, settings }) {
     const results = [];
     const check = (name, ok, detail) => {
         results.push({ name, ok: !!ok, detail });
@@ -87,6 +87,20 @@ module.exports = async function smoke({ runAppCommand, shell, logLines, onShellC
         check('the picked pattern opens in a second tab', tabs.tabs.length === 2 && tabs.tabs[1].title.includes(wanted), tabs.tabs.map((t) => t.title).join(' | '));
         await sleep(1000);
         await capture('05-pattern', shell().activeSurface.view.webContents);
+
+        const viewer = shell().activeSurface;
+        const refreshCount = async () => (await runAppCommand('kigumi.automationListSessions')).sessions
+            .reduce((sum, one) => sum + (one.refreshSequence || 0), 0);
+        const refreshesBefore = await refreshCount();
+        viewer.view.webContents.forcefullyCrashRenderer();
+        await waitFor(async () => (await refreshCount()) > refreshesBefore, { timeoutMs: 30000 });
+        check('a crashed viewer reloads and is drawn again', !viewer.view.webContents.isCrashed(), `refreshes ${refreshesBefore} -> ${await refreshCount()}`);
+
+        check('auto refresh defaults to on in the app', settings.get('viewer.autoRefreshOnFileChange') === true);
+        const edited = { ...JSON.parse(fs.readFileSync(settings.filePath, 'utf8')), 'viewer.autoRefreshOnFileChange': false };
+        fs.writeFileSync(settings.filePath, JSON.stringify(edited, null, 2));
+        await waitFor(() => settings.get('viewer.autoRefreshOnFileChange') === false, { timeoutMs: 5000 });
+        check('editing settings.json applies without a restart', true);
 
         onShellCommand('openLog');
         await sleep(800);
