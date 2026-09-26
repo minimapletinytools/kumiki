@@ -1,5 +1,5 @@
-const { highlightsFor, CSG_COLORS, HOVER_COLOR, HOVER_REFUSED_COLOR, HELD_COLOR, ORDER } =
-    require('../webview/highlights.js');
+const { highlightsFor, pointHighlightAt, CSG_COLORS, HOVER_COLOR, HOVER_REFUSED_COLOR,
+    HELD_COLOR, ORDER } = require('../webview/highlights.js');
 
 // What should be lit, as a list. The old shape built each overlay when its
 // message arrived and tore it down by one of seven scattered calls, so there was
@@ -162,6 +162,120 @@ describe('what is drawn over what', () => {
         expect(ORDER.csgEdges).toBeGreaterThan(ORDER.csgMesh);
         expect(ORDER.hoverEdges).toBeGreaterThan(ORDER.hoverMesh);
         expect(ORDER.heldEdges).toBeGreaterThan(ORDER.heldMesh);
+    });
+
+    test('and a point over the edges that meet at it', () => {
+        // A corner is on those edges and on the faces behind them, so anything
+        // less leaves the one thing you cannot see.
+        expect(ORDER.csgPoint).toBeGreaterThan(ORDER.csgEdges);
+        expect(ORDER.hoverPoint).toBeGreaterThan(ORDER.hoverEdges);
+        expect(ORDER.heldPoint).toBeGreaterThan(ORDER.heldEdges);
+    });
+});
+
+describe('what a point lights', () => {
+    // A vertex is a position and nothing else: no triangles, no line. Before
+    // this it lit nothing at all, so a corner could be selected and named and
+    // never shown.
+    const AT = [1.5, -2, 3];
+
+    test('a selected corner is a marker at its position', () => {
+        const lit = highlightsFor({ csg: { key: 'post#0', pointAt: AT }, policy: POLICY });
+
+        expect(ids(lit)).toEqual(['csg-point:post#0']);
+        expect(lit[0]).toMatchObject({ shape: 'point', at: AT, color: CSG_COLORS.feature });
+    });
+
+    test('a hovered one takes the hover colour', () => {
+        const lit = highlightsFor({ hover: { key: 'h', pointAt: AT }, policy: POLICY });
+
+        expect(byId(lit, 'hover-point')).toMatchObject({ at: AT, color: HOVER_COLOR });
+    });
+
+    test('and the refused colour when the click would refuse it', () => {
+        const lit = highlightsFor({
+            hover: { key: 'h', pointAt: AT, refused: true }, policy: POLICY,
+        });
+
+        expect(byId(lit, 'hover-point').color).toBe(HOVER_REFUSED_COLOR);
+    });
+
+    test('a held one is green like the rest of a held end', () => {
+        const lit = highlightsFor({ held: { key: 'x', pointAt: AT }, policy: POLICY });
+
+        expect(byId(lit, 'held-point')).toMatchObject({ at: AT, color: HELD_COLOR });
+    });
+
+    test('a corner on an edge lights both', () => {
+        // Which is the ordinary case: the corner is where three arrises meet,
+        // and the runner sends the segments for whichever one was resolved.
+        const lit = highlightsFor({
+            csg: { key: 'post#0', pointAt: AT, edgePositions: EDGES }, policy: POLICY,
+        });
+
+        expect(ids(lit).sort()).toEqual(['csg-edges:post#0', 'csg-point:post#0']);
+    });
+
+    test('no position lights no point', () => {
+        for (const at of [null, undefined, [], [1, 2], [1, 2, 3, 4]]) {
+            expect(highlightsFor({ csg: { key: 'a', pointAt: at }, policy: POLICY })).toEqual([]);
+        }
+    });
+
+    test('and neither does a position that is not numbers', () => {
+        // A missing anchor arrives as nulls rather than as no anchor, and a
+        // marker at (0,0,0) is worse than none: it lights the model origin.
+        for (const at of [[null, null, null], [1, 'x', 3], [1, NaN, 3]]) {
+            expect(highlightsFor({ csg: { key: 'a', pointAt: at }, policy: POLICY })).toEqual([]);
+        }
+    });
+});
+
+describe('which picks get a point marker at all', () => {
+    // `at` comes back for every feature, so this is what stops a face from
+    // growing a dot in the middle of itself.
+    const AT = [1, 2, 3];
+
+    test('a point pick does', () => {
+        expect(pointHighlightAt({ featureType: 'POINT', at: AT })).toEqual(AT);
+    });
+
+    test('and one that says so through its geometry instead', () => {
+        // Which is how a held end carries it: it keeps the wire geometry and
+        // not a featureType.
+        expect(pointHighlightAt({ geometry: { kind: 'point', at: AT } })).toEqual(AT);
+    });
+
+    test('a face does NOT, though it has an anchor', () => {
+        // Its anchor is the middle of the face -- a dot there would read as a
+        // feature that is not selected.
+        expect(pointHighlightAt({ featureType: 'FACE', at: AT })).toBeNull();
+    });
+
+    test('nor does an edge, whose anchor is its midpoint', () => {
+        expect(pointHighlightAt({ featureType: 'EDGE', at: AT })).toBeNull();
+        expect(pointHighlightAt({ geometry: { kind: 'line', at: AT } })).toBeNull();
+    });
+
+    test('a point with no anchor gets no marker', () => {
+        expect(pointHighlightAt({ featureType: 'POINT', at: null })).toBeNull();
+        expect(pointHighlightAt({ featureType: 'POINT' })).toBeNull();
+    });
+
+    test('and nothing at all gets nothing', () => {
+        expect(pointHighlightAt(null)).toBeNull();
+        expect(pointHighlightAt(undefined)).toBeNull();
+    });
+
+    test('the anchor wins over the geometry when both are there', () => {
+        // The anchor is cropped to the solid the cuts have left; the geometry is
+        // where the feature was declared. A measurement attaches to the anchor,
+        // so the marker sits where the measurement would.
+        const found = pointHighlightAt({
+            featureType: 'POINT', at: [9, 9, 9], geometry: { kind: 'point', at: AT },
+        });
+
+        expect(found).toEqual([9, 9, 9]);
     });
 });
 

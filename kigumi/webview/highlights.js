@@ -38,14 +38,19 @@
     const ORDER = Object.freeze({
         csgMesh: 999,
         csgEdges: 1000,
+        // A point sits on the edges that meet at it and on the faces behind
+        // those, so it goes over both or it is the one thing you cannot see.
+        csgPoint: 1001,
         hoverMesh: 1100,
         hoverEdges: 1101,
+        hoverPoint: 1102,
         // Above the hover: what is HELD is the more important of the two, and
         // they are the two most likely to overlap -- the pointer is usually
         // right beside the thing being held. They used to share 1101, which
         // left which one won undefined.
-        heldMesh: 1102,
-        heldEdges: 1103,
+        heldMesh: 1103,
+        heldEdges: 1104,
+        heldPoint: 1105,
     });
 
     function hasMesh(mesh) {
@@ -56,6 +61,38 @@
     function hasEdges(positions) {
         return Array.isArray(positions) && positions.length > 0;
     }
+
+    function hasPoint(at) {
+        return Array.isArray(at) && at.length === 3 && at.every(Number.isFinite);
+    }
+
+    /**
+     * Where a pick's point marker goes, or null when the pick is not a point.
+     *
+     * `at` comes back for EVERY feature -- a face's centre, an edge's midpoint
+     * -- so what the pick IS has to gate it, or every selection would grow a
+     * dot in the middle of itself. A held end keeps its kind on `geometry`
+     * rather than as a featureType, so both are read.
+     */
+    function pointHighlightAt(answer) {
+        if (!answer) {
+            return null;
+        }
+        const isPoint = answer.featureType === 'POINT'
+            || Boolean(answer.geometry && answer.geometry.kind === 'point');
+        if (!isPoint) {
+            return null;
+        }
+        const at = Array.isArray(answer.at)
+            ? answer.at
+            : (answer.geometry && answer.geometry.at);
+        if (!Array.isArray(at) || at.length !== 3) {
+            return null;
+        }
+        const numbers = at.map(Number);
+        return numbers.every(Number.isFinite) ? numbers : null;
+    }
+
 
     /**
      * Which overlays should exist, given the state.
@@ -73,6 +110,20 @@
 
         const csg = found.csg;
         if (csg) {
+            if (hasPoint(csg.pointAt)) {
+                // A vertex is a position and nothing else -- neither triangles
+                // nor a line runs through it -- so it is drawn as a marker held
+                // at a fixed size on screen, the way a snap target has to be
+                // findable however far out the camera is.
+                out.push({
+                    id: `csg-point:${csg.key}`,
+                    shape: 'point',
+                    at: csg.pointAt,
+                    color: CSG_COLORS.feature,
+                    opacity: 1,
+                    renderOrder: ORDER.csgPoint,
+                });
+            }
             if (hasEdges(csg.edgePositions)) {
                 // An edge is a line: shading the triangles beside it lit a
                 // stray wedge that read as geometry rather than as a selection.
@@ -123,6 +174,16 @@
             // One colour decides both: what is drawn red is what the click
             // refuses, so they cannot disagree about the same feature.
             const color = hover.refused ? HOVER_REFUSED_COLOR : HOVER_COLOR;
+            if (hasPoint(hover.pointAt)) {
+                out.push({
+                    id: `hover-point:${hover.key}`,
+                    shape: 'point',
+                    at: hover.pointAt,
+                    color,
+                    opacity: 1,
+                    renderOrder: ORDER.hoverPoint,
+                });
+            }
             if (hasEdges(hover.edgePositions)) {
                 out.push({
                     id: `hover-edges:${hover.key}`,
@@ -147,6 +208,16 @@
 
         const held = found.held;
         if (held) {
+            if (hasPoint(held.pointAt)) {
+                out.push({
+                    id: `held-point:${held.key}`,
+                    shape: 'point',
+                    at: held.pointAt,
+                    color: HELD_COLOR,
+                    opacity: 1,
+                    renderOrder: ORDER.heldPoint,
+                });
+            }
             if (hasEdges(held.edgePositions)) {
                 out.push({
                     id: `held-edges:${held.key}`,
@@ -235,6 +306,7 @@
 
     const KigumiHighlights = {
         highlightsFor,
+        pointHighlightAt,
         reconcile,
         sourceForFocus,
         CSG_COLORS,

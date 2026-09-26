@@ -268,6 +268,14 @@ function createInitialViewState() {
 // selection does not read as thicker than the geometry it sits on.
 const CSG_HIGHLIGHT_EDGE_WIDTH_PX = 5;
 
+// A selected corner is a position and nothing else, so it is drawn as a dot.
+// Wider than the edge line is thick, because a corner sits ON the edges that
+// meet there and has to read as more than a bulge in one of them. In pixels and
+// held there whatever the zoom: a snap target you cannot find when zoomed out is
+// no target, which is the same reason the edge and point tolerances are scaled
+// from what a pixel is worth.
+const CSG_HIGHLIGHT_POINT_SIZE_PX = 11;
+
 // Metric stays the default, which is what the viewer always displayed.
 const { DEFAULT_UNIT_SYSTEM } = window.KigumiUnits;
 
@@ -4396,6 +4404,7 @@ class KigumiViewerApp extends LitElement {
             mesh: hlMesh,
             parentMesh: parentHlMesh,
             edgePositions: edgeSegmentPositions(message.highlightEdgeSegments),
+            pointAt: window.KigumiHighlights.pointHighlightAt(message),
             featureLabel,
         };
 
@@ -4518,12 +4527,14 @@ class KigumiViewerApp extends LitElement {
                 key: `${hover.memberKey}|${(hover.path || []).join('/')}|${hover.featureLabel || ''}`,
                 mesh: hover.highlightMesh,
                 edgePositions: edgeSegmentPositions(hover.highlightEdgeSegments),
+                pointAt: window.KigumiHighlights.pointHighlightAt(hover),
                 refused: window.KigumiHover.HoverState.isRefused(hover),
             } : null,
             held: (held && held.highlight) ? {
                 key: heldHighlightKey(held.reference),
                 mesh: held.highlight.highlightMesh,
                 edgePositions: edgeSegmentPositions(held.highlight.highlightEdgeSegments),
+                pointAt: window.KigumiHighlights.pointHighlightAt(held),
             } : null,
             policy: this._getSelectionVisualPolicy(
                 this._getSelectionVisualContext().state,
@@ -4564,8 +4575,28 @@ class KigumiViewerApp extends LitElement {
         });
     }
 
-    /** One overlay, of either shape. */
+    /** One overlay, of any of the three shapes. */
     _buildHighlightObject(descriptor) {
+        if (descriptor.shape === 'point') {
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute(
+                'position', new THREE.BufferAttribute(new Float32Array(descriptor.at), 3));
+            const material = new THREE.PointsMaterial({
+                color: descriptor.color,
+                size: CSG_HIGHLIGHT_POINT_SIZE_PX,
+                // The size is in pixels, not world units, so it does not shrink
+                // to nothing as the camera pulls back.
+                sizeAttenuation: false,
+                transparent: true,
+                opacity: descriptor.opacity,
+                // Over the timber it sits on, as the other two overlays are: a
+                // corner is exactly where the surface is, so depth testing it
+                // leaves it fighting the surface for the same pixels.
+                depthTest: false,
+                depthWrite: false,
+            });
+            return new THREE.Points(geometry, material);
+        }
         if (descriptor.shape === 'edges') {
             const geometry = new THREE.LineSegmentsGeometry();
             geometry.setPositions(descriptor.positions);
