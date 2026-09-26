@@ -130,6 +130,10 @@ function createVscodeHost() {
             await vscode.window.showTextDocument(document, { preview: false });
         },
 
+        showSourceBesideViewer(filePath) {
+            return this.showFile(filePath);
+        },
+
         async pickOne(items, { placeholder, matchOnDescription, matchOnDetail } = {}) {
             const quickPickItems = items.map((item) => (item.separator
                 ? { label: item.label, kind: vscode.QuickPickItemKind.Separator }

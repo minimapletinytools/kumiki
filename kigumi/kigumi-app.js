@@ -75,8 +75,9 @@ function normalizeSessionFilePath(filePath) {
  * @param {string} options.storagePath  per-user storage (downloaded tools)
  * @param {{appendLine, append, show}} options.channel  the Kigumi log
  * @param {boolean} [options.enableTestCommands]
+ * @param {string|null} [options.bundledUv]  a uv binary shipped with the host
  */
-function createKigumiApp({ extensionPath, storagePath, channel, enableTestCommands = false }) {
+function createKigumiApp({ extensionPath, storagePath, channel, enableTestCommands = false, bundledUv = null }) {
     const host = getHost();
     const context = { extensionPath };
     const outputChannel = channel;
@@ -101,6 +102,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
     pruneWorkspaceLogs();
     configureToolchain({
         toolsDir: storagePath,
+        bundledUv,
         log: (line) => outputChannel.appendLine(`[toolchain] ${line}`),
         confirmInstallUv: () => host.confirm({
             message: t('message.installUvPrompt'),
@@ -696,7 +698,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             host.showMessage('error', t('message.noFilePathProvided'));
             return;
         }
-        await host.showFile(filePath);
+        await host.showSourceBesideViewer(filePath);
         await renderFile(filePath);
     }
 

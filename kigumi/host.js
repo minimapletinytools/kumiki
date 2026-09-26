@@ -31,6 +31,7 @@
  * @property {(command: string, ...args: any[]) => Promise<any>} runCommand  a Kigumi command by id
  * @property {() => {filePath: string, languageId: string}|null} activeFile  the focused editor's file
  * @property {(filePath: string) => Promise<void>} showFile  show a file to the user (VS Code: in an editor)
+ * @property {(filePath: string) => Promise<void>} showSourceBesideViewer  when a file opens in the viewer
  * @property {(items: Array<{label, description?, detail?, separator?, value?}>, options?: {placeholder?}) => Promise<object|undefined>} pickOne
  * @property {(options: {message: string, detail?: string, action: string}) => Promise<boolean>} confirm  modal yes/no
  * @property {(title: string, task: () => Promise<any>) => Promise<any>} withProgress
@@ -38,7 +39,7 @@
  * @property {(key: string, value: any) => Promise<void>} updateConfig  `kigumi.<key>`
  * @property {(callback: (affects: (key: string) => boolean) => void) => Disposable} onConfigChange
  * @property {(callback: (change: {filePath, languageId, isDirty, saved}) => void) => Disposable} onDocumentChange
- * @property {(options: {title: string, beside: boolean, resourceRoot: string}) => ViewerSurface} createViewerSurface
+ * @property {(options: {title: string, beside: boolean, resourceRoot: string, filePath: string}) => ViewerSurface} createViewerSurface
  */
 
 let currentHost = null;

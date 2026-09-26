@@ -29,6 +29,7 @@ const UV_RELEASE_ASSETS = {
 
 const DEFAULT_HOST = {
     toolsDir: null,
+    bundledUv: null,
     confirmInstallUv: null,
     withProgress: (task) => task(),
     log: () => {},
@@ -37,7 +38,8 @@ const DEFAULT_HOST = {
 let host = { ...DEFAULT_HOST };
 let pendingUvInstall = null;
 
-// toolsDir: where a downloaded uv lives. confirmInstallUv: async () => boolean.
+// toolsDir: where a downloaded uv lives. bundledUv: a uv shipped with the host.
+// confirmInstallUv: async () => boolean.
 // withProgress: wraps the download so the host can show it.
 function configureToolchain(options = {}) {
     host = { ...DEFAULT_HOST, ...options };
@@ -141,6 +143,9 @@ function wellKnownUvPaths() {
             paths.push(path.join(home, '.local', 'bin', 'uv'), path.join(home, '.cargo', 'bin', 'uv'));
         }
         paths.push('/opt/homebrew/bin/uv', '/usr/local/bin/uv');
+    }
+    if (host.bundledUv) {
+        paths.push(host.bundledUv);
     }
     const managed = managedUvPath();
     if (managed) {
@@ -256,18 +261,19 @@ function findFileNamed(root, name) {
 }
 
 // Downloads the pinned uv release into toolsDir and returns its path.
-async function installManagedUv() {
-    const asset = uvReleaseAsset();
-    const target = managedUvPath();
-    if (!asset || !target) {
-        throw new Error(`Kigumi cannot install uv on ${process.platform}-${process.arch}. Install uv manually (${UV_INSTALL_DOCS}).`);
+// Downloads the pinned uv release for `platformKey` (e.g. "darwin-arm64"),
+// checks its sha256, and writes the uv binary to `targetPath`.
+async function downloadUvRelease({ platformKey, targetPath, log = () => {} }) {
+    const asset = UV_RELEASE_ASSETS[platformKey];
+    if (!asset) {
+        throw new Error(`Kigumi cannot install uv on ${platformKey}. Install uv manually (${UV_INSTALL_DOCS}).`);
     }
 
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-uv-'));
     try {
         const url = `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/${asset.file}`;
         const archive = path.join(workDir, asset.file);
-        host.log(`Downloading ${url}`);
+        log(`Downloading ${url}`);
         await download(url, archive);
 
         const actual = sha256File(archive);
@@ -279,18 +285,28 @@ async function installManagedUv() {
         fs.mkdirSync(extractDir);
         await runCommand('tar', ['-xf', archive, '-C', extractDir], { cwd: workDir });
 
-        const extracted = findFileNamed(extractDir, exeName('uv'));
+        const binaryName = platformKey.startsWith('win32-') ? 'uv.exe' : 'uv';
+        const extracted = findFileNamed(extractDir, binaryName);
         if (!extracted) {
             throw new Error(`uv binary not found in ${asset.file}.`);
         }
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.copyFileSync(extracted, target);
-        fs.chmodSync(target, 0o755);
-        host.log(`Installed uv ${UV_VERSION} at ${target}`);
-        return target;
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+        fs.copyFileSync(extracted, targetPath);
+        fs.chmodSync(targetPath, 0o755);
+        log(`Installed uv ${UV_VERSION} at ${targetPath}`);
+        return targetPath;
     } finally {
         fs.rmSync(workDir, { recursive: true, force: true });
     }
+}
+
+// Downloads the pinned uv release into toolsDir and returns its path.
+async function installManagedUv() {
+    const target = managedUvPath();
+    if (!uvReleaseAsset() || !target) {
+        throw new Error(`Kigumi cannot install uv on ${process.platform}-${process.arch}. Install uv manually (${UV_INSTALL_DOCS}).`);
+    }
+    return downloadUvRelease({ platformKey: `${process.platform}-${process.arch}`, targetPath: target, log: host.log });
 }
 
 function missingToolchainError(detail) {
@@ -380,6 +396,7 @@ module.exports = {
     findUv,
     findPython,
     installManagedUv,
+    downloadUvRelease,
     resolveToolchain,
     ensureProjectVenv,
     pipInstall,

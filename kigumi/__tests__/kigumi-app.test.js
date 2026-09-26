@@ -24,6 +24,7 @@ function fakeHost(overrides = {}) {
     watchFiles: () => ({ dispose() {} }),
     activeFile: () => null,
     showFile: jest.fn(async () => {}),
+    showSourceBesideViewer: jest.fn(async () => {}),
     openExternal: jest.fn(async () => {}),
     pickOne: jest.fn(async () => undefined),
     runCommand: jest.fn(async () => {}),

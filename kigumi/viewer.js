@@ -67,6 +67,7 @@ function createFrameViewer(filePath, frameName = null, isLocalDev = false, openI
         title: getViewerTitle(filePath, frameName, isLocalDev),
         beside: openInSplitView,
         resourceRoot: webviewDir,
+        filePath,
     });
 }
 
