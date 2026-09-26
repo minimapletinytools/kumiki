@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const { createMatcher } = require('../hosts/electron/glob-match');
 const { SettingsStore, defaultsFromPackageJson } = require('../hosts/electron/settings-store');
-const { TabList } = require('../hosts/electron/tab-list');
+const { TabList } = require('../app-shell/tab-list');
 const { LogChannel, rotateIfLarge } = require('../hosts/electron/log-channel');
 
 describe('glob matching for file watches', () => {

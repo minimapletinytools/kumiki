@@ -2,19 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src kigumi://app; style-src kigumi://app; font-src kigumi://app; img-src kigumi://app data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; frame-src 'self';">
     <title>Kigumi</title>
-    <link rel="stylesheet" href="kigumi://app/webview/vendor/codicon.css">
+    <link rel="stylesheet" href="../vendor/codicon.css">
     <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="shell.css">
+    <link rel="stylesheet" href="quickpick.css">
 </head>
 <body>
-    <div class="shell">
-        <aside class="sidebar-slot" id="sidebar-slot"></aside>
-        <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize explorer"></div>
+    <div class="shell" id="shell">
+        <aside class="slot slot-left" id="slot-left" aria-label="Explorer"></aside>
+        <div class="splitter" id="splitter-left" role="separator" aria-orientation="vertical" aria-label="Resize explorer"></div>
         <main class="main">
-            <nav class="tabs" id="tabs" role="tablist" aria-label="Open viewers"></nav>
-            <section class="content-slot" id="content-slot">
+            <nav class="tabs" id="tabs" role="tablist" aria-label="Open panels"></nav>
+            <section class="slot slot-center" id="slot-center">
                 <div class="welcome" id="welcome">
                     <h1>Kigumi</h1>
                     <p class="welcome-lead" id="welcome-lead"></p>
@@ -27,6 +28,8 @@
                 </div>
             </section>
         </main>
+        <div class="splitter" id="splitter-right" role="separator" aria-orientation="vertical" aria-label="Resize side panel" hidden></div>
+        <aside class="slot slot-right" id="slot-right" hidden></aside>
         <footer class="status" id="status">
             <button class="status-item" id="status-workspace" title="Open folder"></button>
             <span class="status-item status-progress" id="status-progress" hidden></span>
@@ -37,6 +40,12 @@
             <button class="status-item" id="status-log" title="Show log"><span class="codicon codicon-output"></span> Log<span class="badge" id="status-log-badge" hidden></span></button>
             <span class="status-item status-version" id="status-version"></span>
         </footer>
+    </div>
+    <div class="quickpick-overlay" id="quickpick" hidden>
+        <div class="picker" role="dialog" aria-modal="true" aria-label="Quick pick">
+            <input id="quickpick-filter" type="text" autocomplete="off" spellcheck="false" aria-controls="quickpick-list">
+            <div id="quickpick-list" class="list" role="listbox"></div>
+        </div>
     </div>
     <script src="shell.js"></script>
 </body>

@@ -1,21 +1,13 @@
-// The shell page's and quick-pick overlay's channel to the main process.
+// Gives the shell page its transport to the core (window.kigumiShell), carried
+// over one IPC channel. Panels inside the shell talk to it, not to this.
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-const TO_MAIN = new Set([
-    'shell:ready', 'shell:layout', 'shell:activateTab', 'shell:closeTab', 'shell:command', 'quickpick:result',
-]);
-const FROM_MAIN = new Set(['shell:state', 'quickpick:show']);
-
 contextBridge.exposeInMainWorld('kigumiShell', {
-    send(channel, ...args) {
-        if (TO_MAIN.has(channel)) {
-            ipcRenderer.send(channel, ...args);
-        }
+    send(message) {
+        ipcRenderer.send('kigumi:shell', message);
     },
-    on(channel, callback) {
-        if (FROM_MAIN.has(channel)) {
-            ipcRenderer.on(channel, (_event, payload) => callback(payload));
-        }
+    onMessage(callback) {
+        ipcRenderer.on('kigumi:shell', (_event, message) => callback(message));
     },
 });

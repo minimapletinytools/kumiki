@@ -1,5 +1,12 @@
-body.overlay {
+.quickpick-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
     background: rgba(0, 0, 0, 0.12);
+}
+
+.quickpick-overlay[hidden] {
+    display: none;
 }
 
 .picker {
@@ -15,7 +22,7 @@ body.overlay {
     box-shadow: 0 4px 20px var(--ka-shadow);
 }
 
-#filter {
+#quickpick-filter {
     height: 28px;
     padding: 0 8px;
     border: 1px solid var(--ka-focus);

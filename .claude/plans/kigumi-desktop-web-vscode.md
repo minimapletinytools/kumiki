@@ -146,10 +146,12 @@ and the seams the shell needs already exist. Two guardrails:
 1. **Pyodide spike** (Decision 1). Report which of numpy, sympy, trimesh and
    manifold3d load, and whether a real frame renders.
 2. **Update this doc** with the outcome and the chosen core placement.
-3. **Shell to iframes.** Move `hosts/electron/shell.js` panels from
-   `WebContentsView`s to iframes in one shell page, and introduce the panel
-   registry. Desktop behaviour stays the same; the smoke test
-   (`npm run test:app`) must keep passing.
+3. **Shell to iframes.** ✅ Done on the `shell-panels` branch: panels are
+   iframes in `webview/shell/shell.html`, driven by the host-neutral
+   `app-shell/` (panel registry with left/center/right slots, shell
+   connection, page store). Electron supplies only the window and IPC
+   transport (`hosts/electron/app-window.js`). A web host needs a transport
+   and something serving `/webview/*` and `/page/*`.
 4. **Editor panel** (Monaco) for frame and pattern files.
 5. **Agent panel** on desktop, with the automation commands as tools.
 6. **Web deployment** on the placement from step 1.

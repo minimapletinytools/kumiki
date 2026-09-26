@@ -32,7 +32,8 @@ function languageOf(filePath) {
 
 /**
  * @param {object} options
- * @param {import('./shell').Shell} options.shell
+ * @param {Electron.BrowserWindow} options.window
+ * @param {import('../../app-shell/shell-connection').ShellConnection} options.connection
  * @param {import('./settings-store').SettingsStore} options.settings
  * @param {string|null} options.workspaceFolder
  * @param {string} options.locale
@@ -41,7 +42,7 @@ function languageOf(filePath) {
  * @param {(level: string, text: string) => void} options.setStatus
  * @param {(title: string|null) => void} options.setProgress
  */
-function createElectronHost({ shell, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress }) {
+function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress }) {
     function openInEditor(filePath, line = 1) {
         const template = settings.get('app.editorCommand', '');
         if (template) {
@@ -108,7 +109,7 @@ function createElectronHost({ shell, settings, workspaceFolder, locale, log, run
                 setStatus(level, text);
                 return undefined;
             }
-            const { response } = await dialog.showMessageBox(shell.window, {
+            const { response } = await dialog.showMessageBox(window, {
                 type: level === 'warning' ? 'warning' : level === 'error' ? 'error' : 'info',
                 message: text,
                 buttons: [...actions, 'Close'],
@@ -119,7 +120,7 @@ function createElectronHost({ shell, settings, workspaceFolder, locale, log, run
         },
 
         async confirm({ message, detail, action }) {
-            const { response } = await dialog.showMessageBox(shell.window, {
+            const { response } = await dialog.showMessageBox(window, {
                 type: 'question',
                 message,
                 detail,
@@ -163,14 +164,14 @@ function createElectronHost({ shell, settings, workspaceFolder, locale, log, run
         },
 
         activeFile() {
-            const surface = shell.activeSurface;
+            const surface = connection.activePanel;
             return surface && surface.filePath
                 ? { filePath: surface.filePath, languageId: languageOf(surface.filePath) }
                 : null;
         },
 
         async pickOne(items, { placeholder } = {}) {
-            return shell.pick(items, placeholder);
+            return connection.pick(items, placeholder);
         },
 
         watchFiles,
@@ -185,7 +186,7 @@ function createElectronHost({ shell, settings, workspaceFolder, locale, log, run
         runCommand,
 
         createViewerSurface({ title, filePath }) {
-            return shell.createTab({ kind: 'viewer', title, filePath });
+            return connection.createPanel('viewer', { title, filePath });
         },
     };
 }

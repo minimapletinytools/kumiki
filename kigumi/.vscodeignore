@@ -12,3 +12,5 @@ electron-builder.yml
 build-app/**
 dist-app/**
 scripts/bundle-docs.js
+app-shell/**
+webview/shell/**

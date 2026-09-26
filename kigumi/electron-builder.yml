@@ -27,6 +27,7 @@ files:
   - i18n/**
   - webview/**
   - hosts/**
+  - app-shell/**
   - skills/**
   - .kigumi/docs/**
   - templogo.png

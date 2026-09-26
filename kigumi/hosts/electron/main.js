@@ -10,13 +10,15 @@ const { app, protocol, Menu, dialog, shell: electronShell } = require('electron'
 const { setHost } = require('../../host');
 const { createKigumiApp } = require('../../kigumi-app');
 const { webviewDir } = require('../../webview-html');
-const { Shell, pages, ORIGIN } = require('./shell');
+const { ShellConnection } = require('../../app-shell/shell-connection');
+const { PageStore } = require('../../app-shell/page-store');
+const { createAppWindow } = require('./app-window');
 const { createElectronHost } = require('./electron-host');
 const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
-const PAGES_DIR = path.join(__dirname, 'pages');
+const ORIGIN = 'kigumi://app';
 const packageJson = JSON.parse(fs.readFileSync(path.join(KIGUMI_DIR, 'package.json'), 'utf8'));
 const STATUS_CLEAR_MS = 10000;
 
@@ -44,7 +46,9 @@ protocol.registerSchemesAsPrivileged([
     { scheme: 'kigumi', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
-let shell = null;
+let mainWindow = null;
+let connection = null;
+let pages = null;
 let kigumiApp = null;
 let settings = null;
 let logChannel = null;
@@ -78,13 +82,12 @@ function handleProtocol(request) {
     }
     const [area, ...rest] = url.pathname.slice(1).split('/');
     if (area === 'page') {
-        const html = pages.get(rest[0]);
+        const html = pages && pages.get(rest[0]);
         return html === undefined
             ? notFound()
             : new Response(html, { headers: { 'content-type': CONTENT_TYPES['.html'] } });
     }
     if (area === 'webview') return serveFrom(webviewDir, rest);
-    if (area === 'shell') return serveFrom(PAGES_DIR, rest);
     return notFound();
 }
 
@@ -93,11 +96,6 @@ function bundledUvPath() {
     if (!app.isPackaged) return null;
     const candidate = path.join(process.resourcesPath, 'uv', process.platform === 'win32' ? 'uv.exe' : 'uv');
     return fs.existsSync(candidate) ? candidate : null;
-}
-
-function resourceUri(absPath) {
-    const relative = path.relative(webviewDir, absPath).split(path.sep).map(encodeURIComponent).join('/');
-    return `${ORIGIN}/webview/${relative}`;
 }
 
 // A folder given on the command line, else the last one opened.
@@ -126,7 +124,7 @@ function shellStatus() {
 }
 
 function pushShellState() {
-    if (shell) shell.pushState();
+    if (connection) connection.pushState();
 }
 
 function setStatus(level, message) {
@@ -164,7 +162,7 @@ async function runAppCommand(id, ...args) {
 }
 
 async function chooseWorkspaceFolder() {
-    const { canceled, filePaths } = await dialog.showOpenDialog(shell.window, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
         title: 'Open Kigumi Project Folder',
         properties: ['openDirectory', 'createDirectory'],
     });
@@ -179,7 +177,7 @@ async function chooseWorkspaceFolder() {
 }
 
 async function chooseFrameFile() {
-    const { canceled, filePaths } = await dialog.showOpenDialog(shell.window, {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
         title: 'Open Frame File',
         defaultPath: workspaceFolder || undefined,
         properties: ['openFile'],
@@ -192,12 +190,12 @@ async function chooseFrameFile() {
 
 function openLogTab() {
     status.logBadge = false;
-    const existing = shell.findTab((surface) => surface.kind === 'log');
+    const existing = connection.findPanel((panel) => panel.type === 'log');
     if (existing) {
         existing.reveal();
         return;
     }
-    const surface = shell.createTab({ kind: 'log', title: 'Log' });
+    const surface = connection.createPanel('log', { title: 'Log' });
     const subscription = logChannel.onLine((line) => {
         void surface.postMessage({ type: 'logLine', line });
     });
@@ -209,7 +207,7 @@ function openLogTab() {
         }
     });
     surface.onDispose(() => subscription.dispose());
-    surface.loadUrl(`${ORIGIN}/shell/log.html`);
+    surface.loadUrl(`${ORIGIN}/webview/shell/log.html`);
 }
 
 // Opens settings.json, listing every setting with its current value.
@@ -245,7 +243,7 @@ function buildMenu() {
                     label: 'Close Tab',
                     accelerator: 'CmdOrCtrl+W',
                     click: () => {
-                        const active = shell.activeSurface;
+                        const active = connection.activePanel;
                         if (active) active.dispose();
                     },
                 },
@@ -281,8 +279,7 @@ function buildMenu() {
                     label: 'Toggle Developer Tools',
                     accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
                     click: () => {
-                        const target = shell.activeSurface ? shell.activeSurface.view.webContents : shell.sidebar.view.webContents;
-                        target.toggleDevTools();
+                        mainWindow.webContents.toggleDevTools();
                     },
                 },
                 { type: 'separator' },
@@ -319,18 +316,23 @@ async function start() {
     logChannel.appendLine(`[app] Kigumi ${packageJson.version} (Electron ${process.versions.electron})`);
     logChannel.appendLine(`[app] Workspace: ${workspaceFolder || '(none)'}`);
 
-    shell = new Shell({
-        resourceUri,
+    const log = (line) => logChannel.appendLine(line);
+    const appWindow = createAppWindow({ origin: ORIGIN, log });
+    mainWindow = appWindow.window;
+    pages = new PageStore({ origin: ORIGIN, webviewDir });
+    connection = new ShellConnection({
+        transport: appWindow.transport,
+        pages,
         status: shellStatus,
-        onShellCommand,
-        log: (line) => logChannel.appendLine(line),
-        onSurfaceCrashed: (surface, gaveUp) => {
-            if (gaveUp) setStatus('error', `"${surface.title || 'A view'}" keeps crashing. Close its tab and open it again.`);
-        },
+        onCommand: onShellCommand,
+        isFocused: () => !mainWindow.isDestroyed() && mainWindow.isFocused(),
+        log,
     });
+    mainWindow.on('focus', () => pushShellState());
 
     setHost(createElectronHost({
-        shell,
+        window: mainWindow,
+        connection,
         settings,
         workspaceFolder,
         locale: app.getLocale(),
@@ -347,7 +349,7 @@ async function start() {
         enableTestCommands: process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1',
         bundledUv: bundledUvPath(),
     });
-    kigumiApp.sidebarController.attach(shell.sidebar);
+    kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
 
     settings.onChange(() => {
         buildMenu();
@@ -355,17 +357,26 @@ async function start() {
     });
     buildMenu();
 
-    shell.window.on('closed', async () => {
+    mainWindow.on('closed', async () => {
         const current = kigumiApp;
         kigumiApp = null;
-        shell = null;
+        connection.dispose();
+        connection = null;
+        mainWindow = null;
         settings.dispose();
         if (current) await current.dispose();
         app.quit();
     });
 
     if (process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1') {
-        global.__kigumi = { runAppCommand, shell: () => shell, logLines: () => logChannel.lines, onShellCommand, settings };
+        global.__kigumi = {
+            runAppCommand,
+            connection: () => connection,
+            window: () => mainWindow,
+            logLines: () => logChannel.lines,
+            onShellCommand,
+            settings,
+        };
         // A test driver run against the live app; its result sets the exit code.
         if (process.env.KIGUMI_TEST_SCRIPT) {
             const driver = require(path.resolve(process.env.KIGUMI_TEST_SCRIPT));
@@ -384,9 +395,9 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
 } else {
     app.on('second-instance', (_event, argv) => {
-        if (!shell || shell.window.isDestroyed()) return;
-        if (shell.window.isMinimized()) shell.window.restore();
-        shell.window.focus();
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
         const requested = argv.slice(1).find((arg) => !arg.startsWith('-') && fs.existsSync(arg) && fs.statSync(arg).isDirectory());
         if (requested && path.resolve(requested) !== workspaceFolder) {
             setStatus('info', `Kigumi is already open on ${path.basename(workspaceFolder || '')}. Use File > Open Folder… to switch to ${path.basename(requested)}.`);

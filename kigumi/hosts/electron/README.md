@@ -18,11 +18,20 @@ From `kigumi/`:
 
 ## Pieces
 
-- `main.js`: startup, the `kigumi://app` protocol, menus, the Log tab.
-- `shell.js`: the window. The sidebar, each tab and the quick pick are
-  WebContentsViews laid over `pages/shell.html`.
-- `preload.js`: gives the viewer and sidebar pages `acquireVsCodeApi()`, so
-  they run unchanged.
+The window is a web page with a fixed layout -- explorer on the left, tabs in
+the middle, an optional right panel, a status bar -- whose panels are iframes.
+Only the transport and the window are Electron-specific, so the same shell
+can later run in a browser.
+
+- `../../webview/shell/`: the shell page (`shell.html`, `shell.js`), the
+  quick pick, the Log panel, and `panel-bridge.js`, which gives each panel page
+  `acquireVsCodeApi()` so the viewer and explorer run unchanged.
+- `../../app-shell/`: the core's side, host-neutral. `panel-registry.js` lists
+  panel types and their slots; `shell-connection.js` keeps panels, tabs and the
+  quick pick in step with the shell page; `page-store.js` serves panel HTML.
+- `app-window.js`: the BrowserWindow and the IPC transport (one channel,
+  `kigumi:shell`, exposed to the page by `shell-preload.js`).
+- `main.js`: startup, the `kigumi://app` protocol, menus, the Log panel.
 - `electron-host.js`: the Host (see `../../host.js`).
 
 Settings live in `<userData>/settings.json`: the extension's `kigumi.*` keys

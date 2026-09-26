@@ -1,23 +1,44 @@
 .shell {
     display: grid;
-    grid-template-columns: var(--sidebar-width, 300px) 4px 1fr;
-    grid-template-rows: 1fr 24px;
+    grid-template-columns: var(--left-width, 300px) 4px minmax(0, 1fr) auto auto;
+    grid-template-rows: minmax(0, 1fr) 24px;
     height: 100vh;
     overflow: hidden;
 }
 
-.sidebar-slot {
+.slot-left {
     grid-row: 1;
     grid-column: 1;
     background: var(--ka-chrome-bg);
 }
 
+.slot-right {
+    grid-row: 1;
+    grid-column: 5;
+    width: var(--right-width, 360px);
+    background: var(--ka-chrome-bg);
+}
+
+.slot-right[hidden],
+.splitter[hidden] {
+    display: none;
+}
+
 .splitter {
     grid-row: 1;
-    grid-column: 2;
     cursor: col-resize;
     background: var(--ka-chrome-bg);
+}
+
+#splitter-left {
+    grid-column: 2;
     border-right: 1px solid var(--ka-border);
+}
+
+#splitter-right {
+    grid-column: 4;
+    width: 4px;
+    border-left: 1px solid var(--ka-border);
 }
 
 .splitter:hover,
@@ -31,6 +52,29 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+}
+
+.slot {
+    position: relative;
+    min-height: 0;
+}
+
+.panel-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--ka-bg);
+}
+
+.panel-frame[hidden] {
+    display: none;
+}
+
+/* While a splitter is dragged the frames would swallow the pointer. */
+.shell.is-resizing .panel-frame {
+    pointer-events: none;
 }
 
 /* Tabs */
@@ -97,10 +141,8 @@
 
 /* Content and welcome */
 
-.content-slot {
-    position: relative;
+.slot-center {
     flex: 1;
-    min-height: 0;
 }
 
 .welcome {
