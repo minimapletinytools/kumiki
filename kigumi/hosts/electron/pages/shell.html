@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src kigumi://app; style-src kigumi://app; font-src kigumi://app; img-src kigumi://app data:;">
+    <title>Kigumi</title>
+    <link rel="stylesheet" href="kigumi://app/webview/vendor/codicon.css">
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="shell.css">
+</head>
+<body>
+    <div class="shell">
+        <aside class="sidebar-slot" id="sidebar-slot"></aside>
+        <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="Resize explorer"></div>
+        <main class="main">
+            <nav class="tabs" id="tabs" role="tablist" aria-label="Open viewers"></nav>
+            <section class="content-slot" id="content-slot">
+                <div class="welcome" id="welcome">
+                    <h1>Kigumi</h1>
+                    <p class="welcome-lead" id="welcome-lead"></p>
+                    <div class="welcome-actions" id="welcome-actions"></div>
+                    <dl class="welcome-keys">
+                        <dt><kbd id="key-open-folder">⌘O</kbd></dt><dd>Open folder</dd>
+                        <dt><kbd id="key-open-frame">⇧⌘O</kbd></dt><dd>Open frame file</dd>
+                        <dt><kbd id="key-browse">⌘P</kbd></dt><dd>Browse patterns</dd>
+                    </dl>
+                </div>
+            </section>
+        </main>
+        <footer class="status" id="status">
+            <button class="status-item" id="status-workspace" title="Open folder"></button>
+            <span class="status-item status-progress" id="status-progress" hidden></span>
+            <span class="status-item status-message" id="status-message" hidden></span>
+            <span class="status-spacer"></span>
+            <button class="status-item" id="status-autorefresh" title="Auto refresh on file change"></button>
+            <button class="status-item" id="status-log" title="Show log"><span class="codicon codicon-output"></span> Log<span class="badge" id="status-log-badge" hidden></span></button>
+            <span class="status-item status-version" id="status-version"></span>
+        </footer>
+    </div>
+    <script src="shell.js"></script>
+</body>
+</html>

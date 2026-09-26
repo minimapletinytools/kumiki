@@ -5,3 +5,10 @@ test-frame.py
 install.sh
 INSTALL.md
 CURSOR-INSTALL.md
+hosts/electron/**
+test/**
+scripts/fetch-uv.js
+electron-builder.yml
+build-app/**
+dist-app/**
+scripts/bundle-docs.js

@@ -1,0 +1,55 @@
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.log-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--ka-border);
+    background: var(--ka-chrome-bg);
+}
+
+.log-header input[type="search"] {
+    flex: 1;
+    max-width: 320px;
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--ka-border);
+    border-radius: 3px;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font: inherit;
+}
+
+.log-header button {
+    padding: 3px 10px;
+    border: 1px solid var(--ka-border);
+    border-radius: 3px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.log-lines {
+    flex: 1;
+    margin: 0;
+    padding: 8px 10px;
+    overflow: auto;
+    font-family: var(--ka-mono);
+    font-size: 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.line-error {
+    color: var(--ka-error);
+}
+
+.line-warn {
+    color: var(--ka-warning);
+}

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src kigumi://app; style-src kigumi://app;">
+    <title>Kigumi Log</title>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="log.css">
+</head>
+<body>
+    <header class="log-header">
+        <input id="filter" type="search" placeholder="Filter log" aria-label="Filter log">
+        <label><input id="follow" type="checkbox" checked> Follow</label>
+        <button id="open-file">Open log file</button>
+    </header>
+    <pre id="lines" class="log-lines" tabindex="0"></pre>
+    <script src="log.js"></script>
+</body>
+</html>

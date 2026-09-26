@@ -1,0 +1,67 @@
+/* Colours for the standalone app's own pages, matching the sidebar's defaults. */
+
+:root {
+    color-scheme: light dark;
+    --ka-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --ka-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --ka-font-size: 13px;
+    --ka-bg: #ffffff;
+    --ka-chrome-bg: #f8f8f8;
+    --ka-tab-bg: #ececec;
+    --ka-tab-active-bg: #ffffff;
+    --ka-fg: #3b3b3b;
+    --ka-muted: #717171;
+    --ka-border: #e5e5e5;
+    --ka-accent: #005fb8;
+    --ka-accent-fg: #ffffff;
+    --ka-hover: rgba(0, 0, 0, 0.06);
+    --ka-focus: #0090f1;
+    --ka-error: #c72e0f;
+    --ka-warning: #b27c00;
+    --ka-status-bg: #f8f8f8;
+    --ka-overlay-bg: #ffffff;
+    --ka-shadow: rgba(0, 0, 0, 0.18);
+    --ka-selected: #e4e6f1;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ka-bg: #1f1f1f;
+        --ka-chrome-bg: #181818;
+        --ka-tab-bg: #181818;
+        --ka-tab-active-bg: #1f1f1f;
+        --ka-fg: #cccccc;
+        --ka-muted: #9d9d9d;
+        --ka-border: #2b2b2b;
+        --ka-accent: #0078d4;
+        --ka-hover: rgba(255, 255, 255, 0.07);
+        --ka-error: #f48771;
+        --ka-warning: #cca700;
+        --ka-status-bg: #181818;
+        --ka-overlay-bg: #252526;
+        --ka-shadow: rgba(0, 0, 0, 0.5);
+        --ka-selected: #04395e;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    height: 100%;
+}
+
+body {
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font-family: var(--ka-font);
+    font-size: var(--ka-font-size);
+}
+
+button {
+    font: inherit;
+    color: inherit;
+}
