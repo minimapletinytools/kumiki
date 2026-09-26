@@ -118,6 +118,68 @@ function createVscodeHost() {
             return watcher;
         },
 
+        activeFile() {
+            const editor = vscode.window.activeTextEditor;
+            return editor && editor.document
+                ? { filePath: editor.document.fileName, languageId: editor.document.languageId }
+                : null;
+        },
+
+        async showFile(filePath) {
+            const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+            await vscode.window.showTextDocument(document, { preview: false });
+        },
+
+        async pickOne(items, { placeholder, matchOnDescription, matchOnDetail } = {}) {
+            const quickPickItems = items.map((item) => (item.separator
+                ? { label: item.label, kind: vscode.QuickPickItemKind.Separator }
+                : { label: item.label, description: item.description, detail: item.detail, item }));
+            const picked = await vscode.window.showQuickPick(quickPickItems, {
+                placeHolder: placeholder,
+                matchOnDescription,
+                matchOnDetail,
+            });
+            return picked ? picked.item : undefined;
+        },
+
+        async confirm({ message, detail, action }) {
+            const choice = await vscode.window.showInformationMessage(message, { modal: true, detail }, action);
+            return choice === action;
+        },
+
+        withProgress(title, task) {
+            return Promise.resolve(vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title,
+                cancellable: false,
+            }, task));
+        },
+
+        openExternal(url) {
+            return Promise.resolve(vscode.env.openExternal(vscode.Uri.parse(url)));
+        },
+
+        updateConfig(key, value) {
+            return Promise.resolve(vscode.workspace.getConfiguration('kigumi').update(key, value, vscode.ConfigurationTarget.Workspace));
+        },
+
+        onConfigChange(callback) {
+            return vscode.workspace.onDidChangeConfiguration((event) => {
+                callback((key) => event.affectsConfiguration(`kigumi.${key}`));
+            });
+        },
+
+        onDocumentChange(callback) {
+            const report = (document, saved) => {
+                if (document) {
+                    callback({ filePath: document.fileName, languageId: document.languageId, isDirty: document.isDirty, saved });
+                }
+            };
+            const changed = vscode.workspace.onDidChangeTextDocument((event) => report(event && event.document, false));
+            const saved = vscode.workspace.onDidSaveTextDocument((document) => report(document, true));
+            return { dispose: () => { changed.dispose(); saved.dispose(); } };
+        },
+
         runCommand(command, ...args) {
             return Promise.resolve(vscode.commands.executeCommand(command, ...args));
         },
