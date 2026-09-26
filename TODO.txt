@@ -80,9 +80,9 @@ So until the kumki's assembly feature can really live up to its own name
 
 lets look into refactoring kigumi into a STANDALONE viewer (i.e. not a VScode extensions)
 
-the same code should still work as the VSCode extension as it is right now, so basicayl there rae 2 build paths, one to make the extension and one tom ake a standalone app.
-
-We do need to recreate the kigumi sidebar in the app though, so that part needs to refactored out so as much code is shared as possible, the in app sidebar is not used in the vs code extension
+1. the same code with 2 deployment taregts, a standalone electron app and the vscode extension
+2. We do need to recreate the kigumi sidebar in the app though, so that part needs to refactored out so as much code is shared as possible, the in app sidebar is not used in the vs code extension because we use the vscode bulit in sidebar. Take this opportunity to rewrite the sidebar a bit though as we use the vscode layout components in the sidebar and those seem limiting so if ew're going ot rewrite them for the standalone app may as well use them in vscode as well
+3. the dependency installer path needs improvement. It should detect ify ou have uv or python installe,d and if neither is installed, it should try and install one or the other for you
 
 
 :: 9/8/2026 project notes
@@ -232,6 +232,12 @@ DONE-do code review
   DONE-geometry
   DONE-drawing
   DONE-identity
+
+-its kinda weird that named features overriding default ones can declare themselves to be different feature so we should prevent that...
+-omg delete the useless docs or hmove them to a different folder
+-add corner features
+-do the standalone app
+-do the solver :O
 
 -do measuring features doc
   -explain CSG fetaure system
