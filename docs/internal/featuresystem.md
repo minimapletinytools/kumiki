@@ -63,7 +63,7 @@ Note that the feature derivation system currently does NOT support the following
 
 ## Limitations
 
-TODO document limitations of the system right now, e.g. limited support for curved surfaces, edge geomeetry information etc.
+TODO document limitations of the system right now, e.g. limited support for curved surfaces, edge geomeetry information etc, an edge cut in half by a difference does not become 2 edges.
 
 # The Measurement/Drawing System 
 
