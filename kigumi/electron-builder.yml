@@ -1,0 +1,62 @@
+# Packages the standalone Kigumi app. Run `npm run app:dist` from kigumi/.
+#
+# Signing is picked up from the environment when present:
+#   macOS:   CSC_LINK, CSC_KEY_PASSWORD, and APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD,
+#            APPLE_TEAM_ID for notarization
+#   Windows: CSC_LINK, CSC_KEY_PASSWORD (or WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD)
+# Without them the builds are unsigned.
+
+appId: com.minimaple.kigumi
+productName: Kigumi
+copyright: Copyright © minimaple
+directories:
+  output: dist-app
+  buildResources: build-app
+extraMetadata:
+  main: hosts/electron/main.js
+# Off so Python can run runner.py and the scanners straight from the app folder.
+asar: false
+files:
+  - package.json
+  - "*.js"
+  - "*.py"
+  - i18n/**
+  - webview/**
+  - hosts/**
+  - skills/**
+  - .kigumi/docs/**
+  - templogo.png
+  - "!jest.config.js"
+  - "!test-frame.py"
+  - "!**/__tests__/**"
+  - "!scripts/**"
+  - "!test/**"
+extraResources:
+  - from: build-app/uv/${os}-${arch}
+    to: uv
+    filter:
+      - "uv*"
+icon: templogo.png
+mac:
+  category: public.app-category.graphics-design
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  hardenedRuntime: true
+win:
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+linux:
+  category: Graphics
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64]

@@ -1,0 +1,68 @@
+name: Build Kigumi App
+
+# Builds the standalone Kigumi app for macOS, Windows and Linux and uploads the
+# installers as workflow artifacts. Builds are signed only when the signing
+# secrets below are configured; otherwise they are unsigned.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'kigumi/hosts/electron/**'
+      - 'kigumi/electron-builder.yml'
+      - 'kigumi/scripts/fetch-uv.js'
+      - 'kigumi/scripts/bundle-docs.js'
+      - '.github/workflows/build-kigumi-app.yml'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: --mac
+          - os: windows-latest
+            target: --win
+          - os: ubuntu-latest
+            target: --linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: kigumi
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: kigumi/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: |
+          npm run prepare:instructions
+          node scripts/bundle-docs.js
+          node scripts/fetch-uv.js
+          npx electron-builder --config electron-builder.yml ${{ matrix.target }} --publish never
+        env:
+          CSC_LINK: ${{ secrets.KIGUMI_APP_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.KIGUMI_APP_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.KIGUMI_APP_APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.KIGUMI_APP_APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.KIGUMI_APP_APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.KIGUMI_APP_CSC_LINK != '' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kigumi-app-${{ runner.os }}
+          path: |
+            kigumi/dist-app/*.dmg
+            kigumi/dist-app/*.zip
+            kigumi/dist-app/*.exe
+            kigumi/dist-app/*.AppImage
+            kigumi/dist-app/*.deb
+          if-no-files-found: error
