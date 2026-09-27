@@ -19,7 +19,7 @@ point it cannot hit exactly. See FeatureTestTolerances.
 """
 
 import re
-from typing import Callable, ClassVar, Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, ClassVar, Dict, Hashable, Iterator, List, Optional, Sequence, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from enum import Enum, Flag
@@ -28,6 +28,8 @@ from .rule import *
 from .geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
+from .solve_recipe import (AxisOf, CylinderEntity, EntityMap, EntityRef, Is, Meet,
+                           PlaneEntity, Recipe, SolveEntity)
 
 
 # ============================================================================
@@ -769,6 +771,13 @@ class CSGFeature(ABC):
     def group(self) -> FeatureGroup:
         return self.properties.group
 
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        """How this feature is built from `owner.solve_entities()`, or None if it can't be."""
+        key = self.feature_key()
+        if key is not None and key in owner.solve_entities():
+            return Is(EntityRef(owner, key))
+        return None
+
     def is_derived(self) -> bool:
         """Whether this feature was derived from others rather than declared.
         """
@@ -848,6 +857,14 @@ def _point_is_on_line(point: V3, line: Line, tolerance: Optional[Numeric] = None
     from_start = point - line.point
     across = from_start - along * safe_dot_product(from_start, along)
     return safe_zero_test_sq(safe_dot_product(across, across), eps=tolerance)
+
+
+def _meet_of_parents(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional[Recipe]:
+    """Where two parent features meet, or None if either has no recipe."""
+    first, second = a.feature.solve_recipe(a.owner), b.feature.solve_recipe(b.owner)
+    if first is None or second is None:
+        return None
+    return Meet((first, second))
 
 
 @dataclass(frozen=True)
@@ -931,6 +948,9 @@ class DerivedEdgeFeature(CSGFeature):
                 return CSGFeatureExtent(
                     anchor=at((low + high) / 2), ends=(at(low), at(high)))
         return CSGFeatureExtent(anchor=start)
+
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        return _meet_of_parents(self.a, self.b)
 
     @staticmethod
     def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedEdgeFeature']:
@@ -1048,6 +1068,9 @@ class DerivedPointFeature(CSGFeature):
         if not isinstance(located, Point):
             return None
         return CSGFeatureExtent(anchor=located.position)
+
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        return _meet_of_parents(self.a, self.b)
 
     @staticmethod
     def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedPointFeature']:
@@ -1307,6 +1330,9 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
     def feature_key(self) -> Optional[FeatureKey]:
         return _prism_arris_key(*self.faces)
 
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        return _meet_of_prism_faces(owner, self.faces)
+
     def _sides(self) -> Tuple['SimpleRectangularPrismFeature', 'SimpleRectangularPrismFeature']:
         """The two faces as features, so their geometry is worked out once, there."""
         return (
@@ -1373,6 +1399,15 @@ def _canonical_corner_faces(
             _PRISM_SIDE_ORDER) != 1:
         first, second = second, first
     return (caps[0], first, second)
+
+
+def _meet_of_prism_faces(owner: 'CutCSG', faces: Sequence[PrismFace]) -> Optional[Recipe]:
+    """Where these faces of a prism meet, or None if one of them isn't there."""
+    entities = owner.solve_entities()
+    keys = [prism_face_key(face) for face in faces]
+    if not all(key in entities for key in keys):
+        return None
+    return Meet(tuple(Is(EntityRef(owner, key)) for key in keys))
 
 
 def prism_face_key(face: PrismFace) -> FeatureKey:
@@ -1464,6 +1499,9 @@ class SimpleRectangularPrismVertexFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.POINT
 
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        return _meet_of_prism_faces(owner, self.faces)
+
     def _position(self, owner: 'CutCSG') -> Optional[V3]:
         """Where the corner is, in the owner's space.
 
@@ -1510,6 +1548,11 @@ class CylinderAxisFeature(CSGFeature):
     @property
     def real(self) -> bool:
         return False
+
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        if self._cylinder(owner) is None:
+            return None
+        return AxisOf(EntityRef(owner, CYLINDER_BARREL))
 
     def _cylinder(self, owner: 'CutCSG') -> Optional['Cylinder']:
         """The owner, as the Cylinder this feature is the axis of.
@@ -1855,6 +1898,17 @@ class HasFeatures:
         """
         return {}
 
+    def solve_entities(self) -> Dict[Hashable, SolveEntity]:
+        """A plane for each default face that has one, keyed like the face."""
+        entities: Dict[Hashable, SolveEntity] = {}
+        for key, feature in self.default_features().items():
+            if feature.feature_type() is not CSGFeatureType.FACE:
+                continue
+            plane = feature.locate_simple_unbounded(cast(CutCSG, self))
+            if isinstance(plane, Plane):
+                entities[key] = PlaneEntity(plane)
+        return entities
+
     def _check_authored_features(self) -> None:
         """Refuse overrides of missing or repeated slots, keyed extras, and repeated names."""
         defaults = self.default_features()
@@ -1987,6 +2041,10 @@ class CutCSG(ABC):
         name, only the surfaces its children contribute.
         """
         return []
+
+    def solve_entities(self) -> Dict[Hashable, SolveEntity]:
+        """This node's own independent geometry, which its features' recipes are built from."""
+        return {}
 
     # does not include derived features
     # TODO rename this to be more descriptive
@@ -2218,6 +2276,15 @@ def walk_csg_with_parity(
     yield root, parity
     for child, child_parity in csg_children_with_parity(root, parity):
         yield from walk_csg_with_parity(child, child_parity)
+
+
+def solve_entity_map(root: CutCSG) -> EntityMap:
+    """Every primitive entity in the tree, coincident planes merged."""
+    def walk(node: CutCSG) -> Iterator[CutCSG]:
+        yield node
+        for child in csg_children(node):
+            yield from walk(child)
+    return EntityMap((node, node.solve_entities()) for node in walk(root))
 
 
 @dataclass(frozen=True)
@@ -2744,6 +2811,14 @@ class Cylinder(HasFeatures, CutCSG):
                                        properties=_DEFAULT_FEATURE_PROPERTIES)
             for key, part in parts
         }
+
+    def solve_entities(self) -> Dict[Hashable, SolveEntity]:
+        """The barrel, and a plane for each finite cap."""
+        entities = super().solve_entities()
+        entities[CYLINDER_BARREL] = CylinderEntity(
+            axis=Line(direction=safe_normalize_vector(self.axis_direction), point=self.position),
+            radius=self.radius)
+        return entities
 
     def _axial_and_radial(self, point: V3) -> Tuple[Numeric, Numeric]:
         """Distance along the axis from `position`, and distance from the axis."""
