@@ -43,7 +43,18 @@ TODO  document limitations of each of these functions
 
 ## The CSG Nodes
 
-TODO markdown table node name | node type (primitive/composite) | has curves | feature support (full or partial) | TODO figure out the rest of the collumns
+| Node Name | Node Type (primitive/composite) | contains_curves | File | Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| `EmptyCSG` | Primitive | No | `cutcsg.py` | Empty solid containing no points; returns `False` for point containment/boundary tests and yields an empty AABB. |
+| `HalfSpace` | Primitive | No | `cutcsg.py` | Infinite half-space defined by a normal vector and signed offset (`P · normal >= offset`). Boundary is a single unbounded planar face. |
+| `RectangularPrism` | Primitive | No | `cutcsg.py` | Box primitive with rectangular cross-section `(width, height)` along local Z; can be finite or semi-infinite/infinite on either end. Declares planar face, arris (edge), and corner vertex features. |
+| `Cylinder` | Primitive | Yes | `cutcsg.py` | Extrusion with circular cross-section defined by axis, radius, and optional infinite ends. Lateral surface is a curved face (`CURVED_FACE`); end caps are planar. Also declares an internal axis feature (`LINE`, non-real). |
+| `ConvexPolygonExtrusion` | Primitive | No | `cutcsg.py` | Extrusion of a 2D convex polygon along local Z with optional infinite ends. All side faces and end caps are planar. |
+| `ConvexPolygonSimpleLoft` | Primitive | No | `cutcsg.py` | Straight-line loft between two 2D convex polygons in parallel planes. Requires planar non-twisted side faces (`_sides_are_planar`) and finite length; no curved surfaces. |
+| `PathExtrusion` | Primitive | Yes (if path has `ArcSegment`s) | `pathcsg.py` | Extrusion of a closed 2D `FancyPath` along local Z. Supports non-convex profiles; straight segments yield planar faces (`FlatSide`), while arc segments yield curved lateral surfaces (`CurvedSide`, `CURVED_FACE`). |
+| `SolidUnion` | Composite | Dependent on children | `cutcsg.py` | Boolean union combining multiple child nodes. Point is in union if inside any child; cancels internal boundary faces where children meet. |
+| `Intersection` | Composite | Dependent on children | `cutcsg.py` | Boolean intersection of two child nodes (`left` and `right`). Point is inside if contained in both children. |
+| `Difference` | Composite | Dependent on children | `cutcsg.py` | Boolean difference subtracting a list of `subtract` child nodes from a `base` node (`base - subtract[0] - subtract[1] ...`). Outward normals along cut cavities are inverted. | 
 
 ## The CSG Feature System
 
@@ -68,9 +79,24 @@ Note that the feature derivation system currently does NOT support the following
 - derived features produced from derived features
 
 
+## Interacting with the CSG System 
+
+### selecting features (technically a kigumi thing)
+
+
+#### feature priority
+
+TODO fetaure hit priority system here
+
+
 ## Limitations
 
-TODO document limitations of the system right now, e.g. limited support for curved surfaces, edge geomeetry information etc, an edge cut in half by a difference does not become 2 edges.
+The CSG system has the following limitations
+
+- boundary point comuptations may break in certain cases, in particular if we have `Difference` B C being removed from A, and B and C share a point on faces with opposite normals, and that point is contained in A, that point will be reported as on the boundary of the final difference when it should not be. (this should be fixable)
+- an edge cut in half by a another CSG is still reported as a single edge feature spanning the gap. e.g. ---☐--- It is still able to compute its segments for rendering the edge though.
+- curved surfaces do not form derived features
+- edge edge intersections to not form derived features
 
 # The Measurement/Drawing System 
 

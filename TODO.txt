@@ -1,34 +1,15 @@
 
 :: 9/19/2026 kumiki next setps
 
-0. understand and cleanup csg code
+0. understand and cleanup csg code (done)
 
+1. add ability for named/default features on a csg node to "depend" on each other, so basically on rectangular prism a face is entirely solved by its 4 edges, an edge is entirely solved by its 2 constituent points, we should be able to express this somehow
 
-
-1. figure out feature "solving" story
-
-- prism
-  - faces defined by a plane, and then bound by 4 edges
-    - plane is defined by point and normal 
-    - edges defined by intersecting planes or lines
-    - face can be defined by 4 edges
-  - edges defined by a line, and then bound by 2 points
-    - line can be defined by a point and an orientation
-    - point can be defined by intersecting planes or points
-    - edge can be definde by 2 points
-  - points defined by position
-
-  - a prism can be solved by knowing all its faces as planes, knowing all its edges as lines, or knowning all its vertices
-    - so it's maybe better to define faces just as a point and orientation, lines as infinite lines, then given a set of planes, lines, vertices we can ask is this prism solved?
-  
-  - I think the general rule is that point fetaures are fundamental, and then they define edge features, and plane features. 
-    - solving plane/edge fetaures solved DOFs on vertex fetaures that define them.
-
-2. refactor features to support this. some stuff we maybe want
+2. refactor features to support this. some stuff we maybe want (done)
   - add points to default features
   - joints can name how specific features be solved (measured)
 
-3. finalize the derived feature priority rule
+3. finalize the derived feature priority rule (done)
   - non derivde features take precedence over derivde featuers
   - do derived features "belong" to highest or lowest element in the tree?
     - what if there's a tie? 
@@ -233,17 +214,20 @@ DONE-do code review
   DONE-drawing
   DONE-identity
 DONE-omg delete the useless docs or hmove them to a different folder
+DONE-add corner features
 
 -its kinda weird that named features overriding default ones can declare themselves to be different feature so we should prevent that...
--add corner features
--do the standalone app
+
+-do the standalone app 
 -do the drawing solver :O
 
 -do measuring features doc
-  -explain CSG fetaure system
+  DONE-explain CSG fetaure system
+  DONE-leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
+  -describe the measuring system
   -explain fetaure hit priority system
   -explain feture solving system
-  -leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
+  
 
 -do the assembly system doc (placeholder doc basically)
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
