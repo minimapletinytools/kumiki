@@ -2,7 +2,7 @@
 
 Design notes and plan for deciding which features of a cut timber must be solved, and for checking whether a set of measurements solves them. This is the basis for an automatic drawing generator: keep adding measurements until every required feature is fully determined.
 
-See `featuresystem.md` for the CSG feature system this builds on.
+See `featuresystem.md` for the CSG feature system this builds on, and `featuresolving-plan.md` for the implementation plan.
 
 # Goal
 
@@ -57,7 +57,7 @@ remaining(f) = rank([R; J_f]) - rank(R)
 
 f is solved when that is 0. The same formula over all required features at once gives the total the drawing generator must bring to 0. A greedy generator then picks, from candidate measurements, the one that lowers the total most, preferring conventional ones (from a reference face, perpendicular).
 
-**Cost.** A timber with a few joints has roughly 20–60 unknowns. Keeping R as an incrementally reduced basis makes each added measurement a small update, exact with sympy rationals to match kumiki.
+**Cost.** A timber with a few joints has roughly 20–60 unknowns. Keeping R as an incrementally reduced basis makes each added measurement a small update. kumiki is floats, so rank is taken with a relative tolerance.
 
 **Caveat.** Rank is a sufficient test: full rank guarantees the geometry is locally pinned down. In rare singular layouts (two collinear distances to one point) it can report a freedom that isn't really there. The worst case is one redundant dimension on the drawing.
 
@@ -128,7 +128,7 @@ Detection is done with our own code, not manifold3d. cutcsg is not fragile at wh
 
 **What exists.**
 
-- **Point queries** (`contains_point`, `is_point_on_boundary`) are exact under sympy, apart from the one documented `Difference` limitation in `featuresystem.md`.
+- **Point queries** (`contains_point`, `is_point_on_boundary`) are reliable within their tolerances, apart from the one documented `Difference` limitation in `featuresystem.md`.
 - **Lines are done exactly.** `crop_line_to_segments_on_csg` walks the whole tree with intervals (which union, intersect and subtract exactly), and `crop_line_to_boundary_segments_on_csg` separates *on the surface* from *inside the material*. That already answers "which stretches of this edge survive on the finished piece".
 - **Planes are approximate.** `approximately_crop_plane_to_area_on_csg` only intersects the solids that enclose the face and counts anything subtracted as still present. Subtracting in a plane needs polygon booleans, and the result can have holes.
 
@@ -136,7 +136,7 @@ Detection is done with our own code, not manifold3d. cutcsg is not fragile at wh
 
 **Proposed: exact face regions by convex clipping.** Every kumiki primitive is convex (a `PathExtrusion` decomposes into convex pieces with `decompose_path_into_convex_pieces`). So:
 
-1. Represent a region in a face's plane as a list of convex polygons, exact in rationals.
+1. Represent a region in a face's plane as a list of convex polygons, in floats with a sliver filter.
 2. Intersecting with a convex primitive is half-plane clipping of each piece. Subtracting one convex polygon from another yields at most as many convex pieces as it has sides, so holes never need a special representation.
 3. Walk the tree the way the line crop does, keeping *on the surface* and *inside* apart, so a face buried in material, one in the air, and one flush with another surface each classify correctly.
 4. A face is required when its on-surface region meets its relative interior (simple rule), or has nonzero area (exact rule; the clipped pieces make this a cheap check, so the exact rule may come for free). Edges keep using the existing exact line crop.
