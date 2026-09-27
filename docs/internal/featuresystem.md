@@ -25,7 +25,6 @@ Again, whether either of the timber's ends are extended to infinity depend if an
 
 `triangles.py` contains logic to convert CSGs into meshes. The raw geometry is passed as a blob and rendered kigumi or written to stl `blueprint.py`. `blueprint.py` also contains logic to directly render the CSG into a step file.
 
-
 # The CSG System
 
 The CSG system declares is hierarchical, with various primitives as its leaf nodes and a handful of compositing nodes. Which nodes and their features/limitations are documented in a table below
@@ -67,6 +66,19 @@ An instance adds to these in two separate ways:
 
 Both are checked when the primitive is constructed. Overriding a key the primitive doesn't have, overriding a key twice, a keyed extra, or two features with the same name raise `ValueError`. `PathExtrusion` has no defaults yet, so its named sides are extras.
 
+Features themselves are bounded geometric primitives
+
+```
+class CSGFeatureType(Enum):
+    FACE = 1
+    EDGE = 2
+    POINT = 3
+    CURVED_FACE = 4
+```
+
+and represented in the `CSGFeature` class. However the `CSGFeature` may not have all the required information to know the feature geometry so many of its methods require passing in the owning CSG object.
+
+Declared features on a CSG can be queried at a point using `collect_feature_hits` and `find_all_features` will also return derived features (see below)
 
 ### derived features
 

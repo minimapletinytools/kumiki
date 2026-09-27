@@ -216,6 +216,8 @@ DONE-do code review
 DONE-omg delete the useless docs or hmove them to a different folder
 DONE-add corner features
 
+
+-if your' egonna do canonical face reordering on SimpleRectangularPrismFeature just use a ctor or assert, don't store it tiwce..
 -its kinda weird that named features overriding default ones can declare themselves to be different feature so we should prevent that...
 
 -do the standalone app 

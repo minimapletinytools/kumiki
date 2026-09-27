@@ -1889,6 +1889,7 @@ class HasFeatures:
         if repeated:
             raise ValueError(f"{shape} names more than one feature {', '.join(map(repr, repeated))}")
 
+    # TODO rename to get_self_declared_features or something
     def get_declared_features(
         self, source: 'FeatureSource' = FeatureSource.BOTH,
     ) -> List['CSGFeature']:
@@ -1974,6 +1975,7 @@ class CutCSG(ABC):
         """
         return re.sub(r"(?<!^)(?=[A-Z])", " ", cls.__name__).lower()
 
+    # TODO rename to get_self_declared_features or something    
     def get_declared_features(
         self, source: 'FeatureSource' = FeatureSource.BOTH,
     ) -> List[CSGFeature]:
@@ -1986,6 +1988,8 @@ class CutCSG(ABC):
         """
         return []
 
+    # does not include derived features
+    # TODO rename this to be more descriptive
     def collect_feature_hits(
         self,
         point: V3,
@@ -2013,6 +2017,8 @@ class CutCSG(ABC):
             hits.extend(child.collect_feature_hits(point, tolerances))
         return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
 
+    # so basically collect_feature_hits + derived features
+    # TODO rename this to be more descriptive
     def find_all_features(
         self,
         point: V3,
