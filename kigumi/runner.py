@@ -4760,12 +4760,14 @@ def _feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
     hits = csg.find_all_features(point, FeatureTestTolerances(face=eps))
     if not hits:
         return None
+    # By name: authored features are rebuilt on each call, and names are unique
+    # within a primitive.
     authored = {
-        id(feature)
+        feature.name
         for feature in csg.get_declared_features(FeatureSource.OVERRIDES)
     }
     for hit in hits:
-        if id(hit.feature) in authored:
+        if not hit.feature.is_derived() and hit.feature.name in authored:
             return hit.feature
     return hits[0].feature
 

@@ -3280,12 +3280,12 @@ class TestDefaultOrderFollowsTimberFeature:
         assert TimberFeature.TOP_FACE.value < TimberFeature.BOTTOM_FACE.value
 
 
-class TestDeclaredFeaturesAreWorkedOutOnce:
-    """The answer is cached per shape, since a frozen shape cannot change it.
+class TestEachShapeHasItsOwnDeclaredFeatures:
+    """Only a prism's defaults are shared between shapes; they are the same for every prism.
 
-    Per SHAPE and not per class, which is the trap: ConvexPolygonExtrusion and
-    ConvexPolygonSimpleLoft read their own profiles to build their defaults, so
-    one cache shared between them would hand a triangle a hexagon's features.
+    ConvexPolygonExtrusion and ConvexPolygonSimpleLoft read their own profiles
+    to build their defaults, so a cache shared between them would hand a
+    triangle a hexagon's features.
     """
 
     def _extrusion(self, sides):
@@ -3317,7 +3317,7 @@ class TestDeclaredFeaturesAreWorkedOutOnce:
         assert (first, second) == (len(self._extrusion(3).get_declared_features()),
                                   len(self._extrusion(6).get_declared_features()))
 
-    def test_each_source_is_cached_apart_from_the_others(self):
+    def test_each_source_answers_for_itself(self):
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(10),
@@ -3333,7 +3333,7 @@ class TestDeclaredFeaturesAreWorkedOutOnce:
         assert len(both) == 26
         assert overrides == prism.get_declared_features(FeatureSource.OVERRIDES)
 
-    def test_what_a_caller_gets_back_cannot_reach_the_cache(self):
+    def test_what_a_caller_gets_back_cannot_reach_the_shared_defaults(self):
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(10))
@@ -3341,8 +3341,16 @@ class TestDeclaredFeaturesAreWorkedOutOnce:
         found = prism.get_declared_features()
         before = len(found)
         found.clear()
+        prism.default_features().clear()
 
         assert len(prism.get_declared_features()) == before
+
+    def test_every_prism_shares_one_set_of_default_features(self):
+        one, other = (RectangularPrism(size=Matrix([scalar(w), scalar(6)]), transform=Transform.identity(),
+                                       start_distance=scalar(0), end_distance=scalar(10))
+                      for w in (4, 8))
+
+        assert all(a is b for a, b in zip(one.default_features().values(), other.default_features().values()))
 
 
 class TestDeclaredFeatures:
@@ -3437,38 +3445,13 @@ class TestFeatureOverridesAndExtras:
         with pytest.raises(ValueError, match="'side.1'"):
             self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "side.1")])
 
-    def test_authored_features_are_the_same_objects_in_every_source(self):
-        """kigumi tells authored from default by identity."""
+    def test_authored_features_are_told_apart_by_name(self):
+        """They are rebuilt on each call, so identity says nothing; names are unique."""
         prism = self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "mine")])
-        authored = prism.get_declared_features(FeatureSource.OVERRIDES)
+        authored = {f.name for f in prism.get_declared_features(FeatureSource.OVERRIDES)}
 
-        assert any(feature is authored[0] for feature in prism.get_declared_features())
-
-    def test_a_shape_nobody_named_is_not_checked_until_asked(self):
-        """Building the defaults is the cost; an unnamed shape does not pay it."""
-        prism = self._prism()
-
-        assert prism._declared_cache == {}
-
-    @pytest.mark.parametrize("shape", [
-        lambda: HalfSpace(normal=create_v3(0, 0, 1), offset=scalar(0)),
-        lambda: RectangularPrism(size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
-                                 start_distance=scalar(0), end_distance=scalar(10)),
-        lambda: Cylinder(axis_direction=create_v3(0, 0, 1), radius=scalar(1),
-                         start_distance=scalar(0), end_distance=scalar(5)),
-        lambda: ConvexPolygonExtrusion(
-            points=[Matrix([scalar(0), scalar(0)]), Matrix([scalar(2), scalar(0)]), Matrix([scalar(0), scalar(2)])],
-            transform=Transform.identity(), start_distance=scalar(0), end_distance=scalar(3)),
-        lambda: ConvexPolygonExtrusion(
-            points=[Matrix([scalar(-1), scalar(-1)]), Matrix([scalar(1), scalar(-1)]),
-                    Matrix([scalar(1), scalar(1)]), Matrix([scalar(-1), scalar(1)])],
-            transform=Transform.identity(), start_distance=scalar(0), end_distance=scalar(3)),
-    ])
-    def test_the_cached_default_names_are_the_defaults_own(self, shape):
-        """The check reads names cached per kind of shape; they must be the real ones."""
-        built = shape()
-
-        assert built._default_names() == {key: feature.name for key, feature in built.default_features().items()}
+        assert authored == {"mine"}
+        assert [f.name for f in prism.get_declared_features()].count("mine") == 1
 
 
 class TestCSGFeatureType:
