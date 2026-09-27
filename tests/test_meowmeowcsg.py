@@ -5,6 +5,7 @@ This module contains tests for the CSG primitives and operations.
 """
 
 import math
+from dataclasses import replace
 
 import pytest
 from kumiki.rule import safe_dot_product, Orientation, Transform, create_v3, radians, scalar, Matrix, simplify, sqrt, cos, sin, pi, safe_zero_test, safe_equality_test, safe_compare, Comparison
@@ -58,6 +59,14 @@ from kumiki.cutcsg import (
     translate_csg,
     translate_profile,
     translate_profiles,
+    FeatureOverride,
+    prism_face_key,
+    prism_arris_key,
+    HALF_SPACE_PLANE,
+    CYLINDER_BARREL,
+    START_CAP,
+    END_CAP,
+    side_key,
 )
 from kumiki.rule import create_v2
 from tests.testing_shavings import assert_is_valid_rotation_matrix, create_standard_vertical_timber
@@ -2537,7 +2546,7 @@ class TestCSGFeatures:
     def test_halfspace_named_feature(self):
         """A HalfSpace with a declared feature hits it for boundary points."""
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(5),
-                       _features=[HalfSpaceFeature("shoulder")])
+                       feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder")])
         on_boundary = create_v3(scalar(0), scalar(0), scalar(5))
         off_boundary = create_v3(scalar(0), scalar(0), scalar(6))
 
@@ -2565,8 +2574,7 @@ class TestCSGFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[SimpleRectangularPrismFeature("my_right", face=PrismFace.RIGHT),
-                       SimpleRectangularPrismFeature("my_top", face=PrismFace.TOP)],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "my_right"), FeatureOverride(prism_face_key(PrismFace.TOP), "my_top")],
         )
         # Point on right face (x = +2, within height and length bounds)
         right_pt = create_v3(scalar(2), scalar(0), scalar(5))
@@ -2631,13 +2639,13 @@ class TestCSGFeatures:
     def test_solid_union_collects_child_features(self):
         """SolidUnion collects features from children that have named features."""
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0),
-                       _features=[HalfSpaceFeature("floor")])
+                       feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "floor")])
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(4)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[SimpleRectangularPrismFeature("wall", face=PrismFace.RIGHT)],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "wall")],
         )
         union = SolidUnion(children=[hs, prism])
 
@@ -2654,12 +2662,12 @@ class TestCSGFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(20),
-            _features=[SimpleRectangularPrismFeature("base_top", face=PrismFace.TOP)],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.TOP), "base_top")],
         )
         cut = HalfSpace(
             normal=Matrix([scalar(0), scalar(0), scalar(-1)]),
             offset=scalar(-15),
-            _features=[HalfSpaceFeature("cut_plane")],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "cut_plane")],
         )
         diff = Difference(base=base, subtract=[cut])
 
@@ -2813,7 +2821,7 @@ class TestPointQueryTolerance:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[SimpleRectangularPrismFeature("my_right", face=PrismFace.RIGHT)],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "my_right")],
         )
 
     def test_default_tolerance_rejects_a_near_miss(self):
@@ -2926,12 +2934,7 @@ class TestFeatureProperties:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature(
-                    "body_right", face=PrismFace.RIGHT,
-                    properties=FeatureProperties(group=FeatureGroup.B1, real=False, priority=7),
-                ),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "body_right", FeatureProperties(group=FeatureGroup.B1, real=False, priority=7))],
         )
         hit = prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert hit is not None
@@ -2948,12 +2951,12 @@ class TestFeatureProperties:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("loser", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(priority=5)),
-                SimpleRectangularPrismFeature("winner", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(priority=1)),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "loser",
+                                               FeatureProperties(priority=5))],
+            extra_features=[ProgrammableCSGFeature(
+                "winner", properties=FeatureProperties(priority=1),
+                predicate=lambda owner, point, eps: safe_equality_test(
+                    owner._local_coords(point)[0], owner.size[0] / 2, eps=eps))],
         )
         feature = prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert feature is not None and feature.name == "winner"
@@ -2973,19 +2976,13 @@ class TestCylinderFeatures:
         )
 
     def test_barrel_resolves(self):
-        bore = self._bore(_features=[
-            SimpleCylinderFeature("peg_hole_wall", part=CylinderPart.BARREL),
-        ])
+        bore = self._bore(feature_overrides=[FeatureOverride(CYLINDER_BARREL, "peg_hole_wall")])
         on_wall = create_v3(scalar(2), scalar(0), scalar(5))
         feature = bore.find_first_feature(on_wall)
         assert feature is not None and feature.name == "peg_hole_wall"
 
     def test_end_caps_resolve_separately_from_the_barrel(self):
-        bore = self._bore(_features=[
-            SimpleCylinderFeature("wall", part=CylinderPart.BARREL),
-            SimpleCylinderFeature("bore_bottom", part=CylinderPart.BOTTOM),
-            SimpleCylinderFeature("bore_top", part=CylinderPart.TOP),
-        ])
+        bore = self._bore(feature_overrides=[FeatureOverride(CYLINDER_BARREL, "wall"), FeatureOverride(START_CAP, "bore_bottom"), FeatureOverride(END_CAP, "bore_top")])
         assert bore.find_first_feature(create_v3(scalar(0), scalar(0), scalar(0))).name == "bore_bottom"
         assert bore.find_first_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "bore_top"
         assert bore.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "wall"
@@ -2997,7 +2994,7 @@ class TestCylinderFeatures:
         assert names == {"side.0"}
 
     def test_a_cap_is_not_claimed_by_the_barrel_name(self):
-        bore = self._bore(_features=[SimpleCylinderFeature("wall", part=CylinderPart.BARREL)])
+        bore = self._bore(feature_overrides=[FeatureOverride(CYLINDER_BARREL, "wall")])
 
         # The authored name is the barrel's and stays there. The cap answers
         # with the cylinder's own default rather than borrowing it.
@@ -3025,16 +3022,13 @@ class TestLoftFeatures:
         )
 
     def test_end_caps_resolve(self):
-        loft = self._taper(_features=[
-            SimpleLoftFeature("wide_end", key=ExtrusionCap.BOTTOM),
-            SimpleLoftFeature("narrow_end", key=ExtrusionCap.TOP),
-        ])
+        loft = self._taper(feature_overrides=[FeatureOverride(START_CAP, "wide_end"), FeatureOverride(END_CAP, "narrow_end")])
         assert loft.find_first_feature(create_v3(scalar(0), scalar(0), scalar(0))).name == "wide_end"
         assert loft.find_first_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "narrow_end"
 
     def test_a_tapered_side_resolves_at_its_own_height(self):
         """Sides are ruled surfaces, so the test tracks the cross-section."""
-        loft = self._taper(_features=[SimpleLoftFeature("front_face", key=0)])
+        loft = self._taper(feature_overrides=[FeatureOverride(side_key(0), "front_face")])
         # Side 0 runs from (-2,-2) to (2,-2) at the bottom, narrowing to y=-1
         # at the top. Halfway up, that edge sits at y = -1.5.
         midway = create_v3(scalar(0), scalar(-3, 2), scalar(5))
@@ -3056,13 +3050,14 @@ class TestProgrammableCSGFeature:
     without adding a class or touching the owner's query path.
     """
 
-    def _prism(self, *features):
+    def _prism(self, *extras, overrides=()):
         return RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=list(features),
+            feature_overrides=list(overrides),
+            extra_features=list(extras),
         )
 
     def test_predicate_decides_membership(self):
@@ -3148,12 +3143,12 @@ class TestProgrammableCSGFeature:
 
     def test_it_coexists_with_simple_features_and_respects_priority(self):
         prism = self._prism(
-            SimpleRectangularPrismFeature("plain_right", face=PrismFace.RIGHT,
-                                          properties=FeatureProperties(priority=5)),
             ProgrammableCSGFeature("computed_right",
                                    properties=FeatureProperties(priority=1),
                                    predicate=lambda owner, point, eps: safe_equality_test(
                                        owner._local_coords(point)[0], owner.size[0] / 2, eps=eps)),
+            overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "plain_right",
+                                       FeatureProperties(priority=5))],
         )
         hits = prism.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
         assert {h.name for h in hits} == {"plain_right", "computed_right"}
@@ -3326,7 +3321,7 @@ class TestDeclaredFeaturesAreWorkedOutOnce:
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(10),
-            _features=[SimpleRectangularPrismFeature("mine", face=PrismFace.TOP)])
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.TOP), "mine")])
 
         overrides = prism.get_declared_features(FeatureSource.OVERRIDES)
         defaults = prism.get_declared_features(FeatureSource.DEFAULTS)
@@ -3357,10 +3352,7 @@ class TestDeclaredFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("a", face=PrismFace.RIGHT),
-                SimpleRectangularPrismFeature("b", face=PrismFace.TOP),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "a"), FeatureOverride(prism_face_key(PrismFace.TOP), "b")],
         )
         # Authored first, then whatever default slots are still free. Asking
         # for one layer or the other is what FeatureSource is for.
@@ -3385,6 +3377,100 @@ class TestDeclaredFeatures:
         assert len(prism.get_declared_features()) == 26
 
 
+class TestFeatureOverridesAndExtras:
+    """An override renames a default; an extra adds geometry. Never the reverse."""
+
+    def _prism(self, overrides=(), extras=()):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10),
+            feature_overrides=list(overrides), extra_features=list(extras))
+
+    def _named(self, prism, name):
+        return next(f for f in prism.get_declared_features() if f.name == name)
+
+    def test_an_override_is_the_default_with_a_new_name_and_properties(self):
+        properties = FeatureProperties(group=FeatureGroup.A, real=False, priority=3)
+        prism = self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "joint", properties)])
+        default = prism.default_features()[prism_face_key(PrismFace.RIGHT)]
+        joint = self._named(prism, "joint")
+
+        assert joint.properties == properties
+        assert replace(joint, name=default.name, properties=default.properties) == default
+
+    def test_what_an_override_leaves_out_it_keeps(self):
+        prism = self._prism([
+            FeatureOverride(prism_face_key(PrismFace.RIGHT), "renamed"),
+            FeatureOverride(prism_face_key(PrismFace.TOP), properties=FeatureProperties(priority=2)),
+        ])
+        default_properties = prism.default_features()[prism_face_key(PrismFace.RIGHT)].properties
+
+        assert self._named(prism, "renamed").properties == default_properties
+        assert self._named(prism, "cap.1").properties == FeatureProperties(priority=2)
+
+    def test_an_override_of_a_slot_the_shape_lacks_fails_where_it_is_written(self):
+        with pytest.raises(ValueError, match="no default feature corner.9"):
+            self._prism([FeatureOverride((FeatureCategory.CORNER, 9), "nowhere")])
+
+    def test_a_slot_overridden_twice_is_refused(self):
+        with pytest.raises(ValueError, match="twice"):
+            self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "one"),
+                         FeatureOverride(prism_face_key(PrismFace.RIGHT), "two")])
+
+    def test_an_extra_that_names_a_default_slot_is_refused(self):
+        with pytest.raises(ValueError, match="FeatureOverride"):
+            self._prism(extras=[SimpleRectangularPrismFeature("right", face=PrismFace.RIGHT)])
+
+    def test_an_extra_sits_beside_the_defaults(self):
+        axis = ProgrammableCSGFeature("axis", declared_type=CSGFeatureType.EDGE)
+        prism = self._prism(extras=[axis])
+
+        assert prism.get_declared_features(FeatureSource.OVERRIDES) == [axis]
+        assert len(prism.get_declared_features()) == 27
+
+    def test_two_features_with_one_name_are_refused(self):
+        with pytest.raises(ValueError, match="'twin'"):
+            self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "twin")],
+                        [ProgrammableCSGFeature("twin")])
+
+    def test_nor_may_an_override_take_a_default_name_still_in_use(self):
+        with pytest.raises(ValueError, match="'side.1'"):
+            self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "side.1")])
+
+    def test_authored_features_are_the_same_objects_in_every_source(self):
+        """kigumi tells authored from default by identity."""
+        prism = self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "mine")])
+        authored = prism.get_declared_features(FeatureSource.OVERRIDES)
+
+        assert any(feature is authored[0] for feature in prism.get_declared_features())
+
+    def test_a_shape_nobody_named_is_not_checked_until_asked(self):
+        """Building the defaults is the cost; an unnamed shape does not pay it."""
+        prism = self._prism()
+
+        assert prism._declared_cache == {}
+
+    @pytest.mark.parametrize("shape", [
+        lambda: HalfSpace(normal=create_v3(0, 0, 1), offset=scalar(0)),
+        lambda: RectangularPrism(size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
+                                 start_distance=scalar(0), end_distance=scalar(10)),
+        lambda: Cylinder(axis_direction=create_v3(0, 0, 1), radius=scalar(1),
+                         start_distance=scalar(0), end_distance=scalar(5)),
+        lambda: ConvexPolygonExtrusion(
+            points=[Matrix([scalar(0), scalar(0)]), Matrix([scalar(2), scalar(0)]), Matrix([scalar(0), scalar(2)])],
+            transform=Transform.identity(), start_distance=scalar(0), end_distance=scalar(3)),
+        lambda: ConvexPolygonExtrusion(
+            points=[Matrix([scalar(-1), scalar(-1)]), Matrix([scalar(1), scalar(-1)]),
+                    Matrix([scalar(1), scalar(1)]), Matrix([scalar(-1), scalar(1)])],
+            transform=Transform.identity(), start_distance=scalar(0), end_distance=scalar(3)),
+    ])
+    def test_the_cached_default_names_are_the_defaults_own(self, shape):
+        """The check reads names cached per kind of shape; they must be the real ones."""
+        built = shape()
+
+        assert built._default_names() == {key: feature.name for key, feature in built.default_features().items()}
+
+
 class TestCSGFeatureType:
     """Every feature says what kind of geometry it names.
 
@@ -3392,13 +3478,13 @@ class TestCSGFeatureType:
     so this has to be right before step 8 can key off it.
     """
 
-    def _prism(self, *features):
+    def _prism(self, *extras):
         return RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=list(features),
+            extra_features=list(extras),
         )
 
     def test_the_simple_classes_are_faces_by_construction(self):
@@ -3474,7 +3560,7 @@ class TestFeatureLocate:
 
     def test_a_prism_face_locates_as_an_outward_plane(self):
         face = SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT)
-        prism = self._prism(_features=[face])
+        prism = self._prism()
         plane = face.locate_simple_unbounded(prism)
         assert isinstance(plane, Plane)
         # +X outward, anchored at the centre of that face
@@ -3642,7 +3728,7 @@ class TestNonRealFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT)],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right")],
         )
         bore = Cylinder(
             axis_direction=create_v3(scalar(1), scalar(0), scalar(0)),
@@ -3650,7 +3736,7 @@ class TestNonRealFeatures:
             position=create_v3(scalar(0), scalar(0), scalar(5)),
             start_distance=scalar(-5),
             end_distance=scalar(5),
-            _features=[axis_feature],
+            extra_features=[axis_feature],
         )
         return Difference(base=body, subtract=[bore])
 
@@ -3685,13 +3771,11 @@ class TestNonRealFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("the_face", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(priority=0)),
-                ProgrammableCSGFeature("the_axis",
-                                       properties=FeatureProperties(real=False, priority=99),
-                                       predicate=lambda owner, point, eps: True),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "the_face",
+                                               FeatureProperties(priority=0))],
+            extra_features=[ProgrammableCSGFeature("the_axis",
+                                                   properties=FeatureProperties(real=False, priority=99),
+                                                   predicate=lambda owner, point, eps: True)],
         )
         on_face = create_v3(scalar(2), scalar(0), scalar(5))
         assert {h.name for h in prism.find_all_features(on_face)} == {"the_face", "the_axis"}
@@ -3706,15 +3790,13 @@ class TestNonRealFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                ProgrammableCSGFeature(
+            extra_features=[ProgrammableCSGFeature(
                     "centre_line",
                     declared_type=CSGFeatureType.EDGE,
                     properties=FeatureProperties(real=False),
                     predicate=lambda owner, point, eps: safe_zero_test_sq(
                         float(point[0]) ** 2 + float(point[1]) ** 2, eps),
-                ),
-            ],
+                )],
         )
         near_axis = create_v3(scalar(1, 100), scalar(0), scalar(5))
         assert prism.find_first_feature(near_axis, FeatureTestTolerances(edge=scalar(1, 1000))) is None
@@ -3724,8 +3806,8 @@ class TestNonRealFeatures:
 class TestCompoundNodesOwnNoFeatures:
     """A SolidUnion, Difference or Intersection has no surface of its own.
 
-    It only combines what its children name, so it has no `_features` field to
-    declare one in -- which makes the mistake a construction error rather than
+    It only combines what its children name, so it has no feature_overrides or
+    extra_features field to declare one in -- which makes the mistake a construction error rather than
     something that half works until a query happens to land on it.
     """
 
@@ -3741,17 +3823,17 @@ class TestCompoundNodesOwnNoFeatures:
         return ProgrammableCSGFeature("rogue", predicate=lambda owner, point, eps: True)
 
     def test_a_union_cannot_be_given_features(self):
-        with pytest.raises(TypeError, match="_features"):
-            SolidUnion(children=[self._prism()], _features=[self._rogue_feature()])  # type: ignore[call-arg]
+        with pytest.raises(TypeError, match="extra_features"):
+            SolidUnion(children=[self._prism()], extra_features=[self._rogue_feature()])  # type: ignore[call-arg]
 
     def test_a_difference_cannot_be_given_features(self):
-        with pytest.raises(TypeError, match="_features"):
-            Difference(base=self._prism(), subtract=[], _features=[self._rogue_feature()])  # type: ignore[call-arg]
+        with pytest.raises(TypeError, match="extra_features"):
+            Difference(base=self._prism(), subtract=[], extra_features=[self._rogue_feature()])  # type: ignore[call-arg]
 
     def test_an_intersection_cannot_be_given_features(self):
-        with pytest.raises(TypeError, match="_features"):
+        with pytest.raises(TypeError, match="feature_overrides"):
             Intersection(left=self._prism(), right=self._prism(),
-                         _features=[self._rogue_feature()])  # type: ignore[call-arg]
+                         feature_overrides=[FeatureOverride(START_CAP, "rogue")])  # type: ignore[call-arg]
 
     def test_compound_nodes_declare_nothing(self):
         prism = self._prism()
@@ -3766,7 +3848,7 @@ class TestCompoundNodesOwnNoFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[SimpleRectangularPrismFeature("wall", face=PrismFace.RIGHT)],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "wall")],
         )
         union = SolidUnion(children=[named])
         hits = union.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
@@ -3796,7 +3878,7 @@ class TestDegeneracyGuardsIgnoreQueryTolerance:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(1, 10),
-            _features=[SimpleConvexPolygonExtrusionFeature("east", key=1)],
+            feature_overrides=[FeatureOverride(side_key(1), "east")],
         )
 
     def test_a_small_face_still_resolves_at_the_default_tolerance(self):
@@ -3852,7 +3934,7 @@ class TestFeatureTestTolerancesScaling:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[SimpleRectangularPrismFeature("right", face=PrismFace.RIGHT)],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "right")],
         )
         tight = FeatureTestTolerances.uniform(scalar(1, 100000))
         near_miss = create_v3(scalar(2) + 1e-4, scalar(0), scalar(5))
@@ -4055,18 +4137,17 @@ class TestNamingTheSameGeometry:
 class TestDerivedEdges:
     """Edges are derived from face pairs the group rules allow to meet."""
 
-    def _prism(self, *features):
+    def _prism(self, *overrides):
         return RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=list(features),
+            feature_overrides=list(overrides),
         )
 
     def _face(self, name, face, group=FeatureGroup.B2):
-        return SimpleRectangularPrismFeature(
-            name, face=face, properties=FeatureProperties(group=group))
+        return FeatureOverride(prism_face_key(face), name, FeatureProperties(group=group))
 
     def _owned(self, prism, name):
         feature = next(f for f in prism.get_declared_features() if f.name == name)
@@ -4120,8 +4201,8 @@ class TestDerivedEdges:
     def test_an_edge_is_real_only_if_both_faces_are(self):
         prism = self._prism(
             self._face("right", PrismFace.RIGHT),
-            SimpleRectangularPrismFeature("front", face=PrismFace.FRONT,
-                                          properties=FeatureProperties(group=FeatureGroup.A, real=False)),
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "front",
+                            FeatureProperties(group=FeatureGroup.A, real=False)),
         )
         edge = DerivedEdgeFeature.derive(self._owned(prism, "right"), self._owned(prism, "front"))
         assert edge is not None and edge.real is False
@@ -4144,8 +4225,7 @@ class TestDerivedEdges:
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             radius=scalar(2), position=create_v3(scalar(0), scalar(0), scalar(0)),
             start_distance=scalar(0), end_distance=scalar(10),
-            _features=[SimpleCylinderFeature("wall", part=CylinderPart.BARREL,
-                                             properties=FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(CYLINDER_BARREL, "wall", FeatureProperties(group=FeatureGroup.A))],
         )
         prism = self._prism(self._face("right", PrismFace.RIGHT))
 
@@ -4161,8 +4241,7 @@ class TestDerivedEdges:
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             radius=scalar(2), position=create_v3(scalar(0), scalar(0), scalar(0)),
             start_distance=scalar(0), end_distance=scalar(10),
-            _features=[SimpleCylinderFeature("lid", part=CylinderPart.TOP,
-                                             properties=FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(END_CAP, "lid", FeatureProperties(group=FeatureGroup.A))],
         )
         prism = self._prism(self._face("right", PrismFace.RIGHT))
 
@@ -4202,15 +4281,11 @@ class TestDerivedEdgesInAQuery:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            _features=[HalfSpaceFeature(
-                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
         )
         return Difference(base=body, subtract=[shoulder])
 
@@ -4273,12 +4348,7 @@ class TestDerivedEdgesInAQuery:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
-                SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2)), FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.B2))],
         )
         best = prism.find_first_feature(create_v3(scalar(2), scalar(3), scalar(5)))
         assert best is not None
@@ -4300,10 +4370,7 @@ class TestDerivedEdgesInAQuery:
                 transform=Transform.identity(),
                 start_distance=scalar(0),
                 end_distance=scalar(10),
-                _features=[
-                    SimpleRectangularPrismFeature("tenon_side", face=PrismFace.RIGHT,
-                                                  properties=FeatureProperties(group=FeatureGroup.B2)),
-                ],
+                feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_side", FeatureProperties(group=FeatureGroup.B2))],
             )
         # A narrow prism each way, so their two "tenon_side" faces are the
         # planes x=1 and y=1, and one shoulder across both makes an edge in
@@ -4316,15 +4383,11 @@ class TestDerivedEdgesInAQuery:
                                     create_v3(0, 0, 1), create_v3(-1, 0, 0))),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("tenon_side", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_side", FeatureProperties(group=FeatureGroup.B2))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            _features=[HalfSpaceFeature(
-                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
         )
         csg = Difference(base=SolidUnion(children=[across, along]), subtract=[shoulder])
         names = [h.name for h in csg.find_all_features(create_v3(scalar(1), scalar(1), scalar(5)))]
@@ -4338,7 +4401,7 @@ class TestACylindersAxis:
         return Cylinder(
             axis_direction=create_v3(0, 0, 1), radius=scalar(1),
             position=create_v3(2, 3, 0), start_distance=start, end_distance=end,
-            _features=[CylinderAxisFeature(
+            extra_features=[CylinderAxisFeature(
                 "peg_hole_axis", properties=FeatureProperties(group=group))])
 
     def _axis(self, bore):
@@ -4353,7 +4416,7 @@ class TestACylindersAxis:
         bore = Cylinder(
             axis_direction=create_v3(0, 0, 1), radius=scalar(1),
             position=create_v3(2, 3, 0), start_distance=scalar(0), end_distance=scalar(10),
-            _features=[CylinderAxisFeature(
+            extra_features=[CylinderAxisFeature(
                 "peg_hole_axis", properties=FeatureProperties(real=True))])
         assert not self._axis(bore).real
 
@@ -4418,9 +4481,7 @@ class TestACylindersAxis:
         body = RectangularPrism(
             size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(20),
-            _features=[SimpleRectangularPrismFeature(
-                "cap", face=PrismFace.TOP,
-                properties=FeatureProperties(group=FeatureGroup.B1))])
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.TOP), "cap", FeatureProperties(group=FeatureGroup.B1))])
         # A blind bore, so the cap is still there where the axis crosses it --
         # which is the only arrangement where a pair could form at all.
         csg = Difference(base=body, subtract=[self._bore(end=scalar(10))])
@@ -4439,9 +4500,7 @@ class TestACylindersAxis:
         body = RectangularPrism(
             size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(20),
-            _features=[SimpleRectangularPrismFeature(
-                "cap", face=PrismFace.TOP,
-                properties=FeatureProperties(group=FeatureGroup.B1))])
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.TOP), "cap", FeatureProperties(group=FeatureGroup.B1))])
         csg = Difference(base=body,
                          subtract=[self._bore(group=FeatureGroup.A, end=scalar(10))])
         at_cap = create_v3(scalar(2), scalar(3), scalar(20))
@@ -4455,19 +4514,19 @@ class TestACylindersAxis:
 class TestDerivedPoints:
     """A point is derived where an edge crosses a face."""
 
-    def _body(self, *features):
+    def _body(self, *overrides):
         return RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=list(features),
+            feature_overrides=list(overrides),
         )
 
     def _arris(self, name="rough.front_right", group=FeatureGroup.B1):
-        body = self._body(SimpleRectangularPrismEdgeFeature(
-            name=name, faces=(PrismFace.FRONT, PrismFace.RIGHT),
-            properties=FeatureProperties(group=group)))
+        body = self._body(FeatureOverride(
+            prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT), name,
+            FeatureProperties(group=group)))
         feature = next(f for f in body.get_declared_features() if f.name == name)
         return OwnedFeatureHit(feature=feature, owner=body)
 
@@ -4486,7 +4545,7 @@ class TestDerivedPoints:
     def _plane(self, normal, offset, name="shoulder", group=FeatureGroup.A):
         space = HalfSpace(
             normal=normal, offset=offset,
-            _features=[HalfSpaceFeature(name, properties=FeatureProperties(group=group))])
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, name, FeatureProperties(group=group))])
         feature = next(f for f in space.get_declared_features() if f.name == name)
         return OwnedFeatureHit(feature=feature, owner=space)
 
@@ -4586,20 +4645,11 @@ class TestDerivedPointsInAQuery:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(group=FeatureGroup.B1)),
-                SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
-                                              properties=FeatureProperties(group=FeatureGroup.B1)),
-                SimpleRectangularPrismEdgeFeature(
-                    name="rough.front_right", faces=(PrismFace.FRONT, PrismFace.RIGHT),
-                    properties=FeatureProperties(group=FeatureGroup.B1)),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B1)), FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.B1)), FeatureOverride(prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT), "rough.front_right", FeatureProperties(group=FeatureGroup.B1))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            _features=[HalfSpaceFeature(
-                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
         )
         return Difference(base=body, subtract=[shoulder])
 
@@ -4641,13 +4691,14 @@ class TestDerivedPointsInAQuery:
 class TestThePreferredFeature:
     """Which of two features naming the same geometry is the one that answers."""
 
-    def _prism(self, *features):
+    def _prism(self, *overrides, extras=()):
         return RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=list(features),
+            feature_overrides=list(overrides),
+            extra_features=list(extras),
         )
 
     def test_a_declared_feature_beats_a_derived_one_naming_the_same_line(self):
@@ -4658,10 +4709,8 @@ class TestThePreferredFeature:
         arris as a second way to say the same thing.
         """
         prism = self._prism(
-            SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
-                                          properties=FeatureProperties(group=FeatureGroup.B2)),
-            SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
-                                          properties=FeatureProperties(group=FeatureGroup.B2)),
+            FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2)),
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.B2)),
         )
         hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
         edges = [h for h in hits if h.feature_type() == CSGFeatureType.EDGE]
@@ -4680,10 +4729,8 @@ class TestThePreferredFeature:
         what makes dropping duplicates work at all.
         """
         prism = self._prism(
-            SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
-                                          properties=FeatureProperties(group=FeatureGroup.B2)),
-            SimpleRectangularPrismFeature("rough.front", face=PrismFace.FRONT,
-                                          properties=FeatureProperties(group=FeatureGroup.B2)),
+            FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2)),
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.B2)),
         )
         hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
         arris = next(h for h in hits if h.feature_type() == CSGFeatureType.EDGE)
@@ -4698,12 +4745,8 @@ class TestThePreferredFeature:
         faces genuinely land on one plane under one name. Collapsing those
         would eat a real feature.
         """
-        first = self._prism(SimpleRectangularPrismFeature(
-            "rough.right", face=PrismFace.RIGHT,
-            properties=FeatureProperties(group=FeatureGroup.B1)))
-        second = self._prism(SimpleRectangularPrismFeature(
-            "rough.right", face=PrismFace.RIGHT,
-            properties=FeatureProperties(group=FeatureGroup.B1)))
+        first = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B1)))
+        second = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B1)))
         union = SolidUnion(children=[first, second])
 
         faces = [h for h in union.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
@@ -4713,10 +4756,12 @@ class TestThePreferredFeature:
     def test_a_better_group_sorts_first(self):
         """Group rank, by the enum's own index, with A ahead of B1."""
         prism = self._prism(
-            SimpleRectangularPrismFeature("joint_face", face=PrismFace.RIGHT,
-                                          properties=FeatureProperties(group=FeatureGroup.A)),
-            SimpleRectangularPrismFeature("body_face", face=PrismFace.RIGHT,
-                                          properties=FeatureProperties(group=FeatureGroup.B1)),
+            FeatureOverride(prism_face_key(PrismFace.RIGHT), "body_face",
+                            FeatureProperties(group=FeatureGroup.B1)),
+            extras=[ProgrammableCSGFeature(
+                "joint_face", properties=FeatureProperties(group=FeatureGroup.A),
+                predicate=lambda owner, point, eps: safe_equality_test(
+                    owner._local_coords(point)[0], owner.size[0] / 2, eps=eps))],
         )
         names = [h.name for h in prism.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))]
 
@@ -4739,13 +4784,10 @@ class TestThePreferredFeature:
 
     def test_two_derived_features_on_different_geometry_both_stand(self):
         """Dropping goes by geometry, so different lines are different features."""
-        body = self._prism(SimpleRectangularPrismFeature(
-            "rough.right", face=PrismFace.RIGHT,
-            properties=FeatureProperties(group=FeatureGroup.B2)))
+        body = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2)))
         near = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            _features=[HalfSpaceFeature("shoulder",
-                                        properties=FeatureProperties(group=FeatureGroup.A))])
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))])
         csg = Difference(base=body, subtract=[near])
         on_edge = create_v3(scalar(2), scalar(0), scalar(5))
         edges = [h for h in csg.find_all_features(on_edge)
@@ -4775,15 +4817,11 @@ class TestGatherRefineIsolation:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            _features=[HalfSpaceFeature(
-                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
         )
         return Difference(base=body, subtract=[shoulder])
 
@@ -4840,12 +4878,7 @@ class TestBuriedFacesAreNotReported:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[
-                SimpleRectangularPrismFeature("small.right", face=PrismFace.RIGHT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
-                SimpleRectangularPrismFeature("small.front", face=PrismFace.FRONT,
-                                              properties=FeatureProperties(group=FeatureGroup.B2)),
-            ],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "small.right", FeatureProperties(group=FeatureGroup.B2)), FeatureOverride(prism_face_key(PrismFace.FRONT), "small.front", FeatureProperties(group=FeatureGroup.B2))],
         )
 
     def _swallowing(self):
@@ -4970,12 +5003,11 @@ class TestAbuttingSolidsDoNotReportTheFaceTheyShare:
     """The same trap, through the two nodes that used to fall into it."""
 
     def _post(self, z0, z1, name=None):
-        features = [SimpleRectangularPrismFeature(
-            name, face=PrismFace.TOP,
-            properties=FeatureProperties(group=FeatureGroup.B1))] if name else []
+        overrides = [FeatureOverride(prism_face_key(PrismFace.TOP), name,
+                                     FeatureProperties(group=FeatureGroup.B1))] if name else []
         return RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
-            start_distance=scalar(z0), end_distance=scalar(z1), _features=features)
+            start_distance=scalar(z0), end_distance=scalar(z1), feature_overrides=overrides)
 
     def _mortise(self, z0, z1):
         return RectangularPrism(
@@ -5280,17 +5312,16 @@ def _all_nodes(root):
 class TestAFeatureThatFormsNoEdges:
     """FeatureGroup.NONE: named and selectable, and never an arris."""
 
-    def _prism(self, *features):
+    def _prism(self, *overrides):
         return RectangularPrism(
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(10),
-            _features=list(features),
+            feature_overrides=list(overrides),
         )
 
     def _face(self, name, face, group):
-        return SimpleRectangularPrismFeature(
-            name, face=face, properties=FeatureProperties(group=group))
+        return FeatureOverride(prism_face_key(face), name, FeatureProperties(group=group))
 
     def test_it_meets_nothing(self):
         for other in FeatureGroup:
@@ -5328,10 +5359,10 @@ class TestAFeatureThatFormsNoEdges:
 class TestANamedArris:
     """An edge a prism simply has, declared rather than derived."""
 
-    def _prism(self, *features):
+    def _prism(self, *overrides):
         return RectangularPrism(
             size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
-            start_distance=scalar(0), end_distance=scalar(10), _features=list(features))
+            start_distance=scalar(0), end_distance=scalar(10), feature_overrides=list(overrides))
 
     def _arris(self, name="arris.front_right",
                faces=(PrismFace.FRONT, PrismFace.RIGHT)):
@@ -5346,7 +5377,7 @@ class TestANamedArris:
         # merely pickable.
         arris = self._arris()
 
-        line = arris.locate_simple_unbounded(self._prism(arris))
+        line = arris.locate_simple_unbounded(self._prism())
 
         assert isinstance(line, Line)
         assert [round(float(line.point[i, 0]), 6) for i in range(3)] == [2.0, 3.0, 0.0]
@@ -5358,11 +5389,11 @@ class TestANamedArris:
         with pytest.warns(UserWarning, match="meet in no arris"):
             opposite = self._arris("nope", faces=(PrismFace.FRONT, PrismFace.BACK))
 
-        assert opposite.locate_simple_unbounded(self._prism(opposite)) is None
+        assert opposite.locate_simple_unbounded(self._prism()) is None
 
     def test_a_point_is_on_it_only_when_it_is_on_both_faces(self):
         arris = self._arris()
-        prism = self._prism(arris)
+        prism = self._prism()
 
         assert arris.test_point_unbounded(prism, create_v3(scalar(2), scalar(3), scalar(5)))
         # On the right face, not on the front one.
@@ -5371,13 +5402,13 @@ class TestANamedArris:
     def test_it_has_an_extent_to_hang_an_annotation_from(self):
         arris = self._arris()
 
-        assert arris.get_extent(self._prism(arris)) is not None
+        assert arris.get_extent(self._prism()) is not None
 
     def test_it_is_found_by_a_point_query_like_any_other_feature(self):
         # The difference from a derived edge: it is simply there, and does not
         # have to be reconstructed from two face hits.
         arris = self._arris()
-        prism = self._prism(arris)
+        prism = self._prism(FeatureOverride(prism_arris_key(*arris.faces), arris.name))
 
         hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
 
@@ -5387,10 +5418,10 @@ class TestANamedArris:
 class TestANamedCorner:
     """A prism's vertex: the most specific thing there is to point at."""
 
-    def _prism(self, *features):
+    def _prism(self, *overrides):
         return RectangularPrism(
             size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
-            start_distance=scalar(0), end_distance=scalar(10), _features=list(features))
+            start_distance=scalar(0), end_distance=scalar(10), feature_overrides=list(overrides))
 
     def _corner(self, name="corner", faces=(PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT)):
         return SimpleRectangularPrismVertexFeature(name, faces=faces)
@@ -5401,7 +5432,7 @@ class TestANamedCorner:
     def test_it_locates_to_where_its_three_faces_meet(self):
         corner = self._corner()
 
-        located = corner.locate_simple_unbounded(self._prism(corner))
+        located = corner.locate_simple_unbounded(self._prism())
 
         assert isinstance(located, Point)
         assert points_are_coincident(
@@ -5409,7 +5440,7 @@ class TestANamedCorner:
 
     def test_a_point_is_on_it_only_at_that_corner(self):
         corner = self._corner()
-        prism = self._prism(corner)
+        prism = self._prism()
 
         assert corner.test_point_unbounded(prism, create_v3(scalar(2), scalar(3), scalar(0)))
         # Along an arris leading to it, but not at it.
@@ -5418,7 +5449,7 @@ class TestANamedCorner:
     def test_its_extent_is_the_point_itself(self):
         corner = self._corner()
 
-        extent = corner.get_extent(self._prism(corner))
+        extent = corner.get_extent(self._prism())
 
         assert extent is not None and extent.ends is None
         assert points_are_coincident(
@@ -5484,7 +5515,7 @@ class TestACornerIsNamedTheSameWayWhoeverNamesIt:
         tags = _corner_tags("ptw.")
 
         assert len(tags) == 8
-        assert {tag.feature_key() for tag in tags} == {
+        assert {tag.key for tag in tags} == {
             key for key, _ in ((c.feature_key(), c) for c in self._prism_corners())}
 
 
@@ -5609,14 +5640,11 @@ class TestADerivedFeatureIsOwnedByWhatMadeIt:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            _features=[SimpleRectangularPrismFeature(
-                "rough.right", face=PrismFace.RIGHT,
-                properties=FeatureProperties(group=FeatureGroup.B2))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            _features=[HalfSpaceFeature(
-                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
         )
         return Difference(base=body, subtract=[shoulder])
 

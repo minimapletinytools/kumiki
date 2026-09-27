@@ -26,8 +26,9 @@ from kumiki.cutcsg import (
     PrismFace,
     Cylinder,
     CylinderAxisFeature,
-    HalfSpaceFeature,
-    SimpleRectangularPrismFeature,
+    FeatureOverride,
+    HALF_SPACE_PLANE,
+    prism_face_key,
 )
 from kumiki.measuring import (
     locate_top_center_position,
@@ -233,12 +234,12 @@ def cut_mortise_and_tenon_joint(
             transform=marking_space.transform,
             start_distance=-back_extension,
             end_distance=tenon_length,
-            _features=[
-                SimpleRectangularPrismFeature("tenon_right", face=PrismFace.RIGHT, properties=_TENON_FACE),
-                SimpleRectangularPrismFeature("tenon_left", face=PrismFace.LEFT, properties=_TENON_FACE),
-                SimpleRectangularPrismFeature("tenon_front", face=PrismFace.FRONT, properties=_TENON_FACE),
-                SimpleRectangularPrismFeature("tenon_back", face=PrismFace.BACK, properties=_TENON_FACE),
-                SimpleRectangularPrismFeature(tenon_tip_name, face=PrismFace.TOP, properties=_TENON_FACE),
+            feature_overrides=[
+                FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_right", _TENON_FACE),
+                FeatureOverride(prism_face_key(PrismFace.LEFT), "tenon_left", _TENON_FACE),
+                FeatureOverride(prism_face_key(PrismFace.FRONT), "tenon_front", _TENON_FACE),
+                FeatureOverride(prism_face_key(PrismFace.BACK), "tenon_back", _TENON_FACE),
+                FeatureOverride(prism_face_key(PrismFace.TOP), tenon_tip_name, _TENON_FACE),
             ],
             label=CutCSGLabel("tenon"),
         )
@@ -276,7 +277,7 @@ def cut_mortise_and_tenon_joint(
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
-        _features=[HalfSpaceFeature("shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+        feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
         label=CutCSGLabel("shoulder"),
     )
 
@@ -329,12 +330,12 @@ def cut_mortise_and_tenon_joint(
                 transform=mortise_hole_transform,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
-                _features=[
-                    SimpleRectangularPrismFeature("mortise_right", face=PrismFace.RIGHT),
-                    SimpleRectangularPrismFeature("mortise_left", face=PrismFace.LEFT),
-                    SimpleRectangularPrismFeature("mortise_front", face=PrismFace.FRONT),
-                    SimpleRectangularPrismFeature("mortise_back", face=PrismFace.BACK),
-                    SimpleRectangularPrismFeature("mortise_bottom", face=PrismFace.TOP),
+                feature_overrides=[
+                    FeatureOverride(prism_face_key(PrismFace.RIGHT), "mortise_right"),
+                    FeatureOverride(prism_face_key(PrismFace.LEFT), "mortise_left"),
+                    FeatureOverride(prism_face_key(PrismFace.FRONT), "mortise_front"),
+                    FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back"),
+                    FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom"),
                 ],
                 label=CutCSGLabel("mortise_hole"),
             )
@@ -356,12 +357,12 @@ def cut_mortise_and_tenon_joint(
                 transform=marking_space.transform,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
-                _features=[
-                    SimpleRectangularPrismFeature("mortise_right", face=PrismFace.RIGHT),
-                    SimpleRectangularPrismFeature("mortise_left", face=PrismFace.LEFT),
-                    SimpleRectangularPrismFeature("mortise_front", face=PrismFace.FRONT),
-                    SimpleRectangularPrismFeature("mortise_back", face=PrismFace.BACK),
-                    SimpleRectangularPrismFeature("mortise_bottom", face=PrismFace.TOP),
+                feature_overrides=[
+                    FeatureOverride(prism_face_key(PrismFace.RIGHT), "mortise_right"),
+                    FeatureOverride(prism_face_key(PrismFace.LEFT), "mortise_left"),
+                    FeatureOverride(prism_face_key(PrismFace.FRONT), "mortise_front"),
+                    FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back"),
+                    FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom"),
                 ],
                 label=CutCSGLabel("mortise_hole"),
             )
@@ -524,7 +525,7 @@ def cut_mortise_and_tenon_joint(
                     # not by a tangent to its wall -- and the barrel declines to
                     # locate, being curved, so without this the hole has nothing
                     # measurable on it at all.
-                    _features=[CylinderAxisFeature("peg_hole_axis")],
+                    extra_features=[CylinderAxisFeature("peg_hole_axis")],
                     label=CutCSGLabel(label),
                 )
             return RectangularPrism(

@@ -179,7 +179,7 @@ class TestPathCSG:
         extrusion = PathExtrusion(
             path=path, transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(1, 25),
-            _features=[
+            extra_features=[
                 # The key says which kind of side it is, so the knee cannot be
                 # written down as flat.
                 SimplePathExtrusionFeature("foot", key=FlatSide(0)),

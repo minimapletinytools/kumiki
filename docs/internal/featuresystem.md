@@ -47,7 +47,14 @@ TODO markdown table node name | node type (primitive/composite) | has curves | f
 
 ## The CSG Feature System
 
-Each CSG leaf node declares a set of `default_features` and instances may also add their own "named features" which name default features or add entirely new features. The default feature set represents all the normal features of that primitive.
+Each CSG leaf node declares a set of `default_features`: every face, arris and corner of that primitive, each at a `FeatureKey` (a `FeatureCategory` and an index, printed as `side.0`, `arris.5`, `cap.1`) and named after that key until someone names it otherwise.
+
+An instance adds to these in two separate ways:
+
+- `feature_overrides`: `FeatureOverride(key, name, properties)` renames a default and/or replaces its `FeatureProperties` (everything in `FeatureProperties`, including `real`, can change). It carries no geometry, so an override can never move or reshape what it names. Keys come from helpers: `prism_face_key`, `prism_arris_key`, `prism_corner_key`, `side_key`, `START_CAP` / `END_CAP`, `HALF_SPACE_PLANE`, `CYLINDER_BARREL`.
+- `extra_features`: features with geometry of their own that no default names, e.g. `CylinderAxisFeature` or a `ProgrammableCSGFeature`. An extra must not report a `FeatureKey`; one that does is naming a default and belongs in `feature_overrides`.
+
+Both are checked when the primitive is constructed. Overriding a key the primitive doesn't have, overriding a key twice, a keyed extra, or two features with the same name raise `ValueError`. `PathExtrusion` has no defaults yet, so its named sides are extras.
 
 
 ### derived features

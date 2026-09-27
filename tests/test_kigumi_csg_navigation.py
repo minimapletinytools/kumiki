@@ -33,6 +33,9 @@ from kumiki.cutcsg import (
     SimpleRectangularPrismFeature,
     PrismFace,
     RectangularPrism,
+    FeatureOverride,
+    prism_face_key,
+    HALF_SPACE_PLANE,
 )
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.mixed import (
@@ -373,7 +376,7 @@ def _timber_prism(named=True):
         transform=Transform.identity(),
         start_distance=scalar(0),
         end_distance=scalar(100),
-        _features=[SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT)] if named else None,
+        feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right")] if named else [],
     )
 
 
@@ -503,7 +506,7 @@ class TestDescribeLeafCsg:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(100),
-            _features=[SimpleRectangularPrismFeature("tenon_right", face=PrismFace.RIGHT)],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_right")],
         )
         assert runner._describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
 
@@ -572,7 +575,7 @@ class TestDescribeLeafCsg:
         plane = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)),
             offset=scalar(50),
-            _features=[HalfSpaceFeature("shoulder")],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder")],
         )
         assert runner._describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
 
@@ -1299,16 +1302,13 @@ class TestEdgeHighlightSpan:
             size=create_v2(scalar(0.1), scalar(0.2)),
             transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(1),
-            _features=[SimpleRectangularPrismFeature(
-                "rough.right", face=PrismFace.RIGHT,
-                properties=FeatureProperties(group=FeatureGroup.B1))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B1))],
         )
         # Parallel to the length and far past the end of it, so the line where
         # the two planes cross runs nowhere near the solid.
         far = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(9),
-            _features=[HalfSpaceFeature(
-                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
         )
         edge = DerivedEdgeFeature.derive(
             OwnedFeatureHit(feature=body.get_declared_features()[0], owner=body),

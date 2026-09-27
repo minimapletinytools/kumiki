@@ -19,7 +19,7 @@ point it cannot hit exactly. See FeatureTestTolerances.
 """
 
 import re
-from typing import Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, Dict, FrozenSet, Hashable, Iterator, List, Optional, Sequence, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from enum import Enum, Flag
@@ -140,6 +140,16 @@ def default_feature_name(key: FeatureKey) -> str:
     """
     category, index = key
     return f"{category.name.lower()}.{index}"
+
+
+def side_key(index: int) -> FeatureKey:
+    """Side n of an extrusion-like primitive: see ExtrusionFeatureKey."""
+    return (FeatureCategory.SIDE, index)
+
+
+# The one surface of a half space, and a cylinder's barrel -- its one side.
+HALF_SPACE_PLANE: FeatureKey = side_key(0)
+CYLINDER_BARREL: FeatureKey = side_key(0)
 
 
 # A prism's four sides in order around it -- +x, +y, -x, -y -- which is what
@@ -1122,9 +1132,7 @@ class SimpleRectangularPrismFeature(CSGFeature):
     face: PrismFace = PrismFace.TOP
 
     def feature_key(self) -> Optional[FeatureKey]:
-        if self.face in _PRISM_CAP_KEYS:
-            return _PRISM_CAP_KEYS[self.face]
-        return (FeatureCategory.SIDE, _PRISM_SIDE_ORDER.index(self.face))
+        return prism_face_key(self.face)
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
@@ -1297,25 +1305,7 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
         return CSGFeatureType.EDGE
 
     def feature_key(self) -> Optional[FeatureKey]:
-        """
-        """
-        first, second = self.faces
-        if first in _PRISM_CAP_KEYS or second in _PRISM_CAP_KEYS:
-            cap, side = ((first, second) if first in _PRISM_CAP_KEYS
-                         else (second, first))
-            if side in _PRISM_CAP_KEYS:
-                return None  # two caps never meet
-            return arris_against_cap(
-                _PRISM_SIDE_ORDER.index(side), len(_PRISM_SIDE_ORDER),
-                end=cap is PrismFace.TOP)
-        low, high = (_PRISM_SIDE_ORDER.index(first), _PRISM_SIDE_ORDER.index(second))
-        low, high = min(low, high), max(low, high)
-        sides = len(_PRISM_SIDE_ORDER)
-        if high - low == 1:
-            return (FeatureCategory.ARRIS, low)
-        if low == 0 and high == sides - 1:
-            return (FeatureCategory.ARRIS, high)  # the wrap-around join
-        return None  # opposite sides: parallel, no arris
+        return _prism_arris_key(*self.faces)
 
     def _sides(self) -> Tuple['SimpleRectangularPrismFeature', 'SimpleRectangularPrismFeature']:
         """The two faces as features, so their geometry is worked out once, there."""
@@ -1385,6 +1375,58 @@ def _canonical_corner_faces(
     return (caps[0], first, second)
 
 
+def prism_face_key(face: PrismFace) -> FeatureKey:
+    """The default slot of one of a RectangularPrism's faces."""
+    if face in _PRISM_CAP_KEYS:
+        return _PRISM_CAP_KEYS[face]
+    return side_key(_PRISM_SIDE_ORDER.index(face))
+
+
+def _prism_arris_key(first: PrismFace, second: PrismFace) -> Optional[FeatureKey]:
+    """The default slot of the arris between two faces, or None if they meet in none."""
+    if first in _PRISM_CAP_KEYS or second in _PRISM_CAP_KEYS:
+        cap, side = (first, second) if first in _PRISM_CAP_KEYS else (second, first)
+        if side in _PRISM_CAP_KEYS:
+            return None  # two caps never meet
+        return arris_against_cap(
+            _PRISM_SIDE_ORDER.index(side), len(_PRISM_SIDE_ORDER), end=cap is PrismFace.TOP)
+    low, high = _PRISM_SIDE_ORDER.index(first), _PRISM_SIDE_ORDER.index(second)
+    low, high = min(low, high), max(low, high)
+    sides = len(_PRISM_SIDE_ORDER)
+    if high - low == 1:
+        return (FeatureCategory.ARRIS, low)
+    if low == 0 and high == sides - 1:
+        return (FeatureCategory.ARRIS, high)  # the wrap-around join
+    return None  # opposite sides: parallel, no arris
+
+
+def _prism_corner_key(
+    canonical: Optional[Tuple[PrismFace, PrismFace, PrismFace]],
+) -> Optional[FeatureKey]:
+    """The default slot of a corner, given its faces in canonical order."""
+    if canonical is None:
+        return None
+    cap, first, _ = canonical
+    return corner_on_cap(_PRISM_SIDE_ORDER.index(first), len(_PRISM_SIDE_ORDER),
+                         end=cap is PrismFace.TOP)
+
+
+def prism_arris_key(first: PrismFace, second: PrismFace) -> FeatureKey:
+    """The default slot of the arris between two faces, in either order."""
+    key = _prism_arris_key(first, second)
+    if key is None:
+        raise ValueError(f"{first} and {second} meet in no arris")
+    return key
+
+
+def prism_corner_key(*faces: PrismFace) -> FeatureKey:
+    """The default slot of the corner where three faces meet, in any order."""
+    key = _prism_corner_key(_canonical_corner_faces(faces))
+    if key is None:
+        raise ValueError(f"{', '.join(face.name for face in faces)} meet at no corner")
+    return key
+
+
 @dataclass(frozen=True)
 class SimpleRectangularPrismVertexFeature(CSGFeature):
     """A corner of a RectangularPrism, named by the three faces meeting there.
@@ -1417,12 +1459,7 @@ class SimpleRectangularPrismVertexFeature(CSGFeature):
                 f"the canonical order is {', '.join(f.name for f in canonical)}")
 
     def feature_key(self) -> Optional[FeatureKey]:
-        canonical = self._canonical
-        if canonical is None:
-            return None
-        cap, first, _ = canonical
-        return corner_on_cap(_PRISM_SIDE_ORDER.index(first), len(_PRISM_SIDE_ORDER),
-                             end=cap is PrismFace.TOP)
+        return _prism_corner_key(self._canonical)
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.POINT
@@ -1748,14 +1785,56 @@ class FeatureSource(Flag):
     """Which features a query is asking for.
 
     DEFAULTS are what a primitive names on its own, in FeatureKey slots.
-    OVERRIDES are what an author handed it: a replacement for a default at the
-    same key, or a feature at a slot no default occupies. BOTH is the answer to
-    "what does this shape name", which is what nearly every caller wants.
+    OVERRIDES are what an author added: defaults renamed or re-propertied by a
+    FeatureOverride, and extra features with geometry of their own. BOTH is the
+    answer to "what does this shape name", which is what nearly every caller
+    wants.
     """
 
     DEFAULTS = 1
     OVERRIDES = 2
     BOTH = 3
+
+
+@dataclass(frozen=True)
+class FeatureOverride:
+    """Renames and/or replaces the properties of one of a primitive's defaults.
+
+    Carries no geometry: the feature it produces is the default at `key` with a
+    new name and properties, so an override can never move or reshape what it
+    names. New geometry goes in HasFeatures.extra_features instead.
+
+    Args:
+        key: the default being overridden, e.g. prism_face_key(PrismFace.RIGHT).
+        name: its new name; None keeps the default's ("side.0").
+        properties: its new properties, replacing the default's wholesale; None
+            keeps them.
+    """
+    key: FeatureKey
+    name: Optional[str] = None
+    properties: Optional[FeatureProperties] = None
+
+    def apply(self, default: 'CSGFeature') -> 'CSGFeature':
+        """The default at this key, renamed and re-propertied."""
+        return replace(
+            default,
+            name=default.name if self.name is None else self.name,
+            properties=default.properties if self.properties is None else self.properties,
+        )
+
+
+@dataclass(frozen=True)
+class _DeclaredFeatures:
+    """A primitive's features, worked out once: see HasFeatures._declared."""
+    overridden: Tuple['CSGFeature', ...]
+    extras: Tuple['CSGFeature', ...]
+    untouched_defaults: Tuple['CSGFeature', ...]
+    defaults: Tuple['CSGFeature', ...]
+
+
+# A shape's default names by key, by whatever that set depends on. See
+# HasFeatures.default_feature_keys.
+_DEFAULT_NAMES_CACHE: Dict[Hashable, Dict['FeatureKey', str]] = {}
 
 
 #TODO this should an ABC? or is that not allowed for dual inheritance or osemtihng?
@@ -1764,22 +1843,37 @@ class HasFeatures:
     """Storage for the features a primitive names on its own boundary.
 
     inherited Mixin for CutCSG deriving classes that name their own features
+
+    Args:
+        feature_overrides: renames/re-properties of this shape's defaults, one
+            per default at most. Every key must be one of default_features().
+        extra_features: features with geometry of their own, which no default
+            already names -- a bore's axis, a reference plane. Keyless: a
+            feature that reports a FeatureKey is naming a default, and belongs
+            in feature_overrides.
+
+    Both are checked when the shape is built, so a bad key fails where it was
+    written rather than when someone later picks the shape in the viewer. The
+    check reads only default names cached per kind of shape, so it costs next
+    to nothing; the features themselves are still built on first use.
     """
 
-    # named features overriding default features
-    _features: Optional[List['CSGFeature']] = field(default=None, kw_only=True)
+    feature_overrides: Sequence[FeatureOverride] = field(default=(), kw_only=True)
+    extra_features: Sequence['CSGFeature'] = field(default=(), kw_only=True)
 
-    #: What get_declared_features last worked out, per source. Out of init, repr
-    #: and equality: it is a restatement of the fields above and not a second
-    #: thing to set.
+    #: What _declared last worked out. Out of init, repr and equality: it is a
+    #: restatement of the fields above and not a second thing to set.
     #:
-    #: Safe because a shape is frozen and nothing appends to `_features` after
-    #: construction, so the answer cannot change. NOT safe as a class attribute,
-    #: which is the shape this first took: ConvexPolygonExtrusion and
-    #: ConvexPolygonSimpleLoft read their own profiles to build their defaults,
-    #: so two of them with different profiles have different features.
-    _declared_cache: Dict['FeatureSource', List['CSGFeature']] = field(
+    #: Safe because a shape is frozen, so the answer cannot change. NOT safe as
+    #: a class attribute: ConvexPolygonExtrusion and ConvexPolygonSimpleLoft
+    #: read their own profiles to build their defaults, so two of them with
+    #: different profiles have different features.
+    _declared_cache: Dict[str, _DeclaredFeatures] = field(
         default_factory=dict, init=False, repr=False, compare=False)
+
+    def __post_init__(self):
+        if self.feature_overrides or self.extra_features:
+            self._check_authored_features()
 
     # TODO should probably make this an abstract method, or... this overrides the CutCSG one or osemthing? plesae update the comment explaniing if that's the case
     def default_features(self) -> Dict['FeatureKey', 'CSGFeature']:
@@ -1790,6 +1884,64 @@ class HasFeatures:
         RectangularPrism for why that matters more than it looks.
         """
         return {}
+
+    def _default_keys_signature(self) -> Optional[Hashable]:
+        """What this shape's set of default keys depends on, or None if unknown.
+
+        A shape whose keys depend on nothing returns its type; an extrusion
+        returns its type and vertex count. None means the keys are worked out
+        from default_features every time.
+        """
+        return None
+
+    def default_feature_keys(self) -> FrozenSet['FeatureKey']:
+        """The keys of default_features, without building the features."""
+        return frozenset(self._default_names())
+
+    def _default_names(self) -> Dict['FeatureKey', str]:
+        """Each default's name by key, cached by _default_keys_signature."""
+        signature = self._default_keys_signature()
+        names = None if signature is None else _DEFAULT_NAMES_CACHE.get(signature)
+        if names is None:
+            names = {key: feature.name for key, feature in self.default_features().items()}
+            if signature is not None:
+                _DEFAULT_NAMES_CACHE[signature] = names
+        return names
+
+    def _check_authored_features(self) -> None:
+        """Refuse overrides of missing or repeated slots, keyed extras, and repeated names."""
+        defaults = self._default_names()
+        shape = type(self).__name__
+
+        overridden: Dict['FeatureKey', FeatureOverride] = {}
+        for override in self.feature_overrides:
+            if override.key not in defaults:
+                known = ', '.join(sorted(defaults.values())) or 'none'
+                raise ValueError(
+                    f"{shape} has no default feature {default_feature_name(override.key)} "
+                    f"to override (as {override.name!r}); its defaults are: {known}")
+            if override.key in overridden:
+                raise ValueError(
+                    f"{shape} overrides {default_feature_name(override.key)} twice, "
+                    f"as {overridden[override.key].name!r} and {override.name!r}")
+            overridden[override.key] = override
+
+        for extra in self.extra_features:
+            key = extra.feature_key()
+            if key is not None:
+                raise ValueError(
+                    f"extra feature {extra.name!r} on {shape} names the default "
+                    f"{default_feature_name(key)}; rename it with a FeatureOverride "
+                    f"in feature_overrides instead")
+
+        names = [defaults[o.key] if o.name is None else o.name for o in overridden.values()]
+        names += [extra.name for extra in self.extra_features]
+        if len(overridden) < len(defaults):
+            names += [name for key, name in defaults.items() if key not in overridden]
+        seen: set = set()
+        repeated = sorted({name for name in names if name in seen or seen.add(name)})
+        if repeated:
+            raise ValueError(f"{shape} names more than one feature {', '.join(map(repr, repeated))}")
 
     def get_declared_features(
         self, source: 'FeatureSource' = FeatureSource.BOTH,
@@ -1802,29 +1954,36 @@ class HasFeatures:
         collect_feature_hits asks for them at every node of every gather, so a
         pick paid it over and over for an answer that cannot change.
 
-        A copy each time, cheap next to building them, so a caller that does
-        mutate what it gets back cannot reach into the cache.
+        The same objects every time, in every source -- a caller may tell an
+        authored feature from a default by identity -- but a fresh list, so a
+        caller that mutates what it gets back cannot reach into the cache.
         """
-        found = self._declared_cache.get(source)
-        if found is None:
-            found = self._build_declared_features(source)
-            self._declared_cache[source] = found
-        return list(found)
-
-    def _build_declared_features(self, source: 'FeatureSource') -> List['CSGFeature']:
-        authored = list(self._features or ())
+        declared = self._declared()
         if source is FeatureSource.OVERRIDES:
-            return authored
-
-        defaults = dict(self.default_features())
+            return [*declared.overridden, *declared.extras]
         if source is FeatureSource.DEFAULTS:
-            return list(defaults.values())
+            return list(declared.defaults)
+        return [*declared.overridden, *declared.extras, *declared.untouched_defaults]
 
-        for feature in authored:
-            key = feature.feature_key()
-            if key is not None:
-                defaults.pop(key, None)
-        return authored + list(defaults.values())
+    def _declared(self) -> _DeclaredFeatures:
+        found = self._declared_cache.get('all')
+        if found is None:
+            found = self._build_declared_features()
+            self._declared_cache['all'] = found
+        return found
+
+    def _build_declared_features(self) -> _DeclaredFeatures:
+        """Apply the overrides to the defaults. Already checked in __post_init__."""
+        defaults = self.default_features()
+        overridden = {override.key: override.apply(defaults[override.key])
+                      for override in self.feature_overrides}
+        return _DeclaredFeatures(
+            overridden=tuple(overridden.values()),
+            extras=tuple(self.extra_features),
+            untouched_defaults=tuple(
+                feature for key, feature in defaults.items() if key not in overridden),
+            defaults=tuple(defaults.values()),
+        )
 
 
 @dataclass(frozen=True)
@@ -2177,6 +2336,9 @@ class HalfSpace(HasFeatures, CutCSG):
         offset: Distance from origin along normal direction where plane is located (default: 0)
     """
 
+    def _default_keys_signature(self) -> Optional[Hashable]:
+        return type(self)
+
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
         """Its one surface. See RectangularPrism.default_features for the group."""
         key = (FeatureCategory.SIDE, 0)
@@ -2275,6 +2437,9 @@ class RectangularPrism(HasFeatures, CutCSG):
         -infinite)
         end_distance: Distance from position along Z-axis to end of prism (None = infinite)
     """
+
+    def _default_keys_signature(self) -> Optional[Hashable]:
+        return type(self)
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
 
@@ -2636,6 +2801,9 @@ class Cylinder(HasFeatures, CutCSG):
     position: V3 = field(default_factory=lambda: Matrix([scalar(0), scalar(0), scalar(0)]))  # Position in global coordinates
     start_distance: Optional[Numeric] = None  # None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # None means infinite in positive direction
+
+    def _default_keys_signature(self) -> Optional[Hashable]:
+        return type(self)
 
     # Features this primitive names on its own boundary. Private: read it
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
@@ -3263,6 +3431,9 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         end_distance: Distance from position along Z-axis to end of extrusion (None = infinite)
     """
 
+    def _default_keys_signature(self) -> Optional[Hashable]:
+        return (type(self), len(self.points))
+
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
         """Two caps and a side per edge of the profile.
 
@@ -3655,6 +3826,9 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         top_points_z_pos: distance from position along Z-axis to top_points
         transform: Transform (position and orientation) in global coordinates (default: identity)
     """
+
+    def _default_keys_signature(self) -> Optional[Hashable]:
+        return (type(self), len(self.bottom_points))
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
         """Two caps and a side per edge of the profile, as an extrusion has."""

@@ -3,7 +3,9 @@ Kumiki - Timber types, enums, constants, and core classes
 Contains all core data structures and type definitions for the timber framing system
 """
 
+import functools
 import re
+from typing import Sequence
 from dataclasses import replace as dataclass_replace
 
 from .rule import *
@@ -689,7 +691,7 @@ class PerfectTimberWithin(ABC):
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=self.length,
-            _features=_ptw_face_tags(),
+            feature_overrides=_ptw_face_tags(),
             label=self.csg_label("perfect"),
         )
 
@@ -899,7 +901,7 @@ class Timber(PerfectTimberWithin):
             transform=Transform(position=offset, orientation=Orientation.identity()),
             start_distance=scalar(0),
             end_distance=self.length,
-            _features=_rough_face_tags(),
+            feature_overrides=_rough_face_tags(),
             label=self.csg_label("rough"),
         )
 
@@ -923,7 +925,7 @@ class Timber(PerfectTimberWithin):
             transform=Transform(position=offset, orientation=Orientation.identity()),
             start_distance=None if extend_bot else scalar(0),
             end_distance=None if extend_top else self.length,
-            _features=_rough_face_tags(),
+            feature_overrides=_rough_face_tags(),
             label=self.csg_label("rough", "extended"),
         )
     
@@ -1407,7 +1409,7 @@ _TIMBER_SHORT_ARRISES: List[Tuple[str, PrismFace, PrismFace]] = [
 ]
 
 
-def _long_arris_tags(prefix: str) -> List[CSGFeature]:
+def _long_arris_tags(prefix: str) -> List[FeatureOverride]:
     """Named features for a timber's four long arrises.
 
     Declared rather than left to be derived from the two faces meeting. A
@@ -1418,16 +1420,16 @@ def _long_arris_tags(prefix: str) -> List[CSGFeature]:
     reachable two ways and show up twice.
     """
     return [
-        SimpleRectangularPrismEdgeFeature(
+        FeatureOverride(
+            prism_arris_key(first, second),
             name=f"{prefix}{name}",
-            faces=(first, second),
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for name, first, second in _TIMBER_LONG_ARRISES
     ]
 
 
-def _short_arris_tags(prefix: str) -> List[CSGFeature]:
+def _short_arris_tags(prefix: str) -> List[FeatureOverride]:
     """Named features for the eight arrises around a timber's two ends.
 
     The same argument as _long_arris_tags: a timber HAS these, so they are
@@ -1443,9 +1445,9 @@ def _short_arris_tags(prefix: str) -> List[CSGFeature]:
     reason to leave it anonymous.
     """
     return [
-        SimpleRectangularPrismEdgeFeature(
+        FeatureOverride(
+            prism_arris_key(first, second),
             name=f"{prefix}{name}",
-            faces=(first, second),
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for name, first, second in _TIMBER_SHORT_ARRISES
@@ -1467,7 +1469,7 @@ _TIMBER_CORNERS: List[Tuple[str, PrismFace, PrismFace, PrismFace]] = [
 ]
 
 
-def _corner_tags(prefix: str) -> List[CSGFeature]:
+def _corner_tags(prefix: str) -> List[FeatureOverride]:
     """Named features for a timber's eight corners.
 
     The same argument as the arrises: the prism underneath names them too, as
@@ -1476,16 +1478,17 @@ def _corner_tags(prefix: str) -> List[CSGFeature]:
     "corner.4" into "ptw.top_right_front" without leaving both.
     """
     return [
-        SimpleRectangularPrismVertexFeature(
+        FeatureOverride(
+            prism_corner_key(cap, first, second),
             name=f"{prefix}{name}",
-            faces=(cap, first, second),
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for name, cap, first, second in _TIMBER_CORNERS
     ]
 
 
-def _ptw_face_tags() -> List[CSGFeature]:
+@functools.lru_cache(maxsize=None)
+def _ptw_face_tags() -> Tuple[FeatureOverride, ...]:
     """Named features for the 6 faces of a timber's perfect-timber-within prism.
 
     Group B1: they form edges against joint features (group A) and not against
@@ -1499,17 +1502,18 @@ def _ptw_face_tags() -> List[CSGFeature]:
     defaults at all, and every part of it can be referred to by a name that
     means something about a timber rather than about a prism.
     """
-    return [
-        SimpleRectangularPrismFeature(
+    return tuple([
+        FeatureOverride(
+            prism_face_key(face),
             name=PTW_FACE_PREFIX + face_name,
-            face=face,
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(PTW_FACE_PREFIX) + _short_arris_tags(PTW_FACE_PREFIX) + _corner_tags(PTW_FACE_PREFIX)
+    ] + _long_arris_tags(PTW_FACE_PREFIX) + _short_arris_tags(PTW_FACE_PREFIX) + _corner_tags(PTW_FACE_PREFIX))
 
 
-def _rough_face_tags() -> List[CSGFeature]:
+@functools.lru_cache(maxsize=None)
+def _rough_face_tags() -> Tuple[FeatureOverride, ...]:
     """Named features for the 6 faces of a timber's rough (as-sawn) prism.
 
     Group B1 as well, but kept separately named: a rough face only coincides
@@ -1517,18 +1521,18 @@ def _rough_face_tags() -> List[CSGFeature]:
     measurements may never be taken from one that does not (see
     PerfectTimberWithin.is_face_perfect).
     """
-    return [
-        SimpleRectangularPrismFeature(
+    return tuple([
+        FeatureOverride(
+            prism_face_key(face),
             name=ROUGH_FACE_PREFIX + face_name,
-            face=face,
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(ROUGH_FACE_PREFIX) + _short_arris_tags(ROUGH_FACE_PREFIX) + _corner_tags(ROUGH_FACE_PREFIX)
+    ] + _long_arris_tags(ROUGH_FACE_PREFIX) + _short_arris_tags(ROUGH_FACE_PREFIX) + _corner_tags(ROUGH_FACE_PREFIX))
 
 
 def _create_extended_rectangular_prism(
-    face_tags: List[CSGFeature],
+    face_tags: Sequence[FeatureOverride],
     size: V2,
     length: Numeric,
     extend_bot: bool,
@@ -1554,7 +1558,7 @@ def _create_extended_rectangular_prism(
         transform=Transform.identity(),
         start_distance=None if extend_bot else scalar(0),
         end_distance=None if extend_top else length,
-        _features=face_tags,
+        feature_overrides=face_tags,
         label=label,
     )
 
