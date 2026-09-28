@@ -29,7 +29,7 @@ from .geometry import (Line, Plane, Point, intersect_line_plane, intersect_plane
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
 from .solve_recipe import (BarrelEntity, EntityMap, EntityRef, Is, LineEntity, Meet,
-                           PlaneEntity, Recipe, SolveEntity, meet)
+                           PlaneEntity, Recipe, SolveEntity, meet, merge_coincident_planes)
 
 
 # ============================================================================
@@ -2291,7 +2291,9 @@ def solve_entity_map(root: CutCSG) -> EntityMap:
         yield node
         for child in csg_children(node):
             yield from walk(child)
-    return EntityMap((node, node.solve_entities()) for node in walk(root))
+    entities = {EntityRef(node, key): entity
+                for node in walk(root) for key, entity in node.solve_entities().items()}
+    return EntityMap(entities, merge_coincident_planes(entities))
 
 
 @dataclass(frozen=True)

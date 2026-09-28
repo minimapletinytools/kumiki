@@ -8,7 +8,7 @@ measurement to any feature then becomes a row over the entities' unknowns, via
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 
@@ -131,28 +131,28 @@ def meet(*recipes: Recipe) -> Meet:
                       for part in (recipe.parts if isinstance(recipe, Meet) else (recipe,))))
 
 
+def merge_coincident_planes(entities: Dict[EntityRef, SolveEntity]) -> Dict[EntityRef, EntityRef]:
+    """Each entity's solving entity: coincident planes, facing either way, share the first one; anything else is its own."""
+    canonical: Dict[EntityRef, EntityRef] = {}
+    planes: List[Tuple[EntityRef, Plane]] = []
+    for ref, entity in entities.items():
+        canonical[ref] = ref
+        if not isinstance(entity, PlaneEntity):
+            continue
+        same = next((other for other, plane in planes if planes_are_coincident(plane, entity.plane)), None)
+        if same is None:
+            planes.append((ref, entity.plane))
+        else:
+            canonical[ref] = same
+    return canonical
+
+
 class EntityMap:
-    """Every primitive entity mapped to the solving entity whose columns it uses.
+    """Every primitive entity mapped to the solving entity whose columns it uses."""
 
-    Coincident planes, facing either way, share the first one's columns.
-    """
-
-    def __init__(self, owned: Iterable[Tuple['CutCSG', Dict['FeatureKey', SolveEntity]]]):
-        self._canonical: Dict[EntityRef, EntityRef] = {}
-        self._entities: Dict[EntityRef, SolveEntity] = {}
-        planes: List[Tuple[EntityRef, Plane]] = []
-        for owner, entities in owned:
-            for local, entity in entities.items():
-                ref = EntityRef(owner, local)
-                self._entities[ref] = entity
-                canonical = ref
-                if isinstance(entity, PlaneEntity):
-                    canonical = next(
-                        (other for other, plane in planes if planes_are_coincident(plane, entity.plane)),
-                        ref)
-                    if canonical is ref:
-                        planes.append((ref, entity.plane))
-                self._canonical[ref] = canonical
+    def __init__(self, entities: Dict[EntityRef, SolveEntity], canonical: Dict[EntityRef, EntityRef]):
+        self._entities = entities
+        self._canonical = canonical
 
     def canonical(self, ref: EntityRef) -> EntityRef:
         return self._canonical[ref]
