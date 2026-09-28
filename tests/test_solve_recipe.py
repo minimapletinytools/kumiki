@@ -13,7 +13,8 @@ from kumiki.cutcsg import (
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
 from kumiki.solve_recipe import (
-    BarrelCoord, EntityRef, Is, PlaneCoord, Meet, combine, locate_recipe, motion_along, perturbed,
+    Anchor, BarrelCoord, DistanceMeasurement, EntityRef, Is, Meet, PlaneCoord, locate_recipe,
+    measurement_row, motion_along, perturbed,
 )
 
 
@@ -103,11 +104,12 @@ def _assert_rows_match(actual, expected, tolerance=1e-4):
 
 
 def _measure(entities, anchors, along):
-    """A measurement row: the sum of each anchor's motion, signed."""
-    row = {}
-    for recipe, at, sign in anchors:
-        row = combine(row, motion_along(recipe, entities, at, along), sign)
-    return row
+    """One anchor's motion, or the measurement from the -1 anchor to the +1 anchor."""
+    if len(anchors) == 1:
+        recipe, at, _ = anchors[0]
+        return motion_along(recipe, entities, at, along)
+    (end, end_at, _), (start, start_at, _) = sorted(anchors, key=lambda anchor: -anchor[2])
+    return measurement_row(DistanceMeasurement(Anchor(start, start_at), Anchor(end, end_at), along), entities)
 
 
 class TestRecipesLocateLikeTheirFeatures:

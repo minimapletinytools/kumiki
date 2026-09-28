@@ -3,7 +3,7 @@
 A primitive names its independent pieces as `SolveEntity`s (`CutCSG.solve_entities`),
 and each feature says how it is built from them (`CSGFeature.solve_recipe`). A
 measurement to any feature then becomes a row over the entities' unknowns, via
-`motion_along`. See docs/internal/featuresolving-plan.md, Part 2 B.
+`measurement_row`. See docs/internal/featuresolving-plan.md, Part 2 B.
 """
 
 from dataclasses import dataclass
@@ -258,6 +258,28 @@ def combine(first: Row, second: Row, sign: float = 1.0) -> Row:
     for key, value in second.items():
         row[key] = row.get(key, 0.0) + sign * value
     return {key: value for key, value in row.items() if abs(value) > 1e-12}
+
+
+@dataclass(frozen=True)
+class Anchor:
+    """Where a measurement attaches to a feature."""
+    recipe: Recipe
+    at: V3
+
+
+@dataclass(frozen=True)
+class DistanceMeasurement:
+    """The distance from `start` to `end`, read along `along`."""
+    start: Anchor
+    end: Anchor
+    along: V3
+
+
+def measurement_row(measurement: DistanceMeasurement, entities: EntityMap) -> Row:
+    """How the measured distance changes with the solving entities' unknowns."""
+    end = motion_along(measurement.end.recipe, entities, measurement.end.at, measurement.along)
+    start = motion_along(measurement.start.recipe, entities, measurement.start.at, measurement.along)
+    return combine(end, start, -1.0)
 
 
 def locate_recipe(
