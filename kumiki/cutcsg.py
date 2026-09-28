@@ -1900,17 +1900,6 @@ class HasFeatures:
         """
         return {}
 
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
-        """A plane for each default face that has one, keyed like the face."""
-        entities: Dict[FeatureKey, SolveEntity] = {}
-        for key, feature in self.default_features().items():
-            if feature.feature_type() is not CSGFeatureType.FACE:
-                continue
-            plane = feature.locate_simple_unbounded(cast(CutCSG, self))
-            if isinstance(plane, Plane):
-                entities[key] = PlaneEntity(plane)
-        return entities
-
     def _check_authored_features(self) -> None:
         """Refuse overrides of missing or repeated slots, keyed extras, and repeated names."""
         defaults = self.default_features()
@@ -1965,6 +1954,18 @@ class HasFeatures:
         if source is FeatureSource.OVERRIDES:
             return authored
         return authored + [feature for key, feature in defaults.items() if key not in overridden]
+
+
+def face_plane_entities(csg: 'HasFeatures') -> Dict[FeatureKey, SolveEntity]:
+    """A plane for each default face of `csg` that has one, keyed like the face."""
+    entities: Dict[FeatureKey, SolveEntity] = {}
+    for key, feature in csg.default_features().items():
+        if feature.feature_type() is not CSGFeatureType.FACE:
+            continue
+        plane = feature.locate_simple_unbounded(cast(CutCSG, csg))
+        if isinstance(plane, Plane):
+            entities[key] = PlaneEntity(plane)
+    return entities
 
 
 @dataclass(frozen=True)
@@ -2044,9 +2045,10 @@ class CutCSG(ABC):
         """
         return []
 
+    @abstractmethod
     def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
         """This node's own independent geometry, which its features' recipes are built from."""
-        return {}
+        ...
 
     # does not include derived features
     # TODO rename this to be more descriptive
@@ -2300,6 +2302,9 @@ class EmptyCSG(CutCSG):
     def __repr__(self) -> str:
         return "EmptyCSG()"
 
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return {}
+
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         return False
 
@@ -2350,6 +2355,9 @@ class HalfSpace(HasFeatures, CutCSG):
     def __repr__(self) -> str:
         return f"HalfSpace(normal={self.normal.T}, offset={self.offset})"
     
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return face_plane_entities(self)
+
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the half-plane.
@@ -2587,6 +2595,9 @@ class RectangularPrism(HasFeatures, CutCSG):
         z_coord = safe_dot_product(local_point, length_dir)
         return x_coord, y_coord, z_coord
 
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return face_plane_entities(self)
+
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the prism.
@@ -2816,7 +2827,7 @@ class Cylinder(HasFeatures, CutCSG):
 
     def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
         """The axis, the barrel around it, and a plane for each finite cap."""
-        entities = super().solve_entities()
+        entities = face_plane_entities(self)
         entities[CYLINDER_AXIS] = LineEntity(
             Line(direction=safe_normalize_vector(self.axis_direction), point=self.position))
         entities[CYLINDER_BARREL] = BarrelEntity(axis=CYLINDER_AXIS, radius=self.radius)
@@ -3116,6 +3127,9 @@ class SolidUnion(CutCSG):
     def __repr__(self) -> str:
         return f"SolidUnion({len(self.children)} children)"
     
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return {}
+
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the union.
@@ -3212,6 +3226,9 @@ class Intersection(CutCSG):
     def __repr__(self) -> str:
         return f"Intersection(left={self.left}, right={self.right})"
 
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return {}
+
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         return self.left.contains_point(point, eps=eps) and self.right.contains_point(point, eps=eps)
 
@@ -3290,6 +3307,9 @@ class Difference(CutCSG):
     def __repr__(self) -> str:
         return f"Difference(base={self.base}, subtract={len(self.subtract)} objects)"
     
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return {}
+
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the difference.
@@ -3534,6 +3554,9 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         return (len(non_zero_crosses) > 0 and
                 (all(safe_compare(cp, 0, Comparison.GT) for cp in non_zero_crosses) or
                  all(safe_compare(cp, 0, Comparison.LT) for cp in non_zero_crosses)))
+
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return face_plane_entities(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
@@ -3984,6 +4007,9 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         closest_point = p1 + edge * t
         distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
         return safe_zero_test_sq(distance_sq, eps)
+
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return face_plane_entities(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
