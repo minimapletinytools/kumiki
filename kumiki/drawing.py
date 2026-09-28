@@ -545,9 +545,10 @@ class ViewAxes:
     vertical distance, so a 3D pick passes neither and gets the defaults.
     """
 
-    look: V3 = DEFAULT_LOOK
-    right: V3 = DEFAULT_RIGHT
-    up: V3 = DEFAULT_UP
+    # A factory, since Python 3.11+ refuses an unhashable Matrix as a default.
+    look: V3 = field(default_factory=lambda: DEFAULT_LOOK)
+    right: V3 = field(default_factory=lambda: DEFAULT_RIGHT)
+    up: V3 = field(default_factory=lambda: DEFAULT_UP)
 
     def __post_init__(self):
         for name, fallback in (("look", DEFAULT_LOOK), ("right", DEFAULT_RIGHT),
