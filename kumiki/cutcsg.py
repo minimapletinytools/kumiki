@@ -2047,7 +2047,10 @@ class CutCSG(ABC):
 
     @abstractmethod
     def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
-        """This node's own independent geometry, which its features' recipes are built from."""
+        """return all entities needed to determine this feature
+
+        TODO when we add FeatureMarkingStatus decide if we want to filter out NEVER_MARK here and if returned entities should be tagged if their underlying features are marked OPTIONAL
+        """
         ...
 
     # does not include derived features
