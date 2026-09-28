@@ -45,7 +45,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.13
 
       - name: Cache uv artifacts
         uses: actions/cache@v4
@@ -53,9 +53,9 @@ jobs:
           path: |
             ~/.cache/uv
             .venv
-          key: uv-${{ runner.os }}-py3.12-docs-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          key: uv-${{ runner.os }}-py3.13-docs-${{ hashFiles('pyproject.toml', 'uv.lock') }}
           restore-keys: |
-            uv-${{ runner.os }}-py3.12-docs-
+            uv-${{ runner.os }}-py3.13-docs-
 
       - name: Build documentation site
         run: make docs SITE_DIR=website/dist/docs
