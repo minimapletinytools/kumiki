@@ -8,7 +8,7 @@ jest.mock('child_process', () => ({
 }));
 
 const { spawn } = require('child_process');
-const { initializeWorkspaceProject } = require('../project-initializer');
+const { initializeWorkspaceProject, getInlineExampleFrameContent } = require('../project-initializer');
 
 const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', '.kigumi', 'docs');
 const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', '..', 'docs');
@@ -247,5 +247,14 @@ describe('project-initializer', () => {
     expect(updateResult.kumikiVersion).toBe('0.7.1');
     expect(updateResult.copiedWorkspaceUsageInstructionsFile).toBe(true);
     expect(refreshedWorkspaceContent).toContain('Refreshed by update flow.');
+  });
+});
+describe('inline example frame', () => {
+  // An installed extension has no patterns/ beside it, so new projects get
+  // the inline copy. It drifted once and shipped a NameError.
+  test('matches patterns/structures/my_cute_frame.py', () => {
+    const canonical = fs.readFileSync(
+      path.resolve(__dirname, '..', '..', 'patterns', 'structures', 'my_cute_frame.py'), 'utf8');
+    expect(getInlineExampleFrameContent()).toBe(canonical);
   });
 });

@@ -254,6 +254,12 @@ function getBundledExampleFrameContent() {
         return fs.readFileSync(canonicalExamplePath, 'utf8');
     }
 
+    return getInlineExampleFrameContent();
+}
+
+// A copy of patterns/structures/my_cute_frame.py, for an install that ships
+// without patterns/. A unit test keeps the two identical.
+function getInlineExampleFrameContent() {
     return [
         '"""Starter Kigumi frame: a simple H-shaped frame made of four 90x90mm timbers.',
         '',
@@ -273,7 +279,6 @@ function getBundledExampleFrameContent() {
         'side_spacing = mm(500)           # center-to-center spacing of side timbers (along X)',
         'end_inset = mm(100)              # cross-timber inset from the side-timber ends',
         '',
-        '# Tenon cross-section is (width_axis, height_axis) in the cross-timber local frame.',
         '# Tenon dimensions relative to joint plane (shared XY plane):',
         '# 80mm wide parallel to joint plane (along Y), 40mm tall perpendicular to joint plane (along Z).',
         'tenon_width_relative_to_joint = mm(80)',
@@ -289,7 +294,7 @@ function getBundledExampleFrameContent() {
         'def build_frame() -> Frame:',
         '    # Side timbers run in +Y, at x = +/- side_spacing/2.',
         '    left_side = create_axis_aligned_timber(',
-        '        bottom_position=create_v3(-side_spacing / 2, -side_length / 2, Rational(0)),',
+        '        bottom_position=create_v3(-side_spacing / 2, -side_length / 2, scalar(0)),',
         '        length=side_length,',
         '        size=timber_size,',
         '        length_direction=TimberFace.FRONT,',
@@ -297,7 +302,7 @@ function getBundledExampleFrameContent() {
         '        ticket="Left Side",',
         '    )',
         '    right_side = create_axis_aligned_timber(',
-        '        bottom_position=create_v3(side_spacing / 2, -side_length / 2, Rational(0)),',
+        '        bottom_position=create_v3(side_spacing / 2, -side_length / 2, scalar(0)),',
         '        length=side_length,',
         '        size=timber_size,',
         '        length_direction=TimberFace.FRONT,',
@@ -312,7 +317,7 @@ function getBundledExampleFrameContent() {
         '    cross_y_back = -cross_y_front',
         '',
         '    back_cross = create_axis_aligned_timber(',
-        '        bottom_position=create_v3(-cross_length / 2, cross_y_back, Rational(0)),',
+        '        bottom_position=create_v3(-cross_length / 2, cross_y_back, scalar(0)),',
         '        length=cross_length,',
         '        size=timber_size,',
         '        length_direction=TimberFace.RIGHT,',
@@ -320,7 +325,7 @@ function getBundledExampleFrameContent() {
         '        ticket="Back Cross",',
         '    )',
         '    front_cross = create_axis_aligned_timber(',
-        '        bottom_position=create_v3(-cross_length / 2, cross_y_front, Rational(0)),',
+        '        bottom_position=create_v3(-cross_length / 2, cross_y_front, scalar(0)),',
         '        length=cross_length,',
         '        size=timber_size,',
         '        length_direction=TimberFace.RIGHT,',
@@ -333,7 +338,7 @@ function getBundledExampleFrameContent() {
         '    # the side timber from the front, in global +Y on the back cross and -Y on the front cross).',
         '    peg_params = SimplePegParameters(',
         '        shape=PegShape.ROUND,',
-        '        peg_positions=[(tenon_length / 2, Rational(0))],',
+        '        peg_positions=[(tenon_length / 2, scalar(0))],',
         '        size=peg_diameter,',
         '        depth=None,                                # through peg',
         '        tenon_hole_offset=peg_draw_bore_offset,    # draw-bore offset pulls the joint tight',
@@ -656,6 +661,7 @@ async function updateWorkspaceKumiki(workspaceRoot, filePath) {
 }
 
 module.exports = {
+    getInlineExampleFrameContent,
     getInitializationStatus,
     initializeWorkspaceProject,
     updateWorkspaceKumiki,

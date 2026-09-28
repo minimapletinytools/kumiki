@@ -8,7 +8,16 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
-## [0.7.1] - 2026-09-27
+## [kigumi 0.7.1] - 2026-09-28
+
+### kigumi
+
+#### Fixed
+
+- A new project's `my_cute_frame.py` failed with `NameError: name 'Rational' is not defined`. The copy kigumi writes had fallen behind `patterns/structures/my_cute_frame.py`; it now matches, and a unit test keeps it that way.
+  **Migrate:** in a project already created, replace `Rational(0)` with `scalar(0)`.
+
+## [kumiki 0.7.1] - 2026-09-27
 
 ### kumiki
 
