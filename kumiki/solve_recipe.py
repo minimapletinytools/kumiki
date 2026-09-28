@@ -79,7 +79,7 @@ class Is:
 @dataclass(frozen=True)
 class Meet:
     """The feature is where all of these meet: two planes in a line, three in a point, a line and a plane in a point."""
-    parts: Tuple['Recipe', ...]
+    parts: Tuple[Is, ...]
 
 
 Recipe = Union[Is, Meet]
@@ -93,7 +93,13 @@ def entity_refs(recipe: Recipe) -> List[EntityRef]:
     """Every entity the recipe is built from."""
     if isinstance(recipe, Is):
         return [recipe.entity]
-    return [ref for part in recipe.parts for ref in entity_refs(part)]
+    return [part.entity for part in recipe.parts]
+
+
+def meet(*recipes: Recipe) -> Meet:
+    """Where these recipes meet, flattened to entities."""
+    return Meet(tuple(part for recipe in recipes
+                      for part in (recipe.parts if isinstance(recipe, Meet) else (recipe,))))
 
 
 class EntityMap:

@@ -338,6 +338,7 @@ class TestDerivedFeatures:
             a=OwnedFeatureHit(feature=axis, owner=peg),
             b=OwnedFeatureHit(feature=_feature(box, prism_face_key(PrismFace.FRONT)), owner=box))
         recipe = point.solve_recipe(root)
+        assert isinstance(recipe, Meet) and all(isinstance(part, Is) for part in recipe.parts)
         at = _point(recipe)
         located = point.locate_simple_unbounded(root)
         assert isinstance(located, Point)
@@ -346,3 +347,19 @@ class TestDerivedFeatures:
         for along in (_v(1, 0, 0), _v(0, 1, 0), _v(0, 0, 1)):
             _assert_rows_match(_measure(entities, [(recipe, at, 1.0)], along),
                                _finite_difference_row(entities, [(recipe, at, 1.0)], along))
+
+    def test_a_derived_point_from_a_declared_arris_flattens_to_three_planes(self):
+        box = _box()
+        shoulder = HalfSpace(normal=_v(0, 0, 1), offset=scalar(1))
+        root = Difference(base=box, subtract=[shoulder])
+        entities = solve_entity_map(root)
+        point = DerivedPointFeature(
+            name="arris x shoulder",
+            a=OwnedFeatureHit(feature=_feature(box, prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT)), owner=box),
+            b=OwnedFeatureHit(feature=_feature(shoulder, HALF_SPACE_PLANE), owner=shoulder))
+        recipe = point.solve_recipe(root)
+        assert isinstance(recipe, Meet) and len(recipe.parts) == 3
+        at = _point(recipe)
+        along = _v(0, 0, 1)
+        _assert_rows_match(_measure(entities, [(recipe, at, 1.0)], along),
+                           _finite_difference_row(entities, [(recipe, at, 1.0)], along))

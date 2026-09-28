@@ -29,7 +29,7 @@ from .geometry import (Line, Plane, Point, intersect_line_plane, intersect_plane
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
 from .solve_recipe import (BarrelEntity, EntityMap, EntityRef, Is, LineEntity, Meet,
-                           PlaneEntity, Recipe, SolveEntity)
+                           PlaneEntity, Recipe, SolveEntity, meet)
 
 
 # ============================================================================
@@ -866,7 +866,7 @@ def _meet_of_parents(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional[Rec
     first, second = a.feature.solve_recipe(a.owner), b.feature.solve_recipe(b.owner)
     if first is None or second is None:
         return None
-    return Meet((first, second))
+    return meet(first, second)
 
 
 @dataclass(frozen=True)
