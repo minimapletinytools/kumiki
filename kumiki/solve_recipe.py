@@ -51,21 +51,21 @@ Coord = Union[PlaneCoord, LineCoord, PointCoord, BarrelCoord]
 class PlaneEntity:
     plane: Plane
 
-    COORDS: ClassVar[Type[Enum]] = PlaneCoord
+    COORDS: ClassVar[Type[PlaneCoord]] = PlaneCoord
 
 
 @dataclass(frozen=True)
 class LineEntity:
     line: Line
 
-    COORDS: ClassVar[Type[Enum]] = LineCoord
+    COORDS: ClassVar[Type[LineCoord]] = LineCoord
 
 
 @dataclass(frozen=True)
 class PointEntity:
     point: V3
 
-    COORDS: ClassVar[Type[Enum]] = PointCoord
+    COORDS: ClassVar[Type[PointCoord]] = PointCoord
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,7 @@ class BarrelEntity:
     axis: 'FeatureKey'
     radius: Numeric
 
-    COORDS: ClassVar[Type[Enum]] = BarrelCoord
+    COORDS: ClassVar[Type[BarrelCoord]] = BarrelCoord
 
 
 SolveEntity = Union[PlaneEntity, LineEntity, PointEntity, BarrelEntity]
@@ -280,6 +280,28 @@ def measurement_row(measurement: DistanceMeasurement, entities: EntityMap) -> Ro
     end = motion_along(measurement.end.recipe, entities, measurement.end.at, measurement.along)
     start = motion_along(measurement.start.recipe, entities, measurement.start.at, measurement.along)
     return combine(end, start, -1.0)
+
+
+def feature_rows(recipe: Recipe, entities: EntityMap) -> List[Row]:
+    """The feature's own unknowns as rows: it is solved when all of them are known."""
+    if isinstance(recipe, Is):
+        entity = entities.entity(recipe.entity)
+        column = entities.canonical(recipe.entity)
+        coords: List[Coord] = list(type(entity).COORDS)
+        rows: List[Row] = [{(column, coord): 1.0} for coord in coords]
+        if isinstance(entity, BarrelEntity):
+            rows += feature_rows(Is(EntityRef(recipe.entity.owner, entity.axis)), entities)
+        return rows
+
+    located = locate_recipe(recipe, entities.entity)
+    if isinstance(located, Point):
+        return [motion_along(recipe, entities, located.position, Matrix(axis)) for axis in np.eye(3)]
+    if isinstance(located, Line):
+        direction = _unit(_np(located.direction))
+        ends = (_np(located.point), _np(located.point) + direction)
+        return [motion_along(recipe, entities, Matrix(end), Matrix(axis))
+                for end in ends for axis in _axes(direction)]
+    raise ValueError("the recipe's parts don't meet in a single line or point")
 
 
 def locate_recipe(

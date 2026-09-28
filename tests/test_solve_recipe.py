@@ -5,6 +5,7 @@ import math
 import numpy as np
 import pytest
 
+from kumiki.dof_solver import remaining
 from kumiki.cutcsg import (
     CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
     DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism,
@@ -13,7 +14,7 @@ from kumiki.cutcsg import (
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
 from kumiki.solve_recipe import (
-    Anchor, BarrelCoord, DistanceMeasurement, EntityRef, Is, Meet, PlaneCoord, locate_recipe,
+    Anchor, BarrelCoord, DistanceMeasurement, EntityRef, Is, Meet, PlaneCoord, feature_rows, locate_recipe,
     measurement_row, motion_along, perturbed,
 )
 
@@ -365,3 +366,52 @@ class TestDerivedFeatures:
         along = _v(0, 0, 1)
         _assert_rows_match(_measure(entities, [(recipe, at, 1.0)], along),
                            _finite_difference_row(entities, [(recipe, at, 1.0)], along))
+
+
+class TestSolvingAFace:
+    """Marking the x of the right face's corners from the known left face."""
+
+    right_corners = [
+        prism_corner_key(PrismFace.TOP, PrismFace.RIGHT, PrismFace.FRONT),
+        prism_corner_key(PrismFace.BOTTOM, PrismFace.BACK, PrismFace.RIGHT),
+        prism_corner_key(PrismFace.TOP, PrismFace.BACK, PrismFace.RIGHT),
+        prism_corner_key(PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT),
+    ]
+
+    def _solve(self, box, corners, target_key=prism_face_key(PrismFace.RIGHT)):
+        entities = solve_entity_map(box)
+        left = _recipe(box, prism_face_key(PrismFace.LEFT))
+        along = _plane(locate_recipe(_recipe(box, prism_face_key(PrismFace.RIGHT)))).normal
+        known = feature_rows(left, entities)
+        for key in corners:
+            corner = _recipe(box, key)
+            at = _point(corner)
+            foot = create_v3(*_closest(locate_recipe(left), at))
+            known.append(measurement_row(DistanceMeasurement(Anchor(left, foot), Anchor(corner, at), along), entities))
+        return remaining(known, feature_rows(_recipe(box, target_key), entities)).count
+
+    @pytest.mark.parametrize("box", [_box(), _box(turn=0.6, position=(1, -2, 0))])
+    def test_four_corners_solve_the_face_with_one_to_spare(self, box):
+        assert self._solve(box, self.right_corners) == 0
+        assert self._solve(box, self.right_corners[:3]) == 0
+
+    def test_fewer_corners_leave_tilts(self):
+        box = _box()
+        assert self._solve(box, []) == 3
+        assert self._solve(box, self.right_corners[:1]) == 2
+        assert self._solve(box, self.right_corners[:2]) == 1
+
+    def test_one_corner_solves_only_its_x(self):
+        box = _box()
+        corner = self.right_corners[0]
+        # The corner's y and z belong to the front and top faces, which nothing measured.
+        assert self._solve(box, [corner], target_key=corner) == 2
+
+    def test_an_arris_is_solved_by_its_two_faces(self):
+        box = _box(turn=0.3)
+        entities = solve_entity_map(box)
+        arris = _recipe(box, prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT))
+        faces = [_recipe(box, prism_face_key(face)) for face in (PrismFace.FRONT, PrismFace.RIGHT)]
+        assert remaining([], feature_rows(arris, entities)).count == 4
+        assert remaining(feature_rows(faces[0], entities), feature_rows(arris, entities)).count == 2
+        assert remaining(sum((feature_rows(f, entities) for f in faces), []), feature_rows(arris, entities)).count == 0
