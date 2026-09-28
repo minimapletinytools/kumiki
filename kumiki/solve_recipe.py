@@ -43,15 +43,15 @@ class PointEntity:
 
 
 @dataclass(frozen=True)
-class CylinderEntity:
-    """A cylinder's barrel. Unknowns: its axis as a LineEntity, then its radius."""
-    axis: Line
+class BarrelEntity:
+    """A cylinder's barrel around the LineEntity at `axis` on the same primitive. Unknowns: its radius."""
+    axis: 'FeatureKey'
     radius: Numeric
 
-    COORDS = LineEntity.COORDS + ("radius",)
+    COORDS = ("radius",)
 
 
-SolveEntity = Union[PlaneEntity, LineEntity, PointEntity, CylinderEntity]
+SolveEntity = Union[PlaneEntity, LineEntity, PointEntity, BarrelEntity]
 
 
 @dataclass(frozen=True, eq=False)
@@ -77,18 +77,12 @@ class Is:
 
 
 @dataclass(frozen=True)
-class AxisOf:
-    """The feature is the axis of this cylinder entity."""
-    cylinder: EntityRef
-
-
-@dataclass(frozen=True)
 class Meet:
     """The feature is where all of these meet: two planes in a line, three in a point, a line and a plane in a point."""
     parts: Tuple['Recipe', ...]
 
 
-Recipe = Union[Is, AxisOf, Meet]
+Recipe = Union[Is, Meet]
 
 # One unknown: a solving entity and the index of one of its COORDS.
 Column = Tuple[EntityRef, int]
@@ -99,8 +93,6 @@ def entity_refs(recipe: Recipe) -> List[EntityRef]:
     """Every entity the recipe is built from."""
     if isinstance(recipe, Is):
         return [recipe.entity]
-    if isinstance(recipe, AxisOf):
-        return [recipe.cylinder]
     return [ref for part in recipe.parts for ref in entity_refs(part)]
 
 
@@ -172,14 +164,9 @@ def _constraints(recipe: Recipe, entities: EntityMap, at: np.ndarray) -> List[Co
     if isinstance(recipe, Meet):
         return [c for part in recipe.parts for c in _constraints(part, entities, at)]
 
-    ref = recipe.cylinder if isinstance(recipe, AxisOf) else recipe.entity
+    ref = recipe.entity
     column = entities.canonical(ref)
     entity = entities.entity(ref)
-
-    if isinstance(recipe, AxisOf):
-        if not isinstance(entity, CylinderEntity):
-            raise ValueError(f"{ref} is not a cylinder, so it has no axis")
-        return _line_constraints(column, entity.axis, at)
 
     if isinstance(entity, PlaneEntity):
         normal = _unit(_np(entity.plane.normal))
@@ -193,14 +180,17 @@ def _constraints(recipe: Recipe, entities: EntityMap, at: np.ndarray) -> List[Co
         return [(np.eye(3)[k], {(column, k): 1.0}) for k in range(3)]
 
     # The barrel moves radially: with its axis, plus its radius.
-    direction = _unit(_np(entity.axis.direction))
-    offset = at - _np(entity.axis.point)
+    axis_ref = EntityRef(ref.owner, entity.axis)
+    axis = entities.entity(axis_ref)
+    assert isinstance(axis, LineEntity)
+    direction = _unit(_np(axis.line.direction))
+    offset = at - _np(axis.line.point)
     radial = offset - direction * float(offset @ direction)
     if np.linalg.norm(radial) < 1e-12:
         raise ValueError("a point on the axis is not on the barrel")
     radial = _unit(radial)
-    row: Row = {(column, 4): 1.0}
-    for normal, form in _line_constraints(column, entity.axis, at):
+    row: Row = {(column, 0): 1.0}
+    for normal, form in _line_constraints(entities.canonical(axis_ref), axis.line, at):
         for key, value in form.items():
             row[key] = row.get(key, 0.0) + value * float(radial @ normal)
     return [(radial, row)]
@@ -238,9 +228,6 @@ def locate_recipe(
     entity_of: Callable[[EntityRef], SolveEntity] = EntityRef.entity,
 ) -> Optional[Union[Plane, Line, Point]]:
     """The geometry the recipe builds."""
-    if isinstance(recipe, AxisOf):
-        entity = entity_of(recipe.cylinder)
-        return entity.axis if isinstance(entity, CylinderEntity) else None
     if isinstance(recipe, Is):
         entity = entity_of(recipe.entity)
         if isinstance(entity, PlaneEntity):
@@ -277,9 +264,10 @@ def perturbed(entity: SolveEntity, coord: int, step: float) -> SolveEntity:
     if isinstance(entity, PointEntity):
         return PointEntity(Matrix(_np(entity.point) + step * np.eye(3)[coord]))
 
-    line = entity.axis if isinstance(entity, CylinderEntity) else entity.line
-    if isinstance(entity, CylinderEntity) and coord == 4:
-        return CylinderEntity(axis=line, radius=float(entity.radius) + step)
+    if isinstance(entity, BarrelEntity):
+        return BarrelEntity(axis=entity.axis, radius=float(entity.radius) + step)
+
+    line = entity.line
     direction = _unit(_np(line.direction))
     first, second = _axes(direction)
     point, moved = _np(line.point), direction
@@ -288,7 +276,4 @@ def perturbed(entity: SolveEntity, coord: int, step: float) -> SolveEntity:
         point = point + step * shift
     else:
         moved = direction + step * shift
-    new_line = Line(direction=Matrix(moved), point=Matrix(point))
-    if isinstance(entity, CylinderEntity):
-        return CylinderEntity(axis=new_line, radius=entity.radius)
-    return LineEntity(new_line)
+    return LineEntity(Line(direction=Matrix(moved), point=Matrix(point)))

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from kumiki.cutcsg import (
-    CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
+    CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
     DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism,
     SolidUnion, prism_arris_key, prism_corner_key, prism_face_key, solve_entity_map,
 )
@@ -156,7 +156,7 @@ class TestRecipesLocateLikeTheirFeatures:
                             extra_features=(CylinderAxisFeature(name="axis"),))
         axis = next(f for f in cylinder.get_declared_features() if f.name == "axis")
         recipe = axis.solve_recipe(cylinder)
-        assert recipe.cylinder == EntityRef(cylinder, CYLINDER_BARREL)
+        assert recipe == Is(EntityRef(cylinder, CYLINDER_AXIS))
 
 
 class TestPointToPoint:
@@ -303,7 +303,8 @@ class TestCylinders:
         entities = solve_entity_map(peg)
         barrel = Is(EntityRef(peg, CYLINDER_BARREL))
         row = motion_along(barrel, entities, _v(0.25, 1, 2), _v(1, 0, 0))
-        assert row[(EntityRef(peg, CYLINDER_BARREL), 4)] == pytest.approx(1.0)
+        assert row[(EntityRef(peg, CYLINDER_BARREL), 0)] == pytest.approx(1.0)
+        assert any(ref == EntityRef(peg, CYLINDER_AXIS) for ref, _ in row)
 
 
 class TestDerivedFeatures:

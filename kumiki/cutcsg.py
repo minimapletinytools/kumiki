@@ -28,7 +28,7 @@ from .rule import *
 from .geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
-from .solve_recipe import (AxisOf, CylinderEntity, EntityMap, EntityRef, Is, Meet,
+from .solve_recipe import (BarrelEntity, EntityMap, EntityRef, Is, LineEntity, Meet,
                            PlaneEntity, Recipe, SolveEntity)
 
 
@@ -86,6 +86,7 @@ class FeatureCategory(Enum):
     SIDE = 1    # n = the nth side;
     ARRIS = 2   # every arris, in one run -- see below
     CORNER = 3  # every corner, in one run -- see below
+    AXIS = 4    # a cylinder's axis
 
     # ARRIS and CORNER each number all of their kind together rather than
     # splitting by which end they belong to. For a shape with s sides:
@@ -152,6 +153,7 @@ def side_key(index: int) -> FeatureKey:
 # The one surface of a half space, and a cylinder's barrel -- its one side.
 HALF_SPACE_PLANE: FeatureKey = side_key(0)
 CYLINDER_BARREL: FeatureKey = side_key(0)
+CYLINDER_AXIS: FeatureKey = (FeatureCategory.AXIS, 0)
 
 
 # A prism's four sides in order around it -- +x, +y, -x, -y -- which is what
@@ -1552,7 +1554,7 @@ class CylinderAxisFeature(CSGFeature):
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         if self._cylinder(owner) is None:
             return None
-        return AxisOf(EntityRef(owner, CYLINDER_BARREL))
+        return Is(EntityRef(owner, CYLINDER_AXIS))
 
     def _cylinder(self, owner: 'CutCSG') -> Optional['Cylinder']:
         """The owner, as the Cylinder this feature is the axis of.
@@ -2813,11 +2815,11 @@ class Cylinder(HasFeatures, CutCSG):
         }
 
     def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
-        """The barrel, and a plane for each finite cap."""
+        """The axis, the barrel around it, and a plane for each finite cap."""
         entities = super().solve_entities()
-        entities[CYLINDER_BARREL] = CylinderEntity(
-            axis=Line(direction=safe_normalize_vector(self.axis_direction), point=self.position),
-            radius=self.radius)
+        entities[CYLINDER_AXIS] = LineEntity(
+            Line(direction=safe_normalize_vector(self.axis_direction), point=self.position))
+        entities[CYLINDER_BARREL] = BarrelEntity(axis=CYLINDER_AXIS, radius=self.radius)
         return entities
 
     def _axial_and_radial(self, point: V3) -> Tuple[Numeric, Numeric]:
