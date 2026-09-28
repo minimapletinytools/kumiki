@@ -104,7 +104,10 @@ class Is:
 
 @dataclass(frozen=True)
 class Meet:
-    """The feature is where all of these meet: two planes in a line, three in a point, a line and a plane in a point."""
+    """The feature is where these entities intersect: two planes in a line, three in a point, a line and a plane in a point.
+
+    It moves as they move. It can be solved while they aren't: a corner is 3 unknowns of its planes' 9.
+    """
     parts: Tuple[Is, ...]
 
 
