@@ -19,7 +19,7 @@ point it cannot hit exactly. See FeatureTestTolerances.
 """
 
 import re
-from typing import Callable, ClassVar, Dict, Hashable, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, ClassVar, Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from enum import Enum, Flag
@@ -1898,9 +1898,9 @@ class HasFeatures:
         """
         return {}
 
-    def solve_entities(self) -> Dict[Hashable, SolveEntity]:
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
         """A plane for each default face that has one, keyed like the face."""
-        entities: Dict[Hashable, SolveEntity] = {}
+        entities: Dict[FeatureKey, SolveEntity] = {}
         for key, feature in self.default_features().items():
             if feature.feature_type() is not CSGFeatureType.FACE:
                 continue
@@ -2042,7 +2042,7 @@ class CutCSG(ABC):
         """
         return []
 
-    def solve_entities(self) -> Dict[Hashable, SolveEntity]:
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
         """This node's own independent geometry, which its features' recipes are built from."""
         return {}
 
@@ -2812,7 +2812,7 @@ class Cylinder(HasFeatures, CutCSG):
             for key, part in parts
         }
 
-    def solve_entities(self) -> Dict[Hashable, SolveEntity]:
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
         """The barrel, and a plane for each finite cap."""
         entities = super().solve_entities()
         entities[CYLINDER_BARREL] = CylinderEntity(

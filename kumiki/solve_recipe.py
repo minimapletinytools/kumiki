@@ -7,12 +7,15 @@ measurement to any feature then becomes a row over the entities' unknowns, via
 """
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Hashable, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 
 from .geometry import Line, Plane, Point, intersect_line_plane, intersect_planes, perpendicular_axes, planes_are_coincident
 from .rule import Matrix, Numeric, V3
+
+if TYPE_CHECKING:
+    from .cutcsg import CutCSG, FeatureKey
 
 
 @dataclass(frozen=True)
@@ -51,14 +54,11 @@ class CylinderEntity:
 SolveEntity = Union[PlaneEntity, LineEntity, PointEntity, CylinderEntity]
 
 
+@dataclass(frozen=True, eq=False)
 class EntityRef:
-    """One entity of one primitive: the primitive node, by identity, and its local key."""
-
-    __slots__ = ("owner", "local")
-
-    def __init__(self, owner, local: Hashable):
-        self.owner = owner
-        self.local = local
+    """One entity of one primitive: the primitive, compared by identity, and the entity's key."""
+    owner: 'CutCSG'
+    local: 'FeatureKey'
 
     def entity(self) -> SolveEntity:
         return self.owner.solve_entities()[self.local]
@@ -68,9 +68,6 @@ class EntityRef:
 
     def __hash__(self) -> int:
         return hash((id(self.owner), self.local))
-
-    def __repr__(self) -> str:
-        return f"EntityRef({type(self.owner).__name__}@{id(self.owner):x}, {self.local!r})"
 
 
 @dataclass(frozen=True)
@@ -113,7 +110,7 @@ class EntityMap:
     Coincident planes, facing either way, share the first one's columns.
     """
 
-    def __init__(self, owned: Iterable[Tuple[object, Dict[Hashable, SolveEntity]]]):
+    def __init__(self, owned: Iterable[Tuple['CutCSG', Dict['FeatureKey', SolveEntity]]]):
         self._canonical: Dict[EntityRef, EntityRef] = {}
         self._entities: Dict[EntityRef, SolveEntity] = {}
         planes: List[Tuple[EntityRef, Plane]] = []
