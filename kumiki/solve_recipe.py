@@ -7,7 +7,8 @@ measurement to any feature then becomes a row over the entities' unknowns, via
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from enum import Enum
+from typing import TYPE_CHECKING, Callable, ClassVar, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 import numpy as np
 
@@ -18,37 +19,62 @@ if TYPE_CHECKING:
     from .cutcsg import CutCSG, FeatureKey
 
 
+class PlaneCoord(Enum):
+    """A plane's unknowns: its offset, and tilts toward its perpendicular_axes."""
+    OFFSET = 0
+    TILT_1 = 1
+    TILT_2 = 2
+
+
+class LineCoord(Enum):
+    """A line's unknowns: shifts along its perpendicular_axes, and turns toward them about `line.point`."""
+    SHIFT_1 = 0
+    SHIFT_2 = 1
+    TURN_1 = 2
+    TURN_2 = 3
+
+
+class PointCoord(Enum):
+    X = 0
+    Y = 1
+    Z = 2
+
+
+class BarrelCoord(Enum):
+    RADIUS = 0
+
+
+Coord = Union[PlaneCoord, LineCoord, PointCoord, BarrelCoord]
+
+
 @dataclass(frozen=True)
 class PlaneEntity:
-    """A plane. Unknowns: offset, then tilts about its perpendicular_axes."""
     plane: Plane
 
-    COORDS = ("offset", "tilt_1", "tilt_2")
+    COORDS: ClassVar[Type[Enum]] = PlaneCoord
 
 
 @dataclass(frozen=True)
 class LineEntity:
-    """A line. Unknowns: shifts along its perpendicular_axes, then turns toward them about `line.point`."""
     line: Line
 
-    COORDS = ("shift_1", "shift_2", "turn_1", "turn_2")
+    COORDS: ClassVar[Type[Enum]] = LineCoord
 
 
 @dataclass(frozen=True)
 class PointEntity:
-    """A point. Unknowns: x, y, z."""
     point: V3
 
-    COORDS = ("x", "y", "z")
+    COORDS: ClassVar[Type[Enum]] = PointCoord
 
 
 @dataclass(frozen=True)
 class BarrelEntity:
-    """A cylinder's barrel around the LineEntity at `axis` on the same primitive. Unknowns: its radius."""
+    """A cylinder's barrel around the LineEntity at `axis` on the same primitive."""
     axis: 'FeatureKey'
     radius: Numeric
 
-    COORDS = ("radius",)
+    COORDS: ClassVar[Type[Enum]] = BarrelCoord
 
 
 SolveEntity = Union[PlaneEntity, LineEntity, PointEntity, BarrelEntity]
@@ -84,8 +110,8 @@ class Meet:
 
 Recipe = Union[Is, Meet]
 
-# One unknown: a solving entity and the index of one of its COORDS.
-Column = Tuple[EntityRef, int]
+# One unknown: a solving entity and one of its COORDS.
+Column = Tuple[EntityRef, Coord]
 Row = Dict[Column, float]
 
 
@@ -161,8 +187,8 @@ def _line_constraints(column: EntityRef, line: Line, at: np.ndarray) -> List[Con
     first, second = _axes(direction)
     along = float((at - _np(line.point)) @ direction)
     return [
-        (first, {(column, 0): 1.0, (column, 2): along}),
-        (second, {(column, 1): 1.0, (column, 3): along}),
+        (first, {(column, LineCoord.SHIFT_1): 1.0, (column, LineCoord.TURN_1): along}),
+        (second, {(column, LineCoord.SHIFT_2): 1.0, (column, LineCoord.TURN_2): along}),
     ]
 
 
@@ -177,13 +203,15 @@ def _constraints(recipe: Recipe, entities: EntityMap, at: np.ndarray) -> List[Co
     if isinstance(entity, PlaneEntity):
         normal = _unit(_np(entity.plane.normal))
         first, second = _axes(normal)
-        return [(normal, {(column, 0): 1.0, (column, 1): -float(at @ first), (column, 2): -float(at @ second)})]
+        return [(normal, {(column, PlaneCoord.OFFSET): 1.0,
+                          (column, PlaneCoord.TILT_1): -float(at @ first),
+                          (column, PlaneCoord.TILT_2): -float(at @ second)})]
 
     if isinstance(entity, LineEntity):
         return _line_constraints(column, entity.line, at)
 
     if isinstance(entity, PointEntity):
-        return [(np.eye(3)[k], {(column, k): 1.0}) for k in range(3)]
+        return [(np.eye(3)[coord.value], {(column, coord): 1.0}) for coord in PointCoord]
 
     # The barrel moves radially: with its axis, plus its radius.
     axis_ref = EntityRef(ref.owner, entity.axis)
@@ -195,7 +223,7 @@ def _constraints(recipe: Recipe, entities: EntityMap, at: np.ndarray) -> List[Co
     if np.linalg.norm(radial) < 1e-12:
         raise ValueError("a point on the axis is not on the barrel")
     radial = _unit(radial)
-    row: Row = {(column, 0): 1.0}
+    row: Row = {(column, BarrelCoord.RADIUS): 1.0}
     for normal, form in _line_constraints(entities.canonical(axis_ref), axis.line, at):
         for key, value in form.items():
             row[key] = row.get(key, 0.0) + value * float(radial @ normal)
@@ -256,19 +284,19 @@ def locate_recipe(
     return None
 
 
-def perturbed(entity: SolveEntity, coord: int, step: float) -> SolveEntity:
+def perturbed(entity: SolveEntity, coord: Coord, step: float) -> SolveEntity:
     """The entity with one unknown moved by `step`, for finite-difference checks."""
     if isinstance(entity, PlaneEntity):
         normal = _unit(_np(entity.plane.normal))
         offset = float(normal @ _np(entity.plane.point))
         first, second = _axes(normal)
-        moved = normal + step * (first if coord == 1 else second if coord == 2 else 0.0)
-        if coord == 0:
+        moved = normal + step * (first if coord is PlaneCoord.TILT_1 else second if coord is PlaneCoord.TILT_2 else 0.0)
+        if coord is PlaneCoord.OFFSET:
             offset += step
         return PlaneEntity(Plane(normal=Matrix(moved), point=Matrix(moved * offset / float(moved @ moved))))
 
     if isinstance(entity, PointEntity):
-        return PointEntity(Matrix(_np(entity.point) + step * np.eye(3)[coord]))
+        return PointEntity(Matrix(_np(entity.point) + step * np.eye(3)[coord.value]))
 
     if isinstance(entity, BarrelEntity):
         return BarrelEntity(axis=entity.axis, radius=float(entity.radius) + step)
@@ -277,8 +305,8 @@ def perturbed(entity: SolveEntity, coord: int, step: float) -> SolveEntity:
     direction = _unit(_np(line.direction))
     first, second = _axes(direction)
     point, moved = _np(line.point), direction
-    shift = first if coord in (0, 2) else second
-    if coord in (0, 1):
+    shift = first if coord in (LineCoord.SHIFT_1, LineCoord.TURN_1) else second
+    if coord in (LineCoord.SHIFT_1, LineCoord.SHIFT_2):
         point = point + step * shift
     else:
         moved = direction + step * shift

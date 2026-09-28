@@ -13,7 +13,7 @@ from kumiki.cutcsg import (
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
 from kumiki.solve_recipe import (
-    EntityRef, Is, Meet, combine, locate_recipe, motion_along, perturbed,
+    BarrelCoord, EntityRef, Is, PlaneCoord, Meet, combine, locate_recipe, motion_along, perturbed,
 )
 
 
@@ -82,7 +82,7 @@ def _finite_difference_row(entities, anchors, along, step=1e-6):
     u = _np(along)
     row = {}
     for solving in entities.solving_entities():
-        for coord in range(len(type(entities.entity(solving)).COORDS)):
+        for coord in type(entities.entity(solving)).COORDS:
             moved = perturbed(entities.entity(solving), coord, step)
 
             def entity_of(ref, solving=solving, moved=moved):
@@ -177,11 +177,11 @@ class TestPointToPoint:
         left = entities.canonical(EntityRef(b, prism_face_key(PrismFace.LEFT)))
         assert {ref for ref, _ in row} == {right, left}
         # p1 is on x = 0.5 (normal +x), p2 on x = 2.5 (normal -x, offset -2.5): x1 - x2 = d_right + d_left.
-        assert row[(right, 0)] == pytest.approx(1.0)
-        assert row[(left, 0)] == pytest.approx(1.0)
+        assert row[(right, PlaneCoord.OFFSET)] == pytest.approx(1.0)
+        assert row[(left, PlaneCoord.OFFSET)] == pytest.approx(1.0)
         # Tilt terms: -w (p . e) with e the plane's perpendicular_axes, here y and +-z.
-        assert row[(right, 1)] == pytest.approx(-float(at1[1, 0]))
-        assert row[(right, 2)] == pytest.approx(-float(at1[2, 0]))
+        assert row[(right, PlaneCoord.TILT_1)] == pytest.approx(-float(at1[1, 0]))
+        assert row[(right, PlaneCoord.TILT_2)] == pytest.approx(-float(at1[2, 0]))
 
     def test_matches_finite_differences(self):
         a, b = _box(), _box(position=(3, 0, 0))
@@ -209,8 +209,8 @@ class TestPointToPoint:
                    (_recipe(a, bottom_back), _point(_recipe(a, bottom_back)), -1.0)]
         row = _measure(entities, anchors, _v(1, 0, 0))
         right = EntityRef(a, prism_face_key(PrismFace.RIGHT))
-        assert (right, 0) not in row
-        assert (right, 1) in row and (right, 2) in row
+        assert (right, PlaneCoord.OFFSET) not in row
+        assert (right, PlaneCoord.TILT_1) in row and (right, PlaneCoord.TILT_2) in row
         _assert_rows_match(row, _finite_difference_row(entities, anchors, _v(1, 0, 0)))
 
 
@@ -274,7 +274,7 @@ class TestMergedPlanes:
         row = _measure(entities, anchors, along)
         shoulder_ref = entities.canonical(EntityRef(tenon, prism_face_key(PrismFace.BOTTOM)))
         assert shoulder_ref.owner is shoulder
-        assert (shoulder_ref, 0) in row
+        assert (shoulder_ref, PlaneCoord.OFFSET) in row
         _assert_rows_match(row, _finite_difference_row(entities, anchors, along))
 
 
@@ -303,7 +303,7 @@ class TestCylinders:
         entities = solve_entity_map(peg)
         barrel = Is(EntityRef(peg, CYLINDER_BARREL))
         row = motion_along(barrel, entities, _v(0.25, 1, 2), _v(1, 0, 0))
-        assert row[(EntityRef(peg, CYLINDER_BARREL), 0)] == pytest.approx(1.0)
+        assert row[(EntityRef(peg, CYLINDER_BARREL), BarrelCoord.RADIUS)] == pytest.approx(1.0)
         assert any(ref == EntityRef(peg, CYLINDER_AXIS) for ref, _ in row)
 
 
