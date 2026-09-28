@@ -8,6 +8,14 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-27
+
+### kumiki
+
+#### Fixed
+
+- kumiki 0.7.0 failed at import on Python 3.11 and later -- including the 3.13 venv kigumi creates -- with `mutable default <class 'kumiki.rule.Matrix'> for field look is not allowed`. `ViewAxes` now builds its default axes with a factory.
+
 ## [0.7.0] - 2026-09-27
 
 Upgrade kumiki and kigumi together: the new kigumi runner imports parts of kumiki that 0.6.x does not have.
