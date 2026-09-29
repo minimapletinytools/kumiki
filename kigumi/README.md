@@ -90,3 +90,9 @@ Kumiki scans three sources:
 - shipped patterns bundled with `kumiki`
 - patterns bundled with any other python dependency in your project
 
+
+## License
+
+Kigumi is under the [Elastic License 2.0](LICENSE). You may use, modify and redistribute it freely, including commercially, but you may not offer it to others as a hosted or managed service. Versions up to and including 0.7.2 were released under MPL-2.0 and remain so.
+
+kumiki, the Python library kigumi runs, stays under the Mozilla Public License 2.0. Third-party files bundled with kigumi, such as those in `webview/vendor/`, keep their own licenses.
