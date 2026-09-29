@@ -41,12 +41,13 @@ kigumi enforces this at runtime and will refuse to start if they diverge.
    - `git checkout main`
    - `git pull --ff-only`
 3. Apply requested bump.
-4. If `minor`/`major`: update hardcoded kumiki version fixtures in kigumi tests (see below) and
-   run `cd kigumi && npm run test:unit` to confirm.
-5. Update `CHANGELOG.md` (see below).
-6. Commit on `main`.
-7. Create tag(s).
-8. Push commit and tag(s) to origin.
+4. If `minor`/`major`: update hardcoded kumiki version fixtures in kigumi tests (see below).
+5. Run the pre-release checks (see below). Every bump, every target. If one fails, stop and
+   tell the user; do not tag.
+6. Update `CHANGELOG.md` (see below).
+7. Commit on `main`.
+8. Create tag(s).
+9. Push commit and tag(s) to origin.
 
 ## Exact bump logic
 
@@ -133,6 +134,40 @@ NODE
 ```
 
 Tag: `kigumi-v<new_version>`
+
+## Pre-release checks
+
+Each of these has let a broken release out before.
+
+1. **Python 3.13 venv.** kigumi builds user venvs with 3.13 (`VENV_PYTHON_VERSION` in
+   `kigumi/python-toolchain.js`), and `.python-version` pins dev to the same. Confirm
+   `.venv/bin/python --version` says 3.13; `uv sync --group dev` rebuilds it if not. kumiki
+   0.7.0 shipped unimportable on 3.11+ because dev and CI were on 3.10.
+2. **Both test suites, locally:**
+   ```bash
+   .venv/bin/python -m pytest -q tests
+   cd kigumi && npm run test:unit
+   ```
+   The kigumi runner tests need the repo-root `.venv`; without it they time out rather than
+   fail clearly. The kigumi suite includes the check that the starter frame copy in
+   `project-initializer.js` matches `patterns/structures/my_cute_frame.py` -- kigumi 0.7.0 wrote
+   a stale copy into every new project. If it fails, regenerate the copy from the pattern file.
+3. **Import the built wheel** (kumiki releases), from outside the checkout so the source tree
+   is not what gets imported:
+   ```bash
+   rm -rf dist && uv build -q
+   WHEEL=$(ls "$PWD"/dist/*.whl); cd "$(mktemp -d)"
+   for py in 3.10 3.13; do
+     uv run --isolated --no-project --python "$py" --with "$WHEEL" python -c "import kumiki"
+   done
+   ```
+4. **Patch bumps: the new kigumi must run on every kumiki it accepts.** A patch release of
+   kigumi still accepts `kumiki~=X.Y.0`, so its `runner.py` must not import anything the
+   oldest `X.Y` kumiki lacks. Check every `from kumiki... import` in `kigumi/runner.py` against
+   `git archive kumiki-vX.Y.0 kumiki`. If names are missing, the release needs a minor bump
+   instead -- tell the user before going on.
+5. **CI on `main` is green** for the commit being released: `gh run list --branch main --limit 5`.
+   Name any failure that already existed before this release rather than blocking on it.
 
 ## Minor/major bumps: update hardcoded version fixtures in kigumi tests
 

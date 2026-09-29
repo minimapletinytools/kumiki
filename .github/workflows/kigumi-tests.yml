@@ -1,0 +1,60 @@
+name: Kigumi Tests
+
+# The same unit tests the release build runs, on every change, so a failure
+# shows up on the PR rather than when a tag is pushed.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: kigumi
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Cache uv artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: uv-${{ runner.os }}-py3.13-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py3.13-
+
+      # The runner tests start runner.py against the repo's .venv.
+      - name: Install dependencies
+        run: |
+          if [ ! -f ../kumiki/_pattern_index.json ]; then
+            echo '{"schema_version":1,"entries":{}}' > ../kumiki/_pattern_index.json
+          fi
+          uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: kigumi/package.json
+
+      - name: Install Node.js dependencies
+        run: npm install
+
+      - name: Run unit tests
+        run: npm run test:unit
