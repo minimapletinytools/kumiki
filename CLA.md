@@ -1,14 +1,20 @@
 # Contributor License Agreement
 
-Thank you for contributing to kumiki and kigumi (the "Project"). This agreement
-makes clear what rights you grant when you contribute. You keep the copyright in
-your contributions; this is a license, not an assignment.
+Thank you for contributing to kigumi (the "Project"), the viewer in the
+`kigumi/` folder of the kumiki repository. This agreement makes clear what
+rights you grant when you contribute. You keep the copyright in your
+contributions; this is a license, not an assignment.
+
+This agreement covers kigumi only. Contributions to the rest of the repository,
+including the kumiki library, are made under its Mozilla Public License 2.0 and
+need no CLA.
 
 "We" and "us" mean the owner of the Project, the GitHub account
 `minimapletinytools`, and any successor to the Project's ownership. "You" means
 the individual or legal entity signing this agreement. A "Contribution" is any
-work you intentionally submit to the Project, by pull request or otherwise,
-including any modifications or additions to an existing work.
+work you intentionally submit to the Project -- any change to a file under
+`kigumi/`, by pull request or otherwise -- including any modifications or
+additions to an existing work.
 
 ## 1. Copyright license
 
@@ -56,4 +62,5 @@ Sign by commenting on your pull request with the sentence the CLA bot gives you:
 
 > I have read the CLA Document and I hereby sign the CLA
 
-One signature covers all your future Contributions to the Project.
+The bot only asks when a pull request changes something under `kigumi/`. One
+signature covers all your future Contributions to the Project.

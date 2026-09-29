@@ -16,7 +16,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### Project
 
-- Contributions now need a signed [Contributor License Agreement](CLA.md); a bot asks on each new contributor's first pull request.
+- Contributions to kigumi now need a signed [Contributor License Agreement](CLA.md); a bot asks on a new contributor's first pull request that changes `kigumi/`. Contributions to kumiki need no CLA.
 
 ## [kigumi 0.7.2] - 2026-09-29
 

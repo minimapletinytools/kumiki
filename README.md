@@ -77,7 +77,7 @@ Kigumi is 100% AI SLOP and it seems to not even be that awful :). Still, it's de
 
 ## Contributor License Agreement
 
-Before your first pull request can be merged, you'll be asked to sign the [Contributor License Agreement](CLA.md) by posting a comment on the PR. The CLA bot tells you exactly what to write, and you only sign once.
+Pull requests that change anything under `kigumi/` need a signed [Contributor License Agreement](CLA.md) before they can be merged. The CLA bot asks on your first such PR and tells you exactly what to comment; you only sign once. Contributions to kumiki need no CLA.
 
 # License
 
