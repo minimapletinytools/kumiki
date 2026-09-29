@@ -74,3 +74,14 @@ Kigumi has a separate project scanning flow such that it can be used with the Ku
 ## Developing Kigumi
 
 Kigumi is 100% AI SLOP and it seems to not even be that awful :). Still, it's designed with more care than I might sometimes pretends. It may be best to open a bug report of feature request in github vs making a PR as I have no documented architectural guidance for kigumi yet simultaneously highly opinionated.
+
+## Contributor License Agreement
+
+Before your first pull request can be merged, you'll be asked to sign the [Contributor License Agreement](CLA.md) by posting a comment on the PR. The CLA bot tells you exactly what to write, and you only sign once.
+
+# License
+
+- **kumiki** (the Python library, its patterns and docs) is under the [Mozilla Public License 2.0](LICENSE).
+- **kigumi** (the viewer: the VS Code extension and desktop app, in `kigumi/`) is under the [Elastic License 2.0](kigumi/LICENSE). You may use, modify and redistribute it freely, including commercially. What you may not do is offer it to others as a hosted or managed service -- the hosted web version of kigumi is published only by the project owner.
+
+Releases of kigumi up to and including 0.7.2 were under MPL-2.0 and remain so. Third-party files bundled with kigumi, such as those in `kigumi/webview/vendor/`, keep their own licenses.

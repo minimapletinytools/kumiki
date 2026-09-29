@@ -8,6 +8,16 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kigumi
+
+#### Changed
+
+- **License:** kigumi is now under the Elastic License 2.0 rather than MPL-2.0. Using, modifying and redistributing it stay free, including commercially; offering it to others as a hosted or managed service is not permitted. Releases up to and including 0.7.2 remain under MPL-2.0. kumiki is unchanged and stays MPL-2.0.
+
+### Project
+
+- Contributions now need a signed [Contributor License Agreement](CLA.md); a bot asks on each new contributor's first pull request.
+
 ## [kigumi 0.7.2] - 2026-09-29
 
 ### kigumi
