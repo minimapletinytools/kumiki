@@ -18,7 +18,7 @@ import math
 import warnings
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .rule import sqrt as sym_sqrt
 
@@ -30,6 +30,7 @@ from .cutcsg import (
     CSGFeatureExtent,
     CSGFeatureType,
     CutCSG,
+    FeatureKey,
     HasFeatures,
     LocatedFeatureGeometry,
     _finite_midpoint,
@@ -38,6 +39,7 @@ from .cutcsg import (
     OwnedFeatureHit,
     Profile,
 )
+from .solve_recipe import SolveEntity
 
 
 # ============================================================================
@@ -1020,6 +1022,9 @@ class PathExtrusion(HasFeatures, CutCSG):
         local_point = point - self.transform.position
         local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
         return local_coords[0], local_coords[1], local_coords[2]
+
+    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+        return {}
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         x, y, z = self._local_coords(point)
