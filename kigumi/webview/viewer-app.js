@@ -6580,9 +6580,10 @@ class KigumiViewerApp extends LitElement {
 
     getSceneBounds() {
         const acc = createBoundsAccumulator();
-        this.sceneManager.bundles().forEach((bundle) => {
+        // An iterator, not an array: older webviews have no Iterator.prototype.forEach.
+        for (const bundle of this.sceneManager.bundles()) {
             accumulateBounds(acc, bundle.mesh.geometry.getAttribute('position').array);
-        });
+        }
 
         if (!acc.hasAny) {
             return { minX: -1, minY: -1, minZ: -1, maxX: 1, maxY: 1, maxZ: 1 };

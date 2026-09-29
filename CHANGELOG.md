@@ -8,6 +8,14 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [kigumi 0.7.2] - 2026-09-29
+
+### kigumi
+
+#### Fixed
+
+- The viewer failed to show any frame on older VS Code builds, with `this.sceneManager.bundles(...).forEach is not a function`. It called `forEach` on an iterator, which Chromium only supports from 122; kigumi supports VS Code 1.63 (Chromium 91). A unit test now refuses iterator helpers in the webview.
+
 ## [kigumi 0.7.1] - 2026-09-28
 
 ### kigumi
