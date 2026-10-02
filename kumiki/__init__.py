@@ -75,8 +75,3 @@ except ModuleNotFoundError as exc:
     if exc.name != "trimesh":
         raise
 
-# Explicitly import private helper functions that are used by tests
-# These start with _ so they won't be included in "import *" by default
-from .timber import (
-    _create_timber_prism_csg_local
-)

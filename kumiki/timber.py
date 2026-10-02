@@ -1563,26 +1563,8 @@ def _create_extended_rectangular_prism(
     )
 
 
-# TODO DELETE, just combine with _extended_timber_without_cuts_csg_local
-def _create_timber_prism_csg_local(
-    timber: PerfectTimberWithin, 
-    cuts: list
-) -> CutCSG:
-    """
-    Helper function to create a prism CSG for a timber in LOCAL coordinates, 
-    extending ends with cuts to infinity.
-    
-    LOCAL coordinates means distances are relative to timber.bottom_position.
-    This is used for rendering (where the prism is created at origin and then transformed)
-    and for CSG operations (where cuts are also in local coordinates).
-    
-    Args:
-        timber: The timber to create a prism for
-        cuts: List of cuts on this timber (used to determine if ends should be infinite)
-        
-    Returns:
-        CutCSG representing the timber (possibly semi-infinite or infinite) in LOCAL coordinates
-    """
+def _ends_extended_by_cuts(timber: PerfectTimberWithin, cuts: list) -> Tuple[bool, bool]:
+    """(bottom, top): whether each end of `timber` runs to infinity because a cut has an end cut there."""
     # Check if bottom end has cuts
     has_bottom_cut = any(
         cut.get_maybe_bottom_end_cut() is not None
@@ -1601,9 +1583,7 @@ def _create_timber_prism_csg_local(
     
     # Note: did_end_cuts_extend_timber() can be called separately to check if cuts extend beyond bounds
     # For splice joints and similar, cuts extending beyond is expected and valid behavior
-    
-    # Use polymorphic method to get extended CSG
-    return timber.get_extended_actual_csg_local(extend_bot=has_bottom_cut, extend_top=has_top_cut)
+    return has_bottom_cut, has_top_cut
 
 
 def did_end_cuts_extend_timber(timber: PerfectTimberWithin, cuts: List['Cutting']) -> bool:
@@ -1672,6 +1652,8 @@ class CutTimber:
     timber: PerfectTimberWithin
     cuts: List['Cutting']
     joints: List['Joint']
+    _extended_rough_csg_local: CutCSG
+    _extended_perfect_csg_local: CutCSG
 
     def __init__(
         self,
@@ -1694,6 +1676,13 @@ class CutTimber:
         self.timber = timber
         self.cuts = cuts if cuts is not None else []
         self.joints = joints if joints is not None else []
+
+        # Built once here, so every caller gets the same node objects.
+        extend_bot, extend_top = _ends_extended_by_cuts(timber, self.cuts)
+        self._extended_rough_csg_local = timber.get_extended_actual_csg_local(
+            extend_bot=extend_bot, extend_top=extend_top)
+        self._extended_perfect_csg_local = timber.get_extended_perfect_csg_local(
+            extend_bot=extend_bot, extend_top=extend_top)
 
     def resolve_joint_path(self, path: 'JointPath') -> List['ResolvedJointPath']:
         """Which of this timber's joints a name refers to.
@@ -1776,7 +1765,11 @@ class CutTimber:
         Returns:
             RectangularPrism CSG representing the timber (possibly semi-infinite or infinite) in LOCAL coordinates
         """
-        return _create_timber_prism_csg_local(self.timber, self.cuts)
+        return self._extended_rough_csg_local
+
+    def get_extended_perfect_csg_local(self) -> CutCSG:
+        """The perfect timber within, with each end that has an end cut extended to infinity. Built once, at construction."""
+        return self._extended_perfect_csg_local
 
     # this one returns the timber with all cuts applied
     def render_timber_with_cuts_csg_local(self) -> CutCSG:

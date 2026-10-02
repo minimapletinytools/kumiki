@@ -749,6 +749,29 @@ class TestGetCornerPositionGlobal:
 
 class TestCutTimber:
     """Test CutTimber CSG operations."""
+
+    def _timber(self):
+        return create_timber(scalar(100), Matrix([scalar(4), scalar(6)]), Matrix([scalar(0), scalar(0), scalar(0)]),
+                             Matrix([scalar(0), scalar(0), scalar(1)]), Matrix([scalar(1), scalar(0), scalar(0)]),
+                             ticket='test_timber')
+
+    def test_prisms_are_built_once_and_reused(self):
+        timber = self._timber()
+        cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))])
+        rough = cut_timber._extended_timber_without_cuts_csg_local()
+        perfect = cut_timber.get_extended_perfect_csg_local()
+        assert cut_timber._extended_timber_without_cuts_csg_local() is rough
+        assert cut_timber.get_extended_perfect_csg_local() is perfect
+        rendered = cut_timber.render_timber_with_cuts_csg_local()
+        assert isinstance(rendered, Difference) and rendered.base is rough
+
+    def test_both_prisms_extend_the_ends_with_end_cuts(self):
+        timber = self._timber()
+        cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))])
+        for prism in (cut_timber._extended_timber_without_cuts_csg_local(), cut_timber.get_extended_perfect_csg_local()):
+            assert isinstance(prism, RectangularPrism)
+            assert prism.start_distance == 0
+            assert prism.end_distance is None
     
     def test_extended_timber_without_cuts_finite(self):
         """Test _extended_timber_without_cuts_csg for a timber with no cuts (finite)."""
