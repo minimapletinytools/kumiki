@@ -321,43 +321,8 @@ def prism_to_mesh(prism: Any) -> Dict[str, Any]:
 
 
 def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
-    """Build a perfect-timber-within (rectangular prism) CSG with the same cuts applied.
-
-    This mirrors CutTimber.render_timber_with_cuts_csg_local, but substitutes a
-    plain rectangular prism (sized to the timber's perfect bounding box) for the
-    timber's actual base CSG. Used to render a "perfect timber within" preview of
-    non-perfect timbers (e.g. RoundTimber, RegularPolygonTimber, MeshTimber).
-    """
-    from kumiki.cutcsg import Difference
-    from kumiki.timber import _create_extended_rectangular_prism, _ptw_face_tags
-
-    timber = cut_timber.timber
-    has_bottom_cut = any(c.get_maybe_bottom_end_cut() is not None for c in cut_timber.cuts)
-    has_top_cut = any(c.get_maybe_top_end_cut() is not None for c in cut_timber.cuts)
-
-    # face_tags is required; omitting it raised TypeError, so this preview
-    # never rendered. It is the perfect-timber-within prism, so it carries the
-    # ptw faces and names itself the way the timber's own perfect shape does.
-    base_prism = _create_extended_rectangular_prism(
-        face_tags=_ptw_face_tags(),
-        size=timber.get_perfect_size(),
-        length=timber.length,
-        extend_bot=has_bottom_cut,
-        extend_top=has_top_cut,
-        label=type(timber).csg_label("perfect", "extended"),
-    )
-
-    if not cut_timber.cuts:
-        return base_prism
-    # A cut that removes nothing contributes no node, exactly as in
-    # render_timber_with_cuts_csg_local.
-    negs = [
-        csg for csg in (c.get_negative_csg_local() for c in cut_timber.cuts)
-        if csg is not None
-    ]
-    if not negs:
-        return base_prism
-    return Difference(base_prism, negs)
+    """The perfect timber within with the same cuts applied, for previewing non-perfect timbers."""
+    return cut_timber.render_perfect_timber_within_with_cuts_csg_local()
 
 
 def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:

@@ -1260,33 +1260,44 @@ class Cutting:
     # joint); the order is assigned afterwards via Joint.with_order.
     assembly_ordering: Ordering = Ordering()
 
-    def get_maybe_top_end_cut(self) -> Optional[HalfSpace]:
-        """Return the top end cut HalfSpace derived from distance metadata."""
+    # Built once in __post_init__ from the fields above; the getters below return them.
+    _top_end_cut: Optional[HalfSpace] = field(default=None, init=False, repr=False, compare=False)
+    _bottom_end_cut: Optional[HalfSpace] = field(default=None, init=False, repr=False, compare=False)
+    _negative_csg_local: Optional[CutCSG] = field(default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self):
         if self.maybe_top_end_cut_distance_from_bottom is not None:
-            return HalfSpace(
+            object.__setattr__(self, '_top_end_cut', HalfSpace(
                 normal=create_v3(scalar(0), scalar(0), scalar(1)),
                 offset=self.maybe_top_end_cut_distance_from_bottom,
                 label=CutCSGLabel("top_end_cut"),
-            )
-        return None
-
-    def get_maybe_bottom_end_cut(self) -> Optional[HalfSpace]:
-        """Return the bottom end cut HalfSpace derived from distance metadata."""
+            ))
         if self.maybe_bottom_end_cut_distance_from_bottom is not None:
-            return HalfSpace(
+            object.__setattr__(self, '_bottom_end_cut', HalfSpace(
                 normal=create_v3(scalar(0), scalar(0), scalar(-1)),
                 offset=-self.maybe_bottom_end_cut_distance_from_bottom,
                 label=CutCSGLabel("bottom_end_cut"),
-            )
-        return None
+            ))
+        object.__setattr__(self, '_negative_csg_local', self._build_negative_csg_local())
+
+    def get_maybe_top_end_cut(self) -> Optional[HalfSpace]:
+        """The top end cut HalfSpace, or None. Built once, at construction."""
+        return self._top_end_cut
+
+    def get_maybe_bottom_end_cut(self) -> Optional[HalfSpace]:
+        """The bottom end cut HalfSpace, or None. Built once, at construction."""
+        return self._bottom_end_cut
 
     def get_negative_csg_local(self) -> Optional[CutCSG]:
         """
-        Get the complete negative CSG including end cuts.
+        Get the complete negative CSG including end cuts. Built once, at construction.
 
         Returns the union of negative_csg with any end cuts that are defined,
         or None when this cutting removes nothing at all.
         """
+        return self._negative_csg_local
+
+    def _build_negative_csg_local(self) -> Optional[CutCSG]:
         csg_components = []
 
         # negative_csg and the end-cut metadata can describe the same plane.
@@ -1654,6 +1665,8 @@ class CutTimber:
     joints: List['Joint']
     _extended_rough_csg_local: CutCSG
     _extended_perfect_csg_local: CutCSG
+    _rendered_csg_local: CutCSG
+    _rendered_perfect_csg_local: CutCSG
 
     def __init__(
         self,
@@ -1683,6 +1696,15 @@ class CutTimber:
             extend_bot=extend_bot, extend_top=extend_top)
         self._extended_perfect_csg_local = timber.get_extended_perfect_csg_local(
             extend_bot=extend_bot, extend_top=extend_top)
+
+        # A cut that removes nothing contributes no node.
+        negative_csgs = [csg for csg in (cut.get_negative_csg_local() for cut in self.cuts) if csg is not None]
+        self._rendered_csg_local = (
+            Difference(self._extended_rough_csg_local, negative_csgs) if negative_csgs
+            else self._extended_rough_csg_local)
+        self._rendered_perfect_csg_local = (
+            Difference(self._extended_perfect_csg_local, negative_csgs) if negative_csgs
+            else self._extended_perfect_csg_local)
 
     def resolve_joint_path(self, path: 'JointPath') -> List['ResolvedJointPath']:
         """Which of this timber's joints a name refers to.
@@ -1771,33 +1793,13 @@ class CutTimber:
         """The perfect timber within, with each end that has an end cut extended to infinity. Built once, at construction."""
         return self._extended_perfect_csg_local
 
-    # this one returns the timber with all cuts applied
     def render_timber_with_cuts_csg_local(self) -> CutCSG:
-        """
-        Returns a CSG representation of the timber with all cuts applied.
+        """The rough timber with every cut subtracted. Built once, at construction."""
+        return self._rendered_csg_local
 
-        
-        Returns:
-            Difference CSG representing the timber with all cuts subtracted
-        """
-        # Start with the timber prism (possibly with infinite ends where cuts exist)
-        starting_csg = self._extended_timber_without_cuts_csg_local()
-        
-        # If there are no cuts, just return the starting CSG
-        if not self.cuts:
-            return starting_csg
-        
-        # Collect all the negative CSGs (volumes to be removed) from the cuts.
-        # A cut that removes nothing contributes no node.
-        negative_csgs = [
-            csg for csg in (cut.get_negative_csg_local() for cut in self.cuts)
-            if csg is not None
-        ]
-        if not negative_csgs:
-            return starting_csg
-        
-        # Return the difference: timber - all cuts
-        return Difference(starting_csg, negative_csgs)
+    def render_perfect_timber_within_with_cuts_csg_local(self) -> CutCSG:
+        """The perfect timber within with every cut subtracted. Built once, at construction."""
+        return self._rendered_perfect_csg_local
 
     
     def _bounding_box_prism_for_cross_section(
