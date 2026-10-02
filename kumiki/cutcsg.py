@@ -1968,6 +1968,7 @@ def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
     return carriers
 
 
+# TODO consider making this typed, you could do this by adding... an optional owner field to FeatureHit and removing this class all together. Or making several OwnedFeatureHit classes is fine too I guess.
 @dataclass(frozen=True)
 class OwnedFeatureHit:
     """A feature, paired with the primitive it belongs to
