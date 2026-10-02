@@ -2097,12 +2097,16 @@ def _plane_for_pick(
         held_geometry, geometry, payload.get("heldAt"), anchor, look)
 
 
-def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
-    placement = getattr(measure, "placement", None)
+def _serialize_code_measure(measure: Any, frame: Any) -> Optional[Dict[str, Any]]:
+    anchors = measure.wire_anchors(frame)
+    if anchors is None:
+        log_stderr("Warning: a measurement's feature is not in this frame, so it is left out.")
+        return None
+    first, second, placement = anchors
     plane = getattr(measure, "plane", None)
     return {
-        "a": serialize_feature_path(measure.anchor_a),
-        "b": serialize_feature_path(measure.anchor_b),
+        "a": serialize_feature_path(first),
+        "b": serialize_feature_path(second),
         "measureId": str(measure.measure_id) if measure.measure_id else None,
         # Neither is part of identity: asking for a different kind, or moving
         # the line, is not measuring something else. They travel so that
@@ -2198,6 +2202,7 @@ def _file_measurements_by_viewport(entry: Optional[Dict[str, Any]]) -> Dict[str,
 def _measurements_by_viewport(
     declared: Any,
     override: Optional[Dict[str, Any]],
+    frame: Any,
 ) -> Dict[str, List[Dict[str, Any]]]:
     """A drawing's measurements, merged tier over tier, under each viewport.
 
@@ -2212,7 +2217,8 @@ def _measurements_by_viewport(
     merged: Dict[str, List[Dict[str, Any]]] = {}
     for viewport in list(code_by_viewport) + [v for v in file_by_viewport if v not in code_by_viewport]:
         merged[viewport] = merge_measurements(
-            [_serialize_code_measure(m) for m in code_by_viewport.get(viewport, ())],
+            [wire for wire in (_serialize_code_measure(m, frame) for m in code_by_viewport.get(viewport, ()))
+             if wire is not None],
             list(file_by_viewport.get(viewport) or []),
         )
     return merged
@@ -2532,7 +2538,7 @@ def collect_drawings(
             overridden.add(id(override))
             scene["overriddenBy"] = override["id"]
         scene["origin"] = ORIGIN_CODE if override is None else ORIGIN_OVERRIDDEN
-        _attach_measurements(scene, _measurements_by_viewport(declared, override), scene["name"], frame)
+        _attach_measurements(scene, _measurements_by_viewport(declared, override, frame), scene["name"], frame)
         drawings.append(scene)
 
     for entry in from_file:
@@ -2551,7 +2557,7 @@ def collect_drawings(
                 "which the frame no longer declares."
             )
         scene["origin"] = ORIGIN_FILE
-        _attach_measurements(scene, _measurements_by_viewport(None, entry), scene["name"], frame)
+        _attach_measurements(scene, _measurements_by_viewport(None, entry, frame), scene["name"], frame)
         drawings.append(scene)
 
     # Not in the file yet: either the drawing itself is unsaved, or the override

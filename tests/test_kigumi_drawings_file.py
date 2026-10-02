@@ -21,7 +21,8 @@ from kumiki.identity import (DerivedFeaturePath, DrawingId, FeaturePath, Feature
                              ResolvedJointPath, ResolvedTimberPath, SingleFeaturePath,
                              TimberPath)
 from kumiki.timber import Frame
-from tests.testing_shavings import load_module, present
+from kumiki.feature_paths import find_feature
+from tests.testing_shavings import load_module, mortise_and_tenon_handles, present
 
 
 def _load_runner():
@@ -54,6 +55,25 @@ def _frame(drawings=(), paths=("posts/fl", "posts/fr")):
         joints=[], additional_unjointed_timbers=[_post(path) for path in paths]
     )
     return Frame(cut_timbers=built.cut_timbers, drawings=list(drawings))
+
+
+BODY = ("timber (rough, extended)",)
+# An uncut timber's tree is its prism alone, so its faces' wire path is empty.
+UNCUT = ()
+
+
+def _posts_with(make_drawings, paths=("posts/fl", "posts/fr")):
+    """A frame of posts whose drawings are made from handles to the posts' own faces.
+
+    `make_drawings(face)` gets `face(name, timber="posts/fl")`, a handle to one rough face.
+    """
+    built = Frame.from_joints(joints=[], additional_unjointed_timbers=[_post(path) for path in paths])
+
+    def face(name, timber="posts/fl"):
+        cut_timber = present(built.cut_timber_at(ResolvedTimberPath(timber)), timber)
+        return present(find_feature(cut_timber, BODY, name), name)
+
+    return Frame(cut_timbers=built.cut_timbers, drawings=list(make_drawings(face)))
 
 
 def _write_file(example, drawings):
@@ -343,9 +363,9 @@ class TestMeasurementsThroughADrawing:
         return next(v for v in drawing["viewports"] if v["id"] == str(FRONT))["measurements"]
 
     def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
-        frame = _frame([Drawing(
+        frame = _posts_with(lambda face: [Drawing(
             name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
-            measurements={FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
+            measurements={FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))]},
         )])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -358,11 +378,11 @@ class TestMeasurementsThroughADrawing:
 
     def test_the_same_pair_in_two_viewports_are_two_measurements(self, example):
         # Neither overrides the other; they have different numbers.
-        frame = _frame([Drawing(
+        frame = _posts_with(lambda face: [Drawing(
             name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
             measurements={
-                FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
-                RIGHT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
+                FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
+                RIGHT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
             },
         )])
 
@@ -373,15 +393,17 @@ class TestMeasurementsThroughADrawing:
         assert len(by_id[str(RIGHT)]) == 1
 
     def test_an_override_only_reaches_its_own_viewport(self, example):
-        frame = _frame([Drawing(
+        frame = _posts_with(lambda face: [Drawing(
             name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
             measurements={
-                FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
-                RIGHT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
+                FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
+                RIGHT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
             },
         )])
         _write_file(example, [_override("sheet", "post", [
-            {"id": str(FRONT), "measurements": [{"a": _ref("x"), "b": _ref("y")}]},
+            {"id": str(FRONT), "measurements": [
+                {"a": _ref("rough.front", timber="posts/fl#0", csg_path=UNCUT),
+                 "b": _ref("rough.back", timber="posts/fl#0", csg_path=UNCUT)}]},
         ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -393,9 +415,9 @@ class TestMeasurementsThroughADrawing:
     def test_adding_a_measurement_does_not_freeze_the_drawing(self, example):
         # The reason measurements merge where everything else replaces: an
         # override of the whole drawing would take its layout with it.
-        frame = _frame([Drawing(
+        frame = _posts_with(lambda face: [Drawing(
             name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
-            measurements={FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
+            measurements={FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))]},
         )])
         _write_file(example, [_override("sheet", "post", [
             {"id": str(FRONT), "measurements": [{"a": _ref("p"), "b": _ref("q")}]},
@@ -554,14 +576,20 @@ class TestSingleFeaturePath:
         assert runner._feature_path_identity(on_the_wire) == reference.identity()
 
     def test_a_measurement_is_the_same_measured_either_way_round(self):
-        there = Measure(anchor_a=_path("x"), anchor_b=_path("y"))
-        back = Measure(anchor_a=_path("y"), anchor_b=_path("x"))
+        found = {}
+        frame = _posts_with(lambda face: found.update(x=face("rough.front"), y=face("rough.back")) or [])
+        there = Measure(anchor_a=found["x"], anchor_b=found["y"])
+        back = Measure(anchor_a=found["y"], anchor_b=found["x"])
 
-        assert there.identity() == back.identity()
+        assert there.identity(frame) == back.identity(frame)
 
     def test_an_id_still_separates_two_of_the_same_pair(self):
-        assert (Measure(anchor_a=_path("x"), anchor_b=_path("y")).identity()
-                != Measure(anchor_a=_path("x"), anchor_b=_path("y"), measure_id=MeasurementId("2")).identity())
+        found = {}
+        frame = _posts_with(lambda face: found.update(x=face("rough.front"), y=face("rough.back")) or [])
+
+        assert (Measure(anchor_a=found["x"], anchor_b=found["y"]).identity(frame)
+                != Measure(anchor_a=found["x"], anchor_b=found["y"],
+                           measure_id=MeasurementId("2")).identity(frame))
 
 
 class TestResolvingATimberPath:
@@ -695,16 +723,17 @@ class TestPuttingAPairInOneOrder:
     def test_measuring_a_to_b_is_measuring_b_to_a(self):
         from kumiki.drawing import Measure, MeasurementKind, MeasurementPlacement
 
-        face, edge = self._single("top", "cut"), self._derived("a", "b")
+        frame, found = mortise_and_tenon_handles()
+        face, edge = found["tenon_left"], found["shoulder_edge"]
         kind = MeasurementKind.parse("projected_perpendicular_distance")
 
         one = Measure(face, edge, kind=kind, placement=MeasurementPlacement(offset=12.0))
         other = Measure(edge, face, kind=kind, placement=MeasurementPlacement(offset=-12.0))
 
-        assert one.identity() == other.identity()
+        assert one.identity(frame) == other.identity(frame)
         # The offset follows the swap, so both name the same line on the sheet.
-        assert (present(one.placement, "a placement").offset
-                == present(other.placement, "a placement").offset)
+        assert (present(present(one.wire_anchors(frame))[2]).offset
+                == present(present(other.wire_anchors(frame))[2]).offset)
 
 
 class TestResolvingAnchors:
@@ -1079,22 +1108,17 @@ class TestDeletingAMeasurementTheCodeAsksFor:
     """It cannot be done. The code asks again the next time it runs."""
 
     def _frame(self):
-        anchor = lambda feature: SingleFeaturePath(
-            timber=ResolvedTimberPath("post"),
-            ref=FeatureRef(csg_path=("cut",), feature=feature),
-            feature_type="FACE",
-        )
-        return Frame(cut_timbers=[], name="f", drawings=[Drawing(
+        return _posts_with(lambda face: [Drawing(
             name="plan",
             timber_paths=(ResolvedTimberPath("post"),),
             measurements={ViewportId(VIEWPORT): [
-                Measure(anchor_a=anchor("left"), anchor_b=anchor("right"))]},
-        )])
+                Measure(anchor_a=face("rough.left", "post"), anchor_b=face("rough.right", "post"))]},
+        )], paths=("post",))
 
     def _wire(self):
         return {
-            "a": {"timber": "post#0", "csgPath": ["cut"], "feature": "left", "type": "FACE"},
-            "b": {"timber": "post#0", "csgPath": ["cut"], "feature": "right", "type": "FACE"},
+            "a": _ref("rough.left", timber="post#0", csg_path=UNCUT),
+            "b": _ref("rough.right", timber="post#0", csg_path=UNCUT),
             "measureId": None,
         }
 

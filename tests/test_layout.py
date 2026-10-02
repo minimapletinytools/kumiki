@@ -14,11 +14,10 @@ from kumiki.drawing import (Drawing, ELEVATION_IDS, Length, Measure, Page,
                             Portion, SHOP_DRAWING_IDS, Share,
                             SplitDirection, Subdivision, Viewport, columns,
                             covering_page, rows)
-from kumiki.identity import (FeatureRef, ResolvedTimberPath, SingleFeaturePath,
-                             TimberPath, ViewportId)
+from kumiki.identity import ResolvedTimberPath, TimberPath, ViewportId
 from kumiki.layout import resolve_drawing, resolve_viewports
 from kumiki.rule import mm
-from tests.testing_shavings import present
+from tests.testing_shavings import mortise_and_tenon_handles, present
 
 A3 = Page(0.420, 0.297)
 
@@ -333,11 +332,10 @@ class TestDrawingOrder:
 class TestWhereAMeasurementIsWritten:
     """Two ways of saying it, for two different situations."""
 
-    def _anchor(self, name):
-        return SingleFeaturePath(ResolvedTimberPath("post"), FeatureRef(("cut",), name))
+    _handles = mortise_and_tenon_handles()[1]
 
-    def _measure(self, name="a"):
-        return Measure(self._anchor(name), self._anchor("b"))
+    def _measure(self, name="tenon_top"):
+        return Measure(self._handles[name], self._handles["shoulder"])
 
     def test_on_the_viewport_when_the_drawing_built_it(self):
         # No counting: the measurement sits on the view it is drawn in, and the
@@ -358,9 +356,9 @@ class TestWhereAMeasurementIsWritten:
         assert list(drawing.measurements_by_viewport()) == ["0.0.1"]
 
     def test_a_viewport_with_both_gets_both(self):
-        front = Viewport(label="Front", measurements=[self._measure("own")])
+        front = Viewport(label="Front", measurements=[self._measure("tenon_top")])
         drawing = Drawing(name="d", page=A3, viewports=[covering_page(rows(front))],
-                          measurements={ViewportId("0.0"): [self._measure("keyed")]})
+                          measurements={ViewportId("0.0"): [self._measure("tenon_left")]})
 
         assert len(drawing.measurements_by_viewport()["0.0"]) == 2
 
