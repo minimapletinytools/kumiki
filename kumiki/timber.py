@@ -2546,6 +2546,24 @@ class Frame:
 
         return [TimberPath(_timber_path_of(cut.timber)) for cut in self.cut_timbers]
 
+    def cut_timber_of(self, timber: PerfectTimberWithin) -> Optional[CutTimber]:
+        """The cut timber holding this exact timber object, or None."""
+        return next((cut for cut in self.cut_timbers if cut.timber is timber), None)
+
+    def resolved_timber_path_of(self, timber: PerfectTimberWithin) -> Optional['ResolvedTimberPath']:
+        """This exact timber's path in this frame, with its occurrence among timbers sharing the name."""
+        from .identity import ResolvedTimberPath
+
+        wanted = _timber_path_of(timber)
+        same_name = [cut for cut in self.cut_timbers if _timber_path_of(cut.timber) == wanted]
+        occurrence = next((i for i, cut in enumerate(same_name) if cut.timber is timber), None)
+        return None if occurrence is None else ResolvedTimberPath(path=wanted, occurrence=occurrence)
+
+    def cut_timber_at(self, path: 'ResolvedTimberPath') -> Optional[CutTimber]:
+        """The cut timber a resolved path names in this frame, or None."""
+        same_name = [cut for cut in self.cut_timbers if _timber_path_of(cut.timber) == path.path]
+        return same_name[path.occurrence] if path.occurrence < len(same_name) else None
+
     @classmethod
     def from_joints(cls, joints: List[Joint],
                     additional_unjointed_timbers: Optional[List[PerfectTimberWithin]] = None,

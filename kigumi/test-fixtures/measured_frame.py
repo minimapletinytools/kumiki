@@ -14,23 +14,22 @@ project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
 from kumiki.drawing import Drawing, Measure
-from kumiki.identity import (FeatureRef, ResolvedTimberPath, SingleFeaturePath,
-                             ViewportId)
+from kumiki.feature_paths import find_feature
+from kumiki.identity import ResolvedTimberPath, ViewportId
 from kumiki.timber import Frame
 from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
 
 
-def _face(timber, cut, feature):
-    """A declared face of one timber, named the way the drawings file names it."""
-    return SingleFeaturePath(
-        timber=ResolvedTimberPath(timber),
-        ref=FeatureRef(csg_path=cut, feature=feature),
-        feature_type="FACE",
-    )
-
-
 def build_frame():
     joint = example_basic_mortise_and_tenon_joint()
+    built = Frame.from_joints(joints=[joint])
+
+    def _face(timber, cut, feature):
+        cut_timber = built.cut_timber_at(ResolvedTimberPath(timber))
+        assert cut_timber is not None
+        handle = find_feature(cut_timber, cut, feature)
+        assert handle is not None, feature
+        return handle
 
     tenon_top = _face("butt_timber", ("tenon_waste", "tenon"), "tenon_top")
     shoulder = _face("butt_timber", ("tenon_waste", "shoulder"), "shoulder")
@@ -38,7 +37,7 @@ def build_frame():
     mortise_front = _face("receiving_timber", ("mortise_hole",), "mortise_front")
 
     return Frame(
-        cut_timbers=Frame.from_joints(joints=[joint]).cut_timbers,
+        cut_timbers=built.cut_timbers,
         name="Measured Fixture Frame",
         drawings=[
             # One piece, so this gets the four-long-faces layout, and the

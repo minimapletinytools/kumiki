@@ -25,12 +25,10 @@ from kumiki.drawing import (
     does_override,
     kinds_for,
 )
-from kumiki.identity import (DerivedFeaturePath, FeatureRef, MeasurementId,
-                             ResolvedTimberPath,
-                             SingleFeaturePath)
+from kumiki.feature_paths import to_feature_path
 from kumiki.geometry import Line, Plane, Point
 from kumiki.rule import create_v3
-from tests.testing_shavings import load_module, present
+from tests.testing_shavings import load_module, mortise_and_tenon_handles, present
 
 
 def geometry(wire):
@@ -52,27 +50,6 @@ def geometry(wire):
     if kind == "plane":
         return Plane(point=at, normal=create_v3(*(wire.get("normal") or (0, 0, 0))))
     return None
-
-def _feature_of(anchor) -> str:
-    """The feature an anchor names.
-
-    Measure holds FeaturePath, which is abstract on purpose -- a derived edge
-    has two parents and no single feature. These tests build the other kind, so
-    this says so rather than reaching for an attribute the declared type has
-    not got.
-    """
-    assert isinstance(anchor, SingleFeaturePath), f"expected a single feature, got {anchor!r}"
-    return anchor.feature or ""
-
-
-def _offset_of(measure) -> float:
-    """Where a measurement's dimension line sits.
-
-    Both the placement and its offset are optional -- "wherever the viewport
-    puts it" -- and these tests are about the ones that say.
-    """
-    return present(present(measure.placement, "a placement").offset, "an offset")
-
 
 DISTANCE = MeasurementOperation.DISTANCE
 ANGLE = MeasurementOperation.ANGLE
@@ -305,116 +282,126 @@ class TestWhatTheSolidAdmits:
 # See .claude/plans/drawing-rule-migration.md for how it got here.
 
 
+@pytest.fixture(scope="module")
+def handles():
+    return mortise_and_tenon_handles()
+
+
+def _in_wire_order(frame, one, other):
+    """The two handles, sorted the way a measurement writes them."""
+    first, second = present(to_feature_path(one, frame)), present(to_feature_path(other, frame))
+    return (one, other) if first.sort_key <= second.sort_key else (other, one)
+
+
+def _wire(measure, frame):
+    return present(measure.wire_anchors(frame), "both anchors in the frame")
+
+
 class TestAnchorsAreWrittenInOneOrder:
     """Measuring A to B and measuring B to A are the same measurement."""
 
-    def _anchor(self, name):
-        return SingleFeaturePath(
-            ResolvedTimberPath("post"), FeatureRef((name,), name), "FACE")
+    def _pair(self, handles):
+        frame, found = handles
+        return frame, *_in_wire_order(frame, found["tenon_top"], found["shoulder"])
 
-    def test_the_pair_comes_out_the_same_way_round(self):
-        first, second = self._anchor("aaa"), self._anchor("zzz")
+    def test_the_pair_comes_out_the_same_way_round(self, handles):
+        frame, first, second = self._pair(handles)
 
-        forwards = Measure(first, second)
-        backwards = Measure(second, first)
+        assert _wire(Measure(first, second), frame)[:2] == _wire(Measure(second, first), frame)[:2]
 
-        assert _feature_of(forwards.anchor_a) == _feature_of(backwards.anchor_a)
-        assert forwards == backwards
-
-    def test_it_is_one_measurement_however_it_was_written(self):
+    def test_it_is_one_measurement_however_it_was_written(self, handles):
         # Without this a pair written both ways is two entries in a viewport,
         # two dimensions drawn on top of each other, and a file override that
         # matches neither.
-        first, second = self._anchor("aaa"), self._anchor("zzz")
+        frame, first, second = self._pair(handles)
 
-        assert Measure(first, second).identity() == Measure(second, first).identity()
+        assert Measure(first, second).identity(frame) == Measure(second, first).identity(frame)
 
-    def test_swapping_keeps_the_dimension_on_the_same_side(self):
+    def test_swapping_keeps_the_dimension_on_the_same_side(self, handles):
         # The offset is perpendicular to the run between the anchors, so
         # reversing the run reverses the side. The offset is signed, so
         # negating it puts the line back.
-        first, second = self._anchor("aaa"), self._anchor("zzz")
+        frame, first, second = self._pair(handles)
 
-        swapped = Measure(second, first, placement=MeasurementPlacement(offset=-24.0))
+        placement = _wire(Measure(second, first, placement=MeasurementPlacement(offset=-24.0)), frame)[2]
 
-        assert _offset_of(swapped) == 24.0
+        assert present(placement).offset == 24.0
 
-    def test_an_order_that_is_already_canonical_is_left_alone(self):
-        first, second = self._anchor("aaa"), self._anchor("zzz")
+    def test_an_order_that_is_already_canonical_is_left_alone(self, handles):
+        frame, first, second = self._pair(handles)
 
-        kept = Measure(first, second, placement=MeasurementPlacement(offset=-24.0))
+        a, _, placement = _wire(Measure(first, second, placement=MeasurementPlacement(offset=-24.0)), frame)
 
-        assert _feature_of(kept.anchor_a) == "aaa"
-        assert _offset_of(kept) == -24.0
+        assert a == to_feature_path(first, frame)
+        assert present(placement).offset == -24.0
 
-    def test_no_placement_is_fine(self):
-        first, second = self._anchor("aaa"), self._anchor("zzz")
+    def test_no_placement_is_fine(self, handles):
+        frame, first, second = self._pair(handles)
 
-        assert Measure(second, first).placement is None
+        assert _wire(Measure(second, first), frame)[2] is None
+
+    def test_an_anchor_not_in_the_frame_has_no_wire_form(self, handles):
+        frame, found = handles
+        _, elsewhere = mortise_and_tenon_handles()
+
+        assert Measure(found["tenon_top"], elsewhere["shoulder"]).wire_anchors(frame) is None
 
 
 class TestKindTellsTwoMeasurementsApart:
     """Two kinds between one pair are two dimensions, and both should show."""
 
-    def _anchor(self, name):
-        return SingleFeaturePath(
-            ResolvedTimberPath("post"), FeatureRef((name,), name), "FACE")
-
-    def _pair(self):
-        return self._anchor("aaa"), self._anchor("zzz")
-
-    def test_the_horizontal_and_the_vertical_are_not_the_same_measurement(self):
+    def test_the_horizontal_and_the_vertical_are_not_the_same_measurement(self, handles):
         # The ordinary thing to want between two points, without having to mint
         # an id to say they are different.
-        first, second = self._pair()
+        frame, found = handles
+        first, second = found["tenon_top"], found["shoulder"]
 
         across = Measure(first, second, kind=MeasurementKind.parse("projected_horizontal_distance"))
         up = Measure(first, second, kind=MeasurementKind.parse("projected_vertical_distance"))
 
-        assert across.identity() != up.identity()
+        assert across.identity(frame) != up.identity(frame)
 
-    def test_the_same_kind_written_twice_is_one_measurement(self):
-        first, second = self._pair()
+    def test_the_same_kind_written_twice_is_one_measurement(self, handles):
+        frame, found = handles
+        first, second = found["tenon_top"], found["shoulder"]
+        kind = MeasurementKind.parse("projected_horizontal_distance")
 
-        assert (Measure(first, second, kind=MeasurementKind.parse("projected_horizontal_distance")).identity()
-                == Measure(second, first, kind=MeasurementKind.parse("projected_horizontal_distance")).identity())
+        assert Measure(first, second, kind=kind).identity(frame) == Measure(second, first, kind=kind).identity(frame)
 
-    def test_an_older_name_matches_the_kind_it_became(self):
+    def test_an_older_name_matches_the_kind_it_became(self, handles):
         # A file written before kinds had structure has to keep overriding the
         # code measurement it always overrode.
-        first, second = self._pair()
+        frame, found = handles
+        first, second = found["tenon_top"], found["shoulder"]
         older = Measure(first, second, kind=MeasurementKind.parse("projected_angle"))
         newer = Measure(first, second,
                         kind=MeasurementKind.from_wire(
                             {"operation": "angle", "space": "projected",
                              "direction": "perpendicular"}))
 
-        assert older.identity() == newer.identity()
+        assert older.identity(frame) == newer.identity(frame)
 
-    def test_asking_for_no_kind_is_its_own_measurement(self):
+    def test_asking_for_no_kind_is_its_own_measurement(self, handles):
         # "Whichever is natural" is a different request from naming one, even
         # when the viewport would resolve it to the same thing.
-        first, second = self._pair()
+        frame, found = handles
+        first, second = found["tenon_top"], found["shoulder"]
 
-        assert Measure(first, second).identity() != Measure(
-            first, second, kind=MeasurementKind.parse("projected_horizontal_distance")).identity()
+        assert Measure(first, second).identity(frame) != Measure(
+            first, second, kind=MeasurementKind.parse("projected_horizontal_distance")).identity(frame)
 
-    def test_the_viewer_and_the_library_build_the_same_identity(self):
+    def test_the_viewer_and_the_library_build_the_same_identity(self, handles):
         # A file measurement overrides a code one by matching this tuple, so
         # the two sides have to agree on what it is.
         runner_path = Path(__file__).resolve().parent.parent / "kigumi" / "runner.py"
         runner = load_module("kigumi_runner_kinds", runner_path)
 
-        first, second = self._pair()
-        measure = Measure(first, second, kind=MeasurementKind.parse("projected_horizontal_distance"))
-        on_the_wire = {
-            "a": runner.serialize_feature_path(measure.anchor_a),
-            "b": runner.serialize_feature_path(measure.anchor_b),
-            "kind": present(measure.kind, "a kind").as_wire(),
-            "measureId": None,
-        }
+        frame, found = handles
+        measure = Measure(found["shoulder"], found["tenon_top"],
+                          kind=MeasurementKind.parse("projected_horizontal_distance"))
+        on_the_wire = present(runner._serialize_code_measure(measure, frame))
 
-        assert runner._measure_identity(on_the_wire) == measure.identity()
+        assert runner._measure_identity(on_the_wire) == measure.identity(frame)
 
 
 class TestWhatReplacesWhat:
@@ -424,88 +411,70 @@ class TestWhatReplacesWhat:
     CODED = MeasurementSource.PYTHON_CODED
     FILE = MeasurementSource.FILE_OVERRIDE
 
-    def _anchor(self, name):
-        return SingleFeaturePath(
-            ResolvedTimberPath("post"), FeatureRef((name,), name), "FACE")
-
-    def _measure(self, kind=None):
-        """A measurement of the named kind. The name is parsed, not passed --
-        Measure takes a MeasurementKind, and turning a name into one is
-        MeasurementKind.parse's job rather than the constructor's."""
-        return Measure(self._anchor("aaa"), self._anchor("zzz"),
+    def _measure(self, handles, kind=None, other="shoulder"):
+        _, found = handles
+        return Measure(found["tenon_top"], found[other],
                        kind=None if kind is None else MeasurementKind.parse(kind))
 
-    def test_a_file_override_must_match_the_kind_too(self):
+    def test_a_file_override_must_match_the_kind_too(self, handles):
         # It was written against a particular dimension. The vertical between
         # the same two features is one it was never about.
-        across = self._measure("projected_horizontal_distance")
-        up = self._measure("projected_vertical_distance")
+        frame = handles[0]
+        across = self._measure(handles, "projected_horizontal_distance")
+        up = self._measure(handles, "projected_vertical_distance")
 
-        assert does_override(across, across, self.FILE, self.CODED)
-        assert not does_override(up, across, self.FILE, self.CODED)
+        assert does_override(across, across, self.FILE, self.CODED, frame)
+        assert not does_override(up, across, self.FILE, self.CODED, frame)
 
-    def test_code_overrules_an_algorithm_whatever_kind_it_chose(self):
+    def test_code_overrules_an_algorithm_whatever_kind_it_chose(self, handles):
         # Otherwise you would have to guess the generated kind to replace it,
         # which stops working the next time the algorithm changes.
-        across = self._measure("projected_horizontal_distance")
-        up = self._measure("projected_vertical_distance")
+        frame = handles[0]
+        across = self._measure(handles, "projected_horizontal_distance")
+        up = self._measure(handles, "projected_vertical_distance")
 
-        assert does_override(up, across, self.CODED, self.GENERATED)
+        assert does_override(up, across, self.CODED, self.GENERATED, frame)
 
-    def test_a_different_pair_is_never_the_same_measurement(self):
-        one = self._measure("projected_horizontal_distance")
-        other = Measure(self._anchor("aaa"), self._anchor("mmm"), kind=MeasurementKind.parse("projected_horizontal_distance"))
+    def test_a_different_pair_is_never_the_same_measurement(self, handles):
+        frame = handles[0]
+        one = self._measure(handles, "projected_horizontal_distance")
+        other = self._measure(handles, "projected_horizontal_distance", other="tenon_left")
 
-        assert not does_override(other, one, self.FILE, self.CODED)
-        assert not does_override(other, one, self.CODED, self.GENERATED)
+        assert not does_override(other, one, self.FILE, self.CODED, frame)
+        assert not does_override(other, one, self.CODED, self.GENERATED, frame)
 
-    def test_two_of_the_same_tier_sit_beside_each_other(self):
+    def test_two_of_the_same_tier_sit_beside_each_other(self, handles):
         # However alike. Two coded measurements are two measurements.
-        measure = self._measure("projected_horizontal_distance")
+        frame = handles[0]
+        measure = self._measure(handles, "projected_horizontal_distance")
 
-        assert not does_override(measure, measure, self.CODED, self.CODED)
-        assert not does_override(measure, measure, self.FILE, self.FILE)
+        assert not does_override(measure, measure, self.CODED, self.CODED, frame)
+        assert not does_override(measure, measure, self.FILE, self.FILE, frame)
 
-    def test_a_lower_tier_never_displaces_a_higher_one(self):
-        measure = self._measure("projected_horizontal_distance")
+    def test_a_lower_tier_never_displaces_a_higher_one(self, handles):
+        frame = handles[0]
+        measure = self._measure(handles, "projected_horizontal_distance")
 
-        assert not does_override(measure, measure, self.CODED, self.FILE)
-        assert not does_override(measure, measure, self.GENERATED, self.FILE)
-        assert not does_override(measure, measure, self.GENERATED, self.CODED)
+        assert not does_override(measure, measure, self.CODED, self.FILE, frame)
+        assert not does_override(measure, measure, self.GENERATED, self.FILE, frame)
+        assert not does_override(measure, measure, self.GENERATED, self.CODED, frame)
 
 
 class TestMeasuringAFaceToAnEdge:
     """The pair whose two identities are different shapes."""
 
-    def _face(self):
-        return SingleFeaturePath(
-            ResolvedTimberPath("post"), FeatureRef(("cut",), "tenon_left"), "FACE")
-
-    def _edge(self):
-        return DerivedFeaturePath(
-            ResolvedTimberPath("post"),
-            FeatureRef(("cut",), "tenon_left"), FeatureRef(("body",), "rough.front"))
-
-    def test_it_can_be_measured_at_all(self):
+    def test_it_can_be_measured_at_all(self, handles):
         # A face's identity has a name where an edge's has a whole parent
-        # reference, and python will not order a string against a tuple. So
-        # this raised rather than measuring -- on the ordinary case of
-        # dimensioning a face to an arris.
-        measure = Measure(self._face(), self._edge())
+        # reference, and python will not order a string against a tuple.
+        frame, found = handles
 
-        assert measure.identity() is not None
+        assert Measure(found["tenon_left"], found["shoulder_edge"]).identity(frame) is not None
 
-    def test_it_is_one_measurement_whichever_way_round(self):
-        assert Measure(self._face(), self._edge()).identity() == Measure(
-            self._edge(), self._face()).identity()
+    def test_it_is_one_measurement_whichever_way_round(self, handles):
+        frame, found = handles
+        face, edge = found["tenon_left"], found["shoulder_edge"]
 
-    def test_the_order_is_stable(self):
-        # Nothing reads the order; it exists so a pair comes out the same way
-        # round every time.
-        one = Measure(self._face(), self._edge())
-        other = Measure(self._face(), self._edge())
-
-        assert one.anchor_a.identity() == other.anchor_a.identity()
+        assert Measure(face, edge).identity(frame) == Measure(edge, face).identity(frame)
 
 
 class TestEveryKindHasANameAPersonWouldUse:
