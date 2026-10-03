@@ -46,6 +46,10 @@ def _load_runner():
 runner = _load_runner()
 
 
+# (member, feature) -> index of the point that last resolved to it.
+_RESOLVING_POINT = {}
+
+
 class Viewer:
     """As much of the viewer as the runner can see: a mesh cache and a pointer."""
 
@@ -96,15 +100,23 @@ class Viewer:
         self.pending = []
 
     def pick(self, member, feature, held=None):
-        """Click every point on a member until one resolves to `feature`."""
+        """Click points on a member until one resolves to `feature`.
+
+        The point that worked last time is tried first: every test builds the
+        same fixture, and scanning every point costs seconds.
+        """
         payload = dict(held or {})
-        for point in self._points[member]:
+        points = self._points[member]
+        remembered = _RESOLVING_POINT.get((member, feature))
+        order = ([remembered] if remembered is not None else []) + list(range(len(points)))
+        for index in order:
             answer = runner._handle_find_csg_at_point(
                 self._state,
-                {"memberKey": member, "point": point, "currentPath": [],
+                {"memberKey": member, "point": points[index], "currentPath": [],
                  "ctrlClick": False, **payload},
                 self._slot)
             if answer.get("featureLabel") == feature and answer.get("geometry"):
+                _RESOLVING_POINT[(member, feature)] = index
                 return answer
         raise AssertionError(f"no point on {member} resolved to {feature}")
 
