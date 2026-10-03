@@ -8,7 +8,7 @@ carriers' unknowns, via `measurement_row`. See docs/internal/featuresolving-plan
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Callable, ClassVar, Dict, List, Mapping, Optional, Tuple, Type, Union
 
 import numpy as np
 
@@ -316,30 +316,32 @@ def locate_recipe(
     return None
 
 
-def perturbed(carrier: Carrier, coord: Coord, step: float) -> Carrier:
-    """The carrier with one unknown moved by `step`, for finite-difference checks."""
+def moved_by(carrier: Carrier, changes: Mapping[Coord, float]) -> Carrier:
+    """The carrier with each of its unknowns changed by the given amount, all in its own frame."""
+    def amount(coord: Coord) -> float:
+        return float(changes.get(coord, 0.0))
+
     if isinstance(carrier, CarrierPlane):
         normal = _unit(_np(carrier.plane.normal))
-        offset = float(normal @ _np(carrier.plane.point))
+        offset = float(normal @ _np(carrier.plane.point)) + amount(PlaneCoord.OFFSET)
         first, second = _axes(normal)
-        moved = normal + step * (first if coord is PlaneCoord.TILT_1 else second if coord is PlaneCoord.TILT_2 else 0.0)
-        if coord is PlaneCoord.OFFSET:
-            offset += step
+        moved = normal + amount(PlaneCoord.TILT_1) * first + amount(PlaneCoord.TILT_2) * second
         return CarrierPlane(Plane(normal=Matrix(moved), point=Matrix(moved * offset / float(moved @ moved))))
 
     if isinstance(carrier, CarrierPoint):
-        return CarrierPoint(Matrix(_np(carrier.point) + step * np.eye(3)[coord.value]))
+        return CarrierPoint(Matrix(_np(carrier.point) + np.array([amount(coord) for coord in PointCoord])))
 
     if isinstance(carrier, CarrierBarrel):
-        return CarrierBarrel(axis=carrier.axis, radius=float(carrier.radius) + step)
+        return CarrierBarrel(axis=carrier.axis, radius=float(carrier.radius) + amount(BarrelCoord.RADIUS))
 
     line = carrier.line
     direction = _unit(_np(line.direction))
     first, second = _axes(direction)
-    point, moved = _np(line.point), direction
-    shift = first if coord in (LineCoord.SHIFT_1, LineCoord.TURN_1) else second
-    if coord in (LineCoord.SHIFT_1, LineCoord.SHIFT_2):
-        point = point + step * shift
-    else:
-        moved = direction + step * shift
+    point = _np(line.point) + amount(LineCoord.SHIFT_1) * first + amount(LineCoord.SHIFT_2) * second
+    moved = direction + amount(LineCoord.TURN_1) * first + amount(LineCoord.TURN_2) * second
     return CarrierLine(Line(direction=Matrix(moved), point=Matrix(point)))
+
+
+def perturbed(carrier: Carrier, coord: Coord, step: float) -> Carrier:
+    """The carrier with one unknown moved by `step`, for finite-difference checks."""
+    return moved_by(carrier, {coord: step})

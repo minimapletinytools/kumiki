@@ -15,7 +15,7 @@ from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
 from kumiki.solve_recipe import (
     Anchor, BarrelCoord, CarrierRef, DistanceMeasurement, PlaneCoord, feature_dof_rows, locate_recipe,
-    measurement_row, motion_along, perturbed,
+    measurement_row, motion_along, moved_by, perturbed,
 )
 
 
@@ -394,6 +394,9 @@ class TestSolvingAFace:
     ]
 
     def _solve(self, box, corners, target_key=prism_face_key(PrismFace.RIGHT)):
+        return self._remaining(box, corners, target_key).count
+
+    def _remaining(self, box, corners, target_key=prism_face_key(PrismFace.RIGHT)):
         carriers = carrier_map(box)
         left = _recipe(box, prism_face_key(PrismFace.LEFT))
         along = _plane(locate_recipe(_recipe(box, prism_face_key(PrismFace.RIGHT)))).normal
@@ -403,12 +406,34 @@ class TestSolvingAFace:
             at = _point(corner)
             foot = create_v3(*_closest(locate_recipe(left), at))
             known.append(measurement_row(DistanceMeasurement(Anchor(left, foot), Anchor(corner, at), along), carriers))
-        return remaining(known, feature_dof_rows(_recipe(box, target_key), carriers)).count
+        return remaining(known, feature_dof_rows(_recipe(box, target_key), carriers))
 
     @pytest.mark.parametrize("box", [_box(), _box(turn=0.6, position=(1, -2, 0))])
     def test_four_corners_solve_the_face_with_one_to_spare(self, box):
         assert self._solve(box, self.right_corners) == 0
         assert self._solve(box, self.right_corners[:3]) == 0
+
+    def test_two_corners_leave_a_rotation_about_the_line_through_them(self):
+        box = _box()
+        result = self._remaining(box, self.right_corners[:2])
+        assert result.count == 1
+        (motion,) = result.free_motions
+
+        right = CarrierRef(box, prism_face_key(PrismFace.RIGHT))
+        assert {ref for ref, _ in motion} == {right}
+        step = 1e-6
+        moved = moved_by(right.carrier(), {coord: step * amount for (_, coord), amount in motion.items()})
+
+        def x_change(key):
+            recipe = _recipe(box, key)
+            before = _point(recipe)
+            after = locate_recipe(recipe, lambda ref: moved if ref == right else ref.carrier())
+            assert isinstance(after, Point)
+            return (float(after.position[0, 0]) - float(before[0, 0])) / step
+
+        measured, unmeasured = self.right_corners[:2], self.right_corners[2:]
+        assert all(x_change(key) == pytest.approx(0.0, abs=1e-4) for key in measured)
+        assert all(abs(x_change(key)) > 1e-2 for key in unmeasured)
 
     def test_fewer_corners_leave_tilts(self):
         box = _box()

@@ -59,3 +59,19 @@ class TestTenon:
         known = self.known + [self.measurements[2]]
         assert remaining(known, _unit("cheek_1")).count == 1
         assert remaining(known, _unit("cheek_1", "cheek_2")).count == 1
+
+
+def test_a_free_dof_reads_back_as_a_quantity_and_a_motion():
+    # a - b is known; a is not. The unknown quantity is a; the motion moves a and b together.
+    result = remaining([{"a": 1.0, "b": -1.0}], _unit("a"))
+    assert result.count == 1
+    (quantity,) = result.free_quantities
+    (motion,) = result.free_motions
+    assert set(quantity) == {"a"}
+    assert motion["a"] == pytest.approx(motion["b"])
+    assert abs(motion["a"]) == pytest.approx(2 ** -0.5)
+
+
+def test_nothing_free_reads_back_as_nothing():
+    result = remaining(_unit("a", "b"), _unit("a"))
+    assert result.count == 0 and result.free_quantities == () and result.free_motions == ()
