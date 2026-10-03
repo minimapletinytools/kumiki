@@ -53,5 +53,5 @@ jobs:
           # commits to main.
           branch: cla-signatures
           path-to-signatures: signatures/version1/cla.json
-          allowlist: minimapletinytools,dependabot[bot],github-actions[bot]
+          allowlist: minimapletinytools,pdlla,dependabot[bot],github-actions[bot]
           lock-pullrequest-aftermerge: false
