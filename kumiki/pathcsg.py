@@ -39,7 +39,7 @@ from .cutcsg import (
     OwnedFeatureHit,
     Profile,
 )
-from .solve_recipe import SolveEntity
+from .solve_recipe import Carrier
 
 
 # ============================================================================
@@ -1023,7 +1023,7 @@ class PathExtrusion(HasFeatures, CutCSG):
         local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
         return local_coords[0], local_coords[1], local_coords[2]
 
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:

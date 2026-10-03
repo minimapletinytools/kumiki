@@ -1,4 +1,4 @@
-"""Solve recipes: features built from their primitive's entities, and measurements turned into rows."""
+"""Solve recipes: features built from their primitive's carriers, and measurements turned into rows."""
 
 import math
 
@@ -9,12 +9,12 @@ from kumiki.dof_solver import remaining
 from kumiki.cutcsg import (
     CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
     DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism,
-    SolidUnion, prism_arris_key, prism_corner_key, prism_face_key, solve_entity_map,
+    SolidUnion, prism_arris_key, prism_corner_key, prism_face_key, carrier_map,
 )
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
 from kumiki.solve_recipe import (
-    Anchor, BarrelCoord, DistanceMeasurement, EntityRef, Is, Meet, PlaneCoord, feature_dof_rows, locate_recipe,
+    Anchor, BarrelCoord, CarrierRef, DistanceMeasurement, PlaneCoord, feature_dof_rows, locate_recipe,
     measurement_row, motion_along, perturbed,
 )
 
@@ -76,23 +76,23 @@ def _closest(geometry, at):
     return x - normal * float((x - _np(geometry.point)) @ normal) / float(normal @ normal)
 
 
-def _finite_difference_row(entities, anchors, along, step=1e-6):
+def _finite_difference_row(carriers, anchors, along, step=1e-6):
     """What `motion_along` should give, by moving each unknown and re-locating.
 
     `anchors` is a list of (recipe, at, sign), summed.
     """
     u = _np(along)
     row = {}
-    for solving in entities.solving_entities():
-        for coord in type(entities.entity(solving)).COORDS:
-            moved = perturbed(entities.entity(solving), coord, step)
+    for solving in carriers.solving_carriers():
+        for coord in type(carriers.carrier(solving)).COORDS:
+            moved = perturbed(carriers.carrier(solving), coord, step)
 
-            def entity_of(ref, solving=solving, moved=moved):
-                return moved if entities.canonical(ref) == solving else entities.entity(ref)
+            def carrier_of(ref, solving=solving, moved=moved):
+                return moved if carriers.canonical(ref) == solving else carriers.carrier(ref)
 
             change = 0.0
             for recipe, at, sign in anchors:
-                geometry = locate_recipe(recipe, entity_of)
+                geometry = locate_recipe(recipe, carrier_of)
                 change += sign * float(u @ (_closest(geometry, at) - _np(at))) / step
             if abs(change) > 1e-6:
                 row[(solving, coord)] = change
@@ -104,13 +104,13 @@ def _assert_rows_match(actual, expected, tolerance=1e-4):
         assert actual.get(key, 0.0) == pytest.approx(expected.get(key, 0.0), abs=tolerance), key
 
 
-def _measure(entities, anchors, along):
+def _measure(carriers, anchors, along):
     """One anchor's motion, or the measurement from the -1 anchor to the +1 anchor."""
     if len(anchors) == 1:
         recipe, at, _ = anchors[0]
-        return motion_along(recipe, entities, at, along)
+        return motion_along(recipe, carriers, at, along)
     (end, end_at, _), (start, start_at, _) = sorted(anchors, key=lambda anchor: -anchor[2])
-    return measurement_row(DistanceMeasurement(Anchor(start, start_at), Anchor(end, end_at), along), entities)
+    return measurement_row(DistanceMeasurement(Anchor(start, start_at), Anchor(end, end_at), along), carriers)
 
 
 class TestRecipesLocateLikeTheirFeatures:
@@ -159,7 +159,7 @@ class TestRecipesLocateLikeTheirFeatures:
                             extra_features=(CylinderAxisFeature(name="axis"),))
         axis = next(f for f in cylinder.get_declared_features() if f.name == "axis")
         recipe = axis.solve_recipe(cylinder)
-        assert recipe == Is(EntityRef(cylinder, CYLINDER_AXIS))
+        assert recipe == (CarrierRef(cylinder, CYLINDER_AXIS),)
 
 
 class TestPointToPoint:
@@ -170,14 +170,14 @@ class TestPointToPoint:
 
     def test_axis_aligned_corners_touch_only_the_planes_that_fix_x(self):
         a, b = _box(), _box(position=(3, 0, 0))
-        entities = solve_entity_map(SolidUnion([a, b]))
+        carriers = carrier_map(SolidUnion([a, b]))
         p1, p2 = _recipe(a, self.corner), _recipe(b, self.other_corner)
         at1, at2 = _point(p1), _point(p2)
 
-        row = _measure(entities, [(p1, at1, 1.0), (p2, at2, -1.0)], _v(1, 0, 0))
+        row = _measure(carriers, [(p1, at1, 1.0), (p2, at2, -1.0)], _v(1, 0, 0))
 
-        right = entities.canonical(EntityRef(a, prism_face_key(PrismFace.RIGHT)))
-        left = entities.canonical(EntityRef(b, prism_face_key(PrismFace.LEFT)))
+        right = carriers.canonical(CarrierRef(a, prism_face_key(PrismFace.RIGHT)))
+        left = carriers.canonical(CarrierRef(b, prism_face_key(PrismFace.LEFT)))
         assert {ref for ref, _ in row} == {right, left}
         # p1 is on x = 0.5 (normal +x), p2 on x = 2.5 (normal -x, offset -2.5): x1 - x2 = d_right + d_left.
         assert row[(right, PlaneCoord.OFFSET)] == pytest.approx(1.0)
@@ -188,33 +188,33 @@ class TestPointToPoint:
 
     def test_matches_finite_differences(self):
         a, b = _box(), _box(position=(3, 0, 0))
-        entities = solve_entity_map(SolidUnion([a, b]))
+        carriers = carrier_map(SolidUnion([a, b]))
         anchors = [(_recipe(a, self.corner), _point(_recipe(a, self.corner)), 1.0),
                    (_recipe(b, self.other_corner), _point(_recipe(b, self.other_corner)), -1.0)]
-        _assert_rows_match(_measure(entities, anchors, _v(1, 0, 0)),
-                           _finite_difference_row(entities, anchors, _v(1, 0, 0)))
+        _assert_rows_match(_measure(carriers, anchors, _v(1, 0, 0)),
+                           _finite_difference_row(carriers, anchors, _v(1, 0, 0)))
 
     def test_turned_boxes_spread_over_more_planes_and_still_match(self):
         a, b = _box(turn=0.3), _box(position=(3, 1, 0), turn=-0.5)
-        entities = solve_entity_map(SolidUnion([a, b]))
+        carriers = carrier_map(SolidUnion([a, b]))
         anchors = [(_recipe(a, self.corner), _point(_recipe(a, self.corner)), 1.0),
                    (_recipe(b, self.other_corner), _point(_recipe(b, self.other_corner)), -1.0)]
-        row = _measure(entities, anchors, _v(1, 0, 0))
+        row = _measure(carriers, anchors, _v(1, 0, 0))
         assert len({ref for ref, _ in row}) == 4
-        _assert_rows_match(row, _finite_difference_row(entities, anchors, _v(1, 0, 0)))
+        _assert_rows_match(row, _finite_difference_row(carriers, anchors, _v(1, 0, 0)))
 
     def test_two_points_on_one_face_measured_along_its_normal_only_check_its_tilt(self):
         a = _box()
-        entities = solve_entity_map(a)
+        carriers = carrier_map(a)
         top_front = prism_corner_key(PrismFace.TOP, PrismFace.RIGHT, PrismFace.FRONT)
         bottom_back = prism_corner_key(PrismFace.BOTTOM, PrismFace.BACK, PrismFace.RIGHT)
         anchors = [(_recipe(a, top_front), _point(_recipe(a, top_front)), 1.0),
                    (_recipe(a, bottom_back), _point(_recipe(a, bottom_back)), -1.0)]
-        row = _measure(entities, anchors, _v(1, 0, 0))
-        right = EntityRef(a, prism_face_key(PrismFace.RIGHT))
+        row = _measure(carriers, anchors, _v(1, 0, 0))
+        right = CarrierRef(a, prism_face_key(PrismFace.RIGHT))
         assert (right, PlaneCoord.OFFSET) not in row
         assert (right, PlaneCoord.TILT_1) in row and (right, PlaneCoord.TILT_2) in row
-        _assert_rows_match(row, _finite_difference_row(entities, anchors, _v(1, 0, 0)))
+        _assert_rows_match(row, _finite_difference_row(carriers, anchors, _v(1, 0, 0)))
 
 
 class TestEdges:
@@ -222,7 +222,7 @@ class TestEdges:
     def test_an_arris_measured_to_a_parallel_face_touches_its_two_planes_and_that_face(self):
         a = _box(turn=0.3)
         b = _box(position=(4, 0, 0), turn=0.3)
-        entities = solve_entity_map(SolidUnion([a, b]))
+        carriers = carrier_map(SolidUnion([a, b]))
         arris = _recipe(a, prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT))
         face = _recipe(b, prism_face_key(PrismFace.LEFT))
         at = _np(_line(locate_recipe(arris)).point)
@@ -231,15 +231,15 @@ class TestEdges:
         along = create_v3(*normal)
         anchors = [(arris, create_v3(*at), -1.0), (face, create_v3(*foot), 1.0)]
 
-        row = _measure(entities, anchors, along)
+        row = _measure(carriers, anchors, along)
         assert {ref.local for ref, _ in row} <= {prism_face_key(PrismFace.FRONT), prism_face_key(PrismFace.RIGHT),
                                                  prism_face_key(PrismFace.LEFT)}
-        _assert_rows_match(row, _finite_difference_row(entities, anchors, along))
+        _assert_rows_match(row, _finite_difference_row(carriers, anchors, along))
 
     def test_a_point_to_a_skew_edge(self):
         a = _box()
         b = _box(position=(3, 2, 1), turn=0.7)
-        entities = solve_entity_map(SolidUnion([a, b]))
+        carriers = carrier_map(SolidUnion([a, b]))
         corner = _recipe(a, prism_corner_key(PrismFace.TOP, PrismFace.RIGHT, PrismFace.FRONT))
         edge = _recipe(b, prism_arris_key(PrismFace.BOTTOM, PrismFace.LEFT))
         at = _point(corner)
@@ -247,8 +247,8 @@ class TestEdges:
         gap = foot - _np(at)
         along = create_v3(*(gap / np.linalg.norm(gap)))
         anchors = [(edge, create_v3(*foot), 1.0), (corner, at, -1.0)]
-        _assert_rows_match(_measure(entities, anchors, along),
-                           _finite_difference_row(entities, anchors, along))
+        _assert_rows_match(_measure(carriers, anchors, along),
+                           _finite_difference_row(carriers, anchors, along))
 
 
 class TestMergedPlanes:
@@ -261,39 +261,39 @@ class TestMergedPlanes:
 
     def test_a_merged_face_has_the_rows_of_the_plane_it_merged_into(self):
         shoulder, tenon, root = self._tenon()
-        entities = solve_entity_map(root)
-        back = EntityRef(tenon, prism_face_key(PrismFace.BOTTOM))
+        carriers = carrier_map(root)
+        back = CarrierRef(tenon, prism_face_key(PrismFace.BOTTOM))
 
-        assert entities.entity_rows(back) == entities.entity_rows(EntityRef(shoulder, HALF_SPACE_PLANE))
+        assert carriers.carrier_rows(back) == carriers.carrier_rows(CarrierRef(shoulder, HALF_SPACE_PLANE))
 
     def test_the_tree_s_unknowns_count_merged_planes_once(self):
         _, _, root = self._tenon()
-        entities = solve_entity_map(root)
+        carriers = carrier_map(root)
 
         # The shoulder plane and the tenon's six planes, less the back face merged into the shoulder.
-        assert len(entities.unknowns()) == 3 * 6
-        assert len({column for row in entities.unknowns() for column in row}) == 3 * 6
+        assert len(carriers.unknowns()) == 3 * 6
+        assert len({column for row in carriers.unknowns() for column in row}) == 3 * 6
 
     def test_the_back_face_merges_with_the_shoulder(self):
         shoulder, tenon, root = self._tenon()
-        entities = solve_entity_map(root)
-        back = EntityRef(tenon, prism_face_key(PrismFace.BOTTOM))
-        assert entities.canonical(back) == entities.canonical(EntityRef(shoulder, HALF_SPACE_PLANE))
+        carriers = carrier_map(root)
+        back = CarrierRef(tenon, prism_face_key(PrismFace.BOTTOM))
+        assert carriers.canonical(back) == carriers.canonical(CarrierRef(shoulder, HALF_SPACE_PLANE))
 
     def test_a_back_face_corner_measures_the_shoulder(self):
         shoulder, tenon, root = self._tenon()
-        entities = solve_entity_map(root)
+        carriers = carrier_map(root)
         corner = _recipe(tenon, prism_corner_key(PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT))
         tip = _recipe(tenon, prism_face_key(PrismFace.TOP))
         at = _point(corner)
         anchors = [(corner, at, -1.0), (tip, _v(float(at[0, 0]), float(at[1, 0]), 3.0), 1.0)]
         along = _v(0, 0, 1)
 
-        row = _measure(entities, anchors, along)
-        shoulder_ref = entities.canonical(EntityRef(tenon, prism_face_key(PrismFace.BOTTOM)))
+        row = _measure(carriers, anchors, along)
+        shoulder_ref = carriers.canonical(CarrierRef(tenon, prism_face_key(PrismFace.BOTTOM)))
         assert shoulder_ref.owner is shoulder
         assert (shoulder_ref, PlaneCoord.OFFSET) in row
-        _assert_rows_match(row, _finite_difference_row(entities, anchors, along))
+        _assert_rows_match(row, _finite_difference_row(carriers, anchors, along))
 
 
 class TestCylinders:
@@ -305,7 +305,7 @@ class TestCylinders:
 
     def test_a_corner_to_the_peg_axis(self):
         box, peg = _box(), self._peg()
-        entities = solve_entity_map(Difference(base=box, subtract=[peg]))
+        carriers = carrier_map(Difference(base=box, subtract=[peg]))
         corner = _recipe(box, prism_corner_key(PrismFace.TOP, PrismFace.RIGHT, PrismFace.FRONT))
         axis = next(f for f in peg.get_declared_features() if f.name == "axis").solve_recipe(peg)
         at = _point(corner)
@@ -313,16 +313,16 @@ class TestCylinders:
         gap = _np(at) - foot
         along = create_v3(*(gap / np.linalg.norm(gap)))
         anchors = [(corner, at, 1.0), (axis, create_v3(*foot), -1.0)]
-        _assert_rows_match(_measure(entities, anchors, along),
-                           _finite_difference_row(entities, anchors, along))
+        _assert_rows_match(_measure(carriers, anchors, along),
+                           _finite_difference_row(carriers, anchors, along))
 
     def test_the_barrel_moves_with_its_radius(self):
         peg = self._peg()
-        entities = solve_entity_map(peg)
-        barrel = Is(EntityRef(peg, CYLINDER_BARREL))
-        row = motion_along(barrel, entities, _v(0.25, 1, 2), _v(1, 0, 0))
-        assert row[(EntityRef(peg, CYLINDER_BARREL), BarrelCoord.RADIUS)] == pytest.approx(1.0)
-        assert any(ref == EntityRef(peg, CYLINDER_AXIS) for ref, _ in row)
+        carriers = carrier_map(peg)
+        barrel = (CarrierRef(peg, CYLINDER_BARREL),)
+        row = motion_along(barrel, carriers, _v(0.25, 1, 2), _v(1, 0, 0))
+        assert row[(CarrierRef(peg, CYLINDER_BARREL), BarrelCoord.RADIUS)] == pytest.approx(1.0)
+        assert any(ref == CarrierRef(peg, CYLINDER_AXIS) for ref, _ in row)
 
 
 class TestDerivedFeatures:
@@ -331,56 +331,56 @@ class TestDerivedFeatures:
         shoulder = HalfSpace(normal=_v(0, 0, 1), offset=scalar(1))
         box = _box(turn=0.2)
         root = Difference(base=box, subtract=[shoulder])
-        entities = solve_entity_map(root)
+        carriers = carrier_map(root)
         edge = DerivedEdgeFeature(
             name="shoulder x right",
             a=OwnedFeatureHit(feature=_feature(shoulder, HALF_SPACE_PLANE), owner=shoulder),
             b=OwnedFeatureHit(feature=_feature(box, prism_face_key(PrismFace.RIGHT)), owner=box))
         recipe = edge.solve_recipe(root)
-        assert isinstance(recipe, Meet)
+        assert recipe is not None and len(recipe) == 2
         assert lines_are_coincident(_line(locate_recipe(recipe)), _line(edge.locate_simple_unbounded(root)))
 
         at = _line(locate_recipe(recipe)).point
         along = _v(math.cos(0.2), math.sin(0.2), 0)
-        _assert_rows_match(_measure(entities, [(recipe, at, 1.0)], along),
-                           _finite_difference_row(entities, [(recipe, at, 1.0)], along))
+        _assert_rows_match(_measure(carriers, [(recipe, at, 1.0)], along),
+                           _finite_difference_row(carriers, [(recipe, at, 1.0)], along))
 
     def test_a_derived_point_where_the_peg_axis_crosses_a_face(self):
         box = _box()
         peg = TestCylinders()._peg()
         root = Difference(base=box, subtract=[peg])
-        entities = solve_entity_map(root)
+        carriers = carrier_map(root)
         axis = next(f for f in peg.get_declared_features() if f.name == "axis")
         point = DerivedPointFeature(
             name="axis x front",
             a=OwnedFeatureHit(feature=axis, owner=peg),
             b=OwnedFeatureHit(feature=_feature(box, prism_face_key(PrismFace.FRONT)), owner=box))
         recipe = point.solve_recipe(root)
-        assert isinstance(recipe, Meet) and all(isinstance(part, Is) for part in recipe.parts)
+        assert recipe is not None and len(recipe) == 2
         at = _point(recipe)
         located = point.locate_simple_unbounded(root)
         assert isinstance(located, Point)
         assert np.allclose(_np(at), _np(located.position))
 
         for along in (_v(1, 0, 0), _v(0, 1, 0), _v(0, 0, 1)):
-            _assert_rows_match(_measure(entities, [(recipe, at, 1.0)], along),
-                               _finite_difference_row(entities, [(recipe, at, 1.0)], along))
+            _assert_rows_match(_measure(carriers, [(recipe, at, 1.0)], along),
+                               _finite_difference_row(carriers, [(recipe, at, 1.0)], along))
 
     def test_a_derived_point_from_a_declared_arris_flattens_to_three_planes(self):
         box = _box()
         shoulder = HalfSpace(normal=_v(0, 0, 1), offset=scalar(1))
         root = Difference(base=box, subtract=[shoulder])
-        entities = solve_entity_map(root)
+        carriers = carrier_map(root)
         point = DerivedPointFeature(
             name="arris x shoulder",
             a=OwnedFeatureHit(feature=_feature(box, prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT)), owner=box),
             b=OwnedFeatureHit(feature=_feature(shoulder, HALF_SPACE_PLANE), owner=shoulder))
         recipe = point.solve_recipe(root)
-        assert isinstance(recipe, Meet) and len(recipe.parts) == 3
+        assert recipe is not None and len(recipe) == 3
         at = _point(recipe)
         along = _v(0, 0, 1)
-        _assert_rows_match(_measure(entities, [(recipe, at, 1.0)], along),
-                           _finite_difference_row(entities, [(recipe, at, 1.0)], along))
+        _assert_rows_match(_measure(carriers, [(recipe, at, 1.0)], along),
+                           _finite_difference_row(carriers, [(recipe, at, 1.0)], along))
 
 
 class TestSolvingAFace:
@@ -394,16 +394,16 @@ class TestSolvingAFace:
     ]
 
     def _solve(self, box, corners, target_key=prism_face_key(PrismFace.RIGHT)):
-        entities = solve_entity_map(box)
+        carriers = carrier_map(box)
         left = _recipe(box, prism_face_key(PrismFace.LEFT))
         along = _plane(locate_recipe(_recipe(box, prism_face_key(PrismFace.RIGHT)))).normal
-        known = feature_dof_rows(left, entities)
+        known = feature_dof_rows(left, carriers)
         for key in corners:
             corner = _recipe(box, key)
             at = _point(corner)
             foot = create_v3(*_closest(locate_recipe(left), at))
-            known.append(measurement_row(DistanceMeasurement(Anchor(left, foot), Anchor(corner, at), along), entities))
-        return remaining(known, feature_dof_rows(_recipe(box, target_key), entities)).count
+            known.append(measurement_row(DistanceMeasurement(Anchor(left, foot), Anchor(corner, at), along), carriers))
+        return remaining(known, feature_dof_rows(_recipe(box, target_key), carriers)).count
 
     @pytest.mark.parametrize("box", [_box(), _box(turn=0.6, position=(1, -2, 0))])
     def test_four_corners_solve_the_face_with_one_to_spare(self, box):
@@ -424,9 +424,9 @@ class TestSolvingAFace:
 
     def test_an_arris_is_solved_by_its_two_faces(self):
         box = _box(turn=0.3)
-        entities = solve_entity_map(box)
+        carriers = carrier_map(box)
         arris = _recipe(box, prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT))
         faces = [_recipe(box, prism_face_key(face)) for face in (PrismFace.FRONT, PrismFace.RIGHT)]
-        assert remaining([], feature_dof_rows(arris, entities)).count == 4
-        assert remaining(feature_dof_rows(faces[0], entities), feature_dof_rows(arris, entities)).count == 2
-        assert remaining(sum((feature_dof_rows(f, entities) for f in faces), []), feature_dof_rows(arris, entities)).count == 0
+        assert remaining([], feature_dof_rows(arris, carriers)).count == 4
+        assert remaining(feature_dof_rows(faces[0], carriers), feature_dof_rows(arris, carriers)).count == 2
+        assert remaining(sum((feature_dof_rows(f, carriers) for f in faces), []), feature_dof_rows(arris, carriers)).count == 0

@@ -5,9 +5,9 @@ import pytest
 from kumiki.cutcsg import OwnedFeatureHit, PrismFace, prism_corner_key, prism_face_key
 from kumiki.drawing import Measure, MeasurementKind, ViewAxes
 from kumiki.feature_paths import FeatureHandle
-from kumiki.feature_solving import entity_map_of, measure_row, remaining_dofs
+from kumiki.feature_solving import carrier_map_of, measure_row, remaining_dofs
 from kumiki.rule import create_v3
-from kumiki.solve_recipe import EntityRef, PlaneCoord
+from kumiki.solve_recipe import CarrierRef, PlaneCoord
 from tests.testing_shavings import mortise_and_tenon_handles, present
 
 
@@ -77,40 +77,40 @@ class TestRows:
     def test_a_back_face_corner_lands_on_the_shoulder(self, handles):
         # The tenon's back cap lies on the shoulder plane, so they share columns.
         frame, found = handles
-        entities = entity_map_of(_cut_timber(frame, found["shoulder"]))
+        carriers = carrier_map_of(_cut_timber(frame, found["shoulder"]))
         corner = _tenon(found, PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT)
 
-        row = measure_row(Measure(found["tenon_top"], corner), entities)
+        row = measure_row(Measure(found["tenon_top"], corner), carriers)
 
         shoulder_key = present(found["shoulder"].feature.feature_key(), "the shoulder's key")
-        shoulder = entities.canonical(EntityRef(found["shoulder"].owner, shoulder_key))
+        shoulder = carriers.canonical(CarrierRef(found["shoulder"].owner, shoulder_key))
         assert (shoulder, PlaneCoord.OFFSET) in row
 
     def test_a_horizontal_distance_between_two_points_reads_along_the_view(self, handles):
         frame, found = handles
-        entities = entity_map_of(_cut_timber(frame, found["tenon_top"]))
+        carriers = carrier_map_of(_cut_timber(frame, found["tenon_top"]))
         a = _tenon(found, *RIGHT_CORNERS[0])
         b = _tenon(found, PrismFace.TOP, PrismFace.LEFT, PrismFace.BACK)
         view = ViewAxes(look=create_v3(0, 0, -1), right=create_v3(1, 0, 0), up=create_v3(0, 1, 0))
 
         across = measure_row(Measure(a, b, kind=MeasurementKind.parse("projected_horizontal_distance")),
-                             entities, view)
+                             carriers, view)
         up = measure_row(Measure(a, b, kind=MeasurementKind.parse("projected_vertical_distance")),
-                         entities, view)
+                         carriers, view)
 
         assert across and up and across != up
 
     def test_an_angle_is_not_supported_yet(self, handles):
         frame, found = handles
-        entities = entity_map_of(_cut_timber(frame, found["tenon_top"]))
+        carriers = carrier_map_of(_cut_timber(frame, found["tenon_top"]))
 
         with pytest.raises(NotImplementedError):
             measure_row(Measure(found["tenon_top"], found["tenon_left"], kind=MeasurementKind.parse("angle")),
-                        entities)
+                        carriers)
 
     def test_a_measurement_between_two_timbers_is_not_supported_yet(self, handles):
         frame, found = handles
-        entities = entity_map_of(_cut_timber(frame, found["tenon_top"]))
+        carriers = carrier_map_of(_cut_timber(frame, found["tenon_top"]))
 
         with pytest.raises(NotImplementedError):
-            measure_row(Measure(found["tenon_top"], found["mortise_bottom"]), entities)
+            measure_row(Measure(found["tenon_top"], found["mortise_bottom"]), carriers)

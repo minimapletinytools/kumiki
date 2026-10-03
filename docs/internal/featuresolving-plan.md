@@ -7,7 +7,7 @@ Implementation plan for the design in `featuresolving.md`. Two parts:
 
 All numerics are floats (`rule.py` is numpy/float), with explicit tolerances.
 
-**Status:** Part 2 A (`dof_solver.py`), B and C (`solve_recipe.py`, recipes on the CSG classes) and a first D (`feature_solving.py`: 3D distances, and horizontal/vertical sheet distances between points) are in. Not yet: angle rows, measurements between timbers, projected perpendicular distances, `Own` recipes, `PathExtrusion` entities, Part 1, and the generator.
+**Status:** Part 2 A (`dof_solver.py`), B and C (`solve_recipe.py`, recipes on the CSG classes) and a first D (`feature_solving.py`: 3D distances, and horizontal/vertical sheet distances between points) are in. Not yet: angle rows, measurements between timbers, projected perpendicular distances, `Own` recipes, `PathExtrusion` carriers, Part 1, and the generator.
 
 # Part 1: the required feature set
 
@@ -35,7 +35,7 @@ On top of the table:
 - Anything marked `NEVER_MARK` is dropped.
 - Anything marked `ALWAYS_MARK` is required even if hidden.
 
-A cylinder axis and its barrel map onto the same Cylinder entity (Part 2 B), so when the barrel is required the axis is solved with it, not separately.
+A cylinder's barrel carrier moves with its axis carrier (Part 2 B), so when the barrel is required the axis is solved with it, not separately.
 
 ## Flat faces: two-sided sections
 
@@ -95,7 +95,7 @@ This is approximate only for slivers narrower than the sampling. Documented, not
    - its class (table above)
    - its reason: buried / in air / swallowed / on surface / face-bound / non-real / waived / marked
    - its surviving region (faces) or segments (free edges)
-   - its solving entity (Part 2 B)
+   - its solving carrier (Part 2 B)
 4. **Kigumi debug overlay** colouring faces required or hidden. It's the fastest way to check correctness across the pattern book.
 5. **Tests**, from the cases in `featuresolving.md`:
    - tenon back face buried, and exactly on the shoulder
@@ -117,7 +117,7 @@ Five pieces. A is pure linear algebra. B and C are where kinds of feature and pr
 
 Pure numpy, no kumiki imports.
 
-- **Columns:** named unknown blocks, one per entity.
+- **Columns:** named unknown blocks, one per carrier.
 - **Rows:** sparse, each labelled with its source (datum / convention / measurement id), so a report can say which measurement solved what.
 - **`KnownSpace`:** an incrementally maintained orthonormal basis of R's row space (Gram–Schmidt with re-orthogonalisation), with a relative rank tolerance.
 - **Column scaling** by a characteristic length, so angle unknowns and length unknowns mix sanely in the rank tolerance.
@@ -136,11 +136,11 @@ Tests on hand-built matrices:
 
 ## B. Feature recipes on the CSG classes
 
-Measurements are written against declared features: defaults (`side.0`, `arris.5`, `corner.3`), overrides and extras, and derived edges and points. The solving is done on entities: merged planes, cylinders, free lines and points. So every feature needs a fixed statement of how it is built from its primitive's independent geometry. That statement is a fact about the primitive, the same kind of fact as `locate_simple_unbounded`, so it lives on the CSG classes.
+Measurements are written against declared features: defaults (`side.0`, `arris.5`, `corner.3`), overrides and extras, and derived edges and points. The solving is done on carriers: merged planes, cylinders, free lines and points. So every feature needs a fixed statement of how it is built from its primitive's independent geometry. That statement is a fact about the primitive, the same kind of fact as `locate_simple_unbounded`, so it lives on the CSG classes.
 
-**Per primitive, `solve_entities()`:** the primitive's independent geometric pieces, each with a local id.
+**Per primitive, `carriers()`:** the primitive's independent geometric pieces, each with a local id.
 
-| Primitive | Entities |
+| Primitive | Carriers |
 | :--- | :--- |
 | `HalfSpace` | 1 plane |
 | `RectangularPrism` | 4 side planes + each finite cap plane |
@@ -149,28 +149,28 @@ Measurements are written against declared features: defaults (`side.0`, `arris.5
 | `Cylinder` | 1 cylinder (axis + radius) + each finite cap plane |
 | `PathExtrusion` | a plane per straight segment, a cylinder per arc segment (axis parallel to the extrusion) + each finite cap plane |
 
-**Per feature, `solve_recipe(owner)`:** how the feature is built from those entities, in the owner's space.
+**Per feature, `solve_recipe(owner)`:** a `Recipe`, the list of references to the carriers producing the feature, which is the carrier itself for non-derived features.
 
 | Recipe | Used by |
 | :--- | :--- |
-| `Is(entity)` | every face; a cylinder axis (`Is(cylinder).axis`) |
-| `Meet(e1, e2)` | prism and extrusion arrises, derived edges |
-| `Meet(e1, e2, e3)` | prism and extrusion corners, derived points (an edge's recipe flattened with a face's) |
-| `Own(kind)` | a feature tied to nothing else: a free extra line or point, a `ProgrammableCSGFeature`. It brings its own unknowns |
+| `(carrier,)` | every face; a cylinder axis |
+| `(c1, c2)` | prism and extrusion arrises, derived edges |
+| `(c1, c2, c3)` | prism and extrusion corners, derived points (an edge's recipe followed by a face's) |
+| `(own carrier,)` (not yet) | a feature tied to nothing else: a free extra line or point, a `ProgrammableCSGFeature`. It brings its own carrier |
 | `None` | a feature that can't be measured yet (a twisted loft side). Measurements to it are reported, not silently dropped |
 
-The prism edge and vertex features already know their `PrismFace`s, and derived features already carry their two parents, so most recipes are a few lines. The recipe also gives Part 1 its classes: `Meet` is face-bound, `Own` is free.
+The prism edge and vertex features already know their `PrismFace`s, and derived features already carry their two parents, so most recipes are a few lines. The recipe also gives Part 1 its classes: several carriers is face-bound, its own carrier is free.
 
-**Entity map:** every primitive entity in the timber's tree, hidden or not, maps to one solving entity:
+**Carrier map:** every primitive carrier in the timber's tree, hidden or not, maps to one solving carrier:
 
 - coincident planes (Part 1's grouping) map to one merged plane
 - everything else maps to itself
 
-Columns are every solving entity. Only required features are targets. So a measurement to a hidden feature still resolves: a corner of the tenon's back face that sits on the shoulder is `Meet(back, cheek₁, cheek₂)`, and since the back face is merged with the shoulder, its rows land on the shoulder's and cheeks' columns. A measurement whose rows touch only non-target columns is legal, and worth a warning ("measures something not on the piece").
+Columns are every solving carrier. Only required features are targets. So a measurement to a hidden feature still resolves: a corner of the tenon's back face that sits on the shoulder is `(back, cheek₁, cheek₂)`, and since the back face is merged with the shoulder, its rows land on the shoulder's and cheeks' columns. A measurement whose rows touch only non-target columns is legal, and worth a warning ("measures something not on the piece").
 
 The map carries a sign: merged planes can face opposite ways, and a plane written as (−n, −d) is the same plane, so its coefficients are flipped on the way into the merged columns.
 
-**Worked example: a point-to-point measurement.** A horizontal distance between corners p1 and p2 measures `u·(p1 − p2)`, with u the view's right axis. Neither point has unknowns of its own. Say p1's recipe is `Meet(A, B, C)`.
+**Worked example: a point-to-point measurement.** A horizontal distance between corners p1 and p2 measures `u·(p1 − p2)`, with u the view's right axis. Neither point has unknowns of its own. Say p1's recipe is `(A, B, C)`.
 
 A plane has unknowns offset δd and tilts α1, α2 (δn = α1 e1 + α2 e2). Moving the planes moves the corner by δp, where each plane still passes through it:
 
@@ -196,7 +196,7 @@ For an axis-aligned corner (A: x = a, B: y = b, C: z = c) N is the identity, so 
 
 In words: the x of the corner depends only on the plane that fixes x. The tilt terms say that if A might tilt, where along A the corner sits matters. If A's normal is known (square convention), those columns are already in R, and the measurement is effectively `δd_A − δd_D` for p2's x-plane D.
 
-Then the entity map puts each coefficient in its solving entity's column. If A is the tenon's back face merged with the shoulder, the 1 lands on the shoulder's offset. If A and D map to the same entity (two points on one plane), the offsets cancel and only tilt terms remain: measuring two points on one face along its normal is a check on that face's tilt, which is the right answer.
+Then the carrier map puts each coefficient in its solving carrier's column. If A is the tenon's back face merged with the shoulder, the 1 lands on the shoulder's offset. If A and D map to the same carrier (two points on one plane), the offsets cancel and only tilt terms remain: measuring two points on one face along its normal is a check on that face's tilt, which is the right answer.
 
 For a sloped face, N isn't the identity and w spreads over all three planes. The recipe and the formula don't change. A derived point (edge × face) flattens to the edge's two planes plus the face, and goes through the same formula.
 
@@ -207,45 +207,45 @@ For a sloped face, N isn't the identity and w spreads over all three planes. The
 - derived edges and points: recipe of the pair equals the pair's located geometry
 - the tenon back-face corner above resolves to shoulder and cheek columns
 
-## C. Entity model: the part that depends on the kind of feature
+## C. Carrier model: the part that depends on the kind of feature
 
-One small class per entity kind, holding pure geometry. Each provides:
+One small class per carrier kind, holding pure geometry. Each provides:
 
 - **own rows:** its coordinates, which are what "solved" means for it
 - **displacement along u at x:** the row for the first-order motion of the feature at point x, measured along direction u (used by distance measurements)
 - **direction rows:** the row for the motion of its normal or direction (used by angle measurements)
 - **needs:** turning a free combination into what kind of measurement would fix it
 
-| Entity | Own rows | Displacement along u at x | Direction rows | Free combination → need |
+| Carrier | Own rows | Displacement along u at x | Direction rows | Free combination → need |
 | :--- | :--- | :--- | :--- | :--- |
 | Plane (n, d; tilt basis e1, e2) | offset, 2 tilts | `(δd − x·δn) / (n·u)` | normal | offset → a distance along n; tilt about eᵢ → an angle, or a second distance at a spread anchor |
 | Line | 2 shifts, 2 turns | its perpendicular motion at x | direction | shift → distances in the 2 perpendicular directions; turn → an angle |
 | Point | 3 | `u·δp` | — | a distance along the free direction |
 | Cylinder | axis (4) + radius | radial motion at x (radius only enters through a radius/diameter measurement) | axis | radius → a diameter; axis → as Line |
-| `Meet` line (2 planes) | none of its own | chain rule: solve the 2×2 parent-plane system for its perpendicular motion | from parents | pushed back to the parent planes |
-| `Meet` point (3 planes) | none of its own | chain rule: `N δp = (δdᵢ − p·δnᵢ)` | — | pushed back to the parent planes |
+| Line from 2 planes | none of its own | chain rule: solve the 2×2 parent-plane system for its perpendicular motion | from parents | pushed back to the parent planes |
+| Point from 3 planes | none of its own | chain rule: `N δp = (δdᵢ − p·δnᵢ)` | — | pushed back to the parent planes |
 
-The last column is why the output is feature dependent. A DOF count is generic. But turning "this combination is free" into "measure this" depends on the entity: an offset wants a distance along the normal, a tilt wants an angle or a spread second distance, and a radius accepts only a diameter.
+The last column is why the output is feature dependent. A DOF count is generic. But turning "this combination is free" into "measure this" depends on the carrier: an offset wants a distance along the normal, a tilt wants an angle or a spread second distance, and a radius accepts only a diameter.
 
 ## D. Interface layer: `kumiki/feature_solving.py`
 
 Features and `Measure`s in, a per-feature report out.
 
-**Columns and targets** come from B and Part 1: the entity map gives the columns, the `RequiredSet` the targets. A target's rows are its recipe's rows (identity for `Is` and `Own`, chain rule for `Meet`).
+**Columns and targets** come from B and Part 1: the carrier map gives the columns, the `RequiredSet` the targets. A target's rows are its recipe's rows (identity for `Is` and `Own`, chain rule for `Meet`).
 
-**Measure → rows.** Resolve each anchor (`FeaturePath`) to a feature and owner, take its recipe, and map through the entity map. Then reuse `drawing.py`, so the rows describe what is actually drawn:
+**Measure → rows.** Resolve each anchor (`FeaturePath`) to a feature and owner, take its recipe, and map through the carrier map. Then reuse `drawing.py`, so the rows describe what is actually drawn:
 
 1. `distance_anchors` gives the two anchor points. u is the dimension direction: the view axis for horizontal/vertical, otherwise the unit vector between the anchors (square to the features, so sliding along them doesn't matter).
 2. Row = `u·δ_b(anchor_b) − u·δ_a(anchor_a)`, with each δ from the anchor's recipe (C). For projected kinds u already lies in the sheet, so motion along the look direction drops out.
 3. Angles go through `angle_rays`, and the row is the derivative of the angle between the two rays.
 
-**Finite-difference tests:** perturb each entity, recompute the value with `pair_separation` / `angle_between`, and compare to the row. This pins the linearisation to the real measuring code.
+**Finite-difference tests:** perturb each carrier, recompute the value with `pair_separation` / `angle_between`, and compare to the row. This pins the linearisation to the real measuring code.
 
 **Seeding R:**
 
 - **Datum policy:** which timber faces start fully known (see decisions).
 - **Square convention:** any plane whose design normal is parallel to a datum normal gets its normal rows.
-- **Merges** need no rows: merged planes already share columns through the entity map.
+- **Merges** need no rows: merged planes already share columns through the carrier map.
 
 **`SolveReport`:**
 
@@ -270,8 +270,8 @@ Once A–D agree on real joints.
 1. **Part 2 A**, the core solver. Isolated, quick, de-risks the maths.
 2. **Part 2 B**, recipes on the CSG classes, with the recipe-vs-locate tests. Needed before anything maps a measurement, and gives Part 1 its feature classes. Can proceed in parallel with 1.
 3. **`planar_region.py`** and **`two_sided_section`**.
-4. **`required_features`**, the entity map, and the debug overlay.
-5. **Entity model** and **interface layer**, with the finite-difference tests.
+4. **`required_features`**, the carrier map, and the debug overlay.
+5. **Carrier model** and **interface layer**, with the finite-difference tests.
 6. **Generator.**
 
 # Decisions needed

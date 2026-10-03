@@ -297,7 +297,7 @@ class _UnknownShape(CutCSG):
     def __repr__(self) -> str:
         return "_UnknownShape()"
 
-    def solve_entities(self):
+    def carriers(self):
         return {}
 
     def contains_point(self, point, eps=None) -> bool:

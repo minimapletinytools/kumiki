@@ -28,8 +28,8 @@ from .rule import *
 from .geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
-from .solve_recipe import (BarrelEntity, EntityMap, EntityRef, Is, LineEntity, Meet,
-                           PlaneEntity, Recipe, SolveEntity, meet, merge_coincident_planes)
+from .solve_recipe import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef,
+                           Recipe, merge_coincident_planes)
 
 
 # ============================================================================
@@ -774,10 +774,10 @@ class CSGFeature(ABC):
         return self.properties.group
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
-        """How this feature is built from `owner.solve_entities()`, or None if it can't be."""
+        """The carriers in `owner.carriers()` that produce this feature, or None if there are none."""
         key = self.feature_key()
-        if key is not None and key in owner.solve_entities():
-            return Is(EntityRef(owner, key))
+        if key is not None and key in owner.carriers():
+            return (CarrierRef(owner, key),)
         return None
 
     def is_derived(self) -> bool:
@@ -866,7 +866,7 @@ def _meet_of_parents(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional[Rec
     first, second = a.feature.solve_recipe(a.owner), b.feature.solve_recipe(b.owner)
     if first is None or second is None:
         return None
-    return meet(first, second)
+    return first + second
 
 
 @dataclass(frozen=True)
@@ -1405,11 +1405,11 @@ def _canonical_corner_faces(
 
 def _meet_of_prism_faces(owner: 'CutCSG', faces: Sequence[PrismFace]) -> Optional[Recipe]:
     """Where these faces of a prism meet, or None if one of them isn't there."""
-    entities = owner.solve_entities()
+    carriers = owner.carriers()
     keys = [prism_face_key(face) for face in faces]
-    if not all(key in entities for key in keys):
+    if not all(key in carriers for key in keys):
         return None
-    return Meet(tuple(Is(EntityRef(owner, key)) for key in keys))
+    return tuple(CarrierRef(owner, key) for key in keys)
 
 
 def prism_face_key(face: PrismFace) -> FeatureKey:
@@ -1554,7 +1554,7 @@ class CylinderAxisFeature(CSGFeature):
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         if self._cylinder(owner) is None:
             return None
-        return Is(EntityRef(owner, CYLINDER_AXIS))
+        return (CarrierRef(owner, CYLINDER_AXIS),)
 
     def _cylinder(self, owner: 'CutCSG') -> Optional['Cylinder']:
         """The owner, as the Cylinder this feature is the axis of.
@@ -1956,16 +1956,16 @@ class HasFeatures:
         return authored + [feature for key, feature in defaults.items() if key not in overridden]
 
 
-def face_plane_entities(csg: 'HasFeatures') -> Dict[FeatureKey, SolveEntity]:
+def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
     """A plane for each default face of `csg` that has one, keyed like the face."""
-    entities: Dict[FeatureKey, SolveEntity] = {}
+    carriers: Dict[FeatureKey, Carrier] = {}
     for key, feature in csg.default_features().items():
         if feature.feature_type() is not CSGFeatureType.FACE:
             continue
         plane = feature.locate_simple_unbounded(cast(CutCSG, csg))
         if isinstance(plane, Plane):
-            entities[key] = PlaneEntity(plane)
-    return entities
+            carriers[key] = CarrierPlane(plane)
+    return carriers
 
 
 @dataclass(frozen=True)
@@ -2046,10 +2046,10 @@ class CutCSG(ABC):
         return []
 
     @abstractmethod
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
-        """return all entities needed to determine this feature
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
+        """return all carriers needed to determine this feature
 
-        TODO when we add FeatureMarkingStatus decide if we want to filter out NEVER_MARK here and if returned entities should be tagged if their underlying features are marked OPTIONAL
+        TODO when we add FeatureMarkingStatus decide if we want to filter out NEVER_MARK here and if returned carriers should be tagged if their underlying features are marked OPTIONAL
         """
         ...
 
@@ -2285,15 +2285,15 @@ def walk_csg_with_parity(
         yield from walk_csg_with_parity(child, child_parity)
 
 
-def solve_entity_map(root: CutCSG) -> EntityMap:
-    """Every primitive entity in the tree, coincident planes merged."""
+def carrier_map(root: CutCSG) -> CarrierMap:
+    """Every primitive carrier in the tree, coincident planes merged."""
     def walk(node: CutCSG) -> Iterator[CutCSG]:
         yield node
         for child in csg_children(node):
             yield from walk(child)
-    entities = {EntityRef(node, key): entity
-                for node in walk(root) for key, entity in node.solve_entities().items()}
-    return EntityMap(entities, merge_coincident_planes(entities))
+    carriers = {CarrierRef(node, key): carrier
+                for node in walk(root) for key, carrier in node.carriers().items()}
+    return CarrierMap(carriers, merge_coincident_planes(carriers))
 
 
 @dataclass(frozen=True)
@@ -2307,7 +2307,7 @@ class EmptyCSG(CutCSG):
     def __repr__(self) -> str:
         return "EmptyCSG()"
 
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
@@ -2360,8 +2360,8 @@ class HalfSpace(HasFeatures, CutCSG):
     def __repr__(self) -> str:
         return f"HalfSpace(normal={self.normal.T}, offset={self.offset})"
     
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
-        return face_plane_entities(self)
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
+        return face_plane_carriers(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
@@ -2600,8 +2600,8 @@ class RectangularPrism(HasFeatures, CutCSG):
         z_coord = safe_dot_product(local_point, length_dir)
         return x_coord, y_coord, z_coord
 
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
-        return face_plane_entities(self)
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
+        return face_plane_carriers(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
@@ -2830,13 +2830,13 @@ class Cylinder(HasFeatures, CutCSG):
             for key, part in parts
         }
 
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
         """The axis, the barrel around it, and a plane for each finite cap."""
-        entities = face_plane_entities(self)
-        entities[CYLINDER_AXIS] = LineEntity(
+        carriers = face_plane_carriers(self)
+        carriers[CYLINDER_AXIS] = CarrierLine(
             Line(direction=safe_normalize_vector(self.axis_direction), point=self.position))
-        entities[CYLINDER_BARREL] = BarrelEntity(axis=CYLINDER_AXIS, radius=self.radius)
-        return entities
+        carriers[CYLINDER_BARREL] = CarrierBarrel(axis=CYLINDER_AXIS, radius=self.radius)
+        return carriers
 
     def _axial_and_radial(self, point: V3) -> Tuple[Numeric, Numeric]:
         """Distance along the axis from `position`, and distance from the axis."""
@@ -3132,7 +3132,7 @@ class SolidUnion(CutCSG):
     def __repr__(self) -> str:
         return f"SolidUnion({len(self.children)} children)"
     
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
@@ -3231,7 +3231,7 @@ class Intersection(CutCSG):
     def __repr__(self) -> str:
         return f"Intersection(left={self.left}, right={self.right})"
 
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
@@ -3312,7 +3312,7 @@ class Difference(CutCSG):
     def __repr__(self) -> str:
         return f"Difference(base={self.base}, subtract={len(self.subtract)} objects)"
     
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
@@ -3560,8 +3560,8 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
                 (all(safe_compare(cp, 0, Comparison.GT) for cp in non_zero_crosses) or
                  all(safe_compare(cp, 0, Comparison.LT) for cp in non_zero_crosses)))
 
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
-        return face_plane_entities(self)
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
+        return face_plane_carriers(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
@@ -4013,8 +4013,8 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
         return safe_zero_test_sq(distance_sq, eps)
 
-    def solve_entities(self) -> Dict[FeatureKey, SolveEntity]:
-        return face_plane_entities(self)
+    def carriers(self) -> Dict[FeatureKey, Carrier]:
+        return face_plane_carriers(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """

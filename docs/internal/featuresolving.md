@@ -19,9 +19,9 @@ Every feature and every measurement becomes rows of one matrix, and "solved" is 
 
 ## Unknowns
 
-Each distinct geometric entity on the timber gets a few unknowns:
+Each distinct carrier on the timber (the plane, line or point a feature lies on) gets a few unknowns:
 
-| Entity | Unknowns |
+| Carrier | Unknowns |
 | :--- | :--- |
 | Plane (a face) | 3: normal (2) + offset (1) |
 | Line (an edge, an axis) | 4: direction (2) + position (2) |
@@ -41,7 +41,7 @@ This also covers measuring the derived feature directly. A measurement to a deri
 
 ## Rows, known space, remaining DOFs
 
-A feature is the set of rows that locate it: its entity's unknowns, or for a derived feature the chain-rule rows through its parents.
+A feature is the set of rows that locate it: its carrier's unknowns, or for a derived feature the chain-rule rows through its parents.
 
 A measurement adds rows to the *known space* R. R starts with:
 
@@ -101,7 +101,7 @@ Boundary points of the feature don't need to be considered: if an edge or corner
 
 **Grazing contact.** The rule is conservative. A feature whose relative interior touches ∂S only on a set of zero measure in its own dimension (a cutter face whose plane passes exactly through a timber arris without removing anything) is flagged as required even though it isn't: the arris is already solved by the two timber faces. The exact version is "required iff ∂S contains a nonempty subset of the relative interior that is open relative to the feature" (a patch with area for a face, a stretch with length for an edge). Start with the simple rule and treat grazing as a known over-report.
 
-**Required but already known.** A feature can be required and still need no measurement, when it coincides with a plane that is already known or solved (a lap cutter's side flush with the timber's side). Planes that coincide are merged into one entity before the rank test.
+**Required but already known.** A feature can be required and still need no measurement, when it coincides with a plane that is already known or solved (a lap cutter's side flush with the timber's side). Planes that coincide are merged into one carrier before the rank test.
 
 ## Examples
 
@@ -120,7 +120,7 @@ Boundary points of the feature don't need to be considered: if an edge or corner
 | Extras | peg centrelines, layout lines, reference points | not part of the CSG | — | added by the user, not geometry | what the user marks required |
 | Don't care | any feature the user waives | any | any | the user says it doesn't matter | removed, unless a required feature still depends on it |
 
-In the solver, the required set is just the rows of the required entities, stacked. Waiving a feature removes its rows; if a still-required edge depends on the same plane, the plane's rows come back in through the edge, and the rank test handles it.
+In the solver, the required set is just the rows of the required carriers, stacked. Waiving a feature removes its rows; if a still-required edge depends on the same plane, the plane's rows come back in through the edge, and the rank test handles it.
 
 # Detecting hidden features with cutcsg
 
@@ -179,5 +179,5 @@ A barefaced tenon has a cheek flush with a timber face. That cheek is required (
 
 1. **Exact face regions** in `cropcsg.py`: convex-piece polygon booleans, and an "on the finished surface" region query per face, tested against the mortise-and-tenon and dovetail patterns.
 2. **Required set for a cut timber:** features whose relative interior reaches ∂S, planes merged where they coincide, curved surfaces, user extras.
-3. **Rank solver:** unknowns per entity, rows per measurement kind (including the explicit parallel/coincident constraints), R as an incremental exact basis, remaining DOFs per feature. Reproduce the tenon example as a test.
+3. **Rank solver:** unknowns per carrier, rows per measurement kind (including the explicit parallel/coincident constraints), R as an incremental exact basis, remaining DOFs per feature. Reproduce the tenon example as a test.
 4. **Greedy generator** on top, once 1–3 agree on real joints.

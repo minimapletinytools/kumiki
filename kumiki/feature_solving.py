@@ -1,4 +1,4 @@
-"""Measurements on a cut timber, as rows over its solving entities, and what they leave unsolved.
+"""Measurements on a cut timber, as rows over its solving carriers, and what they leave unsolved.
 
 The interface layer of docs/internal/featuresolving-plan.md, Part 2 D: FeatureHandles and
 Measures in, rows and remaining DOFs out. Works in the timber's local space, where its CSG tree is.
@@ -6,23 +6,23 @@ Measures in, rows and remaining DOFs out. Works in the timber's local space, whe
 
 from typing import List, Optional, Sequence
 
-from .cutcsg import solve_entity_map
+from .cutcsg import carrier_map
 from .dof_solver import Remaining, remaining
 from .drawing import (Measure, MeasureSpan, MeasurementDirection, MeasurementKind,
                       MeasurementOperation, MeasurementSpace, ViewAxes, distance_anchors)
 from .feature_paths import FeatureHandle
 from .geometry import Line, Plane, Point
 from .rule import V3, safe_norm
-from .solve_recipe import (Anchor, DistanceMeasurement, EntityMap, Recipe, Row, feature_dof_rows,
+from .solve_recipe import (Anchor, CarrierMap, DistanceMeasurement, Recipe, Row, feature_dof_rows,
                            measurement_row)
 from .timber import CutTimber
 
 THREE_D_DISTANCE = MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
 
-def entity_map_of(cut_timber: CutTimber) -> EntityMap:
-    """The solving entities of a cut timber's rendered tree, the tree its handles point into."""
-    return solve_entity_map(cut_timber.render_timber_with_cuts_csg_local())
+def carrier_map_of(cut_timber: CutTimber) -> CarrierMap:
+    """The solving carriers of a cut timber's rendered tree, the tree its handles point into."""
+    return carrier_map(cut_timber.render_timber_with_cuts_csg_local())
 
 
 def _recipe(handle: FeatureHandle) -> Recipe:
@@ -51,13 +51,13 @@ def _span(handle: FeatureHandle) -> MeasureSpan:
     raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
 
 
-def feature_handle_dof_rows(handle: FeatureHandle, entities: EntityMap) -> List[Row]:
+def feature_handle_dof_rows(handle: FeatureHandle, carriers: CarrierMap) -> List[Row]:
     """The feature's own DOFs as rows. See solve_recipe.feature_dof_rows."""
-    return feature_dof_rows(_recipe(handle), entities)
+    return feature_dof_rows(_recipe(handle), carriers)
 
 
-def measure_row(measure: Measure, entities: EntityMap, view: Optional[ViewAxes] = None) -> Row:
-    """How a measurement's value changes with the solving entities' unknowns.
+def measure_row(measure: Measure, carriers: CarrierMap, view: Optional[ViewAxes] = None) -> Row:
+    """How a measurement's value changes with the solving carriers' unknowns.
 
     Supports 3D distances, and horizontal or vertical distances between two points on a sheet,
     with `view` in the timber's local space. Both anchors must be on one timber.
@@ -87,7 +87,7 @@ def measure_row(measure: Measure, entities: EntityMap, view: Optional[ViewAxes] 
         start=Anchor(_recipe(measure.anchor_a), at_a),
         end=Anchor(_recipe(measure.anchor_b), at_b),
         along=along,
-    ), entities)
+    ), carriers)
 
 
 def remaining_dofs(
@@ -98,7 +98,7 @@ def remaining_dofs(
     view: Optional[ViewAxes] = None,
 ) -> Remaining:
     """What of `target` the measurements leave unsolved, given the `known` features."""
-    entities = entity_map_of(cut_timber)
-    rows: List[Row] = [row for handle in known for row in feature_handle_dof_rows(handle, entities)]
-    rows += [measure_row(measure, entities, view) for measure in measures]
-    return remaining(rows, feature_handle_dof_rows(target, entities))
+    carriers = carrier_map_of(cut_timber)
+    rows: List[Row] = [row for handle in known for row in feature_handle_dof_rows(handle, carriers)]
+    rows += [measure_row(measure, carriers, view) for measure in measures]
+    return remaining(rows, feature_handle_dof_rows(target, carriers))

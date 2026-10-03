@@ -1,9 +1,9 @@
-"""Solve recipes: each feature built from its primitive's independent geometry.
+"""Solve recipes: each feature as the carriers it lies on.
 
-A primitive names its independent pieces as `SolveEntity`s (`CutCSG.solve_entities`),
-and each feature says how it is built from them (`CSGFeature.solve_recipe`). A
-measurement to any feature then becomes a row over the entities' unknowns, via
-`measurement_row`. See docs/internal/featuresolving-plan.md, Part 2 B.
+A primitive names the planes, lines and surfaces its faces and axes lie on as carriers
+(`CutCSG.carriers`), and each feature names the carriers that produce it
+(`CSGFeature.solve_recipe`). A measurement to any feature then becomes a row over the
+carriers' unknowns, via `measurement_row`. See docs/internal/featuresolving-plan.md, Part 2 B.
 """
 
 from dataclasses import dataclass
@@ -48,133 +48,107 @@ Coord = Union[PlaneCoord, LineCoord, PointCoord, BarrelCoord]
 
 
 @dataclass(frozen=True)
-class PlaneEntity:
+class CarrierPlane:
     plane: Plane
 
     COORDS: ClassVar[Type[PlaneCoord]] = PlaneCoord
 
 
 @dataclass(frozen=True)
-class LineEntity:
+class CarrierLine:
     line: Line
 
     COORDS: ClassVar[Type[LineCoord]] = LineCoord
 
 
 @dataclass(frozen=True)
-class PointEntity:
+class CarrierPoint:
     point: V3
 
     COORDS: ClassVar[Type[PointCoord]] = PointCoord
 
 
 @dataclass(frozen=True)
-class BarrelEntity:
-    """A cylinder's barrel around the LineEntity at `axis` on the same primitive."""
+class CarrierBarrel:
+    """A cylinder's barrel around the CarrierLine at `axis` on the same primitive."""
     axis: 'FeatureKey'
     radius: Numeric
 
     COORDS: ClassVar[Type[BarrelCoord]] = BarrelCoord
 
 
-SolveEntity = Union[PlaneEntity, LineEntity, PointEntity, BarrelEntity]
+Carrier = Union[CarrierPlane, CarrierLine, CarrierPoint, CarrierBarrel]
 
 
 @dataclass(frozen=True, eq=False)
-class EntityRef:
-    """One entity of one primitive: the primitive, compared by identity, and the entity's key."""
+class CarrierRef:
+    """One carrier of one primitive: the primitive, compared by identity, and the carrier's key."""
     owner: 'CutCSG'
     local: 'FeatureKey'
 
-    def entity(self) -> SolveEntity:
-        return self.owner.solve_entities()[self.local]
+    def carrier(self) -> Carrier:
+        return self.owner.carriers()[self.local]
 
     def __eq__(self, other) -> bool:
-        return isinstance(other, EntityRef) and self.owner is other.owner and self.local == other.local
+        return isinstance(other, CarrierRef) and self.owner is other.owner and self.local == other.local
 
     def __hash__(self) -> int:
         return hash((id(self.owner), self.local))
 
 
-@dataclass(frozen=True)
-class Is:
-    """The feature is this entity."""
-    entity: EntityRef
+# List of references to the carriers producing the feature in question, which is the carrier
+# itself for non-derived features.
+Recipe = Tuple[CarrierRef, ...]
 
-
-@dataclass(frozen=True)
-class Meet:
-    """The feature is where these entities intersect: two planes in a line, three in a point, a line and a plane in a point.
-
-    It moves as they move. It can be solved while they aren't: a corner is 3 unknowns of its planes' 9.
-    """
-    parts: Tuple[Is, ...]
-
-
-Recipe = Union[Is, Meet]
-
-# One unknown: a solving entity and one of its COORDS.
-Column = Tuple[EntityRef, Coord]
+# One unknown: a solving carrier and one of its COORDS.
+Column = Tuple[CarrierRef, Coord]
 Row = Dict[Column, float]
 
 
-def entity_refs(recipe: Recipe) -> List[EntityRef]:
-    """Every entity the recipe is built from."""
-    if isinstance(recipe, Is):
-        return [recipe.entity]
-    return [part.entity for part in recipe.parts]
-
-
-def meet(*recipes: Recipe) -> Meet:
-    """Where these recipes meet, flattened to entities."""
-    return Meet(tuple(part for recipe in recipes
-                      for part in (recipe.parts if isinstance(recipe, Meet) else (recipe,))))
-
-
-def merge_coincident_planes(entities: Dict[EntityRef, SolveEntity]) -> Dict[EntityRef, EntityRef]:
-    """Each entity's solving entity: coincident planes, facing either way, share the first one; anything else is its own."""
-    canonical: Dict[EntityRef, EntityRef] = {}
-    planes: List[Tuple[EntityRef, Plane]] = []
-    for ref, entity in entities.items():
+def merge_coincident_planes(carriers: Dict[CarrierRef, Carrier]) -> Dict[CarrierRef, CarrierRef]:
+    """Each carrier's solving carrier: coincident planes, facing either way, share the first one; anything else is its own."""
+    canonical: Dict[CarrierRef, CarrierRef] = {}
+    planes: List[Tuple[CarrierRef, Plane]] = []
+    for ref, carrier in carriers.items():
         canonical[ref] = ref
-        if not isinstance(entity, PlaneEntity):
+        if not isinstance(carrier, CarrierPlane):
             continue
-        same = next((other for other, plane in planes if planes_are_coincident(plane, entity.plane)), None)
+        same = next((other for other, plane in planes if planes_are_coincident(plane, carrier.plane)), None)
         if same is None:
-            planes.append((ref, entity.plane))
+            planes.append((ref, carrier.plane))
         else:
             canonical[ref] = same
     return canonical
 
 
-class EntityMap:
-    """Every primitive entity mapped to the solving entity whose columns it uses."""
+class CarrierMap:
+    """Every primitive carrier mapped to the solving carrier whose columns it uses."""
 
-    def __init__(self, entities: Dict[EntityRef, SolveEntity], canonical: Dict[EntityRef, EntityRef]):
-        self._entities = entities
+    def __init__(self, carriers: Dict[CarrierRef, Carrier], canonical: Dict[CarrierRef, CarrierRef]):
+        self._carriers = carriers
         self._canonical = canonical
 
-    def canonical(self, ref: EntityRef) -> EntityRef:
+    def canonical(self, ref: CarrierRef) -> CarrierRef:
         return self._canonical[ref]
 
-    def entity(self, ref: EntityRef) -> SolveEntity:
-        """The solving entity's geometry, which is what the columns are measured against."""
-        return self._entities[self._canonical[ref]]
+    def carrier(self, ref: CarrierRef) -> Carrier:
+        """The solving carrier's geometry, which is what the columns are measured against."""
+        return self._carriers[self._canonical[ref]]
 
-    def solving_entities(self) -> List[EntityRef]:
+    def solving_carriers(self) -> List[CarrierRef]:
         return list(dict.fromkeys(self._canonical.values()))
 
-    def entity_rows(self, ref: EntityRef) -> List[Row]:
-        """One row per unknown of the solving entity `ref` maps to."""
+    def carrier_rows(self, ref: CarrierRef) -> List[Row]:
+        """One row per unknown of the solving carrier `ref` maps to."""
         column = self.canonical(ref)
-        coords: List[Coord] = list(type(self.entity(ref)).COORDS)
+        coords: List[Coord] = list(type(self.carrier(ref)).COORDS)
         return [{(column, coord): 1.0} for coord in coords]
 
     def unknowns(self) -> List[Row]:
-        """One row per unknown of every solving entity."""
-        return [row for ref in self.solving_entities() for row in self.entity_rows(ref)]
+        """One row per unknown of every solving carrier."""
+        return [row for ref in self.solving_carriers() for row in self.carrier_rows(ref)]
 
-    def __contains__(self, ref: EntityRef) -> bool:
+    def __contains__(self, ref: CarrierRef) -> bool:
         return ref in self._canonical
 
 
@@ -195,7 +169,7 @@ def _axes(direction: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 Constraint = Tuple[np.ndarray, Row]
 
 
-def _line_constraints(column: EntityRef, line: Line, at: np.ndarray) -> List[Constraint]:
+def _line_constraints(column: CarrierRef, line: Line, at: np.ndarray) -> List[Constraint]:
     direction = _unit(_np(line.direction))
     first, second = _axes(direction)
     along = float((at - _np(line.point)) @ direction)
@@ -205,31 +179,27 @@ def _line_constraints(column: EntityRef, line: Line, at: np.ndarray) -> List[Con
     ]
 
 
-def _constraints(recipe: Recipe, entities: EntityMap, at: np.ndarray) -> List[Constraint]:
-    if isinstance(recipe, Meet):
-        return [c for part in recipe.parts for c in _constraints(part, entities, at)]
+def _carrier_constraints(ref: CarrierRef, carriers: CarrierMap, at: np.ndarray) -> List[Constraint]:
+    column = carriers.canonical(ref)
+    carrier = carriers.carrier(ref)
 
-    ref = recipe.entity
-    column = entities.canonical(ref)
-    entity = entities.entity(ref)
-
-    if isinstance(entity, PlaneEntity):
-        normal = _unit(_np(entity.plane.normal))
+    if isinstance(carrier, CarrierPlane):
+        normal = _unit(_np(carrier.plane.normal))
         first, second = _axes(normal)
         return [(normal, {(column, PlaneCoord.OFFSET): 1.0,
                           (column, PlaneCoord.TILT_1): -float(at @ first),
                           (column, PlaneCoord.TILT_2): -float(at @ second)})]
 
-    if isinstance(entity, LineEntity):
-        return _line_constraints(column, entity.line, at)
+    if isinstance(carrier, CarrierLine):
+        return _line_constraints(column, carrier.line, at)
 
-    if isinstance(entity, PointEntity):
+    if isinstance(carrier, CarrierPoint):
         return [(np.eye(3)[coord.value], {(column, coord): 1.0}) for coord in PointCoord]
 
     # The barrel moves radially: with its axis, plus its radius.
-    axis_ref = EntityRef(ref.owner, entity.axis)
-    axis = entities.entity(axis_ref)
-    assert isinstance(axis, LineEntity)
+    axis_ref = CarrierRef(ref.owner, carrier.axis)
+    axis = carriers.carrier(axis_ref)
+    assert isinstance(axis, CarrierLine)
     direction = _unit(_np(axis.line.direction))
     offset = at - _np(axis.line.point)
     radial = offset - direction * float(offset @ direction)
@@ -237,23 +207,23 @@ def _constraints(recipe: Recipe, entities: EntityMap, at: np.ndarray) -> List[Co
         raise ValueError("a point on the axis is not on the barrel")
     radial = _unit(radial)
     row: Row = {(column, BarrelCoord.RADIUS): 1.0}
-    for normal, form in _line_constraints(entities.canonical(axis_ref), axis.line, at):
+    for normal, form in _line_constraints(carriers.canonical(axis_ref), axis.line, at):
         for key, value in form.items():
             row[key] = row.get(key, 0.0) + value * float(radial @ normal)
     return [(radial, row)]
 
 
-def motion_along(recipe: Recipe, entities: EntityMap, at: V3, along: V3) -> Row:
-    """The first-order motion of the feature at `at`, read along `along`, as a row over solving entity unknowns.
+def motion_along(recipe: Recipe, carriers: CarrierMap, at: V3, along: V3) -> Row:
+    """The first-order motion of the feature at `at`, read along `along`, as a row over solving carrier unknowns.
 
     The motion is the smallest one that keeps `at` on the moved feature, so sliding along
     the feature doesn't count.
     """
-    constraints = _constraints(recipe, entities, _np(at))
+    constraints = [c for ref in recipe for c in _carrier_constraints(ref, carriers, _np(at))]
     normals = np.array([normal for normal, _ in constraints])
     gram = normals @ normals.T
     if abs(np.linalg.det(gram)) < 1e-12:
-        raise ValueError("the recipe's parts don't meet in a single line or point")
+        raise ValueError("the recipe's carriers don't meet in a single line or point")
     weights = np.linalg.solve(gram, normals @ _np(along))
     row: Row = {}
     for weight, (_, form) in zip(weights, constraints):
@@ -285,53 +255,56 @@ class DistanceMeasurement:
     along: V3
 
 
-def measurement_row(measurement: DistanceMeasurement, entities: EntityMap) -> Row:
-    """How the measured distance changes with the solving entities' unknowns."""
-    end = motion_along(measurement.end.recipe, entities, measurement.end.at, measurement.along)
-    start = motion_along(measurement.start.recipe, entities, measurement.start.at, measurement.along)
+def measurement_row(measurement: DistanceMeasurement, carriers: CarrierMap) -> Row:
+    """How the measured distance changes with the solving carriers' unknowns."""
+    end = motion_along(measurement.end.recipe, carriers, measurement.end.at, measurement.along)
+    start = motion_along(measurement.start.recipe, carriers, measurement.start.at, measurement.along)
     return combine(end, start, -1.0)
 
 
-def feature_dof_rows(recipe: Recipe, entities: EntityMap) -> List[Row]:
-    """The feature's own DOFs as rows over the solving entities' unknowns.
+def feature_dof_rows(recipe: Recipe, carriers: CarrierMap) -> List[Row]:
+    """The feature's own DOFs as rows over the solving carriers' unknowns.
 
-    An entity's DOFs are its unknowns. A point's are its motion along x, y and z; a line's
+    A single carrier's DOFs are its unknowns. A point's are its motion along x, y and z; a line's
     its motion across it at two points.
     """
-    if isinstance(recipe, Is):
-        rows = entities.entity_rows(recipe.entity)
-        entity = entities.entity(recipe.entity)
-        if isinstance(entity, BarrelEntity):
-            rows += entities.entity_rows(EntityRef(recipe.entity.owner, entity.axis))
+    if len(recipe) == 1:
+        (ref,) = recipe
+        rows = carriers.carrier_rows(ref)
+        carrier = carriers.carrier(ref)
+        if isinstance(carrier, CarrierBarrel):
+            rows += carriers.carrier_rows(CarrierRef(ref.owner, carrier.axis))
         return rows
 
-    located = locate_recipe(recipe, entities.entity)
+    located = locate_recipe(recipe, carriers.carrier)
     if isinstance(located, Point):
-        return [motion_along(recipe, entities, located.position, Matrix(axis)) for axis in np.eye(3)]
+        return [motion_along(recipe, carriers, located.position, Matrix(axis)) for axis in np.eye(3)]
     if isinstance(located, Line):
         direction = _unit(_np(located.direction))
         ends = (_np(located.point), _np(located.point) + direction)
-        return [motion_along(recipe, entities, Matrix(end), Matrix(axis))
+        return [motion_along(recipe, carriers, Matrix(end), Matrix(axis))
                 for end in ends for axis in _axes(direction)]
-    raise ValueError("the recipe's parts don't meet in a single line or point")
+    raise ValueError("the recipe's carriers don't meet in a single line or point")
+
+
+def _carrier_geometry(carrier: Carrier) -> Optional[Union[Plane, Line, Point]]:
+    if isinstance(carrier, CarrierPlane):
+        return carrier.plane
+    if isinstance(carrier, CarrierLine):
+        return carrier.line
+    if isinstance(carrier, CarrierPoint):
+        return Point(position=carrier.point)
+    return None
 
 
 def locate_recipe(
     recipe: Recipe,
-    entity_of: Callable[[EntityRef], SolveEntity] = EntityRef.entity,
+    carrier_of: Callable[[CarrierRef], Carrier] = CarrierRef.carrier,
 ) -> Optional[Union[Plane, Line, Point]]:
-    """The geometry the recipe builds."""
-    if isinstance(recipe, Is):
-        entity = entity_of(recipe.entity)
-        if isinstance(entity, PlaneEntity):
-            return entity.plane
-        if isinstance(entity, LineEntity):
-            return entity.line
-        if isinstance(entity, PointEntity):
-            return Point(position=entity.point)
-        return None
-
-    located = [locate_recipe(part, entity_of) for part in recipe.parts]
+    """The geometry the recipe builds: its one carrier, or where its carriers meet."""
+    located = [_carrier_geometry(carrier_of(ref)) for ref in recipe]
+    if len(located) == 1:
+        return located[0]
     planes = [g for g in located if isinstance(g, Plane)]
     lines = [g for g in located if isinstance(g, Line)]
     if len(planes) == 2 and not lines:
@@ -343,24 +316,24 @@ def locate_recipe(
     return None
 
 
-def perturbed(entity: SolveEntity, coord: Coord, step: float) -> SolveEntity:
-    """The entity with one unknown moved by `step`, for finite-difference checks."""
-    if isinstance(entity, PlaneEntity):
-        normal = _unit(_np(entity.plane.normal))
-        offset = float(normal @ _np(entity.plane.point))
+def perturbed(carrier: Carrier, coord: Coord, step: float) -> Carrier:
+    """The carrier with one unknown moved by `step`, for finite-difference checks."""
+    if isinstance(carrier, CarrierPlane):
+        normal = _unit(_np(carrier.plane.normal))
+        offset = float(normal @ _np(carrier.plane.point))
         first, second = _axes(normal)
         moved = normal + step * (first if coord is PlaneCoord.TILT_1 else second if coord is PlaneCoord.TILT_2 else 0.0)
         if coord is PlaneCoord.OFFSET:
             offset += step
-        return PlaneEntity(Plane(normal=Matrix(moved), point=Matrix(moved * offset / float(moved @ moved))))
+        return CarrierPlane(Plane(normal=Matrix(moved), point=Matrix(moved * offset / float(moved @ moved))))
 
-    if isinstance(entity, PointEntity):
-        return PointEntity(Matrix(_np(entity.point) + step * np.eye(3)[coord.value]))
+    if isinstance(carrier, CarrierPoint):
+        return CarrierPoint(Matrix(_np(carrier.point) + step * np.eye(3)[coord.value]))
 
-    if isinstance(entity, BarrelEntity):
-        return BarrelEntity(axis=entity.axis, radius=float(entity.radius) + step)
+    if isinstance(carrier, CarrierBarrel):
+        return CarrierBarrel(axis=carrier.axis, radius=float(carrier.radius) + step)
 
-    line = entity.line
+    line = carrier.line
     direction = _unit(_np(line.direction))
     first, second = _axes(direction)
     point, moved = _np(line.point), direction
@@ -369,4 +342,4 @@ def perturbed(entity: SolveEntity, coord: Coord, step: float) -> SolveEntity:
         point = point + step * shift
     else:
         moved = direction + step * shift
-    return LineEntity(Line(direction=Matrix(moved), point=Matrix(point)))
+    return CarrierLine(Line(direction=Matrix(moved), point=Matrix(point)))
