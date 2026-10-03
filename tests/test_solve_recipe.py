@@ -14,7 +14,7 @@ from kumiki.cutcsg import (
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
 from kumiki.solve_recipe import (
-    Anchor, BarrelCoord, DistanceMeasurement, EntityRef, Is, Meet, PlaneCoord, feature_rows, locate_recipe,
+    Anchor, BarrelCoord, DistanceMeasurement, EntityRef, Is, Meet, PlaneCoord, feature_dof_rows, locate_recipe,
     measurement_row, motion_along, perturbed,
 )
 
@@ -259,6 +259,21 @@ class TestMergedPlanes:
         tenon = _box(size=(1, 1), start=0.0, end=3.0)
         return shoulder, tenon, Difference(base=shoulder, subtract=[tenon])
 
+    def test_a_merged_face_has_the_rows_of_the_plane_it_merged_into(self):
+        shoulder, tenon, root = self._tenon()
+        entities = solve_entity_map(root)
+        back = EntityRef(tenon, prism_face_key(PrismFace.BOTTOM))
+
+        assert entities.entity_rows(back) == entities.entity_rows(EntityRef(shoulder, HALF_SPACE_PLANE))
+
+    def test_the_tree_s_unknowns_count_merged_planes_once(self):
+        _, _, root = self._tenon()
+        entities = solve_entity_map(root)
+
+        # The shoulder plane and the tenon's six planes, less the back face merged into the shoulder.
+        assert len(entities.unknowns()) == 3 * 6
+        assert len({column for row in entities.unknowns() for column in row}) == 3 * 6
+
     def test_the_back_face_merges_with_the_shoulder(self):
         shoulder, tenon, root = self._tenon()
         entities = solve_entity_map(root)
@@ -382,13 +397,13 @@ class TestSolvingAFace:
         entities = solve_entity_map(box)
         left = _recipe(box, prism_face_key(PrismFace.LEFT))
         along = _plane(locate_recipe(_recipe(box, prism_face_key(PrismFace.RIGHT)))).normal
-        known = feature_rows(left, entities)
+        known = feature_dof_rows(left, entities)
         for key in corners:
             corner = _recipe(box, key)
             at = _point(corner)
             foot = create_v3(*_closest(locate_recipe(left), at))
             known.append(measurement_row(DistanceMeasurement(Anchor(left, foot), Anchor(corner, at), along), entities))
-        return remaining(known, feature_rows(_recipe(box, target_key), entities)).count
+        return remaining(known, feature_dof_rows(_recipe(box, target_key), entities)).count
 
     @pytest.mark.parametrize("box", [_box(), _box(turn=0.6, position=(1, -2, 0))])
     def test_four_corners_solve_the_face_with_one_to_spare(self, box):
@@ -412,6 +427,6 @@ class TestSolvingAFace:
         entities = solve_entity_map(box)
         arris = _recipe(box, prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT))
         faces = [_recipe(box, prism_face_key(face)) for face in (PrismFace.FRONT, PrismFace.RIGHT)]
-        assert remaining([], feature_rows(arris, entities)).count == 4
-        assert remaining(feature_rows(faces[0], entities), feature_rows(arris, entities)).count == 2
-        assert remaining(sum((feature_rows(f, entities) for f in faces), []), feature_rows(arris, entities)).count == 0
+        assert remaining([], feature_dof_rows(arris, entities)).count == 4
+        assert remaining(feature_dof_rows(faces[0], entities), feature_dof_rows(arris, entities)).count == 2
+        assert remaining(sum((feature_dof_rows(f, entities) for f in faces), []), feature_dof_rows(arris, entities)).count == 0

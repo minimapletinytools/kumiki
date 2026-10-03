@@ -164,6 +164,16 @@ class EntityMap:
     def solving_entities(self) -> List[EntityRef]:
         return list(dict.fromkeys(self._canonical.values()))
 
+    def entity_rows(self, ref: EntityRef) -> List[Row]:
+        """One row per unknown of the solving entity `ref` maps to."""
+        column = self.canonical(ref)
+        coords: List[Coord] = list(type(self.entity(ref)).COORDS)
+        return [{(column, coord): 1.0} for coord in coords]
+
+    def unknowns(self) -> List[Row]:
+        """One row per unknown of every solving entity."""
+        return [row for ref in self.solving_entities() for row in self.entity_rows(ref)]
+
     def __contains__(self, ref: EntityRef) -> bool:
         return ref in self._canonical
 
@@ -282,15 +292,17 @@ def measurement_row(measurement: DistanceMeasurement, entities: EntityMap) -> Ro
     return combine(end, start, -1.0)
 
 
-def feature_rows(recipe: Recipe, entities: EntityMap) -> List[Row]:
-    """The feature's own unknowns as rows: it is solved when all of them are known."""
+def feature_dof_rows(recipe: Recipe, entities: EntityMap) -> List[Row]:
+    """The feature's own DOFs as rows over the solving entities' unknowns.
+
+    An entity's DOFs are its unknowns. A point's are its motion along x, y and z; a line's
+    its motion across it at two points.
+    """
     if isinstance(recipe, Is):
+        rows = entities.entity_rows(recipe.entity)
         entity = entities.entity(recipe.entity)
-        column = entities.canonical(recipe.entity)
-        coords: List[Coord] = list(type(entity).COORDS)
-        rows: List[Row] = [{(column, coord): 1.0} for coord in coords]
         if isinstance(entity, BarrelEntity):
-            rows += feature_rows(Is(EntityRef(recipe.entity.owner, entity.axis)), entities)
+            rows += entities.entity_rows(EntityRef(recipe.entity.owner, entity.axis))
         return rows
 
     located = locate_recipe(recipe, entities.entity)

@@ -13,7 +13,7 @@ from .drawing import (Measure, MeasureSpan, MeasurementDirection, MeasurementKin
 from .feature_paths import FeatureHandle
 from .geometry import Line, Plane, Point
 from .rule import V3, safe_norm
-from .solve_recipe import (Anchor, DistanceMeasurement, EntityMap, Recipe, Row, feature_rows,
+from .solve_recipe import (Anchor, DistanceMeasurement, EntityMap, Recipe, Row, feature_dof_rows,
                            measurement_row)
 from .timber import CutTimber
 
@@ -51,9 +51,9 @@ def _span(handle: FeatureHandle) -> MeasureSpan:
     raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
 
 
-def feature_handle_rows(handle: FeatureHandle, entities: EntityMap) -> List[Row]:
-    """The feature's own unknowns as rows: it is solved when all of them are known."""
-    return feature_rows(_recipe(handle), entities)
+def feature_handle_dof_rows(handle: FeatureHandle, entities: EntityMap) -> List[Row]:
+    """The feature's own DOFs as rows. See solve_recipe.feature_dof_rows."""
+    return feature_dof_rows(_recipe(handle), entities)
 
 
 def measure_row(measure: Measure, entities: EntityMap, view: Optional[ViewAxes] = None) -> Row:
@@ -99,6 +99,6 @@ def remaining_dofs(
 ) -> Remaining:
     """What of `target` the measurements leave unsolved, given the `known` features."""
     entities = entity_map_of(cut_timber)
-    rows: List[Row] = [row for handle in known for row in feature_handle_rows(handle, entities)]
+    rows: List[Row] = [row for handle in known for row in feature_handle_dof_rows(handle, entities)]
     rows += [measure_row(measure, entities, view) for measure in measures]
-    return remaining(rows, feature_handle_rows(target, entities))
+    return remaining(rows, feature_handle_dof_rows(target, entities))
