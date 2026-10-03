@@ -5,7 +5,7 @@ Based on the API specification in morenotes.md
 This is the main entry point that imports and re-exports all kumiki functionality.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.7.1"
 
 # Import everything from the organized modules
 from .rule import *
@@ -75,8 +75,3 @@ except ModuleNotFoundError as exc:
     if exc.name != "trimesh":
         raise
 
-# Explicitly import private helper functions that are used by tests
-# These start with _ so they won't be included in "import *" by default
-from .timber import (
-    _create_timber_prism_csg_local
-)

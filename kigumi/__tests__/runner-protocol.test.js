@@ -38,6 +38,9 @@ function createRunnerClient(fixtureName = 'minimal_frame.py') {
 
   let buffer = '';
   const waiters = [];
+  // Messages that arrive before anyone reads them. Several lines can land in
+  // one chunk, and dropping the extras loses a `ready` behind a milestone.
+  const pending = [];
   const stderr = [];
 
   child.stdout.on('data', (chunk) => {
@@ -58,6 +61,8 @@ function createRunnerClient(fixtureName = 'minimal_frame.py') {
         const waiter = waiters.shift();
         if (waiter) {
           waiter.resolve(parsed);
+        } else {
+          pending.push(parsed);
         }
       }
 
@@ -70,6 +75,9 @@ function createRunnerClient(fixtureName = 'minimal_frame.py') {
   });
 
   function readMessage(timeoutMs = 15000) {
+    if (pending.length > 0) {
+      return Promise.resolve(pending.shift());
+    }
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error(`Timed out waiting for runner message. stderr:\n${stderr.join('')}`));

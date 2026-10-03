@@ -133,7 +133,7 @@ describe('status rows', () => {
 
   test('an out-of-date kumiki offers the update', async () => {
     const model = new SidebarModel({
-      getKumikiVersionInfo: async () => ({ installedVersion: '0.6.0', latestVersion: '0.6.1' }),
+      getKumikiVersionInfo: async () => ({ installedVersion: '0.7.0', latestVersion: '0.7.1' }),
     });
     await model.refresh(true);
     const version = rootOf(model, 'kumikiVersionAction');

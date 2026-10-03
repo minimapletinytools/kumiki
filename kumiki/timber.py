@@ -189,8 +189,20 @@ class PerfectTimberWithin(ABC):
     transform: Transform
     ticket: TimberTicket = field(default_factory=TimberTicket)
 
+    # Built once in __post_init__; get_perfect_timber_within_csg_local returns it.
+    _perfect_timber_within_csg_local: Optional[RectangularPrism] = field(
+        default=None, init=False, repr=False, compare=False)
+
     def __post_init__(self):
         self._warn_about_imperfect_reference_features()
+        object.__setattr__(self, '_perfect_timber_within_csg_local', RectangularPrism(
+            size=self.size,
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=self.length,
+            feature_overrides=_ptw_face_tags(),
+            label=self.csg_label("perfect"),
+        ))
 
     def _warn_about_imperfect_reference_features(self):
         """Warn where a reference rests on a face the rough timber does not match.
@@ -683,17 +695,13 @@ class PerfectTimberWithin(ABC):
         boundary. All timber types have a perfect rectangular prism that bounds
         their actual geometry.
 
+        Built once, at construction.
+
         Returns:
             RectangularPrism in local coordinates (relative to timber's bottom position)
         """
-        return RectangularPrism(
-            size=self.size,
-            transform=Transform.identity(),
-            start_distance=scalar(0),
-            end_distance=self.length,
-            feature_overrides=_ptw_face_tags(),
-            label=self.csg_label("perfect"),
-        )
+        assert self._perfect_timber_within_csg_local is not None
+        return self._perfect_timber_within_csg_local
 
     @classmethod
     def csg_label_name(cls) -> str:
@@ -1260,33 +1268,44 @@ class Cutting:
     # joint); the order is assigned afterwards via Joint.with_order.
     assembly_ordering: Ordering = Ordering()
 
-    def get_maybe_top_end_cut(self) -> Optional[HalfSpace]:
-        """Return the top end cut HalfSpace derived from distance metadata."""
+    # Built once in __post_init__ from the fields above; the getters below return them.
+    _top_end_cut: Optional[HalfSpace] = field(default=None, init=False, repr=False, compare=False)
+    _bottom_end_cut: Optional[HalfSpace] = field(default=None, init=False, repr=False, compare=False)
+    _negative_csg_local: Optional[CutCSG] = field(default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self):
         if self.maybe_top_end_cut_distance_from_bottom is not None:
-            return HalfSpace(
+            object.__setattr__(self, '_top_end_cut', HalfSpace(
                 normal=create_v3(scalar(0), scalar(0), scalar(1)),
                 offset=self.maybe_top_end_cut_distance_from_bottom,
                 label=CutCSGLabel("top_end_cut"),
-            )
-        return None
-
-    def get_maybe_bottom_end_cut(self) -> Optional[HalfSpace]:
-        """Return the bottom end cut HalfSpace derived from distance metadata."""
+            ))
         if self.maybe_bottom_end_cut_distance_from_bottom is not None:
-            return HalfSpace(
+            object.__setattr__(self, '_bottom_end_cut', HalfSpace(
                 normal=create_v3(scalar(0), scalar(0), scalar(-1)),
                 offset=-self.maybe_bottom_end_cut_distance_from_bottom,
                 label=CutCSGLabel("bottom_end_cut"),
-            )
-        return None
+            ))
+        object.__setattr__(self, '_negative_csg_local', self._build_negative_csg_local())
+
+    def get_maybe_top_end_cut(self) -> Optional[HalfSpace]:
+        """The top end cut HalfSpace, or None. Built once, at construction."""
+        return self._top_end_cut
+
+    def get_maybe_bottom_end_cut(self) -> Optional[HalfSpace]:
+        """The bottom end cut HalfSpace, or None. Built once, at construction."""
+        return self._bottom_end_cut
 
     def get_negative_csg_local(self) -> Optional[CutCSG]:
         """
-        Get the complete negative CSG including end cuts.
+        Get the complete negative CSG including end cuts. Built once, at construction.
 
         Returns the union of negative_csg with any end cuts that are defined,
         or None when this cutting removes nothing at all.
         """
+        return self._negative_csg_local
+
+    def _build_negative_csg_local(self) -> Optional[CutCSG]:
         csg_components = []
 
         # negative_csg and the end-cut metadata can describe the same plane.
@@ -1563,26 +1582,8 @@ def _create_extended_rectangular_prism(
     )
 
 
-# TODO DELETE, just combine with _extended_timber_without_cuts_csg_local
-def _create_timber_prism_csg_local(
-    timber: PerfectTimberWithin, 
-    cuts: list
-) -> CutCSG:
-    """
-    Helper function to create a prism CSG for a timber in LOCAL coordinates, 
-    extending ends with cuts to infinity.
-    
-    LOCAL coordinates means distances are relative to timber.bottom_position.
-    This is used for rendering (where the prism is created at origin and then transformed)
-    and for CSG operations (where cuts are also in local coordinates).
-    
-    Args:
-        timber: The timber to create a prism for
-        cuts: List of cuts on this timber (used to determine if ends should be infinite)
-        
-    Returns:
-        CutCSG representing the timber (possibly semi-infinite or infinite) in LOCAL coordinates
-    """
+def _ends_extended_by_cuts(timber: PerfectTimberWithin, cuts: list) -> Tuple[bool, bool]:
+    """(bottom, top): whether each end of `timber` runs to infinity because a cut has an end cut there."""
     # Check if bottom end has cuts
     has_bottom_cut = any(
         cut.get_maybe_bottom_end_cut() is not None
@@ -1601,9 +1602,7 @@ def _create_timber_prism_csg_local(
     
     # Note: did_end_cuts_extend_timber() can be called separately to check if cuts extend beyond bounds
     # For splice joints and similar, cuts extending beyond is expected and valid behavior
-    
-    # Use polymorphic method to get extended CSG
-    return timber.get_extended_actual_csg_local(extend_bot=has_bottom_cut, extend_top=has_top_cut)
+    return has_bottom_cut, has_top_cut
 
 
 def did_end_cuts_extend_timber(timber: PerfectTimberWithin, cuts: List['Cutting']) -> bool:
@@ -1672,6 +1671,10 @@ class CutTimber:
     timber: PerfectTimberWithin
     cuts: List['Cutting']
     joints: List['Joint']
+    _extended_rough_csg_local: CutCSG
+    _extended_perfect_csg_local: CutCSG
+    _rendered_csg_local: CutCSG
+    _rendered_perfect_csg_local: CutCSG
 
     def __init__(
         self,
@@ -1694,6 +1697,22 @@ class CutTimber:
         self.timber = timber
         self.cuts = cuts if cuts is not None else []
         self.joints = joints if joints is not None else []
+
+        # Built once here, so every caller gets the same node objects.
+        extend_bot, extend_top = _ends_extended_by_cuts(timber, self.cuts)
+        self._extended_rough_csg_local = timber.get_extended_actual_csg_local(
+            extend_bot=extend_bot, extend_top=extend_top)
+        self._extended_perfect_csg_local = timber.get_extended_perfect_csg_local(
+            extend_bot=extend_bot, extend_top=extend_top)
+
+        # A cut that removes nothing contributes no node.
+        negative_csgs = [csg for csg in (cut.get_negative_csg_local() for cut in self.cuts) if csg is not None]
+        self._rendered_csg_local = (
+            Difference(self._extended_rough_csg_local, negative_csgs) if negative_csgs
+            else self._extended_rough_csg_local)
+        self._rendered_perfect_csg_local = (
+            Difference(self._extended_perfect_csg_local, negative_csgs) if negative_csgs
+            else self._extended_perfect_csg_local)
 
     def resolve_joint_path(self, path: 'JointPath') -> List['ResolvedJointPath']:
         """Which of this timber's joints a name refers to.
@@ -1776,35 +1795,19 @@ class CutTimber:
         Returns:
             RectangularPrism CSG representing the timber (possibly semi-infinite or infinite) in LOCAL coordinates
         """
-        return _create_timber_prism_csg_local(self.timber, self.cuts)
+        return self._extended_rough_csg_local
 
-    # this one returns the timber with all cuts applied
+    def get_extended_perfect_csg_local(self) -> CutCSG:
+        """The perfect timber within, with each end that has an end cut extended to infinity. Built once, at construction."""
+        return self._extended_perfect_csg_local
+
     def render_timber_with_cuts_csg_local(self) -> CutCSG:
-        """
-        Returns a CSG representation of the timber with all cuts applied.
+        """The rough timber with every cut subtracted. Built once, at construction."""
+        return self._rendered_csg_local
 
-        
-        Returns:
-            Difference CSG representing the timber with all cuts subtracted
-        """
-        # Start with the timber prism (possibly with infinite ends where cuts exist)
-        starting_csg = self._extended_timber_without_cuts_csg_local()
-        
-        # If there are no cuts, just return the starting CSG
-        if not self.cuts:
-            return starting_csg
-        
-        # Collect all the negative CSGs (volumes to be removed) from the cuts.
-        # A cut that removes nothing contributes no node.
-        negative_csgs = [
-            csg for csg in (cut.get_negative_csg_local() for cut in self.cuts)
-            if csg is not None
-        ]
-        if not negative_csgs:
-            return starting_csg
-        
-        # Return the difference: timber - all cuts
-        return Difference(starting_csg, negative_csgs)
+    def render_perfect_timber_within_with_cuts_csg_local(self) -> CutCSG:
+        """The perfect timber within with every cut subtracted. Built once, at construction."""
+        return self._rendered_perfect_csg_local
 
     
     def _bounding_box_prism_for_cross_section(
@@ -2516,6 +2519,36 @@ class Frame:
     # it may adjust without a module-level declaration to go looking for.
     kiwari: Optional['Kiwari'] = field(default=None, compare=False)
 
+    def __post_init__(self):
+        self._check_drawings_are_of_this_frame()
+
+    def _check_drawings_are_of_this_frame(self) -> None:
+        """Raise if a drawing names a timber, or a measurement a feature, that isn't this frame's own object."""
+        from .feature_paths import to_feature_path
+
+        for drawing in self.drawings:
+            for timber in drawing.timbers:
+                if self.cut_timber_of(timber) is None:
+                    raise ValueError(f"Drawing {drawing.name!r}: {self._describe_missing(timber)}")
+            for viewport_id, measures in drawing.measurements_by_viewport().items():
+                for measure in measures:
+                    for handle in (measure.anchor_a, measure.anchor_b):
+                        where = f"Drawing {drawing.name!r}, viewport {viewport_id}"
+                        if self.cut_timber_of(handle.timber) is None:
+                            raise ValueError(f"{where}: a measurement's {self._describe_missing(handle.timber)}")
+                        if to_feature_path(handle, self) is None:
+                            raise ValueError(
+                                f"{where}: a measurement's feature {handle.feature.name!r} is not on a node "
+                                f"of {_timber_path_of(handle.timber)!r}'s CSG tree in this frame. Get handles "
+                                "from this frame's cut timbers, not from another build.")
+
+    def _describe_missing(self, timber: PerfectTimberWithin) -> str:
+        name = _timber_path_of(timber)
+        if any(cut.timber == timber for cut in self.cut_timbers):
+            return (f"timber {name!r} is an equal copy of one in this frame, not the frame's own object. "
+                    "Use the timber from this frame's cut_timbers.")
+        return f"timber {name!r} is not in this frame."
+
     def resolve_timber_path(self, path: 'TimberPath') -> List['ResolvedTimberPath']:
         """Which timbers a name refers to, in this frame.
 
@@ -2550,6 +2583,24 @@ class Frame:
         from .identity import TimberPath
 
         return [TimberPath(_timber_path_of(cut.timber)) for cut in self.cut_timbers]
+
+    def cut_timber_of(self, timber: PerfectTimberWithin) -> Optional[CutTimber]:
+        """The cut timber holding this exact timber object, or None."""
+        return next((cut for cut in self.cut_timbers if cut.timber is timber), None)
+
+    def resolved_timber_path_of(self, timber: PerfectTimberWithin) -> Optional['ResolvedTimberPath']:
+        """This exact timber's path in this frame, with its occurrence among timbers sharing the name."""
+        from .identity import ResolvedTimberPath
+
+        wanted = _timber_path_of(timber)
+        same_name = [cut for cut in self.cut_timbers if _timber_path_of(cut.timber) == wanted]
+        occurrence = next((i for i, cut in enumerate(same_name) if cut.timber is timber), None)
+        return None if occurrence is None else ResolvedTimberPath(path=wanted, occurrence=occurrence)
+
+    def cut_timber_at(self, path: 'ResolvedTimberPath') -> Optional[CutTimber]:
+        """The cut timber a resolved path names in this frame, or None."""
+        same_name = [cut for cut in self.cut_timbers if _timber_path_of(cut.timber) == path.path]
+        return same_name[path.occurrence] if path.occurrence < len(same_name) else None
 
     @classmethod
     def from_joints(cls, joints: List[Joint],

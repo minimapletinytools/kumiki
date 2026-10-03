@@ -8,9 +8,60 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kigumi
+
+#### Changed
+
+- **License:** kigumi is now under the Elastic License 2.0 rather than MPL-2.0. Using, modifying and redistributing it stay free, including commercially; offering it to others as a hosted or managed service is not permitted. Releases up to and including 0.7.2 remain under MPL-2.0. kumiki is unchanged and stays MPL-2.0.
+
+### Project
+
+- Contributions to kigumi now need a signed [Contributor License Agreement](CLA.md); a bot asks on a new contributor's first pull request that changes `kigumi/`. Contributions to kumiki need no CLA.
+
+## [kigumi 0.7.2] - 2026-09-29
+
+### kigumi
+
+#### Fixed
+
+- The viewer failed to show any frame on older VS Code builds, with `this.sceneManager.bundles(...).forEach is not a function`. It called `forEach` on an iterator, which Chromium only supports from 122; kigumi supports VS Code 1.63 (Chromium 91). A unit test now refuses iterator helpers in the webview.
+
+## [kigumi 0.7.1] - 2026-09-28
+
+### kigumi
+
+#### Fixed
+
+- A new project's `my_cute_frame.py` failed with `NameError: name 'Rational' is not defined`. The copy kigumi writes had fallen behind `patterns/structures/my_cute_frame.py`; it now matches, and a unit test keeps it that way.
+  **Migrate:** in a project already created, replace `Rational(0)` with `scalar(0)`.
+
+## [kumiki 0.7.1] - 2026-09-27
+
+### kumiki
+
+#### Fixed
+
+- kumiki 0.7.0 failed at import on Python 3.11 and later -- including the 3.13 venv kigumi creates -- with `mutable default <class 'kumiki.rule.Matrix'> for field look is not allowed`. `ViewAxes` now builds its default axes with a factory.
+
+## [0.7.0] - 2026-09-27
+
+Upgrade kumiki and kigumi together: the new kigumi runner imports parts of kumiki that 0.6.x does not have.
+
 ### kumiki
 
 #### Added
+
+- Kiwari (木割): a frame declares the numbers it is proportioned from, `k = kiwari(legs=kiwari.count(4, minimum=3), seat_height=kiwari.length(mm(450))).resolve(k)`, and returns them on `Frame.from_joints(..., kiwari=k)`. Declarations are typed (`length`, `angle`, `count`, `number`, `flag`, `text`, `choice`, `point2`, `point3`), may be `optional=True`, and an accessor asked for the wrong kind raises. A pattern declares its own on the `Pattern`.
+- `rule.parse_length`, `parse_angle` and `format_length` read and write lengths as people type them -- `10in`, `1 1/4"`, `2'6"` -- with a closed grammar that never evaluates an expression.
+- Drawing layout: a drawing holds a tree of `Viewport`s, divided by `Portion`s on a `Page`, and every drawing has viewports -- one that names none gets `shop_drawing_viewports` (one piece) or `elevation_viewports` (several). A viewport is identified by its position (`ViewportId`), with `SHOP_DRAWING_IDS` / `ELEVATION_IDS` naming the defaults. `kumiki.layout` resolves the tree to page rects.
+- Measurement geometry moved into `drawing`: `ViewAxes` for a camera frame, `MeasureSpan`, `project_geometry_for_measuring`, `pair_separation`, `distance_anchors`, `angle_rays` / `angle_between`, and `measures_nothing`. A measurement has a plane, `FromViewport` (`FROM_VIEWPORT`) when it takes the viewport's.
+- `DerivedPointFeature`: the point where an edge crosses a face, derived the way edges are. A prism names its eight corners (`SimpleRectangularPrismVertexFeature`), and a timber's come out as `ptw.top_right_front` and so on.
+- `CSGFeatureType.CURVED_FACE` for a cylinder barrel or an arc-extruded side; `FACE` now means planar. A path extrusion's feature key says which it is (`FlatSide`, `CurvedSide`, `ExtrusionCap`).
+- A feature can state where it ends -- an arris is a pair of corners, a derived edge runs as far as both its faces -- instead of being clipped against the solid. `cropcsg.crop_line_to_boundary_segments_on_csg` crops an edge to where the surface is.
+- `cut_dovetail_corner_joint`: a through or half-blind box dovetail corner, sized with `SingleDovetailSizeParameter`.
+- `cut_practice_straight_angled_end_cut_decoration`, with a pattern.
+- Burr puzzle patterns: a 6-piece Luban lock, a 3-piece Luban lock (`luban_lock_2`) and Gordian's Knot (`gordian_knot`).
+- Japanese names for the Kanawa Tsugi (金輪継ぎ) scarf.
 
 - `TimberCenterplane` names the two planes that bisect a timber along its length, `RIGHT_LEFT` and `FRONT_BACK`, and `measuring.locate_center_plane` returns one as an `UnsignedPlane` -- unsigned because a bisector has no outward side. There is deliberately no TOP/BOTTOM one: it is not a long plane, and it moves with every end cut.
 - `TimberLongFaceCenterline` names the line down the middle of each long face, and `measuring.locate_long_face_centerline` locates it. Geometrically it is where a center plane meets that face, and the pairing crosses over -- the RIGHT face's centerline lies in the FRONT_BACK plane.
@@ -24,6 +75,51 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
   **Migrate:** `reference_faces=("RIGHT",)` becomes `reference_features=(TimberFeature.RIGHT_FACE,)`.
 - **Breaking:** a reference face the rough timber does not match now WARNS rather than raising, and the check reuses `is_face_perfect` instead of reimplementing the half-size comparison. A timber with no perfect face still has to be measured from somewhere, and the answer there is to render the internal PTW face to carry the measurements.
 - **Breaking:** `TimberFeature.CENTERLINE` is 30, not 7, so the five centerlines form one run alongside the two center planes at 28-29. Value 7 is retired and left empty rather than reused -- a value is how the narrow enums address a member, so handing it to something else would turn anything still holding the old one into a different feature. Nothing persists a `TimberFeature` by value, so this is invisible outside the library.
+- **Breaking:** the workshop joints are split into category subpackages -- `butt`, `corner`, `cross`, `splice`, `board`, `decorative`, `free`, `mixed` -- mostly one module per joint. `butt_joints.py`, `corner_joints.py`, `splice_joints.py`, `compound_joints.py`, `cross_joints.py`, `free_joints.py`, `multi_butt_joints.py` and `mortise_and_tenon_joints.py` are gone from `kumiki.joints.workshop`.
+  **Migrate:** import from `kumiki.joints.workshop` (which still re-exports everything) rather than from a module inside it.
+- **Breaking:** `dropin_dovetail_butt_joint` takes `dovetail_angle` instead of `dovetail_large_width`.
+- The half-blind tenoned, dadoed and rabbeted scarf is `cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers`, and its `stepped_shoulder_depth` / `stepped_shoulder_length` are `rebated_shoulder_depth` / `rebated_shoulder_length`. The old function name remains as an alias.
+- **Breaking:** the render-parameter system is gone: `librarian.Param` and reading a frame function's signature for UI controls. A pattern lambda takes exactly one argument, its center.
+  **Migrate:** declare adjustable values with a kiwari.
+- **Breaking:** `CSGFeature.locate` is `locate_simple_unbounded`, saying that it returns the unbounded plane, line or point.
+- **Breaking:** a primitive's authored features are split in two. `feature_overrides` holds `FeatureOverride(key, name, properties)`, which renames or re-properties a default but cannot move it; `extra_features` holds features no default names. Both are checked when the shape is built, and names must be unique.
+  **Migrate:** an authored feature that shared a default's key becomes a `FeatureOverride`; build keys with `prism_face_key`, `prism_arris_key`, `prism_corner_key`, `side_key`.
+- **Breaking:** `Drawing.timber_paths` holds `ResolvedTimberPath`s, one per timber, so a name matching two posts is two entries. A string or `TimberPath` is still accepted.
+- **Breaking:** `Measure.plane` is never `None`; it defaults to `FROM_VIEWPORT`.
+- **Breaking:** the measurement helpers take `Point | Line | Plane` rather than a mapping with a `"kind"` key.
+- **Breaking:** legacy measurement kind names are no longer parsed, and a bare `angle` now means the 3D angle. An unreadable kind warns and is dropped rather than raising.
+- **Breaking:** `geometry.LineOnPlane` is removed; nothing constructed one.
+- **Breaking:** a `ConvexPolygonSimpleLoft` with twisted, non-planar sides is invalid. In exchange a lofted side locates to a plane, so a tapered cheek can be measured to.
+- A derived feature is owned by the deepest node holding both of its parents, rather than wherever the query started, and both parents are required.
+
+#### Fixed
+
+- Two solids butted together, or two mortises meeting, no longer report the face they share as selectable surface.
+- An arris lying on the surface it belongs to no longer extends the whole length of the post when its extent is asked for.
+- A vertical distance with no up axis ran along X rather than Z.
+- Roundover and miter cuts triangulate into sound meshes, and long-edge roundovers run cleanly through miter end cuts.
+- A wedged half-dovetail is actually wedged, and two notch patterns that rendered the same joint are told apart.
+
+### kigumi
+
+#### Added
+
+- Measurements from the viewer: pick two features in a drawing or the 3D view, see the dimension preview follow the pointer, change its kind, drag it where it should sit, and undo or delete it. Angles are drawn as arcs in their corner, perpendicular distances drop square onto a face, and a broken measurement is shown in red with the reason.
+- A kiwari panel: a frame's declared parameters are editable in the viewer, optional ones get a switch, and a button saves the changed values to `myframe.parameters.json` beside the source.
+- Step through the features under the pointer, or right-click to choose among them; corners and derived points can be selected.
+- A standalone Kigumi desktop app (Electron), sharing a host-neutral core and webview sidebar with the VS Code extension. It can bundle uv, and the toolchain installs uv when neither uv nor Python is found.
+- Accessories can be hidden and locked from the layers tree like any other member.
+
+#### Changed
+
+- Drawings take their layout from kumiki's viewport tree rather than hard-coded rects, and a measurement names its viewport by `ViewportId`.
+- Measurement rules run in kumiki only; the viewer's copy is gone.
+- Dimensions are stored in world units, not screen pixels.
+
+#### Fixed
+
+- The layers tree no longer scrolls under the reader, ctrl-Z reaches undo, and hovering no longer promises a click that will be refused.
+- A measurement that describes nothing is reported rather than stopping the frame.
 
 ## [0.6.0] - 2026-09-07
 

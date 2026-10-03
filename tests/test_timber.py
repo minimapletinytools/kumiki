@@ -749,6 +749,68 @@ class TestGetCornerPositionGlobal:
 
 class TestCutTimber:
     """Test CutTimber CSG operations."""
+
+    def _timber(self):
+        return create_timber(scalar(100), Matrix([scalar(4), scalar(6)]), Matrix([scalar(0), scalar(0), scalar(0)]),
+                             Matrix([scalar(0), scalar(0), scalar(1)]), Matrix([scalar(1), scalar(0), scalar(0)]),
+                             ticket='test_timber')
+
+    def test_prisms_are_built_once_and_reused(self):
+        timber = self._timber()
+        cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))])
+        rough = cut_timber._extended_timber_without_cuts_csg_local()
+        perfect = cut_timber.get_extended_perfect_csg_local()
+        assert cut_timber._extended_timber_without_cuts_csg_local() is rough
+        assert cut_timber.get_extended_perfect_csg_local() is perfect
+        rendered = cut_timber.render_timber_with_cuts_csg_local()
+        assert isinstance(rendered, Difference) and rendered.base is rough
+
+    def test_the_perfect_timber_within_is_built_once(self):
+        from dataclasses import replace
+        timber = self._timber()
+        prism = timber.get_perfect_timber_within_csg_local()
+        assert timber.get_perfect_timber_within_csg_local() is prism
+        assert prism.end_distance == timber.length
+        longer = replace(timber, length=scalar(120))
+        assert longer.get_perfect_timber_within_csg_local().end_distance == 120
+        assert longer == replace(longer)
+
+    def test_a_cutting_builds_its_nodes_once(self):
+        timber = self._timber()
+        cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80),
+                          maybe_bottom_end_cut_distance_from_bottom=scalar(5))
+        assert cutting.get_maybe_top_end_cut() is cutting.get_maybe_top_end_cut()
+        assert cutting.get_maybe_bottom_end_cut() is cutting.get_maybe_bottom_end_cut()
+        negative = cutting.get_negative_csg_local()
+        assert negative is cutting.get_negative_csg_local()
+        assert isinstance(negative, SolidUnion)
+        assert negative.children[0] is cutting.get_maybe_top_end_cut()
+
+    def test_both_trees_are_built_once_from_the_same_cut_nodes(self):
+        timber = self._timber()
+        cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))
+        cut_timber = CutTimber(timber, cuts=[cutting])
+        rough = cut_timber.render_timber_with_cuts_csg_local()
+        perfect = cut_timber.render_perfect_timber_within_with_cuts_csg_local()
+        assert cut_timber.render_timber_with_cuts_csg_local() is rough
+        assert cut_timber.render_perfect_timber_within_with_cuts_csg_local() is perfect
+        assert isinstance(rough, Difference) and isinstance(perfect, Difference)
+        assert rough.subtract[0] is cutting.get_negative_csg_local()
+        assert perfect.subtract[0] is cutting.get_negative_csg_local()
+        assert perfect.base is cut_timber.get_extended_perfect_csg_local()
+
+    def test_an_uncut_timber_renders_as_its_prisms(self):
+        cut_timber = CutTimber(self._timber())
+        assert cut_timber.render_timber_with_cuts_csg_local() is cut_timber._extended_timber_without_cuts_csg_local()
+        assert cut_timber.render_perfect_timber_within_with_cuts_csg_local() is cut_timber.get_extended_perfect_csg_local()
+
+    def test_both_prisms_extend_the_ends_with_end_cuts(self):
+        timber = self._timber()
+        cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))])
+        for prism in (cut_timber._extended_timber_without_cuts_csg_local(), cut_timber.get_extended_perfect_csg_local()):
+            assert isinstance(prism, RectangularPrism)
+            assert prism.start_distance == 0
+            assert prism.end_distance is None
     
     def test_extended_timber_without_cuts_finite(self):
         """Test _extended_timber_without_cuts_csg for a timber with no cuts (finite)."""

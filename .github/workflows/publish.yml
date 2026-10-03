@@ -58,7 +58,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.13
 
       - name: Cache uv artifacts
         uses: actions/cache@v4
@@ -66,9 +66,9 @@ jobs:
           path: |
             ~/.cache/uv
             .venv
-          key: uv-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          key: uv-${{ runner.os }}-py3.13-${{ hashFiles('pyproject.toml', 'uv.lock') }}
           restore-keys: |
-            uv-${{ runner.os }}-py3.12-
+            uv-${{ runner.os }}-py3.13-
 
       - name: Install dependencies
         run: |
@@ -87,6 +87,18 @@ jobs:
 
       - name: Validate distribution metadata
         run: uvx twine check dist/*
+
+      # Import the built wheel on the oldest and newest supported Pythons, so a
+      # package that cannot import never reaches the index.
+      - name: Import built wheel
+        # From outside the checkout, or `import kumiki` finds the source tree.
+        run: |
+          WHEEL=$(ls "$PWD"/dist/*.whl)
+          cd "$RUNNER_TEMP"
+          for py in 3.10 3.13; do
+            uv run --isolated --no-project --python "$py" --with "$WHEEL" \
+              python -c "import kumiki; print('$py', kumiki.__version__)"
+          done
 
       - name: Resolve package version
         id: package_info
@@ -136,7 +148,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install from selected index
         run: |

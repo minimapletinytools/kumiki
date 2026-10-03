@@ -14,23 +14,27 @@ project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
 from kumiki.drawing import Drawing, Measure
-from kumiki.identity import (FeatureRef, ResolvedTimberPath, SingleFeaturePath,
-                             ViewportId)
+from kumiki.feature_paths import find_feature
+from kumiki.identity import ResolvedTimberPath, ViewportId
 from kumiki.timber import Frame
 from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
 
 
-def _face(timber, cut, feature):
-    """A declared face of one timber, named the way the drawings file names it."""
-    return SingleFeaturePath(
-        timber=ResolvedTimberPath(timber),
-        ref=FeatureRef(csg_path=cut, feature=feature),
-        feature_type="FACE",
-    )
-
-
 def build_frame():
     joint = example_basic_mortise_and_tenon_joint()
+    built = Frame.from_joints(joints=[joint])
+
+    def _timber(name):
+        cut_timber = built.cut_timber_at(ResolvedTimberPath(name))
+        assert cut_timber is not None
+        return cut_timber.timber
+
+    def _face(timber, cut, feature):
+        cut_timber = built.cut_timber_at(ResolvedTimberPath(timber))
+        assert cut_timber is not None
+        handle = find_feature(cut_timber, cut, feature)
+        assert handle is not None, feature
+        return handle
 
     tenon_top = _face("butt_timber", ("tenon_waste", "tenon"), "tenon_top")
     shoulder = _face("butt_timber", ("tenon_waste", "shoulder"), "shoulder")
@@ -38,7 +42,7 @@ def build_frame():
     mortise_front = _face("receiving_timber", ("mortise_hole",), "mortise_front")
 
     return Frame(
-        cut_timbers=Frame.from_joints(joints=[joint]).cut_timbers,
+        cut_timbers=built.cut_timbers,
         name="Measured Fixture Frame",
         drawings=[
             # One piece, so this gets the four-long-faces layout, and the
@@ -46,14 +50,14 @@ def build_frame():
             # shoulder, which is the length that has to be cut.
             Drawing(
                 name="tenon",
-                timber_paths=[ResolvedTimberPath("butt_timber")],
+                timbers=[_timber("butt_timber")],
                 measurements={ViewportId("0.0.0"): [Measure(anchor_a=tenon_top, anchor_b=shoulder)]},
             ),
             # The mortise it goes into, measured in two viewports, to show that
             # the same drawing carries different dimensions in different views.
             Drawing(
                 name="mortise",
-                timber_paths=[ResolvedTimberPath("receiving_timber")],
+                timbers=[_timber("receiving_timber")],
                 measurements={
                     # Keyed by viewport id, which is a POSITION in the layout --
                     # see kumiki/layout.py. "0.0.0" and "0.0.1" are the first two
@@ -73,7 +77,7 @@ def build_frame():
             # view shows the whole of it.
             Drawing(
                 name="the joint",
-                timber_paths=[ResolvedTimberPath("butt_timber"), ResolvedTimberPath("receiving_timber")],
+                timbers=[_timber("butt_timber"), _timber("receiving_timber")],
                 measurements={ViewportId("0.0.1"): [Measure(anchor_a=shoulder, anchor_b=mortise_bottom)]},
             ),
         ],

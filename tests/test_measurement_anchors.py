@@ -17,6 +17,7 @@ from kumiki.drawing import (MeasureSpan, MeasurementDirection, MeasurementKind,
                             ViewAxes,
                             MeasurementOperation, MeasurementSpace, distance_anchors)
 from kumiki.rule import create_v3
+from tests.testing_shavings import load_module, present
 
 
 def v(triple):
@@ -230,17 +231,11 @@ class TestOnARealFrame:
 
     @pytest.fixture
     def drawings(self):
-        import importlib.util
-        import sys
         from pathlib import Path
         from tests.testing_shavings import load_module
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_anchors", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_anchors"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_anchors", root / "kigumi" / "runner.py")
         frame = load_module(
             "anchors_fixture", root / "kigumi" / "test-fixtures" / "measured_frame.py"
         ).build_frame()
@@ -334,16 +329,10 @@ class TestAFeatureSeenEndOn:
     """
 
     def test_a_line_along_the_view_is_a_point_to_the_rules(self):
-        import importlib.util
-        import sys
         from pathlib import Path
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_endon", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_endon"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_endon", root / "kigumi" / "runner.py")
 
         assert runner._projects_to_a_point((0, 1, 0), (0, 1, 0)) is True
         assert runner._projects_to_a_point((0, -1, 0), (0, 1, 0)) is True
@@ -352,16 +341,10 @@ class TestAFeatureSeenEndOn:
     def test_a_hair_off_end_on_is_still_a_line(self):
         # It draws as a very short line, and calling it a point would refuse a
         # dimension that is drawable.
-        import importlib.util
-        import sys
         from pathlib import Path
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_endon2", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_endon2"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_endon2", root / "kigumi" / "runner.py")
 
         assert runner._projects_to_a_point((0.05, 1, 0), (0, 1, 0)) is False
 
@@ -390,8 +373,6 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
 
     @pytest.fixture
     def receiving(self):
-        import importlib.util
-        import sys
         from pathlib import Path
 
         from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
@@ -401,11 +382,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         from kumiki.timber import Frame
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_bounds", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_bounds"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_bounds", root / "kigumi" / "runner.py")
 
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0)),
@@ -517,7 +494,7 @@ class TestAFeatureKnowsItsOwnEnds:
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
-        extent = arris.get_extent(self._box())
+        extent = present(arris.get_extent(self._box()), "an extent")
 
         assert extent.ends is not None
         first, second = extent.ends
@@ -526,8 +503,8 @@ class TestAFeatureKnowsItsOwnEnds:
     def test_and_its_anchor_is_between_them(self):
         from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
-        extent = SimpleRectangularPrismEdgeFeature(
-            name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT)).get_extent(self._box())
+        extent = present(SimpleRectangularPrismEdgeFeature(
+            name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT)).get_extent(self._box()), "an extent")
 
         assert float(extent.anchor[2, 0]) == pytest.approx(0.2)
 
@@ -555,25 +532,19 @@ class TestAFeatureKnowsItsOwnEnds:
             OwnedFeatureHit(feature=face(PrismFace.FRONT, FeatureGroup.B2), owner=box))
         assert edge is not None, "adjacent faces in meeting groups form an edge"
 
-        extent = edge.get_extent(box)
+        extent = present(edge.get_extent(box), "an extent")
 
         assert extent.ends is not None
         first, second = extent.ends
         assert abs(float(second[2, 0]) - float(first[2, 0])) == pytest.approx(0.4)
 
     def test_the_runner_reads_those_ends_as_an_interval(self):
-        import importlib.util
-        import sys
         from pathlib import Path
 
         from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_declared", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_declared"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_declared", root / "kigumi" / "runner.py")
 
         box = self._box()
         arris = SimpleRectangularPrismEdgeFeature(
@@ -586,8 +557,6 @@ class TestAFeatureKnowsItsOwnEnds:
 
     def test_a_feature_that_cannot_say_returns_nothing(self):
         # So the caller falls back to clipping rather than to a wrong number.
-        import importlib.util
-        import sys
         from pathlib import Path
 
         from kumiki.cutcsg import PrismFace, RectangularPrism
@@ -595,11 +564,7 @@ class TestAFeatureKnowsItsOwnEnds:
         from kumiki.rule import create_v2, scalar
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_declared2", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_declared2"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_declared2", root / "kigumi" / "runner.py")
 
         endless = RectangularPrism(
             size=create_v2(scalar("0.1"), scalar("0.2")),
@@ -623,17 +588,11 @@ class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
         # Not from geometry sent along with the request: resolving it the way a
         # written measurement resolves it is what makes the two agree, rather
         # than being a second way of working out the same answer.
-        import importlib.util
         import inspect
-        import sys
         from pathlib import Path
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_preview", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_preview"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_preview", root / "kigumi" / "runner.py")
 
         source = inspect.getsource(runner._pick_placement)
 
@@ -644,16 +603,10 @@ class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
         assert "angle_rays" in source
 
     def test_a_pick_with_nothing_held_places_nothing(self):
-        import importlib.util
-        import sys
         from pathlib import Path
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_preview2", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_preview2"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_preview2", root / "kigumi" / "runner.py")
 
         # `settled` rides along with the placement -- what the measurement
         # would come to, so the preview shows the number the finished one will
@@ -676,17 +629,11 @@ class TestAPlacedAnchorStaysPlaced:
 
     @pytest.fixture
     def resolved(self):
-        import importlib.util
-        import sys
         from pathlib import Path
         from tests.testing_shavings import load_module
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_stable", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_stable"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_stable", root / "kigumi" / "runner.py")
         frame = load_module(
             "stable_fixture", root / "kigumi" / "test-fixtures" / "measured_frame.py"
         ).build_frame()
@@ -769,7 +716,7 @@ class TestDroppingAPerpendicularOntoAFace:
     def _anchors(self, first, second):
         from kumiki.drawing import distance_anchors
 
-        return distance_anchors(first, second, self.THREE_D)
+        return distance_anchors(first, second, present(self.THREE_D, "a kind"))
 
     def _along(self, a, b):
         return tuple(round(b[i] - a[i], 9) for i in range(3))
@@ -838,17 +785,11 @@ class TestAFaceIsOnlyAPlaneInTheSolid:
     """
 
     def _span(self, in_three_d):
-        import importlib.util
-        import sys
         from pathlib import Path
         from tests.testing_shavings import load_module
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_space", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_space"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_space", root / "kigumi" / "runner.py")
         frame = load_module(
             "space_fixture", root / "kigumi" / "test-fixtures" / "measured_frame.py"
         ).build_frame()
@@ -1050,17 +991,11 @@ class TestAFeatureOnALabelledRoot:
     """
 
     def _runner_and_frame(self):
-        import importlib.util
-        import sys
         from pathlib import Path
         from tests.testing_shavings import load_module
 
         root = Path(__file__).resolve().parent.parent
-        spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_rooted", root / "kigumi" / "runner.py")
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_rooted"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_rooted", root / "kigumi" / "runner.py")
         frame = load_module(
             "rooted_fixture", root / "kigumi" / "test-fixtures" / "measured_frame.py"
         ).build_frame()

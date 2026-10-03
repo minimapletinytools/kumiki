@@ -409,3 +409,35 @@ def standard_4x4_timber_size():
     """Fixture providing standard 4x4 inch timber dimensions."""
     return create_v2(inches(4), inches(4))
 
+
+
+def mortise_and_tenon_handles():
+    """A mortise-and-tenon frame, and handles to some of its features by name.
+
+    Faces: tenon_top, tenon_left, shoulder, mortise_bottom, mortise_front, rough_front.
+    Edge: shoulder_edge, where the shoulder meets the butt timber's rough front.
+    """
+    from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit
+    from kumiki.feature_paths import FeatureHandle, find_feature
+    from kumiki.identity import ResolvedTimberPath
+    from kumiki.timber import Frame
+    from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
+
+    frame = Frame.from_joints(joints=[example_basic_mortise_and_tenon_joint()])
+    butt = present(frame.cut_timber_at(ResolvedTimberPath("butt_timber")), "butt_timber")
+    receiving = present(frame.cut_timber_at(ResolvedTimberPath("receiving_timber")), "receiving_timber")
+    body = ("timber (rough, extended)",)
+    tenon = ("mortise_and_tenon", "tenon_waste", "tenon")
+    handles = {
+        "tenon_top": find_feature(butt, tenon, "tenon_top"),
+        "tenon_left": find_feature(butt, tenon, "tenon_left"),
+        "shoulder": find_feature(butt, ("mortise_and_tenon", "tenon_waste", "shoulder"), "shoulder"),
+        "rough_front": find_feature(butt, body, "rough.front"),
+        "mortise_bottom": find_feature(receiving, ("mortise_and_tenon", "mortise_hole"), "mortise_bottom"),
+        "mortise_front": find_feature(receiving, ("mortise_and_tenon", "mortise_hole"), "mortise_front"),
+    }
+    found = {name: present(handle, name) for name, handle in handles.items()}
+    edge = present(DerivedEdgeFeature.derive(found["shoulder"].hit, found["rough_front"].hit), "shoulder edge")
+    found["shoulder_edge"] = FeatureHandle(
+        timber=butt.timber, hit=OwnedFeatureHit(feature=edge, owner=found["shoulder"].owner))
+    return frame, found

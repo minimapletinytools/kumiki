@@ -8,7 +8,6 @@ from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.ticket import JointTicket
 from kumiki.drawing import Drawing
-from kumiki.identity import ResolvedTimberPath
 from kumiki.timber import AssemblyFreedom, Cutting, Frame, Joint, Ordering
 
 
@@ -57,5 +56,5 @@ def build_frame():
         name=frame.name,
         source_joints=frame.source_joints,
         footprints=frame.footprints,
-        drawings=[Drawing(name="timber A", timber_paths=[ResolvedTimberPath("A")])],
+        drawings=[Drawing(name="timber A", timbers=[timber_a])],
     )

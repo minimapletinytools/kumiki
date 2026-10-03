@@ -10,8 +10,6 @@ The viewer's half cannot run here (it wants a browser), so this stops at what
 the runner answers. That is the half where the geometry lives.
 """
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
@@ -41,15 +39,15 @@ def plane(through, normal):
 
 def _load_runner():
     root = Path(__file__).resolve().parent.parent
-    spec = importlib.util.spec_from_file_location(
-        "kigumi_runner_end_to_end", root / "kigumi" / "runner.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["kigumi_runner_end_to_end"] = module
-    spec.loader.exec_module(module)
+    module = load_module("kigumi_runner_end_to_end", root / "kigumi" / "runner.py")
     return module
 
 
 runner = _load_runner()
+
+
+# (member, feature) -> index of the point that last resolved to it.
+_RESOLVING_POINT = {}
 
 
 class Viewer:
@@ -102,15 +100,23 @@ class Viewer:
         self.pending = []
 
     def pick(self, member, feature, held=None):
-        """Click every point on a member until one resolves to `feature`."""
+        """Click points on a member until one resolves to `feature`.
+
+        The point that worked last time is tried first: every test builds the
+        same fixture, and scanning every point costs seconds.
+        """
         payload = dict(held or {})
-        for point in self._points[member]:
+        points = self._points[member]
+        remembered = _RESOLVING_POINT.get((member, feature))
+        order = ([remembered] if remembered is not None else []) + list(range(len(points)))
+        for index in order:
             answer = runner._handle_find_csg_at_point(
                 self._state,
-                {"memberKey": member, "point": point, "currentPath": [],
+                {"memberKey": member, "point": points[index], "currentPath": [],
                  "ctrlClick": False, **payload},
                 self._slot)
             if answer.get("featureLabel") == feature and answer.get("geometry"):
+                _RESOLVING_POINT[(member, feature)] = index
                 return answer
         raise AssertionError(f"no point on {member} resolved to {feature}")
 
