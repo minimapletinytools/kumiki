@@ -765,6 +765,16 @@ class TestCutTimber:
         rendered = cut_timber.render_timber_with_cuts_csg_local()
         assert isinstance(rendered, Difference) and rendered.base is rough
 
+    def test_the_perfect_timber_within_is_built_once(self):
+        from dataclasses import replace
+        timber = self._timber()
+        prism = timber.get_perfect_timber_within_csg_local()
+        assert timber.get_perfect_timber_within_csg_local() is prism
+        assert prism.end_distance == timber.length
+        longer = replace(timber, length=scalar(120))
+        assert longer.get_perfect_timber_within_csg_local().end_distance == 120
+        assert longer == replace(longer)
+
     def test_a_cutting_builds_its_nodes_once(self):
         timber = self._timber()
         cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80),

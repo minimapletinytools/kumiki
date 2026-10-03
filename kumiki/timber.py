@@ -189,8 +189,20 @@ class PerfectTimberWithin(ABC):
     transform: Transform
     ticket: TimberTicket = field(default_factory=TimberTicket)
 
+    # Built once in __post_init__; get_perfect_timber_within_csg_local returns it.
+    _perfect_timber_within_csg_local: Optional[RectangularPrism] = field(
+        default=None, init=False, repr=False, compare=False)
+
     def __post_init__(self):
         self._warn_about_imperfect_reference_features()
+        object.__setattr__(self, '_perfect_timber_within_csg_local', RectangularPrism(
+            size=self.size,
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=self.length,
+            feature_overrides=_ptw_face_tags(),
+            label=self.csg_label("perfect"),
+        ))
 
     def _warn_about_imperfect_reference_features(self):
         """Warn where a reference rests on a face the rough timber does not match.
@@ -683,17 +695,13 @@ class PerfectTimberWithin(ABC):
         boundary. All timber types have a perfect rectangular prism that bounds
         their actual geometry.
 
+        Built once, at construction.
+
         Returns:
             RectangularPrism in local coordinates (relative to timber's bottom position)
         """
-        return RectangularPrism(
-            size=self.size,
-            transform=Transform.identity(),
-            start_distance=scalar(0),
-            end_distance=self.length,
-            feature_overrides=_ptw_face_tags(),
-            label=self.csg_label("perfect"),
-        )
+        assert self._perfect_timber_within_csg_local is not None
+        return self._perfect_timber_within_csg_local
 
     @classmethod
     def csg_label_name(cls) -> str:
