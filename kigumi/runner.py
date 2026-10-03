@@ -92,8 +92,11 @@ if _project_root is not None:
                 return p
         return None
 
+    # Only when run as the runner: imported (by a test), argv is someone else's,
+    # and exec would replace their process.
     _venv_python = _find_venv_python(_project_root)
-    if _venv_python is not None and Path(sys.executable).resolve() != _venv_python.resolve():
+    if (__name__ == "__main__" and _venv_python is not None
+            and Path(sys.executable).resolve() != _venv_python.resolve()):
         os.execv(str(_venv_python), [str(_venv_python)] + sys.argv)
         # os.execv replaces the current process; code below never runs if it succeeds
 
