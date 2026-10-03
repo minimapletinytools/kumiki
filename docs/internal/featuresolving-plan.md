@@ -7,6 +7,8 @@ Implementation plan for the design in `featuresolving.md`. Two parts:
 
 All numerics are floats (`rule.py` is numpy/float), with explicit tolerances.
 
+**Status:** Part 2 A (`dof_solver.py`), B and C (`solve_recipe.py`, recipes on the CSG classes) and a first D (`feature_solving.py`: 3D distances, and horizontal/vertical sheet distances between points) are in. Not yet: angle rows, measurements between timbers, projected perpendicular distances, `Own` recipes, `PathExtrusion` entities, Part 1, and the generator.
+
 # Part 1: the required feature set
 
 ## What exists
