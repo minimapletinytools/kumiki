@@ -22,10 +22,10 @@ from typing import TYPE_CHECKING, Dict, Iterator, Mapping, Optional, Sequence, T
 
 from .geometry import Line, Plane, Point, closest_stations, intersect_planes
 from .identity import (DrawingId, FeaturePath, MeasurementId,
-                       ResolvedTimberPath, TimberPath, ViewportId)
+                       ViewportId)
 if TYPE_CHECKING:
     from .feature_paths import FeatureHandle
-    from .timber import Frame
+    from .timber import Frame, PerfectTimberWithin
 from .rule import (Matrix, Numeric, V3, are_vectors_parallel,
                    are_vectors_perpendicular, create_v3, cross_product,
                    safe_dot_product, safe_norm, safe_zero_test_sq)
@@ -1547,16 +1547,9 @@ class Drawing:
 
     name: str
 
-    #: Which timbers this is a drawing of, one entry per timber. Held as a
-    #: tuple; any sequence may be given, and a string is read as a member key
-    #: ("posts/fl#1"), which is the form the viewer already uses.
-    #:
-    #: RESOLVED, so each entry names one timber rather than a name that may
-    #: match several. A drawing is of particular pieces: it lays out their
-    #: faces, and "how many" decides the layout, so a bare TimberPath matching
-    #: two posts counted as one and got the single-piece shop drawing for what
-    #: was really a pair.
-    timber_paths: Sequence[ResolvedTimberPath] = ()
+    #: Which timbers this is a drawing of, one entry per timber: the frame's own
+    #: timber objects, not copies. Frame checks this when it is built.
+    timbers: Sequence['PerfectTimberWithin'] = ()
 
     #: What an override in the drawings file names, so it has to survive editing
     #: the code around it. Optional only at CONSTRUCTION: leave it out and it
@@ -1590,11 +1583,7 @@ class Drawing:
     measurements: Mapping[ViewportId, Sequence[Measure]] = field(default_factory=dict)
 
     def __post_init__(self):
-        object.__setattr__(self, 'timber_paths', tuple(
-            ResolvedTimberPath.parse(path) if isinstance(path, str)
-            else (ResolvedTimberPath(path=path.path) if isinstance(path, TimberPath) else path)
-            for path in (self.timber_paths or ())
-        ))
+        object.__setattr__(self, 'timbers', tuple(self.timbers or ()))
         if not self.drawing_id:
             object.__setattr__(self, 'drawing_id', DrawingId(self.name))
         elif isinstance(self.drawing_id, str):
@@ -1609,7 +1598,7 @@ class Drawing:
         # other -- so there is no second kind of drawing whose views exist only
         # once something else has laid it out. Saying () means none, and is
         # kept.
-        viewports = (default_viewports_for(len(self.timber_paths))
+        viewports = (default_viewports_for(len(self.timbers))
                      if self.viewports is None else tuple(self.viewports))
         object.__setattr__(self, 'viewports', viewports)
         self._check_placement()

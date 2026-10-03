@@ -2519,6 +2519,36 @@ class Frame:
     # it may adjust without a module-level declaration to go looking for.
     kiwari: Optional['Kiwari'] = field(default=None, compare=False)
 
+    def __post_init__(self):
+        self._check_drawings_are_of_this_frame()
+
+    def _check_drawings_are_of_this_frame(self) -> None:
+        """Raise if a drawing names a timber, or a measurement a feature, that isn't this frame's own object."""
+        from .feature_paths import to_feature_path
+
+        for drawing in self.drawings:
+            for timber in drawing.timbers:
+                if self.cut_timber_of(timber) is None:
+                    raise ValueError(f"Drawing {drawing.name!r}: {self._describe_missing(timber)}")
+            for viewport_id, measures in drawing.measurements_by_viewport().items():
+                for measure in measures:
+                    for handle in (measure.anchor_a, measure.anchor_b):
+                        where = f"Drawing {drawing.name!r}, viewport {viewport_id}"
+                        if self.cut_timber_of(handle.timber) is None:
+                            raise ValueError(f"{where}: a measurement's {self._describe_missing(handle.timber)}")
+                        if to_feature_path(handle, self) is None:
+                            raise ValueError(
+                                f"{where}: a measurement's feature {handle.feature.name!r} is not on a node "
+                                f"of {_timber_path_of(handle.timber)!r}'s CSG tree in this frame. Get handles "
+                                "from this frame's cut timbers, not from another build.")
+
+    def _describe_missing(self, timber: PerfectTimberWithin) -> str:
+        name = _timber_path_of(timber)
+        if any(cut.timber == timber for cut in self.cut_timbers):
+            return (f"timber {name!r} is an equal copy of one in this frame, not the frame's own object. "
+                    "Use the timber from this frame's cut_timbers.")
+        return f"timber {name!r} is not in this frame."
+
     def resolve_timber_path(self, path: 'TimberPath') -> List['ResolvedTimberPath']:
         """Which timbers a name refers to, in this frame.
 

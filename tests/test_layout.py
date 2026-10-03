@@ -14,7 +14,7 @@ from kumiki.drawing import (Drawing, ELEVATION_IDS, Length, Measure, Page,
                             Portion, SHOP_DRAWING_IDS, Share,
                             SplitDirection, Subdivision, Viewport, columns,
                             covering_page, rows)
-from kumiki.identity import ResolvedTimberPath, TimberPath, ViewportId
+from kumiki.identity import ViewportId
 from kumiki.layout import resolve_drawing, resolve_viewports
 from kumiki.rule import mm
 from tests.testing_shavings import mortise_and_tenon_handles, present
@@ -30,6 +30,15 @@ def _rects(tree, page=A3):
     return {str(placed.id): tuple(round(value, 9) for value in placed.rect)
             for placed in resolve_viewports([tree], page)}
 
+
+
+def _timber(path):
+    """A timber, for a drawing to be of. Layout only counts them."""
+    from kumiki.construction import create_timber
+    from kumiki.rule import create_v2, create_v3
+
+    return create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(100)),
+                         length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket=path)
 
 class TestTheLayoutsThatShip:
     """The trees reproduce the fraction tables they replaced, value for value."""
@@ -69,7 +78,7 @@ class TestEveryDrawingHasViewports:
     """There is no drawing whose views exist only once something lays it out."""
 
     def test_one_timber_gets_the_shop_drawing(self):
-        drawing = Drawing(name="d", timber_paths=[ResolvedTimberPath("posts/fl")])
+        drawing = Drawing(name="d", timbers=[_timber("posts/fl")])
 
         assert [str(i) for i, _ in drawing.leaves()] == [
             "0.0.0", "0.0.1", "0.0.2", "0.0.3", "0.1"]
@@ -78,15 +87,15 @@ class TestEveryDrawingHasViewports:
 
     def test_several_timbers_get_world_elevations(self):
         # No single piece whose faces the sheet could be about.
-        drawing = Drawing(name="d", timber_paths=[ResolvedTimberPath("a"), ResolvedTimberPath("b")])
+        drawing = Drawing(name="d", timbers=[_timber("a"), _timber("b")])
 
         assert [v.label for _, v in drawing.leaves()] == ["Front", "Top", "Right", "Preview"]
 
     def test_the_published_ids_match_the_shapes_they_describe(self):
         # These are what code finds a view by, so a change to either shape has
         # to fail here rather than move someone's measurements in silence.
-        shop = Drawing(name="d", timber_paths=[ResolvedTimberPath("one")])
-        elevations = Drawing(name="d", timber_paths=[ResolvedTimberPath("a"), ResolvedTimberPath("b")])
+        shop = Drawing(name="d", timbers=[_timber("one")])
+        elevations = Drawing(name="d", timbers=[_timber("a"), _timber("b")])
 
         assert {role: present(shop.viewport_at(vid), role).label
                 for role, vid in SHOP_DRAWING_IDS.items()} == {
@@ -98,7 +107,7 @@ class TestEveryDrawingHasViewports:
 
     def test_a_drawing_that_names_its_own_keeps_them(self):
         mine = _view("Only")
-        drawing = Drawing(name="d", page=A3, timber_paths=[ResolvedTimberPath("posts/fl")],
+        drawing = Drawing(name="d", page=A3, timbers=[_timber("posts/fl")],
                           viewports=[covering_page(rows(mine))])
 
         assert [v.label for _, v in drawing.leaves()] == ["Only"]
@@ -107,8 +116,8 @@ class TestEveryDrawingHasViewports:
         # Made per drawing, not shared: two drawings that took the same default
         # must not end up holding the same viewport objects, or a measurement
         # written on one would appear on the other.
-        one = Drawing(name="a", timber_paths=[ResolvedTimberPath("x")])
-        other = Drawing(name="b", timber_paths=[ResolvedTimberPath("x")])
+        one = Drawing(name="a", timbers=[_timber("x")])
+        other = Drawing(name="b", timbers=[_timber("x")])
 
         assert one.viewport_at(ViewportId("0.0.0")) is not other.viewport_at(ViewportId("0.0.0"))
 
@@ -350,7 +359,7 @@ class TestWhereAMeasurementIsWritten:
     def test_by_id_when_the_layout_is_not_the_drawings(self):
         # A drawing that names only its timbers has its viewports chosen for
         # it, so there is no viewport object to hang one on.
-        drawing = Drawing(name="d", timber_paths=[ResolvedTimberPath("posts/fl")],
+        drawing = Drawing(name="d", timbers=[_timber("posts/fl")],
                           measurements={ViewportId("0.0.1"): [self._measure()]})
 
         assert list(drawing.measurements_by_viewport()) == ["0.0.1"]

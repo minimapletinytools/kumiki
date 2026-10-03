@@ -50,11 +50,22 @@ def _post(path):
     )
 
 
-def _frame(drawings=(), paths=("posts/fl", "posts/fr")):
+def _frame(make_drawings=None, paths=("posts/fl", "posts/fr")):
+    """A frame of posts. `make_drawings(timber)` gets `timber(path)`, the frame's own post."""
     built = Frame.from_joints(
         joints=[], additional_unjointed_timbers=[_post(path) for path in paths]
     )
-    return Frame(cut_timbers=built.cut_timbers, drawings=list(drawings))
+
+    def timber(path):
+        return present(built.cut_timber_at(ResolvedTimberPath(path)), path).timber
+
+    drawings = list(make_drawings(timber)) if make_drawings is not None else []
+    return Frame(cut_timbers=built.cut_timbers, drawings=drawings)
+
+
+def _plan_frame():
+    """One post, "post", and a drawing of it called "plan"."""
+    return _frame(lambda timber: [Drawing(name="plan", timbers=(timber("post"),))], paths=("post",))
 
 
 BODY = ("timber (rough, extended)",)
@@ -65,7 +76,8 @@ UNCUT = ()
 def _posts_with(make_drawings, paths=("posts/fl", "posts/fr")):
     """A frame of posts whose drawings are made from handles to the posts' own faces.
 
-    `make_drawings(face)` gets `face(name, timber="posts/fl")`, a handle to one rough face.
+    `make_drawings(face, timber)` gets `face(name, timber="posts/fl")`, a handle to one rough
+    face, and `timber(path)`, the frame's own post.
     """
     built = Frame.from_joints(joints=[], additional_unjointed_timbers=[_post(path) for path in paths])
 
@@ -73,7 +85,10 @@ def _posts_with(make_drawings, paths=("posts/fl", "posts/fr")):
         cut_timber = present(built.cut_timber_at(ResolvedTimberPath(timber)), timber)
         return present(find_feature(cut_timber, BODY, name), name)
 
-    return Frame(cut_timbers=built.cut_timbers, drawings=list(make_drawings(face)))
+    def timber(path):
+        return present(built.cut_timber_at(ResolvedTimberPath(path)), path).timber
+
+    return Frame(cut_timbers=built.cut_timbers, drawings=list(make_drawings(face, timber)))
 
 
 def _write_file(example, drawings):
@@ -130,7 +145,7 @@ class TestCollectDrawings:
     def test_the_code_says_what_to_draw_and_the_runner_works_out_how(self, example):
         # A frame names a drawing and its timbers; the page, viewports and
         # cameras are none of its business.
-        frame = _frame([Drawing(name="front left post", timber_paths=[ResolvedTimberPath("posts/fl")])])
+        frame = _frame(lambda timber: [Drawing(name="front left post", timbers=[timber("posts/fl")])])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
@@ -142,7 +157,7 @@ class TestCollectDrawings:
 
     def test_the_file_overrides_a_drawing_the_code_asked_for(self, example):
         # By naming it, not by sharing its id.
-        frame = _frame([Drawing(name="post", timber_paths=[ResolvedTimberPath("posts/fl")])])
+        frame = _frame(lambda timber: [Drawing(name="post", timbers=[timber("posts/fl")])])
         _write_file(example, [_override("my post sheet", "post")])
 
         drawings = runner.collect_drawings(frame, example)
@@ -171,9 +186,9 @@ class TestCollectDrawings:
         assert [d["origin"] for d in drawings] == [runner.ORIGIN_FILE]
 
     def test_code_drawings_come_first_and_keep_their_order(self, example):
-        frame = _frame([
-            Drawing(name="a", timber_paths=[ResolvedTimberPath("posts/fl")]),
-            Drawing(name="b", timber_paths=[ResolvedTimberPath("posts/fr")]),
+        frame = _frame(lambda timber: [
+            Drawing(name="a", timbers=[timber("posts/fl")]),
+            Drawing(name="b", timbers=[timber("posts/fr")]),
         ])
         _write_file(example, [_sheet("z")])
 
@@ -188,17 +203,51 @@ class TestCollectDrawings:
         assert drawings[0]["origin"] == runner.ORIGIN_FILE
         assert "dangling" not in drawings[0]
 
-    def test_a_drawing_of_a_timber_that_is_gone_is_still_a_drawing(self, example):
-        # Raising the frame must not fail because a path stopped matching.
-        frame = _frame([Drawing(name="ghost", timber_paths=[ResolvedTimberPath("posts/never")])])
+    def test_a_drawing_holds_the_frame_s_own_timbers(self, example):
+        frame = _frame(lambda timber: [Drawing(name="post", timbers=[timber("posts/fr")])])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
-        assert drawing["members"] == []
+        assert drawing["members"] == ["posts/fr#0"]
+
+    def test_a_timber_not_in_the_frame_is_refused(self):
+        stray = _post("posts/never")
+
+        with pytest.raises(ValueError, match="not in this frame"):
+            _frame(lambda timber: [Drawing(name="ghost", timbers=[stray])])
+
+    def test_a_copy_of_the_frame_s_timber_is_refused(self):
+        # An equal copy is still another object, and nothing in the frame refers to it.
+        from dataclasses import replace
+
+        with pytest.raises(ValueError, match="equal copy"):
+            _frame(lambda timber: [Drawing(name="copy", timbers=[replace(timber("posts/fl"))])])
+
+    def test_a_measurement_from_another_build_is_refused(self):
+        _, elsewhere = mortise_and_tenon_handles()
+
+        with pytest.raises(ValueError, match="not in this frame"):
+            _frame(lambda timber: [Drawing(
+                name="d", timbers=[timber("posts/fl")],
+                measurements={FRONT: [Measure(elsewhere["tenon_top"], elsewhere["shoulder"])]})])
+
+    def test_a_feature_of_the_right_timber_from_another_tree_is_refused(self):
+        # The same timber object, but a node from a CutTimber the frame doesn't hold.
+        from kumiki.timber import CutTimber
+
+        def drawings(timber):
+            other_tree = CutTimber(timber("posts/fl"))
+            front = present(find_feature(other_tree, BODY, "rough.front"), "rough.front")
+            back = present(find_feature(other_tree, BODY, "rough.back"), "rough.back")
+            return [Drawing(name="d", timbers=[timber("posts/fl")],
+                            measurements={FRONT: [Measure(front, back)]})]
+
+        with pytest.raises(ValueError, match="CSG tree"):
+            _frame(drawings)
 
     def test_an_id_keeps_an_override_attached_across_a_rename(self, example):
         # drawing_id is what the override names, so the name can change.
-        frame = _frame([Drawing(name="new name", drawing_id=DrawingId("stable"), timber_paths=[ResolvedTimberPath("posts/fl")])])
+        frame = _frame(lambda timber: [Drawing(name="new name", drawing_id=DrawingId("stable"), timbers=[timber("posts/fl")])])
         _write_file(example, [_override("sheet", "stable")])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -211,7 +260,7 @@ class TestCollectDrawings:
         path = runner._drawings_file_path(example)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{ not json", encoding="utf-8")
-        frame = _frame([Drawing(name="post", timber_paths=[ResolvedTimberPath("posts/fl")])])
+        frame = _frame(lambda timber: [Drawing(name="post", timbers=[timber("posts/fl")])])
 
         drawings = runner.collect_drawings(frame, example)
 
@@ -363,8 +412,8 @@ class TestMeasurementsThroughADrawing:
         return next(v for v in drawing["viewports"] if v["id"] == str(FRONT))["measurements"]
 
     def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
-        frame = _posts_with(lambda face: [Drawing(
-            name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
+        frame = _posts_with(lambda face, timber: [Drawing(
+            name="post", timbers=[timber("posts/fl")],
             measurements={FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))]},
         )])
 
@@ -378,8 +427,8 @@ class TestMeasurementsThroughADrawing:
 
     def test_the_same_pair_in_two_viewports_are_two_measurements(self, example):
         # Neither overrides the other; they have different numbers.
-        frame = _posts_with(lambda face: [Drawing(
-            name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
+        frame = _posts_with(lambda face, timber: [Drawing(
+            name="post", timbers=[timber("posts/fl")],
             measurements={
                 FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
                 RIGHT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
@@ -393,8 +442,8 @@ class TestMeasurementsThroughADrawing:
         assert len(by_id[str(RIGHT)]) == 1
 
     def test_an_override_only_reaches_its_own_viewport(self, example):
-        frame = _posts_with(lambda face: [Drawing(
-            name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
+        frame = _posts_with(lambda face, timber: [Drawing(
+            name="post", timbers=[timber("posts/fl")],
             measurements={
                 FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
                 RIGHT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
@@ -415,8 +464,8 @@ class TestMeasurementsThroughADrawing:
     def test_adding_a_measurement_does_not_freeze_the_drawing(self, example):
         # The reason measurements merge where everything else replaces: an
         # override of the whole drawing would take its layout with it.
-        frame = _posts_with(lambda face: [Drawing(
-            name="post", timber_paths=[ResolvedTimberPath("posts/fl")],
+        frame = _posts_with(lambda face, timber: [Drawing(
+            name="post", timbers=[timber("posts/fl")],
             measurements={FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))]},
         )])
         _write_file(example, [_override("sheet", "post", [
@@ -432,7 +481,7 @@ class TestMeasurementsThroughADrawing:
 
     def test_a_measurement_for_a_viewport_that_is_gone_is_not_shown(self, example):
         # An override naming a viewport the code's layout does not produce.
-        frame = _frame([Drawing(name="post", timber_paths=[ResolvedTimberPath("posts/fl")])])
+        frame = _frame(lambda timber: [Drawing(name="post", timbers=[timber("posts/fl")])])
         _write_file(example, [_override("sheet", "post", [
             {"id": "nowhere", "measurements": [{"a": _ref("x"), "b": _ref("y")}]},
         ])])
@@ -577,7 +626,7 @@ class TestSingleFeaturePath:
 
     def test_a_measurement_is_the_same_measured_either_way_round(self):
         found = {}
-        frame = _posts_with(lambda face: found.update(x=face("rough.front"), y=face("rough.back")) or [])
+        frame = _posts_with(lambda face, timber: found.update(x=face("rough.front"), y=face("rough.back")) or [])
         there = Measure(anchor_a=found["x"], anchor_b=found["y"])
         back = Measure(anchor_a=found["y"], anchor_b=found["x"])
 
@@ -585,7 +634,7 @@ class TestSingleFeaturePath:
 
     def test_an_id_still_separates_two_of_the_same_pair(self):
         found = {}
-        frame = _posts_with(lambda face: found.update(x=face("rough.front"), y=face("rough.back")) or [])
+        frame = _posts_with(lambda face, timber: found.update(x=face("rough.front"), y=face("rough.back")) or [])
 
         assert (Measure(anchor_a=found["x"], anchor_b=found["y"]).identity(frame)
                 != Measure(anchor_a=found["x"], anchor_b=found["y"],
@@ -678,10 +727,11 @@ class TestIdentifiers:
 
         assert Drawing(name="post 1").drawing_id == DrawingId("post 1")
 
-    def test_a_drawing_takes_the_timber_names_as_names(self):
-        assert Drawing(name="d", timber_paths=[ResolvedTimberPath("posts/fl")]).timber_paths == (
-            ResolvedTimberPath(path="posts/fl"),
-        )
+    def test_a_drawing_holds_its_timbers_as_given(self):
+        post = _post("posts/fl")
+        (held,) = Drawing(name="d", timbers=[post]).timbers
+
+        assert held is post
 
 
 class TestPuttingAPairInOneOrder:
@@ -1015,8 +1065,7 @@ class TestChangingAndRemovingAMeasurement:
     """
 
     def _frame(self):
-        return Frame(cut_timbers=[], name="f",
-                     drawings=[Drawing(name="plan", timber_paths=(ResolvedTimberPath("post"),))])
+        return _plan_frame()
 
     def _measure(self, feature_b="right"):
         return {
@@ -1108,9 +1157,9 @@ class TestDeletingAMeasurementTheCodeAsksFor:
     """It cannot be done. The code asks again the next time it runs."""
 
     def _frame(self):
-        return _posts_with(lambda face: [Drawing(
+        return _posts_with(lambda face, timber: [Drawing(
             name="plan",
-            timber_paths=(ResolvedTimberPath("post"),),
+            timbers=(timber("post"),),
             measurements={ViewportId(VIEWPORT): [
                 Measure(anchor_a=face("rough.left", "post"), anchor_b=face("rough.right", "post"))]},
         )], paths=("post",))
@@ -1170,8 +1219,7 @@ class TestAddingAMeasurement:
     def _frame(self):
         # No timbers: nothing here resolves an anchor, and a drawing is all the
         # measurement needs somewhere to live.
-        return Frame(cut_timbers=[], name="f",
-                     drawings=[Drawing(name="plan", timber_paths=(ResolvedTimberPath("post"),))])
+        return _plan_frame()
 
     def _measure(self):
         return {
@@ -1319,8 +1367,7 @@ class TestTheReservedDrawingForTheThreeDView:
     """Measurements that belong to the model rather than to any drawing of it."""
 
     def _frame(self):
-        return Frame(cut_timbers=[], name="f",
-                     drawings=[Drawing(name="plan", timber_paths=(ResolvedTimberPath("post"),))])
+        return _plan_frame()
 
     def _measure(self):
         return {
@@ -1399,8 +1446,7 @@ class TestMovingAMeasurement:
     """Dragging a dimension writes where it now sits, and nothing else."""
 
     def _frame(self):
-        return Frame(cut_timbers=[], name="f",
-                     drawings=[Drawing(name="plan", timber_paths=(ResolvedTimberPath("post"),))])
+        return _plan_frame()
 
     def _measure(self):
         return {

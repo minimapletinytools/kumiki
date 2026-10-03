@@ -2268,30 +2268,19 @@ def _read_drawings_file(path: Path) -> List[Dict[str, Any]]:
     ]
 
 
-def _member_keys_for_paths(frame: Any, paths: List[Any]) -> List[str]:
-    """The member keys of the timbers a code drawing names.
-
-    A drawing holds ResolvedTimberPaths, so each one already names exactly one
-    timber -- it used to hold bare TimberPaths and ask the frame, because a name
-    can match several, which meant one entry could quietly become two while the
-    layout counted it as one.
-
-    Still checked against the frame, because naming a timber that is not there
-    is not an error: a drawing of a piece a later edit removed is worth keeping,
-    and it shows as empty rather than pointing the viewer at a member key that
-    resolves to nothing.
-    """
+def _member_keys_for_timbers(frame: Any, timbers: List[Any]) -> List[str]:
+    """The member keys of the timbers a code drawing holds. Frame has checked they are its own."""
     keys: List[str] = []
-    for path in paths or []:
-        present = {str(found) for found in frame.resolve_timber_path(path.timber_path)}
-        if str(path) in present:
+    for timber in timbers or []:
+        path = frame.resolved_timber_path_of(timber)
+        if path is not None:
             keys.append(str(path))
     return keys
 
 
 def _drawing_from_code(frame: Any, declared: Any) -> Dict[str, Any]:
     """Turn what the frame asked for into a scene the viewer can render."""
-    member_keys = _member_keys_for_paths(frame, list(declared.timber_paths))
+    member_keys = _member_keys_for_timbers(frame, list(declared.timbers))
     scene = create_drawing_from_selection(frame, member_keys)
     scene["id"] = str(declared.drawing_id)
     scene["name"] = declared.name
