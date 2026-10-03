@@ -10,8 +10,6 @@ The viewer's half cannot run here (it wants a browser), so this stops at what
 the runner answers. That is the half where the geometry lives.
 """
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
@@ -41,11 +39,7 @@ def plane(through, normal):
 
 def _load_runner():
     root = Path(__file__).resolve().parent.parent
-    spec = importlib.util.spec_from_file_location(
-        "kigumi_runner_end_to_end", root / "kigumi" / "runner.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["kigumi_runner_end_to_end"] = module
-    spec.loader.exec_module(module)
+    module = load_module("kigumi_runner_end_to_end", root / "kigumi" / "runner.py")
     return module
 
 

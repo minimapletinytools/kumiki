@@ -10,22 +10,19 @@ perpendicular to any face, is parallel to any edge, and of whatever is left
 faces the camera as squarely as it can.
 """
 
-import importlib.util
 import math
-import sys
 from pathlib import Path
 
 import pytest
+
+from tests.testing_shavings import load_module
 
 from kumiki.drawing import MeasurementPlane
 
 
 def _load_runner():
     runner_path = Path(__file__).resolve().parent.parent / "kigumi" / "runner.py"
-    spec = importlib.util.spec_from_file_location("kigumi_runner_plane", runner_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["kigumi_runner_plane"] = module
-    spec.loader.exec_module(module)
+    module = load_module("kigumi_runner_plane", runner_path)
     return module
 
 
@@ -146,6 +143,7 @@ class TestTheDerivedPlaneIsOneTheModelAccepts:
             face([1, 0, 0]), edge([0, 0, 1]), [0, 0, 0], [1, 0, 1], LOOK)
 
         built = MeasurementPlane.from_wire(derived)
+        assert isinstance(built, MeasurementPlane)
 
         assert built.at == pytest.approx(derived["at"])
         assert built.normal == pytest.approx(derived["normal"])
