@@ -5,7 +5,7 @@ import pytest
 
 from kumiki.csg.cutcsg import OwnedFeatureHit, PrismFace, prism_corner_key, prism_face_key
 from kumiki.drawings.drawing import Measure, MeasurementKind, ViewAxes
-from kumiki.csg.feature_paths import FeatureHandle, find_feature
+from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.drawings.feature_solving import carrier_map_of, measure_row, remaining_dofs, solve_report
 from kumiki.rule import create_v3
 from kumiki.csg.carriers import CarrierRef, PlaneCoord
@@ -19,6 +19,13 @@ def handles():
 
 def _cut_timber(frame, handle):
     return present(frame.cut_timber_of(handle.timber), "the handle's cut timber")
+
+
+def _ptw(cut_timber, face):
+    """A face of the timber's perfect timber within, the body the solver works on."""
+    body = cut_timber.get_extended_perfect_csg_local()
+    feature = next(f for f in body.get_declared_features() if f.name == f"ptw.{face}")
+    return FeatureHandle(timber=cut_timber.timber, hit=OwnedFeatureHit(feature=feature, owner=body))
 
 
 def _tenon(found, *faces):
@@ -191,7 +198,7 @@ class TestBetweenTwoTimbers:
         receiving = _cut_timber(frame, found["mortise_front"])
         shoulder_normal = _world_normal(found["shoulder"])
         for name in ("front", "back", "left", "right", "top", "bottom"):
-            face = present(find_feature(receiving, BODY, f"rough.{name}"), name)
+            face = _ptw(receiving, name)
             if abs(abs(float(_world_normal(face) @ shoulder_normal)) - 1) < 1e-9:
                 try:
                     measure_row(Measure(face, found["shoulder"]), carrier_map_of(*frame.cut_timbers))
@@ -225,14 +232,11 @@ class TestBetweenTwoTimbers:
             remaining_dofs(found["shoulder"], [Measure(face, found["shoulder"])], [face],
                            _cut_timber(frame, found["shoulder"]))
 
-BODY = ("timber (rough, extended)",)
-
-
 class TestSolveReport:
     """Every required feature of a timber, with its body faces known."""
 
     def _body(self, cut_timber, *faces):
-        return [present(find_feature(cut_timber, BODY, f"rough.{face}"), face) for face in faces]
+        return [_ptw(cut_timber, face) for face in faces]
 
     def _butt(self, handles):
         frame, found = handles
@@ -246,7 +250,7 @@ class TestSolveReport:
         counts = {r.required.handle.feature.name: present(r.remaining).count for r in report.features}
 
         assert report.total.count == 6 * 3
-        assert all(counts[f"rough.{face}"] == 0 for face in ("front", "back", "left", "right", "bottom"))
+        assert all(counts[f"ptw.{face}"] == 0 for face in ("front", "back", "left", "right", "bottom"))
         assert all(counts[name] == 3 for name in ("shoulder", "tenon_top", "tenon_left", "tenon_right"))
 
     def test_measurements_take_off_what_they_fix(self, handles):

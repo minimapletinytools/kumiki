@@ -13,7 +13,7 @@ See **Status** at the end for what is done and what is left.
 
 ## What exists
 
-- A cut timber's CSG is `Difference(timber_prism, [joint negative CSGs])` (`CutTimber.render_timber_with_cuts_csg_local`), and `walk_csg_with_parity` yields every primitive with its parity.
+- A cut timber's CSG is `Difference(timber_prism, [joint negative CSGs])`, and `walk_csg_with_parity` yields every primitive with its parity. The solver and `required_features` work on the perfect-timber-within version (`CutTimber.render_perfect_timber_within_with_cuts_csg_local`); the rough one is not solved for.
 - Each primitive's declared features are its defaults + `feature_overrides` + `extra_features` (`get_declared_features`).
 - `real=False` features (cylinder axis, reference planes) name no surface, so they are never hidden.
 - `FeatureMarkingStatus` (`OPTIONAL` / `ALWAYS_MARK` / `NEVER_MARK`) exists as declared intent that nothing reads yet.
@@ -301,6 +301,7 @@ Once A–D agree on real joints.
 Decided:
 - **Marking:** `FeatureMarkingStatus` is reused. `NEVER_MARK` waives a feature; `ALWAYS_MARK` requires it even if hidden.
 - **Non-real features** (an axis, a reference plane) are required by default.
+- **Solved tree:** carriers and required features come from the perfect-timber-within tree only. Drawings and measuring will be changed to reference features in that tree.
 - **Curved faces** are required, for now. No sampling.
 
 Open:
