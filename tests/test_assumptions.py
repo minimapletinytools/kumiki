@@ -8,7 +8,7 @@ from kumiki.csg.cutcsg import CutCSGLabel, HalfSpace
 from kumiki.drawings.assumptions import sheet_axis_assumptions, square_assumptions
 from kumiki.drawings.dof_solver import remaining
 from kumiki.drawings.feature_solving import carrier_map_of, feature_handle_dof_rows
-from kumiki.drawings.required_features import required_features
+from kumiki.drawings.required_features import Reason, required_features
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, mm, safe_normalize_vector, sqrt
 from kumiki.timber import CutTimber, Cutting
 
@@ -18,7 +18,9 @@ def _plain():
     timber = create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(150)),
                            length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="t")
     cut_timber = CutTimber(timber, cuts=[])
-    faces = {required.handle.feature.name: required.handle for required in required_features(cut_timber)}
+    # Keyed without the "rough." or "ptw." prefix; only the six faces, not any non-real features.
+    faces = {required.handle.feature.name.split(".")[-1]: required.handle for required in required_features(cut_timber)
+             if required.reason is Reason.ON_SURFACE}
     return cut_timber, faces
 
 
@@ -45,8 +47,8 @@ class TestSquare:
         cut_timber, faces = _plain()
         carriers = carrier_map_of(cut_timber)
 
-        without = _solve(faces, carriers, ["rough.top"], [])
-        with_square = _solve(faces, carriers, ["rough.top"], square_assumptions(list(faces.values()), carriers))
+        without = _solve(faces, carriers, ["top"], [])
+        with_square = _solve(faces, carriers, ["top"], square_assumptions(list(faces.values()), carriers))
 
         assert without.count == 6 * 3 - 3
         # The five other offsets, and the prism spinning about the known face's normal.
@@ -58,7 +60,7 @@ class TestSquare:
         bevel = HalfSpace(normal=safe_normalize_vector(create_v3(1, 0, 1)), offset=mm(1020) / sqrt(2),
                           label=CutCSGLabel("bevel"))
         cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, negative_csg=bevel)])
-        handles = [required.handle for required in required_features(cut_timber)]
+        handles = [required.handle for required in required_features(cut_timber) if required.reason is Reason.ON_SURFACE]
         carriers = carrier_map_of(cut_timber)
 
         assumptions = square_assumptions(handles, carriers)
@@ -77,8 +79,8 @@ class TestSheetAxes:
         assumptions = sheet_axis_assumptions(list(faces.values()), carriers, Transform.identity())
 
         # right/left face x (the sheet's right), front/back face y (its up); top/bottom face the viewer.
-        assert sorted(assumption.reason.split(" ")[0] for assumption in assumptions) == \
-            ["rough.back", "rough.front", "rough.left", "rough.right"]
+        assert sorted(assumption.reason.split(" ")[0].split(".")[-1] for assumption in assumptions) == \
+            ["back", "front", "left", "right"]
         assert all(len(assumption.rows) == 2 for assumption in assumptions)
 
     def test_with_square_and_the_sheet_only_offsets_are_left(self):
@@ -88,7 +90,7 @@ class TestSheetAxes:
         assumptions = square_assumptions(handles, carriers) + sheet_axis_assumptions(
             handles, carriers, Transform.identity())
 
-        left = _solve(faces, carriers, ["rough.top"], assumptions)
+        left = _solve(faces, carriers, ["top"], assumptions)
 
         assert left.count == 5
         assert all(column[1] is PlaneCoord.OFFSET for quantity in left.free_quantities for column in quantity)
