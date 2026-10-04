@@ -1,0 +1,37 @@
+# robots.txt for https://kumiki.build/
+
+User-agent: *
+Allow: /
+
+# Explicit access for AI agents and LLM search bots
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Cohere-ai
+Allow: /
+
+# Agent Discovery & LLM context files
+# https://kumiki.build/llms.txt
+# https://kumiki.build/llms-full.txt
+# https://kumiki.build/.well-known/llms.txt
+
+Sitemap: https://kumiki.build/sitemap.xml
+Sitemap: https://kumiki.build/docs/sitemap.xml
