@@ -17,6 +17,13 @@ For the full kigumi + VS Code setup, see [Getting Started](https://kumiki.build/
   from the library's docstrings. Everything here is also reachable directly as
   `kumiki.<name>` after `from kumiki import *` or `import kumiki`.
 
+## For AI Agents & LLMs
+
+Kumiki is purpose-built for agentic AI coding. Agents designing timber structures should consult:
+
+- **[llms.txt](https://kumiki.build/llms.txt)** &mdash; fast project summary and agent quickstart conventions.
+- **[llms-full.txt](https://kumiki.build/llms-full.txt)** &mdash; complete consolidated documentation, prompt guidelines, and joint catalog in a single file.
+
 ## Links
 
 - [GitHub](https://github.com/minimapletinytools/kumiki)

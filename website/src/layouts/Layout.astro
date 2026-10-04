@@ -2,13 +2,103 @@
 export interface Props {
   title: string;
   description?: string;
+  image?: string;
+  canonicalPath?: string;
+  type?: string;
+  faqs?: { question: string; answer: string }[];
   /** Let the page run full width and manage its own columns, so full-bleed
       section bands are actually full width rather than faked with 100vw. */
   wide?: boolean;
 }
 
-const { title, description = 'Kumiki — Python timber-framing library and Kigumi VS Code viewer.', wide = false } = Astro.props;
+const {
+  title,
+  description = 'Kumiki is an open-source programmatic CAD library for Python designed for timber framing and woodworking joinery, with real parametric joinery and live 3D preview in VS Code via Kigumi.',
+  image = '/photos/tinyhouse120_angle.png',
+  canonicalPath,
+  type = 'website',
+  faqs,
+  wide = false,
+} = Astro.props;
+
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const siteUrl = 'https://kumiki.build';
+const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
+const canonicalUrl = canonicalPath ? `${siteUrl}${canonicalPath}` : `${siteUrl}${pathname === '/' ? '' : pathname}`;
+const imageUrl = image.startsWith('http') ? image : `${siteUrl}${image.startsWith('/') ? '' : '/'}${image}`;
+
+const graphNodes: any[] = [
+  {
+    '@type': 'WebSite',
+    '@id': 'https://kumiki.build/#website',
+    url: 'https://kumiki.build/',
+    name: 'Kumiki',
+    description: 'Programmatic CAD library for Python designed for timber framing and woodworking joinery.',
+    publisher: {
+      '@type': 'Organization',
+      name: 'minimaple',
+      url: 'https://kumiki.build',
+    },
+    sameAs: [
+      'https://github.com/minimapletinytools/kumiki',
+      'https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi',
+      'https://open-vsx.org/extension/minimaple/kigumi',
+      'https://www.youtube.com/playlist?list=PLWKU1B561fyM',
+    ],
+  },
+  {
+    '@type': 'SoftwareApplication',
+    '@id': 'https://kumiki.build/#software-kumiki',
+    name: 'Kumiki',
+    applicationCategory: 'CADApplication, DeveloperApplication',
+    operatingSystem: 'Cross-platform (macOS, Linux, Windows)',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    description:
+      'Programmatic CAD library for Python designed for timber framing and woodworking with parametric joinery and agentic workflows.',
+    url: 'https://kumiki.build',
+    codeRepository: 'https://github.com/minimapletinytools/kumiki',
+    license: 'https://www.mozilla.org/MPL/2.0/',
+  },
+  {
+    '@type': 'SoftwareApplication',
+    '@id': 'https://kumiki.build/#software-kigumi',
+    name: 'Kigumi',
+    applicationCategory: 'DeveloperApplication, CADApplication',
+    operatingSystem: 'Visual Studio Code, Cursor',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    description:
+      'Interactive 3D timber frame viewer and CSG inspection tool for Visual Studio Code and Cursor.',
+    url: 'https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi',
+    installUrl: 'https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi',
+  },
+];
+
+if (faqs && faqs.length > 0) {
+  graphNodes.push({
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: f.answer,
+      },
+    })),
+  });
+}
+
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': graphNodes,
+};
 ---
 <!doctype html>
 <html lang="en">
@@ -19,6 +109,36 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <link rel="icon" type="image/png" href={`${base}/photos/wedged_half_dovetail.png`} />
+
+    <!-- Canonical & Agent Discovery Links -->
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" type="text/markdown" title="LLM Context Summary" href={`${siteUrl}/llms.txt`} />
+    <link rel="help" title="Comprehensive LLM Guide" href={`${siteUrl}/llms-full.txt`} />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href={`${siteUrl}/sitemap.xml`} />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:site_name" content="Kumiki" />
+    <meta property="og:type" content={type} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:alt" content="Kumiki timber frame CAD preview" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={canonicalUrl} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
+
+    <!-- SEO Meta Tags -->
+    <meta name="keywords" content="timber framing, woodworking CAD, programmatic CAD, Python CAD, Japanese joinery, parametric joinery, Kigumi, mortise and tenon, dovetail joint, VS Code CAD, agentic CAD, AI timber framing" />
+    <meta name="author" content="minimaple" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   </head>
   <body>
     <header class="site-header">
@@ -38,10 +158,38 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       <slot />
     </main>
     <footer class="site-footer">
-      <div class="footer-row">
-        <span>&copy; 2026 minimaple</span>
+      <div class="footer-nav">
+        <div class="footer-col">
+          <span class="footer-heading">Product</span>
+          <a href={`${base}/install`}>Install Guide</a>
+          <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi" target="_blank" rel="noreferrer">VS Code Extension</a>
+          <a href="https://open-vsx.org/extension/minimaple/kigumi" target="_blank" rel="noreferrer">OpenVSX (Cursor)</a>
+          <a href="https://github.com/minimapletinytools/kumiki/releases" target="_blank" rel="noreferrer">Releases</a>
+        </div>
+        <div class="footer-col">
+          <span class="footer-heading">Documentation</span>
+          <a href="https://kumiki.build/docs/" target="_blank" rel="noreferrer">Docs Overview</a>
+          <a href="https://kumiki.build/docs/concepts/" target="_blank" rel="noreferrer">Concepts</a>
+          <a href="https://kumiki.build/docs/patternbook/" target="_blank" rel="noreferrer">Pattern Book</a>
+          <a href="https://kumiki.build/docs/reference/" target="_blank" rel="noreferrer">API Reference</a>
+        </div>
+        <div class="footer-col">
+          <span class="footer-heading">AI &amp; Agents</span>
+          <a href={`${base}/llms.txt`}>Agent Summary (llms.txt)</a>
+          <a href={`${base}/llms-full.txt`}>Full Agent Guide (llms-full.txt)</a>
+          <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md" target="_blank" rel="noreferrer">Agent Instructions</a>
+        </div>
+        <div class="footer-col">
+          <span class="footer-heading">Community &amp; Code</span>
+          <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">Video Tutorials</a>
+          <a href={`${base}/about`}>About Kumiki</a>
+          <a href="mailto:minimapletinytools@gmail.com">Contact</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 minimaple &middot; Open source under MPL-2.0</span>
         <span>Kumiki &amp; Kigumi</span>
-        <a href="mailto:minimapletinytools@gmail.com">minimapletinytools@gmail.com</a>
       </div>
     </footer>
 
@@ -137,18 +285,47 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       .site-footer {
         max-width: var(--max);
         margin: 0 auto;
-        padding: 2rem 1.5rem 3rem;
+        padding: 3rem 1.5rem 2.5rem;
         color: var(--ink-soft);
         font-size: 0.9rem;
         border-top: 1px solid var(--border);
       }
-      .footer-row {
+      .footer-nav {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 2rem;
+        margin-bottom: 2.5rem;
+      }
+      .footer-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+      }
+      .footer-heading {
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        margin-bottom: 0.2rem;
+      }
+      .footer-col a {
+        color: var(--ink-soft);
+        font-size: 0.92rem;
+      }
+      .footer-col a:hover {
+        color: var(--accent);
+      }
+      .footer-bottom {
         display: flex;
         flex-wrap: wrap;
-        gap: 0.4rem 1.2rem;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-soft);
+        font-size: 0.85rem;
+        color: var(--ink-faint);
       }
-      .footer-row a { color: var(--ink-soft); }
-      .footer-row a:hover { color: var(--accent); }
 
       /* A real scale, so the page asserts a hierarchy instead of running at one
          size throughout. */

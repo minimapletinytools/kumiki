@@ -110,10 +110,45 @@ const gallery = [
   { src: `${base}/photos/splined_opposing_joint.png`, alt: 'Splined opposing scarf joint' },
   { src: `${base}/photos/splined_opposing_joint_xray.png`, alt: 'X-ray: splined opposing scarf joint' },
 ];
+const faqs = [
+  {
+    question: 'What is Kumiki?',
+    answer:
+      'Kumiki is an open-source programmatic CAD library for Python designed specifically for timber framing, post-and-beam construction, and woodworking joinery. It pairs with the Kigumi VS Code extension for live interactive 3D rendering, CSG inspection, and parametric Kiwari tuning.',
+  },
+  {
+    question: 'How does Kumiki compare to OpenSCAD, CadQuery, or FreeCAD for woodworking?',
+    answer:
+      'General-purpose CAD software treats joints as manual boolean CSG cutouts that break whenever timber sizes or spans change. In Kumiki, joinery (mortise-and-tenon, dovetails, scarfs, half-laps, gooseneck splices, housings, pegs) is parametric and self-healing: changing a dimension or span automatically recalculates all cuts, housings, and clearances across the frame.',
+  },
+  {
+    question: 'Can I use AI coding agents (Claude, Cursor, Copilot, ChatGPT) to design timber frames with Kumiki?',
+    answer:
+      'Yes. Kumiki is designed from the ground up for agentic workflows. Because frames are declarative Python using an exact rational rule system, AI agents can reliably generate, refactor, and validate structural models without floating-point errors. Agents can consume our standardized llms.txt and llms-full.txt endpoints for complete context.',
+  },
+  {
+    question: 'What types of woodworking joinery does Kumiki support?',
+    answer:
+      'Kumiki supports over 30 traditional and modern timber joints with full parametric variations, including mortise and tenon (square, housed, through, wedged, pegged, drawbored), lap joints (corner laps, cross laps, mitered laps, half-blind laps), dovetails (standard, wedged half-dovetail, drop-in dovetails), scarf and splice joints (splined opposing scarf, lapped gooseneck / kanawa-tsugi), tongue-and-fork rafter joints, and drop-in housed joist pockets.',
+  },
+  {
+    question: 'What is the Kigumi VS Code extension?',
+    answer:
+      'Kigumi is the companion 3D viewer for Visual Studio Code and Cursor. It executes your Python frame script in the background, renders the assembly in real-time, provides X-ray joint inspection, lets you walk the CSG tree, toggle layers, and adjust parameters live with Kiwari sliders.',
+  },
+  {
+    question: 'Can Kumiki export 3D models and manufacturing files (STEP, STL, OBJ)?',
+    answer:
+      'Yes. Kumiki can export frames and individual timbers to STL and OBJ for 3D rendering and 3D printing, and STEP format for fabrication, CNC milling, and architectural BIM workflows.',
+  },
+];
 ---
 <Layout
-  title="Kumiki — programmatic CAD for timber framing and woodworking"
-  description="Kumiki is a purpose-built programmatic CAD tool for timber framing and woodworking, with real parametric joinery and fast agentic workflows. View your designs live in VS Code with the Kigumi extension."
+  title="Kumiki — Programmatic CAD for Timber Framing & Woodworking Joinery"
+  description="Kumiki is an open-source programmatic CAD library for Python designed for timber framing and woodworking joinery, with real parametric joinery, live 3D preview in VS Code via Kigumi, and AI agentic design workflows."
+  canonicalPath="/"
+  image="/photos/tinyhouse120_angle.png"
+  faqs={faqs}
   wide
 >
   <div class="column">
@@ -216,6 +251,70 @@ const gallery = [
   </section>
   </div>
 
+  <section class="band ai-section" id="ai-agents">
+    <div class="band-inner">
+      <div class="ai-header">
+        <p class="eyebrow">Agentic CAD</p>
+        <h2>Built for AI agents and human woodworkers alike</h2>
+        <p class="ai-lead">
+          Kumiki frames are written in clean, declarative Python with exact rule arithmetic.
+          Point your AI coding agent (Claude, Cursor, Copilot, ChatGPT) at our specifications,
+          and watch it formulate authentic joinery without floating-point errors.
+        </p>
+      </div>
+
+      <div class="ai-cards">
+        <div class="ai-card">
+          <h3>1. Prompt your agent</h3>
+          <p>Ask in natural language for timber frames, sheds, sawhorses, or Japanese joints.</p>
+          <div class="prompt-box">
+            <code>"Design a 12x16 timber pavilion with 6x6 posts, tie beams, and pegged mortise-and-tenon joints in Kumiki"</code>
+          </div>
+        </div>
+        <div class="ai-card">
+          <h3>2. Zero-hallucination context</h3>
+          <p>
+            Agents ingest <a href={`${base}/llms.txt`}><code>llms.txt</code></a> or
+            <a href={`${base}/llms-full.txt`}><code>llms-full.txt</code></a> to get precise rule types,
+            coordinate systems, and joint methods in a single context fetch.
+          </p>
+          <div class="ai-links">
+            <a class="btn btn-secondary btn-sm" href={`${base}/llms.txt`}>View llms.txt</a>
+            <a class="btn btn-secondary btn-sm" href={`${base}/llms-full.txt`}>View llms-full.txt</a>
+          </div>
+        </div>
+        <div class="ai-card">
+          <h3>3. Inspect live in Kigumi</h3>
+          <p>
+            The agent reloads the frame in the Kigumi VS Code viewer, reads session diagnostics,
+            and inspects joints in X-ray view until the frame is verified.
+          </p>
+          <a class="card-link" href={`${base}/install`}>Setup guide &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="column">
+  <section class="faq" id="faq">
+    <p class="eyebrow">Frequently asked questions</p>
+    <h2>Timber framing, parametric CAD &amp; AI workflows</h2>
+    <div class="faq-list">
+      {faqs.map((faq) => (
+        <details class="faq-item">
+          <summary class="faq-question">
+            <span>{faq.question}</span>
+            <span class="faq-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq-answer">
+            <p>{faq.answer}</p>
+          </div>
+        </details>
+      ))}
+    </div>
+  </section>
+  </div>
+
   <section class="band closing">
     <div class="band-inner closing-inner">
       <h2>Start with a sawhorse, end with a barn</h2>
@@ -226,6 +325,7 @@ const gallery = [
       <div class="cta">
         <a class="btn btn-primary" href={`${base}/install`}>Install Kumiki</a>
         <a class="btn btn-secondary" href="https://kumiki.build/docs/" target="_blank" rel="noreferrer">Read the docs</a>
+        <a class="btn btn-secondary" href={`${base}/llms.txt`}>Agent Guide (llms.txt)</a>
       </div>
     </div>
   </section>
@@ -603,6 +703,123 @@ const gallery = [
   .lightbox-nav:hover { background: rgba(255, 255, 255, 0.18); }
   .lightbox-prev { grid-column: 1; }
   .lightbox-next { grid-column: 3; }
+
+  /* AI Agents Section */
+  .ai-header {
+    max-width: 760px;
+    margin-bottom: 2.5rem;
+  }
+  .ai-lead {
+    font-size: 1.15rem;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    margin-top: 0.8rem;
+  }
+  .ai-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+  .ai-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.8rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow);
+  }
+  .ai-card h3 {
+    margin: 0 0 0.6rem;
+    font-size: 1.15rem;
+  }
+  .ai-card p {
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    margin: 0 0 1.2rem;
+    line-height: 1.5;
+    flex-grow: 1;
+  }
+  .prompt-box {
+    background: var(--paper);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 0.75rem 0.9rem;
+    font-size: 0.84rem;
+    color: var(--accent);
+    line-height: 1.45;
+  }
+  .ai-links {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+  .btn-sm {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.82rem;
+  }
+  .card-link {
+    font-weight: 600;
+    font-size: 0.92rem;
+  }
+
+  /* FAQ Section */
+  .faq {
+    padding: 4.5rem 0 3rem;
+    max-width: 820px;
+  }
+  .faq h2 {
+    margin: 0 0 2rem;
+  }
+  .faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  .faq-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.15s ease;
+  }
+  .faq-item[open] {
+    border-color: var(--accent);
+  }
+  .faq-question {
+    padding: 1.15rem 1.3rem;
+    font-weight: 650;
+    font-size: 1.05rem;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    user-select: none;
+  }
+  .faq-question::-webkit-details-marker {
+    display: none;
+  }
+  .faq-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--ink-faint);
+    transition: transform 0.2s ease;
+  }
+  .faq-item[open] .faq-icon {
+    transform: rotate(45deg);
+    color: var(--accent);
+  }
+  .faq-answer {
+    padding: 0 1.3rem 1.3rem;
+    color: var(--ink-soft);
+    font-size: 0.96rem;
+    line-height: 1.6;
+  }
+  .faq-answer p {
+    margin: 0;
+  }
 
   @media (max-width: 640px) {
     .lightbox { padding: 3.5rem 0.75rem 1.5rem; }

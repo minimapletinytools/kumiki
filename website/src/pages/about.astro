@@ -2,7 +2,12 @@
 import Layout from '../layouts/Layout.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<Layout title="About · Kumiki" description="Why Kumiki exists, and who's behind it.">
+<Layout
+  title="About Kumiki — Programmatic CAD & Japanese Timber Framing"
+  description="Learn about the origin and philosophy of Kumiki: bringing Japanese carpentry traditions (kumiki, kigumi, kiwari) into modern software engineering and agentic coding workflows."
+  canonicalPath="/about"
+  image="/photos/oscarshed_built.png"
+>
   <section class="about">
     <p class="eyebrow">About the project</p>
     <h1>Japanese joinery, and decades of writing software</h1>
