@@ -1,3 +1,24 @@
+:: 10/3/2026 solver feature mapping thinking
+
+known info:
+
+list of 
+
+inputs:
+
+list of measurements:
+
+measurement type
+feature1
+feature2
+
+
+
+
+outputs:
+
+
+
 
 :: 9/19/2026 kumiki next setps
 
