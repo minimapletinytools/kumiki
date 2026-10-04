@@ -26,6 +26,7 @@ from kumiki.assembly import RotationDof, TranslationDof
 # --- Dimensions -----------------------------------------------------------
 
 side = inches(1)
+freeme = inches(0.5)
 length = inches(3)
 block_size = create_v2(side, side)
 
@@ -293,14 +294,14 @@ def example() -> Frame:
     freedom_y_in_xy = AssemblyFreedom(rotations=(rot_neg_x,))
 
     # 2. Between Y and Z: Y moves in +X and is free after 1.
-    freedom_y_in_yz = AssemblyFreedom.translation(PX, side)
-    freedom_z_in_yz = AssemblyFreedom.translation(-PX, side)
+    freedom_y_in_yz = AssemblyFreedom.translation(PX, freeme)
+    freedom_z_in_yz = AssemblyFreedom.translation(-PX, freeme)
 
     # 3. Between Z and X: Z moves in +Y and is free after 1.
     #    X's rotation about the cylinder axis is permitted but does not free this joint.
     permitted_rot_x = RotationDof(axis_position=cyl_axis_pos, axis_direction=PX, freed_after_angle=None)
     permitted_rot_neg_x = RotationDof(axis_position=cyl_axis_pos, axis_direction=-PX, freed_after_angle=None)
-    trans_z_in_zx = TranslationDof(direction=PY, freed_after=side)
+    trans_z_in_zx = TranslationDof(direction=PY, freed_after=freeme)
     freedom_z_in_zx = AssemblyFreedom(
         translations=(trans_z_in_zx,),
         rotations=(permitted_rot_neg_x,),
