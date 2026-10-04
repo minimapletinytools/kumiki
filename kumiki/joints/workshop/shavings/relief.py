@@ -24,6 +24,7 @@ from kumiki.csg.cutcsg import (
     SolidUnion,
     adopt_csg,
     EmptyCSG,
+    shoulder_override,
 )
 from kumiki.measuring import Plane, get_center_point_on_face_global, locate_centerline, locate_plane_from_edge_in_direction
 from kumiki.rule import *
@@ -1054,6 +1055,7 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
         normal=n_depth,
         offset=safe_dot_product(n_depth, shoulder_plane.point),
         label=CutCSGLabel("shoulder"),
+        feature_overrides=[shoulder_override()],
     )
     far_plane_point_global = shoulder_plane.point + n_depth * loft_depth
     far_plane_global = HalfSpace(
@@ -1301,6 +1303,7 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
         normal=n_depth,
         offset=safe_dot_product(n_depth, shoulder_plane.point),
         label=CutCSGLabel("shoulder"),
+        feature_overrides=[shoulder_override()],
     )
     far_plane_point_global = shoulder_plane.point + n_depth * loft_depth
     far_plane_global = HalfSpace(

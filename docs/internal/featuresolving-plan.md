@@ -272,6 +272,7 @@ Once A–D agree on real joints.
 - **Part 1, required features:**
   - `planar_region.face_reaches_surface` decides flat faces by the two-sided section (front XOR back), with no sampling.
   - `required_features.required_features(cut_timber, face_test=...)` lists required features with a reason. `face_test` is swappable.
+  - `required_features.planning_features(cut_timber)` keeps only the timber's own prism and its joints' shoulder planes (`FeaturePurpose.SHOULDER`, set by the joints), for planning drawings.
 - **Part 2 A, `dof_solver.py`:** `remaining(known, target)` returns the count, plus per free DOF its weights, its quantity, and its motion, all keyed by column.
 - **Part 2 B and C, `solve_recipe.py` and the CSG classes:**
   - carriers (`CarrierPlane`, `CarrierLine`, `CarrierPoint`, `CarrierBarrel`);

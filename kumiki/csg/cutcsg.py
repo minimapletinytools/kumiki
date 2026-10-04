@@ -426,6 +426,8 @@ class FeaturePurpose(Enum):
 
     NOT_SPECIFIED = 0
     ROUGH_RELIEF = 1
+    # The plane a joint's shoulder sits in. Planning drawings solve for these and the timber prisms only.
+    SHOULDER = 2
 
 
 @dataclass(frozen=True)
@@ -1881,6 +1883,12 @@ class FeatureOverride:
             name=default.name if self.name is None else self.name,
             properties=default.properties if self.properties is None else self.properties,
         )
+
+
+def shoulder_override(key: FeatureKey = HALF_SPACE_PLANE, name: Optional[str] = None,
+                      group: FeatureGroup = FeatureGroup.NONE) -> FeatureOverride:
+    """Marks the default feature at `key` as a joint's shoulder plane."""
+    return FeatureOverride(key, name, FeatureProperties(group=group, purpose=FeaturePurpose.SHOULDER))
 
 
 #TODO this should an ABC? or is that not allowed for dual inheritance or osemtihng?

@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Iterator, List
 
-from ..csg.cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, OwnedFeatureHit,
-                     csg_children)
+from ..csg.cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
+                     OwnedFeatureHit, csg_children)
 from ..csg.feature_paths import FeatureHandle
 from ..csg.planar_region import face_reaches_surface
 from ..rule import V3, create_v3
@@ -72,3 +72,10 @@ def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_
             elif feature.feature_key() is None:
                 required.append(RequiredFeature(handle, Reason.EXTRA))
     return required
+
+
+def planning_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_surface) -> List[RequiredFeature]:
+    """The required features a planning drawing solves for: the timber's own prism and its joints' shoulder planes."""
+    body = cut_timber.get_extended_rough_csg_local()
+    return [required for required in required_features(cut_timber, face_test)
+            if required.handle.owner is body or required.handle.feature.properties.purpose is FeaturePurpose.SHOULDER]

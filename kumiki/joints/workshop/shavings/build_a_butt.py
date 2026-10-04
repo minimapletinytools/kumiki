@@ -32,7 +32,7 @@ from kumiki.measuring import (
 )
 from kumiki.construction import *
 from kumiki.rule import *
-from kumiki.csg.cutcsg import CutCSG, CutCSGLabel
+from kumiki.csg.cutcsg import CutCSG, CutCSGLabel, shoulder_override
 
 
 def _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_butt(
@@ -568,6 +568,7 @@ def dovetail_tenon_geometry(
         normal=into_mortise_dir,
         offset=shoulder_offset,
         label=CutCSGLabel("shoulder"),
+        feature_overrides=[shoulder_override()],
     )
 
     tenon_negative_csg = Difference(

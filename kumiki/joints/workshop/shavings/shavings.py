@@ -278,6 +278,7 @@ def chop_timber_end_with_prism(
     end: TimberEnd,
     distance_from_end_to_cut: Numeric,
     label: CutCSGLabel = CutCSGLabel("timber_end_prism_cut"),
+    is_shoulder: bool = False,
 ) -> RectangularPrism:
     """
     Create a RectangularPrism CSG for chopping off material from a timber end (in local coordinates).
@@ -293,6 +294,7 @@ def chop_timber_end_with_prism(
         timber: The timber to create a chop prism for
         end: Which end to chop from (TOP or BOTTOM)
         distance_from_end_to_cut: Distance from the end where the cut begins
+        is_shoulder: The prism's face at the cut is a joint's shoulder plane.
     
     Returns:
         RectangularPrism: A CSG prism in local coordinates representing the material beyond 
@@ -322,6 +324,7 @@ def chop_timber_end_with_prism(
         start_distance_local = None  # Infinite in -Z direction
         end_distance_local = distance_from_end_to_cut
     
+    cut_face = PrismFace.BOTTOM if end == TimberEnd.TOP else PrismFace.TOP
     # Create the prism with identity transform (local coordinates)
     return RectangularPrism(
         size=timber.size,
@@ -329,6 +332,7 @@ def chop_timber_end_with_prism(
         start_distance=start_distance_local,
         end_distance=end_distance_local,
         label=label,
+        feature_overrides=[shoulder_override(prism_face_key(cut_face))] if is_shoulder else [],
     )
 
 
@@ -337,6 +341,7 @@ def chop_timber_end_with_half_plane(
     end: TimberEnd,
     distance_from_end_to_cut: Numeric,
     label: CutCSGLabel = CutCSGLabel.NoLabel(),
+    is_shoulder: bool = False,
 ) -> HalfSpace:
     """
     Create a HalfSpace CSG for chopping off material from a timber end (in local coordinates).
@@ -356,6 +361,7 @@ def chop_timber_end_with_half_plane(
             caller because an end-chop means something different in every joint
             that makes one; the top_end_cut / bottom_end_cut names belong to a
             Cutting's own maybe-end-cuts, not to every plane of this shape.
+        is_shoulder: The plane is a joint's shoulder plane.
     
     Returns:
         HalfSpace: A half-plane in local coordinates that removes material beyond 
@@ -395,7 +401,8 @@ def chop_timber_end_with_half_plane(
         normal = create_v3(0, 0, -1)
         offset = -distance_from_end_to_cut
     
-    return HalfSpace(normal=normal, offset=offset, label=label)
+    return HalfSpace(normal=normal, offset=offset, label=label,
+                     feature_overrides=[shoulder_override()] if is_shoulder else [])
 
 def chop_lap_on_timber_end(
     lap_timber: TimberLike,

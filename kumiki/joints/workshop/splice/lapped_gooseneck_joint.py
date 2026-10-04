@@ -194,6 +194,7 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
         end=gooseneck_timber_end,
         distance_from_end_to_cut=-(gooseneck_profile_y_position),
         label=CutCSGLabel("gooseneck_shoulder"),
+        is_shoulder=True,
     )
 
     gooseneck_profile_difference_csg = Difference(

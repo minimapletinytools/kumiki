@@ -1797,6 +1797,10 @@ class CutTimber:
         """
         return self._extended_rough_csg_local
 
+    def get_extended_rough_csg_local(self) -> CutCSG:
+        """The rough timber, with each end that has an end cut extended to infinity. The node the rendered tree is cut from."""
+        return self._extended_rough_csg_local
+
     def get_extended_perfect_csg_local(self) -> CutCSG:
         """The perfect timber within, with each end that has an end cut extended to infinity. Built once, at construction."""
         return self._extended_perfect_csg_local

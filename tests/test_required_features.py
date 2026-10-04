@@ -6,13 +6,15 @@ from dataclasses import replace
 
 from kumiki.construction import create_timber
 from kumiki.csg.cutcsg import (CutCSGLabel, Cylinder, Difference, FeatureMarkingSpec, FeatureMarkingStatus, FeatureOverride,
-                           FeatureProperties, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism, SolidUnion,
+                           FeatureProperties, FeaturePurpose, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism, SolidUnion,
                            prism_face_key)
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.pathcsg import FancyPath, PathExtrusion, StraightSegment
 from kumiki.csg.planar_region import face_reaches_surface
-from kumiki.drawings.required_features import Reason, required_features
+from kumiki.drawings.required_features import Reason, planning_features, required_features
+from kumiki.joints.workshop.shavings.shavings import chop_timber_end_with_half_plane, chop_timber_end_with_prism
 from kumiki.rule import Transform, create_v2, create_v3, mm, scalar
+from kumiki.timber import TimberEnd
 from tests.testing_shavings import mortise_and_tenon_handles
 
 TIMBER = create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(100)),
@@ -172,3 +174,60 @@ def test_a_face_test_can_be_swapped():
 
     assert required_features(cut_timber, face_test=lambda *_: False) == [
         r for r in required_features(cut_timber) if r.reason is not Reason.ON_SURFACE]
+
+
+class TestPlanningFeatures:
+    """The timber's own prism and its joints' shoulder planes, and nothing else of the joinery."""
+
+    def _names(self, cut_timber):
+        return sorted(required.handle.feature.name for required in planning_features(cut_timber))
+
+    def test_the_tenon_timber_keeps_its_body_and_shoulder(self):
+        frame, found = mortise_and_tenon_handles()
+        butt = frame.cut_timber_of(found["shoulder"].timber)
+
+        names = self._names(butt)
+
+        assert "shoulder" in names
+        assert not any(name.startswith("tenon") for name in names)
+        assert all(name == "shoulder" or name.startswith("rough.") for name in names)
+
+    def test_the_mortised_timber_keeps_only_its_body(self):
+        frame, found = mortise_and_tenon_handles()
+        receiving = frame.cut_timber_of(found["mortise_front"].timber)
+
+        assert all(name.startswith("rough.") for name in self._names(receiving))
+
+    @pytest.mark.parametrize("example", [
+        "example_basic_mortise_and_tenon_joint",
+        "example_basic_tongue_and_fork_joint",
+        "example_basic_lapped_gooseneck_joint",
+        "example_basic_dropin_housed_butt_joint",
+    ])
+    def test_joints_mark_their_shoulders(self, example):
+        import patterns.basic_joints_patterns as patterns
+        from kumiki.timber import Frame
+
+        frame = Frame.from_joints(joints=[getattr(patterns, example)()])
+        shoulders = [required for cut_timber in frame.cut_timbers for required in planning_features(cut_timber)
+                     if required.handle.feature.properties.purpose is FeaturePurpose.SHOULDER]
+
+        assert shoulders
+
+
+class TestChopShoulders:
+
+    @pytest.mark.parametrize("end, face", [(TimberEnd.TOP, PrismFace.BOTTOM), (TimberEnd.BOTTOM, PrismFace.TOP)])
+    def test_the_prism_face_at_the_cut_is_the_shoulder(self, end, face):
+        prism = chop_timber_end_with_prism(TIMBER, end, mm(100), is_shoulder=True)
+
+        marked = [feature.feature_key() for feature in prism.get_declared_features()
+                  if feature.properties.purpose is FeaturePurpose.SHOULDER]
+
+        assert marked == [prism_face_key(face)]
+
+    def test_unmarked_by_default(self):
+        plane = chop_timber_end_with_half_plane(TIMBER, TimberEnd.TOP, mm(100))
+
+        assert all(feature.properties.purpose is not FeaturePurpose.SHOULDER
+                   for feature in plane.get_declared_features())

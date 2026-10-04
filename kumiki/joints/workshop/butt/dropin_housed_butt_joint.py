@@ -129,6 +129,7 @@ def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         end=housed_timber_end,
         distance_from_end_to_cut=shoulder_distance_from_end,
         label=CutCSGLabel("housing_shoulder"),
+        is_shoulder=True,
     )
 
     housed_centerline = scribe_centerline_onto_centerline(housed_timber)

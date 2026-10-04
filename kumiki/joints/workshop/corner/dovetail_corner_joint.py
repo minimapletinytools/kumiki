@@ -249,6 +249,7 @@ def cut_dovetail_corner_joint(arrangement: CornerJointTimberArrangement, distanc
         end=dovetail_timber_end,
         distance_from_end_to_cut=shoulder_distance_from_end,
         label=CutCSGLabel("shoulder"),
+        is_shoulder=True,
     )
     dovetail_timber_negative_csg = Difference(
         shoulder_half_space, [dovetails_csg], label=CutCSGLabel("dovetail_waste"),
