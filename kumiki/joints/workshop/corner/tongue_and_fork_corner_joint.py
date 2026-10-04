@@ -144,7 +144,7 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
         label=CutCSGLabel("shoulder"),
-        feature_overrides=[shoulder_override()],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE)],
     )
 
     tongue_prism_local = adopt_csg(None, tongue_timber.transform, tongue_prism_global)

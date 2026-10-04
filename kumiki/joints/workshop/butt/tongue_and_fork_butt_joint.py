@@ -45,6 +45,7 @@ from kumiki.csg.cutcsg import (
     Difference,
     SolidUnion,
     adopt_csg,
+    HALF_SPACE_PLANE,
     shoulder_override,
 )
 from ..shavings.relief import (
@@ -181,7 +182,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, shoulder_point_global),
         label=CutCSGLabel("shoulder"),
-        feature_overrides=[shoulder_override()],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE)],
     )
     shoulder_half_space_local = adopt_csg(None, fork_timber.transform, shoulder_half_space_global)
 
@@ -247,7 +248,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, shoulder_point_global),
         label=CutCSGLabel("shoulder"),
-        feature_overrides=[shoulder_override()],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE)],
     )
     shoulder_half_space_tongue_local = adopt_csg(None, tongue_timber.transform, shoulder_half_space_tongue_global)
 

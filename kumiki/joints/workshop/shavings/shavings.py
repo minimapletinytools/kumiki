@@ -402,7 +402,7 @@ def chop_timber_end_with_half_plane(
         offset = -distance_from_end_to_cut
     
     return HalfSpace(normal=normal, offset=offset, label=label,
-                     feature_overrides=[shoulder_override()] if is_shoulder else [])
+                     feature_overrides=[shoulder_override(HALF_SPACE_PLANE)] if is_shoulder else [])
 
 def chop_lap_on_timber_end(
     lap_timber: TimberLike,

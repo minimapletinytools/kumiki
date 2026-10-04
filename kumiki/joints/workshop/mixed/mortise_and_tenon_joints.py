@@ -28,6 +28,7 @@ from kumiki.csg.cutcsg import (
     CylinderAxisFeature,
     FeatureOverride,
     prism_face_key,
+    HALF_SPACE_PLANE,
     shoulder_override,
 )
 from kumiki.measuring import (
@@ -277,7 +278,7 @@ def cut_mortise_and_tenon_joint(
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
-        feature_overrides=[shoulder_override(name="shoulder", group=FeatureGroup.A)],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder", group=FeatureGroup.A)],
         label=CutCSGLabel("shoulder"),
     )
 

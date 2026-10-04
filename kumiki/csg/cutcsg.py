@@ -1885,7 +1885,7 @@ class FeatureOverride:
         )
 
 
-def shoulder_override(key: FeatureKey = HALF_SPACE_PLANE, name: Optional[str] = None,
+def shoulder_override(key: FeatureKey, name: Optional[str] = None,
                       group: FeatureGroup = FeatureGroup.NONE) -> FeatureOverride:
     """Marks the default feature at `key` as a joint's shoulder plane."""
     return FeatureOverride(key, name, FeatureProperties(group=group, purpose=FeaturePurpose.SHOULDER))
