@@ -2318,14 +2318,14 @@ def walk_csg_with_parity(
         yield from walk_csg_with_parity(child, child_parity)
 
 
-def carrier_map(root: CutCSG) -> CarrierMap:
-    """Every primitive carrier in the tree, coincident planes merged."""
+def carrier_map(*roots: CutCSG) -> CarrierMap:
+    """Every primitive carrier in the trees, coincident planes merged. A node the trees share counts once."""
     def walk(node: CutCSG) -> Iterator[CutCSG]:
         yield node
         for child in csg_children(node):
             yield from walk(child)
     carriers = {CarrierRef(node, key): carrier
-                for node in walk(root) for key, carrier in node.carriers().items()}
+                for root in roots for node in walk(root) for key, carrier in node.carriers().items()}
     return CarrierMap(carriers, merge_coincident_planes(carriers))
 
 

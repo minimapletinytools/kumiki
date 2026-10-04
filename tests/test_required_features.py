@@ -11,6 +11,7 @@ from kumiki.csg.cutcsg import (CutCSGLabel, Cylinder, Difference, FeatureMarking
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.pathcsg import FancyPath, PathExtrusion, StraightSegment
 from kumiki.csg.planar_region import face_reaches_surface
+from kumiki.drawings.feature_solving import carrier_map_of, feature_handle_dof_rows
 from kumiki.drawings.required_features import Reason, planning_features, required_features
 from kumiki.joints.workshop.shavings.shavings import chop_timber_end_with_half_plane, chop_timber_end_with_prism
 from kumiki.rule import Transform, create_v2, create_v3, mm, scalar
@@ -177,7 +178,7 @@ def test_a_face_test_can_be_swapped():
 
 
 class TestPlanningFeatures:
-    """The timber's own prism and its joints' shoulder planes, and nothing else of the joinery."""
+    """The perfect timber within and its joints' shoulder planes, and nothing else of the joinery."""
 
     def _names(self, cut_timber):
         return sorted(required.handle.feature.name for required in planning_features(cut_timber))
@@ -190,13 +191,20 @@ class TestPlanningFeatures:
 
         assert "shoulder" in names
         assert not any(name.startswith("tenon") for name in names)
-        assert all(name == "shoulder" or name.startswith("rough.") for name in names)
+        assert all(name == "shoulder" or name.startswith("ptw.") for name in names)
 
     def test_the_mortised_timber_keeps_only_its_body(self):
         frame, found = mortise_and_tenon_handles()
         receiving = frame.cut_timber_of(found["mortise_front"].timber)
 
-        assert all(name.startswith("rough.") for name in self._names(receiving))
+        assert all(name.startswith("ptw.") for name in self._names(receiving))
+
+    def test_each_is_solvable(self):
+        frame, found = mortise_and_tenon_handles()
+        butt = frame.cut_timber_of(found["shoulder"].timber)
+        carriers = carrier_map_of(butt)
+
+        assert all(len(feature_handle_dof_rows(required.handle, carriers)) == 3 for required in planning_features(butt))
 
     @pytest.mark.parametrize("example", [
         "example_basic_mortise_and_tenon_joint",
