@@ -1277,3 +1277,13 @@ class TestTransformToLocalTransform:
         local_t = T.to_local_transform(parent)
         assert local_t.position == T.position
         assert local_t.orientation.matrix == T.orientation.matrix
+
+def test_a_direction_is_rotated_but_not_translated():
+    from kumiki.rule import Orientation, Transform, create_v3
+
+    transform = Transform(position=create_v3(5, 6, 7), orientation=Orientation.from_axis_angle(create_v3(0, 0, 1), 0.5))
+    direction = create_v3(1, 2, 3)
+
+    rotated = transform.local_to_global_direction(direction)
+    assert (transform.local_to_global(direction) - transform.local_to_global(direction * 0) - rotated).norm() < 1e-12
+    assert (transform.global_to_local_direction(rotated) - direction).norm() < 1e-12

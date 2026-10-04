@@ -409,6 +409,14 @@ class Transform:
         translated = global_point - self.position
         return safe_transform_vector(self.orientation.matrix.T, translated)
 
+    def local_to_global_direction(self, local_direction: V3) -> V3:
+        """Rotate a direction from local to global coordinates. Directions are not translated."""
+        return safe_transform_vector(self.orientation.matrix, local_direction)
+
+    def global_to_local_direction(self, global_direction: V3) -> V3:
+        """Rotate a direction from global to local coordinates. Directions are not translated."""
+        return safe_transform_vector(self.orientation.matrix.T, global_direction)
+
     def numeric_local_to_global(self, local_point: V3) -> V3:
         """Convert local to global using numeric (Float) math. For hot paths like CSG."""
         return numeric_transform_vector(self.orientation.matrix, local_point) + self.position

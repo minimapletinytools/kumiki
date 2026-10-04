@@ -21,7 +21,7 @@ from .required_features import FaceTest, RequiredFeature, required_features
 from .rule import Matrix, V3
 from .solve_recipe import (CarrierMap, Recipe, Row, combine, direction_motion, dot_vector_row, feature_dof_rows,
                            motion_along, transform_vector_row)
-from .timber import CutTimber, PerfectTimberWithin
+from .timber import CutTimber
 
 if TYPE_CHECKING:
     from .timber import Frame
@@ -45,27 +45,6 @@ def _unit(vector: np.ndarray) -> np.ndarray:
     return vector / np.linalg.norm(vector)
 
 
-class _Placement:
-    """A timber's local space in the world: rotation and position."""
-
-    def __init__(self, timber: PerfectTimberWithin):
-        self.transform = timber.transform
-        self.rotation = np.array([[float(timber.transform.orientation.matrix[i, j]) for j in range(3)]
-                                  for i in range(3)])
-
-    def point_to_world(self, point: V3) -> np.ndarray:
-        return _np(self.transform.local_to_global(point))
-
-    def point_to_local(self, point: np.ndarray) -> V3:
-        return self.transform.global_to_local(Matrix(point))
-
-    def direction_to_world(self, direction: V3) -> np.ndarray:
-        return self.rotation @ _np(direction)
-
-    def direction_to_local(self, direction: np.ndarray) -> V3:
-        return Matrix(self.rotation.T @ direction)
-
-
 def _recipe(handle: FeatureHandle) -> Recipe:
     recipe = handle.feature.solve_recipe(handle.owner)
     if recipe is None:
@@ -75,11 +54,11 @@ def _recipe(handle: FeatureHandle) -> Recipe:
 
 def _span(handle: FeatureHandle) -> MeasureSpan:
     """The feature as drawing's measuring rules see it, in world space."""
-    place = _Placement(handle.timber)
+    transform = handle.timber.transform
     located = handle.feature.locate_simple_unbounded(handle.owner)
     extent = handle.feature.get_extent(handle.owner)
     if isinstance(located, Point):
-        return PointSpan(at=Matrix(place.point_to_world(located.position)))
+        return PointSpan(at=transform.local_to_global(located.position))
     if isinstance(located, Line):
         direction = _unit(_np(located.direction))
         ends = extent.ends if extent is not None else None
@@ -87,11 +66,11 @@ def _span(handle: FeatureHandle) -> MeasureSpan:
         if ends:
             stations = sorted(float((_np(end) - _np(located.point)) @ direction) for end in ends)
             interval = (stations[0], stations[-1])
-        return LineSpan(at=Matrix(place.point_to_world(located.point)),
-                        direction=Matrix(place.direction_to_world(located.direction)), interval=interval)
+        return LineSpan(at=transform.local_to_global(located.point),
+                        direction=transform.local_to_global_direction(located.direction), interval=interval)
     if isinstance(located, Plane):
         at = extent.anchor if extent is not None else located.point
-        return PlaneSpan(at=Matrix(place.point_to_world(at)), normal=Matrix(place.direction_to_world(located.normal)))
+        return PlaneSpan(at=transform.local_to_global(at), normal=transform.local_to_global_direction(located.normal))
     raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
 
 
@@ -127,8 +106,9 @@ def _distance_row(measure: Measure, at_a: np.ndarray, at_b: np.ndarray, along: n
     """How the distance from `at_a` to `at_b`, read along `along`, changes. Points and direction in world space."""
     rows = []
     for handle, at in ((measure.anchor_a, at_a), (measure.anchor_b, at_b)):
-        place = _Placement(handle.timber)
-        rows.append(motion_along(_recipe(handle), carriers, place.point_to_local(at), place.direction_to_local(along)))
+        transform = handle.timber.transform
+        rows.append(motion_along(_recipe(handle), carriers, transform.global_to_local(Matrix(at)),
+                                 transform.global_to_local_direction(Matrix(along))))
     return combine(rows[1], rows[0], -1.0)
 
 
@@ -144,7 +124,7 @@ def _gap_direction(at_a: np.ndarray, at_b: np.ndarray, look: Optional[np.ndarray
 
 def _direction_in_world(handle: FeatureHandle, carriers: CarrierMap) -> Tuple[np.ndarray, Tuple[Row, Row, Row]]:
     direction, change = direction_motion(_recipe(handle), carriers)
-    rotation = _Placement(handle.timber).rotation
+    rotation = np.array(handle.timber.transform.orientation.matrix.tolist(), dtype=float)
     return rotation @ direction, transform_vector_row(change, rotation)
 
 

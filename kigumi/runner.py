@@ -2704,10 +2704,9 @@ def _edge_outward_normal(feature: Any, node: Any, timber: Any) -> Optional[Tuple
 
 
 def _direction_to_world(direction: Any, timber: Any) -> List[float]:
-    """A direction rotated into world space. Rotated but not translated."""
-    origin = timber.transform.local_to_global(direction * 0)
-    moved = timber.transform.local_to_global(direction)
-    return [moved[i, 0] - origin[i, 0] for i in range(3)]
+    """A direction rotated into world space."""
+    rotated = timber.transform.local_to_global_direction(direction)
+    return [rotated[i, 0] for i in range(3)]
 
 
 def _measure_span(
@@ -3217,9 +3216,7 @@ def _located_geometry(located: Any, timber: Any) -> Optional[Any]:
         return timber.transform.local_to_global(point)
 
     def direction_to_world(direction: Any) -> Any:
-        # A direction is rotated but not translated.
-        return (timber.transform.local_to_global(direction)
-                - timber.transform.local_to_global(direction * 0))
+        return timber.transform.local_to_global_direction(direction)
 
     if isinstance(located, Point):
         return Point(position=to_world(located.position))
