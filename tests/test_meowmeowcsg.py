@@ -5535,10 +5535,10 @@ class TestAnArrisIsNamedTheSameWayWhoeverNamesIt:
 
     def test_and_that_is_the_order_the_arris_itself_calls_canonical(self):
         """So the warning on a hand-written arris agrees with both."""
-        from kumiki.csg.cutcsg import _canonical_arris_faces
+        from kumiki.csg.cutcsg import _canonical_ordering_arris_faces
 
         for pair in self._timber_order().values():
-            assert _canonical_arris_faces(*pair) == pair
+            assert _canonical_ordering_arris_faces(*pair) == pair
 
 
 class TestALoftMayNotTwist:

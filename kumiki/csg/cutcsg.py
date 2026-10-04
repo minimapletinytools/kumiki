@@ -1301,7 +1301,7 @@ class SimpleRectangularPrismFeature(FaceFeature):
         return False
 
 
-def _canonical_arris_faces(
+def _canonical_ordering_arris_faces(
     first: 'PrismFace', second: 'PrismFace',
 ) -> Optional[Tuple['PrismFace', 'PrismFace']]:
     """The one order an arris between these two faces is named in.
@@ -1340,17 +1340,17 @@ class SimpleRectangularPrismEdgeFeature(EdgeFeature):
 
     def __post_init__(self):
         first, second = self.faces
-        canonical = _canonical_arris_faces(first, second)
-        if canonical is None:
+        canonical_ordering = _canonical_ordering_arris_faces(first, second)
+        if canonical_ordering is None:
             warnings.warn(
                 f"{first} and {second} meet in no arris, so {self.name!r} locates "
                 "to nothing")
-        elif (first, second) != canonical:
+        elif (first, second) != canonical_ordering:
             # Not cosmetic: the order decides which way round locate() runs the
             # line, since it is the cross product of the two faces' normals.
             warnings.warn(
                 f"{self.name!r} names its faces {first}, {second}; the canonical "
-                f"order is {canonical[0]}, {canonical[1]}")
+                f"order is {canonical_ordering[0]}, {canonical_ordering[1]}")
 
     def feature_key(self) -> Optional[FeatureKey]:
         return _prism_arris_key(*self.faces)
@@ -1394,7 +1394,7 @@ class SimpleRectangularPrismEdgeFeature(EdgeFeature):
         return CSGFeatureExtent(anchor=line.point)
 
 
-def _canonical_corner_faces(
+def _canonical_ordering_corner_faces(
     faces: Sequence['PrismFace'],
 ) -> Optional[Tuple['PrismFace', 'PrismFace', 'PrismFace']]:
     """The one order a corner between these three faces is named in.
@@ -1414,7 +1414,7 @@ def _canonical_corner_faces(
     sides = [face for face in faces if face not in _PRISM_CAP_KEYS]
     if len(caps) != 1:
         return None
-    ordered = _canonical_arris_faces(*sides)
+    ordered = _canonical_ordering_arris_faces(*sides)
     if ordered is None:
         return None  # opposite sides, which meet in no arris and so in no corner
     # The arris order puts FRONT or BACK first; a corner reads the sides the way
@@ -1461,12 +1461,12 @@ def _prism_arris_key(first: PrismFace, second: PrismFace) -> Optional[FeatureKey
 
 
 def _prism_corner_key(
-    canonical: Optional[Tuple[PrismFace, PrismFace, PrismFace]],
+    canonical_ordering: Optional[Tuple[PrismFace, PrismFace, PrismFace]],
 ) -> Optional[FeatureKey]:
     """The default slot of a corner, given its faces in canonical order."""
-    if canonical is None:
+    if canonical_ordering is None:
         return None
-    cap, first, _ = canonical
+    cap, first, _ = canonical_ordering
     return corner_on_cap(_PRISM_SIDE_ORDER.index(first), len(_PRISM_SIDE_ORDER),
                          end=cap is PrismFace.TOP)
 
@@ -1481,7 +1481,7 @@ def prism_arris_key(first: PrismFace, second: PrismFace) -> FeatureKey:
 
 def prism_corner_key(*faces: PrismFace) -> FeatureKey:
     """The default slot of the corner where three faces meet, in any order."""
-    key = _prism_corner_key(_canonical_corner_faces(faces))
+    key = _prism_corner_key(_canonical_ordering_corner_faces(faces))
     if key is None:
         raise ValueError(f"{', '.join(face.name for face in faces)} meet at no corner")
     return key
@@ -1501,25 +1501,25 @@ class SimpleRectangularPrismVertexFeature(PointFeature):
 
     #: `faces` in canonical order, worked out once. Out of init, repr and
     #: equality: it is a restatement of `faces` and not a second thing to set.
-    _canonical: Optional[Tuple[PrismFace, PrismFace, PrismFace]] = field(
+    _canonical_ordering: Optional[Tuple[PrismFace, PrismFace, PrismFace]] = field(
         default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self):
-        canonical = _canonical_corner_faces(self.faces)
+        canonical_ordering = _canonical_ordering_corner_faces(self.faces)
         # Kept, not recomputed: every question below needs it, and a point test
         # runs once per feature per pick.
-        object.__setattr__(self, '_canonical', canonical)
-        if canonical is None:
+        object.__setattr__(self, '_canonical_ordering', canonical_ordering)
+        if canonical_ordering is None:
             warnings.warn(
                 f"{', '.join(face.name for face in self.faces)} meet at no corner, "
                 f"so {self.name!r} locates to nothing")
-        elif tuple(self.faces) != canonical:
+        elif tuple(self.faces) != canonical_ordering:
             warnings.warn(
                 f"{self.name!r} names its faces {', '.join(f.name for f in self.faces)}; "
-                f"the canonical order is {', '.join(f.name for f in canonical)}")
+                f"the canonical order is {', '.join(f.name for f in canonical_ordering)}")
 
     def feature_key(self) -> Optional[FeatureKey]:
-        return _prism_corner_key(self._canonical)
+        return _prism_corner_key(self._canonical_ordering)
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         return _meet_of_prism_faces(owner, self.faces)
@@ -1530,10 +1530,10 @@ class SimpleRectangularPrismVertexFeature(PointFeature):
         Out to the cap, then out along each side's own half size -- the same
         walk timber.get_corner_position_global makes over its three faces.
         """
-        canonical = self._canonical
-        if canonical is None or not isinstance(owner, RectangularPrism):
+        canonical_ordering = self._canonical_ordering
+        if canonical_ordering is None or not isinstance(owner, RectangularPrism):
             return None
-        cap, first, second = canonical
+        cap, first, second = canonical_ordering
         width_dir, height_dir, length_dir = owner._local_axes()
         distance = owner.end_distance if cap is PrismFace.TOP else owner.start_distance
         if distance is None:
@@ -2487,23 +2487,23 @@ class RectangularPrism(HasFeatures, CutCSG):
                   lambda name, face=face: SimpleRectangularPrismFeature(
                       name=name, face=face, properties=_DEFAULT_FEATURE_PROPERTIES))
 
-        # Through _canonical_arris_faces, so these are named the way timber.py
+        # Through _canonical_ordering_arris_faces, so these are named the way timber.py
         # names the same arrises rather than in a second order of their own.
         sides = len(_PRISM_SIDE_ORDER)
         for index in range(sides):
-            pair = _canonical_arris_faces(
+            pair = _canonical_ordering_arris_faces(
                 _PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides])
             assert pair is not None, "consecutive sides meet in an arris"
             named((FeatureCategory.ARRIS, index),
                   lambda name, pair=pair: SimpleRectangularPrismEdgeFeature(
                       name=name, faces=pair, properties=_DEFAULT_FEATURE_PROPERTIES))
             for cap in (PrismFace.BOTTOM, PrismFace.TOP):
-                ends = _canonical_arris_faces(cap, _PRISM_SIDE_ORDER[index])
+                ends = _canonical_ordering_arris_faces(cap, _PRISM_SIDE_ORDER[index])
                 assert ends is not None, "a cap meets every side"
                 named(arris_against_cap(index, sides, end=cap is PrismFace.TOP),
                       lambda name, ends=ends: SimpleRectangularPrismEdgeFeature(
                           name=name, faces=ends, properties=_DEFAULT_FEATURE_PROPERTIES))
-                corner = _canonical_corner_faces(
+                corner = _canonical_ordering_corner_faces(
                     (cap, _PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides]))
                 assert corner is not None, "a cap and two neighbouring sides meet at a corner"
                 named(corner_on_cap(index, sides, end=cap is PrismFace.TOP),
