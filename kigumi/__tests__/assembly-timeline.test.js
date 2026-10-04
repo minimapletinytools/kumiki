@@ -3,6 +3,7 @@ const { AssemblyTimeline } = require('../webview/assembly-timeline');
 const {
   normalizeAssemblyPayload,
   computeAssemblyOffsets,
+  computeAssemblyRotations,
   getTimelineMarks,
   getScrubMax,
 } = AssemblyTimeline;
@@ -128,6 +129,53 @@ describe('computeAssemblyOffsets', () => {
   test('empty steps produce no offsets', () => {
     expect(computeAssemblyOffsets([], 1, 1.5).size).toBe(0);
     expect(computeAssemblyOffsets(null, 1, 1.5).size).toBe(0);
+  });
+});
+
+describe('computeAssemblyRotations', () => {
+  const quarterTurn = { axisPosition: [0, -1, 1], axisDirection: [1, 0, 0], angle: Math.PI / 2 };
+  const steps = [
+    { order: 1, movements: [movement('x#0', [1, 0, 0], 0, { rotation: quarterTurn })] },
+    { order: 1, movements: [movement('y#0', [1, 0, 0], 2)] },
+  ];
+  const place = (pose, point) => {
+    const [x, y, z, w] = pose.quaternion;
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const t = cross([x, y, z], point).map((c) => 2 * c);
+    const u = cross([x, y, z], t);
+    return point.map((c, i) => c + w * t[i] + u[i] + pose.shift[i]);
+  };
+  const expectClose = (actual, expected) => actual.forEach((c, i) => expect(c).toBeCloseTo(expected[i]));
+
+  test('normalization keeps a valid rotation and drops a malformed one', () => {
+    const payload = normalizeAssemblyPayload({
+      steps: [{ order: 1, movements: [
+        movement('x#0', [1, 0, 0], 0, { rotation: quarterTurn }),
+        movement('y#0', [1, 0, 0], 0, { rotation: { angle: 1 } }),
+      ] }],
+    });
+
+    expect(payload.steps[0].movements[0].rotation).toEqual(quarterTurn);
+    expect(payload.steps[0].movements[1].rotation).toBeNull();
+  });
+
+  test('a full step turns the member about the pivot line', () => {
+    const pose = computeAssemblyRotations(steps, 1).get('x#0');
+
+    expectClose(place(pose, [5, -1, 1]), [5, -1, 1]);
+    expectClose(place(pose, [0, 0, 0]), [0, 0, 2]);
+  });
+
+  test('fractional scrub interpolates the angle', () => {
+    const pose = computeAssemblyRotations(steps, 0.5).get('x#0');
+
+    expect(pose.quaternion[3]).toBeCloseTo(Math.cos(Math.PI / 8));
+  });
+
+  test('members without a rotation are absent', () => {
+    expect(computeAssemblyRotations(steps, 2).has('y#0')).toBe(false);
+    expect(computeAssemblyRotations(steps, 0).size).toBe(0);
+    expect(computeAssemblyRotations(null, 1).size).toBe(0);
   });
 });
 

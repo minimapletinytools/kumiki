@@ -14,9 +14,7 @@ Timber 'x' cut:
     - (-y, +z): positive cylinder with parallel length axis
       (negative 1/2 × 1/2 × 1 prism minus positive cylinder)
 
-NOTE: Disassembly and the assembly solver (solve_frame_assembly) will not work
-on this frame until rotational degrees of freedom (RotationDof) are supported
-in the solver (currently raises NotImplementedError).
+Disassembly: 'x' turns 90° about the cylinder axis, which frees 'y' to slide out.
 """
 
 from kumiki import *
@@ -273,9 +271,6 @@ def example() -> Frame:
     ])
 
     # -- Assembly Freedoms --------------------------------------------------
-    # NOTE: Disassembly / the assembly solver does not yet support rotational DOFs
-    # (RotationDof raises NotImplementedError in solve_frame_assembly).
-    #
     # 1. Between X and Y: X rotates about cylinder axis by +90°, then is free.
     #    Cylinder axis runs along +X at Y = -0.25", Z = +0.25".
     PX = create_v3(scalar(1), scalar(0), scalar(0))
@@ -300,16 +295,16 @@ def example() -> Frame:
     freedom_y_in_yz = AssemblyFreedom.translation(PX, side)
     freedom_z_in_yz = AssemblyFreedom.translation(-PX, side)
 
-    # 3. Between Z and X: Z moves in +Y and is free after 1;
-    #    also X rotates about cylinder axis by +90° (and Z opposite).
-    trans_z_in_zx = TranslationDof(direction=PY, freed_after=side)
-    trans_x_in_zx = TranslationDof(direction=-PY, freed_after=side)
+    # 3. Between Z and X: X rotates about cylinder axis by +90° (and Z opposite).
+    # ad-hoc: translations are left out to force X to free itself by rotating.
+    # trans_z_in_zx = TranslationDof(direction=PY, freed_after=side)
+    # trans_x_in_zx = TranslationDof(direction=-PY, freed_after=side)
     freedom_z_in_zx = AssemblyFreedom(
-        translations=(trans_z_in_zx,),
+        # translations=(trans_z_in_zx,),
         rotations=(rot_neg_x,),
     )
     freedom_x_in_zx = AssemblyFreedom(
-        translations=(trans_x_in_zx,),
+        # translations=(trans_x_in_zx,),
         rotations=(rot_x,),
     )
 

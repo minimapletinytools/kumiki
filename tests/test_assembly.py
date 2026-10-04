@@ -6,6 +6,8 @@ AssemblyMember / AssemblyJoint records directly — no timbers involved. See
 names below (closure, ring escape, centering, compaction, clear-out).
 """
 
+import math
+
 import pytest
 
 from kumiki.assembly import (
@@ -130,15 +132,6 @@ class TestSolveAssemblyBasics:
         joints = [AssemblyJoint(name="j", members={1: spec(), 99: spec()})]
 
         with pytest.raises(ValueError, match="unknown assembly member key 99"):
-            solve_assembly(members, joints)
-
-    def test_rotational_freedom_not_implemented(self):
-        rotation = RotationDof(axis_position=create_v3(0, 0, 0), axis_direction=Z, freed_after_angle=1)
-        freedom = AssemblyFreedom(rotations=(rotation,))
-        members = [member(1, "a"), member(2, "b")]
-        joints = [AssemblyJoint(name="j", members={1: spec(freedom), 2: spec()})]
-
-        with pytest.raises(NotImplementedError, match="rotational"):
             solve_assembly(members, joints)
 
     def test_single_joint_extraction(self):
@@ -980,3 +973,88 @@ class TestClearOut:
         for step in solution.steps:
             moved = movements_by_key(step)
             assert 3 not in moved
+
+
+class TestRotation:
+    def test_single_rotation_frees_the_joint(self):
+        rotation = RotationDof(axis_position=create_v3(0, 1, 2), axis_direction=Z, freed_after_angle=0.5)
+        members = [member(1, "a"), member(2, "b")]
+        joints = [AssemblyJoint(name="j", members={1: spec(AssemblyFreedom(rotations=(rotation,))), 2: spec()})]
+
+        solution = solve_assembly(members, joints)
+
+        assert solution.failure is None
+        assert len(solution.steps) == 1
+        (movement,) = solution.steps[0].movements
+        assert movement.member_key == 1
+        assert not movement.dragged
+        assert float(movement.distance) == 0.0
+        assert float(movement.rotation.angle) == pytest.approx(0.5)
+        assert_direction(movement, (0, 0, 1))
+        assert [float(movement.rotation.axis_position[i, 0]) for i in range(3)] == [0, 1, 2]
+
+    def test_rotation_then_slide(self):
+        """a turns to release b, which then slides out of c."""
+        turn = AssemblyFreedom(rotations=(
+            RotationDof(axis_position=create_v3(0, 0, 0), axis_direction=X, freed_after_angle=1.0),))
+        members = [member(1, "a"), member(2, "b"), member(3, "c")]
+        joints = [
+            AssemblyJoint(name="ab", members={1: spec(turn), 2: spec()}),
+            AssemblyJoint(name="ac", members={1: spec(turn), 3: spec()}),
+            AssemblyJoint(name="bc", members={2: spec(AssemblyFreedom.translation(X, 2)), 3: spec()}),
+        ]
+
+        solution = solve_assembly(members, joints)
+
+        assert solution.failure is None
+        assert len(solution.steps) == 2
+        (turned,) = solution.steps[0].movements
+        assert turned.member_key == 1
+        assert float(turned.rotation.angle) == pytest.approx(1.0)
+        slid = movements_by_key(solution.steps[1])
+        assert slid[2].rotation is None
+        assert not slid[2].dragged
+
+    def test_partner_without_matching_rotation_turns_along(self):
+        turn = AssemblyFreedom(rotations=(
+            RotationDof(axis_position=create_v3(0, 0, 0), axis_direction=X, freed_after_angle=1.0),))
+        members = [member(1, "a"), member(2, "b"), member(3, "c")]
+        joints = [
+            AssemblyJoint(name="ab", members={1: spec(turn), 2: spec()}),
+            AssemblyJoint(name="ac", members={1: spec(), 3: spec()}),
+        ]
+
+        solution = solve_assembly(members, joints)
+
+        assert solution.failure is None
+        turned = movements_by_key(solution.steps[0])
+        assert set(turned) == {1, 3}
+        assert not turned[1].dragged
+        assert turned[3].dragged
+
+    def test_translation_is_preferred_over_rotation(self):
+        freedom = AssemblyFreedom(
+            translations=AssemblyFreedom.translation(Z, 1).translations,
+            rotations=(RotationDof(axis_position=create_v3(0, 0, 0), axis_direction=X, freed_after_angle=1.0),),
+        )
+        members = [member(1, "a"), member(2, "b")]
+        joints = [AssemblyJoint(name="j", members={1: spec(freedom), 2: spec()})]
+
+        solution = solve_assembly(members, joints)
+
+        assert len(solution.steps) == 1
+        assert all(movement.rotation is None for movement in solution.steps[0].movements)
+
+    def test_luban_lock_2(self):
+        from kumiki.timber import solve_frame_assembly
+        from patterns.structures.actually_kumiki.luban_lock_2 import example
+
+        frame = example()
+        solution = solve_frame_assembly(frame)
+
+        assert solution.failure is None
+        assert len(solution.steps) == 2
+        (turned,) = solution.steps[0].movements
+        assert float(turned.rotation.angle) == pytest.approx(math.pi / 2)
+        assert_direction(turned, (1, 0, 0))
+        assert all(movement.rotation is None for movement in solution.steps[1].movements)
