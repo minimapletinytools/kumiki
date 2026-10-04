@@ -201,6 +201,7 @@ class PerfectTimberWithin(ABC):
             start_distance=scalar(0),
             end_distance=self.length,
             feature_overrides=_ptw_face_tags(),
+            extra_features=_ptw_centerplanes(),
             label=self.csg_label("perfect"),
         ))
 
@@ -784,6 +785,7 @@ class PerfectTimberWithin(ABC):
         """
         return _create_extended_rectangular_prism(
             face_tags=_ptw_face_tags(),
+            extra_features=_ptw_centerplanes(),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1532,6 +1534,15 @@ def _ptw_face_tags() -> Tuple[FeatureOverride, ...]:
 
 
 @functools.lru_cache(maxsize=None)
+def _ptw_centerplanes() -> Tuple[PrismCenterplaneFeature, ...]:
+    """The perfect timber within's two centerplanes, midway between left and right and between front and back."""
+    return (
+        PrismCenterplaneFeature(name=PTW_FACE_PREFIX + "centerplane_left_right", faces=(PrismFace.RIGHT, PrismFace.LEFT)),
+        PrismCenterplaneFeature(name=PTW_FACE_PREFIX + "centerplane_front_back", faces=(PrismFace.FRONT, PrismFace.BACK)),
+    )
+
+
+@functools.lru_cache(maxsize=None)
 def _rough_face_tags() -> Tuple[FeatureOverride, ...]:
     """Named features for the 6 faces of a timber's rough (as-sawn) prism.
 
@@ -1557,6 +1568,7 @@ def _create_extended_rectangular_prism(
     extend_bot: bool,
     extend_top: bool,
     label: CutCSGLabel = CutCSGLabel.NoLabel(),
+    extra_features: Sequence['CSGFeature'] = (),
 ) -> 'RectangularPrism':
     """
     Helper to create an extended rectangular prism in local coordinates.
@@ -1578,6 +1590,7 @@ def _create_extended_rectangular_prism(
         start_distance=None if extend_bot else scalar(0),
         end_distance=None if extend_top else length,
         feature_overrides=face_tags,
+        extra_features=extra_features,
         label=label,
     )
 

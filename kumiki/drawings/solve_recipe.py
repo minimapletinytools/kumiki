@@ -10,7 +10,8 @@ from typing import Callable, List, Mapping, Optional, Tuple, Union
 import numpy as np
 
 from ..csg.carriers import (BarrelCoord, Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane,
-                            CarrierPoint, CarrierRef, Coord, LineCoord, PlaneCoord, PointCoord, Recipe, Row)
+                            CarrierPoint, CarrierRef, Coord, LineCoord, Midplane, PlaneCoord, PointCoord, Recipe,
+                            RecipePart, Row)
 from ..geometry import Line, Plane, Point, intersect_line_plane, intersect_planes, perpendicular_axes
 from ..rule import Matrix, V3
 
@@ -76,13 +77,38 @@ def _carrier_constraints(ref: CarrierRef, carriers: CarrierMap, at: np.ndarray) 
     return [(radial, row)]
 
 
+def _midplane_normal(part: Midplane, carriers: CarrierMap) -> Tuple[np.ndarray, float]:
+    """The midplane's unit normal and |n_front - n_back|. It is (n_front - n_back) . x = d_front - d_back."""
+    normals = []
+    for ref in (part.front, part.back):
+        carrier = carriers.carrier(ref)
+        if not isinstance(carrier, CarrierPlane):
+            raise ValueError("a midplane is between two planes")
+        normals.append(_unit(_np(carrier.plane.normal)))
+    difference = normals[0] - normals[1]
+    length = float(np.linalg.norm(difference))
+    if length < 1e-12:
+        raise ValueError("a midplane's two planes face the same way")
+    return difference / length, length
+
+
+def _part_constraints(part: RecipePart, carriers: CarrierMap, at: np.ndarray) -> List[Constraint]:
+    if isinstance(part, CarrierRef):
+        return _carrier_constraints(part, carriers, at)
+    # d((n_f - n_b) . x - (d_f - d_b)) = 0, so (n_f - n_b) . dx is the front's form less the back's.
+    normal, length = _midplane_normal(part, carriers)
+    [(_, front)] = _carrier_constraints(part.front, carriers, at)
+    [(_, back)] = _carrier_constraints(part.back, carriers, at)
+    return [(normal, _scale_row(combine(front, back, -1.0), 1.0 / length))]
+
+
 def motion_along(recipe: Recipe, carriers: CarrierMap, at: V3, along: V3) -> Row:
     """The first-order motion of the feature at `at`, read along `along`, as a row over solving carrier unknowns.
 
     The motion is the smallest one that keeps `at` on the moved feature, so sliding along
     the feature doesn't count.
     """
-    constraints = [c for ref in recipe for c in _carrier_constraints(ref, carriers, _np(at))]
+    constraints = [c for part in recipe for c in _part_constraints(part, carriers, _np(at))]
     normals = np.array([normal for normal, _ in constraints])
     gram = normals @ normals.T
     if abs(np.linalg.det(gram)) < 1e-12:
@@ -186,15 +212,25 @@ def _carrier_direction(ref: CarrierRef, carriers: CarrierMap) -> Tuple[np.ndarra
     raise ValueError(f"{type(carrier).__name__} has no direction")
 
 
+def _part_direction(part: RecipePart, carriers: CarrierMap) -> Tuple[np.ndarray, VectorRow]:
+    if isinstance(part, CarrierRef):
+        return _carrier_direction(part, carriers)
+    normal, length = _midplane_normal(part, carriers)
+    (_, front), (_, back) = _carrier_direction(part.front, carriers), _carrier_direction(part.back, carriers)
+    across = np.eye(3) - np.outer(normal, normal)
+    change = _sum_vector_rows(front, _scale_vector_row(back, -1.0))
+    return normal, _scale_vector_row(transform_vector_row(change, across), 1.0 / length)
+
+
 def direction_motion(recipe: Recipe, carriers: CarrierMap) -> Tuple[np.ndarray, VectorRow]:
     """The feature's unit direction (a plane's normal, a line's direction) and its first-order change.
 
     For a line where two planes meet, the direction is n1 × n2 normalised.
     """
     if len(recipe) == 1:
-        return _carrier_direction(recipe[0], carriers)
+        return _part_direction(recipe[0], carriers)
     if len(recipe) == 2:
-        (n1, dn1), (n2, dn2) = (_carrier_direction(ref, carriers) for ref in recipe)
+        (n1, dn1), (n2, dn2) = (_part_direction(part, carriers) for part in recipe)
         cross = np.cross(n1, n2)
         length = float(np.linalg.norm(cross))
         if length < 1e-12:
@@ -213,8 +249,15 @@ def feature_dof_rows(recipe: Recipe, carriers: CarrierMap) -> List[Row]:
     A single carrier's DOFs are its unknowns. A point's are its motion along x, y and z; a line's
     its motion across it at two points.
     """
+    if len(recipe) == 1 and isinstance(recipe[0], Midplane):
+        plane = locate_recipe(recipe, carriers.carrier)
+        assert isinstance(plane, Plane)
+        normal = _unit(_np(plane.normal))
+        points = [_np(plane.point) + offset for offset in (np.zeros(3), *_axes(normal))]
+        return [motion_along(recipe, carriers, Matrix(point), Matrix(normal)) for point in points]
     if len(recipe) == 1:
         (ref,) = recipe
+        assert isinstance(ref, CarrierRef)
         rows = carriers.carrier_rows(ref)
         carrier = carriers.carrier(ref)
         if isinstance(carrier, CarrierBarrel):
@@ -242,12 +285,28 @@ def _carrier_geometry(carrier: Carrier) -> Optional[Union[Plane, Line, Point]]:
     return None
 
 
+def _part_geometry(part: RecipePart,
+                   carrier_of: Callable[[CarrierRef], Carrier]) -> Optional[Union[Plane, Line, Point]]:
+    if isinstance(part, CarrierRef):
+        return _carrier_geometry(carrier_of(part))
+    planes = [carrier.plane for carrier in (carrier_of(part.front), carrier_of(part.back))
+              if isinstance(carrier, CarrierPlane)]
+    if len(planes) != 2:
+        return None
+    normals = [_unit(_np(plane.normal)) for plane in planes]
+    offsets = [float(n @ _np(plane.point)) for n, plane in zip(normals, planes)]
+    normal, offset = normals[0] - normals[1], offsets[0] - offsets[1]
+    if float(normal @ normal) < 1e-24:
+        return None
+    return Plane(normal=Matrix(_unit(normal)), point=Matrix(normal * offset / float(normal @ normal)))
+
+
 def locate_recipe(
     recipe: Recipe,
     carrier_of: Callable[[CarrierRef], Carrier] = CarrierRef.carrier,
 ) -> Optional[Union[Plane, Line, Point]]:
-    """The geometry the recipe builds: its one carrier, or where its carriers meet."""
-    located = [_carrier_geometry(carrier_of(ref)) for ref in recipe]
+    """The geometry the recipe builds: its one part, or where its parts meet."""
+    located = [_part_geometry(part, carrier_of) for part in recipe]
     if len(located) == 1:
         return located[0]
     planes = [g for g in located if isinstance(g, Plane)]

@@ -9,11 +9,11 @@ from kumiki.drawings.dof_solver import remaining
 from kumiki.csg.cutcsg import (
     EdgeFeature, FaceFeature, hit_of_kind,
     CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
-    DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism,
+    DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, PrismCenterplaneFeature, PrismFace, RectangularPrism,
     SolidUnion, prism_arris_key, prism_corner_key, prism_face_key, carrier_map,
 )
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
-from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
+from kumiki.rule import Matrix, Orientation, Transform, create_v2, create_v3, scalar
 from tests.testing_shavings import present
 from kumiki.csg.carriers import BarrelCoord, CarrierRef, PlaneCoord
 from kumiki.drawings.solve_recipe import (
@@ -496,3 +496,79 @@ class TestDirectionMotion:
         with pytest.raises(ValueError):
             direction_motion(_recipe(box, prism_corner_key(PrismFace.TOP, PrismFace.RIGHT, PrismFace.FRONT)),
                              carrier_map(box))
+
+
+class TestMidplane:
+    """A prism's centerplane, solved as the plane midway between two opposite faces."""
+
+    def _prism(self, turn=0.0, size=(1.0, 2.0)):
+        orientation = Orientation.from_axis_angle(_v(0, 0, 1), scalar(turn)) if turn else Transform.identity().orientation
+        return RectangularPrism(
+            size=create_v2(scalar(size[0]), scalar(size[1])),
+            transform=Transform(position=_v(1, 2, 0), orientation=orientation),
+            start_distance=scalar(0), end_distance=scalar(4),
+            extra_features=(PrismCenterplaneFeature(name="across", faces=(PrismFace.FRONT, PrismFace.BACK)),))
+
+    def _centerplane(self, prism):
+        feature = next(f for f in prism.get_declared_features() if isinstance(f, PrismCenterplaneFeature))
+        recipe = feature.solve_recipe(prism)
+        assert recipe is not None
+        return feature, recipe
+
+    def test_the_recipe_locates_where_the_feature_does(self):
+        prism = self._prism(turn=0.4)
+        feature, recipe = self._centerplane(prism)
+
+        assert planes_are_coincident(_plane(locate_recipe(recipe)), present(feature.locate_simple_unbounded(prism), "plane"))
+
+    @pytest.mark.parametrize("along", [(0, 1, 0), (0.3, 1, 0.2)])
+    def test_motion_matches_finite_differences(self, along):
+        prism = self._prism(turn=0.3)
+        _, recipe = self._centerplane(prism)
+        carriers = carrier_map(prism)
+        at = _closest(locate_recipe(recipe), _v(1.4, 2.0, 1.5))
+        anchors = [(recipe, Matrix(at), 1.0)]
+
+        row = _measure(carriers, anchors, _v(*along))
+
+        assert {coord for (_, coord) in row} >= {PlaneCoord.OFFSET}
+        _assert_rows_match(row, _finite_difference_row(carriers, anchors, _v(*along)))
+
+    def test_its_normal_turns_with_its_two_faces(self, step=1e-6):
+        prism = self._prism(turn=0.3)
+        _, recipe = self._centerplane(prism)
+        carriers = carrier_map(prism)
+        normal, change = direction_motion(recipe, carriers)
+
+        for solving in carriers.solving_carriers():
+            for coord in type(carriers.carrier(solving)).COORDS:
+                moved = perturbed(carriers.carrier(solving), coord, step)
+                located = _plane(locate_recipe(recipe, lambda ref: moved if carriers.canonical(ref) == solving
+                                               else carriers.carrier(ref)))
+                expected = (_np(located.normal) / np.linalg.norm(_np(located.normal)) - normal) / step
+                actual = np.array([component.get((solving, coord), 0.0) for component in change])
+                assert actual == pytest.approx(expected, abs=1e-4)
+
+    def test_its_dofs_are_three(self):
+        prism = self._prism()
+        _, recipe = self._centerplane(prism)
+
+        assert len(feature_dof_rows(recipe, carrier_map(prism))) == 3
+
+    def test_a_derived_edge_with_a_cap(self):
+        prism = self._prism(turn=0.2)
+        feature, _ = self._centerplane(prism)
+        cap = _feature(prism, prism_face_key(PrismFace.TOP))
+        edge = DerivedEdgeFeature(name="edge", a=OwnedFeatureHit(feature=feature, owner=prism),
+                                  b=OwnedFeatureHit(feature=cap, owner=prism))
+        recipe = present(edge.solve_recipe(prism), "recipe")
+        carriers = carrier_map(prism)
+        line = _line(locate_recipe(recipe))
+        anchors = [(recipe, line.point, 1.0)]
+
+        _assert_rows_match(_measure(carriers, anchors, _v(0.2, 1, 0.5)),
+                           _finite_difference_row(carriers, anchors, _v(0.2, 1, 0.5)))
+
+    def test_only_opposite_long_faces(self):
+        with pytest.raises(ValueError, match="centerplane"):
+            PrismCenterplaneFeature(name="bad", faces=(PrismFace.RIGHT, PrismFace.FRONT))

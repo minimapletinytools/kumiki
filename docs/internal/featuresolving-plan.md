@@ -277,7 +277,8 @@ Once A–D agree on real joints.
 - **Part 2 B and C, `solve_recipe.py` and the CSG classes:**
   - carriers (`CarrierPlane`, `CarrierLine`, `CarrierPoint`, `CarrierBarrel`);
   - `CutCSG.carriers()`;
-  - `CSGFeature.solve_recipe` (a tuple of carrier refs);
+  - `CSGFeature.solve_recipe` (a tuple of parts: carrier refs, or a `Midplane` between two plane carriers);
+  - the perfect timber within's two centerplanes (`PrismCenterplaneFeature`, `ptw.centerplane_left_right` / `ptw.centerplane_front_back`), non-real, solved as midplanes of their faces. A real face lying on a centerplane is not assumed to: that has to be measured;
   - `carrier_map` with merged coincident planes;
   - `motion_along`, `measurement_row`, `feature_dof_rows`, `moved_by`.
 - **Part 2 D, `feature_solving.py`:**

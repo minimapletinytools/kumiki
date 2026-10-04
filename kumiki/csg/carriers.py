@@ -92,9 +92,19 @@ class CarrierRef:
         return hash((id(self.owner), self.local))
 
 
+@dataclass(frozen=True)
+class Midplane:
+    """The plane midway between two planar carriers, e.g. a timber's centerplane between two opposite faces."""
+    front: CarrierRef
+    back: CarrierRef
+
+
+# A carrier, or a plane made from carriers.
+RecipePart = Union[CarrierRef, Midplane]
+
 # List of references to the carriers producing the feature in question, which is the carrier
 # itself for non-derived features.
-Recipe = Tuple[CarrierRef, ...]
+Recipe = Tuple[RecipePart, ...]
 
 # One unknown: a solving carrier and one of its COORDS.
 Column = Tuple[CarrierRef, Coord]

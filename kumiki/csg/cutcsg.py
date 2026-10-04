@@ -28,7 +28,7 @@ from ..rule import *
 from ..geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
-from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Recipe,
+from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Midplane, Recipe,
                        merge_coincident_planes)
 
 
@@ -1301,6 +1301,43 @@ class SimpleRectangularPrismFeature(FaceFeature):
         if self.face == PrismFace.BOTTOM:
             return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=test_tolerance)
         return False
+
+
+@dataclass(frozen=True)
+class PrismCenterplaneFeature(FaceFeature):
+    """The plane midway between two opposite long faces of a RectangularPrism. Not real: no surface lies on it.
+
+    Solved as the midplane of its two faces, so knowing both faces solves it.
+    """
+    faces: Tuple[PrismFace, PrismFace] = (PrismFace.RIGHT, PrismFace.LEFT)
+    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(real=False))
+
+    def __post_init__(self):
+        if set(self.faces) not in ({PrismFace.RIGHT, PrismFace.LEFT}, {PrismFace.FRONT, PrismFace.BACK}):
+            raise ValueError(f"{self.name!r}: a centerplane is between RIGHT and LEFT or FRONT and BACK, "
+                             f"not {self.faces[0].name} and {self.faces[1].name}")
+
+    def _sides(self) -> Tuple[SimpleRectangularPrismFeature, SimpleRectangularPrismFeature]:
+        return (SimpleRectangularPrismFeature(name=self.name, face=self.faces[0]),
+                SimpleRectangularPrismFeature(name=self.name, face=self.faces[1]))
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
+        first, second = (side.locate_simple_unbounded(owner) for side in self._sides())
+        if first is None or second is None:
+            return None
+        return Plane(normal=first.normal, point=(first.point + second.point) / 2)
+
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        refs = [CarrierRef(owner, prism_face_key(face)) for face in self.faces]
+        if not all(ref.local in owner.carriers() for ref in refs):
+            return None
+        return (Midplane(front=refs[0], back=refs[1]),)
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, RectangularPrism):
+            return False
+        x, y, _ = owner._local_coords(point)
+        return safe_equality_test(x if PrismFace.RIGHT in self.faces else y, 0, eps=test_tolerance)
 
 
 def _canonical_ordering_arris_faces(
