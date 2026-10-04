@@ -157,7 +157,7 @@ def example() -> Frame:
 
     # -- Assembly freedom helpers -------------------------------------------
     # Escape distance — use the full timber length so pieces clear completely.
-    freed = block_length / scalar(3)
+    freed = block_length / scalar(5)
 
     # Global axis unit directions
     PX = create_v3(scalar(1), scalar(0), scalar(0))
