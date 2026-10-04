@@ -204,7 +204,7 @@ def _carriers_for(handles: Sequence[FeatureHandle], cut_timbers: Sequence[CutTim
         if found is None:
             raise ValueError(f"{handle.feature.name!r} is on a timber not in cut_timbers")
         touched.append(found)
-    return CarrierMap.union([carrier_map(cut.render_timber_with_cuts_csg_local()) for cut in touched])
+    return carrier_map_of(*touched)
 
 
 def _known_rows(
