@@ -92,11 +92,12 @@ class TranslationDof:
 @dataclass(frozen=True)
 class RotationDof:
     """One half-interval rotational DOF, in GLOBAL space: right-handed about
-    the axis, freed after ``freed_after_angle`` radians."""
+    the axis, freed after ``freed_after_angle`` radians. With None the joint
+    permits the rotation but is never freed by it."""
 
     axis_position: V3
     axis_direction: Direction3D
-    freed_after_angle: Numeric
+    freed_after_angle: Optional[Numeric]
 
 
 @dataclass(frozen=True)
@@ -398,7 +399,7 @@ class _RotationRay:
 
     __slots__ = ("pivot", "axis", "freed_after", "owners", "angle")
 
-    def __init__(self, pivot: _Float3, axis: _Float3, freed_after: float,
+    def __init__(self, pivot: _Float3, axis: _Float3, freed_after: Optional[float],
                  owners: List[Tuple[int, Ordering]]):
         self.pivot = pivot
         self.axis = axis
@@ -515,9 +516,10 @@ def _build_pairs(
             axis = _unit3(_float3(dof.axis_direction))
             if axis is None:
                 continue
+            freed_after = (None if dof.freed_after_angle is None
+                           else float(giraffe_evalf(dof.freed_after_angle)))
             rays.append(_RotationRay(_float3(dof.axis_position), _scale3(axis, sign),
-                                     float(giraffe_evalf(dof.freed_after_angle)),
-                                     [(member_key, spec.ordering)]))
+                                     freed_after, [(member_key, spec.ordering)]))
         return rays
 
     for joint_index, joint in enumerate(joints):
@@ -549,7 +551,8 @@ def _build_pairs(
                     if existing is None:
                         pair.rotation_rays.append(candidate)
                     else:
-                        existing.freed_after = min(existing.freed_after, candidate.freed_after)
+                        finite = [a for a in (existing.freed_after, candidate.freed_after) if a is not None]
+                        existing.freed_after = min(finite) if finite else None
                         existing.owners = existing.owners + candidate.owners
                 pairs.append(pair)
                 pairs_by_member.setdefault(m, []).append(pair)
@@ -818,7 +821,7 @@ def _evaluate_rotation_candidate(
     scheduled_remaining = [
         ray.freed_after - ray.angle
         for pair, ray in crossing
-        if ordering in pair.scheduled_orderings
+        if ordering in pair.scheduled_orderings and ray.freed_after is not None
     ]
     if not scheduled_remaining:
         return None
@@ -1523,7 +1526,8 @@ def solve_assembly(
                     sequence += 1
                     for pair, rotation_ray in best_rotation.crossing:
                         rotation_ray.angle += best_rotation.angle
-                        if rotation_ray.angle >= rotation_ray.freed_after - _ZERO_EPSILON:
+                        if rotation_ray.freed_after is not None \
+                                and rotation_ray.angle >= rotation_ray.freed_after - _ZERO_EPSILON:
                             pair.separated = True
                             pair.separated_at_seq = sequence
                             note_separation(pair, ordering)

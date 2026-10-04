@@ -1015,6 +1015,32 @@ class TestRotation:
         assert slid[2].rotation is None
         assert not slid[2].dragged
 
+    def test_permitted_rotation_does_not_free_the_joint(self):
+        """a turns free of b; its joint with c permits the turn but needs the slide."""
+        axis = dict(axis_position=create_v3(0, 0, 0), axis_direction=X)
+        frees = AssemblyFreedom(rotations=(RotationDof(freed_after_angle=1.0, **axis),))
+        permits = AssemblyFreedom(
+            translations=AssemblyFreedom.translation(Z, 2).translations,
+            rotations=(RotationDof(freed_after_angle=None, **axis),),
+        )
+        members = [member(1, "a"), member(2, "b"), member(3, "c")]
+        joints = [
+            AssemblyJoint(name="ab", members={1: spec(frees), 2: spec()}),
+            AssemblyJoint(name="ac", members={1: spec(permits), 3: spec()}),
+            AssemblyJoint(name="bc", members={2: spec(), 3: spec()}),
+        ]
+
+        solution = solve_assembly(members, joints)
+
+        assert solution.failure is None
+        assert len(solution.steps) == 2
+        (turned,) = solution.steps[0].movements
+        assert turned.member_key == 1
+        assert turned.rotation is not None
+        slid = movements_by_key(solution.steps[1])[1]
+        assert slid.rotation is None
+        assert not slid.dragged
+
     def test_partner_without_matching_rotation_turns_along(self):
         turn = AssemblyFreedom(rotations=(
             RotationDof(axis_position=create_v3(0, 0, 0), axis_direction=X, freed_after_angle=1.0),))
@@ -1052,9 +1078,16 @@ class TestRotation:
         frame = example()
         solution = solve_frame_assembly(frame)
 
+        key = {cut.timber.ticket.path: cut.timber.ticket.kumiki_id for cut in frame.cut_timbers}
         assert solution.failure is None
-        assert len(solution.steps) == 2
+        assert len(solution.steps) == 3
         (turned,) = solution.steps[0].movements
+        assert turned.member_key == key["x"]
         assert float(turned.rotation.angle) == pytest.approx(math.pi / 2)
         assert_direction(turned, (1, 0, 0))
-        assert all(movement.rotation is None for movement in solution.steps[1].movements)
+        y_slide = movements_by_key(solution.steps[1])[key["y"]]
+        assert not y_slide.dragged
+        assert_direction(y_slide, (1, 0, 0))
+        z_slide = movements_by_key(solution.steps[2])[key["z"]]
+        assert not z_slide.dragged
+        assert_direction(z_slide, (0, 1, 0))
