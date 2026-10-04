@@ -2680,7 +2680,7 @@ def _edge_outward_normal(feature: Any, node: Any, timber: Any) -> Optional[Tuple
 
     located = []
     if isinstance(feature, DerivedEdgeFeature):
-        for parent in (feature.a, feature.b):
+        for parent in feature.parents:
             if parent is not None:
                 located.append(parent.locate_simple_unbounded())
     elif isinstance(feature, SimpleRectangularPrismEdgeFeature):
@@ -4605,7 +4605,7 @@ def _derived_feature_owner(root: 'CutCSG', derived: Any) -> Optional[Tuple[Any, 
     two nodes at the same depth is not something the joint library produces
     today; when it does, this is the rule to revisit.
     """
-    parents = [hit for hit in (getattr(derived, "a", None), getattr(derived, "b", None))
+    parents = [hit for hit in getattr(derived, "parents", ())
                if hit is not None]
     if len(parents) != 2:
         return None
@@ -4698,7 +4698,7 @@ def _cropped_edge_segments(
     # A derived edge is bounded by the two solids its parent faces belong to.
     # A declared one -- a timber's own arris -- belongs to a single primitive,
     # which is the owner it was found on.
-    hits = [getattr(edge_feature, "a", None), getattr(edge_feature, "b", None)]
+    hits = list(getattr(edge_feature, "parents", (None, None)))
     parents = [
         hit.owner for hit in hits
         if hit is not None and getattr(hit, "owner", None) is not None
@@ -5288,7 +5288,7 @@ def _pick_reference(
     if edge is not None:
         positions = _node_positions(local_csg)
         parents = []
-        for hit in (getattr(edge, "a", None), getattr(edge, "b", None)):
+        for hit in getattr(edge, "parents", (None, None)):
             if hit is None or id(hit.owner) not in positions:
                 return None
             parents.append(FeatureRef(tuple(positions[id(hit.owner)][2]), hit.feature.name))

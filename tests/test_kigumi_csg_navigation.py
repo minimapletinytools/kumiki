@@ -1810,8 +1810,8 @@ class TestResolvingADerivedEdge:
         positions = runner._node_positions(local)
         return DerivedFeaturePath(
             timber=ResolvedTimberPath.parse(member_key),
-            a=FeatureRef(tuple(positions[id(derived.a.owner)][2]), derived.a.feature.name),
-            b=FeatureRef(tuple(positions[id(derived.b.owner)][2]), derived.b.feature.name),
+            a=FeatureRef(tuple(positions[id(derived.parents[0].owner)][2]), derived.parents[0].feature.name),
+            b=FeatureRef(tuple(positions[id(derived.parents[1].owner)][2]), derived.parents[1].feature.name),
             kind=kind,
         )
 

@@ -12,7 +12,7 @@ import numpy as np
 
 from .cropcsg import _loft_sides_are_planar, solid_bounds
 from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, CutCSG, Cylinder, Difference, EmptyCSG,
-                     Intersection, SolidUnion)
+                     FaceFeature, Intersection, SolidUnion)
 from .feature_paths import FeatureHandle
 from .geometry import Plane, perpendicular_axes
 from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
@@ -235,7 +235,7 @@ def _sides(csg: CutCSG, frame: _Frame, seed: Region) -> Sides:
     return _half_space_section(bounds.require_faces(), frame, seed)
 
 
-def face_reaches_surface(face: FeatureHandle, root: CutCSG, near: V3, reach: float) -> bool:
+def face_reaches_surface(face: FeatureHandle[FaceFeature], root: CutCSG, near: V3, reach: float) -> bool:
     """Determines whether part of `face`, with area, is on the finished surface of `root`.
 
     For each spot on the face, check whether `root` has material just in front of it and just
@@ -247,8 +247,8 @@ def face_reaches_surface(face: FeatureHandle, root: CutCSG, near: V3, reach: flo
     A face, or a tree, this module can't cut by a plane counts as on the surface.
     """
     plane = face.feature.locate_simple_unbounded(face.owner)
-    if not isinstance(plane, Plane):
-        raise ValueError(f"{face.feature.name!r} is not a flat face")
+    if plane is None:
+        raise ValueError(f"{face.feature.name!r} has no plane")
     frame = _Frame(plane, near)
     seed = [_square(reach)]
     try:

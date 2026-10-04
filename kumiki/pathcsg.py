@@ -29,7 +29,9 @@ from .cutcsg import (
     CSGFeature,
     CSGFeatureExtent,
     CSGFeatureType,
+    CurvedFaceFeature,
     CutCSG,
+    FaceFeature,
     HasFeatures,
     LocatedFeatureGeometry,
     _finite_midpoint,
@@ -888,19 +890,9 @@ def side_index(key: PathExtrusionFeatureKey) -> int:
 
 
 @dataclass(frozen=True)
-class SimplePathExtrusionFeature(CSGFeature):
-    """One side face or end cap of a PathExtrusion.
-
-    A key naming a curved side never matches any point: there is no planar face
-    there to name. That is the graceful-fail behaviour, not a special case --
-    the feature simply stays unmatched.
-    """
+class _PathExtrusionFeature(CSGFeature):
+    """What the flat and curved PathExtrusion features share: a key, a footprint, an extent."""
     key: PathExtrusionFeatureKey = ExtrusionCap.TOP
-
-    def feature_type(self) -> CSGFeatureType:
-        """Read off the key, which is the point of the key carrying it."""
-        return (CSGFeatureType.CURVED_FACE if isinstance(self.key, CurvedSide)
-                else CSGFeatureType.FACE)
 
     def _midpoint_2d(self, owner: 'PathExtrusion') -> Optional[V2]:
         """Centre of this face's footprint in the path's own 2D plane."""
@@ -910,7 +902,7 @@ class SimplePathExtrusionFeature(CSGFeature):
         segment = owner.path.segments[side_index(self.key)]
         return (segment.start + segment.end) / scalar(2)
 
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
         if not isinstance(owner, PathExtrusion):
             return None
         orientation = owner.transform.orientation.matrix
@@ -971,6 +963,27 @@ class SimplePathExtrusionFeature(CSGFeature):
 
 
 @dataclass(frozen=True)
+class SimplePathExtrusionFeature(_PathExtrusionFeature, FaceFeature):
+    """A flat side (FlatSide key) or an end cap of a PathExtrusion."""
+
+    def __post_init__(self):
+        if isinstance(self.key, CurvedSide):
+            raise ValueError(f"{self.name!r}: {self.key!r} is curved; use SimplePathExtrusionCurvedFeature")
+
+
+@dataclass(frozen=True)
+class SimplePathExtrusionCurvedFeature(_PathExtrusionFeature, CurvedFaceFeature):
+    """A curved side (CurvedSide key) of a PathExtrusion. Matches no point: there is no plane to name."""
+
+    def __post_init__(self):
+        if not isinstance(self.key, CurvedSide):
+            raise ValueError(f"{self.name!r}: {self.key!r} is not a curved side; use SimplePathExtrusionFeature")
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> None:
+        return None
+
+
+@dataclass(frozen=True)
 class PathExtrusion(HasFeatures, CutCSG):
     """
     Generalizes ConvexPolygonExtrusion to an arbitrary closed FancyPath (lines and
@@ -1007,13 +1020,15 @@ class PathExtrusion(HasFeatures, CutCSG):
         return FlatSide(index) if segment.is_planar() else CurvedSide(index)
 
     def feature(self, name: str, key: PathExtrusionFeatureKey,
-                **rest) -> 'SimplePathExtrusionFeature':
+                **rest) -> '_PathExtrusionFeature':
         """A feature on this extrusion. Pass `extrusion.side(n)` for a side.
 
         Both caps are flat whatever the path does -- they are its own footprint,
         and a footprint is a closed region however curved its boundary -- so
         ExtrusionCap.TOP and BOTTOM need nothing worked out.
         """
+        if isinstance(key, CurvedSide):
+            return SimplePathExtrusionCurvedFeature(name, key=key, **rest)
         return SimplePathExtrusionFeature(name, key=key, **rest)
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:

@@ -4,15 +4,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Iterator, List
 
-from .cutcsg import CSGFeatureType, CutCSG, FeatureMarkingStatus, OwnedFeatureHit, csg_children
+from .cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, OwnedFeatureHit,
+                     csg_children)
 from .feature_paths import FeatureHandle
-from .geometry import Plane
 from .planar_region import face_reaches_surface
 from .rule import V3, create_v3
 from .timber import CutTimber
 
 # Whether a flat face is on the finished surface: (face, root, near, reach) -> bool.
-FaceTest = Callable[[FeatureHandle, CutCSG, V3, float], bool]
+FaceTest = Callable[[FeatureHandle[FaceFeature], CutCSG, V3, float], bool]
 
 
 class Reason(Enum):
@@ -25,7 +25,7 @@ class Reason(Enum):
 
 @dataclass(frozen=True)
 class RequiredFeature:
-    handle: FeatureHandle
+    handle: FeatureHandle[CSGFeature]
     reason: Reason
 
 
@@ -53,20 +53,21 @@ def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_
     required: List[RequiredFeature] = []
     for node in _nodes(root):
         for feature in node.get_declared_features():
-            handle = FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=node))
+            handle: FeatureHandle[CSGFeature] = FeatureHandle(
+                timber=timber, hit=OwnedFeatureHit(feature=feature, owner=node))
             marking = feature.properties.marking_override
             status = marking.mark if marking is not None else FeatureMarkingStatus.OPTIONAL
-            kind = feature.feature_type()
             if status is FeatureMarkingStatus.NEVER_MARK:
                 continue
             if status is FeatureMarkingStatus.ALWAYS_MARK:
                 required.append(RequiredFeature(handle, Reason.MARKED))
             elif not feature.real:
                 required.append(RequiredFeature(handle, Reason.NON_REAL))
-            elif kind is CSGFeatureType.FACE and isinstance(feature.locate_simple_unbounded(node), Plane):
-                if face_test(handle, root, near, reach):
+            elif isinstance(feature, FaceFeature) and feature.locate_simple_unbounded(node) is not None:
+                face = FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=node))
+                if face_test(face, root, near, reach):
                     required.append(RequiredFeature(handle, Reason.ON_SURFACE))
-            elif kind is CSGFeatureType.CURVED_FACE:
+            elif isinstance(feature, CurvedFaceFeature):
                 required.append(RequiredFeature(handle, Reason.CURVED))
             elif feature.feature_key() is None:
                 required.append(RequiredFeature(handle, Reason.EXTRA))
