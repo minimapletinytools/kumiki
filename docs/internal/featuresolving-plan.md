@@ -284,7 +284,7 @@ Once A–D agree on real joints.
 - **Part 2 D, `feature_solving.py`:**
   - `measure_row`, from a `Measure` with `FeatureHandle` anchors: 3D and sheet distances (perpendicular, horizontal, vertical), 3D and sheet angles, on one timber or between two. Measurements are placed in world space; each anchor's row is taken in its own timber's frame;
   - `remaining_dofs`;
-  - `solve_report`, whose targets come from `required_features`.
+  - `solve_report`, over any list of targets on any number of timbers; `required_targets` lists a timber's required features as targets.
 
 ## Left
 
@@ -295,7 +295,7 @@ Once A–D agree on real joints.
 3. **Curved faces:** always required for now; decide them properly.
 4. **Generator (Part 2 E):** greedy candidate measurements scored by remaining DOFs, using `free_motions` to rule out candidates that can't help. Output is `Measure`s with `MeasurementSource.PYTHON_GENERATED`.
 5. **Debug overlay in kigumi:** colour faces required or hidden, and by remaining DOFs.
-6. **Speed:** `required_features` takes about 8.6s for `tinyhouse120`'s 75 timbers. Walk each distinct plane once rather than once per face.
+6. **Speed:** `required_features` takes about 2s for `tinyhouse120`'s 75 timbers (3,410 faces tested, 1,767 distinct planes). Walk each distinct plane once rather than once per face, compute each primitive's bounding planes once per timber, and skip primitives whose bounds miss the plane.
 
 # Decisions
 

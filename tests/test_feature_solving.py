@@ -6,7 +6,7 @@ import pytest
 from kumiki.csg.cutcsg import OwnedFeatureHit, PrismFace, prism_corner_key, prism_face_key
 from kumiki.drawings.drawing import Measure, MeasurementKind, ViewAxes
 from kumiki.csg.feature_paths import FeatureHandle
-from kumiki.drawings.feature_solving import carrier_map_of, measure_row, remaining_dofs, solve_report
+from kumiki.drawings.feature_solving import carrier_map_of, measure_row, remaining_dofs, required_targets, solve_report
 from kumiki.rule import create_v3
 from kumiki.csg.carriers import CarrierRef, PlaneCoord
 from tests.testing_shavings import mortise_and_tenon_handles, present
@@ -51,14 +51,14 @@ class TestAMeasureSolvesWhatItMeasures:
         length = Measure(found["shoulder"], found["tenon_top"])
         cut_timber = _cut_timber(frame, found["shoulder"])
 
-        assert remaining_dofs(found["tenon_top"], [], [found["shoulder"]], cut_timber).count == 3
-        assert remaining_dofs(found["tenon_top"], [length], [found["shoulder"]], cut_timber).count == 2
+        assert remaining_dofs(found["tenon_top"], [], [found["shoulder"]], [cut_timber]).count == 3
+        assert remaining_dofs(found["tenon_top"], [length], [found["shoulder"]], [cut_timber]).count == 2
 
     def test_without_the_shoulder_known_the_length_alone_solves_nothing(self, handles):
         frame, found = handles
         length = Measure(found["shoulder"], found["tenon_top"])
 
-        assert remaining_dofs(found["tenon_top"], [length], [], _cut_timber(frame, found["shoulder"])).count == 3
+        assert remaining_dofs(found["tenon_top"], [length], [], [_cut_timber(frame, found["shoulder"])]).count == 3
 
 
 class TestMarkingTheCornersOfAFace:
@@ -68,7 +68,7 @@ class TestMarkingTheCornersOfAFace:
         frame, found = handles
         left, right = _tenon(found, PrismFace.LEFT), _tenon(found, PrismFace.RIGHT)
         measures = [Measure(left, _tenon(found, *corner)) for corner in corners]
-        return remaining_dofs(right, measures, [left], _cut_timber(frame, left)).count
+        return remaining_dofs(right, measures, [left], [_cut_timber(frame, left)]).count
 
     def test_four_corners_solve_the_face_with_one_to_spare(self, handles):
         assert self._remaining(handles, RIGHT_CORNERS) == 0
@@ -140,15 +140,15 @@ class TestAngles:
         butt = _cut_timber(frame, found["tenon_top"])
         angle = Measure(found["tenon_top"], found["tenon_left"], kind=MeasurementKind.parse("angle"))
 
-        assert remaining_dofs(found["tenon_left"], [], [found["tenon_top"]], butt).count == 3
-        assert remaining_dofs(found["tenon_left"], [angle], [found["tenon_top"]], butt).count == 2
+        assert remaining_dofs(found["tenon_left"], [], [found["tenon_top"]], [butt]).count == 3
+        assert remaining_dofs(found["tenon_left"], [angle], [found["tenon_top"]], [butt]).count == 2
 
     def test_an_angle_between_parallel_faces_fixes_nothing(self, handles):
         frame, found = handles
         butt = _cut_timber(frame, found["tenon_top"])
         angle = Measure(found["tenon_left"], found["tenon_right"], kind=MeasurementKind.parse("angle"))
 
-        assert remaining_dofs(found["tenon_right"], [angle], [found["tenon_left"]], butt).count == 3
+        assert remaining_dofs(found["tenon_right"], [angle], [found["tenon_left"]], [butt]).count == 3
 
     def test_on_a_sheet_seeing_both_faces_edge_on_it_is_the_3d_angle(self, handles):
         frame, found = handles
@@ -179,7 +179,7 @@ class TestSheetDistances:
         assert solid.keys() == sheet.keys()
         assert all(solid[key] == pytest.approx(sheet[key]) for key in solid)
         assert remaining_dofs(right, [Measure(left, right, kind=MeasurementKind.parse(
-            "projected_perpendicular_distance"))], [left], butt, view).count == 2
+            "projected_perpendicular_distance"))], [left], [butt], view).count == 2
 
     def test_a_face_seen_at_an_angle_is_refused(self, handles):
         frame, found = handles
@@ -213,8 +213,8 @@ class TestBetweenTwoTimbers:
         face = self._across(frame, found)
         across = Measure(face, found["shoulder"])
 
-        assert remaining_dofs(found["shoulder"], [], [face], butt, frame=frame).count == 3
-        assert remaining_dofs(found["shoulder"], [across], [face], butt, frame=frame).count == 2
+        assert remaining_dofs(found["shoulder"], [], [face], frame.cut_timbers).count == 3
+        assert remaining_dofs(found["shoulder"], [across], [face], frame.cut_timbers).count == 2
 
     def test_the_row_spans_both_timbers(self, handles):
         frame, found = handles
@@ -224,13 +224,13 @@ class TestBetweenTwoTimbers:
         owners = {id(ref.owner) for ref, _ in row}
         assert id(face.owner) in owners and id(found["shoulder"].owner) in owners
 
-    def test_without_the_frame_it_says_so(self, handles):
+    def test_without_the_other_timber_it_says_so(self, handles):
         frame, found = handles
         face = self._across(frame, found)
 
-        with pytest.raises(ValueError, match="frame"):
+        with pytest.raises(ValueError, match="not in cut_timbers"):
             remaining_dofs(found["shoulder"], [Measure(face, found["shoulder"])], [face],
-                           _cut_timber(frame, found["shoulder"]))
+                           [_cut_timber(frame, found["shoulder"])])
 
 class TestSolveReport:
     """Every required feature of a timber, with its body faces known."""
@@ -246,8 +246,8 @@ class TestSolveReport:
     def test_the_tenon_s_six_planes_are_what_is_left(self, handles):
         butt, _, known = self._butt(handles)
 
-        report = solve_report(butt, [], known)
-        counts = {r.required.handle.feature.name: present(r.remaining).count for r in report.features}
+        report = solve_report(required_targets(butt), [], known, [butt])
+        counts = {r.handle.feature.name: present(r.remaining).count for r in report.features}
 
         assert report.total.count == 6 * 3
         assert all(counts[f"ptw.{face}"] == 0 for face in ("front", "back", "left", "right", "bottom"))
@@ -258,8 +258,8 @@ class TestSolveReport:
         shoulder_from_end = Measure(known[-1], found["shoulder"])
         tenon_length = Measure(found["shoulder"], found["tenon_top"])
 
-        report = solve_report(butt, [shoulder_from_end, tenon_length], known)
-        counts = {r.required.handle.feature.name: present(r.remaining).count for r in report.features}
+        report = solve_report(required_targets(butt), [shoulder_from_end, tenon_length], known, [butt])
+        counts = {r.handle.feature.name: present(r.remaining).count for r in report.features}
 
         assert report.total.count == 6 * 3 - 2
         assert counts["shoulder"] == 2 and counts["tenon_top"] == 2
@@ -269,7 +269,23 @@ class TestSolveReport:
         receiving = _cut_timber(frame, found["mortise_front"])
         known = self._body(receiving, "front", "back", "left", "right", "bottom", "top")
 
-        assert solve_report(receiving, [], known).total.count == 4 * 3
+        assert solve_report(required_targets(receiving), [], known, [receiving]).total.count == 4 * 3
+
+    def test_targets_on_two_timbers(self, handles):
+        frame, found = handles
+        butt = _cut_timber(frame, found["shoulder"])
+        receiving = _cut_timber(frame, found["mortise_front"])
+        known = (self._body(butt, "front", "back", "left", "right", "bottom")
+                 + self._body(receiving, "front", "back", "left", "right", "bottom", "top"))
+        targets = [found["shoulder"], found["mortise_front"]]
+
+        report = solve_report(targets, [], known, frame.cut_timbers)
+        measured = solve_report(targets, [Measure(found["mortise_front"], found["shoulder"])], known,
+                                frame.cut_timbers)
+
+        assert [present(r.remaining).count for r in report.features] == [3, 3]
+        assert report.total.count == 6
+        assert measured.total.count == 5
 
     def test_a_required_feature_with_no_recipe_reports_none(self):
         from kumiki.construction import create_timber
@@ -284,7 +300,7 @@ class TestSolveReport:
                                  extra_features=(ProgrammableEdgeFeature(name="mark"),))
         cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, negative_csg=notch)])
 
-        report = solve_report(cut_timber, [], [])
-        mark = next(r for r in report.features if r.required.handle.feature.name == "mark")
+        report = solve_report(required_targets(cut_timber), [], [], [cut_timber])
+        mark = next(r for r in report.features if r.handle.feature.name == "mark")
 
         assert mark.remaining is None

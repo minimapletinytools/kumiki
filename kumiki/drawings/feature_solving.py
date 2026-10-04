@@ -6,7 +6,7 @@ row is taken in its own timber's local space, where its carriers are.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -17,15 +17,12 @@ from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, Meas
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
 from ..csg.planar_region import face_reaches_surface
-from .required_features import FaceTest, RequiredFeature, required_features
+from .required_features import FaceTest, required_features
 from ..rule import Matrix, V3
 from ..csg.carriers import CarrierMap, Recipe, Row
 from .solve_recipe import (combine, direction_motion, dot_vector_row, feature_dof_rows, motion_along,
                            transform_vector_row)
 from ..timber import CutTimber
-
-if TYPE_CHECKING:
-    from ..timber import Frame
 
 THREE_D_DISTANCE = MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
@@ -197,17 +194,17 @@ def measure_row(measure: Measure, carriers: CarrierMap, view: Optional[ViewAxes]
                          along, carriers)
 
 
-def _carriers_for(cut_timber: CutTimber, handles: Sequence[FeatureHandle], frame: Optional['Frame']) -> CarrierMap:
-    """Carriers of `cut_timber` and of every other timber the handles are on, found in `frame`."""
-    others: List[CutTimber] = []
+def _carriers_for(handles: Sequence[FeatureHandle], cut_timbers: Sequence[CutTimber]) -> CarrierMap:
+    """Carriers of every timber the handles are on, each found among `cut_timbers`."""
+    touched: List[CutTimber] = []
     for handle in handles:
-        if handle.timber is cut_timber.timber or any(other.timber is handle.timber for other in others):
+        if any(cut.timber is handle.timber for cut in touched):
             continue
-        found = frame.cut_timber_of(handle.timber) if frame is not None else None
+        found = next((cut for cut in cut_timbers if cut.timber is handle.timber), None)
         if found is None:
-            raise ValueError(f"{handle.feature.name!r} is on another timber; pass the frame that holds it")
-        others.append(found)
-    return carrier_map_of(cut_timber, *others)
+            raise ValueError(f"{handle.feature.name!r} is on a timber not in cut_timbers")
+        touched.append(found)
+    return CarrierMap.union([carrier_map(cut.render_timber_with_cuts_csg_local()) for cut in touched])
 
 
 def _known_rows(
@@ -225,54 +222,58 @@ def remaining_dofs(
     target: FeatureHandle,
     measures: Sequence[Measure],
     known: Sequence[FeatureHandle],
-    cut_timber: CutTimber,
+    cut_timbers: Sequence[CutTimber],
     view: Optional[ViewAxes] = None,
-    frame: Optional['Frame'] = None,
 ) -> Remaining:
     """What of `target` the measurements leave unsolved, given the `known` features.
 
-    Pass `frame` when measurements or known features are on other timbers.
+    `cut_timbers` must hold every timber the target, measurements and known features are on.
     """
-    carriers = _carriers_for(cut_timber, _handles(measures, known), frame)
+    carriers = _carriers_for([target, *_handles(measures, known)], cut_timbers)
     return remaining(_known_rows(measures, known, carriers, view), feature_handle_dof_rows(target, carriers))
 
 
 @dataclass(frozen=True)
 class FeatureReport:
-    """One required feature, and what of it is still unsolved. `remaining` is None if it has no recipe."""
-    required: RequiredFeature
+    """One target feature, and what of it is still unsolved. `remaining` is None if it has no recipe."""
+    handle: FeatureHandle
     remaining: Optional[Remaining]
 
 
 @dataclass(frozen=True)
 class SolveReport:
-    """What the measurements leave unsolved on a timber: per required feature, and in total."""
+    """What the measurements leave unsolved: per target feature, and in total."""
     features: List[FeatureReport]
     total: Remaining
 
 
 def solve_report(
-    cut_timber: CutTimber,
+    targets: Sequence[FeatureHandle],
     measures: Sequence[Measure],
     known: Sequence[FeatureHandle],
+    cut_timbers: Sequence[CutTimber],
     view: Optional[ViewAxes] = None,
-    face_test: FaceTest = face_reaches_surface,
-    frame: Optional['Frame'] = None,
 ) -> SolveReport:
-    """Remaining DOFs of every feature `required_features` finds on `cut_timber`, given the `known` features.
+    """Remaining DOFs of each target, and of all of them together, given the `known` features.
 
-    Pass `frame` when measurements or known features are on other timbers.
+    Targets may be on any number of timbers. `cut_timbers` must hold every timber the targets,
+    measurements and known features are on; a frame's `cut_timbers` will do.
     """
-    carriers = _carriers_for(cut_timber, _handles(measures, known), frame)
+    carriers = _carriers_for([*targets, *_handles(measures, known)], cut_timbers)
     known_rows = _known_rows(measures, known, carriers, view)
     reports: List[FeatureReport] = []
     target_rows: List[Row] = []
-    for required in required_features(cut_timber, face_test):
-        recipe = required.handle.feature.solve_recipe(required.handle.owner)
+    for handle in targets:
+        recipe = handle.feature.solve_recipe(handle.owner)
         if recipe is None:
-            reports.append(FeatureReport(required, None))
+            reports.append(FeatureReport(handle, None))
             continue
         rows = feature_dof_rows(recipe, carriers)
         target_rows += rows
-        reports.append(FeatureReport(required, remaining(known_rows, rows)))
+        reports.append(FeatureReport(handle, remaining(known_rows, rows)))
     return SolveReport(features=reports, total=remaining(known_rows, target_rows))
+
+
+def required_targets(cut_timber: CutTimber, face_test: FaceTest = face_reaches_surface) -> List[FeatureHandle]:
+    """The features `required_features` finds on `cut_timber`, as targets for `solve_report`."""
+    return [required.handle for required in required_features(cut_timber, face_test)]
