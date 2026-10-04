@@ -8,7 +8,7 @@ carriers' unknowns, via `measurement_row`. See docs/internal/featuresolving-plan
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, ClassVar, Dict, List, Mapping, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Callable, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
 import numpy as np
 
@@ -127,6 +127,16 @@ class CarrierMap:
     def __init__(self, carriers: Dict[CarrierRef, Carrier], canonical: Dict[CarrierRef, CarrierRef]):
         self._carriers = carriers
         self._canonical = canonical
+
+    @staticmethod
+    def union(maps: Sequence['CarrierMap']) -> 'CarrierMap':
+        """Several maps as one, each keeping its own merges. Their primitives must be distinct."""
+        carriers: Dict[CarrierRef, Carrier] = {}
+        canonical: Dict[CarrierRef, CarrierRef] = {}
+        for one in maps:
+            carriers.update(one._carriers)
+            canonical.update(one._canonical)
+        return CarrierMap(carriers, canonical)
 
     def canonical(self, ref: CarrierRef) -> CarrierRef:
         return self._canonical[ref]
@@ -260,6 +270,88 @@ def measurement_row(measurement: DistanceMeasurement, carriers: CarrierMap) -> R
     end = motion_along(measurement.end.recipe, carriers, measurement.end.at, measurement.along)
     start = motion_along(measurement.start.recipe, carriers, measurement.start.at, measurement.along)
     return combine(end, start, -1.0)
+
+
+# A vector whose components are rows: the first-order change of a 3-vector.
+VectorRow = Tuple[Row, Row, Row]
+
+
+def _vector_row(direction: np.ndarray, column: CarrierRef, coord: Coord) -> VectorRow:
+    x, y, z = ({(column, coord): float(component)} if abs(component) > 1e-15 else {} for component in direction)
+    return (x, y, z)
+
+
+def _sum_vector_rows(*vectors: VectorRow) -> VectorRow:
+    out: List[Row] = [{}, {}, {}]
+    for vector in vectors:
+        for k in range(3):
+            out[k] = combine(out[k], vector[k])
+    return (out[0], out[1], out[2])
+
+
+def _scale_vector_row(vector: VectorRow, factor: float) -> VectorRow:
+    return (_scale_row(vector[0], factor), _scale_row(vector[1], factor), _scale_row(vector[2], factor))
+
+
+def cross_vector_row(vector: VectorRow, fixed: np.ndarray) -> VectorRow:
+    """`vector × fixed`, for a varying vector and a fixed one."""
+    x, y, z = vector
+    return (combine(_scale_row(y, fixed[2]), _scale_row(z, fixed[1]), -1.0),
+            combine(_scale_row(z, fixed[0]), _scale_row(x, fixed[2]), -1.0),
+            combine(_scale_row(x, fixed[1]), _scale_row(y, fixed[0]), -1.0))
+
+
+def dot_vector_row(vector: VectorRow, fixed: np.ndarray) -> Row:
+    """`vector · fixed`, for a varying vector and a fixed one."""
+    row: Row = {}
+    for k in range(3):
+        row = combine(row, _scale_row(vector[k], float(fixed[k])))
+    return row
+
+
+def transform_vector_row(vector: VectorRow, matrix: np.ndarray) -> VectorRow:
+    """`matrix @ vector`, for a fixed matrix."""
+    return (dot_vector_row(vector, matrix[0]), dot_vector_row(vector, matrix[1]), dot_vector_row(vector, matrix[2]))
+
+
+def _scale_row(row: Row, factor: float) -> Row:
+    return {key: value * factor for key, value in row.items()}
+
+
+def _carrier_direction(ref: CarrierRef, carriers: CarrierMap) -> Tuple[np.ndarray, VectorRow]:
+    column, carrier = carriers.canonical(ref), carriers.carrier(ref)
+    if isinstance(carrier, CarrierPlane):
+        normal = _unit(_np(carrier.plane.normal))
+        first, second = _axes(normal)
+        return normal, _sum_vector_rows(_vector_row(first, column, PlaneCoord.TILT_1),
+                                        _vector_row(second, column, PlaneCoord.TILT_2))
+    if isinstance(carrier, CarrierLine):
+        direction = _unit(_np(carrier.line.direction))
+        first, second = _axes(direction)
+        return direction, _sum_vector_rows(_vector_row(first, column, LineCoord.TURN_1),
+                                           _vector_row(second, column, LineCoord.TURN_2))
+    raise ValueError(f"{type(carrier).__name__} has no direction")
+
+
+def direction_motion(recipe: Recipe, carriers: CarrierMap) -> Tuple[np.ndarray, VectorRow]:
+    """The feature's unit direction (a plane's normal, a line's direction) and its first-order change.
+
+    For a line where two planes meet, the direction is n1 × n2 normalised.
+    """
+    if len(recipe) == 1:
+        return _carrier_direction(recipe[0], carriers)
+    if len(recipe) == 2:
+        (n1, dn1), (n2, dn2) = (_carrier_direction(ref, carriers) for ref in recipe)
+        cross = np.cross(n1, n2)
+        length = float(np.linalg.norm(cross))
+        if length < 1e-12:
+            raise ValueError("the recipe's planes are parallel, so they meet in no line")
+        direction = cross / length
+        # d(n1 × n2) = dn1 × n2 - dn2 × n1, then keep the part across the direction.
+        change = _sum_vector_rows(cross_vector_row(dn1, n2), _scale_vector_row(cross_vector_row(dn2, n1), -1.0))
+        across = np.eye(3) - np.outer(direction, direction)
+        return direction, _scale_vector_row(transform_vector_row(change, across), 1.0 / length)
+    raise ValueError("a point has no direction")
 
 
 def feature_dof_rows(recipe: Recipe, carriers: CarrierMap) -> List[Row]:

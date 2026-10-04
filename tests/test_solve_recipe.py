@@ -17,7 +17,7 @@ from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
 from tests.testing_shavings import present
 from kumiki.solve_recipe import (
     Anchor, BarrelCoord, CarrierRef, DistanceMeasurement, PlaneCoord, feature_dof_rows, locate_recipe,
-    measurement_row, motion_along, moved_by, perturbed,
+    direction_motion, measurement_row, motion_along, moved_by, perturbed,
 )
 
 
@@ -462,3 +462,36 @@ class TestSolvingAFace:
         assert remaining([], feature_dof_rows(arris, carriers)).count == 4
         assert remaining(feature_dof_rows(faces[0], carriers), feature_dof_rows(arris, carriers)).count == 2
         assert remaining(sum((feature_dof_rows(f, carriers) for f in faces), []), feature_dof_rows(arris, carriers)).count == 0
+
+
+class TestDirectionMotion:
+    """How a feature's direction moves: a face's normal, an edge's direction."""
+
+    @pytest.mark.parametrize("key", [prism_face_key(PrismFace.RIGHT),
+                                     prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT)])
+    def test_matches_finite_differences(self, key):
+        box = _box(turn=0.4, position=(1, 2, 3))
+        carriers = carrier_map(box)
+        recipe = _recipe(box, key)
+        direction, change = direction_motion(recipe, carriers)
+
+        def located_direction(carrier_of):
+            located = locate_recipe(recipe, carrier_of)
+            raw = located.normal if isinstance(located, Plane) else _line(located).direction
+            return _np(raw) / np.linalg.norm(_np(raw))
+
+        assert np.allclose(located_direction(CarrierRef.carrier), direction)
+        step = 1e-6
+        for solving in carriers.solving_carriers():
+            for coord in type(carriers.carrier(solving)).COORDS:
+                moved = perturbed(carriers.carrier(solving), coord, step)
+                after = located_direction(lambda ref: moved if carriers.canonical(ref) == solving else carriers.carrier(ref))
+                expected = (after - direction) / step
+                actual = [component.get((solving, coord), 0.0) for component in change]
+                assert np.allclose(actual, expected, atol=1e-4), (solving.local, coord)
+
+    def test_a_point_has_none(self):
+        box = _box()
+        with pytest.raises(ValueError):
+            direction_motion(_recipe(box, prism_corner_key(PrismFace.TOP, PrismFace.RIGHT, PrismFace.FRONT)),
+                             carrier_map(box))

@@ -280,24 +280,20 @@ Once A–D agree on real joints.
   - `carrier_map` with merged coincident planes;
   - `motion_along`, `measurement_row`, `feature_dof_rows`, `moved_by`.
 - **Part 2 D, `feature_solving.py`:**
-  - `measure_row`, from a `Measure` with `FeatureHandle` anchors;
+  - `measure_row`, from a `Measure` with `FeatureHandle` anchors: 3D and sheet distances (perpendicular, horizontal, vertical), 3D and sheet angles, on one timber or between two. Measurements are placed in world space; each anchor's row is taken in its own timber's frame;
   - `remaining_dofs`;
   - `solve_report`, whose targets come from `required_features`.
 
 ## Left
 
 1. **Datum and conventions.** Callers pass the known features by hand. Decide which faces start known, and whether planes square to the reference faces start with their tilts known (see decisions).
-2. **Measurement kinds without rows yet:**
-   - angles;
-   - projected perpendicular distances (point to line, parallel lines);
-   - measurements between two timbers.
-3. **Recipes:**
+2. **Recipes:**
    - `Own` recipes for free extra points and lines;
    - `PathExtrusion` carriers (it has no default features yet).
-4. **Curved faces:** always required for now; decide them properly.
-5. **Generator (Part 2 E):** greedy candidate measurements scored by remaining DOFs, using `free_motions` to rule out candidates that can't help. Output is `Measure`s with `MeasurementSource.PYTHON_GENERATED`.
-6. **Debug overlay in kigumi:** colour faces required or hidden, and by remaining DOFs.
-7. **Speed:** `required_features` takes about 8.6s for `tinyhouse120`'s 75 timbers. Walk each distinct plane once rather than once per face.
+3. **Curved faces:** always required for now; decide them properly.
+4. **Generator (Part 2 E):** greedy candidate measurements scored by remaining DOFs, using `free_motions` to rule out candidates that can't help. Output is `Measure`s with `MeasurementSource.PYTHON_GENERATED`.
+5. **Debug overlay in kigumi:** colour faces required or hidden, and by remaining DOFs.
+6. **Speed:** `required_features` takes about 8.6s for `tinyhouse120`'s 75 timbers. Walk each distinct plane once rather than once per face.
 
 # Decisions
 

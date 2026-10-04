@@ -1,5 +1,6 @@
 """Measures on a real cut timber, as rows and remaining DOFs (kumiki/feature_solving.py)."""
 
+import numpy as np
 import pytest
 
 from kumiki.cutcsg import OwnedFeatureHit, PrismFace, prism_corner_key, prism_face_key
@@ -100,21 +101,129 @@ class TestRows:
 
         assert across and up and across != up
 
-    def test_an_angle_is_not_supported_yet(self, handles):
+    def test_a_measurement_between_coincident_features_is_refused(self, handles):
+        # The tenon's tip sits flush with the through mortise's opening.
         frame, found = handles
-        carriers = carrier_map_of(_cut_timber(frame, found["tenon_top"]))
+        carriers = carrier_map_of(*frame.cut_timbers)
 
-        with pytest.raises(NotImplementedError):
-            measure_row(Measure(found["tenon_top"], found["tenon_left"], kind=MeasurementKind.parse("angle")),
-                        carriers)
-
-    def test_a_measurement_between_two_timbers_is_not_supported_yet(self, handles):
-        frame, found = handles
-        carriers = carrier_map_of(_cut_timber(frame, found["tenon_top"]))
-
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(ValueError):
             measure_row(Measure(found["tenon_top"], found["mortise_bottom"]), carriers)
 
+
+def _world_normal(handle):
+    from kumiki.geometry import Plane
+
+    plane = handle.feature.locate_simple_unbounded(handle.owner)
+    assert isinstance(plane, Plane)
+    rotation = handle.timber.transform.orientation.matrix
+    return np.array([float((rotation * plane.normal)[i, 0]) for i in range(3)])
+
+
+def _view(look):
+    look = look / np.linalg.norm(look)
+    right = np.cross(look, [0.0, 0.0, 1.0] if abs(look[2]) < 0.9 else [1.0, 0.0, 0.0])
+    right = right / np.linalg.norm(right)
+    return ViewAxes(look=create_v3(*look), right=create_v3(*right), up=create_v3(*np.cross(right, look)))
+
+
+class TestAngles:
+
+    def test_an_angle_fixes_one_tilt(self, handles):
+        frame, found = handles
+        butt = _cut_timber(frame, found["tenon_top"])
+        angle = Measure(found["tenon_top"], found["tenon_left"], kind=MeasurementKind.parse("angle"))
+
+        assert remaining_dofs(found["tenon_left"], [], [found["tenon_top"]], butt).count == 3
+        assert remaining_dofs(found["tenon_left"], [angle], [found["tenon_top"]], butt).count == 2
+
+    def test_an_angle_between_parallel_faces_fixes_nothing(self, handles):
+        frame, found = handles
+        butt = _cut_timber(frame, found["tenon_top"])
+        angle = Measure(found["tenon_left"], found["tenon_right"], kind=MeasurementKind.parse("angle"))
+
+        assert remaining_dofs(found["tenon_right"], [angle], [found["tenon_left"]], butt).count == 3
+
+    def test_on_a_sheet_seeing_both_faces_edge_on_it_is_the_3d_angle(self, handles):
+        frame, found = handles
+        carriers = carrier_map_of(_cut_timber(frame, found["tenon_top"]))
+        top, left = found["tenon_top"], found["tenon_left"]
+        view = _view(np.cross(_world_normal(top), _world_normal(left)))
+
+        solid = measure_row(Measure(top, left, kind=MeasurementKind.parse("angle")), carriers)
+        sheet = measure_row(Measure(top, left, kind=MeasurementKind.parse("projected_angle")), carriers, view)
+
+        assert solid.keys() == sheet.keys()
+        assert all(solid[key] == pytest.approx(sheet[key]) for key in solid)
+
+
+class TestSheetDistances:
+
+    def test_parallel_faces_edge_on_measure_like_3d(self, handles):
+        frame, found = handles
+        butt = _cut_timber(frame, found["tenon_left"])
+        carriers = carrier_map_of(butt)
+        left, right = found["tenon_left"], found["tenon_right"]
+        view = _view(np.cross(_world_normal(left), [0.3, 0.5, 0.8]))
+
+        solid = measure_row(Measure(left, right), carriers)
+        sheet = measure_row(Measure(left, right, kind=MeasurementKind.parse("projected_perpendicular_distance")),
+                            carriers, view)
+
+        assert solid.keys() == sheet.keys()
+        assert all(solid[key] == pytest.approx(sheet[key]) for key in solid)
+        assert remaining_dofs(right, [Measure(left, right, kind=MeasurementKind.parse(
+            "projected_perpendicular_distance"))], [left], butt, view).count == 2
+
+    def test_a_face_seen_at_an_angle_is_refused(self, handles):
+        frame, found = handles
+        carriers = carrier_map_of(_cut_timber(frame, found["tenon_left"]))
+        left, right = found["tenon_left"], found["tenon_right"]
+
+        with pytest.raises(ValueError):
+            measure_row(Measure(left, right, kind=MeasurementKind.parse("projected_perpendicular_distance")),
+                        carriers, _view(_world_normal(left)))
+
+
+class TestBetweenTwoTimbers:
+
+    def _across(self, frame, found):
+        """A face of the mortised timber parallel to the butt timber's shoulder, and not on it."""
+        receiving = _cut_timber(frame, found["mortise_front"])
+        shoulder_normal = _world_normal(found["shoulder"])
+        for name in ("front", "back", "left", "right", "top", "bottom"):
+            face = present(find_feature(receiving, BODY, f"rough.{name}"), name)
+            if abs(abs(float(_world_normal(face) @ shoulder_normal)) - 1) < 1e-9:
+                try:
+                    measure_row(Measure(face, found["shoulder"]), carrier_map_of(*frame.cut_timbers))
+                    return face
+                except ValueError:
+                    continue
+        raise AssertionError("no face of the mortised timber faces the shoulder from a distance")
+
+    def test_a_measurement_from_the_other_timber_fixes_the_shoulder(self, handles):
+        frame, found = handles
+        butt = _cut_timber(frame, found["shoulder"])
+        face = self._across(frame, found)
+        across = Measure(face, found["shoulder"])
+
+        assert remaining_dofs(found["shoulder"], [], [face], butt, frame=frame).count == 3
+        assert remaining_dofs(found["shoulder"], [across], [face], butt, frame=frame).count == 2
+
+    def test_the_row_spans_both_timbers(self, handles):
+        frame, found = handles
+        face = self._across(frame, found)
+        row = measure_row(Measure(face, found["shoulder"]), carrier_map_of(*frame.cut_timbers))
+
+        owners = {id(ref.owner) for ref, _ in row}
+        assert id(face.owner) in owners and id(found["shoulder"].owner) in owners
+
+    def test_without_the_frame_it_says_so(self, handles):
+        frame, found = handles
+        face = self._across(frame, found)
+
+        with pytest.raises(ValueError, match="frame"):
+            remaining_dofs(found["shoulder"], [Measure(face, found["shoulder"])], [face],
+                           _cut_timber(frame, found["shoulder"]))
 
 BODY = ("timber (rough, extended)",)
 

@@ -414,7 +414,7 @@ def standard_4x4_timber_size():
 def mortise_and_tenon_handles():
     """A mortise-and-tenon frame, and handles to some of its features by name.
 
-    Faces: tenon_top, tenon_left, shoulder, mortise_bottom, mortise_front, rough_front.
+    Faces: tenon_top, tenon_left, tenon_right, shoulder, mortise_bottom, mortise_front, rough_front.
     Edge: shoulder_edge, where the shoulder meets the butt timber's rough front.
     """
     from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit
@@ -431,6 +431,7 @@ def mortise_and_tenon_handles():
     handles = {
         "tenon_top": find_feature(butt, tenon, "tenon_top"),
         "tenon_left": find_feature(butt, tenon, "tenon_left"),
+        "tenon_right": find_feature(butt, tenon, "tenon_right"),
         "shoulder": find_feature(butt, ("mortise_and_tenon", "tenon_waste", "shoulder"), "shoulder"),
         "rough_front": find_feature(butt, body, "rough.front"),
         "mortise_bottom": find_feature(receiving, ("mortise_and_tenon", "mortise_hole"), "mortise_bottom"),
