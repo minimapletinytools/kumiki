@@ -41,8 +41,8 @@ The solver is kinematic/topological, not geometric: it trusts the declared
 freedoms and does no collision checking (Phase 4's bbox pass is a visual aid,
 not a proof). A "solved" disassembly is a preview aid.
 
-Rotational freedoms are declared (RotationDof) but not solved yet; the solver
-raises NotImplementedError when it encounters one.
+Rotational freedoms (RotationDof) get ad-hoc support: a rotation about an
+authored axis is tried only when no translation works.
 """
 
 import math
@@ -91,9 +91,8 @@ class TranslationDof:
 
 @dataclass(frozen=True)
 class RotationDof:
-    """One half-interval rotational DOF, in GLOBAL space. Solver support is
-    NotImplemented for now; the type exists so freedoms can already be
-    declared and so future R6 shapes have a home."""
+    """One half-interval rotational DOF, in GLOBAL space: right-handed about
+    the axis, freed after ``freed_after_angle`` radians."""
 
     axis_position: V3
     axis_direction: Direction3D
@@ -224,6 +223,15 @@ class AssemblyJoint:
 
 
 @dataclass(frozen=True)
+class MemberRotation:
+    """Right-handed rotation by ``angle`` radians about a GLOBAL axis."""
+
+    axis_position: V3
+    axis_direction: Direction3D
+    angle: Numeric
+
+
+@dataclass(frozen=True)
 class MemberMovement:
     """Net movement of one member within one step.
 
@@ -237,6 +245,8 @@ class MemberMovement:
     direction: Direction3D
     distance: Numeric
     dragged: bool
+    # Set for a rotation; ``distance`` is then 0.
+    rotation: Optional["MemberRotation"] = None
 
 
 @dataclass(frozen=True)
@@ -382,6 +392,27 @@ class _Ray:
         self.owners = owners
 
 
+class _RotationRay:
+    """One allowed escape rotation for a pair: its ``m`` member turning about
+    the axis line relative to its ``p`` member. ``angle`` is the turn so far."""
+
+    __slots__ = ("pivot", "axis", "freed_after", "owners", "angle")
+
+    def __init__(self, pivot: _Float3, axis: _Float3, freed_after: float,
+                 owners: List[Tuple[int, Ordering]]):
+        self.pivot = pivot
+        self.axis = axis
+        self.freed_after = freed_after
+        self.owners = owners
+        self.angle = 0.0
+
+    def matches(self, pivot: _Float3, axis: _Float3) -> bool:
+        """Same axis line and sense. ``axis`` must be a unit vector."""
+        if not _are_parallel(self.axis, axis):
+            return False
+        return _norm3(_cross3(_sub3(pivot, self.pivot), axis)) < 1e-6
+
+
 class _Pair:
     """Engagement state of one member pair within one joint.
 
@@ -392,7 +423,7 @@ class _Pair:
     """
 
     __slots__ = (
-        "index", "joint_index", "joint_name", "m", "p", "rays",
+        "index", "joint_index", "joint_name", "m", "p", "rays", "rotation_rays",
         "scheduled_orderings", "relative_displacement",
         "separated", "separation_axis", "separation_freed", "separated_at_seq",
     )
@@ -406,6 +437,7 @@ class _Pair:
         self.m = m
         self.p = p
         self.rays = rays
+        self.rotation_rays: List[_RotationRay] = []
         self.scheduled_orderings = scheduled_orderings
         self.relative_displacement: _Float3 = (0.0, 0.0, 0.0)
         self.separated = False
@@ -419,6 +451,12 @@ class _Pair:
     def ray_for(self, relative_direction: _Float3) -> Optional[_Ray]:
         for ray in self.rays:
             if _dot3(ray.axis, relative_direction) >= 1.0 - _PARALLEL_DOT_TOLERANCE:
+                return ray
+        return None
+
+    def rotation_ray_for(self, pivot: _Float3, axis: _Float3) -> Optional[_RotationRay]:
+        for ray in self.rotation_rays:
+            if ray.matches(pivot, axis):
                 return ray
         return None
 
@@ -446,8 +484,8 @@ class _Pair:
         return False
 
 
-def _spec_has_translations(spec: JointMemberSpec) -> bool:
-    return spec.freedom is not None and bool(spec.freedom.translations)
+def _spec_has_dofs(spec: JointMemberSpec) -> bool:
+    return spec.freedom is not None and bool(spec.freedom.translations or spec.freedom.rotations)
 
 
 def _build_pairs(
@@ -469,6 +507,19 @@ def _build_pairs(
                              [(member_key, spec.ordering)]))
         return rays
 
+    def freedom_rotation_rays(member_key: int, spec: JointMemberSpec, sign: float) -> List[_RotationRay]:
+        rays: List[_RotationRay] = []
+        if spec.freedom is None:
+            return rays
+        for dof in spec.freedom.rotations:
+            axis = _unit3(_float3(dof.axis_direction))
+            if axis is None:
+                continue
+            rays.append(_RotationRay(_float3(dof.axis_position), _scale3(axis, sign),
+                                     float(giraffe_evalf(dof.freed_after_angle)),
+                                     [(member_key, spec.ordering)]))
+        return rays
+
     for joint_index, joint in enumerate(joints):
         keys = sorted(joint.members.keys())
         for i in range(len(keys)):
@@ -488,11 +539,18 @@ def _build_pairs(
                     if not merged:
                         rays.append(candidate)
                 scheduled: Set[Ordering] = set()
-                if _spec_has_translations(spec_m):
+                if _spec_has_dofs(spec_m):
                     scheduled.add(spec_m.ordering)
-                if _spec_has_translations(spec_p):
+                if _spec_has_dofs(spec_p):
                     scheduled.add(spec_p.ordering)
                 pair = _Pair(len(pairs), joint_index, joint.name, m, p, rays, scheduled)
+                for candidate in freedom_rotation_rays(m, spec_m, 1.0) + freedom_rotation_rays(p, spec_p, -1.0):
+                    existing = pair.rotation_ray_for(candidate.pivot, candidate.axis)
+                    if existing is None:
+                        pair.rotation_rays.append(candidate)
+                    else:
+                        existing.freed_after = min(existing.freed_after, candidate.freed_after)
+                        existing.owners = existing.owners + candidate.owners
                 pairs.append(pair)
                 pairs_by_member.setdefault(m, []).append(pair)
                 pairs_by_member.setdefault(p, []).append(pair)
@@ -699,6 +757,76 @@ def _chain_text(target: int, absorbed: int, parent: Dict[int, Tuple[int, str]],
     for member, joint_name in reversed(hops):
         text += f" --[{joint_name}]--> {member_by_key[member].name}"
     return text
+
+
+# ============================================================================
+# Rotation fallback (ad hoc)
+# ============================================================================
+
+
+class _RotationCandidate:
+    __slots__ = ("target", "pivot", "axis", "group", "angle", "crossing", "score")
+
+    def __init__(self, target, pivot, axis, group, angle, crossing, score):
+        self.target = target
+        self.pivot = pivot
+        self.axis = axis
+        self.group = group
+        self.angle = angle
+        # crossing: (pair, rotation ray) for every engaged pair with one end in the group.
+        self.crossing = crossing
+        self.score = score
+
+
+def _evaluate_rotation_candidate(
+    target: int,
+    pivot: _Float3,
+    axis: _Float3,
+    ordering: "Ordering",
+    pairs_by_member: Dict[int, List[_Pair]],
+    member_by_key: Dict[int, AssemblyMember],
+) -> Optional[_RotationCandidate]:
+    """Grow the group that must turn rigidly with ``target`` about the axis
+    line; None when the turn separates nothing scheduled."""
+    group: Set[int] = {target}
+    frontier = deque([target])
+    while frontier:
+        x = frontier.popleft()
+        for pair in pairs_by_member.get(x, []):
+            other = pair.other(x)
+            if other in group or pair.separated:
+                continue
+            relative = axis if x == pair.m else _neg3(axis)
+            if pair.rotation_ray_for(pivot, relative) is None:
+                group.add(other)
+                frontier.append(other)
+
+    crossing: List[Tuple[_Pair, _RotationRay]] = []
+    seen_pairs: Set[int] = set()
+    for member in group:
+        for pair in pairs_by_member.get(member, []):
+            if pair.index in seen_pairs or pair.separated:
+                continue
+            seen_pairs.add(pair.index)
+            if (pair.m in group) == (pair.p in group):
+                continue
+            ray = pair.rotation_ray_for(pivot, axis if pair.m in group else _neg3(axis))
+            if ray is None:
+                return None
+            crossing.append((pair, ray))
+
+    scheduled_remaining = [
+        ray.freed_after - ray.angle
+        for pair, ray in crossing
+        if ordering in pair.scheduled_orderings
+    ]
+    if not scheduled_remaining:
+        return None
+    angle = max(scheduled_remaining)
+    if angle <= _ZERO_EPSILON:
+        return None
+    score = (len(group), member_by_key[target].name, target, _axis_key(axis), _axis_key(pivot))
+    return _RotationCandidate(target, pivot, axis, group, angle, crossing, score)
 
 
 # ============================================================================
@@ -1229,13 +1357,12 @@ def solve_assembly(
 ) -> Optional[AssemblySolution]:
     """Solve the disassembly sequence for an abstract assembly graph.
 
-    Returns None when no member has any translational freedom. On an
+    Returns None when no member has any freedom. On an
     unsolvable ordering the already-solved steps (including the failing
     ordering's earlier substeps) are returned with an AssemblyFailure — it
     never raises for unsolvability.
 
-    Raises NotImplementedError for rotational freedoms and ValueError for
-    joints referencing unknown member keys.
+    Raises ValueError for joints referencing unknown member keys.
     """
     member_by_key: Dict[int, AssemblyMember] = {member.key: member for member in members}
     for joint in joints:
@@ -1244,16 +1371,12 @@ def solve_assembly(
                 raise ValueError(
                     f"Joint '{joint.name}' references unknown assembly member key {key}"
                 )
-            if spec.freedom is not None and spec.freedom.rotations:
-                raise NotImplementedError(
-                    f"Joint '{joint.name}': rotational assembly freedoms are not supported yet"
-                )
 
     step_orderings = sorted({
         spec.ordering
         for joint in joints
         for spec in joint.members.values()
-        if _spec_has_translations(spec)
+        if _spec_has_dofs(spec)
     })
     if not step_orderings:
         return None
@@ -1261,7 +1384,7 @@ def solve_assembly(
     member_orderings: Dict[int, Set[Ordering]] = {}
     for joint in joints:
         for key, spec in joint.members.items():
-            if _spec_has_translations(spec):
+            if _spec_has_dofs(spec):
                 member_orderings.setdefault(key, set()).add(spec.ordering)
     member_min_ordering = {key: min(values) for key, values in member_orderings.items()}
 
@@ -1318,12 +1441,15 @@ def solve_assembly(
         # start sequence). A micro-step merges into the open substep when its
         # group is disjoint AND every pair between them was separated before
         # the substep began.
-        ordering_substeps: List[Tuple[Dict[int, _Float3], Set[int], int]] = []
+        # The fourth entry is the substep's rotation (pivot, axis, angle, group), if any.
+        ordering_substeps: List[Tuple[Dict[int, _Float3], Set[int], int,
+                                      Optional[Tuple[_Float3, _Float3, float, Set[int]]]]] = []
 
         def emit_micro(movements: Dict[int, _Float3], primaries: Set[int],
-                       mergeable: bool) -> None:
-            if mergeable and ordering_substeps:
-                current_map, current_primaries, start_seq = ordering_substeps[-1]
+                       mergeable: bool,
+                       rotation: Optional[Tuple[_Float3, _Float3, float, Set[int]]] = None) -> None:
+            if mergeable and ordering_substeps and ordering_substeps[-1][3] is None:
+                current_map, current_primaries, start_seq, _ = ordering_substeps[-1]
                 if not (set(movements) & set(current_map)):
                     blocked = False
                     for key in movements:
@@ -1339,7 +1465,7 @@ def solve_assembly(
                         current_map.update(movements)
                         current_primaries.update(primaries)
                         return
-            ordering_substeps.append((dict(movements), set(primaries), sequence))
+            ordering_substeps.append((dict(movements), set(primaries), sequence, rotation))
 
         while failure is None:
             if should_cancel is not None and should_cancel():
@@ -1380,6 +1506,33 @@ def solve_assembly(
                     best = candidate
 
             if best is None:
+                best_rotation: Optional[_RotationCandidate] = None
+                for pair in scheduled_pairs:
+                    for rotation_ray in pair.rotation_rays:
+                        for owner_key, owner_ordering in rotation_ray.owners:
+                            if owner_ordering != ordering:
+                                continue
+                            turn = _evaluate_rotation_candidate(
+                                owner_key, rotation_ray.pivot,
+                                rotation_ray.axis if owner_key == pair.m else _neg3(rotation_ray.axis),
+                                ordering, pairs_by_member, member_by_key,
+                            )
+                            if turn is not None and (best_rotation is None or turn.score < best_rotation.score):
+                                best_rotation = turn
+                if best_rotation is not None:
+                    sequence += 1
+                    for pair, rotation_ray in best_rotation.crossing:
+                        rotation_ray.angle += best_rotation.angle
+                        if rotation_ray.angle >= rotation_ray.freed_after - _ZERO_EPSILON:
+                            pair.separated = True
+                            pair.separated_at_seq = sequence
+                            note_separation(pair, ordering)
+                    warn_dragged(best_rotation.group, {best_rotation.target}, ordering)
+                    emit_micro({}, {best_rotation.target}, mergeable=False,
+                               rotation=(best_rotation.pivot, best_rotation.axis,
+                                         best_rotation.angle, best_rotation.group))
+                    continue
+
                 ring = _attempt_simultaneous_step(ordering, pairs, should_cancel=should_cancel)
                 if ring is not None:
                     sequence += 1
@@ -1470,7 +1623,7 @@ def solve_assembly(
             )
 
         # Phase 2 (anchored centering) + emission of this ordering's substeps.
-        for substep_index, (movement_map, primaries, _) in enumerate(ordering_substeps):
+        for substep_index, (movement_map, primaries, _, rotation) in enumerate(ordering_substeps):
             final_map = dict(movement_map)
             if ms_members and not cs_members:
                 total = (0.0, 0.0, 0.0)
@@ -1493,6 +1646,20 @@ def solve_assembly(
                     distance=magnitude,
                     dragged=key not in primaries,
                 ))
+            if rotation is not None:
+                pivot, axis, angle, group = rotation
+                for key in sorted(group, key=lambda k: (member_by_key[k].name, k)):
+                    movements.append(MemberMovement(
+                        member_key=key,
+                        direction=create_v3(axis[0], axis[1], axis[2]),
+                        distance=0.0,
+                        dragged=key not in primaries,
+                        rotation=MemberRotation(
+                            axis_position=create_v3(pivot[0], pivot[1], pivot[2]),
+                            axis_direction=create_v3(axis[0], axis[1], axis[2]),
+                            angle=angle,
+                        ),
+                    ))
             if movements:
                 steps.append(AssemblyStep(ordering=ordering, movements=tuple(movements),
                                           substep=substep_index + 1))

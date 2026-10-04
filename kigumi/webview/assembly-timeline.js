@@ -5,7 +5,9 @@
     //   { steps: [{ order, suborder, substep, movements: [{ kumikiEphemeralId, memberKey,
     //                                                       direction: [x, y, z],  // unit
     //                                                       distance,  // base freed_after amount
-    //                                                       dragged }] }],
+    //                                                       dragged,
+    //                                                       rotation: { axisPosition, axisDirection,
+    //                                                                   angle } }] }],  // optional, radians
     //     warnings: [string],
     //     failure: { order, suborder, message, diagnostics: [string] } | null }
     //
@@ -23,6 +25,24 @@
 
     function isFiniteNumber(value) {
         return typeof value === 'number' && Number.isFinite(value);
+    }
+
+    function isVector3(value) {
+        return Array.isArray(value) && value.length === 3 && value.every(isFiniteNumber);
+    }
+
+    function normalizeRotation(raw) {
+        if (!raw || typeof raw !== 'object') {
+            return null;
+        }
+        if (!isVector3(raw.axisPosition) || !isVector3(raw.axisDirection) || !isFiniteNumber(raw.angle)) {
+            return null;
+        }
+        return {
+            axisPosition: [...raw.axisPosition],
+            axisDirection: [...raw.axisDirection],
+            angle: raw.angle,
+        };
     }
 
     function normalizeMovement(raw) {
@@ -45,6 +65,7 @@
             direction: [direction[0], direction[1], direction[2]],
             distance: raw.distance,
             dragged: Boolean(raw.dragged),
+            rotation: normalizeRotation(raw.rotation),
         };
     }
 
@@ -124,6 +145,72 @@
         return offsets;
     }
 
+    function multiplyQuaternions(a, b) {
+        return [
+            a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+            a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+            a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+            a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+        ];
+    }
+
+    function rotateVector(q, v) {
+        const [x, y, z, w] = q;
+        const tx = 2 * (y * v[2] - z * v[1]);
+        const ty = 2 * (z * v[0] - x * v[2]);
+        const tz = 2 * (x * v[1] - y * v[0]);
+        return [
+            v[0] + w * tx + (y * tz - z * ty),
+            v[1] + w * ty + (z * tx - x * tz),
+            v[2] + w * tz + (x * ty - y * tx),
+        ];
+    }
+
+    // Map<memberKey, { quaternion: [x, y, z, w], shift: [x, y, z] }> for the
+    // given scrub position: a point p of the member sits at
+    // rotate(quaternion, p) + shift, before the member's offset is added.
+    // Angles are not scaled by the disassembly multiplier.
+    function computeAssemblyRotations(steps, scrubValue) {
+        const rotations = new Map();
+        if (!Array.isArray(steps) || steps.length === 0) {
+            return rotations;
+        }
+        const clamped = Math.min(Math.max(isFiniteNumber(scrubValue) ? scrubValue : 0, 0), steps.length);
+        for (let index = 0; index < steps.length; index += 1) {
+            const fraction = Math.min(Math.max(clamped - index, 0), 1);
+            if (fraction <= 0) {
+                break;
+            }
+            for (const movement of steps[index].movements) {
+                const rotation = movement.rotation;
+                if (!rotation) {
+                    continue;
+                }
+                const axis = rotation.axisDirection;
+                const length = Math.hypot(axis[0], axis[1], axis[2]);
+                if (length === 0) {
+                    continue;
+                }
+                const half = (rotation.angle * fraction) / 2;
+                const s = Math.sin(half) / length;
+                const q = [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(half)];
+                const pivot = rotation.axisPosition;
+                const existing = rotations.get(movement.memberKey)
+                    || { quaternion: [0, 0, 0, 1], shift: [0, 0, 0] };
+                const turned = rotateVector(q, [
+                    existing.shift[0] - pivot[0],
+                    existing.shift[1] - pivot[1],
+                    existing.shift[2] - pivot[2],
+                ]);
+                rotations.set(movement.memberKey, {
+                    quaternion: multiplyQuaternions(q, existing.quaternion),
+                    shift: [turned[0] + pivot[0], turned[1] + pivot[1], turned[2] + pivot[2]],
+                });
+            }
+        }
+        return rotations;
+    }
+
     // Human-readable label for one step: "2" or "2.1" when a suborder is present.
     function getStepLabel(step) {
         const suborder = isFiniteNumber(step.suborder) ? step.suborder : 0;
@@ -164,6 +251,7 @@
     const AssemblyTimeline = {
         normalizeAssemblyPayload,
         computeAssemblyOffsets,
+        computeAssemblyRotations,
         getStepLabel,
         getTimelineMarks,
         getScrubMax,

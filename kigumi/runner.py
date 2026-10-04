@@ -3561,7 +3561,10 @@ def _build_assembly_payload(
                     "movements": [{"kumikiEphemeralId": int, "memberKey": str,
                                    "direction": [x, y, z],  # unit
                                    "distance": float,       # base freed_after amount
-                                   "dragged": bool}]}],
+                                   "dragged": bool,
+                                   "rotation": {"axisPosition": [x, y, z],  # optional
+                                                "axisDirection": [x, y, z],
+                                                "angle": float}}]}],  # radians
          "warnings": [str],
          "failure": {"order": int | None, "suborder": int,
                      "message": str, "diagnostics": [str]} | None}
@@ -3601,13 +3604,21 @@ def _build_assembly_payload(
             if member_key is None:
                 # Member not rendered (e.g. filtered out of the frame); skip defensively.
                 continue
-            movements_payload.append({
+            movement_payload = {
                 "kumikiEphemeralId": int(movement.member_key),
                 "memberKey": member_key,
                 "direction": [_assembly_float(movement.direction[i, 0]) for i in range(3)],
                 "distance": _assembly_float(movement.distance),
                 "dragged": bool(movement.dragged),
-            })
+            }
+            if movement.rotation is not None:
+                rotation = movement.rotation
+                movement_payload["rotation"] = {
+                    "axisPosition": [_assembly_float(rotation.axis_position[i, 0]) for i in range(3)],
+                    "axisDirection": [_assembly_float(rotation.axis_direction[i, 0]) for i in range(3)],
+                    "angle": _assembly_float(rotation.angle),
+                }
+            movements_payload.append(movement_payload)
         steps_payload.append({
             "order": int(step.ordering.order),
             "suborder": int(step.ordering.suborder),

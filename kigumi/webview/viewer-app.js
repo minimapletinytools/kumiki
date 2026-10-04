@@ -1370,6 +1370,7 @@ class KigumiViewerApp extends LitElement {
         this.assemblySolving = false;
         this.assemblyScrubValue = 0;
         this._assemblyOffsetsByKey = new Map();
+        this._assemblyRotationsByKey = new Map();
         this.logFilterText = '';
 
         this.lightAzimuth = 0;
@@ -5172,7 +5173,13 @@ class KigumiViewerApp extends LitElement {
             // The reflection is mirrored (scale.z = -1), so an assembly offset
             // of +dz on the solid mesh moves the reflection by -dz.
             const offset = this._assemblyOffsetsByKey.get(memberKey) || [0, 0, 0];
-            bundle.reflection.position.set(offset[0], offset[1], reflectionOffsetZ - offset[2]);
+            const rotation = this._assemblyRotationsByKey.get(memberKey);
+            const shift = rotation ? rotation.shift : [0, 0, 0];
+            const q = rotation ? rotation.quaternion : [0, 0, 0, 1];
+            bundle.reflection.position.set(
+                offset[0] + shift[0], offset[1] + shift[1], reflectionOffsetZ - offset[2] - shift[2]);
+            // The member's rotation, mirrored in z.
+            bundle.reflection.quaternion.set(-q[0], -q[1], q[2], q[3]);
             bundle.reflection.scale.set(1, 1, -1);
             // Where it goes, not whether it shows. applyRenderMode owns that.
         }
@@ -5239,13 +5246,19 @@ class KigumiViewerApp extends LitElement {
             ? AssemblyTimeline.computeAssemblyOffsets(
                 this.assemblyData.steps, this.assemblyScrubValue, this.disassemblyMultiplier)
             : new Map();
+        this._assemblyRotationsByKey = active
+            ? AssemblyTimeline.computeAssemblyRotations(this.assemblyData.steps, this.assemblyScrubValue)
+            : new Map();
         for (const [memberKey, bundle] of this.sceneManager.entries()) {
             const offset = this._assemblyOffsetsByKey.get(memberKey) || [0, 0, 0];
-            if (bundle.mesh) {
-                bundle.mesh.position.set(offset[0], offset[1], offset[2]);
-            }
-            if (bundle.edges) {
-                bundle.edges.position.set(offset[0], offset[1], offset[2]);
+            const rotation = this._assemblyRotationsByKey.get(memberKey);
+            const shift = rotation ? rotation.shift : [0, 0, 0];
+            const q = rotation ? rotation.quaternion : [0, 0, 0, 1];
+            for (const object of [bundle.mesh, bundle.edges]) {
+                if (object) {
+                    object.position.set(offset[0] + shift[0], offset[1] + shift[1], offset[2] + shift[2]);
+                    object.quaternion.set(q[0], q[1], q[2], q[3]);
+                }
             }
         }
         this.updateReflectionTransforms();
