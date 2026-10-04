@@ -73,7 +73,7 @@ def _name(item: _Directed) -> str:
 
 
 def square_assumptions(handles: Sequence[FeatureHandle], carriers: CarrierMap) -> List[Assumption]:
-    """Features that are parallel or square to each other stay that way.
+    """Features that are parallel or square (perpendicular) to each other stay that way.
 
     The handles' planes and lines are grouped, in the order given, into aligned sets: features
     whose directions all lie along one set of three square axes. Within a set, the features along
