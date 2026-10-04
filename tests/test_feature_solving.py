@@ -4,8 +4,8 @@ import pytest
 
 from kumiki.cutcsg import OwnedFeatureHit, PrismFace, prism_corner_key, prism_face_key
 from kumiki.drawing import Measure, MeasurementKind, ViewAxes
-from kumiki.feature_paths import FeatureHandle
-from kumiki.feature_solving import carrier_map_of, measure_row, remaining_dofs
+from kumiki.feature_paths import FeatureHandle, find_feature
+from kumiki.feature_solving import carrier_map_of, measure_row, remaining_dofs, solve_report
 from kumiki.rule import create_v3
 from kumiki.solve_recipe import CarrierRef, PlaneCoord
 from tests.testing_shavings import mortise_and_tenon_handles, present
@@ -114,3 +114,64 @@ class TestRows:
 
         with pytest.raises(NotImplementedError):
             measure_row(Measure(found["tenon_top"], found["mortise_bottom"]), carriers)
+
+
+BODY = ("timber (rough, extended)",)
+
+
+class TestSolveReport:
+    """Every required feature of a timber, with its body faces known."""
+
+    def _body(self, cut_timber, *faces):
+        return [present(find_feature(cut_timber, BODY, f"rough.{face}"), face) for face in faces]
+
+    def _butt(self, handles):
+        frame, found = handles
+        butt = _cut_timber(frame, found["shoulder"])
+        return butt, found, self._body(butt, "front", "back", "left", "right", "bottom")
+
+    def test_the_tenon_s_six_planes_are_what_is_left(self, handles):
+        butt, _, known = self._butt(handles)
+
+        report = solve_report(butt, [], known)
+        counts = {r.required.handle.feature.name: present(r.remaining).count for r in report.features}
+
+        assert report.total.count == 6 * 3
+        assert all(counts[f"rough.{face}"] == 0 for face in ("front", "back", "left", "right", "bottom"))
+        assert all(counts[name] == 3 for name in ("shoulder", "tenon_top", "tenon_left", "tenon_right"))
+
+    def test_measurements_take_off_what_they_fix(self, handles):
+        butt, found, known = self._butt(handles)
+        shoulder_from_end = Measure(known[-1], found["shoulder"])
+        tenon_length = Measure(found["shoulder"], found["tenon_top"])
+
+        report = solve_report(butt, [shoulder_from_end, tenon_length], known)
+        counts = {r.required.handle.feature.name: present(r.remaining).count for r in report.features}
+
+        assert report.total.count == 6 * 3 - 2
+        assert counts["shoulder"] == 2 and counts["tenon_top"] == 2
+
+    def test_the_mortise_walls_are_what_is_left(self, handles):
+        frame, found = handles
+        receiving = _cut_timber(frame, found["mortise_front"])
+        known = self._body(receiving, "front", "back", "left", "right", "bottom", "top")
+
+        assert solve_report(receiving, [], known).total.count == 4 * 3
+
+    def test_a_required_feature_with_no_recipe_reports_none(self):
+        from kumiki.construction import create_timber
+        from kumiki.cutcsg import CSGFeatureType, CutCSGLabel, ProgrammableCSGFeature, RectangularPrism
+        from kumiki.rule import Transform, create_v2, mm, scalar
+        from kumiki.timber import CutTimber, Cutting
+
+        timber = create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(100)),
+                               length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="t")
+        notch = RectangularPrism(size=create_v2(0.02, 0.02), transform=Transform.identity(),
+                                 start_distance=scalar(0.4), end_distance=scalar(0.6), label=CutCSGLabel("notch"),
+                                 extra_features=(ProgrammableCSGFeature(name="mark", declared_type=CSGFeatureType.EDGE),))
+        cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, negative_csg=notch)])
+
+        report = solve_report(cut_timber, [], [])
+        mark = next(r for r in report.features if r.required.handle.feature.name == "mark")
+
+        assert mark.remaining is None

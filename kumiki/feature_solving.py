@@ -4,6 +4,7 @@ The interface layer of docs/internal/featuresolving-plan.md, Part 2 D: FeatureHa
 Measures in, rows and remaining DOFs out. Works in the timber's local space, where its CSG tree is.
 """
 
+from dataclasses import dataclass
 from typing import List, Optional, Sequence
 
 from .cutcsg import carrier_map
@@ -12,6 +13,8 @@ from .drawing import (Measure, MeasureSpan, MeasurementDirection, MeasurementKin
                       MeasurementOperation, MeasurementSpace, ViewAxes, distance_anchors)
 from .feature_paths import FeatureHandle
 from .geometry import Line, Plane, Point
+from .planar_region import face_reaches_surface
+from .required_features import FaceTest, RequiredFeature, required_features
 from .rule import V3, safe_norm
 from .solve_recipe import (Anchor, CarrierMap, DistanceMeasurement, Recipe, Row, feature_dof_rows,
                            measurement_row)
@@ -90,6 +93,13 @@ def measure_row(measure: Measure, carriers: CarrierMap, view: Optional[ViewAxes]
     ), carriers)
 
 
+def _known_rows(
+    measures: Sequence[Measure], known: Sequence[FeatureHandle], carriers: CarrierMap, view: Optional[ViewAxes],
+) -> List[Row]:
+    rows: List[Row] = [row for handle in known for row in feature_handle_dof_rows(handle, carriers)]
+    return rows + [measure_row(measure, carriers, view) for measure in measures]
+
+
 def remaining_dofs(
     target: FeatureHandle,
     measures: Sequence[Measure],
@@ -99,6 +109,41 @@ def remaining_dofs(
 ) -> Remaining:
     """What of `target` the measurements leave unsolved, given the `known` features."""
     carriers = carrier_map_of(cut_timber)
-    rows: List[Row] = [row for handle in known for row in feature_handle_dof_rows(handle, carriers)]
-    rows += [measure_row(measure, carriers, view) for measure in measures]
-    return remaining(rows, feature_handle_dof_rows(target, carriers))
+    return remaining(_known_rows(measures, known, carriers, view), feature_handle_dof_rows(target, carriers))
+
+
+@dataclass(frozen=True)
+class FeatureReport:
+    """One required feature, and what of it is still unsolved. `remaining` is None if it has no recipe."""
+    required: RequiredFeature
+    remaining: Optional[Remaining]
+
+
+@dataclass(frozen=True)
+class SolveReport:
+    """What the measurements leave unsolved on a timber: per required feature, and in total."""
+    features: List[FeatureReport]
+    total: Remaining
+
+
+def solve_report(
+    cut_timber: CutTimber,
+    measures: Sequence[Measure],
+    known: Sequence[FeatureHandle],
+    view: Optional[ViewAxes] = None,
+    face_test: FaceTest = face_reaches_surface,
+) -> SolveReport:
+    """Remaining DOFs of every feature `required_features` finds on `cut_timber`, given the `known` features."""
+    carriers = carrier_map_of(cut_timber)
+    known_rows = _known_rows(measures, known, carriers, view)
+    reports: List[FeatureReport] = []
+    target_rows: List[Row] = []
+    for required in required_features(cut_timber, face_test):
+        recipe = required.handle.feature.solve_recipe(required.handle.owner)
+        if recipe is None:
+            reports.append(FeatureReport(required, None))
+            continue
+        rows = feature_dof_rows(recipe, carriers)
+        target_rows += rows
+        reports.append(FeatureReport(required, remaining(known_rows, rows)))
+    return SolveReport(features=reports, total=remaining(known_rows, target_rows))

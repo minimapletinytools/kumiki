@@ -56,18 +56,23 @@ def remaining(
     stacked = np.vstack([known_matrix, target_matrix])
     tolerance = relative_tolerance * max(float(np.linalg.norm(stacked, 2)), 1.0)
 
-    unknown_part = target_matrix
-    if len(known):
-        _, values, basis = np.linalg.svd(known_matrix, full_matrices=False)
-        basis = basis[values > tolerance]
-        unknown_part = target_matrix - target_matrix @ basis.T @ basis
+    # Some BLAS builds (macOS Accelerate) raise spurious floating point warnings in matmul.
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        unknown_part = target_matrix
+        if len(known):
+            _, values, basis = np.linalg.svd(known_matrix, full_matrices=False)
+            basis = basis[values > tolerance]
+            unknown_part = target_matrix - target_matrix @ basis.T @ basis
 
-    left, values, right = np.linalg.svd(unknown_part, full_matrices=False)
-    kept = values > tolerance
-    weights = left[:, kept].T
+        left, values, right = np.linalg.svd(unknown_part, full_matrices=False)
+        kept = values > tolerance
+        weights = left[:, kept].T
+        quantities = weights @ target_matrix
+    if not (np.isfinite(unknown_part).all() and np.isfinite(quantities).all()):
+        raise FloatingPointError("the rows gave non-finite values")
     return Remaining(
         count=len(weights),
         free=tuple(tuple(float(w) for w in combination) for combination in weights),
-        free_quantities=tuple(_by_column(combination @ target_matrix, columns) for combination in weights),
+        free_quantities=tuple(_by_column(quantity, columns) for quantity in quantities),
         free_motions=tuple(_by_column(motion, columns) for motion in right[kept]),
     )
