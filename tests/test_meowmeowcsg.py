@@ -5365,10 +5365,14 @@ class TestANamedArris:
         # Opposite faces are parallel and share no line. Better to say so than
         # to invent an answer -- and to say it at construction, rather than
         # leaving the author to find out when nothing draws.
-        with pytest.warns(UserWarning, match="meet in no arris"):
-            opposite = self._arris("nope", faces=(PrismFace.FRONT, PrismFace.BACK))
+        with pytest.raises(ValueError, match="meet in no arris"):
+            self._arris("nope", faces=(PrismFace.FRONT, PrismFace.BACK))
 
-        assert opposite.locate_simple_unbounded(self._prism()) is None
+    def test_faces_out_of_order_are_refused_and_of_orders_them(self):
+        with pytest.raises(ValueError, match="canonical order"):
+            self._arris("backwards", faces=(PrismFace.RIGHT, PrismFace.FRONT))
+        assert (SimpleRectangularPrismEdgeFeature.of("a", PrismFace.RIGHT, PrismFace.FRONT).faces
+                == (PrismFace.FRONT, PrismFace.RIGHT))
 
     def test_a_point_is_on_it_only_when_it_is_on_both_faces(self):
         arris = self._arris()
@@ -5452,14 +5456,16 @@ class TestANamedCorner:
         assert best.name == "corner.4"      # top profile, first vertex
 
     def test_three_faces_that_meet_at_no_corner_say_so(self):
-        with pytest.warns(UserWarning, match="meet at no corner"):
+        with pytest.raises(ValueError, match="meet at no corner"):
             SimpleRectangularPrismVertexFeature(
                 "nope", faces=(PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.LEFT))
 
     def test_and_naming_them_out_of_order_says_so_too(self):
-        with pytest.warns(UserWarning, match="canonical order"):
+        with pytest.raises(ValueError, match="canonical order"):
             SimpleRectangularPrismVertexFeature(
                 "backwards", faces=(PrismFace.FRONT, PrismFace.RIGHT, PrismFace.BOTTOM))
+        assert (SimpleRectangularPrismVertexFeature.of("c", PrismFace.FRONT, PrismFace.RIGHT, PrismFace.BOTTOM).faces
+                == (PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT))
 
 
 class TestACornerIsNamedTheSameWayWhoeverNamesIt:

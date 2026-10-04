@@ -1342,15 +1342,22 @@ class SimpleRectangularPrismEdgeFeature(EdgeFeature):
         first, second = self.faces
         canonical_ordering = _canonical_ordering_arris_faces(first, second)
         if canonical_ordering is None:
-            warnings.warn(
-                f"{first} and {second} meet in no arris, so {self.name!r} locates "
-                "to nothing")
-        elif (first, second) != canonical_ordering:
-            # Not cosmetic: the order decides which way round locate() runs the
-            # line, since it is the cross product of the two faces' normals.
-            warnings.warn(
-                f"{self.name!r} names its faces {first}, {second}; the canonical "
-                f"order is {canonical_ordering[0]}, {canonical_ordering[1]}")
+            raise ValueError(f"{self.name!r}: {first} and {second} meet in no arris")
+        if (first, second) != canonical_ordering:
+            raise ValueError(
+                f"{self.name!r}: the faces must be in canonical order, "
+                f"{canonical_ordering[0]}, {canonical_ordering[1]}; use SimpleRectangularPrismEdgeFeature.of")
+
+    @classmethod
+    def of(cls, name: str, first: PrismFace, second: PrismFace,
+           properties: Optional[FeatureProperties] = None) -> 'SimpleRectangularPrismEdgeFeature':
+        """The arris between two faces, given in either order."""
+        ordered = _canonical_ordering_arris_faces(first, second)
+        if ordered is None:
+            raise ValueError(f"{name!r}: {first} and {second} meet in no arris")
+        if properties is None:
+            return cls(name=name, faces=ordered)
+        return cls(name=name, faces=ordered, properties=properties)
 
     def feature_key(self) -> Optional[FeatureKey]:
         return _prism_arris_key(*self.faces)
@@ -1499,27 +1506,29 @@ class SimpleRectangularPrismVertexFeature(PointFeature):
     faces: Tuple[PrismFace, PrismFace, PrismFace] = (
         PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT)
 
-    #: `faces` in canonical order, worked out once. Out of init, repr and
-    #: equality: it is a restatement of `faces` and not a second thing to set.
-    _canonical_ordering: Optional[Tuple[PrismFace, PrismFace, PrismFace]] = field(
-        default=None, init=False, repr=False, compare=False)
-
     def __post_init__(self):
         canonical_ordering = _canonical_ordering_corner_faces(self.faces)
-        # Kept, not recomputed: every question below needs it, and a point test
-        # runs once per feature per pick.
-        object.__setattr__(self, '_canonical_ordering', canonical_ordering)
+        names = ', '.join(face.name for face in self.faces)
         if canonical_ordering is None:
-            warnings.warn(
-                f"{', '.join(face.name for face in self.faces)} meet at no corner, "
-                f"so {self.name!r} locates to nothing")
-        elif tuple(self.faces) != canonical_ordering:
-            warnings.warn(
-                f"{self.name!r} names its faces {', '.join(f.name for f in self.faces)}; "
-                f"the canonical order is {', '.join(f.name for f in canonical_ordering)}")
+            raise ValueError(f"{self.name!r}: {names} meet at no corner")
+        if tuple(self.faces) != canonical_ordering:
+            raise ValueError(
+                f"{self.name!r}: the faces must be in canonical order, "
+                f"{', '.join(f.name for f in canonical_ordering)}; use SimpleRectangularPrismVertexFeature.of")
+
+    @classmethod
+    def of(cls, name: str, *faces: PrismFace,
+           properties: Optional[FeatureProperties] = None) -> 'SimpleRectangularPrismVertexFeature':
+        """The corner where three faces meet, given in any order."""
+        ordered = _canonical_ordering_corner_faces(faces)
+        if ordered is None:
+            raise ValueError(f"{name!r}: {', '.join(face.name for face in faces)} meet at no corner")
+        if properties is None:
+            return cls(name=name, faces=ordered)
+        return cls(name=name, faces=ordered, properties=properties)
 
     def feature_key(self) -> Optional[FeatureKey]:
-        return _prism_corner_key(self._canonical_ordering)
+        return _prism_corner_key(self.faces)
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         return _meet_of_prism_faces(owner, self.faces)
@@ -1530,10 +1539,9 @@ class SimpleRectangularPrismVertexFeature(PointFeature):
         Out to the cap, then out along each side's own half size -- the same
         walk timber.get_corner_position_global makes over its three faces.
         """
-        canonical_ordering = self._canonical_ordering
-        if canonical_ordering is None or not isinstance(owner, RectangularPrism):
+        if not isinstance(owner, RectangularPrism):
             return None
-        cap, first, second = canonical_ordering
+        cap, first, second = self.faces
         width_dir, height_dir, length_dir = owner._local_axes()
         distance = owner.end_distance if cap is PrismFace.TOP else owner.start_distance
         if distance is None:
