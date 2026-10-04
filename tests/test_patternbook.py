@@ -5,7 +5,7 @@ Tests for the PatternBook module
 import pytest
 from kumiki.rule import V3, create_v3, create_v2, inches, Transform, Orientation, scalar
 from kumiki.timber import create_timber, Frame, CutTimber, CSGAccessory
-from kumiki.cutcsg import RectangularPrism
+from kumiki.csg.cutcsg import RectangularPrism
 from kumiki.patternbook import PatternMetadata, PatternBook, PatternLambda
 
 

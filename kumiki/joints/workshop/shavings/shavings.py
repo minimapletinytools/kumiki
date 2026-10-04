@@ -8,7 +8,7 @@ These functions help ensure that joints are geometrically valid and sensibly con
 from typing import Optional, Tuple, List, Union, cast
 from kumiki.timber import *
 from kumiki.rule import *
-from kumiki.cutcsg import *
+from kumiki.csg.cutcsg import *
 from kumiki.construction import *
 from kumiki.measuring import *
 

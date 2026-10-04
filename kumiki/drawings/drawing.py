@@ -20,13 +20,13 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
-from .geometry import Line, Plane, Point, closest_stations, intersect_planes
-from .identity import (DrawingId, FeaturePath, MeasurementId,
+from ..geometry import Line, Plane, Point, closest_stations, intersect_planes
+from ..identity import (DrawingId, FeaturePath, MeasurementId,
                        ViewportId)
 if TYPE_CHECKING:
-    from .feature_paths import FeatureHandle
-    from .timber import Frame, PerfectTimberWithin
-from .rule import (Matrix, Numeric, V3, are_vectors_parallel,
+    from ..csg.feature_paths import FeatureHandle
+    from ..timber import Frame, PerfectTimberWithin
+from ..rule import (Matrix, Numeric, V3, are_vectors_parallel,
                    are_vectors_perpendicular, create_v3, cross_product,
                    safe_dot_product, safe_norm, safe_zero_test_sq)
 
@@ -1113,7 +1113,7 @@ class Measure:
 
         NOTE Some day we may support asymmetric measurements.
         """
-        from .feature_paths import to_feature_path
+        from ..csg.feature_paths import to_feature_path
 
         first, second = to_feature_path(self.anchor_a, frame), to_feature_path(self.anchor_b, frame)
         if first is None or second is None:
@@ -1572,7 +1572,7 @@ class Drawing:
     #:
     #: None is the common case -- 31 of the drawings built in this repo -- and
     #: means the sheet is not this drawing's to choose: the viewer lays it out
-    #: and supplies its own page. Only kumiki.layout.resolve_drawing needs one,
+    #: and supplies its own page. Only kumiki.drawings.layout.resolve_drawing needs one,
     #: and it says so rather than inventing a size.
     page: Optional[Page] = None
 

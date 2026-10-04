@@ -5,13 +5,13 @@ import pytest
 from dataclasses import replace
 
 from kumiki.construction import create_timber
-from kumiki.cutcsg import (CutCSGLabel, Cylinder, Difference, FeatureMarkingSpec, FeatureMarkingStatus, FeatureOverride,
+from kumiki.csg.cutcsg import (CutCSGLabel, Cylinder, Difference, FeatureMarkingSpec, FeatureMarkingStatus, FeatureOverride,
                            FeatureProperties, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism, SolidUnion,
                            prism_face_key)
-from kumiki.feature_paths import FeatureHandle
-from kumiki.pathcsg import FancyPath, PathExtrusion, StraightSegment
-from kumiki.planar_region import face_reaches_surface
-from kumiki.required_features import Reason, required_features
+from kumiki.csg.feature_paths import FeatureHandle
+from kumiki.csg.pathcsg import FancyPath, PathExtrusion, StraightSegment
+from kumiki.csg.planar_region import face_reaches_surface
+from kumiki.drawings.required_features import Reason, required_features
 from kumiki.rule import Transform, create_v2, create_v3, mm, scalar
 from tests.testing_shavings import mortise_and_tenon_handles
 
@@ -145,7 +145,7 @@ class TestRequiredFeatures:
         return {r.handle.feature.name: r.reason for r in required_features(cut_timber)}
 
     def test_a_bore_is_required_and_so_is_its_axis(self):
-        from kumiki.cutcsg import CylinderAxisFeature
+        from kumiki.csg.cutcsg import CylinderAxisFeature
 
         reasons = self._reasons(self._cut_timber_with(extra_features=(CylinderAxisFeature(name="axis"),)))
 
@@ -155,7 +155,7 @@ class TestRequiredFeatures:
     def test_marking_overrides_the_surface(self):
         never = FeatureProperties(marking_override=FeatureMarkingSpec(mark=FeatureMarkingStatus.NEVER_MARK))
         always = FeatureProperties(marking_override=FeatureMarkingSpec(mark=FeatureMarkingStatus.ALWAYS_MARK))
-        from kumiki.cutcsg import CYLINDER_BARREL, START_CAP
+        from kumiki.csg.cutcsg import CYLINDER_BARREL, START_CAP
 
         reasons = self._reasons(self._cut_timber_with(feature_overrides=(
             FeatureOverride(key=CYLINDER_BARREL, name="bore", properties=never),

@@ -4,12 +4,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Iterator, List
 
-from .cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, OwnedFeatureHit,
+from ..csg.cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, OwnedFeatureHit,
                      csg_children)
-from .feature_paths import FeatureHandle
-from .planar_region import face_reaches_surface
-from .rule import V3, create_v3
-from .timber import CutTimber
+from ..csg.feature_paths import FeatureHandle
+from ..csg.planar_region import face_reaches_surface
+from ..rule import V3, create_v3
+from ..timber import CutTimber
 
 # Whether a flat face is on the finished surface: (face, root, near, reach) -> bool.
 FaceTest = Callable[[FeatureHandle[FaceFeature], CutCSG, V3, float], bool]

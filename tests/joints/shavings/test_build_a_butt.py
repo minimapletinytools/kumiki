@@ -9,7 +9,7 @@ from kumiki.timber import (
     create_timber, create_v3
 )
 from kumiki.construction import ButtJointTimberArrangement
-from kumiki.cutcsg import CutCSGLabel
+from kumiki.csg.cutcsg import CutCSGLabel
 from kumiki.joints.workshop.shavings.build_a_butt import (
     DovetailTenonWedgeAccessoryParameters,
     compute_butt_joint_shoulder,

@@ -12,7 +12,7 @@ from kumiki.rule import safe_dot_product, Orientation, Transform, create_v3, rad
 from kumiki.geometry import (Line, Plane, Point, closest_stations, intersect_line_plane,
                              intersect_planes, lines_are_coincident, planes_are_coincident,
                              planes_are_parallel, points_are_coincident)
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     FaceFeature,
     hit_of_kind,
     shared_ancestor,
@@ -4915,8 +4915,8 @@ class TestBuriedFacesAreNotReported:
         The union was written last and was written wrong, which is the
         regression this class is named for.
         """
-        from kumiki import cutcsg
-        from kumiki.cutcsg import CutCSG
+        from kumiki.csg import cutcsg
+        from kumiki.csg.cutcsg import CutCSG
 
         defining = [cls.__name__ for cls in vars(cutcsg).values()
                     if isinstance(cls, type) and issubclass(cls, CutCSG)
@@ -5535,7 +5535,7 @@ class TestAnArrisIsNamedTheSameWayWhoeverNamesIt:
 
     def test_and_that_is_the_order_the_arris_itself_calls_canonical(self):
         """So the warning on a hand-written arris agrees with both."""
-        from kumiki.cutcsg import _canonical_arris_faces
+        from kumiki.csg.cutcsg import _canonical_arris_faces
 
         for pair in self._timber_order().values():
             assert _canonical_arris_faces(*pair) == pair

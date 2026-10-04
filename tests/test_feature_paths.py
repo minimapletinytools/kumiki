@@ -1,10 +1,10 @@
-"""Feature handles, and their wire form (kumiki/feature_paths.py)."""
+"""Feature handles, and their wire form (kumiki/csg/feature_paths.py)."""
 
 import pytest
 
 from kumiki.construction import create_timber
-from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit
-from kumiki.feature_paths import (FeatureHandle, deserialize_feature_path, find_feature,
+from kumiki.csg.cutcsg import DerivedEdgeFeature, OwnedFeatureHit
+from kumiki.csg.feature_paths import (FeatureHandle, deserialize_feature_path, find_feature,
                                   resolve_feature_path, serialize_feature_path, to_feature_path)
 from kumiki.identity import DerivedFeaturePath, ResolvedTimberPath, SingleFeaturePath
 from kumiki.rule import create_v2, create_v3, mm

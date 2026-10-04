@@ -19,7 +19,7 @@ from kumiki.joints.workshop.shavings.build_a_butt import (
 )
 from kumiki.rule import degrees as _degrees
 from kumiki.timber import CSGAccessory
-from kumiki.cutcsg import ConvexPolygonExtrusion, SolidUnion
+from kumiki.csg.cutcsg import ConvexPolygonExtrusion, SolidUnion
 
 
 def _render_cutting(cutting: Cutting):
@@ -57,7 +57,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         where the relief function returns None and no notch is built at all --
         so nothing else here covers the notched path.
         """
-        from kumiki.cutcsg import csg_children
+        from kumiki.csg.cutcsg import csg_children
 
         joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=self._make_arrangement(simple_T_configuration),

@@ -3,7 +3,7 @@ Decorative Joints Patterns
 """
 
 from kumiki import *
-from kumiki.pathcsg import StraightSegment, ArcSegment
+from kumiki.csg.pathcsg import StraightSegment, ArcSegment
 from kumiki.patternbook import Pattern, make_pattern_from_joint
 
 

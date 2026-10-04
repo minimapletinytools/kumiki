@@ -10,21 +10,22 @@ from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from .cutcsg import carrier_map
+from ..csg.cutcsg import carrier_map
 from .dof_solver import Remaining, remaining
 from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, MeasurementKind, MeasurementOperation,
                       MeasurementSpace, PlaneSpan, PointSpan, ViewAxes, distance_anchors)
-from .feature_paths import FeatureHandle
-from .geometry import Line, Plane, Point
-from .planar_region import face_reaches_surface
+from ..csg.feature_paths import FeatureHandle
+from ..geometry import Line, Plane, Point
+from ..csg.planar_region import face_reaches_surface
 from .required_features import FaceTest, RequiredFeature, required_features
-from .rule import Matrix, V3
-from .solve_recipe import (CarrierMap, Recipe, Row, combine, direction_motion, dot_vector_row, feature_dof_rows,
-                           motion_along, transform_vector_row)
-from .timber import CutTimber
+from ..rule import Matrix, V3
+from ..csg.carriers import CarrierMap, Recipe, Row
+from .solve_recipe import (combine, direction_motion, dot_vector_row, feature_dof_rows, motion_along,
+                           transform_vector_row)
+from ..timber import CutTimber
 
 if TYPE_CHECKING:
-    from .timber import Frame
+    from ..timber import Frame
 
 THREE_D_DISTANCE = MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 

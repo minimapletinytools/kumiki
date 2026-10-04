@@ -32,7 +32,7 @@ from kumiki.measuring import (
 )
 from kumiki.construction import *
 from kumiki.rule import *
-from kumiki.cutcsg import CutCSG, CutCSGLabel
+from kumiki.csg.cutcsg import CutCSG, CutCSGLabel
 
 
 def _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_butt(

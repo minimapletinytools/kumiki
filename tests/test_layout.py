@@ -10,12 +10,12 @@ is compared by object rather than by value.
 
 import pytest
 
-from kumiki.drawing import (Drawing, ELEVATION_IDS, Length, Measure, Page,
+from kumiki.drawings.drawing import (Drawing, ELEVATION_IDS, Length, Measure, Page,
                             Portion, SHOP_DRAWING_IDS, Share,
                             SplitDirection, Subdivision, Viewport, columns,
                             covering_page, rows)
 from kumiki.identity import ViewportId
-from kumiki.layout import resolve_drawing, resolve_viewports
+from kumiki.drawings.layout import resolve_drawing, resolve_viewports
 from kumiki.rule import mm
 from tests.testing_shavings import mortise_and_tenon_handles, present
 

@@ -257,7 +257,7 @@
         return {
             // Positional -- the index of its floating pane, then of each child
             // stepped through to reach it -- and assigned by the layout that
-            // produced it. See kumiki/layout.py. Nothing derives it here; the
+            // produced it. See kumiki/drawings/layout.py. Nothing derives it here; the
             // fallback is for a spec written by hand without one.
             id: typeof source.id === 'string' && source.id ? source.id : `viewport-${index}`,
             // What to draw on the sheet and show in lists. A LABEL: two views

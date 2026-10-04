@@ -4,7 +4,7 @@
 from kumiki.measuring import MarkingSpace
 from kumiki.rule import V3, V2
 from kumiki.construction import CornerJointTimberArrangement
-from kumiki.cutcsg import ConvexPolygonExtrusion
+from kumiki.csg.cutcsg import ConvexPolygonExtrusion
 from typing import List, Tuple
 from kumiki.timber import Cutting
 

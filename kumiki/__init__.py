@@ -9,7 +9,7 @@ __version__ = "0.7.1"
 
 # Import everything from the organized modules
 from .rule import *
-from .cutcsg import *
+from .csg.cutcsg import *
 from .ticket import (
     AccessoryTicket,
     BoardTicket,
@@ -35,8 +35,8 @@ from .identity import (
     TimberPath,
     ViewportId,
 )
-from .layout import PlacedViewport, resolve_drawing, resolve_viewports
-from .drawing import (Drawing, ELEVATION_IDS, Length, Page, Portion, Share,
+from .drawings.layout import PlacedViewport, resolve_drawing, resolve_viewports
+from .drawings.drawing import (Drawing, ELEVATION_IDS, Length, Page, Portion, Share,
                       SHOP_DRAWING_IDS, SplitDirection, Subdivision, Viewport,
                       columns, covering_page, default_viewports_for,
                       elevation_viewports, rows, shop_drawing_viewports,
@@ -46,7 +46,7 @@ from .drawing import (Drawing, ELEVATION_IDS, Length, Page, Portion, Share,
 from .timber import *
 from .footprint import *
 from .construction import *
-from .pathcsg import *
+from .csg.pathcsg import *
 from .joints.workshop.shavings import *
 from .joints.workshop.butt import *
 from .joints.workshop.corner import *
@@ -64,7 +64,7 @@ from .kiwari import *
 # Optional heavy mesh/export modules.
 # FreeCAD's bundled Python may not have trimesh installed; keep base imports usable.
 try:
-    from .triangles import *
+    from .csg.triangles import *
 except ModuleNotFoundError as exc:
     if exc.name != "trimesh":
         raise

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from kumiki.drawing import ViewAxes
+from kumiki.drawings.drawing import ViewAxes
 
 from tests.testing_shavings import load_module
 
@@ -54,7 +54,7 @@ class Viewer:
     """As much of the viewer as the runner can see: a mesh cache and a pointer."""
 
     def __init__(self, frame):
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         self.frame = frame
         entries, _ = runner._assign_member_keys(frame)
@@ -179,7 +179,7 @@ LOOK = [-0.577, -0.577, -0.577]
 
 
 def _three_d_distance():
-    from kumiki.drawing import ViewAxes, MeasurementKind, MeasurementOperation, MeasurementSpace
+    from kumiki.drawings.drawing import ViewAxes, MeasurementKind, MeasurementOperation, MeasurementSpace
 
     return MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
@@ -390,7 +390,7 @@ class TestAPairWithNothingBetweenThem:
         assert verdict["reason"] is None
 
     def test_what_counts_as_nothing_between_them(self):
-        from kumiki.drawing import DEGENERATE_SEPARATION, measures_nothing
+        from kumiki.drawings.drawing import DEGENERATE_SEPARATION, measures_nothing
 
         face = plane([0, 0, 0], [0, 0, 1])
         touching = at([5, 7, 0])
@@ -409,7 +409,7 @@ class TestAPairWithNothingBetweenThem:
         ends instead would make a rule about what a measurement IS depend on
         where it happens to be drawn.
         """
-        from kumiki.drawing import measures_nothing, pair_separation
+        from kumiki.drawings.drawing import measures_nothing, pair_separation
 
         face = plane([0, 0, 0], [0, 0, 1])
         # An arris lying IN that face, running off to one side. Its own point is
@@ -420,8 +420,8 @@ class TestAPairWithNothingBetweenThem:
         assert measures_nothing(face, lying_in_it, THREE_D_DISTANCE) is True
 
     def test_an_angle_measures_no_length_so_the_rule_leaves_it_alone(self):
-        from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
-        from kumiki.drawing import measures_nothing, pair_separation
+        from kumiki.drawings.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
+        from kumiki.drawings.drawing import measures_nothing, pair_separation
 
         angle = MeasurementKind(MeasurementOperation.ANGLE, MeasurementSpace.THREE_D)
         face = plane([0, 0, 0], [0, 0, 1])
@@ -432,9 +432,9 @@ class TestAPairWithNothingBetweenThem:
 
     def test_kinds_do_not_fail_together(self):
         """Two points one above the other: a vertical worth having, no horizontal."""
-        from kumiki.drawing import MeasurementDirection as D
-        from kumiki.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
-        from kumiki.drawing import measures_nothing
+        from kumiki.drawings.drawing import MeasurementDirection as D
+        from kumiki.drawings.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace
+        from kumiki.drawings.drawing import measures_nothing
 
         axes = ViewAxes(look=create_v3(0, -1, 0), right=create_v3(1, 0, 0),
                         up=create_v3(0, 0, 1))
@@ -552,7 +552,7 @@ class TestWhatTheRunnerSettles:
 
     def _settle(self, one, other, written=None, solid=False, axes=None):
         """What the runner would send for a pair, through its own code."""
-        from kumiki.drawing import (MeasurementKind, projected_kinds,
+        from kumiki.drawings.drawing import (MeasurementKind, projected_kinds,
                                     three_d_kinds)
 
         runner = self._runner()
@@ -574,7 +574,7 @@ class TestWhatTheRunnerSettles:
     def test_the_kind_drawn_is_the_first_when_none_was_written(self):
         settled = self._settle(at([0, 0, 0]), at([1, 0, 1]))
 
-        from kumiki.drawing import MeasurementKind
+        from kumiki.drawings.drawing import MeasurementKind
         from tests.testing_shavings import present
 
         settled_kind = present(MeasurementKind.from_wire(settled["kind"]), "a settled kind")
@@ -584,7 +584,7 @@ class TestWhatTheRunnerSettles:
         settled = self._settle(at([0, 0, 0]), at([1, 0, 1]),
                                written="projected_vertical_distance")
 
-        from kumiki.drawing import MeasurementKind
+        from kumiki.drawings.drawing import MeasurementKind
         from tests.testing_shavings import present
 
         settled_kind = present(MeasurementKind.from_wire(settled["kind"]), "a settled kind")
@@ -613,12 +613,12 @@ class TestWhatTheRunnerSettles:
         assert settled["value"]["unit"] == "angle"
 
     def test_a_corner_reads_its_angle_rather_than_a_length(self):
-        from kumiki.drawing import PlaneSpan, angle_rays
+        from kumiki.drawings.drawing import PlaneSpan, angle_rays
 
         runner = self._runner()
         first = plane([0, 0, 0], [0, 0, 1])
         second = plane([0, 0, 0], [1, 0, 0])
-        from kumiki.drawing import projected_kinds, three_d_kinds
+        from kumiki.drawings.drawing import projected_kinds, three_d_kinds
         admitted = three_d_kinds(first, second)
         rays = angle_rays(PlaneSpan(at=first.point, normal=first.normal),
                           PlaneSpan(at=second.point, normal=second.normal))

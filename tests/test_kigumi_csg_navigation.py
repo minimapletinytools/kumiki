@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     ConvexPolygonExtrusion,
     EmptyCSG,
     CutCSG,
@@ -44,7 +44,7 @@ from kumiki.joints.workshop.mixed import (
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
 from kumiki.rule import Matrix, Transform, create_v3, inches, scalar
 from kumiki.timber import Frame, PegShape
-from kumiki.triangles import triangulate_cutcsg
+from kumiki.csg.triangles import triangulate_cutcsg
 
 # Generous epsilon: mesh vertices come out of a boolean op, so surface points
 # are only approximately on the analytic primitives. Matches the runner's own
@@ -460,7 +460,7 @@ class TestPickTolerancesScaleWithTheView:
     """
 
     def test_without_them_the_built_in_defaults_stand(self):
-        from kumiki.cutcsg import FeatureTestTolerances
+        from kumiki.csg.cutcsg import FeatureTestTolerances
 
         tolerances = runner._pick_tolerances({}, 5e-4)
 
@@ -487,7 +487,7 @@ class TestPickTolerancesScaleWithTheView:
         assert float(tolerances.point) == pytest.approx(5e-4)
 
     def test_nonsense_is_ignored_rather_than_trusted(self):
-        from kumiki.cutcsg import FeatureTestTolerances
+        from kumiki.csg.cutcsg import FeatureTestTolerances
 
         for sent in ({"edge": 0, "point": -1}, {"edge": "wide"}, {"tolerances": None}):
             tolerances = runner._pick_tolerances({"tolerances": sent}, 5e-4)
@@ -534,7 +534,7 @@ class TestDescribeLeafCsg:
         """
         import warnings as warnings_module
 
-        from kumiki.pathcsg import FancyPath, PathExtrusion, StraightSegment
+        from kumiki.csg.pathcsg import FancyPath, PathExtrusion, StraightSegment
         from kumiki.rule import create_v2
 
         def corner(x, y):
@@ -562,7 +562,7 @@ class TestDescribeLeafCsg:
         # It used to reach the "cut_plane" fallback, which is a friendlier name
         # than "side.0" -- see the note on _describe_leaf_csg. The fallback
         # is still there, it is just no longer the thing that answers.
-        from kumiki.cutcsg import HalfSpace
+        from kumiki.csg.cutcsg import HalfSpace
 
         plane = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(50)
@@ -570,7 +570,7 @@ class TestDescribeLeafCsg:
         assert runner._describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "side.0"
 
     def test_half_space_named_feature_wins_over_cut_plane(self):
-        from kumiki.cutcsg import HalfSpace
+        from kumiki.csg.cutcsg import HalfSpace
 
         plane = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)),
@@ -688,7 +688,7 @@ class TestJointAttribution:
 
     def test_nothing_is_stored_on_the_cutting_or_the_csg(self):
         """The link stays derived -- guard against reintroducing a stored copy."""
-        from kumiki.cutcsg import CutCSG
+        from kumiki.csg.cutcsg import CutCSG
         from kumiki.timber import Cutting
 
         assert "joint_ticket" not in Cutting.__dataclass_fields__
@@ -722,7 +722,7 @@ class TestEdgePicking:
 
     def _point_where(self, local_csg, predicate):
         """A surface point the whole tree resolves to a feature matching *predicate*."""
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         for triangle in triangulate_cutcsg(local_csg).mesh.triangles:
             candidates = [
@@ -745,7 +745,7 @@ class TestEdgePicking:
         }, slot)
 
     def test_a_click_on_the_shoulder_line_selects_the_edge(self, mortise_and_tenon_frame):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -759,7 +759,7 @@ class TestEdgePicking:
     def test_the_edge_comes_back_as_a_line_to_draw(self, mortise_and_tenon_frame):
         """The viewer draws a selected edge rather than shading triangles beside
         it, so the pick returns the span the line should cover."""
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -774,7 +774,7 @@ class TestEdgePicking:
 
     def test_the_clicked_point_lies_on_the_drawn_line(self, mortise_and_tenon_frame):
         """A line somewhere else on the timber would look like a stray mark."""
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -801,7 +801,7 @@ class TestEdgePicking:
     def test_an_edge_pick_does_not_shade_triangles(self, mortise_and_tenon_frame):
         """The strip beside the edge was what read as a stray wedge; the line
         replaces it rather than joining it."""
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -811,7 +811,7 @@ class TestEdgePicking:
         assert result["stats"]["trianglesMatched"] == 0
 
     def test_a_face_pick_draws_no_line(self, mortise_and_tenon_frame):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -827,7 +827,7 @@ class TestEdgePicking:
         mesh filter then matched no triangle at all, because no triangle's
         centroid sits on a line. A line is the answer, with the triangle strip
         left as the fallback when no span can be measured."""
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -837,7 +837,7 @@ class TestEdgePicking:
         assert result.get("highlightEdgeSegments") or result["stats"]["trianglesMatched"] > 0
 
     def test_the_middle_of_a_face_still_selects_the_face(self, mortise_and_tenon_frame):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -850,7 +850,7 @@ class TestEdgePicking:
     def test_the_edge_is_shown_under_the_deeper_of_its_two_parents(self, mortise_and_tenon_frame):
         """The shoulder sits inside the joint; the timber body is a child of
         the root. The rule puts the edge with the shoulder."""
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -863,7 +863,7 @@ class TestEdgePicking:
     def test_ctrl_holds_the_click_to_one_level(self, mortise_and_tenon_frame):
         """Ctrl is the way down through the compounds, which are selectable in
         their own right -- so the first one stops above the edge."""
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -874,7 +874,7 @@ class TestEdgePicking:
         assert first["path"] == ["mortise_and_tenon"]
 
     def test_ctrl_clicking_down_reaches_the_edge_once_it_is_deep_enough(self, mortise_and_tenon_frame):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -890,7 +890,7 @@ class TestEdgePicking:
 
     def test_a_plain_click_needs_no_drilling(self, mortise_and_tenon_frame):
         """The whole point of the swap: one click on the line selects it."""
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
@@ -1085,7 +1085,7 @@ class TestSerializedParity:
     def test_the_payload_agrees_with_kumikis_own_rule(self, mortise_and_tenon_frame):
         """The guard against the two drifting apart: the serializer threads
         parity as it recurses, so it must still match the walk."""
-        from kumiki.cutcsg import walk_csg_with_parity
+        from kumiki.csg.cutcsg import walk_csg_with_parity
 
         for name in ("butt_timber", "receiving_timber"):
             cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, name)
@@ -1097,7 +1097,7 @@ class TestSerializedParity:
     def test_parity_matches_which_way_the_surface_actually_faces(self, mortise_and_tenon_frame):
         """Ground truth: a SUBTRACTIVE leaf's own normal opposes the finished
         solid's, an ADDITIVE one agrees. Checked at every surface point."""
-        from kumiki.cutcsg import walk_csg_with_parity
+        from kumiki.csg.cutcsg import walk_csg_with_parity
         from kumiki.rule import safe_dot_product
 
         for name in ("butt_timber", "receiving_timber"):
@@ -1219,7 +1219,7 @@ class TestEdgeHighlightSpan:
     """
 
     def _edge(self, frame, a_name, b_name, member="butt_timber"):
-        from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
+        from kumiki.csg.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
 
         # The tenon timber by default: a derived edge needs two features whose
         # groups pair, and the shoulder against the timber's own faces is the
@@ -1245,7 +1245,7 @@ class TestEdgeHighlightSpan:
 
     def _declared_edge(self, frame, name):
         """A timber's own arris, which is declared rather than derived."""
-        from kumiki.cutcsg import csg_children
+        from kumiki.csg.cutcsg import csg_children
 
         cut_timber = _cut_timber_by_name(frame, "receiving_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()
@@ -1291,7 +1291,7 @@ class TestEdgeHighlightSpan:
         anyway -- a plane run far enough sideways crosses another plane
         somewhere, and that somewhere is on neither face.
         """
-        from kumiki.cutcsg import (DerivedEdgeFeature, FeatureGroup, FeatureProperties,
+        from kumiki.csg.cutcsg import (DerivedEdgeFeature, FeatureGroup, FeatureProperties,
                                    HalfSpace, HalfSpaceFeature, OwnedFeatureHit,
                                    PrismFace, RectangularPrism,
                                    SimpleRectangularPrismFeature)
@@ -1332,8 +1332,8 @@ class TestEdgeHighlightSpan:
         to nothing when clipped exactly. Those keep the tolerant span; only the
         exactly-clippable ones get the exact one.
         """
-        from kumiki.cutcsg import CSGFeatureType
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.cutcsg import CSGFeatureType
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()
@@ -1373,7 +1373,7 @@ class TestEdgeHighlightSpan:
         the code that made a selected edge span a whole timber. Nothing here
         should reach it.
         """
-        from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
+        from kumiki.csg.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
 
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()
@@ -1448,7 +1448,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
         return Frame.from_joints([joint])
 
     def _tenon_arris(self, frame, name):
-        from kumiki.cutcsg import csg_children
+        from kumiki.csg.cutcsg import csg_children
 
         cut_timber = _cut_timber_by_name(frame, "brace_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()
@@ -1530,7 +1530,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
         segments are worked out, so agreeing with it is evidence rather than a
         tautology.
         """
-        from kumiki.cutcsg import CSGFeatureType, csg_children
+        from kumiki.csg.cutcsg import CSGFeatureType, csg_children
 
         cut_timber = _cut_timber_by_name(oblique_shoulder_frame, "brace_timber")
         root = cut_timber.render_timber_with_cuts_csg_local()
@@ -1643,7 +1643,7 @@ class TestPickingAlongTheRay:
     """
 
     def _slot(self, frame):
-        from kumiki.cutcsg import CylinderAxisFeature, csg_children
+        from kumiki.csg.cutcsg import CylinderAxisFeature, csg_children
 
         cut_timber = _cut_timber_by_name(frame, "butt_timber")
         timber = cut_timber.timber
@@ -1785,8 +1785,8 @@ class TestResolvingADerivedEdge:
     """
 
     def _picked_edge(self, frame):
-        from kumiki.cutcsg import CSGFeatureType
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.cutcsg import CSGFeatureType
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         # The tenon timber: a derived edge needs two features whose groups
         # pair, and the shoulder against the timber's own faces is the only
@@ -1836,8 +1836,8 @@ class TestResolvingADerivedEdge:
         A mortise and tenon leaves four of them: the corners where the shoulder
         plane crosses the tenon timber's four long arrises.
         """
-        from kumiki.cutcsg import CSGFeatureType, DerivedPointFeature
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.cutcsg import CSGFeatureType, DerivedPointFeature
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         entries, _ = runner._assign_member_keys(mortise_and_tenon_frame)
         entry = next(e for e in entries if "butt" in e["memberKey"])
@@ -1977,7 +1977,7 @@ class TestPickYieldsAMeasurementReference:
     """
 
     def _pick_at(self, frame, member, predicate):
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         cut_timber = _cut_timber_by_name(frame, member)
         local = cut_timber.render_timber_with_cuts_csg_local()
@@ -1990,7 +1990,7 @@ class TestPickYieldsAMeasurementReference:
         raise AssertionError("no such feature on the finished surface")
 
     def test_a_face_pick_references_that_face(self, mortise_and_tenon_frame):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         local, feature = self._pick_at(
             mortise_and_tenon_frame, "receiving_timber",
@@ -2005,7 +2005,7 @@ class TestPickYieldsAMeasurementReference:
         assert reference.get("kind") != "edge"
 
     def test_an_edge_pick_references_both_its_parents(self, mortise_and_tenon_frame):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         local, edge = self._pick_at(
             mortise_and_tenon_frame, "butt_timber",
@@ -2022,7 +2022,7 @@ class TestPickYieldsAMeasurementReference:
     def test_the_reference_resolves_back_to_a_place(self, mortise_and_tenon_frame):
         # The round trip that matters: what a pick writes down, resolve_anchor
         # finds again.
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         local, edge = self._pick_at(
             mortise_and_tenon_frame, "butt_timber",
@@ -2050,7 +2050,7 @@ class TestHoveringOverAFeature:
     """
 
     def _slot(self, frame, member):
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         cut_timber = _cut_timber_by_name(frame, member)
         timber = cut_timber.timber
@@ -2080,7 +2080,7 @@ class TestHoveringOverAFeature:
         found also the point where that kind ANSWERS: every feature at a corner
         includes a face and an edge, but a corner answers with its vertex.
         """
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         timber = cut_timber.timber
         for triangle in triangulate_cutcsg(local).mesh.triangles:
@@ -2110,7 +2110,7 @@ class TestHoveringOverAFeature:
         face is often on one of its edges too, and an edge is the better answer
         there -- which is what a click does as well.
         """
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         state, slot, local, cut_timber = self._slot(frame, member)
         timber = cut_timber.timber
@@ -2163,7 +2163,7 @@ class TestHoveringOverAFeature:
         crossing is a point nothing declares -- so this is a derived one all the
         way out to the reference a measurement would hold.
         """
-        from kumiki.cutcsg import DerivedPointFeature
+        from kumiki.csg.cutcsg import DerivedPointFeature
 
         state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._a_point_on(
@@ -2211,7 +2211,7 @@ class TestHoveringOverAFeature:
         Without that, picking one sends the viewer the strip of triangles
         around the vertex, which reads as a smear rather than as a point.
         """
-        from kumiki.cutcsg import DerivedPointFeature
+        from kumiki.csg.cutcsg import DerivedPointFeature
 
         state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._a_point_on(
@@ -2227,7 +2227,7 @@ class TestHoveringOverAFeature:
     def test_it_is_the_same_answer_a_click_gives(self, mortise_and_tenon_frame):
         # Not a likeness of it. The only difference is what the viewer does
         # with it: another colour, and under the selection.
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "receiving_timber")
         point = self._a_point_on(local, cut_timber,
@@ -2248,7 +2248,7 @@ class TestHoveringOverAFeature:
         assert hovered.get("highlightEdgeSegments") == clicked.get("highlightEdgeSegments")
 
     def test_an_edge_comes_back_as_a_line_to_draw(self, mortise_and_tenon_frame):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         result = self._hover(
             mortise_and_tenon_frame, "receiving_timber",
@@ -2262,7 +2262,7 @@ class TestHoveringOverAFeature:
     def test_it_says_what_a_measurement_would_hold(self, mortise_and_tenon_frame):
         # So the viewer can say whether this and whatever is already held could
         # be measured -- before the click, which is the point of hovering.
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         result = self._hover(
             mortise_and_tenon_frame, "receiving_timber",
@@ -2330,7 +2330,7 @@ class TestTheBroadphase:
         # The line is the edge's highlight. Without the early return the walk
         # still runs, comparing every triangle against a name no face answers
         # to, and arrives at nothing the slow way.
-        from kumiki.cutcsg import EmptyCSG
+        from kumiki.csg.cutcsg import EmptyCSG
 
         verts, idx, matched, total = runner._extract_highlight_mesh(
             [0.0] * 9, [0, 1, 2], EmptyCSG(), None, None, 5e-4,
@@ -2358,7 +2358,7 @@ class TestTheBroadphase:
     def test_an_unbounded_solid_cannot_be_filtered(self):
         # A half space has no box worth having, so the walk goes ahead
         # unfiltered rather than rejecting everything.
-        from kumiki.cutcsg import HalfSpace
+        from kumiki.csg.cutcsg import HalfSpace
         from kumiki.rule import create_v3, scalar
 
         unbounded = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)),
@@ -2367,7 +2367,7 @@ class TestTheBroadphase:
         assert runner._aabb_filter(unbounded, 5e-4) is None
 
     def test_an_empty_solid_rejects_everything(self):
-        from kumiki.cutcsg import EmptyCSG
+        from kumiki.csg.cutcsg import EmptyCSG
 
         rejects = runner._aabb_filter(EmptyCSG(), 5e-4)
 
@@ -2377,7 +2377,7 @@ class TestTheBroadphase:
     def test_the_highlight_is_the_same_with_the_filter_as_without(self, mortise_and_tenon_frame):
         # The point: faster, not different. A broadphase that changed the answer
         # would be a bug wearing an optimisation's clothes.
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
         timber = cut_timber.timber
@@ -2473,7 +2473,7 @@ class TestChoosingAmongTheFeaturesAtAPoint:
     """
 
     def _slot(self, frame, member):
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         cut_timber = _cut_timber_by_name(frame, member)
         timber = cut_timber.timber
@@ -2559,7 +2559,7 @@ class TestChoosingAmongTheFeaturesAtAPoint:
         assert reached == [hit.feature.name for hit in hits[1:]]
 
     def _hits_at(self, frame, member, point):
-        from kumiki.cutcsg import FeatureTestTolerances
+        from kumiki.csg.cutcsg import FeatureTestTolerances
 
         cut_timber = _cut_timber_by_name(frame, member)
         timber = cut_timber.timber
@@ -2584,7 +2584,7 @@ class TestWhatAPickCarriesBack:
     """Enough for the viewer to judge the pair without asking again."""
 
     def _first_pick(self, frame, member, extra=None):
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         cut_timber = _cut_timber_by_name(frame, member)
         timber = cut_timber.timber
@@ -2682,7 +2682,7 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
     HELD_FACE = {"kind": "plane", "normal": [0, 0, 1], "at": [0, 0, 0]}
 
     def _slot(self, frame, member):
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         cut_timber = _cut_timber_by_name(frame, member)
         timber = cut_timber.timber
@@ -2736,13 +2736,13 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
 
     def test_and_what_it_offers_can_be_measured_against_what_is_held(
             self, mortise_and_tenon_frame):
-        from kumiki.drawing import projected_kinds
+        from kumiki.drawings.drawing import projected_kinds
 
         _plain, held = self._where_the_default_is_an_edge(
             mortise_and_tenon_frame, "receiving_timber")
 
         # Both ends as the rules take them. The wire form is what crosses to
-        # the viewer and back; kumiki.drawing works in the primitives.
+        # the viewer and back; kumiki.drawings.drawing works in the primitives.
         from kumiki.geometry import Plane
         from kumiki.rule import create_v3
 

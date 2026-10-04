@@ -6,9 +6,9 @@ primitive, including decompose_path_into_convex_pieces.
 import pytest
 
 from kumiki.rule import create_v2, create_v3, Transform, scalar, pi
-from kumiki.cutcsg import CSGFeatureType, ExtrusionCap
+from kumiki.csg.cutcsg import CSGFeatureType, ExtrusionCap
 from kumiki.geometry import Plane
-from kumiki.pathcsg import (
+from kumiki.csg.pathcsg import (
     FlatSide,
     CurvedSide,
     side_index,
@@ -16,7 +16,7 @@ from kumiki.pathcsg import (
     SimplePathExtrusionCurvedFeature,
     SimplePathExtrusionFeature,
 )
-from kumiki.triangles import mesh_cutcsg
+from kumiki.csg.triangles import mesh_cutcsg
 
 
 class TestPathCSG:

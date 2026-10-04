@@ -1,14 +1,14 @@
-"""Measures on a real cut timber, as rows and remaining DOFs (kumiki/feature_solving.py)."""
+"""Measures on a real cut timber, as rows and remaining DOFs (kumiki/drawings/feature_solving.py)."""
 
 import numpy as np
 import pytest
 
-from kumiki.cutcsg import OwnedFeatureHit, PrismFace, prism_corner_key, prism_face_key
-from kumiki.drawing import Measure, MeasurementKind, ViewAxes
-from kumiki.feature_paths import FeatureHandle, find_feature
-from kumiki.feature_solving import carrier_map_of, measure_row, remaining_dofs, solve_report
+from kumiki.csg.cutcsg import OwnedFeatureHit, PrismFace, prism_corner_key, prism_face_key
+from kumiki.drawings.drawing import Measure, MeasurementKind, ViewAxes
+from kumiki.csg.feature_paths import FeatureHandle, find_feature
+from kumiki.drawings.feature_solving import carrier_map_of, measure_row, remaining_dofs, solve_report
 from kumiki.rule import create_v3
-from kumiki.solve_recipe import CarrierRef, PlaneCoord
+from kumiki.csg.carriers import CarrierRef, PlaneCoord
 from tests.testing_shavings import mortise_and_tenon_handles, present
 
 
@@ -269,7 +269,7 @@ class TestSolveReport:
 
     def test_a_required_feature_with_no_recipe_reports_none(self):
         from kumiki.construction import create_timber
-        from kumiki.cutcsg import CutCSGLabel, ProgrammableEdgeFeature, RectangularPrism
+        from kumiki.csg.cutcsg import CutCSGLabel, ProgrammableEdgeFeature, RectangularPrism
         from kumiki.rule import Transform, create_v2, mm, scalar
         from kumiki.timber import CutTimber, Cutting
 

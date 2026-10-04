@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from kumiki.construction import CornerJointTimberArrangement
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     CutCSG,
     CutCSGLabel,
     Difference,

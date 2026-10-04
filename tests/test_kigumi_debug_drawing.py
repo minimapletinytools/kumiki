@@ -67,7 +67,7 @@ def _orthographic_viewports(drawing):
     return [v for v in drawing["viewports"] if v["projection"] == "orthographic"]
 
 
-# A viewport is identified by WHERE IT IS -- see kumiki/layout.py -- so these
+# A viewport is identified by WHERE IT IS -- see kumiki/drawings/layout.py -- so these
 # are the two layouts written out, and TestViewportIds below is what catches
 # either changing under the rest of these tests. Looking a viewport up by its
 # label would be the one thing layout.py says nothing may do.

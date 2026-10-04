@@ -12,7 +12,7 @@ from typing import List, Optional, Union
 
 
 from kumiki.construction import ButtJointTimberArrangement, ArrangementNames
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     ConvexPolygonSimpleLoft,
     CutCSG,
     CutCSGLabel,

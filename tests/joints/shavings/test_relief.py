@@ -4,7 +4,7 @@ Tests for the shoulder-notch and relief-cut helpers in kumiki.joints.workshop.re
 
 from dataclasses import replace
 
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     ConvexPolygonSimpleLoft,
     CutCSGLabel,
     Difference,
@@ -174,7 +174,7 @@ class TestChopButtJointShoulderNotchRelief4Sided:
 
         geom = chop_butt_joint_shoulder_notch_relief_4sided(arrangement, scalar(2))
         assert geom is not None
-        from kumiki.cutcsg import adopt_csg
+        from kumiki.csg.cutcsg import adopt_csg
         notch_global = adopt_csg(mortise_timber.transform, Transform.identity(), geom.receiving_timber_notch_negative_CSG)
 
         forward_point = Matrix([scalar(3), scalar(0), scalar(7, 2)])   # X=3, Z=3.5: toward tenon, inside the flare
@@ -303,7 +303,7 @@ class TestChopButtJointShoulderNotchRelief4Sided:
         """
         from dataclasses import replace as dataclasses_replace
 
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         mortise = create_timber(
             length=scalar(100), size=create_v2(scalar(6), scalar(6)),
@@ -489,7 +489,7 @@ class TestChopButtJointShoulderNotchReliefOnPlaneAlignedTimbers2Sided:
         )
         geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
         assert geom is not None
-        from kumiki.cutcsg import adopt_csg
+        from kumiki.csg.cutcsg import adopt_csg
         notch_global = adopt_csg(mortise_timber.transform, Transform.identity(), geom.receiving_timber_notch_negative_CSG)
 
         # Shoulder at global Z=2 (toward tenon), entry face at Z=3.
@@ -583,8 +583,8 @@ class TestChopButtJointShoulderNotchReliefOnPlaneAlignedTimbers2Sided:
         geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
         assert geom is not None
 
-        from kumiki.cutcsg import adopt_csg
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.cutcsg import adopt_csg
+        from kumiki.csg.triangles import triangulate_cutcsg
         notch_global = adopt_csg(mortise_timber.transform, Transform.identity(), geom.receiving_timber_notch_negative_CSG)
         notch_mesh = triangulate_cutcsg(notch_global).mesh
         assert notch_mesh.is_watertight
@@ -644,7 +644,7 @@ class TestChopShoulderNotchAlignedWithTimber:
 
     @staticmethod
     def _base_prism(notch):
-        from kumiki.cutcsg import SolidUnion
+        from kumiki.csg.cutcsg import SolidUnion
 
         return notch.children[0] if isinstance(notch, SolidUnion) else notch
 
@@ -655,7 +655,7 @@ class TestChopShoulderNotchAlignedWithTimber:
         depth clear the receiving's worst-case corner radius r = sqrt(2^2 +
         2.5^2), and no wall relief prisms appear (zero rake).
         """
-        from kumiki.cutcsg import RectangularPrism
+        from kumiki.csg.cutcsg import RectangularPrism
 
         notch = self._make_notch(False, False)
         assert isinstance(notch, RectangularPrism)
@@ -674,7 +674,7 @@ class TestChopShoulderNotchAlignedWithTimber:
         prisms appear automatically (floored at the rake angle) even though
         no wall angle was requested.
         """
-        from kumiki.cutcsg import SolidUnion
+        from kumiki.csg.cutcsg import SolidUnion
 
         notch = self._make_notch(True, False)
         assert isinstance(notch, SolidUnion)
@@ -689,7 +689,7 @@ class TestChopShoulderNotchAlignedWithTimber:
         butt square-on, so the slice is NOT stretched (width stays 5") and no
         wall relief is needed (the butt is perpendicular to ITS shoulder plane).
         """
-        from kumiki.cutcsg import RectangularPrism
+        from kumiki.csg.cutcsg import RectangularPrism
 
         notch = self._make_notch(False, True)
         assert isinstance(notch, RectangularPrism)
@@ -701,7 +701,7 @@ class TestChopShoulderNotchAlignedWithTimber:
         cross-section AND stretches; expected width 0.187470m (7.3807") was
         computed by brute-force corner-edge slicing.
         """
-        from kumiki.cutcsg import SolidUnion
+        from kumiki.csg.cutcsg import SolidUnion
 
         notch = self._make_notch(True, True)
         assert isinstance(notch, SolidUnion)

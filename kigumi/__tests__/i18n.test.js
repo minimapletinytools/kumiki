@@ -62,6 +62,6 @@ describe('createTranslator', () => {
 // `every measurement kind has a name a person would use` moved to
 // tests/test_measurement_kinds.py. It generated the list of kinds by running
 // the viewer's own copy of the measurement rules, and there is one copy now --
-// in kumiki/drawing.py -- so the test went with it. It still reads these same
+// in kumiki/drawings/drawing.py -- so the test went with it. It still reads these same
 // locale files, and still generates rather than hard-codes the list, which is
 // the whole point of it.

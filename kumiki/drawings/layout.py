@@ -19,8 +19,8 @@ from dataclasses import dataclass
 
 from .drawing import (Length, Page, Portion, Rect, Share, Size, SplitDirection,
                       Subdivision, Viewport)
-from .identity import ViewportId
-from .rule import Numeric
+from ..identity import ViewportId
+from ..rule import Numeric
 
 
 @dataclass(frozen=True)

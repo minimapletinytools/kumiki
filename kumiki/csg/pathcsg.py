@@ -20,10 +20,10 @@ from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 
-from .rule import sqrt as sym_sqrt
+from ..rule import sqrt as sym_sqrt
 
-from .rule import *
-from .geometry import Plane
+from ..rule import *
+from ..geometry import Plane
 from .cutcsg import (
     AxisAlignedBoundingBox,
     CSGFeature,
@@ -41,7 +41,7 @@ from .cutcsg import (
     OwnedFeatureHit,
     Profile,
 )
-from .solve_recipe import Carrier
+from .carriers import Carrier
 
 
 # ============================================================================

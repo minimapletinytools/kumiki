@@ -9,7 +9,7 @@ from kumiki.joints.workshop.board import (
 from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.rule import safe_equality_test, scalar, Matrix
 from kumiki.timber import Board, Orientation, Timber, Transform, create_v3
-from kumiki.cutcsg import RectangularPrism, SolidUnion
+from kumiki.csg.cutcsg import RectangularPrism, SolidUnion
 from kumiki.construction import ExtendedTimberArrangement, PanelBoardArrangement
 
 

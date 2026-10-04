@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     # comparing against a stale class object after a reload. Under
     # TYPE_CHECKING there is no runtime import at all, so annotations can be
     # concrete while every isinstance check still imports inside its function.
-    from kumiki.cutcsg import CutCSG
+    from kumiki.csg.cutcsg import CutCSG
     from kumiki.timber import CutTimber, Cutting, Joint
 
 
@@ -212,7 +212,7 @@ def get_timber_display_name(timber: Any) -> str:
 
 
 def _compute_csg_depth(csg: Any) -> int:
-    from kumiki.cutcsg import SolidUnion, Difference
+    from kumiki.csg.cutcsg import SolidUnion, Difference
 
     if isinstance(csg, SolidUnion):
         if not csg.children:
@@ -229,7 +229,7 @@ def _compute_csg_depth(csg: Any) -> int:
 
 def _count_csg_nodes_and_features(csg: Any) -> Tuple[int, int]:
     """Return (node_count, named_feature_count) for the CSG tree."""
-    from kumiki.cutcsg import SolidUnion, Difference
+    from kumiki.csg.cutcsg import SolidUnion, Difference
 
     nodes = 1
     features = 0
@@ -307,7 +307,7 @@ def prism_to_mesh(prism: Any) -> Dict[str, Any]:
 
     # 12 triangles with outward-facing CCW normals (verified via cross-product)
     # Face naming matches kumiki.timber.TimberFace: RIGHT=+X, FRONT=+Y, LEFT=-X, BACK=-Y
-    # (see RectangularPrismFeature.test_point_unbounded in kumiki/cutcsg.py).
+    # (see RectangularPrismFeature.test_point_unbounded in kumiki/csg/cutcsg.py).
     indices = [
         0, 2, 1,   0, 3, 2,  # bottom (-Z face)
         4, 5, 6,   4, 6, 7,  # top    (+Z face)
@@ -330,9 +330,9 @@ def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
 
 def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:
     """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
-    from kumiki.cutcsg import adopt_csg
+    from kumiki.csg.cutcsg import adopt_csg
     from kumiki.rule import Transform
-    from kumiki.triangles import triangulate_cutcsg
+    from kumiki.csg.triangles import triangulate_cutcsg
 
     global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
     triangle_mesh = triangulate_cutcsg(global_csg).mesh
@@ -515,9 +515,9 @@ def _accessory_to_triangle_mesh_payload(
 ) -> Dict[str, Any]:
     import math
 
-    from kumiki.cutcsg import Cylinder, adopt_csg
+    from kumiki.csg.cutcsg import Cylinder, adopt_csg
     from kumiki.rule import Transform
-    from kumiki.triangles import triangulate_cutcsg
+    from kumiki.csg.triangles import triangulate_cutcsg
 
     if hasattr(accessory, "transform"):
         global_csg = adopt_csg(accessory.transform, Transform.identity(), local_csg)
@@ -959,8 +959,8 @@ def _placed_by_role(viewports, ids, page: Dict[str, float]) -> Dict[str, Any]:
     default layout, so moving a view within one changes that map and nothing
     here.
     """
-    from kumiki.drawing import Page
-    from kumiki.layout import resolve_viewports
+    from kumiki.drawings.drawing import Page
+    from kumiki.drawings.layout import resolve_viewports
 
     placed = {str(view.id): view
               for view in resolve_viewports(viewports, Page(page["width"], page["height"]))}
@@ -971,7 +971,7 @@ def _viewport_spec(placed, **rest: Any) -> Dict[str, Any]:
     """The wire form of one placed viewport.
 
     The id is the tree's -- a position, "0.1.2" -- and the name is a label that
-    nothing looks anything up by. See kumiki/drawing.py.
+    nothing looks anything up by. See kumiki/drawings/drawing.py.
     """
     return {"id": str(placed.id), "name": placed.label, "rect": list(placed.rect), **rest}
 
@@ -1102,7 +1102,7 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
     the same kind of viewport the default 3D scene uses.
     """
     centre, half_size = _frame_world_bounds(frame)
-    from kumiki.drawing import ELEVATION_IDS, elevation_viewports
+    from kumiki.drawings.drawing import ELEVATION_IDS, elevation_viewports
     placed = _placed_by_role(elevation_viewports(), ELEVATION_IDS, _DEBUG_DRAWING_PAGE)
     viewports: List[Dict[str, Any]] = []
     for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
@@ -1549,7 +1549,7 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     centre, half_size = _members_world_bounds(drawn)
 
     if len(entries) == 1:
-        from kumiki.drawing import SHOP_DRAWING_IDS, shop_drawing_viewports
+        from kumiki.drawings.drawing import SHOP_DRAWING_IDS, shop_drawing_viewports
         viewports = shop_drawing_viewports()
         placed = _placed_by_role(viewports, SHOP_DRAWING_IDS, page)
         viewports = _long_face_viewports(entries[0], page, placed)
@@ -1563,7 +1563,7 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     else:
         # No selection is treated as the whole frame, so asking for a drawing
         # before selecting anything gives you something rather than nothing.
-        from kumiki.drawing import ELEVATION_IDS, elevation_viewports
+        from kumiki.drawings.drawing import ELEVATION_IDS, elevation_viewports
         viewports = elevation_viewports()
         placed = _placed_by_role(viewports, ELEVATION_IDS, page)
         viewports = _world_elevation_viewports(entries or timber_entries, page, placed)
@@ -1669,7 +1669,7 @@ def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
     it. A kind is normalized through MeasurementKind first, so one written
     under an older name matches the same kind written under the new one.
     """
-    from kumiki.drawing import Measure, MeasurementKind
+    from kumiki.drawings.drawing import Measure, MeasurementKind
 
     first, second = _measure_pair_identity(measure)
     kind = measure.get("kind")
@@ -1681,14 +1681,14 @@ def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
 
 
 def serialize_feature_path(path: Any) -> Dict[str, Any]:
-    """A feature reference as the viewer and the file hold it. See kumiki.feature_paths."""
-    from kumiki.feature_paths import serialize_feature_path as serialize
+    """A feature reference as the viewer and the file hold it. See kumiki.csg.feature_paths."""
+    from kumiki.csg.feature_paths import serialize_feature_path as serialize
     return serialize(path)
 
 
 def deserialize_feature_path(source: Any) -> Optional[Any]:
-    """The reference a wire form names, or None. See kumiki.feature_paths."""
-    from kumiki.feature_paths import deserialize_feature_path as deserialize
+    """The reference a wire form names, or None. See kumiki.csg.feature_paths."""
+    from kumiki.csg.feature_paths import deserialize_feature_path as deserialize
     return deserialize(source)
 
 
@@ -1827,7 +1827,7 @@ def _pick_from_candidate(local_csg: Any, hit: Any):
     feature's owner cannot be placed in the tree, which leaves the caller with
     what it had.
     """
-    from kumiki.cutcsg import CSGFeatureType
+    from kumiki.csg.cutcsg import CSGFeatureType
 
     feature = hit.feature
     positions = _node_positions(local_csg)
@@ -1918,7 +1918,7 @@ def _pick_verdict(
     and a refusal derived separately will eventually disagree, and the
     disagreement is invisible until someone clicks.
     """
-    from kumiki.drawing import ViewAxes, measures_nothing
+    from kumiki.drawings.drawing import ViewAxes, measures_nothing
 
     if not payload.get("heldGeometry") or not payload.get("look"):
         return None
@@ -1980,7 +1980,7 @@ def _pick_space(payload: Dict[str, Any]) -> Any:
     in. A drawing's viewport has a declared camera and projects onto its sheet;
     the 3D view projects nothing, its camera being the reader's.
     """
-    from kumiki.drawing import MeasurementSpace
+    from kumiki.drawings.drawing import MeasurementSpace
 
     named = (payload or {}).get("space")
     return (MeasurementSpace.THREE_D
@@ -1999,7 +1999,7 @@ def _kinds_for_pair(
     parallel ones a distance. Projecting there instead called almost every face
     an AREA and refused it.
     """
-    from kumiki.drawing import MeasurementSpace, projected_kinds, three_d_kinds
+    from kumiki.drawings.drawing import MeasurementSpace, projected_kinds, three_d_kinds
 
     if _pick_space(payload) is MeasurementSpace.THREE_D:
         return three_d_kinds(one, other)
@@ -2022,7 +2022,7 @@ def _pick_placement(
     and the two drifted: a half-made measurement was drawn at each feature's own
     middle while the finished one went to the middle of their overlap.
     """
-    from kumiki.drawing import (MeasurementSpace, ViewAxes, angle_rays,
+    from kumiki.drawings.drawing import (MeasurementSpace, ViewAxes, angle_rays,
                                 distance_anchors)
 
     empty = {"anchors": None, "angle": None, "settled": None}
@@ -2157,7 +2157,7 @@ def merge_measurements(
             _duplicate_warning_given = True
         from_file[identity] = measure
 
-    from kumiki.drawing import MeasurementSource, does_override_identities
+    from kumiki.drawings.drawing import MeasurementSource, does_override_identities
 
     merged: List[Dict[str, Any]] = []
     used = set()
@@ -2582,7 +2582,7 @@ def _line_intervals(located: Any, csg: Any, reach: float, near: Any):
     test to be uncertain about. What the feature itself reaches is asked of the
     feature -- see _declared_line_span.
     """
-    from kumiki.cropcsg import crop_line_to_segments_on_csg
+    from kumiki.csg.cropcsg import crop_line_to_segments_on_csg
 
     pieces = crop_line_to_segments_on_csg(located, csg, seed_reach=reach, near=near)
     if pieces is None:
@@ -2656,7 +2656,7 @@ def _projects_to_a_point(direction: Sequence[float], plane_normal: Sequence[floa
     draws as a very short line, and calling it a point would refuse a dimension
     that is drawable.
     """
-    from kumiki.drawing import ALIGNMENT_EPSILON
+    from kumiki.drawings.drawing import ALIGNMENT_EPSILON
 
     return abs(_dot(_normalize(list(direction)), _normalize(list(plane_normal)))) \
         > 1 - ALIGNMENT_EPSILON
@@ -2674,7 +2674,7 @@ def _edge_outward_normal(feature: Any, node: Any, timber: Any) -> Optional[Tuple
     only when where the features REACH cannot say -- so None is a fair answer
     and the caller falls back to that.
     """
-    from kumiki.cutcsg import (DerivedEdgeFeature, SimpleRectangularPrismEdgeFeature,
+    from kumiki.csg.cutcsg import (DerivedEdgeFeature, SimpleRectangularPrismEdgeFeature,
                                SimpleRectangularPrismFeature)
     from kumiki.geometry import Plane
 
@@ -2731,11 +2731,11 @@ def _measure_span(
     to through the two-lines rule, which leaned the dimension.
     """
     from kumiki.geometry import Line, Plane, Point
-    from kumiki.cropcsg import (
+    from kumiki.csg.cropcsg import (
         approximately_crop_plane_to_area_on_csg,
         crop_line_to_segments_on_csg,
     )
-    from kumiki.drawing import LineSpan, PlaneSpan, PointSpan
+    from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
 
     to_world = lambda v: tuple(_vector3_to_floats(timber.transform.local_to_global(v)))
 
@@ -2836,7 +2836,7 @@ def _resolve_measurement(
     Only when the pair cannot be placed together does each fall back to a point
     of its own, which is what a feature that resolves to nothing else can offer.
     """
-    from kumiki.drawing import (DEGENERATE_SEPARATION, MeasurementDirection,
+    from kumiki.drawings.drawing import (DEGENERATE_SEPARATION, MeasurementDirection,
                                MeasurementKind, MeasurementOperation,
                                MeasurementSpace, ViewAxes, angle_between,
                                angle_rays, distance_anchors, pair_separation,
@@ -2987,7 +2987,7 @@ def _settled_measurement(
     """
     from dataclasses import replace
 
-    from kumiki.drawing import (DEGENERATE_SEPARATION, MeasurementOperation,
+    from kumiki.drawings.drawing import (DEGENERATE_SEPARATION, MeasurementOperation,
                                 ViewAxes, angle_between, pair_separation)
     from kumiki.rule import create_v3
 
@@ -3036,7 +3036,7 @@ def _settled_form(geometry: Any, in_three_d: bool, plane: Any) -> Dict[str, Any]
     "area" and "none" both mean nothing to measure to, and only this edge tells
     them apart.
     """
-    from kumiki.drawing import project_geometry_for_measuring
+    from kumiki.drawings.drawing import project_geometry_for_measuring
     from kumiki.geometry import Line, Plane, Point, unit_vector
 
     if not in_three_d:
@@ -3055,7 +3055,7 @@ def _settled_form(geometry: Any, in_three_d: bool, plane: Any) -> Dict[str, Any]
 
 def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional[Any]:
     """A viewport's camera frame, as the measurement code wants it."""
-    from kumiki.drawing import ViewAxes
+    from kumiki.drawings.drawing import ViewAxes
 
     for viewport in scene.get("viewports") or []:
         if viewport.get("id") != viewport_id:
@@ -3178,17 +3178,17 @@ def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> s
 
 
 def _labelled_candidates(node: Any, label: str) -> List[Any]:
-    from kumiki.feature_paths import labelled_candidates
+    from kumiki.csg.feature_paths import labelled_candidates
     return labelled_candidates(node, label)
 
 
 def _candidate_segments(node: Any) -> Dict[int, str]:
-    from kumiki.feature_paths import candidate_segments
+    from kumiki.csg.feature_paths import candidate_segments
     return candidate_segments(node)
 
 
 def _find_csg_by_labels(csg: Any, labels: Tuple[str, ...]) -> Optional[Any]:
-    from kumiki.feature_paths import find_csg_by_labels
+    from kumiki.csg.feature_paths import find_csg_by_labels
     return find_csg_by_labels(csg, labels)
 
 
@@ -3236,7 +3236,7 @@ def _geometry_payload(geometry: Any) -> Optional[Dict[str, Any]]:
     """One of those, in the shape the viewer reads.
 
     The wire keeps the mapping form -- a "kind" and two lists -- because that is
-    what crosses to JavaScript. Python stopped taking it: kumiki.drawing works
+    what crosses to JavaScript. Python stopped taking it: kumiki.drawings.drawing works
     in the primitives, and this is where the one becomes the other.
     """
     from kumiki.geometry import Line, Plane, Point
@@ -3296,7 +3296,7 @@ def _feature_anchor(
     primitive, say -- since somewhere approximate beats nowhere.
     """
     from kumiki.geometry import Line, Plane, Point
-    from kumiki.cropcsg import (
+    from kumiki.csg.cropcsg import (
         approximately_crop_plane_to_area_on_csg,
         crop_line_to_segments_on_csg,
     )
@@ -3346,7 +3346,7 @@ def _feature_anchor(
 
 
 def _timber_body_csg(cut_timber: Any) -> Optional[Any]:
-    from kumiki.feature_paths import timber_body_csg
+    from kumiki.csg.feature_paths import timber_body_csg
     try:
         return timber_body_csg(cut_timber)
     except Exception:
@@ -3354,13 +3354,13 @@ def _timber_body_csg(cut_timber: Any) -> Optional[Any]:
 
 
 def _roots_for_path(cut_timber: Any, labels: Tuple[str, ...]) -> Tuple[List[Any], Tuple[str, ...]]:
-    from kumiki.feature_paths import roots_for_path
+    from kumiki.csg.feature_paths import roots_for_path
     return roots_for_path(cut_timber, labels)
 
 
 def _find_declared_feature(cut_timber: Any, ref: Any) -> Optional[Tuple[Any, Any]]:
     """The feature a FeatureRef names, with the node declaring it."""
-    from kumiki.feature_paths import find_declared_feature
+    from kumiki.csg.feature_paths import find_declared_feature
     hit = find_declared_feature(cut_timber, ref)
     return None if hit is None else (hit.feature, hit.owner)
 
@@ -3379,7 +3379,7 @@ def _resolve_anchor_placed(
 
     None when it cannot be found, so the caller shows the measurement as broken.
     """
-    from kumiki.feature_paths import resolve_feature_path
+    from kumiki.csg.feature_paths import resolve_feature_path
 
     path = deserialize_feature_path(anchor)
     if path is None:
@@ -3659,7 +3659,7 @@ def _serialize_csg_node(
     gone wrong. `path` still carries labels only, since that is what
     find_csg_by_path navigates by.
     """
-    from kumiki.cutcsg import (
+    from kumiki.csg.cutcsg import (
         Difference, Intersection, SolidUnion, csg_children, csg_children_with_parity,
     )
 
@@ -3733,7 +3733,7 @@ def serialize_cut_csg_tree(cut_timber: 'CutTimber') -> Dict[str, Any]:
     rather than one cutting's negative CSG, which is a piece of the input and
     not the thing on screen.
     """
-    from kumiki.cutcsg import CSGParity
+    from kumiki.csg.cutcsg import CSGParity
 
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
     return {"tree": _serialize_csg_node(
@@ -4040,7 +4040,7 @@ def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
     if _looks_like_frame(value):
         return value
 
-    from kumiki.cutcsg import CutCSG
+    from kumiki.csg.cutcsg import CutCSG
     from kumiki.rule import Transform
     from kumiki.timber import CSGAccessory, Frame
 
@@ -4269,7 +4269,7 @@ def _subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
     """Whether *target* is *root* or somewhere beneath it.
 
     """
-    from kumiki.cutcsg import csg_children
+    from kumiki.csg.cutcsg import csg_children
 
     # note this is identity comparison, not quality as 2 CutCSGs can be `==` equivalent but not the same
     if root is target:
@@ -4308,7 +4308,7 @@ def _cutting_for_node(
     single function, so this reads it in a single function; everything else
     here is identity-based.
     """
-    from kumiki.cutcsg import Difference
+    from kumiki.csg.cutcsg import Difference
 
     if not isinstance(local_csg, Difference):
         return None
@@ -4492,7 +4492,7 @@ def _feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
     the authored layer first says which of those two a person would rather
     read.
     """
-    from kumiki.cutcsg import FeatureSource, FeatureTestTolerances
+    from kumiki.csg.cutcsg import FeatureSource, FeatureTestTolerances
 
     hits = csg.find_all_features(point, FeatureTestTolerances(face=eps))
     if not hits:
@@ -4542,7 +4542,7 @@ def _describe_leaf_csg(csg: Any, local_pt: List[float], eps: float = 1e-4) -> st
     timber in scope. Left undone deliberately; the shape of that string is a
     decision, not a detail.
     """
-    from kumiki.cutcsg import Cylinder, HalfSpace
+    from kumiki.csg.cutcsg import Cylinder, HalfSpace
     from kumiki.rule import are_vectors_perpendicular
 
     point = _to_v3(local_pt)
@@ -4583,7 +4583,7 @@ def _describe_leaf_csg(csg: Any, local_pt: List[float], eps: float = 1e-4) -> st
 
 
 def _node_positions(root: 'CutCSG') -> Dict[int, Tuple[int, int, List[str]]]:
-    from kumiki.feature_paths import node_positions
+    from kumiki.csg.feature_paths import node_positions
     return node_positions(root)
 
 
@@ -4626,7 +4626,7 @@ def _edge_tolerance() -> Any:
     The same tolerance the edge was found with -- an edge is selected by
     snapping to it, so the highlight has to be as forgiving as the pick was.
     """
-    from kumiki.cutcsg import FEATURE_EDGE_TOLERANCE
+    from kumiki.csg.cutcsg import FEATURE_EDGE_TOLERANCE
 
     return FEATURE_EDGE_TOLERANCE
 
@@ -4674,7 +4674,7 @@ def _cropped_edge_segments(
     a parent made the parent's own face count as boundary, which is the whole
     length of the arris.
     """
-    from kumiki.cropcsg import (crop_line_to_boundary_segments_on_csg,
+    from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
                                 crop_line_to_segments_on_csg)
     from kumiki.geometry import Line, unit_vector
 
@@ -4840,7 +4840,7 @@ def _features_at_point(
     the ray struck a surface, and the middle of a bore is a bore's radius away
     from every surface the bore has.
     """
-    from kumiki.cutcsg import FeatureTestTolerances
+    from kumiki.csg.cutcsg import FeatureTestTolerances
 
     resolved = tolerances or FeatureTestTolerances(face=eps)
     hits = root.find_all_features(_to_v3(local_pt), resolved)
@@ -4856,7 +4856,7 @@ def _merge_ray_hits(root, hits, local_ray, tolerances):
     about a point -- it is what the POINTER was aiming at, which only the picking
     layer knows. The ordering is the library's, applied once over both lots.
     """
-    from kumiki.cutcsg import _sort_feature_hits
+    from kumiki.csg.cutcsg import _sort_feature_hits
 
     along_ray = _non_real_features_along_ray(root, local_ray, tolerances)
     if not along_ray:
@@ -4881,7 +4881,7 @@ def _non_real_features_along_ray(root, local_ray, tolerances):
     worth -- so this is a screen-space snap, the way any CAD package snaps to a
     centre line.
     """
-    from kumiki.cutcsg import OwnedFeatureHit, csg_children
+    from kumiki.csg.cutcsg import OwnedFeatureHit, csg_children
     from kumiki.geometry import Line
 
     origin, direction = local_ray
@@ -4970,7 +4970,7 @@ def _resolve_derived_feature(hits: List[Any]) -> Optional[Any]:
     but as the product of two parents needs the roundabout treatment of being
     named by them.
     """
-    from kumiki.cutcsg import CSGFeatureType
+    from kumiki.csg.cutcsg import CSGFeatureType
 
     if not hits:
         return None
@@ -5033,7 +5033,7 @@ def _describe_pick(
         feature was selected; and jointName, which is None for the timber's own
         body, since no joint produced that.
     """
-    from kumiki.cutcsg import CSGFeatureType, FeatureTestTolerances
+    from kumiki.csg.cutcsg import CSGFeatureType, FeatureTestTolerances
 
     described: Dict[str, Any] = {
         "nodeKind": type(target).__name__,
@@ -5112,7 +5112,7 @@ def _outward_normal_and_face(
         nearest of six, so the display can show both rather than rounding
         silently.
     """
-    from kumiki.cutcsg import CSGParity, walk_csg_with_parity
+    from kumiki.csg.cutcsg import CSGParity, walk_csg_with_parity
 
     point = _to_v3(local_pt)
     normal = target.get_outward_normal(point, eps)
@@ -5138,7 +5138,7 @@ def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[floa
     transparently.  When *local_pt* is given and multiple children share the
     same label, prefer the one whose boundary contains *local_pt*.
     """
-    from kumiki.cutcsg import SolidUnion, Difference
+    from kumiki.csg.cutcsg import SolidUnion, Difference
 
     def _find_labeled(node: Any, label_name: str) -> List[Any]:
         """Return all descendants of *node* with the given *label*, searching
@@ -5207,7 +5207,7 @@ def _navigate_csg_one_level(
     compound so its children stay numbered against the labelled ancestor a path
     actually names.
     """
-    from kumiki.cutcsg import SolidUnion, Difference
+    from kumiki.csg.cutcsg import SolidUnion, Difference
 
     if segments is None:
         segments = _candidate_segments(node)
@@ -5245,7 +5245,7 @@ def _navigate_csg_to_leaf(
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
     """A plain click: traverse from root to deepest labeled node, then report face."""
-    from kumiki.cutcsg import SolidUnion, Difference
+    from kumiki.csg.cutcsg import SolidUnion, Difference
 
     path: List[str] = []
     node = csg
@@ -5501,7 +5501,7 @@ def _pick_tolerances(payload: Dict[str, Any], eps: float) -> Any:
     Clamped at the bottom by eps, since no amount of zooming in makes a snap
     tighter than the mesh it is snapping on.
     """
-    from kumiki.cutcsg import FeatureTestTolerances
+    from kumiki.csg.cutcsg import FeatureTestTolerances
 
     sent = payload.get("tolerances")
     if not isinstance(sent, dict):
@@ -5669,7 +5669,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
             # and for the same reason: it is the more specific answer at that
             # point. Unlike a derived one it belongs to the node that declared
             # it, so it is placed the way any declared feature is.
-            from kumiki.cutcsg import CSGFeatureType
+            from kumiki.csg.cutcsg import CSGFeatureType
 
             best = feature_hits[0]
             if best.feature.feature_type() in (CSGFeatureType.EDGE, CSGFeatureType.POINT):

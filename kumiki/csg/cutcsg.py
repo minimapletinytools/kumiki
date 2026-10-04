@@ -24,12 +24,12 @@ from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from enum import Enum, Flag
 import warnings
-from .rule import *
-from .geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
+from ..rule import *
+from ..geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
-from .solve_recipe import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef,
-                           Recipe, merge_coincident_planes)
+from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Recipe,
+                       merge_coincident_planes)
 
 
 # ============================================================================

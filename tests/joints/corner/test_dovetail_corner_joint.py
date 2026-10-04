@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 from kumiki import *
 from kumiki.rule import atan, cross_product, safe_normalize_vector
-from kumiki.cutcsg import Difference, SolidUnion
+from kumiki.csg.cutcsg import Difference, SolidUnion
 from kumiki.timber import KumikiArrangementError
 from tests.testing_shavings import create_standard_horizontal_timber
 

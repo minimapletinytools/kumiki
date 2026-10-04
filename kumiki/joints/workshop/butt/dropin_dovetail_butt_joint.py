@@ -28,7 +28,7 @@ from kumiki.rule import (
 from kumiki.measuring import (
     mark_distance_from_end_along_centerline,
 )
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     CutCSGLabel,
     Difference,
     SolidUnion,

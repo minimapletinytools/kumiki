@@ -7,7 +7,7 @@ holds that copy to this file.
 import runpy
 from pathlib import Path
 
-from kumiki.triangles import triangulate_cutcsg
+from kumiki.csg.triangles import triangulate_cutcsg
 
 STARTER_FRAME = Path(__file__).resolve().parent.parent / "patterns" / "structures" / "my_cute_frame.py"
 

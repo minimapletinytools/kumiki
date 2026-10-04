@@ -14,9 +14,9 @@ from .cropcsg import _loft_sides_are_planar, solid_bounds
 from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, CutCSG, Cylinder, Difference, EmptyCSG,
                      FaceFeature, Intersection, SolidUnion)
 from .feature_paths import FeatureHandle
-from .geometry import Plane, perpendicular_axes
+from ..geometry import Plane, perpendicular_axes
 from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
-from .rule import Matrix, V3
+from ..rule import Matrix, V3
 
 Polygon = List[Tuple[float, float]]
 Region = List[Polygon]

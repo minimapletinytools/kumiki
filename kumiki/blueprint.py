@@ -14,7 +14,7 @@ import importlib
 from pathlib import Path
 from typing import Any, List, Optional, Union, cast
 
-from .cutcsg import (
+from .csg.cutcsg import (
     ConvexPolygonExtrusion,
     ConvexPolygonSimpleLoft,
     CutCSG,
@@ -143,7 +143,7 @@ def _cut_timber_to_trimesh(cut_timber: CutTimber, local: bool = False) -> "trime
             (bottom of timber at the origin). If False, return it in global
             coordinates (its actual assembled position and orientation).
     """
-    from .triangles import triangulate_cutcsg
+    from .csg.triangles import triangulate_cutcsg
 
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
     csg = local_csg if local else adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
@@ -159,7 +159,7 @@ def _joint_accessory_to_trimesh(accessory: Accessory, local: bool = False) -> "t
             If False, return it in global coordinates (its actual assembled
             position and orientation).
     """
-    from .triangles import triangulate_cutcsg
+    from .csg.triangles import triangulate_cutcsg
 
     local_csg = accessory.get_csg_local()
     transform = getattr(accessory, "transform", None)

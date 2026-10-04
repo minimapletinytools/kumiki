@@ -36,7 +36,7 @@ from kumiki.measuring import (
     get_center_point_on_face_global,
     Space,
 )
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     CutCSG,
     CutCSGLabel,
     HalfSpace,

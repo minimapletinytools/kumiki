@@ -417,8 +417,8 @@ def mortise_and_tenon_handles():
     Faces: tenon_top, tenon_left, tenon_right, shoulder, mortise_bottom, mortise_front, rough_front.
     Edge: shoulder_edge, where the shoulder meets the butt timber's rough front.
     """
-    from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit
-    from kumiki.feature_paths import FeatureHandle, find_feature
+    from kumiki.csg.cutcsg import DerivedEdgeFeature, OwnedFeatureHit
+    from kumiki.csg.feature_paths import FeatureHandle, find_feature
     from kumiki.identity import ResolvedTimberPath
     from kumiki.timber import Frame
     from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint

@@ -11,7 +11,7 @@
     //
     // Which measurements a pair of features admits is decided by what the two
     // project to here, not by what they are. The table of that, and of what is
-    // worth adding later, is on MeasureKind in kumiki/drawing.py; this applies
+    // worth adding later, is on MeasureKind in kumiki/drawings/drawing.py; this applies
     // it, since only the viewport knows how anything lies to the view.
     //
     // Pure on purpose: the projecting is the viewer's, the arithmetic is here.

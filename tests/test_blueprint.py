@@ -321,7 +321,7 @@ class TestStepOscarshed:
         off by thousands (which would indicate a broken half-space or transform).
         """
         from kumiki.blueprint import _csg_to_ocp, _OCP_AVAILABLE, sympy_to_float
-        from kumiki.cutcsg import adopt_csg
+        from kumiki.csg.cutcsg import adopt_csg
         from kumiki.rule import Transform
         from kumiki.timber import TimberCorner
         _Bnd = importlib.import_module("OCP.Bnd")

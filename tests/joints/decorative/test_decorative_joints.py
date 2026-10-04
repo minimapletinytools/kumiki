@@ -14,8 +14,8 @@ from kumiki.joints.workshop.decorative import (
 from kumiki.ticket import TimberTicket
 from kumiki.rule import scalar, Transform, Matrix, degrees
 from kumiki.timber import Timber, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge
-from kumiki.cutcsg import Difference, Cylinder
-from kumiki.triangles import triangulate_cutcsg
+from kumiki.csg.cutcsg import Difference, Cylinder
+from kumiki.csg.triangles import triangulate_cutcsg
 
 WIDTH = scalar(4)
 HEIGHT = scalar(6)

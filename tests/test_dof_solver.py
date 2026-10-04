@@ -2,7 +2,7 @@
 
 import pytest
 
-from kumiki.dof_solver import remaining
+from kumiki.drawings.dof_solver import remaining
 
 
 def _unit(*names):

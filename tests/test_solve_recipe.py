@@ -5,8 +5,8 @@ import math
 import numpy as np
 import pytest
 
-from kumiki.dof_solver import remaining
-from kumiki.cutcsg import (
+from kumiki.drawings.dof_solver import remaining
+from kumiki.csg.cutcsg import (
     EdgeFeature, FaceFeature, hit_of_kind,
     CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
     DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism,
@@ -15,8 +15,9 @@ from kumiki.cutcsg import (
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
 from tests.testing_shavings import present
-from kumiki.solve_recipe import (
-    Anchor, BarrelCoord, CarrierRef, DistanceMeasurement, PlaneCoord, feature_dof_rows, locate_recipe,
+from kumiki.csg.carriers import BarrelCoord, CarrierRef, PlaneCoord
+from kumiki.drawings.solve_recipe import (
+    Anchor, DistanceMeasurement, feature_dof_rows, locate_recipe,
     direction_motion, measurement_row, motion_along, moved_by, perturbed,
 )
 

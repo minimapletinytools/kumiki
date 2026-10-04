@@ -1,6 +1,6 @@
 """Feature kinds: every feature is a face, an edge, a point or a curved face, and hits are typed by it."""
 
-from kumiki.cutcsg import (HALF_SPACE_PLANE, CurvedFaceFeature, Cylinder, DerivedPointFeature, EdgeFeature, FaceFeature, FeatureGroup,
+from kumiki.csg.cutcsg import (HALF_SPACE_PLANE, CurvedFaceFeature, Cylinder, DerivedPointFeature, EdgeFeature, FaceFeature, FeatureGroup,
                            FeatureOverride, FeatureProperties, HalfSpace, OwnedFeatureHit, PointFeature, PrismFace,
                            RectangularPrism, hit_of_kind, prism_arris_key)
 from kumiki.geometry import Line, Plane, Point

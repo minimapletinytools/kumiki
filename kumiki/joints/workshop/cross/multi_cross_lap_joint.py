@@ -121,7 +121,7 @@ def cut_multi_cross_lap_joint_on_plane_aligned_timbers(
             cut_ratio=cut_ratio,
         ))
 
-    from kumiki.cutcsg import HalfSpace as _HalfSpace
+    from kumiki.csg.cutcsg import HalfSpace as _HalfSpace
 
     # --- Fill-in cuts for non-adjacent board pairs ---
     for n in range(num_boundaries):

@@ -15,13 +15,13 @@ import pytest
 
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
-from kumiki.drawing import Drawing, Measure
+from kumiki.drawings.drawing import Drawing, Measure
 from kumiki.identity import (DerivedFeaturePath, DrawingId, FeaturePath, FeatureRef,
                              JointPath, MeasurementId, ViewportId,
                              ResolvedJointPath, ResolvedTimberPath, SingleFeaturePath,
                              TimberPath)
 from kumiki.timber import Frame
-from kumiki.feature_paths import find_feature
+from kumiki.csg.feature_paths import find_feature
 from tests.testing_shavings import load_module, mortise_and_tenon_handles, present
 
 
@@ -401,7 +401,7 @@ class TestMergeMeasurements:
         assert _feature_names(merged) == [("a", "b"), ("c", "d"), ("e", "f")]
 
 
-# A viewport's id is its position in the layout -- see kumiki/layout.py -- so a
+# A viewport's id is its position in the layout -- see kumiki/drawings/layout.py -- so a
 # drawing keys its measurements by one of these, not by what the view is called.
 # These are the long-face layout one timber gets.
 FRONT, RIGHT = ViewportId("0.0.0"), ViewportId("0.0.1")
@@ -771,7 +771,7 @@ class TestPuttingAPairInOneOrder:
         assert deep.sort_key != shallow.sort_key
 
     def test_measuring_a_to_b_is_measuring_b_to_a(self):
-        from kumiki.drawing import Measure, MeasurementKind, MeasurementPlacement
+        from kumiki.drawings.drawing import Measure, MeasurementKind, MeasurementPlacement
 
         frame, found = mortise_and_tenon_handles()
         face, edge = found["tenon_left"], found["shoulder_edge"]
@@ -811,7 +811,7 @@ class TestResolvingAnchors:
         # local value rather than against another feature: a tenon's tip and the
         # mortise floor it seats on genuinely do land in the same place, so two
         # features agreeing proves nothing either way.
-        from kumiki.cutcsg import csg_children
+        from kumiki.csg.cutcsg import csg_children
 
         def local_anchor(timber_path, feature_name):
             cut = next(c for c in measured.cut_timbers if c.timber.ticket.path == timber_path)

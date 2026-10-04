@@ -15,7 +15,7 @@ from kumiki.joints.workshop.shavings.shavings import (
 from kumiki.joints.workshop.shavings.relief import chop_shoulder_notch_on_timber_face
 from kumiki.timber import create_timber, TimberEnd, TimberFace, TimberLongFace
 from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel, scalar, safe_equality_test
-from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace, CutCSGLabel
+from kumiki.csg.cutcsg import SolidUnion, RectangularPrism, HalfSpace, CutCSGLabel
 from kumiki.measuring import mark_distance_from_end_along_centerline
 
 # TODO too many tests, just delete some lol... or combine into 1 test that varies only the timber length...

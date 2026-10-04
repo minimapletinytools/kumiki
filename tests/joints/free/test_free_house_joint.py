@@ -14,7 +14,7 @@ from tests.testing_shavings import (
 def _render_cutting(cutting: Cutting):
     return CutTimber(cutting.timber, cuts=[cutting]).render_timber_with_cuts_csg_local()
 
-from kumiki.cutcsg import HalfSpace
+from kumiki.csg.cutcsg import HalfSpace
 
 class TestFreeHouseJoint:
     """Test cut_free_house_joint function."""

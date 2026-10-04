@@ -89,7 +89,7 @@ This is approximate only for slivers narrower than the sampling. Documented, not
 
 ## Deliverables
 
-1. **`kumiki/planar_region.py`:** a region as a list of disjoint convex polygons in a plane frame. Union, intersect, subtract (convex − convex splits into at most k convex pieces), area, sliver filter. Unit tested on its own.
+1. **`kumiki/csg/planar_region.py`:** a region as a list of disjoint convex polygons in a plane frame. Union, intersect, subtract (convex − convex splits into at most k convex pieces), area, sliver filter. Unit tested on its own.
 2. **`two_sided_section(csg, plane)`** in `cropcsg.py`, with a per-primitive convex half-space provider (the table above).
 3. **`required_features(cut_timber) -> RequiredSet`:** every declared feature with
    - its class (table above)
@@ -113,7 +113,7 @@ This is approximate only for slivers narrower than the sampling. Documented, not
 
 Five pieces. A is pure linear algebra. B and C are where kinds of feature and primitive live. D connects them to the drawing, and E generates measurements.
 
-## A. Core: `kumiki/dof_solver.py`
+## A. Core: `kumiki/drawings/dof_solver.py`
 
 Pure numpy, no kumiki imports.
 
@@ -227,7 +227,7 @@ One small class per carrier kind, holding pure geometry. Each provides:
 
 The last column is why the output is feature dependent. A DOF count is generic. But turning "this combination is free" into "measure this" depends on the carrier: an offset wants a distance along the normal, a tilt wants an angle or a spread second distance, and a radius accepts only a diameter.
 
-## D. Interface layer: `kumiki/feature_solving.py`
+## D. Interface layer: `kumiki/drawings/feature_solving.py`
 
 Features and `Measure`s in, a per-feature report out.
 

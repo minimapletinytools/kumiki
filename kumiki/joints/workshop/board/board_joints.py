@@ -22,7 +22,7 @@ from kumiki.rule import (
     safe_normalize_vector,
     safe_equality_test,
 )
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     CutCSGLabel,
     RectangularPrism,
     ConvexPolygonExtrusion,

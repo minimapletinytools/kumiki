@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Sequence, 
 
 from .cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, DerivedPointFeature, Difference, F_co,
                      OwnedFeatureHit, SolidUnion, csg_children, shared_ancestor)
-from .identity import (DerivedFeaturePath, FeaturePath, FeatureRef, ResolvedJointPath,
+from ..identity import (DerivedFeaturePath, FeaturePath, FeatureRef, ResolvedJointPath,
                        ResolvedTimberPath, SingleFeaturePath)
 
 if TYPE_CHECKING:
-    from .timber import CutTimber, Frame, PerfectTimberWithin
+    from ..timber import CutTimber, Frame, PerfectTimberWithin
 
 
 def _same_hit(one: OwnedFeatureHit, other: OwnedFeatureHit) -> bool:

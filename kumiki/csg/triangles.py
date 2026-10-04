@@ -28,7 +28,7 @@ from .cutcsg import (
     SolidUnion,
 )
 from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
-from .rule import Matrix, Numeric, Transform, V2, V3
+from ..rule import Matrix, Numeric, Transform, V2, V3
 
 
 TRIANGLES_FLOAT_DIGITS = 8

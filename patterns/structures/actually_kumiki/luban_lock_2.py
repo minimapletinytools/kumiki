@@ -20,7 +20,7 @@ in the solver (currently raises NotImplementedError).
 """
 
 from kumiki import *
-from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion
+from kumiki.csg.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion
 from kumiki.assembly import RotationDof, TranslationDof
 
 

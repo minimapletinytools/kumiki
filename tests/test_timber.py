@@ -828,7 +828,7 @@ class TestCutTimber:
         csg = cut_timber._extended_timber_without_cuts_csg_local()
         
         # Should be a finite prism
-        from kumiki.cutcsg import RectangularPrism
+        from kumiki.csg.cutcsg import RectangularPrism
         assert isinstance(csg, RectangularPrism)
         
         # In LOCAL coordinates (relative to bottom_position):
@@ -907,7 +907,7 @@ class TestCutTimber:
         csg = cut_timber.render_timber_with_cuts_csg_local()
         
         # Should be a RectangularPrism (since no cuts means no Difference operation)
-        from kumiki.cutcsg import RectangularPrism
+        from kumiki.csg.cutcsg import RectangularPrism
         assert isinstance(csg, RectangularPrism)
         assert csg.size == size
         assert csg.start_distance == 0
@@ -924,7 +924,7 @@ class TestCutTimber:
         timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         
         # Add a cut (a simple half-plane cut at z=50 in local coordinates)
-        from kumiki.cutcsg import HalfSpace
+        from kumiki.csg.cutcsg import HalfSpace
         # Create a half plane that cuts perpendicular to the timber length
         # Normal pointing in +Z direction, offset at 50
         half_plane = HalfSpace(
@@ -942,7 +942,7 @@ class TestCutTimber:
         csg = cut_timber.render_timber_with_cuts_csg_local()
         
         # Should be a Difference operation
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
         assert isinstance(csg, Difference)
         assert isinstance(csg.base, RectangularPrism)
         assert len(csg.subtract) == 1
@@ -962,7 +962,7 @@ class TestCutTimber:
         timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         
         # Add two cuts
-        from kumiki.cutcsg import HalfSpace
+        from kumiki.csg.cutcsg import HalfSpace
         half_plane1 = HalfSpace(
             normal=Matrix([scalar(0), scalar(0), scalar(1)]),
             offset=scalar(25)
@@ -987,7 +987,7 @@ class TestCutTimber:
         csg = cut_timber.render_timber_with_cuts_csg_local()
         
         # Should be a Difference operation
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
         assert isinstance(csg, Difference)
         assert isinstance(csg.base, RectangularPrism)
         assert len(csg.subtract) == 2
@@ -1007,7 +1007,7 @@ class TestCutTimber:
         timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         
         # Add an end cut at the top
-        from kumiki.cutcsg import HalfSpace
+        from kumiki.csg.cutcsg import HalfSpace
         half_plane = HalfSpace(
             normal=Matrix([scalar(0), scalar(0), scalar(-1)]),
             offset=scalar(-50)
@@ -1024,7 +1024,7 @@ class TestCutTimber:
         csg = cut_timber.render_timber_with_cuts_csg_local()
         
         # Should be a Difference operation
-        from kumiki.cutcsg import Difference, RectangularPrism
+        from kumiki.csg.cutcsg import Difference, RectangularPrism
         assert isinstance(csg, Difference)
         assert isinstance(csg.base, RectangularPrism)
         

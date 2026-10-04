@@ -33,7 +33,7 @@ from kumiki.measuring import (
     locate_bottom_center_position,
     get_center_point_on_face_global,
 )
-from kumiki.cutcsg import CutCSGLabel, HalfSpace
+from kumiki.csg.cutcsg import CutCSGLabel, HalfSpace
 from ..shavings.relief import (
     warn_if_arrangement_timbers_imperfect,
     ButtJointScribeReliefConfig,

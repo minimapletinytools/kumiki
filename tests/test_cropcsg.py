@@ -1,4 +1,4 @@
-"""Tests for where a feature actually is (kumiki/cropcsg.py).
+"""Tests for where a feature actually is (kumiki/csg/cropcsg.py).
 
 The declared extent of a feature is the extent of the primitive it was declared
 on, and primitives are deliberately not the finished piece. These pin the
@@ -9,11 +9,11 @@ import pytest
 
 from dataclasses import dataclass
 
-from kumiki.cutcsg import AxisAlignedBoundingBox, CutCSG, HalfSpace, RectangularPrism
+from kumiki.csg.cutcsg import AxisAlignedBoundingBox, CutCSG, HalfSpace, RectangularPrism
 from kumiki.geometry import (
     ConvexPlanarRegion, Line, LineSegment, Plane, frame_for_plane,
 )
-from kumiki.cropcsg import (
+from kumiki.csg.cropcsg import (
     approximately_crop_plane_to_area_on_csg,
     BoundsKind,
     solid_bounds,
@@ -114,12 +114,12 @@ class TestBoundingHalfSpaces:
     def test_a_shape_it_cannot_describe_says_so(self):
         # None rather than an empty list: "does not bound" and "cannot say"
         # are different answers, and only the second should stop a caller.
-        from kumiki.cutcsg import EmptyCSG
+        from kumiki.csg.cutcsg import EmptyCSG
 
         assert solid_bounds(EmptyCSG()).is_empty
 
     def test_the_three_answers_are_told_apart(self):
-        from kumiki.cutcsg import EmptyCSG
+        from kumiki.csg.cutcsg import EmptyCSG
 
         assert solid_bounds(_box()).kind is BoundsKind.HALF_SPACES
         assert solid_bounds(EmptyCSG()).kind is BoundsKind.EMPTY
@@ -132,7 +132,7 @@ class TestBoundingHalfSpaces:
         everything -- so a caller that forgot to check the tag would silently
         return too much. This way it raises instead.
         """
-        from kumiki.cutcsg import EmptyCSG
+        from kumiki.csg.cutcsg import EmptyCSG
 
         for csg in (EmptyCSG(), _undescribable()):
             with pytest.raises(TypeError):
@@ -186,7 +186,7 @@ class TestRegionInPlane:
         # crops used to disagree about which one this was, and an empty solid
         # is not hypothetical -- a timber whose stock is already perfect puts
         # one in its own tree.
-        from kumiki.cutcsg import EmptyCSG
+        from kumiki.csg.cutcsg import EmptyCSG
 
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
 
@@ -238,7 +238,7 @@ class TestLoftedSolids:
         ]
 
     def _loft(self, bottom, top):
-        from kumiki.cutcsg import ConvexPolygonSimpleLoft
+        from kumiki.csg.cutcsg import ConvexPolygonSimpleLoft
 
         return ConvexPolygonSimpleLoft(
             bottom_points=bottom, top_points=top,
@@ -473,7 +473,7 @@ class TestCropLineToSegmentsOnCsg:
     def test_one_undescribable_solid_loses_the_whole_answer(self):
         # Not a shortened segment built from the parts it did understand: a
         # partial answer is wrong in a direction nobody can see.
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
         tree = Difference(base=_box(), subtract=[_undescribable()])
@@ -486,7 +486,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
     """The hexagon circumscribes the cylinder, so it reports chords too long."""
 
     def _cylinder(self, radius=1.0, start=0.0, end=10.0, axis=None):
-        from kumiki.cutcsg import Cylinder
+        from kumiki.csg.cutcsg import Cylinder
 
         return Cylinder(
             axis_direction=axis if axis is not None else _v(0, 0, 1),
@@ -522,7 +522,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         """
         import math
 
-        from kumiki.cropcsg import _spans_within_primitive, solid_bounds
+        from kumiki.csg.cropcsg import _spans_within_primitive, solid_bounds
 
         offset, angle = 0.99, math.radians(30)
         along = _v(math.cos(angle), math.sin(angle), 0)
@@ -564,7 +564,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         arris where the bore meets a face. Widening the bore to find it would
         delete it instead.
         """
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         body = _box(size=(4, 4), start=0.0, end=10.0)
         bore = self._cylinder(radius=1.0, start=-1.0, end=11.0)
@@ -577,7 +577,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         assert span[1] - span[0] == pytest.approx(10.0, abs=3e-3)
 
     def test_a_bore_shortens_a_line_that_runs_through_it(self):
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         body = _box(size=(4, 4), start=0.0, end=10.0)
         # Across the body, straight through the middle of the bore.
@@ -629,7 +629,7 @@ class TestALineOnABoundaryIsKept:
         return sum(segment.length() for segment in (segments or []))
 
     def _bore(self, radius=1.0, start=-1.0, end=11.0):
-        from kumiki.cutcsg import Cylinder
+        from kumiki.csg.cutcsg import Cylinder
 
         return Cylinder(axis_direction=_v(0, 0, 1), radius=scalar(radius),
                         position=_v(0, 0, 0), start_distance=scalar(start),
@@ -640,7 +640,7 @@ class TestALineOnABoundaryIsKept:
                           _box(size=(4, 4), start=0, end=10)) == pytest.approx(10.0)
 
     def test_on_a_flat_face_being_removed(self):
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         tree = Difference(base=_box(size=(8, 4), start=0, end=10),
                           subtract=[_box(size=(4, 4), start=0, end=10, position=(4, 0, 0))])
@@ -655,7 +655,7 @@ class TestALineOnABoundaryIsKept:
     def test_on_a_barrel_being_removed(self):
         # The arris down the wall of a bore. Widening the bore to find it would
         # be the one thing that deletes it.
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         tree = Difference(base=_box(size=(4, 4), start=0, end=10), subtract=[self._bore()])
 
@@ -663,7 +663,7 @@ class TestALineOnABoundaryIsKept:
                           tree) == pytest.approx(10.0)
 
     def test_on_a_cap_of_something_being_removed(self):
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         tree = Difference(base=_box(size=(4, 4), start=0, end=10),
                           subtract=[_box(size=(4, 4), start=5, end=20)])
@@ -672,7 +672,7 @@ class TestALineOnABoundaryIsKept:
                           tree) == pytest.approx(4.0)
 
     def test_and_still_with_a_tolerance_in_play(self):
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         tree = Difference(base=_box(size=(4, 4), start=0, end=10), subtract=[self._bore()])
 
@@ -692,12 +692,12 @@ class TestWhatIsSolvedAndWhatIsBounded:
         return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
 
     def _solved(self, csg):
-        from kumiki.cropcsg import _exact_spans
+        from kumiki.csg.cropcsg import _exact_spans
 
         return _exact_spans(csg, self._line(), (-10.0, 10.0), 0.0, False) is not None
 
     def _loft(self, bottom, top):
-        from kumiki.cutcsg import ConvexPolygonSimpleLoft
+        from kumiki.csg.cutcsg import ConvexPolygonSimpleLoft
 
         return ConvexPolygonSimpleLoft(
             bottom_points=bottom, top_points=top,
@@ -706,7 +706,7 @@ class TestWhatIsSolvedAndWhatIsBounded:
             bottom_points_z_pos=scalar(0), top_points_z_pos=scalar(1))
 
     def test_the_shapes_that_are_their_own_half_spaces(self):
-        from kumiki.cutcsg import ConvexPolygonExtrusion, HalfSpace
+        from kumiki.csg.cutcsg import ConvexPolygonExtrusion, HalfSpace
 
         square = [_p(-1, -1), _p(1, -1), _p(1, 1), _p(-1, 1)]
         assert self._solved(HalfSpace(normal=_v(0, 0, 1), offset=scalar(0)))
@@ -738,7 +738,7 @@ class TestWhatIsSolvedAndWhatIsBounded:
              math.sin(turn) * x + math.cos(turn) * y) for x, y in square]))
 
     def test_a_path_extrusion_still_falls_through_to_the_bound(self):
-        from kumiki.pathcsg import FancyPath, PathExtrusion, StraightSegment
+        from kumiki.csg.pathcsg import FancyPath, PathExtrusion, StraightSegment
         from kumiki.rule import create_v2
 
         def corner(x, y):
@@ -765,7 +765,7 @@ class TestCroppingThroughTheTree:
         return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
 
     def test_a_cut_at_one_end_shortens_the_edge(self):
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         tree = Difference(base=_box(start=0.0, end=1.0),
                           subtract=[_box(start=0.75, end=2.0)])
@@ -780,7 +780,7 @@ class TestCroppingThroughTheTree:
         # The reason this returns a list at all. A mortise crossing an arris
         # leaves two pieces, and one segment spanning both would draw straight
         # through the hole.
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         tree = Difference(base=_box(start=0.0, end=1.0),
                           subtract=[_box(start=0.4, end=0.6)])
@@ -793,7 +793,7 @@ class TestCroppingThroughTheTree:
         assert segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.6, 1.0), abs=1e-9)
 
     def test_two_cuts_leave_three_pieces(self):
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         tree = Difference(base=_box(start=0.0, end=1.0),
                           subtract=[_box(start=0.2, end=0.3), _box(start=0.6, end=0.7)])
@@ -804,7 +804,7 @@ class TestCroppingThroughTheTree:
         assert len(segments) == 3
 
     def test_a_cut_that_removes_all_of_it_leaves_nothing(self):
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         tree = Difference(base=_box(start=0.0, end=1.0),
                           subtract=[_box(start=-1.0, end=2.0)])
@@ -817,7 +817,7 @@ class TestCroppingThroughTheTree:
         # the box's own corner, and the cut's wall is flush with the face it
         # opens onto -- so the cut touches the edge without removing any of it.
         # Widening the subtractor by the tolerance would delete the arris.
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         arris = Line(direction=_v(0, 0, 1), point=_v(0.05, 0.1, 0))
         flush = _box(size=(0.1, 0.2), start=0.0, end=1.0, position=(0.1, 0.0, 0.0))
@@ -846,7 +846,7 @@ class TestCroppingThroughTheTree:
         reading the line: on the line alone this is indistinguishable from a
         cut that planes the arris away.
         """
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         arris = Line(direction=_v(0, 0, 1), point=_v(0.05, 0.1, 0))
         # Reaches past the corner in y, so the material inside the arris is gone.
@@ -868,7 +868,7 @@ class TestCroppingThroughTheTree:
         straight across the opening. On a cross lap that was 127mm of edge
         drawn through thin air.
         """
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         arris = Line(direction=_v(0, 0, 1), point=_v(0.05, 0.1, 0))
         # Reaching past the base's front face rather than stopping on it, which
@@ -886,7 +886,7 @@ class TestCroppingThroughTheTree:
         assert segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.6, 1.0), abs=1e-9)
 
     def test_a_union_joins_what_each_child_covers(self):
-        from kumiki.cutcsg import SolidUnion
+        from kumiki.csg.cutcsg import SolidUnion
 
         tree = SolidUnion(children=[_box(start=0.0, end=0.5), _box(start=0.5, end=1.0)])
 
@@ -897,7 +897,7 @@ class TestCroppingThroughTheTree:
         assert high == pytest.approx(1.0, abs=1e-9)
 
     def test_a_union_of_two_apart_leaves_two_pieces(self):
-        from kumiki.cutcsg import SolidUnion
+        from kumiki.csg.cutcsg import SolidUnion
 
         tree = SolidUnion(children=[_box(start=0.0, end=0.3), _box(start=0.7, end=1.0)])
 
@@ -905,7 +905,7 @@ class TestCroppingThroughTheTree:
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))) == 2
 
     def test_an_intersection_keeps_only_the_overlap(self):
-        from kumiki.cutcsg import Intersection
+        from kumiki.csg.cutcsg import Intersection
 
         tree = Intersection(left=_box(start=0.0, end=0.8), right=_box(start=0.4, end=1.0))
 
@@ -916,13 +916,13 @@ class TestCroppingThroughTheTree:
         assert high == pytest.approx(0.8, abs=1e-9)
 
     def test_an_empty_solid_contains_no_line(self):
-        from kumiki.cutcsg import EmptyCSG
+        from kumiki.csg.cutcsg import EmptyCSG
 
         assert crop_line_to_segments_on_csg(
             self._line(), EmptyCSG(), seed_reach=10, near=_v(0, 0, 0)) == []
 
     def test_subtracting_nothing_changes_nothing(self):
-        from kumiki.cutcsg import Difference, EmptyCSG
+        from kumiki.csg.cutcsg import Difference, EmptyCSG
 
         tree = Difference(base=_box(start=0.0, end=1.0), subtract=[EmptyCSG()])
 
@@ -936,7 +936,7 @@ class TestCroppingThroughTheTree:
         # down the middle of a hole, so once the bore is subtracted the axis is
         # on none of what is left. The sampler said None for this; [] is the
         # same answer said properly -- "not there", not "cannot tell".
-        from kumiki.cutcsg import Cylinder, Difference
+        from kumiki.csg.cutcsg import Cylinder, Difference
 
         body = _box(size=(4, 6), start=0.0, end=10.0)
         bore = Cylinder(
@@ -957,7 +957,7 @@ class TestCroppingThroughTheTree:
         # The subtracted solid is itself a box with its middle removed, so the
         # middle survives in the result. Gets the tolerance sign flip wrong and
         # this comes back as one span or none.
-        from kumiki.cutcsg import Difference
+        from kumiki.csg.cutcsg import Difference
 
         hollow = Difference(base=_box(start=0.2, end=0.8), subtract=[_box(start=0.4, end=0.6)])
         tree = Difference(base=_box(start=0.0, end=1.0), subtract=[hollow])
@@ -987,7 +987,7 @@ class TestCurvedAndPointyPrimitives:
     """The primitives that are described by points or curves rather than planes."""
 
     def _cylinder(self, start=0.0, end=1.0, radius=0.05):
-        from kumiki.cutcsg import Cylinder
+        from kumiki.csg.cutcsg import Cylinder
 
         return Cylinder(
             axis_direction=_v(0, 0, 1), radius=scalar(radius), position=_v(0, 0, 0),
@@ -1020,7 +1020,7 @@ class TestCurvedAndPointyPrimitives:
         assert len(region.boundary) == 6
 
     def _extrusion(self, points, start=0.0, end=2.0):
-        from kumiki.cutcsg import ConvexPolygonExtrusion
+        from kumiki.csg.cutcsg import ConvexPolygonExtrusion
 
         return ConvexPolygonExtrusion(
             points=[_p(x, y) for x, y in points],
@@ -1057,7 +1057,7 @@ class TestSquareJointNeedsNoBackExtension:
         from pathlib import Path as _Path
 
         sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
-        from kumiki.cutcsg import csg_children
+        from kumiki.csg.cutcsg import csg_children
         from kumiki.timber import Frame
         from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
 
@@ -1107,7 +1107,7 @@ class TestObliqueJointStillBuilds:
         return example_brace_joint()
 
     def test_a_braced_joint_builds_and_stays_bounded(self):
-        from kumiki.cutcsg import csg_children
+        from kumiki.csg.cutcsg import csg_children
 
         prisms = {}
 

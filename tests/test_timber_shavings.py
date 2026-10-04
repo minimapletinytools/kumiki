@@ -325,7 +325,7 @@ class TestPeg:
         csg = peg.get_csg_local()
         
         # Should return a RectangularPrism
-        from kumiki.cutcsg import RectangularPrism
+        from kumiki.csg.cutcsg import RectangularPrism
         assert isinstance(csg, RectangularPrism)
         
         # Verify dimensions
@@ -347,7 +347,7 @@ class TestPeg:
         csg = peg.get_csg_local()
         
         # Should return a Cylinder
-        from kumiki.cutcsg import Cylinder
+        from kumiki.csg.cutcsg import Cylinder
         assert isinstance(csg, Cylinder)
         
         # Verify dimensions
@@ -418,7 +418,7 @@ class TestWedge:
         csg = wedge.get_csg_local()
         
         # Should return a ConvexPolygonExtrusion 
-        from kumiki.cutcsg import ConvexPolygonExtrusion
+        from kumiki.csg.cutcsg import ConvexPolygonExtrusion
         assert isinstance(csg, ConvexPolygonExtrusion)
         
 

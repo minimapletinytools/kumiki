@@ -68,7 +68,7 @@ BLUE:
 """
 
 from kumiki import *
-from kumiki.cutcsg import RectangularPrism, SolidUnion
+from kumiki.csg.cutcsg import RectangularPrism, SolidUnion
 
 
 # --- Dimensions -----------------------------------------------------------

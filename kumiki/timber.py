@@ -10,9 +10,9 @@ from dataclasses import replace as dataclass_replace
 
 from .rule import *
 from .footprint import *
-from .cutcsg import *
+from .csg.cutcsg import *
 from .ticket import Ticket, TimberTicket, AccessoryTicket, JointTicket
-from .drawing import Drawing
+from .drawings.drawing import Drawing
 from .assembly import (
     AssemblyFreedom,
     AssemblyJoint,
@@ -2524,7 +2524,7 @@ class Frame:
 
     def _check_drawings_are_of_this_frame(self) -> None:
         """Raise if a drawing names a timber, or a measurement a feature, that isn't this frame's own object."""
-        from .feature_paths import to_feature_path
+        from .csg.feature_paths import to_feature_path
 
         for drawing in self.drawings:
             for timber in drawing.timbers:

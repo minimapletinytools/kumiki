@@ -17,7 +17,7 @@ import pytest
 
 from tests.testing_shavings import load_module
 
-from kumiki.drawing import MeasurementPlane
+from kumiki.drawings.drawing import MeasurementPlane
 
 
 def _load_runner():

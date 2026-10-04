@@ -25,7 +25,7 @@ from kumiki.rule import (
     cos,
     sin,
 )
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     CutCSG,
     CutCSGLabel,
     SolidUnion,

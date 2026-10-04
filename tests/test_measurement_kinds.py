@@ -1,4 +1,4 @@
-"""Measurement kinds: what a dimension is measuring (kumiki/drawing.py).
+"""Measurement kinds: what a dimension is measuring (kumiki/drawings/drawing.py).
 
 The rules live here and only here. They used to live in the viewer as well,
 because the projection needs a camera and only the viewer has one -- and this
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from kumiki.drawing import (
+from kumiki.drawings.drawing import (
     Measure,
     MeasurementDirection,
     MeasurementFeature,
@@ -25,14 +25,14 @@ from kumiki.drawing import (
     does_override,
     kinds_for,
 )
-from kumiki.feature_paths import to_feature_path
+from kumiki.csg.feature_paths import to_feature_path
 from kumiki.geometry import Line, Plane, Point
 from kumiki.rule import create_v3
 from tests.testing_shavings import load_module, mortise_and_tenon_handles, present
 
 
 def geometry(wire):
-    """A wire-form geometry as the primitive kumiki.drawing takes.
+    """A wire-form geometry as the primitive kumiki.drawings.drawing takes.
 
     The dicts in this file are the WIRE form on purpose: the same values go to
     node, as JSON, for the parity tests below. Python stopped taking that shape
@@ -149,13 +149,13 @@ class TestWhatAFeatureLooksLikeOnTheSheet:
     GAZE = create_v3(0, -1, 0)
 
     def test_a_point_stays_where_it_is(self):
-        from kumiki.drawing import project_geometry_for_measuring as project
+        from kumiki.drawings.drawing import project_geometry_for_measuring as project
 
         at = Point(position=create_v3(1, 2, 3))
         assert project(at, self.GAZE) is at
 
     def test_an_edge_seen_end_on_becomes_a_point(self):
-        from kumiki.drawing import project_geometry_for_measuring as project
+        from kumiki.drawings.drawing import project_geometry_for_measuring as project
 
         end_on = Line(direction=create_v3(0, 1, 0), point=create_v3(1, 2, 3))
         seen = project(end_on, self.GAZE)
@@ -163,7 +163,7 @@ class TestWhatAFeatureLooksLikeOnTheSheet:
         assert list(seen.position) == pytest.approx([1, 2, 3])
 
     def test_an_edge_seen_across_stays_a_line_flattened_onto_the_sheet(self):
-        from kumiki.drawing import project_geometry_for_measuring as project
+        from kumiki.drawings.drawing import project_geometry_for_measuring as project
 
         leaning = Line(direction=create_v3(0, 1, 1), point=create_v3(0, 0, 0))
         seen = project(leaning, self.GAZE)
@@ -172,7 +172,7 @@ class TestWhatAFeatureLooksLikeOnTheSheet:
         assert list(seen.direction) == pytest.approx([0, 0, 1])
 
     def test_a_face_seen_edge_on_draws_as_a_line_along_itself(self):
-        from kumiki.drawing import project_geometry_for_measuring as project
+        from kumiki.drawings.drawing import project_geometry_for_measuring as project
 
         upright = Plane(normal=create_v3(0, 0, 1), point=create_v3(0, 0, 5))
         seen = project(upright, self.GAZE)
@@ -181,14 +181,14 @@ class TestWhatAFeatureLooksLikeOnTheSheet:
         assert abs(float(seen.direction[0])) == pytest.approx(1.0)
 
     def test_a_face_seen_at_an_angle_covers_the_view_and_projects_to_nothing(self):
-        from kumiki.drawing import project_geometry_for_measuring as project
+        from kumiki.drawings.drawing import project_geometry_for_measuring as project
 
         facing_you = Plane(normal=create_v3(0, 1, 0), point=create_v3(0, 0, 0))
         assert project(facing_you, self.GAZE) is None
 
     def test_a_feature_lying_on_no_plane_or_line_projects_to_nothing(self):
         """A cylinder's barrel: good to select, never located."""
-        from kumiki.drawing import project_geometry_for_measuring as project
+        from kumiki.drawings.drawing import project_geometry_for_measuring as project
 
         assert project(None, self.GAZE) is None
 
@@ -208,28 +208,28 @@ class TestWhatTheSolidAdmits:
     ALONG = {"kind": "line", "direction": [1, 0, 0]}
 
     def test_a_face_is_a_plane_from_wherever_it_is_seen(self):
-        from kumiki.drawing import MeasurementFeature, form_of
+        from kumiki.drawings.drawing import MeasurementFeature, form_of
 
         assert form_of(geometry(self.TOP)) is MeasurementFeature.PLANE
 
     def test_an_edge_is_a_line_even_when_it_points_at_you(self):
-        from kumiki.drawing import MeasurementFeature, form_of
+        from kumiki.drawings.drawing import MeasurementFeature, form_of
 
         assert form_of(geometry(self.UPRIGHT)) is MeasurementFeature.LINE
 
     def test_two_faces_meeting_at_a_corner_admit_an_angle(self):
-        from kumiki.drawing import three_d_kinds
+        from kumiki.drawings.drawing import three_d_kinds
 
         assert [k.name for k in three_d_kinds(geometry(self.SIDE), geometry(self.TOP))] == ["angle"]
 
     def test_two_parallel_faces_admit_the_distance_between_them(self):
-        from kumiki.drawing import three_d_kinds
+        from kumiki.drawings.drawing import three_d_kinds
 
         assert [k.name for k in three_d_kinds(geometry(self.SIDE), geometry(self.FAR_SIDE))] == [
             "perpendicular_distance"]
 
     def test_crossing_edges_admit_an_angle(self):
-        from kumiki.drawing import three_d_kinds
+        from kumiki.drawings.drawing import three_d_kinds
 
         assert [k.name for k in three_d_kinds(geometry(self.UPRIGHT), geometry(self.ALONG))] == ["angle"]
 
@@ -240,24 +240,24 @@ class TestWhatTheSolidAdmits:
         comparing the two as though both were directions would call this a
         crossing and offer an angle of nothing.
         """
-        from kumiki.drawing import three_d_kinds
+        from kumiki.drawings.drawing import three_d_kinds
 
         assert [k.name for k in three_d_kinds(geometry(self.UPRIGHT), geometry(self.SIDE))] == [
             "perpendicular_distance"]
 
     def test_an_edge_square_to_a_face_crosses_it(self):
-        from kumiki.drawing import three_d_kinds
+        from kumiki.drawings.drawing import three_d_kinds
 
         assert [k.name for k in three_d_kinds(geometry(self.ALONG), geometry(self.SIDE))] == ["angle"]
 
     def test_a_feature_lying_on_nothing_admits_nothing(self):
-        from kumiki.drawing import three_d_kinds
+        from kumiki.drawings.drawing import three_d_kinds
 
         assert three_d_kinds(geometry({"kind": "barrel"}), geometry(self.SIDE)) == ()
 
     def test_the_solid_never_offers_a_direction_of_the_sheet(self):
         """Horizontal and vertical are the page's, and the solid has no up."""
-        from kumiki.drawing import MeasurementDirection, three_d_kinds
+        from kumiki.drawings.drawing import MeasurementDirection, three_d_kinds
 
         for a in (self.SIDE, self.TOP, self.UPRIGHT, self.ALONG):
             for b in (self.SIDE, self.TOP, self.UPRIGHT, self.ALONG):
@@ -504,7 +504,7 @@ class TestEveryKindHasANameAPersonWouldUse:
     LOOK = [0, 0, -1]
 
     def _every_kind(self):
-        from kumiki.drawing import projected_kinds, three_d_kinds
+        from kumiki.drawings.drawing import projected_kinds, three_d_kinds
 
         names = set()
         for one in self.SHAPES:

@@ -13,8 +13,8 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
-from kumiki.drawing import Drawing, Measure
-from kumiki.feature_paths import find_feature
+from kumiki.drawings.drawing import Drawing, Measure
+from kumiki.csg.feature_paths import find_feature
 from kumiki.identity import ResolvedTimberPath, ViewportId
 from kumiki.timber import Frame
 from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
@@ -60,7 +60,7 @@ def build_frame():
                 timbers=[_timber("receiving_timber")],
                 measurements={
                     # Keyed by viewport id, which is a POSITION in the layout --
-                    # see kumiki/layout.py. "0.0.0" and "0.0.1" are the first two
+                    # see kumiki/drawings/layout.py. "0.0.0" and "0.0.1" are the first two
                     # rows of the left column, the front and right elevations of
                     # the long-face layout one timber gets.
                     ViewportId("0.0.0"): [Measure(anchor_a=mortise_bottom, anchor_b=mortise_front)],

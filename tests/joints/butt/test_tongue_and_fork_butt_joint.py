@@ -11,7 +11,7 @@ from tests.testing_shavings import (
 )
 from kumiki.rule import inches, degrees, are_vectors_parallel, safe_dot_product, safe_normalize_vector
 from kumiki.ticket import TimberTicket
-from kumiki.cutcsg import Difference, SolidUnion, ConvexPolygonExtrusion, RectangularPrism, HalfSpace
+from kumiki.csg.cutcsg import Difference, SolidUnion, ConvexPolygonExtrusion, RectangularPrism, HalfSpace
 from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     create_canonical_example_corner_joint_timbers,

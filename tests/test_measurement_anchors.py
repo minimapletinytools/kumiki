@@ -13,7 +13,7 @@ import math
 
 import pytest
 
-from kumiki.drawing import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
+from kumiki.drawings.drawing import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
                             ViewAxes,
                             MeasurementOperation, MeasurementSpace, distance_anchors)
 from kumiki.rule import create_v3
@@ -242,7 +242,7 @@ class TestOnARealFrame:
         return runner, runner.collect_drawings(frame, None, [])
 
     def _measurements(self, runner, drawings):
-        from kumiki.drawing import projected_kinds
+        from kumiki.drawings.drawing import projected_kinds
 
         for drawing in drawings:
             for viewport in drawing.get("viewports") or []:
@@ -395,8 +395,8 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         return runner, entry
 
     def _spans(self, runner, entry, look):
-        from kumiki.cutcsg import CSGFeatureType, FeatureTestTolerances
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.cutcsg import CSGFeatureType, FeatureTestTolerances
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         timber = entry["timber"]
         root = entry["cutTimber"].render_timber_with_cuts_csg_local()
@@ -454,7 +454,7 @@ class TestAFeatureKnowsItsOwnEnds:
     """
 
     def _box(self):
-        from kumiki.cutcsg import RectangularPrism
+        from kumiki.csg.cutcsg import RectangularPrism
         from kumiki.rule import create_v2, scalar
 
         return RectangularPrism(
@@ -462,12 +462,12 @@ class TestAFeatureKnowsItsOwnEnds:
             start_distance=scalar("0"), end_distance=scalar("0.4"))
 
     def _face(self, which):
-        from kumiki.cutcsg import SimpleRectangularPrismFeature
+        from kumiki.csg.cutcsg import SimpleRectangularPrismFeature
 
         return SimpleRectangularPrismFeature(name=str(which), face=which)
 
     def test_a_face_knows_its_four_corners(self):
-        from kumiki.cutcsg import PrismFace
+        from kumiki.csg.cutcsg import PrismFace
 
         corners = self._face(PrismFace.RIGHT).corners(self._box())
 
@@ -479,7 +479,7 @@ class TestAFeatureKnowsItsOwnEnds:
             assert float(corner[2, 0]) in (pytest.approx(0.0), pytest.approx(0.4))
 
     def test_an_unbounded_face_says_so_rather_than_guessing(self):
-        from kumiki.cutcsg import PrismFace, RectangularPrism
+        from kumiki.csg.cutcsg import PrismFace, RectangularPrism
         from kumiki.rule import create_v2, scalar
 
         endless = RectangularPrism(
@@ -489,7 +489,7 @@ class TestAFeatureKnowsItsOwnEnds:
         assert self._face(PrismFace.RIGHT).corners(endless) is None
 
     def test_an_arris_is_two_corners_of_the_faces_that_form_it(self):
-        from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
+        from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
@@ -501,7 +501,7 @@ class TestAFeatureKnowsItsOwnEnds:
         assert abs(float(second[2, 0]) - float(first[2, 0])) == pytest.approx(0.4)
 
     def test_and_its_anchor_is_between_them(self):
-        from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
+        from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
         extent = present(SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT)).get_extent(self._box()), "an extent")
@@ -509,7 +509,7 @@ class TestAFeatureKnowsItsOwnEnds:
         assert float(extent.anchor[2, 0]) == pytest.approx(0.2)
 
     def test_opposite_faces_form_no_arris_and_are_not_invented(self):
-        from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
+        from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
         with pytest.warns(UserWarning, match="meet in no arris"):
             arris = SimpleRectangularPrismEdgeFeature(
@@ -518,7 +518,7 @@ class TestAFeatureKnowsItsOwnEnds:
         assert arris.get_extent(self._box()) is None
 
     def test_a_derived_edge_reaches_as_far_as_both_its_parents(self):
-        from kumiki.cutcsg import (DerivedEdgeFeature, FeatureGroup, FeatureProperties,
+        from kumiki.csg.cutcsg import (DerivedEdgeFeature, FeatureGroup, FeatureProperties,
                                    OwnedFeatureHit, PrismFace,
                                    SimpleRectangularPrismFeature)
 
@@ -541,7 +541,7 @@ class TestAFeatureKnowsItsOwnEnds:
     def test_the_runner_reads_those_ends_as_an_interval(self):
         from pathlib import Path
 
-        from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
+        from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
         root = Path(__file__).resolve().parent.parent
         runner = load_module("kigumi_runner_declared", root / "kigumi" / "runner.py")
@@ -559,8 +559,8 @@ class TestAFeatureKnowsItsOwnEnds:
         # So the caller falls back to clipping rather than to a wrong number.
         from pathlib import Path
 
-        from kumiki.cutcsg import PrismFace, RectangularPrism
-        from kumiki.cutcsg import SimpleRectangularPrismEdgeFeature
+        from kumiki.csg.cutcsg import PrismFace, RectangularPrism
+        from kumiki.csg.cutcsg import SimpleRectangularPrismEdgeFeature
         from kumiki.rule import create_v2, scalar
 
         root = Path(__file__).resolve().parent.parent
@@ -707,14 +707,14 @@ class TestDroppingAPerpendicularOntoAFace:
     THREE_D = None  # built in setup_method, to keep the import local
 
     def setup_method(self):
-        from kumiki.drawing import (MeasurementKind, MeasurementOperation,
+        from kumiki.drawings.drawing import (MeasurementKind, MeasurementOperation,
                                     MeasurementSpace)
 
         self.THREE_D = MeasurementKind(
             MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
     def _anchors(self, first, second):
-        from kumiki.drawing import distance_anchors
+        from kumiki.drawings.drawing import distance_anchors
 
         return distance_anchors(first, second, present(self.THREE_D, "a kind"))
 
@@ -823,14 +823,14 @@ class TestWhereAnAngleSits:
     """
 
     def _span(self, **fields):
-        from kumiki.drawing import LineSpan, PlaneSpan, PointSpan
+        from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
 
         kind = PlaneSpan if "normal" in fields else LineSpan if "direction" in fields else PointSpan
         return kind(**{key: v(value) if key in ('at', 'normal', 'direction')
                        else value for key, value in fields.items()})
 
     def _rays(self, first, second):
-        from kumiki.drawing import angle_rays
+        from kumiki.drawings.drawing import angle_rays
 
         return angle_rays(first, second)
 
@@ -841,7 +841,7 @@ class TestWhereAnAngleSits:
         return present(self._rays(first, second), "rays for this pair")
 
     def _value(self, rays):
-        from kumiki.drawing import angle_between
+        from kumiki.drawings.drawing import angle_between
 
         return angle_between(rays)
 
@@ -1068,7 +1068,7 @@ class TestAnObliqueCornerIsStillTheCorner:
     CORNER = (2000.0, 0.0, 1500.0)
 
     def _faces(self, degrees_apart):
-        from kumiki.drawing import LineSpan, PlaneSpan, PointSpan
+        from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
 
         # Two planes through CORNER, their normals `degrees_apart`. Each holds a
         # point along its own face rather than the corner itself, which is what
@@ -1082,7 +1082,7 @@ class TestAnObliqueCornerIsStillTheCorner:
 
     def _off_the_faces(self, point, first, second):
         """How far `point` sits off each plane. Zero on both means it is on the corner."""
-        from kumiki.drawing import _dot, _unit
+        from kumiki.drawings.drawing import _dot, _unit
 
         return tuple(
             abs(_dot(_unit(span.normal),
@@ -1092,7 +1092,7 @@ class TestAnObliqueCornerIsStillTheCorner:
 
     @pytest.mark.parametrize("degrees_apart", [90, 60, 45, 30, 15])
     def test_the_vertex_lies_on_both_faces(self, degrees_apart):
-        from kumiki.drawing import angle_rays
+        from kumiki.drawings.drawing import angle_rays
         from tests.testing_shavings import present
 
         first, second = self._faces(degrees_apart)
@@ -1105,7 +1105,7 @@ class TestAnObliqueCornerIsStillTheCorner:
 
     def test_and_it_sits_on_the_line_the_two_faces_share(self):
         """Not merely on both planes: on their intersection, which runs along x."""
-        from kumiki.drawing import angle_rays
+        from kumiki.drawings.drawing import angle_rays
         from tests.testing_shavings import present
 
         first, second = self._faces(45)
@@ -1140,7 +1140,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
     APART = [0.1, 0.5, 0.6, 1, 3, 5.7, 5.8, 8, 8.2, 12, 30, 45, 89]
 
     def _turned(self, degrees_apart, shape):
-        from kumiki.drawing import LineSpan, PlaneSpan, PointSpan
+        from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
 
         turn = math.radians(degrees_apart)
         second = v((0, math.cos(turn), math.sin(turn)))
@@ -1162,7 +1162,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
     @pytest.mark.parametrize("degrees_apart", APART)
     def test_whenever_an_angle_is_admitted_the_corner_can_be_placed(
             self, shape, degrees_apart):
-        from kumiki.drawing import (MeasurementOperation, angle_rays,
+        from kumiki.drawings.drawing import (MeasurementOperation, angle_rays,
                                     three_d_kinds)
 
         first, second = self._turned(degrees_apart, shape)
@@ -1189,7 +1189,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
 
     def test_and_the_guard_refuses_a_narrower_band_than_the_table(self):
         """Stated as the numbers, so moving either epsilon fails here first."""
-        from kumiki.drawing import PARALLEL_EPSILON
+        from kumiki.drawings.drawing import PARALLEL_EPSILON
 
         # kinds_for asks it of a cosine; the corner guards ask it of a sine.
         drafting = math.degrees(math.acos(1 - PARALLEL_EPSILON))
@@ -1211,7 +1211,7 @@ class TestALineLyingFlatAlongAFaceTurnsNoCorner:
     FACE = PlaneSpan(at=v((100, -50, 200)), normal=v((0, 1, 0)))
 
     def test_the_table_admits_no_angle(self):
-        from kumiki.drawing import MeasurementOperation, three_d_kinds
+        from kumiki.drawings.drawing import MeasurementOperation, three_d_kinds
         from kumiki.geometry import Line, Plane
 
         kinds = three_d_kinds(
@@ -1221,7 +1221,7 @@ class TestALineLyingFlatAlongAFaceTurnsNoCorner:
 
     @pytest.mark.parametrize("swapped", [False, True])
     def test_and_no_rays_are_placed_either_way_round(self, swapped):
-        from kumiki.drawing import angle_rays
+        from kumiki.drawings.drawing import angle_rays
 
         pair = (self.FACE, self.FLAT) if swapped else (self.FLAT, self.FACE)
         assert angle_rays(*pair) is None
@@ -1246,7 +1246,7 @@ class TestAViewWithNothingSaidAboutIt:
         assert placed(anchors[1]) == (4.0, 0.0, 0.0)
 
     def test_every_shape_of_missing_axis_reads_the_same(self):
-        from kumiki.drawing import DEFAULT_VIEW, ViewAxes
+        from kumiki.drawings.drawing import DEFAULT_VIEW, ViewAxes
 
         for given in (None, {}, {"look": None, "right": None, "up": None}):
             assert ViewAxes.from_wire(given) == DEFAULT_VIEW

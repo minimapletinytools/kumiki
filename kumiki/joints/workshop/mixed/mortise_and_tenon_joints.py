@@ -14,7 +14,7 @@ from typing import List, Optional, Union
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
-from kumiki.cutcsg import (
+from kumiki.csg.cutcsg import (
     CutCSG,
     CutCSGLabel,
     RectangularPrism,

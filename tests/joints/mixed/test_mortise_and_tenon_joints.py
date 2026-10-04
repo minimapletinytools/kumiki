@@ -18,7 +18,7 @@ from kumiki.timber import (
 )
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.timber_shavings import are_timbers_plane_aligned
-from kumiki.cutcsg import csg_children
+from kumiki.csg.cutcsg import csg_children
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.basic_joints import (
     cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers,
@@ -184,7 +184,7 @@ class TestMortiseAndTenonGeometry:
 
     def test_tenon_negative_csg_has_no_cut_behind_shoulder(self, simple_T_configuration):
         """Ensure the tenon cut volume does not extend past the shoulder into the timber body."""
-        from kumiki.cutcsg import Difference, HalfSpace, Intersection
+        from kumiki.csg.cutcsg import Difference, HalfSpace, Intersection
 
         tenon_timber, mortise_timber = simple_T_configuration
         arrangement = ButtJointTimberArrangement(
@@ -619,7 +619,7 @@ class TestPegStuff:
         tenon_cut_csg = tenon_cut_timber.negative_csg
         
         # Verify CSG includes peg holes (should be a SolidUnion with multiple children)
-        from kumiki.cutcsg import SolidUnion
+        from kumiki.csg.cutcsg import SolidUnion
         assert isinstance(tenon_cut_csg, SolidUnion), \
             "Tenon cut CSG with pegs should be a SolidUnion"
         assert len(tenon_cut_csg.children) >= 2, \
@@ -946,7 +946,7 @@ class TestMortiseAndTenonCSGHierarchy:
     """Test that the CSG tree has the expected named node hierarchy."""
 
     def test_tenon_timber_csg_hierarchy(self, simple_T_configuration):
-        from kumiki.cutcsg import Difference, SolidUnion, HalfSpace, RectangularPrism
+        from kumiki.csg.cutcsg import Difference, SolidUnion, HalfSpace, RectangularPrism
 
         tenon_timber, mortise_timber = simple_T_configuration
         arrangement = ButtJointTimberArrangement(
@@ -988,7 +988,7 @@ class TestMortiseAndTenonCSGHierarchy:
         assert isinstance(redundant_end, HalfSpace)
 
     def test_mortise_timber_csg_hierarchy(self, simple_T_configuration):
-        from kumiki.cutcsg import Difference, SolidUnion, RectangularPrism
+        from kumiki.csg.cutcsg import Difference, SolidUnion, RectangularPrism
 
         tenon_timber, mortise_timber = simple_T_configuration
         arrangement = ButtJointTimberArrangement(
@@ -1050,7 +1050,7 @@ class TestMortiseAndTenonCSGNaming:
     def _unlabeled_below_root(self, root):
         """Every unlabeled node except the root, which is the rendered
         Difference wrapping body and cuts -- structure, not geometry."""
-        from kumiki.cutcsg import csg_children
+        from kumiki.csg.cutcsg import csg_children
 
         found = []
 
@@ -1073,7 +1073,7 @@ class TestMortiseAndTenonCSGNaming:
         labels = set()
 
         def walk(node):
-            from kumiki.cutcsg import csg_children
+            from kumiki.csg.cutcsg import csg_children
             if node.label.is_labeled():
                 labels.add(node.label.name)
             for child in csg_children(node):
@@ -1120,8 +1120,8 @@ class TestMortiseAndTenonFeatures:
         Face centroids find faces; triangle-edge midpoints land on the creases
         where two faces meet, which is where an edge is selectable.
         """
-        from kumiki.cutcsg import CSGFeatureType
-        from kumiki.triangles import triangulate_cutcsg
+        from kumiki.csg.cutcsg import CSGFeatureType
+        from kumiki.csg.triangles import triangulate_cutcsg
 
         found = set()
         for triangle in triangulate_cutcsg(rendered).mesh.triangles:
@@ -1137,14 +1137,14 @@ class TestMortiseAndTenonFeatures:
         return found
 
     def test_the_shoulder_is_selectable(self, simple_T_configuration):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         faces = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
                              CSGFeatureType.FACE)
         assert "shoulder" in faces
 
     def test_the_shoulder_forms_the_line_you_knife_around_the_timber(self, simple_T_configuration):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         edges = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
                              CSGFeatureType.EDGE)
@@ -1152,7 +1152,7 @@ class TestMortiseAndTenonFeatures:
         assert {edge for edge in edges if edge.startswith("shoulder\u00d7")}
 
     def test_the_mortise_declares_its_walls_and_floor(self, simple_T_configuration):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         faces = self._picked(self._rendered(simple_T_configuration)["mortise_timber"],
                              CSGFeatureType.FACE)
@@ -1168,7 +1168,7 @@ class TestMortiseAndTenonFeatures:
         still there and still pickable -- only the derived edges between them
         and the timber body are gone.
         """
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         rendered = self._rendered(simple_T_configuration)["mortise_timber"]
         edges = self._picked(rendered, CSGFeatureType.EDGE)
@@ -1181,7 +1181,7 @@ class TestMortiseAndTenonFeatures:
         # They used to come from two rough faces meeting. They are declared now
         # -- rough.front_left rather than rough.front x rough.left -- and the
         # point of the test is unchanged: joint geometry must not crowd them out.
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         edges = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
                              CSGFeatureType.EDGE)
@@ -1222,7 +1222,7 @@ class TestThePegHoleCentreline:
 
     def _axes(self, rendered):
         """Every peg hole centreline in a tree, with the bore that owns it."""
-        from kumiki.cutcsg import CylinderAxisFeature, csg_children
+        from kumiki.csg.cutcsg import CylinderAxisFeature, csg_children
 
         found = []
 
@@ -1245,7 +1245,7 @@ class TestThePegHoleCentreline:
             assert axes[0][0].name == "peg_hole_axis"
 
     def test_it_is_a_non_real_edge(self, simple_T_configuration):
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         axis, _bore = self._axes(self._rendered(simple_T_configuration)["tenon_timber"])[0]
         assert axis.feature_type() == CSGFeatureType.EDGE
@@ -1279,7 +1279,7 @@ class TestThePegHoleCentreline:
         stops a point being derived at the middle of an opening the drill never
         made.
         """
-        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.csg.cutcsg import CSGFeatureType
 
         for name in ("tenon_timber", "mortise_timber"):
             rendered = self._rendered(simple_T_configuration)[name]
@@ -1437,11 +1437,11 @@ class TestUnionIntoCut:
     """_union_into_cut keeps one node per cutting rather than nesting."""
 
     def _piece(self, offset):
-        from kumiki.cutcsg import HalfSpace
+        from kumiki.csg.cutcsg import HalfSpace
         return HalfSpace(normal=create_v3(0, 0, 1), offset=scalar(offset))
 
     def test_the_first_addition_wraps_what_was_there(self):
-        from kumiki.cutcsg import SolidUnion
+        from kumiki.csg.cutcsg import SolidUnion
         from kumiki.joints.workshop.mixed.mortise_and_tenon_joints import (
             _union_into_cut, TENON_CUT_LABEL)
 

@@ -62,7 +62,7 @@ from enum import Enum
 import warnings
 from typing import List, Optional, Sequence, Tuple
 
-from .geometry import (
+from ..geometry import (
     Line,
     Plane,
     ConvexPlanarRegion,
@@ -71,7 +71,7 @@ from .geometry import (
     perpendicular_axes,
     unit_vector,
 )
-from .rule import V3, Matrix, Numeric, safe_magnitude, scalar
+from ..rule import V3, Matrix, Numeric, safe_magnitude, scalar
 
 
 def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:

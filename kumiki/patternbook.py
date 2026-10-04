@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from .kiwari import Kiwari
 from .rule import V3, create_v3, Transform, scalar
 from .timber import Frame, CutTimber, Timber, Peg, Wedge, CSGAccessory, Joint, Accessory
-from .cutcsg import CutCSG, translate_csg
+from .csg.cutcsg import CutCSG, translate_csg
 
 
 # Type alias for pattern functions: ``(center: V3, kiwari: Kiwari | None)``.

@@ -71,7 +71,7 @@ Defines:
 
 import math
 from kumiki import *
-from kumiki.cutcsg import HalfSpace, adopt_csg
+from kumiki.csg.cutcsg import HalfSpace, adopt_csg
 from kumiki.joints.workshop.free import cut_free_house_joint
 from kumiki.construction import ButtJointTimberArrangement, CrossJointTimberArrangement
 from kumiki.joints.workshop.mixed import cut_mortise_and_tenon_joint_on_face_aligned_timbers

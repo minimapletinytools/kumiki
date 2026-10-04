@@ -62,7 +62,7 @@ import trimesh
 from trimesh.path.entities import Line
 from trimesh.path.path import Path3D
 
-from .cutcsg import adopt_csg
+from .csg.cutcsg import adopt_csg
 from .rule import Transform
 from .timber import Accessory, CutTimber, Frame
 
@@ -172,7 +172,7 @@ _CAMERA_DIRECTIONS: dict[CameraAngle, tuple[tuple[float, float, float], tuple[fl
 
 def _cut_timber_to_trimesh(cut_timber: CutTimber, mode: RenderMode) -> "trimesh.Trimesh":
     """Return a global-coordinates trimesh for one CutTimber."""
-    from .triangles import triangulate_cutcsg
+    from .csg.triangles import triangulate_cutcsg
 
     if mode is RenderMode.FULL_CUTS:
         local_csg = cut_timber.render_timber_with_cuts_csg_local()
@@ -187,7 +187,7 @@ def _cut_timber_to_trimesh(cut_timber: CutTimber, mode: RenderMode) -> "trimesh.
 
 def _accessory_to_trimesh(accessory: Accessory) -> "trimesh.Trimesh":
     """Return a global-coordinates trimesh for one Accessory."""
-    from .triangles import triangulate_cutcsg
+    from .csg.triangles import triangulate_cutcsg
 
     transform = getattr(accessory, "transform", None)
     if transform is None:

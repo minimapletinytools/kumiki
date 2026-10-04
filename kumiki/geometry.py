@@ -14,7 +14,7 @@ the infinite lines they lie on.
 Their BOUNDED counterparts live here too, beside them: a LineSegment is a
 stretch of a Line, a ConvexPlanarRegion an area of a Plane. They are what you
 get back from cropping an unbounded primitive to a solid (see
-kumiki.cropcsg) -- a line comes back as a list of LineSegments, since a
+kumiki.csg.cropcsg) -- a line comes back as a list of LineSegments, since a
 cut through the middle of one leaves a piece either side. Both are plain
 geometry: neither knows what a feature or a timber is.
 
