@@ -14,7 +14,8 @@ Timber 'x' cut:
     - (-y, +z): positive cylinder with parallel length axis
       (negative 1/2 × 1/2 × 1 prism minus positive cylinder)
 
-Disassembly: 'x' turns 90° about the cylinder axis, which frees 'y' to slide out.
+Disassembly: 'x' turns 90° about the cylinder axis, 'y' slides out along +X,
+then 'z' slides out along +Y.
 """
 
 from kumiki import *
@@ -295,18 +296,16 @@ def example() -> Frame:
     freedom_y_in_yz = AssemblyFreedom.translation(PX, side)
     freedom_z_in_yz = AssemblyFreedom.translation(-PX, side)
 
-    # 3. Between Z and X: X rotates about cylinder axis by +90° (and Z opposite).
-    # ad-hoc: translations are left out to force X to free itself by rotating.
-    # trans_z_in_zx = TranslationDof(direction=PY, freed_after=side)
-    # trans_x_in_zx = TranslationDof(direction=-PY, freed_after=side)
+    # 3. Between Z and X: Z moves in +Y and is free after 1.
+    #    X's rotation about the cylinder axis is permitted but does not free this joint.
+    permitted_rot_x = RotationDof(axis_position=cyl_axis_pos, axis_direction=PX, freed_after_angle=None)
+    permitted_rot_neg_x = RotationDof(axis_position=cyl_axis_pos, axis_direction=-PX, freed_after_angle=None)
+    trans_z_in_zx = TranslationDof(direction=PY, freed_after=side)
     freedom_z_in_zx = AssemblyFreedom(
-        # translations=(trans_z_in_zx,),
-        rotations=(rot_neg_x,),
+        translations=(trans_z_in_zx,),
+        rotations=(permitted_rot_neg_x,),
     )
-    freedom_x_in_zx = AssemblyFreedom(
-        # translations=(trans_x_in_zx,),
-        rotations=(rot_x,),
-    )
+    freedom_x_in_zx = AssemblyFreedom(rotations=(permitted_rot_x,))
 
     # -- Joints -------------------------------------------------------------
     # Joint between X and Y:
