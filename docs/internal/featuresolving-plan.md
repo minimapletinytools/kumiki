@@ -7,7 +7,7 @@ Implementation plan for the design in `featuresolving.md`. Two parts:
 
 All numerics are floats (`rule.py` is numpy/float), with explicit tolerances.
 
-**Status:** Part 2 A (`dof_solver.py`), B and C (`solve_recipe.py`, recipes on the CSG classes) and a first D (`feature_solving.py`: 3D distances, and horizontal/vertical sheet distances between points) are in. Not yet: angle rows, measurements between timbers, projected perpendicular distances, `Own` recipes, `PathExtrusion` carriers, Part 1, and the generator.
+See **Status** at the end for what is done and what is left.
 
 # Part 1: the required feature set
 
@@ -265,17 +265,47 @@ Once A–D agree on real joints.
 - **Selection:** greedy by `gain`, ties broken toward conventional measurements (from a reference face, perpendicular).
 - **Output:** each choice becomes a `Measure` with `MeasurementSource.PYTHON_GENERATED`, so the existing override rules (code and file overrides replace generated) apply unchanged.
 
-# Order
+# Status
 
-1. **Part 2 A**, the core solver. Isolated, quick, de-risks the maths.
-2. **Part 2 B**, recipes on the CSG classes, with the recipe-vs-locate tests. Needed before anything maps a measurement, and gives Part 1 its feature classes. Can proceed in parallel with 1.
-3. **`planar_region.py`** and **`two_sided_section`**.
-4. **`required_features`**, the carrier map, and the debug overlay.
-5. **Carrier model** and **interface layer**, with the finite-difference tests.
-6. **Generator.**
+## Done
 
-# Decisions needed
+- **Part 1, required features:**
+  - `planar_region.face_reaches_surface` decides flat faces by the two-sided section (front XOR back), with no sampling.
+  - `required_features.required_features(cut_timber, face_test=...)` lists required features with a reason. `face_test` is swappable.
+- **Part 2 A, `dof_solver.py`:** `remaining(known, target)` returns the count, plus per free DOF its weights, its quantity, and its motion, all keyed by column.
+- **Part 2 B and C, `solve_recipe.py` and the CSG classes:**
+  - carriers (`CarrierPlane`, `CarrierLine`, `CarrierPoint`, `CarrierBarrel`);
+  - `CutCSG.carriers()`;
+  - `CSGFeature.solve_recipe` (a tuple of carrier refs);
+  - `carrier_map` with merged coincident planes;
+  - `motion_along`, `measurement_row`, `feature_dof_rows`, `moved_by`.
+- **Part 2 D, `feature_solving.py`:**
+  - `measure_row`, from a `Measure` with `FeatureHandle` anchors;
+  - `remaining_dofs`;
+  - `solve_report`, whose targets come from `required_features`.
 
+## Left
+
+1. **Datum and conventions.** Callers pass the known features by hand. Decide which faces start known, and whether planes square to the reference faces start with their tilts known (see decisions).
+2. **Measurement kinds without rows yet:**
+   - angles;
+   - projected perpendicular distances (point to line, parallel lines);
+   - measurements between two timbers.
+3. **Recipes:**
+   - `Own` recipes for free extra points and lines;
+   - `PathExtrusion` carriers (it has no default features yet).
+4. **Curved faces:** always required for now; decide them properly.
+5. **Generator (Part 2 E):** greedy candidate measurements scored by remaining DOFs, using `free_motions` to rule out candidates that can't help. Output is `Measure`s with `MeasurementSource.PYTHON_GENERATED`.
+6. **Debug overlay in kigumi:** colour faces required or hidden, and by remaining DOFs.
+7. **Speed:** `required_features` takes about 8.6s for `tinyhouse120`'s 75 timbers. Walk each distinct plane once rather than once per face.
+
+# Decisions
+
+Decided:
+- **Marking:** `FeatureMarkingStatus` is reused. `NEVER_MARK` waives a feature; `ALWAYS_MARK` requires it even if hidden.
+- **Non-real features** (an axis, a reference plane) are required by default.
+- **Curved faces** are required, for now. No sampling.
+
+Open:
 1. **Datum:** do the 4 long perfect-timber-within faces plus one chosen end start known, with the timber's length as a measurement? Or all 6 faces? PTW or rough?
-2. **Marking:** reuse `FeatureMarkingStatus` (`NEVER_MARK` = waive, `ALWAYS_MARK` = required even if hidden), or add a separate solve flag?
-3. **Curved faces:** is sampling barrels with generator lines acceptable for now?
+2. **Square by convention:** do planes square to the reference faces start with their normals known, so only non-square angles are drawn?

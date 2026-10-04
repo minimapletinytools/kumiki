@@ -170,14 +170,13 @@ A barefaced tenon has a cheek flush with a timber face. That cheek is required (
 
 # Open questions
 
+What is decided and what is left is tracked in `featuresolving-plan.md` (Status and Decisions). Still open here:
+
 1. **Square by convention?** Is "square to the reference faces unless noted" assumed, so only non-square angles are drawn? If so, those directions start out known in R, which removes most angle measurements.
-2. **Is coincidence free?** A cutter face flush with the timber face or the shoulder is treated as known without a dimension (merged planes). That matches how a carpenter reads it; confirm it's intended.
-3. **Curved extent:** is surviving area enough to decide when a curved surface is required, or should curves use their analytic extent (a bore's depth, an arc's sweep)?
-4. **Extras and waivers:** where does the user mark a feature "required" or "doesn't matter": on the joint in code, in the viewer, or both?
+2. **Curved extent:** curved faces are required for now. Should a curved surface's requirement come from where it survives, or from its analytic extent (a bore's depth, an arc's sweep)?
+
+Decided: coincident planes are merged, so a face flush with a known face needs no dimension. Features are marked "required" or "doesn't matter" with `FeatureMarkingStatus` on the feature, in code.
 
 # Plan
 
-1. **Exact face regions** in `cropcsg.py`: convex-piece polygon booleans, and an "on the finished surface" region query per face, tested against the mortise-and-tenon and dovetail patterns.
-2. **Required set for a cut timber:** features whose relative interior reaches ∂S, planes merged where they coincide, curved surfaces, user extras.
-3. **Rank solver:** unknowns per carrier, rows per measurement kind (including the explicit parallel/coincident constraints), R as an incremental exact basis, remaining DOFs per feature. Reproduce the tenon example as a test.
-4. **Greedy generator** on top, once 1–3 agree on real joints.
+See `featuresolving-plan.md`.
