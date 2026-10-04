@@ -1,7 +1,7 @@
 """Regions in a plane, and whether a flat face is on the finished surface of a CSG.
 
 A region is a list of disjoint convex polygons in a plane's own 2D frame. For a plane, every CSG
-node gives two regions: where it has material just above the plane, and just below. The finished
+node gives two regions: where it has material just in front of the plane, and just behind. The finished
 surface in the plane is where those differ. `face_reaches_surface` is the only public entry point.
 """
 
@@ -38,7 +38,7 @@ def _np(vector: V3) -> np.ndarray:
 
 
 class _Frame:
-    """A plane's 2D frame: origin, two in-plane axes, and its unit normal (the "above" side)."""
+    """A plane's 2D frame: origin, two in-plane axes, and its unit normal (the front side)."""
 
     def __init__(self, plane: Plane, near: V3):
         self.normal = _np(plane.normal) / np.linalg.norm(_np(plane.normal))
@@ -142,8 +142,8 @@ Sides = Tuple[Region, Region]
 def _half_space_section(
     faces: Sequence[Tuple[V3, V3]], frame: _Frame, start: Region,
 ) -> Sides:
-    """(above, below) for the intersection of half spaces dot(normal, p - point) <= 0, from `start`."""
-    region, above, below = start, True, True
+    """(front, back) for the intersection of half spaces dot(normal, p - point) <= 0, from `start`."""
+    region, front, back = start, True, True
     for normal, point in faces:
         n, q = _np(normal), _np(point)
         a, b = float(n @ frame.u), float(n @ frame.v)
@@ -154,13 +154,13 @@ def _half_space_section(
                 return [], []
             if c <= COINCIDENT * length:
                 if float(n @ frame.normal) > 0:
-                    above = False
+                    front = False
                 else:
-                    below = False
+                    back = False
             continue
         region = [_clip(polygon, a, b, c) for polygon in region]
     region = _clean(region)
-    return (region if above else []), (region if below else [])
+    return (region if front else []), (region if back else [])
 
 
 def _cylinder_section(csg: Cylinder, frame: _Frame, seed: Region) -> Sides:
@@ -194,36 +194,36 @@ def _cylinder_section(csg: Cylinder, frame: _Frame, seed: Region) -> Sides:
 
 
 def _sides(csg: CutCSG, frame: _Frame, seed: Region) -> Sides:
-    """Where `csg` has material just above, and just below, the frame's plane."""
+    """Where `csg` has material just in front of the frame's plane (the side its normal points to), and just behind."""
     if isinstance(csg, EmptyCSG):
         return [], []
     if isinstance(csg, SolidUnion):
-        above: Region = []
-        below: Region = []
+        front: Region = []
+        back: Region = []
         for child in csg.children:
-            child_above, child_below = _sides(child, frame, seed)
-            above, below = _union(above, child_above), _union(below, child_below)
-        return above, below
+            child_front, child_back = _sides(child, frame, seed)
+            front, back = _union(front, child_front), _union(back, child_back)
+        return front, back
     if isinstance(csg, Intersection):
-        left_above, left_below = _sides(csg.left, frame, seed)
-        right_above, right_below = _sides(csg.right, frame, seed)
-        return _intersect(left_above, right_above), _intersect(left_below, right_below)
+        left_front, left_back = _sides(csg.left, frame, seed)
+        right_front, right_back = _sides(csg.right, frame, seed)
+        return _intersect(left_front, right_front), _intersect(left_back, right_back)
     if isinstance(csg, Difference):
-        above, below = _sides(csg.base, frame, seed)
+        front, back = _sides(csg.base, frame, seed)
         for cut in csg.subtract:
-            cut_above, cut_below = _sides(cut, frame, seed)
-            above, below = _subtract(above, cut_above), _subtract(below, cut_below)
-        return above, below
+            cut_front, cut_back = _sides(cut, frame, seed)
+            front, back = _subtract(front, cut_front), _subtract(back, cut_back)
+        return front, back
     if isinstance(csg, Cylinder):
         return _cylinder_section(csg, frame, seed)
     if isinstance(csg, PathExtrusion):
-        above, below = [], []
+        front, back = [], []
         for piece in decompose_path_into_convex_pieces(csg.path, tolerance=1e-4):
             convex = ConvexPolygonExtrusion(points=piece, transform=csg.transform,
                                             start_distance=csg.start_distance, end_distance=csg.end_distance)
-            piece_above, piece_below = _sides(convex, frame, seed)
-            above, below = _union(above, piece_above), _union(below, piece_below)
-        return above, below
+            piece_front, piece_back = _sides(convex, frame, seed)
+            front, back = _union(front, piece_front), _union(back, piece_back)
+        return front, back
 
     if isinstance(csg, ConvexPolygonSimpleLoft) and not _loft_sides_are_planar(csg):
         raise _CannotSection("a loft with twisted sides")
@@ -236,7 +236,12 @@ def _sides(csg: CutCSG, frame: _Frame, seed: Region) -> Sides:
 
 
 def face_reaches_surface(face: FeatureHandle, root: CutCSG, near: V3, reach: float) -> bool:
-    """Whether some patch of this flat face, with area, is on the finished surface of `root`.
+    """Determines whether part of `face`, with area, is on the finished surface of `root`.
+
+    For each spot on the face, check whether `root` has material just in front of it and just
+    behind it, and XOR those two sets together. If that comes out empty, the face is either
+    entirely embedded in `root` or entirely away from it. "Just in front/behind" means arbitrarily
+    close; the tolerance only decides when a primitive's face counts as flush with this plane.
 
     `near` and `reach` bound the work: everything that matters must lie within `reach` of `near`.
     A face, or a tree, this module can't cut by a plane counts as on the surface.
@@ -247,12 +252,12 @@ def face_reaches_surface(face: FeatureHandle, root: CutCSG, near: V3, reach: flo
     frame = _Frame(plane, near)
     seed = [_square(reach)]
     try:
-        own_above, own_below = _sides(face.owner, frame, seed)
-        own = own_above or own_below
+        own_front, own_back = _sides(face.owner, frame, seed)
+        own = own_front or own_back
         if not own:
             return False
-        above, below = _sides(root, frame, own)
+        front, back = _sides(root, frame, own)
     except _CannotSection:
         return True
-    surface = _xor(above, below)
+    surface = _xor(front, back)
     return sum(_area(polygon) for polygon in _intersect(own, surface)) > SLIVER_AREA
