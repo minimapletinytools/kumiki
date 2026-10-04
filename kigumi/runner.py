@@ -2736,12 +2736,12 @@ def _measure_span(
         approximately_crop_plane_to_area_on_csg,
         crop_line_to_segments_on_csg,
     )
-    from kumiki.drawing import MeasureSpan
+    from kumiki.drawing import LineSpan, PlaneSpan, PointSpan
 
     to_world = lambda v: tuple(_vector3_to_floats(timber.transform.local_to_global(v)))
 
     if isinstance(located, Point):
-        return MeasureSpan(at=to_world(located.position))
+        return PointSpan(at=to_world(located.position))
 
     solid = timber.get_perfect_timber_within_csg_local()
     reach = float(timber.length) * 4
@@ -2776,8 +2776,8 @@ def _measure_span(
                 # on the sheet to be square to, and treating it as one put a
                 # point-and-line pair through the parallel-lines rule.
                 middle = tuple((start[i] + end[i]) / 2 for i in range(3))
-                return MeasureSpan(at=middle)
-            return MeasureSpan(
+                return PointSpan(at=middle)
+            return LineSpan(
                 at=start, direction=tuple(direction),
                 interval=(0.0, math.dist(start, end)),
                 outward=_edge_outward_normal(feature, node, timber))
@@ -2795,25 +2795,25 @@ def _measure_span(
             # A plane, not a line: measurable from anywhere rather than only
             # edge-on, and square to its normal in two directions rather than
             # one.
-            return MeasureSpan(at=at, normal=tuple(normal))
+            return PlaneSpan(at=at, normal=tuple(normal))
         if plane_normal is None:
-            return MeasureSpan(at=at)
+            return PointSpan(at=at)
         # Edge-on, so it draws as a line running along the face, square to its
         # own normal and to the way we are looking.
         along = _cross(normal, _normalize(list(plane_normal)))
         if not any(abs(part) > 1e-9 for part in along):
             # Facing the reader rather than edge-on: it covers the view and
             # admits no measurement, so there is no line to give.
-            return MeasureSpan(at=at)
+            return PointSpan(at=at)
         along = _normalize(along)
         # The region is timber-local and the direction is world, so the boundary
         # is brought over rather than the direction sent back. Mixing the two
         # spaces is the kind of wrong that still looks plausible on screen.
         if not cropped.boundary:
-            return MeasureSpan(at=at)
+            return PointSpan(at=at)
         reach = [_dot(list(to_world(corner)), along) for corner in cropped.boundary]
         here = _dot(list(at), along)
-        return MeasureSpan(
+        return LineSpan(
             at=at, direction=tuple(along),
             interval=(min(reach) - here, max(reach) - here))
 

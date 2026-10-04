@@ -613,15 +613,15 @@ class TestWhatTheRunnerSettles:
         assert settled["value"]["unit"] == "angle"
 
     def test_a_corner_reads_its_angle_rather_than_a_length(self):
-        from kumiki.drawing import MeasureSpan, angle_rays
+        from kumiki.drawing import PlaneSpan, angle_rays
 
         runner = self._runner()
         first = plane([0, 0, 0], [0, 0, 1])
         second = plane([0, 0, 0], [1, 0, 0])
         from kumiki.drawing import projected_kinds, three_d_kinds
         admitted = three_d_kinds(first, second)
-        rays = angle_rays(MeasureSpan(at=first.point, normal=first.normal),
-                          MeasureSpan(at=second.point, normal=second.normal))
+        rays = angle_rays(PlaneSpan(at=first.point, normal=first.normal),
+                          PlaneSpan(at=second.point, normal=second.normal))
         settled = runner._settled_measurement(
             {"a": {"geometry": first}, "b": {"geometry": second}, "angle": rays},
             None, admitted[0], admitted, True, self.AXES.look, self.AXES)

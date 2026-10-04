@@ -328,86 +328,79 @@ def _cross(a: VectorLike, b: VectorLike) -> V3:
     return _unit(_raw_cross(a, b))
 
 
-# TODO can/should we split this into different classes for each feature type so we don't need to make as many runtime assumption checks?
+def _as_v3(value) -> V3:
+    return value if isinstance(value, Matrix) else _v3(value)
+
+
 @dataclass(frozen=True)
-class MeasureSpan:
-    """What a feature is, where a measurement is being taken.
-
-    Three shapes, and which ones can occur depends on the space:
-
-    ON A SHEET. point and edge only. faces projecting to areas are not measurable features.
-
-    IN 3D. all supported.
-
-    `interval` is measured from `at` in `direction` marking the feature cropped to its parent.
-    """
+class PointSpan:
+    """A point being measured to."""
 
     at: V3
-    direction: Optional[V3] = None
-    interval: Optional[Tuple[float, float]] = None
-    normal: Optional[V3] = None
-    # optional roughly outward direction of the body of the fetaure being measured. Only used to decide which side an angle opens on.
-    outward: Optional[V3] = None
+    #: Roughly outward from the body of the feature. Only decides which side an angle opens on.
+    outward: Optional[V3] = field(default=None, kw_only=True)
 
     def __post_init__(self):
-        """Take a span however it is written, and hold it as vectors.
+        object.__setattr__(self, 'at', _as_v3(self.at))
+        if self.outward is not None:
+            object.__setattr__(self, 'outward', _as_v3(self.outward))
 
-        Callers build these from whatever they have -- a tuple off the wire, a
-        list from a cropped boundary -- and should not each have to convert.
-        """
-        for name in ("at", "direction", "normal", "outward"):
-            value = getattr(self, name)
-            if value is not None and not isinstance(value, Matrix):
-                object.__setattr__(self, name, _v3(value))
+    def ends_global(self) -> Tuple[V3, ...]:
+        return (self.at,)
+
+
+@dataclass(frozen=True)
+class LineSpan:
+    """A line being measured to: through `at` along `direction`, cropped to `interval` from `at`."""
+
+    at: V3
+    direction: V3
+    interval: Optional[Tuple[float, float]] = None
+    outward: Optional[V3] = field(default=None, kw_only=True)
+
+    def __post_init__(self):
+        object.__setattr__(self, 'at', _as_v3(self.at))
+        object.__setattr__(self, 'direction', _as_v3(self.direction))
         if self.interval is not None:
-            object.__setattr__(
-                self, 'interval', tuple(float(end) for end in self.interval))
-
-    @property
-    def is_point(self) -> bool:
-        return self.direction is None and self.normal is None
-
-    @property
-    def is_plane(self) -> bool:
-        return self.normal is not None
-
-    @property
-    def is_line(self) -> bool:
-        return self.direction is not None
+            object.__setattr__(self, 'interval', tuple(float(end) for end in self.interval))
+        if self.outward is not None:
+            object.__setattr__(self, 'outward', _as_v3(self.outward))
 
     @property
     def along(self) -> V3:
-        """Which way this line runs, unit length. Ask only a line.
-
-        Here so that the rules for lines can say `span.along` and mean it: the
-        field is optional because a point has no direction, and every one of
-        those rules has already established it is not looking at a point.
-        """
-        if self.direction is None:
-            raise ValueError(f"{self!r} has no direction: only a line runs a way")
+        """Which way this line runs, unit length."""
         return _unit(self.direction)
+
+    def ends_global(self) -> Tuple[V3, ...]:
+        """The two extremities."""
+        return tuple(self.at + self.along * station for station in (self.interval or (0.0, 0.0)))
+
+
+@dataclass(frozen=True)
+class PlaneSpan:
+    """A plane being measured to, through `at` with `normal`. In 3D only: on a sheet a face is a line."""
+
+    at: V3
+    normal: V3
+    outward: Optional[V3] = field(default=None, kw_only=True)
+
+    def __post_init__(self):
+        object.__setattr__(self, 'at', _as_v3(self.at))
+        object.__setattr__(self, 'normal', _as_v3(self.normal))
+        if self.outward is not None:
+            object.__setattr__(self, 'outward', _as_v3(self.outward))
 
     @property
     def facing(self) -> V3:
-        """Which way this plane faces, unit length. Ask only a plane."""
-        if self.normal is None:
-            raise ValueError(f"{self!r} has no normal: only a plane faces a way")
+        """Which way this plane faces, unit length."""
         return _unit(self.normal)
 
     def ends_global(self) -> Tuple[V3, ...]:
-        """The two extremities, or the point itself.
+        return (self.at,)
 
-        A plane has no extremities along any one direction, so it answers with
-        the one point it is placed at; the rules that ask this are the ones for
-        lines.
-        """
-        if self.is_point or self.is_plane:
-            return (self.at,)
-        at, unit = self.at, self.along
-        return tuple(
-            at + unit * station
-            for station in (self.interval or (0.0, 0.0))
-        )
+
+#: What a feature is, where a measurement is being taken.
+MeasureSpan = Union[PointSpan, LineSpan, PlaneSpan]
 
 
 def _stations_global(span: MeasureSpan, along: VectorLike) -> Tuple[float, float]:
@@ -421,9 +414,9 @@ def _stations_global(span: MeasureSpan, along: VectorLike) -> Tuple[float, float
     return (min(reach), max(reach))
 
 
-def _at_station(span: MeasureSpan, along: VectorLike, station: float) -> V3:
+def _at_station(span: Union[PointSpan, LineSpan], along: VectorLike, station: float) -> V3:
     """The point on a span that sits at a given station along `along`."""
-    if span.is_point:
+    if isinstance(span, PointSpan):
         return span.at
     unit = span.along
     rate = _dot(unit, along)
@@ -433,7 +426,7 @@ def _at_station(span: MeasureSpan, along: VectorLike, station: float) -> V3:
     return span.at + unit * step
 
 
-def _foot_on(span: MeasureSpan, point: VectorLike) -> V3:
+def _foot_on(span: LineSpan, point: VectorLike) -> V3:
     """Where a perpendicular from `point` meets a span, kept on the span."""
     at, unit = span.at, span.along
     station = _dot(_v3(point) - at, unit)
@@ -450,7 +443,7 @@ def _representative_point(span: MeasureSpan) -> V3:
     A point is itself. A line offers the middle of its surviving extent, which is
     where a reader would put a finger on it.
     """
-    if not span.is_line:
+    if not isinstance(span, LineSpan):
         return span.at
     low, high = span.interval or (0.0, 0.0)
     unit = span.along
@@ -458,7 +451,7 @@ def _representative_point(span: MeasureSpan) -> V3:
     return span.at + unit * middle
 
 
-def _foot_on_plane(span: MeasureSpan, point: VectorLike) -> V3:
+def _foot_on_plane(span: PlaneSpan, point: VectorLike) -> V3:
     """Where a perpendicular from `point` meets a plane.
 
     NOT clamped to the face, unlike the foot on a line: a span carries a plane's
@@ -479,7 +472,7 @@ def _closest_on_line(point: VectorLike, at: VectorLike, direction: VectorLike) -
     return at + unit * step
 
 
-def _plane_crossing(first: MeasureSpan, second: MeasureSpan) -> Optional[Line]:
+def _plane_crossing(first: PlaneSpan, second: PlaneSpan) -> Optional[Line]:
     """The line two planes share, or None when they are too near parallel.
 
     Too near parallel has no corner to stand in -- and admits a distance rather
@@ -525,7 +518,7 @@ def _ray_toward(
     unit = _unit(ray)
     if not any(abs(part) > 1e-9 for part in unit):
         return None
-    if span.is_line:
+    if isinstance(span, LineSpan):
         stations = [_dot(end - vertex, unit) for end in span.ends_global()]
         low, high = min(stations), max(stations)
         straddles = low < -1e-9 < 1e-9 < high
@@ -688,7 +681,7 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
     """
     if first is None or second is None:
         return None
-    if first.is_plane and second.is_plane:
+    if isinstance(first, PlaneSpan) and isinstance(second, PlaneSpan):
         crossing = _plane_crossing(first, second)
         if crossing is None:
             return None
@@ -698,15 +691,17 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
         # Square to the shared corner, and lying in its own face.
         rays = (_ray_toward(_cross(along, first.facing), vertex, first),
                 _ray_toward(_cross(along, second.facing), vertex, second))
-    elif first.is_line and second.is_line:
+    elif isinstance(first, LineSpan) and isinstance(second, LineSpan):
         placed = _closest_between(first, second)
         if placed is None:
             return None
         vertex = placed
         rays = (_ray_toward(first.along, vertex, first, second),
                 _ray_toward(second.along, vertex, second, first))
-    elif first.is_line or second.is_line:
-        line, plane = (first, second) if first.is_line else (second, first)
+    elif isinstance(first, LineSpan) and isinstance(second, PlaneSpan) or \
+            isinstance(first, PlaneSpan) and isinstance(second, LineSpan):
+        line, plane = (first, second) if isinstance(first, LineSpan) else (second, first)
+        assert isinstance(line, LineSpan) and isinstance(plane, PlaneSpan)
         vertex = _line_meets_plane(line, plane)
         if vertex is None:
             return None
@@ -715,7 +710,7 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
             return None
         line_ray = _ray_toward(line.along, vertex, line, plane)
         plane_ray = _ray_toward(in_plane, vertex, plane)
-        rays = (line_ray, plane_ray) if first.is_line else (plane_ray, line_ray)
+        rays = (line_ray, plane_ray) if isinstance(first, LineSpan) else (plane_ray, line_ray)
     else:
         return None
     if rays[0] is None or rays[1] is None:
@@ -738,7 +733,7 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
     return AngleRays(vertex=_v3(vertex), opens_from=rays[0], opens_to=rays[1],
                      normal=_unit(upright))
 
-def _closest_between(first: MeasureSpan, second: MeasureSpan) -> Optional[V3]:
+def _closest_between(first: LineSpan, second: LineSpan) -> Optional[V3]:
     """Where two lines come nearest each other, kept on both.
     """
     one, other = first.along, second.along
@@ -758,7 +753,7 @@ def _clamp_to(station: float, interval: Optional[Tuple[float, float]]) -> float:
     return max(low, min(high, station))
 
 
-def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan) -> Optional[V3]:
+def _line_meets_plane(line: LineSpan, plane: PlaneSpan) -> Optional[V3]:
     """Where a line crosses a plane, kept within the line's interval.
 
     None when it runs flat along the face and so never crosses -- the same
@@ -849,22 +844,23 @@ def distance_anchors(
     # and the dimension leaned by however far the two were offset in the other.
     #
     # Only in 3D: on a sheet a face is a line and never gets here.
-    if first.is_plane or second.is_plane:
-        if first.is_plane and second.is_plane:
-            # Parallel faces. Either centroid will do, and the first is the one
-            # the reader chose first.
-            return (first.at, _foot_on_plane(second, first.at))
-        if first.is_plane:
-            from_second = _representative_point(second)
-            return (_foot_on_plane(first, from_second), from_second)
+    if isinstance(first, PlaneSpan) and isinstance(second, PlaneSpan):
+        # Parallel faces. Either centroid will do, and the first is the one
+        # the reader chose first.
+        return (first.at, _foot_on_plane(second, first.at))
+    if isinstance(first, PlaneSpan):
+        from_second = _representative_point(second)
+        return (_foot_on_plane(first, from_second), from_second)
+    if isinstance(second, PlaneSpan):
         from_first = _representative_point(first)
         return (from_first, _foot_on_plane(second, from_first))
 
-    if first.is_point and second.is_point:
+    if isinstance(first, PointSpan) and isinstance(second, PointSpan):
         return (first.at, second.at)
-    if first.is_point:
+    if isinstance(first, PointSpan):
+        assert isinstance(second, LineSpan)
         return (first.at, _foot_on(second, first.at))
-    if second.is_point:
+    if isinstance(second, PointSpan):
         return (_foot_on(first, second.at), second.at)
 
     along = first.along

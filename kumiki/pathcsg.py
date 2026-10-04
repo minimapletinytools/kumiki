@@ -880,7 +880,7 @@ def side_index(key: PathExtrusionFeatureKey) -> int:
     Insists rather than answering None, so the rules below can index the path
     with it. Every one of them has already established it is not looking at a
     cap, and carrying an optional through them would be an optionality that
-    cannot happen -- the same reason MeasureSpan.along insists in drawing.py.
+    cannot happen.
     """
     if isinstance(key, (FlatSide, CurvedSide)):
         return key.index
