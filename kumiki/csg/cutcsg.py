@@ -2495,28 +2495,21 @@ class RectangularPrism(HasFeatures, CutCSG):
                   lambda name, face=face: SimpleRectangularPrismFeature(
                       name=name, face=face, properties=_DEFAULT_FEATURE_PROPERTIES))
 
-        # Through _canonical_ordering_arris_faces, so these are named the way timber.py
-        # names the same arrises rather than in a second order of their own.
+        # Through .of, so these are named the way timber.py names the same
+        # arrises rather than in a second order of their own.
         sides = len(_PRISM_SIDE_ORDER)
         for index in range(sides):
-            pair = _canonical_ordering_arris_faces(
-                _PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides])
-            assert pair is not None, "consecutive sides meet in an arris"
+            side, next_side = _PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides]
             named((FeatureCategory.ARRIS, index),
-                  lambda name, pair=pair: SimpleRectangularPrismEdgeFeature(
-                      name=name, faces=pair, properties=_DEFAULT_FEATURE_PROPERTIES))
+                  lambda name, side=side, next_side=next_side: SimpleRectangularPrismEdgeFeature.of(
+                      name, side, next_side, properties=_DEFAULT_FEATURE_PROPERTIES))
             for cap in (PrismFace.BOTTOM, PrismFace.TOP):
-                ends = _canonical_ordering_arris_faces(cap, _PRISM_SIDE_ORDER[index])
-                assert ends is not None, "a cap meets every side"
                 named(arris_against_cap(index, sides, end=cap is PrismFace.TOP),
-                      lambda name, ends=ends: SimpleRectangularPrismEdgeFeature(
-                          name=name, faces=ends, properties=_DEFAULT_FEATURE_PROPERTIES))
-                corner = _canonical_ordering_corner_faces(
-                    (cap, _PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides]))
-                assert corner is not None, "a cap and two neighbouring sides meet at a corner"
+                      lambda name, cap=cap, side=side: SimpleRectangularPrismEdgeFeature.of(
+                          name, cap, side, properties=_DEFAULT_FEATURE_PROPERTIES))
                 named(corner_on_cap(index, sides, end=cap is PrismFace.TOP),
-                      lambda name, corner=corner: SimpleRectangularPrismVertexFeature(
-                          name=name, faces=corner, properties=_DEFAULT_FEATURE_PROPERTIES))
+                      lambda name, cap=cap, side=side, next_side=next_side: SimpleRectangularPrismVertexFeature.of(
+                          name, cap, side, next_side, properties=_DEFAULT_FEATURE_PROPERTIES))
         return features
 
     @classmethod
