@@ -218,12 +218,12 @@ DONE-omg delete the useless docs or hmove them to a different folder
 DONE-add corner features
 IGNORE/DONE-if your' egonna do canonical face reordering on SimpleRectangularPrismFeature just use a ctor or assert, don't store it tiwce..
 DONE-its kinda weird that named features overriding default ones can declare themselves to be different feature so we should prevent that...
-
--test luban lock assembly for the purpose of video https://github.com/minimapletinytools/kumiki/pull/55 no need to merge the branch I guess cuz it's kind ahack
+DONE-test luban lock assembly for the purpose of video https://github.com/minimapletinytools/kumiki/pull/55 no need to merge the branch I guess cuz it's kind ahack
 
 
 -do the standalone app 
 -do the drawing solver :O
+  -as part of this, you need to figure out the measuring to rough thing.... I think all measurements should just go to PTW faces... so you need to make it so when selecting faces only PTW faces can be mesaured from/to
 
 -do measuring features doc
   DONE-explain CSG fetaure system
@@ -313,6 +313,11 @@ DONE-its kinda weird that named features overriding default ones can declare the
   -do V2 of assembly allowing multi step dissameblies
 -the right way to do hashing is to have all joints hash their input properties and store a _hash property
 -IFC rendering?
+-do drawing solver optimization, most expensive part is checking which of the faces are actually part of the surface
+  -"many faces share a plane, such as a tenon cheek that lies flush with the timber's face. Slicing each distinct plane once and reusing the result for every face on it gives 1,767 distinct
+  planes for 3,410 faces. That's roughly a 2× speedup, and it's the biggest structural win."  (is this correct, many fetaures are coplanar but they have different bounds usually?)
+  -cache solid_bounds computations
+  -maybe add some kinda broadphase check?
 
 
 -JOINTS
