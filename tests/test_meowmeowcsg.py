@@ -13,6 +13,8 @@ from kumiki.geometry import (Line, Plane, Point, closest_stations, intersect_lin
                              intersect_planes, lines_are_coincident, planes_are_coincident,
                              planes_are_parallel, points_are_coincident)
 from kumiki.cutcsg import (
+    FaceFeature,
+    hit_of_kind,
     shared_ancestor,
     CutCSGLabel,
     HalfSpace,
@@ -42,10 +44,13 @@ from kumiki.cutcsg import (
     FeatureProperties,
     FeatureCategory,
     FeatureSource,
-    ProgrammableCSGFeature,
+    ProgrammableEdgeFeature,
+    ProgrammableFaceFeature,
+    ProgrammablePointFeature,
     HalfSpaceFeature,
     SimpleConvexPolygonExtrusionFeature,
-    SimpleCylinderFeature,
+    SimpleCylinderBarrelFeature,
+    SimpleCylinderCapFeature,
     SimpleLoftFeature,
     SimpleRectangularPrismEdgeFeature,
     SimpleRectangularPrismVertexFeature,
@@ -69,7 +74,7 @@ from kumiki.cutcsg import (
     side_key,
 )
 from kumiki.rule import create_v2
-from tests.testing_shavings import assert_is_valid_rotation_matrix, create_standard_vertical_timber
+from tests.testing_shavings import assert_is_valid_rotation_matrix, create_standard_vertical_timber, present
 import random
 
 
@@ -2953,7 +2958,7 @@ class TestFeatureProperties:
             end_distance=scalar(10),
             feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "loser",
                                                FeatureProperties(priority=5))],
-            extra_features=[ProgrammableCSGFeature(
+            extra_features=[ProgrammableFaceFeature(
                 "winner", properties=FeatureProperties(priority=1),
                 predicate=lambda owner, point, eps: safe_equality_test(
                     owner._local_coords(point)[0], owner.size[0] / 2, eps=eps))],
@@ -3042,7 +3047,7 @@ class TestLoftFeatures:
         assert names == {"cap.0"}
 
 
-class TestProgrammableCSGFeature:
+class TestProgrammableFeatures:
     """The escape hatch: a feature identified by a predicate, not an enum member.
 
     This is what lets a primitive name something the Simple* classes cannot --
@@ -3062,13 +3067,12 @@ class TestProgrammableCSGFeature:
 
     def test_predicate_decides_membership(self):
         """Names the lower half of the right face -- no enum could say that."""
-        lower_right = ProgrammableCSGFeature(
+        lower_right = ProgrammableFaceFeature(
             "lower_right_half",
             predicate=lambda owner, point, eps: (
                 safe_equality_test(owner._local_coords(point)[0], owner.size[0] / 2, eps=eps)
                 and safe_compare(owner._local_coords(point)[2], scalar(5), Comparison.LE, eps=eps)
-            ),
-        )
+            ))
         prism = self._prism(lower_right)
 
         def claimed_by_predicate(point):
@@ -3082,7 +3086,7 @@ class TestProgrammableCSGFeature:
 
     def test_it_still_requires_the_point_to_be_on_the_boundary(self):
         """A predicate that says yes to everything cannot claim interior points."""
-        always = ProgrammableCSGFeature("always", predicate=lambda owner, point, eps: True)
+        always = ProgrammableFaceFeature("always", predicate=lambda owner, point, eps: True)
         prism = self._prism(always)
 
         assert prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5))) is not None
@@ -3101,11 +3105,9 @@ class TestProgrammableCSGFeature:
         recorded = []
 
         def spy(name, feature_type):
-            return ProgrammableCSGFeature(
+            return {CSGFeatureType.FACE: ProgrammableFaceFeature, CSGFeatureType.EDGE: ProgrammableEdgeFeature, CSGFeatureType.POINT: ProgrammablePointFeature}[feature_type](
                 name,
-                declared_type=feature_type,
-                predicate=lambda owner, point, eps: (recorded.append((name, eps)), True)[1],
-            )
+                predicate=lambda owner, point, eps: (recorded.append((name, eps)), True)[1])
 
         face_tolerance, edge_tolerance = scalar(1, 1000), scalar(1, 100)
         point_tolerance = scalar(1, 50)
@@ -3134,7 +3136,7 @@ class TestProgrammableCSGFeature:
         assert face_tolerance not in seen["e"]
 
     def test_a_predicateless_feature_matches_nothing(self):
-        prism = self._prism(ProgrammableCSGFeature("inert"))
+        prism = self._prism(ProgrammableFaceFeature("inert"))
 
         names = {h.name for h in prism.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))}
 
@@ -3143,7 +3145,7 @@ class TestProgrammableCSGFeature:
 
     def test_it_coexists_with_simple_features_and_respects_priority(self):
         prism = self._prism(
-            ProgrammableCSGFeature("computed_right",
+            ProgrammableFaceFeature("computed_right",
                                    properties=FeatureProperties(priority=1),
                                    predicate=lambda owner, point, eps: safe_equality_test(
                                        owner._local_coords(point)[0], owner.size[0] / 2, eps=eps)),
@@ -3430,7 +3432,7 @@ class TestFeatureOverridesAndExtras:
             self._prism(extras=[SimpleRectangularPrismFeature("right", face=PrismFace.RIGHT)])
 
     def test_an_extra_sits_beside_the_defaults(self):
-        axis = ProgrammableCSGFeature("axis", declared_type=CSGFeatureType.EDGE)
+        axis = ProgrammableEdgeFeature("axis")
         prism = self._prism(extras=[axis])
 
         assert prism.get_declared_features(FeatureSource.OVERRIDES) == [axis]
@@ -3439,7 +3441,7 @@ class TestFeatureOverridesAndExtras:
     def test_two_features_with_one_name_are_refused(self):
         with pytest.raises(ValueError, match="'twin'"):
             self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "twin")],
-                        [ProgrammableCSGFeature("twin")])
+                        [ProgrammableFaceFeature("twin")])
 
     def test_nor_may_an_override_take_a_default_name_still_in_use(self):
         with pytest.raises(ValueError, match="'side.1'"):
@@ -3474,13 +3476,13 @@ class TestCSGFeatureType:
         """Faces are all a primitive can name directly."""
         assert HalfSpaceFeature("shoulder").feature_type() == CSGFeatureType.FACE
         assert SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT).feature_type() == CSGFeatureType.FACE
-        assert (SimpleCylinderFeature("cap", part=CylinderPart.TOP).feature_type()
+        assert (SimpleCylinderCapFeature("cap", part=CylinderPart.TOP).feature_type()
                 == CSGFeatureType.FACE)
 
     def test_but_a_barrel_says_it_is_curved(self):
         """A cap lies on a plane and the barrel does not, which is the whole
         difference between the two types."""
-        assert (SimpleCylinderFeature("wall", part=CylinderPart.BARREL).feature_type()
+        assert (SimpleCylinderBarrelFeature("wall").feature_type()
                 == CSGFeatureType.CURVED_FACE)
         assert SimpleLoftFeature("s", key=0).feature_type() == CSGFeatureType.FACE
 
@@ -3500,18 +3502,16 @@ class TestCSGFeatureType:
             Forgetful("oops")
 
     def test_a_programmable_feature_can_name_an_edge_or_a_point(self):
-        edge = ProgrammableCSGFeature("arris", declared_type=CSGFeatureType.EDGE)
-        vertex = ProgrammableCSGFeature("corner", declared_type=CSGFeatureType.POINT)
+        edge = ProgrammableEdgeFeature("arris")
+        vertex = ProgrammablePointFeature("corner")
         assert edge.feature_type() == CSGFeatureType.EDGE
         assert vertex.feature_type() == CSGFeatureType.POINT
 
     def test_it_survives_the_round_trip_through_a_query(self):
-        axis = ProgrammableCSGFeature(
+        axis = ProgrammableEdgeFeature(
             "centre_axis",
-            declared_type=CSGFeatureType.EDGE,
             properties=FeatureProperties(real=False),
-            predicate=lambda owner, point, eps: True,
-        )
+            predicate=lambda owner, point, eps: True)
         hit = self._prism(axis).find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert hit is not None
         assert hit.feature_type() == CSGFeatureType.EDGE
@@ -3592,11 +3592,11 @@ class TestFeatureLocate:
             start_distance=scalar(0),
             end_distance=scalar(10),
         )
-        cap = SimpleCylinderFeature("top", part=CylinderPart.TOP).locate_simple_unbounded(bore)
+        cap = SimpleCylinderCapFeature("top", part=CylinderPart.TOP).locate_simple_unbounded(bore)
         assert isinstance(cap, Plane)
         assert float(cap.point[2]) == pytest.approx(10.0)
         # A curved surface has no single plane; declining beats inventing one.
-        assert SimpleCylinderFeature("wall", part=CylinderPart.BARREL).locate_simple_unbounded(bore) is None
+        assert SimpleCylinderBarrelFeature("wall").locate_simple_unbounded(bore) is None
 
     def test_an_extrusion_side_locates_with_an_outward_normal(self):
         extrusion = ConvexPolygonExtrusion(
@@ -3660,7 +3660,7 @@ class TestFeatureLocate:
 
     def test_a_feature_asked_about_the_wrong_owner_declines(self):
         prism = self._prism()
-        assert SimpleCylinderFeature("w", part=CylinderPart.TOP).locate_simple_unbounded(prism) is None
+        assert SimpleCylinderCapFeature("w", part=CylinderPart.TOP).locate_simple_unbounded(prism) is None
 
 
 class TestFeatureExtent:
@@ -3697,7 +3697,7 @@ class TestFeatureExtent:
             start_distance=scalar(0),
             end_distance=scalar(10),
         )
-        extent = SimpleCylinderFeature("wall", part=CylinderPart.BARREL).get_extent(bore)
+        extent = SimpleCylinderBarrelFeature("wall").get_extent(bore)
         assert extent is not None
         assert float(extent.anchor[2]) == pytest.approx(5.0)
 
@@ -3725,13 +3725,11 @@ class TestNonRealFeatures:
 
     def _axis_feature(self):
         """A bore's centre axis: real geometry nowhere, selectable anyway."""
-        return ProgrammableCSGFeature(
+        return ProgrammableEdgeFeature(
             "peg_axis",
-            declared_type=CSGFeatureType.EDGE,
             properties=FeatureProperties(real=False),
             predicate=lambda owner, point, eps: safe_zero_test_sq(
-                float(point[1]) ** 2 + (float(point[2]) - 5.0) ** 2, eps),
-        )
+                float(point[1]) ** 2 + (float(point[2]) - 5.0) ** 2, eps))
 
     def test_a_non_real_feature_is_found_inside_the_void(self):
         """The point is in the hole -- on no surface at all -- and still hits."""
@@ -3756,7 +3754,7 @@ class TestNonRealFeatures:
             end_distance=scalar(10),
             feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "the_face",
                                                FeatureProperties(priority=0))],
-            extra_features=[ProgrammableCSGFeature("the_axis",
+            extra_features=[ProgrammableFaceFeature("the_axis",
                                                    properties=FeatureProperties(real=False, priority=99),
                                                    predicate=lambda owner, point, eps: True)],
         )
@@ -3773,13 +3771,11 @@ class TestNonRealFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            extra_features=[ProgrammableCSGFeature(
+            extra_features=[ProgrammableEdgeFeature(
                     "centre_line",
-                    declared_type=CSGFeatureType.EDGE,
                     properties=FeatureProperties(real=False),
                     predicate=lambda owner, point, eps: safe_zero_test_sq(
-                        float(point[0]) ** 2 + float(point[1]) ** 2, eps),
-                )],
+                        float(point[0]) ** 2 + float(point[1]) ** 2, eps))],
         )
         near_axis = create_v3(scalar(1, 100), scalar(0), scalar(5))
         assert prism.find_first_feature(near_axis, FeatureTestTolerances(edge=scalar(1, 1000))) is None
@@ -3803,7 +3799,7 @@ class TestCompoundNodesOwnNoFeatures:
         )
 
     def _rogue_feature(self):
-        return ProgrammableCSGFeature("rogue", predicate=lambda owner, point, eps: True)
+        return ProgrammableFaceFeature("rogue", predicate=lambda owner, point, eps: True)
 
     def test_a_union_cannot_be_given_features(self):
         with pytest.raises(TypeError, match="extra_features"):
@@ -4741,7 +4737,7 @@ class TestThePreferredFeature:
         prism = self._prism(
             FeatureOverride(prism_face_key(PrismFace.RIGHT), "body_face",
                             FeatureProperties(group=FeatureGroup.B1)),
-            extras=[ProgrammableCSGFeature(
+            extras=[ProgrammableFaceFeature(
                 "joint_face", properties=FeatureProperties(group=FeatureGroup.A),
                 predicate=lambda owner, point, eps: safe_equality_test(
                     owner._local_coords(point)[0], owner.size[0] / 2, eps=eps))],
@@ -5053,8 +5049,8 @@ class TestADerivedEdgeIsAskedAboutItself:
             offset=scalar(0))
         edge = DerivedEdgeFeature(
             name="scarf",
-            a=OwnedFeatureHit(feature=flat.get_declared_features()[0], owner=flat),
-            b=OwnedFeatureHit(feature=tipped.get_declared_features()[0], owner=tipped))
+            a=present(hit_of_kind(OwnedFeatureHit(feature=flat.get_declared_features()[0], owner=flat), FaceFeature)),
+            b=present(hit_of_kind(OwnedFeatureHit(feature=tipped.get_declared_features()[0], owner=tipped), FaceFeature)))
         return edge, flat
 
     def _click_near_both_faces(self, degrees, distance=0.0018):
@@ -5088,8 +5084,8 @@ class TestADerivedEdgeIsAskedAboutItself:
         flat = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(0))
         edge = DerivedEdgeFeature(
             name="round",
-            a=OwnedFeatureHit(feature=barrel.get_declared_features()[0], owner=barrel),
-            b=OwnedFeatureHit(feature=flat.get_declared_features()[0], owner=flat))
+            a=present(hit_of_kind(OwnedFeatureHit(feature=barrel.get_declared_features()[0], owner=barrel), FaceFeature)),
+            b=present(hit_of_kind(OwnedFeatureHit(feature=flat.get_declared_features()[0], owner=flat), FaceFeature)),)
 
         assert edge.locate_simple_unbounded(barrel) is None
         # Still answers, from its parents, rather than refusing outright.

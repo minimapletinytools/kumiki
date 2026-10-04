@@ -13,7 +13,7 @@ import math
 
 import pytest
 
-from kumiki.drawing import (MeasureSpan, MeasurementDirection, MeasurementKind,
+from kumiki.drawing import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
                             ViewAxes,
                             MeasurementOperation, MeasurementSpace, distance_anchors)
 from kumiki.rule import create_v3
@@ -40,15 +40,15 @@ AXES = ViewAxes(right=create_v3(1, 0, 0), up=create_v3(0, 0, 1),
 
 
 def line(at, direction, interval):
-    return MeasureSpan(at=v(at), direction=v(direction), interval=interval)
+    return LineSpan(at=v(at), direction=v(direction), interval=interval)
 
 
 def point(at):
-    return MeasureSpan(at=v(at))
+    return PointSpan(at=v(at))
 
 
 def face_span(at, normal):
-    return MeasureSpan(at=v(at), normal=v(normal))
+    return PlaneSpan(at=v(at), normal=v(normal))
 
 
 def placed(anchor):
@@ -420,7 +420,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         spans, length = self._spans(runner, entry, [1, 0, 0])
 
         holes = [span for name, span in spans.items()
-                 if name.startswith("arris.") and span is not None and not span.is_point]
+                 if name.startswith("arris.") and span is not None and not isinstance(span, PointSpan)]
         assert holes, "the mortise hole should declare some arrises"
         for span in holes:
             low, high = span.interval
@@ -433,7 +433,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         spans, length = self._spans(runner, entry, [0, 0, 1])
 
         rough = [span for name, span in spans.items()
-                 if name.startswith("rough.") and span is not None and not span.is_point]
+                 if name.startswith("rough.") and span is not None and not isinstance(span, PointSpan)]
         assert rough, "the timber should declare some arrises"
         assert max(high - low for low, high in (span.interval for span in rough)) \
             > length / 2
@@ -806,10 +806,10 @@ class TestAFaceIsOnlyAPlaneInTheSolid:
         return placed[1]
 
     def test_on_a_sheet_a_face_is_not_a_plane(self):
-        assert self._span(False).is_plane is False
+        assert not isinstance(self._span(False), PlaneSpan)
 
     def test_in_three_d_it_is(self):
-        assert self._span(True).is_plane is True
+        assert isinstance(self._span(True), PlaneSpan)
 
 
 class TestWhereAnAngleSits:
@@ -823,10 +823,11 @@ class TestWhereAnAngleSits:
     """
 
     def _span(self, **fields):
-        from kumiki.drawing import MeasureSpan
+        from kumiki.drawing import LineSpan, PlaneSpan, PointSpan
 
-        return MeasureSpan(**{key: v(value) if key in ('at', 'normal', 'direction')
-                              else value for key, value in fields.items()})
+        kind = PlaneSpan if "normal" in fields else LineSpan if "direction" in fields else PointSpan
+        return kind(**{key: v(value) if key in ('at', 'normal', 'direction')
+                       else value for key, value in fields.items()})
 
     def _rays(self, first, second):
         from kumiki.drawing import angle_rays
@@ -1067,7 +1068,7 @@ class TestAnObliqueCornerIsStillTheCorner:
     CORNER = (2000.0, 0.0, 1500.0)
 
     def _faces(self, degrees_apart):
-        from kumiki.drawing import MeasureSpan
+        from kumiki.drawing import LineSpan, PlaneSpan, PointSpan
 
         # Two planes through CORNER, their normals `degrees_apart`. Each holds a
         # point along its own face rather than the corner itself, which is what
@@ -1139,23 +1140,23 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
     APART = [0.1, 0.5, 0.6, 1, 3, 5.7, 5.8, 8, 8.2, 12, 30, 45, 89]
 
     def _turned(self, degrees_apart, shape):
-        from kumiki.drawing import MeasureSpan
+        from kumiki.drawing import LineSpan, PlaneSpan, PointSpan
 
         turn = math.radians(degrees_apart)
         second = v((0, math.cos(turn), math.sin(turn)))
         if shape == "planes":
-            return (MeasureSpan(at=v((100, 0, 200)), normal=v((0, 1, 0))),
-                    MeasureSpan(at=v((100, -50, 200)), normal=second))
+            return (PlaneSpan(at=v((100, 0, 200)), normal=v((0, 1, 0))),
+                    PlaneSpan(at=v((100, -50, 200)), normal=second))
         if shape == "lines":
-            return (MeasureSpan(at=v((100, 0, 200)), direction=v((0, 1, 0)),
+            return (LineSpan(at=v((100, 0, 200)), direction=v((0, 1, 0)),
                                 interval=(0.0, 300.0)),
-                    MeasureSpan(at=v((100, -50, 260)), direction=second,
+                    LineSpan(at=v((100, -50, 260)), direction=second,
                                 interval=(0.0, 300.0)))
         # A line against a plane runs the other way round: it is parallel to the
         # face when it lies IN it, so the pair crosses as the line tips out.
-        return (MeasureSpan(at=v((100, 0, 200)), direction=second,
+        return (LineSpan(at=v((100, 0, 200)), direction=second,
                             interval=(0.0, 300.0)),
-                MeasureSpan(at=v((100, -50, 200)), normal=v((0, 1, 0))))
+                PlaneSpan(at=v((100, -50, 200)), normal=v((0, 1, 0))))
 
     @pytest.mark.parametrize("shape", ["planes", "lines", "line and plane"])
     @pytest.mark.parametrize("degrees_apart", APART)
@@ -1182,7 +1183,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
     def _geometry(self, span):
         from kumiki.geometry import Line, Plane
 
-        if span.is_plane:
+        if isinstance(span, PlaneSpan):
             return Plane(point=span.at, normal=span.normal)
         return Line(point=span.at, direction=span.direction)
 
@@ -1205,9 +1206,9 @@ class TestALineLyingFlatAlongAFaceTurnsNoCorner:
     perpendicular distance -- so refusing here agrees with what was on offer.
     """
 
-    FLAT = MeasureSpan(at=v((100, 0, 200)), direction=v((1, 0, 0)),
+    FLAT = LineSpan(at=v((100, 0, 200)), direction=v((1, 0, 0)),
                        interval=(0.0, 300.0))
-    FACE = MeasureSpan(at=v((100, -50, 200)), normal=v((0, 1, 0)))
+    FACE = PlaneSpan(at=v((100, -50, 200)), normal=v((0, 1, 0)))
 
     def test_the_table_admits_no_angle(self):
         from kumiki.drawing import MeasurementOperation, three_d_kinds

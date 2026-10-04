@@ -9,7 +9,7 @@ from typing import List, Optional, Sequence
 
 from .cutcsg import carrier_map
 from .dof_solver import Remaining, remaining
-from .drawing import (Measure, MeasureSpan, MeasurementDirection, MeasurementKind,
+from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, MeasurementKind, PlaneSpan, PointSpan,
                       MeasurementOperation, MeasurementSpace, ViewAxes, distance_anchors)
 from .feature_paths import FeatureHandle
 from .geometry import Line, Plane, Point
@@ -40,7 +40,7 @@ def _span(handle: FeatureHandle) -> MeasureSpan:
     located = handle.feature.locate_simple_unbounded(handle.owner)
     extent = handle.feature.get_extent(handle.owner)
     if isinstance(located, Point):
-        return MeasureSpan(at=located.position)
+        return PointSpan(at=located.position)
     if isinstance(located, Line):
         ends = extent.ends if extent is not None else None
         interval = None
@@ -48,9 +48,9 @@ def _span(handle: FeatureHandle) -> MeasureSpan:
             direction = located.direction / safe_norm(located.direction)
             stations = sorted(float(((end - located.point).T * direction)[0, 0]) for end in ends)
             interval = (stations[0], stations[-1])
-        return MeasureSpan(at=located.point, direction=located.direction, interval=interval)
+        return LineSpan(at=located.point, direction=located.direction, interval=interval)
     if isinstance(located, Plane):
-        return MeasureSpan(at=extent.anchor if extent is not None else located.point, normal=located.normal)
+        return PlaneSpan(at=extent.anchor if extent is not None else located.point, normal=located.normal)
     raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
 
 
@@ -73,7 +73,8 @@ def measure_row(measure: Measure, carriers: CarrierMap, view: Optional[ViewAxes]
 
     first, second = _span(measure.anchor_a), _span(measure.anchor_b)
     if kind.space is MeasurementSpace.PROJECTED:
-        if kind.direction is MeasurementDirection.PERPENDICULAR or not (first.is_point and second.is_point):
+        if kind.direction is MeasurementDirection.PERPENDICULAR or not (
+                isinstance(first, PointSpan) and isinstance(second, PointSpan)):
             raise NotImplementedError(f"rows for a {kind.name} measurement")
         view = view or ViewAxes()
         along: V3 = view.right if kind.direction is MeasurementDirection.HORIZONTAL else view.up

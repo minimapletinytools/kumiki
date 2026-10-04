@@ -7,12 +7,14 @@ import pytest
 
 from kumiki.dof_solver import remaining
 from kumiki.cutcsg import (
+    EdgeFeature, FaceFeature, hit_of_kind,
     CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
     DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, PrismFace, RectangularPrism,
     SolidUnion, prism_arris_key, prism_corner_key, prism_face_key, carrier_map,
 )
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, scalar
+from tests.testing_shavings import present
 from kumiki.solve_recipe import (
     Anchor, BarrelCoord, CarrierRef, DistanceMeasurement, PlaneCoord, feature_dof_rows, locate_recipe,
     measurement_row, motion_along, moved_by, perturbed,
@@ -39,6 +41,11 @@ def _box(size=(1.0, 2.0), start=0.0, end=4.0, position=(0.0, 0.0, 0.0), turn=0.0
 
 def _feature(owner, key):
     return next(f for f in owner.get_declared_features() if f.feature_key() == key)
+
+
+def _hit(feature, owner, kind):
+    """A hit typed by its feature's kind."""
+    return present(hit_of_kind(OwnedFeatureHit(feature=feature, owner=owner), kind), kind.__name__)
 
 
 def _recipe(owner, key):
@@ -334,8 +341,8 @@ class TestDerivedFeatures:
         carriers = carrier_map(root)
         edge = DerivedEdgeFeature(
             name="shoulder x right",
-            a=OwnedFeatureHit(feature=_feature(shoulder, HALF_SPACE_PLANE), owner=shoulder),
-            b=OwnedFeatureHit(feature=_feature(box, prism_face_key(PrismFace.RIGHT)), owner=box))
+            a=_hit(_feature(shoulder, HALF_SPACE_PLANE), shoulder, FaceFeature),
+            b=_hit(_feature(box, prism_face_key(PrismFace.RIGHT)), box, FaceFeature))
         recipe = edge.solve_recipe(root)
         assert recipe is not None and len(recipe) == 2
         assert lines_are_coincident(_line(locate_recipe(recipe)), _line(edge.locate_simple_unbounded(root)))
@@ -353,8 +360,8 @@ class TestDerivedFeatures:
         axis = next(f for f in peg.get_declared_features() if f.name == "axis")
         point = DerivedPointFeature(
             name="axis x front",
-            a=OwnedFeatureHit(feature=axis, owner=peg),
-            b=OwnedFeatureHit(feature=_feature(box, prism_face_key(PrismFace.FRONT)), owner=box))
+            edge=_hit(axis, peg, EdgeFeature),
+            face=_hit(_feature(box, prism_face_key(PrismFace.FRONT)), box, FaceFeature))
         recipe = point.solve_recipe(root)
         assert recipe is not None and len(recipe) == 2
         at = _point(recipe)
@@ -373,8 +380,8 @@ class TestDerivedFeatures:
         carriers = carrier_map(root)
         point = DerivedPointFeature(
             name="arris x shoulder",
-            a=OwnedFeatureHit(feature=_feature(box, prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT)), owner=box),
-            b=OwnedFeatureHit(feature=_feature(shoulder, HALF_SPACE_PLANE), owner=shoulder))
+            edge=_hit(_feature(box, prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT)), box, EdgeFeature),
+            face=_hit(_feature(shoulder, HALF_SPACE_PLANE), shoulder, FaceFeature))
         recipe = point.solve_recipe(root)
         assert recipe is not None and len(recipe) == 3
         at = _point(recipe)

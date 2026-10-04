@@ -7,9 +7,9 @@ convert between the two.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Sequence, Tuple
 
-from .cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, DerivedPointFeature, Difference,
+from .cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, DerivedPointFeature, Difference, F_co,
                      OwnedFeatureHit, SolidUnion, csg_children, shared_ancestor)
 from .identity import (DerivedFeaturePath, FeaturePath, FeatureRef, ResolvedJointPath,
                        ResolvedTimberPath, SingleFeaturePath)
@@ -24,22 +24,22 @@ def _same_hit(one: OwnedFeatureHit, other: OwnedFeatureHit) -> bool:
         return False
     if isinstance(one.feature, (DerivedEdgeFeature, DerivedPointFeature)):
         assert isinstance(other.feature, (DerivedEdgeFeature, DerivedPointFeature))
-        return _same_hit(one.feature.a, other.feature.a) and _same_hit(one.feature.b, other.feature.b)
+        return all(_same_hit(mine, theirs) for mine, theirs in zip(one.feature.parents, other.feature.parents))
     return one.feature.name == other.feature.name
 
 
 @dataclass(frozen=True, eq=False)
-class FeatureHandle:
+class FeatureHandle(Generic[F_co]):
     """A feature of one timber: the timber, and the feature with the node that owns it.
 
-    A derived feature carries its two parents, so one type covers declared and derived features.
-    Equal when it is the same timber and node, compared by identity, and the same feature.
+    Generic in the feature's type, like OwnedFeatureHit. A derived feature carries its two parents,
+    so one type covers declared and derived features. Equal when it is the same timber and node, compared by identity, and the same feature.
     """
     timber: 'PerfectTimberWithin'
-    hit: OwnedFeatureHit
+    hit: OwnedFeatureHit[F_co]
 
     @property
-    def feature(self) -> CSGFeature:
+    def feature(self) -> F_co:
         return self.hit.feature
 
     @property
@@ -241,7 +241,7 @@ def to_feature_path(handle: FeatureHandle, frame: 'Frame') -> Optional[FeaturePa
 
     feature = handle.feature
     if isinstance(feature, (DerivedEdgeFeature, DerivedPointFeature)):
-        a, b = ref(feature.a), ref(feature.b)
+        a, b = (ref(parent) for parent in feature.parents)
         if a is None or b is None:
             return None
         return DerivedFeaturePath(timber=timber_path, a=a, b=b,

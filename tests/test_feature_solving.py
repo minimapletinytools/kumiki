@@ -160,7 +160,7 @@ class TestSolveReport:
 
     def test_a_required_feature_with_no_recipe_reports_none(self):
         from kumiki.construction import create_timber
-        from kumiki.cutcsg import CSGFeatureType, CutCSGLabel, ProgrammableCSGFeature, RectangularPrism
+        from kumiki.cutcsg import CutCSGLabel, ProgrammableEdgeFeature, RectangularPrism
         from kumiki.rule import Transform, create_v2, mm, scalar
         from kumiki.timber import CutTimber, Cutting
 
@@ -168,7 +168,7 @@ class TestSolveReport:
                                length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="t")
         notch = RectangularPrism(size=create_v2(0.02, 0.02), transform=Transform.identity(),
                                  start_distance=scalar(0.4), end_distance=scalar(0.6), label=CutCSGLabel("notch"),
-                                 extra_features=(ProgrammableCSGFeature(name="mark", declared_type=CSGFeatureType.EDGE),))
+                                 extra_features=(ProgrammableEdgeFeature(name="mark"),))
         cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, negative_csg=notch)])
 
         report = solve_report(cut_timber, [], [])

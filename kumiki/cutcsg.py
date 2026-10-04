@@ -19,7 +19,7 @@ point it cannot hit exactly. See FeatureTestTolerances.
 """
 
 import re
-from typing import Callable, ClassVar, Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, ClassVar, Dict, Generic, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from enum import Enum, Flag
@@ -736,7 +736,7 @@ class CSGFeature(ABC):
 
         This is what lets an authored feature REPLACE the default at the same
         place rather than sit alongside it. None is the honest answer for
-        anything with no fixed place on a primitive -- a ProgrammableCSGFeature
+        anything with no fixed place on a primitive -- a programmable feature
         matching a formula, or a derived edge, which exists only as the product
         of two hits and never occupies a slot of its own.
         """
@@ -817,25 +817,81 @@ class CSGFeature(ABC):
 
 
 @dataclass(frozen=True)
-class ProgrammableCSGFeature(CSGFeature):
-    """A feature identified by an arbitrary predicate rather than an enum member.
-
-    The escape hatch for anything the simple per-primitive classes cannot name.
-
-    Currently unused, but a sensible placeholder to limit the assumption we can make on CSGFeature i.e. ProgrammableCSGFeature must be supported
-    """
-    predicate: Optional[Callable[['CutCSG', V3, Optional[Numeric]], bool]] = None
-    # The only class that stores its kind: a predicate can describe a face, an
-    # edge or a point, so there is nothing constant to return.
-    declared_type: CSGFeatureType = CSGFeatureType.FACE
+class FaceFeature(CSGFeature):
+    """A flat face. Locates to a Plane."""
 
     def feature_type(self) -> CSGFeatureType:
-        return self.declared_type
+        return CSGFeatureType.FACE
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
+        return None
+
+
+@dataclass(frozen=True)
+class EdgeFeature(CSGFeature):
+    """A straight edge or axis. Locates to a Line."""
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.EDGE
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Line]:
+        return None
+
+
+@dataclass(frozen=True)
+class PointFeature(CSGFeature):
+    """A vertex. Locates to a Point."""
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.POINT
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Point]:
+        return None
+
+
+@dataclass(frozen=True)
+class CurvedFaceFeature(CSGFeature):
+    """A curved face. Locates to nothing: no plane, line or point describes it."""
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.CURVED_FACE
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> None:
+        return None
+
+
+# A feature type, for OwnedFeatureHit and FeatureHandle to be generic over.
+F_co = TypeVar("F_co", bound=CSGFeature, covariant=True)
+K = TypeVar("K", bound=CSGFeature)
+
+
+@dataclass(frozen=True)
+class _ProgrammableFeature(CSGFeature):
+    """A feature identified by an arbitrary predicate rather than an enum member.
+
+    The escape hatch for anything the simple per-primitive classes cannot name. Currently unused.
+    """
+    predicate: Optional[Callable[['CutCSG', V3, Optional[Numeric]], bool]] = None
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if self.predicate is None:
             return False
         return self.predicate(owner, point, test_tolerance)
+
+
+@dataclass(frozen=True)
+class ProgrammableFaceFeature(_ProgrammableFeature, FaceFeature):
+    pass
+
+
+@dataclass(frozen=True)
+class ProgrammableEdgeFeature(_ProgrammableFeature, EdgeFeature):
+    pass
+
+
+@dataclass(frozen=True)
+class ProgrammablePointFeature(_ProgrammableFeature, PointFeature):
+    pass
 
 
 def _as_plane(geometry: Optional['LocatedFeatureGeometry']) -> Optional[Plane]:
@@ -870,7 +926,7 @@ def _meet_of_parents(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional[Rec
 
 
 @dataclass(frozen=True)
-class DerivedEdgeFeature(CSGFeature):
+class DerivedEdgeFeature(EdgeFeature):
     """The edge where two planar FACE features meet.
 
     The `owner` of the edge itself is the deepest node holding both of them --
@@ -878,13 +934,12 @@ class DerivedEdgeFeature(CSGFeature):
     """
 
     #: The two faces forming this edge
-    #:
-    #: TODO consider refactoring OwnedFeatureHit to be split out by types so these can be typed to faces
-    a: 'OwnedFeatureHit' = field(kw_only=True)
-    b: 'OwnedFeatureHit' = field(kw_only=True)
+    a: 'OwnedFeatureHit[FaceFeature]' = field(kw_only=True)
+    b: 'OwnedFeatureHit[FaceFeature]' = field(kw_only=True)
 
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.EDGE
+    @property
+    def parents(self) -> Tuple['OwnedFeatureHit[FaceFeature]', 'OwnedFeatureHit[FaceFeature]']:
+        return (self.a, self.b)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         """Test the point against the analytic edge itself. Testing against both
@@ -899,11 +954,9 @@ class DerivedEdgeFeature(CSGFeature):
         return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
                 and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
-        # None if either parent is a surface with no plane -- a cylinder
-        # barrel, a lofted side. The edge is still pickable; it just cannot be
-        # measured against, the same decline locate() makes elsewhere.
-        return intersect_planes(_as_plane(self.a.locate_simple_unbounded()), _as_plane(self.b.locate_simple_unbounded()))
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Line]:
+        return intersect_planes(self.a.feature.locate_simple_unbounded(self.a.owner),
+                                self.b.feature.locate_simple_unbounded(self.b.owner))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
         """Where this edge sits, and where it ends when its parents can say.
@@ -935,7 +988,7 @@ class DerivedEdgeFeature(CSGFeature):
             return start + along * scalar(repr(station))
 
         bounds = []
-        for hit in (self.a, self.b):
+        for hit in self.parents:
             # Nothing for a face that cannot say where its corners are: one
             # running to infinity, or a shape that does not work them out yet.
             corners = getattr(hit.feature, "corners", None)
@@ -964,9 +1017,8 @@ class DerivedEdgeFeature(CSGFeature):
         - either names a face that is not THERE (e.g. the top of an infinite prism)
         - or their planes are parallel (which includes being the same plane -- coincident faces share a whole plane, not a line).
         """
-        if a.feature.feature_type() != CSGFeatureType.FACE:
-            return None
-        if b.feature.feature_type() != CSGFeatureType.FACE:
+        face_a, face_b = hit_of_kind(a, FaceFeature), hit_of_kind(b, FaceFeature)
+        if face_a is None or face_b is None:
             return None
         if not feature_groups_intersect(a.feature.group, b.feature.group):
             return None
@@ -981,12 +1033,13 @@ class DerivedEdgeFeature(CSGFeature):
                     and hit.feature.get_extent(hit.owner) is None):
                 return None
             
-        if planes_are_parallel(_as_plane(a.locate_simple_unbounded()), _as_plane(b.locate_simple_unbounded())):
+        if planes_are_parallel(face_a.feature.locate_simple_unbounded(face_a.owner),
+                               face_b.feature.locate_simple_unbounded(face_b.owner)):
             return None
 
         # Deterministic order, so the same edge gets the same identity however traversal reached it.
         first, second = sorted(
-            (a, b), key=lambda hit: (hit.feature.group.value, hit.feature.name))
+            (face_a, face_b), key=lambda hit: (hit.feature.group.value, hit.feature.name))
         return DerivedEdgeFeature(
             name=f"{first.feature.name}\u00d7{second.feature.name}",
             properties=FeatureProperties(
@@ -1005,28 +1058,28 @@ class DerivedEdgeFeature(CSGFeature):
 
     def group_rank(self) -> int:
         """The better rank of the two faces that formed it."""
-        ranks = [hit.feature.group.value for hit in (self.a, self.b) if hit is not None]
+        ranks = [hit.feature.group.value for hit in self.parents]
         return min(ranks) if ranks else FeatureGroup.NONE.value
 
 
 @dataclass(frozen=True)
-class DerivedPointFeature(CSGFeature):
+class DerivedPointFeature(PointFeature):
     """The point where an edge feature crosses a face feature.
 
     """
-    #: The edge and the face that cross here. Required, as on DerivedEdgeFeature.
-    a: 'OwnedFeatureHit' = field(kw_only=True)
-    b: 'OwnedFeatureHit' = field(kw_only=True)
+    edge: 'OwnedFeatureHit[EdgeFeature]' = field(kw_only=True)
+    face: 'OwnedFeatureHit[FaceFeature]' = field(kw_only=True)
 
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.POINT
+    @property
+    def parents(self) -> Tuple['OwnedFeatureHit[EdgeFeature]', 'OwnedFeatureHit[FaceFeature]']:
+        return (self.edge, self.face)
 
     def is_derived(self) -> bool:
         return True
 
     def group_rank(self) -> int:
         """The better rank of the edge and the face that formed it."""
-        ranks = [hit.feature.group.value for hit in (self.a, self.b) if hit is not None]
+        ranks = [hit.feature.group.value for hit in self.parents]
         return min(ranks) if ranks else FeatureGroup.NONE.value
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
@@ -1039,31 +1092,12 @@ class DerivedPointFeature(CSGFeature):
         # debatable if this is the right behavior. In any case, this falls back
         # to the parents only when locate_simple_unbounded returns no vertex,
         # which should never happen.
-        return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
-                and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
+        return (self.edge.feature.test_point_unbounded(self.edge.owner, point, test_tolerance)
+                and self.face.feature.test_point_unbounded(self.face.owner, point, test_tolerance))
 
-    def _line_and_plane(self) -> Tuple[Optional[Line], Optional[Plane]]:
-        """The parents' geometry, sorted into which is which.
-
-        Parents are stored in the order that names the feature deterministically
-        rather than edge-then-face, so this picks them apart by what they
-        located to rather than by position.
-        """
-        line: Optional[Line] = None
-        plane: Optional[Plane] = None
-        for hit in (self.a, self.b):
-            if hit is None:
-                continue
-            located = hit.locate_simple_unbounded()
-            if isinstance(located, Line) and line is None:
-                line = located
-            elif isinstance(located, Plane) and plane is None:
-                plane = located
-        return line, plane
-
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
-        line, plane = self._line_and_plane()
-        return intersect_line_plane(line, plane)
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Point]:
+        return intersect_line_plane(self.edge.feature.locate_simple_unbounded(self.edge.owner),
+                                    self.face.feature.locate_simple_unbounded(self.face.owner))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
         located = self.locate_simple_unbounded(owner)
@@ -1072,7 +1106,7 @@ class DerivedPointFeature(CSGFeature):
         return CSGFeatureExtent(anchor=located.position)
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
-        return _meet_of_parents(self.a, self.b)
+        return _meet_of_parents(self.edge, self.face)
 
     @staticmethod
     def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedPointFeature']:
@@ -1084,8 +1118,9 @@ class DerivedPointFeature(CSGFeature):
         - either names something that is not THERE (e.g. top end of an infinite prism); 
         - or the line does not pierce the plane in a single point -- which includes the line LYING in the plane
         """
-        types = {a.feature.feature_type(), b.feature.feature_type()}
-        if types != {CSGFeatureType.EDGE, CSGFeatureType.FACE}:
+        edge = hit_of_kind(a, EdgeFeature) or hit_of_kind(b, EdgeFeature)
+        face = hit_of_kind(a, FaceFeature) or hit_of_kind(b, FaceFeature)
+        if edge is None or face is None:
             return None
         if not feature_groups_intersect(a.feature.group, b.feature.group):
             return None
@@ -1095,11 +1130,8 @@ class DerivedPointFeature(CSGFeature):
                     and hit.feature.get_extent(hit.owner) is None):
                 return None
 
-        edge, face = ((a, b) if a.feature.feature_type() == CSGFeatureType.EDGE else (b, a))
-        located_edge, located_face = edge.locate_simple_unbounded(), face.locate_simple_unbounded()
-        if not isinstance(located_edge, Line):
-            return None
-        if intersect_line_plane(located_edge, _as_plane(located_face)) is None:
+        if intersect_line_plane(edge.feature.locate_simple_unbounded(edge.owner),
+                                face.feature.locate_simple_unbounded(face.owner)) is None:
             return None
 
         # Deterministic order, so the same point gets the same identity however
@@ -1116,13 +1148,13 @@ class DerivedPointFeature(CSGFeature):
                 # said rather than defaulted.
                 group=FeatureGroup.NONE,
             ),
-            a=first,
-            b=second,
+            edge=edge,
+            face=face,
         )
 
 
 @dataclass(frozen=True)
-class HalfSpaceFeature(CSGFeature):
+class HalfSpaceFeature(FaceFeature):
     """The entire boundary plane of a HalfSpace.
     """
 
@@ -1130,10 +1162,7 @@ class HalfSpaceFeature(CSGFeature):
         # Its only surface. Not a cap: a half space has no ends to be an end of.
         return (FeatureCategory.SIDE, 0)
 
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.FACE
-
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
         if not isinstance(owner, HalfSpace):
             return None
         # The solid is dot(normal, p) >= offset, so the boundary plane is
@@ -1152,15 +1181,12 @@ class HalfSpaceFeature(CSGFeature):
 
 
 @dataclass(frozen=True)
-class SimpleRectangularPrismFeature(CSGFeature):
+class SimpleRectangularPrismFeature(FaceFeature):
     """One of the six faces of a RectangularPrism, named by PrismFace."""
     face: PrismFace = PrismFace.TOP
 
     def feature_key(self) -> Optional[FeatureKey]:
         return prism_face_key(self.face)
-
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.FACE
 
     def _face_frame(self, owner: 'RectangularPrism') -> Optional[Tuple[Direction3D, V3]]:
         """(outward normal, centre point) of this face, in the owner's space."""
@@ -1186,7 +1212,7 @@ class SimpleRectangularPrismFeature(CSGFeature):
             return -height_dir, base - height_dir * half_height
         return None
 
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
         if not isinstance(owner, RectangularPrism):
             return None
         frame = self._face_frame(owner)
@@ -1306,7 +1332,7 @@ def _canonical_arris_faces(
 
 
 @dataclass(frozen=True)
-class SimpleRectangularPrismEdgeFeature(CSGFeature):
+class SimpleRectangularPrismEdgeFeature(EdgeFeature):
     """An arris of a RectangularPrism, named by the two faces it lies between.
     """
 
@@ -1325,9 +1351,6 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
             warnings.warn(
                 f"{self.name!r} names its faces {first}, {second}; the canonical "
                 f"order is {canonical[0]}, {canonical[1]}")
-
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.EDGE
 
     def feature_key(self) -> Optional[FeatureKey]:
         return _prism_arris_key(*self.faces)
@@ -1348,7 +1371,7 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
         return (first.test_point_unbounded(owner, point, test_tolerance)
                 and second.test_point_unbounded(owner, point, test_tolerance))
 
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Line]:
         """The line the two faces meet in, or None if they never do."""
         first, second = self._sides()
         return intersect_planes(_as_plane(first.locate_simple_unbounded(owner)), _as_plane(second.locate_simple_unbounded(owner)))
@@ -1465,7 +1488,7 @@ def prism_corner_key(*faces: PrismFace) -> FeatureKey:
 
 
 @dataclass(frozen=True)
-class SimpleRectangularPrismVertexFeature(CSGFeature):
+class SimpleRectangularPrismVertexFeature(PointFeature):
     """A corner of a RectangularPrism, named by the three faces meeting there.
 
     The counterpart of TimberCorner, and numbered to match it: see
@@ -1498,9 +1521,6 @@ class SimpleRectangularPrismVertexFeature(CSGFeature):
     def feature_key(self) -> Optional[FeatureKey]:
         return _prism_corner_key(self._canonical)
 
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.POINT
-
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         return _meet_of_prism_faces(owner, self.faces)
 
@@ -1525,7 +1545,7 @@ class SimpleRectangularPrismVertexFeature(CSGFeature):
                  PrismFace.BACK: -height_dir * (owner.size[1] / 2)}
         return at + reach[first] + reach[second]
 
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Point]:
         at = self._position(owner)
         return None if at is None else Point(position=at)
 
@@ -1540,12 +1560,9 @@ class SimpleRectangularPrismVertexFeature(CSGFeature):
 
 
 @dataclass(frozen=True)
-class CylinderAxisFeature(CSGFeature):
+class CylinderAxisFeature(EdgeFeature):
     """The centre line of a Cylinder, down the middle of the void it cuts.
     """
-
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.EDGE
 
     @property
     def real(self) -> bool:
@@ -1569,7 +1586,7 @@ class CylinderAxisFeature(CSGFeature):
             f"{type(owner).__name__}, which has no axis")
         return None
 
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Line]:
         cylinder = self._cylinder(owner)
         if cylinder is None:
             return None
@@ -1603,64 +1620,64 @@ class CylinderAxisFeature(CSGFeature):
 
 
 @dataclass(frozen=True)
-class SimpleCylinderFeature(CSGFeature):
-    """One surface of a Cylinder: an end cap, or the barrel."""
-    part: CylinderPart = CylinderPart.BARREL
+class SimpleCylinderCapFeature(FaceFeature):
+    """One end cap of a Cylinder. `part` is TOP or BOTTOM."""
+    part: CylinderPart = CylinderPart.TOP
 
     def feature_key(self) -> Optional[FeatureKey]:
-        if self.part is CylinderPart.BOTTOM:
-            return START_CAP
-        if self.part is CylinderPart.TOP:
-            return END_CAP
-        # A cylinder is an extrusion with one side, and that side is curved.
-        return (FeatureCategory.SIDE, 0)
+        return END_CAP if self.part is CylinderPart.TOP else START_CAP
 
-    def feature_type(self) -> CSGFeatureType:
-        """A cap is planar; the barrel is not.
-        """
-        if self.part is CylinderPart.BARREL:
-            return CSGFeatureType.CURVED_FACE
-        return CSGFeatureType.FACE
+    def _distance(self, owner: 'Cylinder') -> Optional[Numeric]:
+        return owner.end_distance if self.part is CylinderPart.TOP else owner.start_distance
 
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
         if not isinstance(owner, Cylinder):
             return None
-        # The barrel is curved: no single plane describes it, so decline rather
-        # than invent one. (Its axis is a separate, non-real feature -- see D5.)
-        if self.part == CylinderPart.BARREL:
-            return None
-        axis = safe_normalize_vector(owner.axis_direction)
-        distance = owner.end_distance if self.part == CylinderPart.TOP else owner.start_distance
+        distance = self._distance(owner)
         if distance is None:
             return None
-        sign = scalar(1) if self.part == CylinderPart.TOP else scalar(-1)
+        axis = safe_normalize_vector(owner.axis_direction)
+        sign = scalar(1) if self.part is CylinderPart.TOP else scalar(-1)
         return Plane(normal=axis * sign, point=owner.position + axis * distance)
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
         if not isinstance(owner, Cylinder):
             return None
-        axis = safe_normalize_vector(owner.axis_direction)
-        if self.part == CylinderPart.BARREL:
-            mid = _finite_midpoint(owner.start_distance, owner.end_distance)
-            return CSGFeatureExtent(anchor=owner.position + axis * mid)
-        distance = owner.end_distance if self.part == CylinderPart.TOP else owner.start_distance
+        distance = self._distance(owner)
         if distance is None:
             return None
-        return CSGFeatureExtent(anchor=owner.position + axis * distance)
+        return CSGFeatureExtent(anchor=owner.position + safe_normalize_vector(owner.axis_direction) * distance)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, Cylinder):
             return False
-        axial, radial = owner._axial_and_radial(point)
-        if self.part == CylinderPart.TOP:
-            return owner.end_distance is not None and safe_equality_test(axial, owner.end_distance, eps=test_tolerance)
-        if self.part == CylinderPart.BOTTOM:
-            return owner.start_distance is not None and safe_equality_test(axial, owner.start_distance, eps=test_tolerance)
+        distance = self._distance(owner)
+        axial, _radial = owner._axial_and_radial(point)
+        return distance is not None and safe_equality_test(axial, distance, eps=test_tolerance)
+
+
+@dataclass(frozen=True)
+class SimpleCylinderBarrelFeature(CurvedFaceFeature):
+    """The curved side of a Cylinder."""
+
+    def feature_key(self) -> Optional[FeatureKey]:
+        return (FeatureCategory.SIDE, 0)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        if not isinstance(owner, Cylinder):
+            return None
+        mid = _finite_midpoint(owner.start_distance, owner.end_distance)
+        return CSGFeatureExtent(anchor=owner.position + safe_normalize_vector(owner.axis_direction) * mid)
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, Cylinder):
+            return False
+        _axial, radial = owner._axial_and_radial(point)
         return safe_equality_test(radial, owner.radius, eps=test_tolerance)
 
 
 @dataclass(frozen=True)
-class SimpleConvexPolygonExtrusionFeature(CSGFeature):
+class SimpleConvexPolygonExtrusionFeature(FaceFeature):
     """One side face (points[key] -> points[key+1 mod n]) or end cap of a
     ConvexPolygonExtrusion."""
     key: ExtrusionFeatureKey = ExtrusionCap.TOP
@@ -1671,9 +1688,6 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
         if self.key is ExtrusionCap.TOP:
             return END_CAP
         return (FeatureCategory.SIDE, int(self.key))
-
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.FACE
 
     def _frame(self, owner: 'ConvexPolygonExtrusion') -> Optional[Tuple[Direction3D, V3]]:
         """(outward normal, centre point) of this face, in the owner's space."""
@@ -1706,7 +1720,7 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
         local_mid = Matrix([midpoint_2d[0], midpoint_2d[1], mid_length])
         return normal, owner.transform.position + safe_transform_vector(orientation, local_mid)
 
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
         if not isinstance(owner, ConvexPolygonExtrusion):
             return None
         frame = self._frame(owner)
@@ -1736,7 +1750,7 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
 
 
 @dataclass(frozen=True)
-class SimpleLoftFeature(CSGFeature):
+class SimpleLoftFeature(FaceFeature):
     """One side face or end cap of a ConvexPolygonSimpleLoft.
 
     Side faces are ruled surfaces and are only planar in the special case of a
@@ -1752,10 +1766,7 @@ class SimpleLoftFeature(CSGFeature):
             return END_CAP
         return (FeatureCategory.SIDE, int(self.key))
 
-    def feature_type(self) -> CSGFeatureType:
-        return CSGFeatureType.FACE
-
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
             return None
         
@@ -1960,20 +1971,20 @@ def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
     """A plane for each default face of `csg` that has one, keyed like the face."""
     carriers: Dict[FeatureKey, Carrier] = {}
     for key, feature in csg.default_features().items():
-        if feature.feature_type() is not CSGFeatureType.FACE:
+        if not isinstance(feature, FaceFeature):
             continue
         plane = feature.locate_simple_unbounded(cast(CutCSG, csg))
-        if isinstance(plane, Plane):
+        if plane is not None:
             carriers[key] = CarrierPlane(plane)
     return carriers
 
 
 # TODO consider making this typed, you could do this by adding... an optional owner field to FeatureHit and removing this class all together. Or making several OwnedFeatureHit classes is fine too I guess.
 @dataclass(frozen=True)
-class OwnedFeatureHit:
-    """A feature, paired with the primitive it belongs to
+class OwnedFeatureHit(Generic[F_co]):
+    """A feature, paired with the primitive it belongs to. Generic in the feature's type.
     """
-    feature: CSGFeature
+    feature: F_co
     owner: 'CutCSG'
 
     @property
@@ -1992,6 +2003,11 @@ class OwnedFeatureHit:
 
     def get_extent(self) -> Optional['CSGFeatureExtent']:
         return self.feature.get_extent(self.owner)
+
+
+def hit_of_kind(hit: OwnedFeatureHit[CSGFeature], kind: Type[K]) -> Optional[OwnedFeatureHit[K]]:
+    """The hit, typed by its feature's kind, or None if its feature isn't that kind."""
+    return cast(OwnedFeatureHit[K], hit) if isinstance(hit.feature, kind) else None
 
 
 @dataclass(frozen=True)
@@ -2822,14 +2838,14 @@ class Cylinder(HasFeatures, CutCSG):
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
         """Two caps and the barrel
         """
-        parts = ((START_CAP, CylinderPart.BOTTOM),
-                 (END_CAP, CylinderPart.TOP),
-                 ((FeatureCategory.SIDE, 0), CylinderPart.BARREL))
-        return {
-            key: SimpleCylinderFeature(name=default_feature_name(key), part=part,
-                                       properties=_DEFAULT_FEATURE_PROPERTIES)
-            for key, part in parts
+        features: Dict[FeatureKey, CSGFeature] = {
+            key: SimpleCylinderCapFeature(name=default_feature_name(key), part=part,
+                                          properties=_DEFAULT_FEATURE_PROPERTIES)
+            for key, part in ((START_CAP, CylinderPart.BOTTOM), (END_CAP, CylinderPart.TOP))
         }
+        features[CYLINDER_BARREL] = SimpleCylinderBarrelFeature(
+            name=default_feature_name(CYLINDER_BARREL), properties=_DEFAULT_FEATURE_PROPERTIES)
+        return features
 
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         """The axis, the barrel around it, and a plane for each finite cap."""

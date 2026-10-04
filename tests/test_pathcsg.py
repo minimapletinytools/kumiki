@@ -13,6 +13,7 @@ from kumiki.pathcsg import (
     CurvedSide,
     side_index,
     ArcSegment, StraightSegment, FancyPath, Path, PathExtrusion,
+    SimplePathExtrusionCurvedFeature,
     SimplePathExtrusionFeature,
 )
 from kumiki.triangles import mesh_cutcsg
@@ -183,7 +184,7 @@ class TestPathCSG:
                 # The key says which kind of side it is, so the knee cannot be
                 # written down as flat.
                 SimplePathExtrusionFeature("foot", key=FlatSide(0)),
-                SimplePathExtrusionFeature("knee_bulge", key=CurvedSide(1)),
+                SimplePathExtrusionCurvedFeature("knee_bulge", key=CurvedSide(1)),
                 SimplePathExtrusionFeature("top", key=ExtrusionCap.TOP),
             ],
         )
@@ -352,7 +353,7 @@ class TestAPathFeatureSaysWhetherItIsCurved:
                 == CSGFeatureType.FACE)
 
     def test_a_curved_side_is_a_curved_face(self):
-        assert (SimplePathExtrusionFeature("knee", key=CurvedSide(1)).feature_type()
+        assert (SimplePathExtrusionCurvedFeature("knee", key=CurvedSide(1)).feature_type()
                 == CSGFeatureType.CURVED_FACE)
 
     def test_both_caps_are_faces_whatever_the_path_does(self):
@@ -385,11 +386,11 @@ class TestAPathFeatureSaysWhetherItIsCurved:
         keeps it out of measurement."""
         extrusion = self._extrusion()
 
-        assert SimplePathExtrusionFeature("knee", key=CurvedSide(1)).locate_simple_unbounded(extrusion) is None
+        assert SimplePathExtrusionCurvedFeature("knee", key=CurvedSide(1)).locate_simple_unbounded(extrusion) is None
         assert SimplePathExtrusionFeature("foot", key=FlatSide(0)).locate_simple_unbounded(extrusion) is not None
 
-    def test_the_kind_travels_with_the_key_and_cannot_be_set_apart_from_it(self):
-        """Which is the point. There is no second field to disagree with the
-        first -- naming a side flat or curved IS saying what kind of face it is.
-        """
-        assert "declared_type" not in SimplePathExtrusionFeature.__dataclass_fields__
+    def test_a_key_of_the_other_kind_is_refused(self):
+        with pytest.raises(ValueError):
+            SimplePathExtrusionFeature("knee", key=CurvedSide(1))
+        with pytest.raises(ValueError):
+            SimplePathExtrusionCurvedFeature("foot", key=FlatSide(0))
