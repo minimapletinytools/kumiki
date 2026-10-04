@@ -243,8 +243,8 @@ Features and `Measure`s in, a per-feature report out.
 
 **Seeding R:**
 
-- **Datum policy:** which timber faces start fully known (see decisions).
-- **Square convention:** any plane whose design normal is parallel to a datum normal gets its normal rows.
+- **Datum:** the known features, passed in by the caller.
+- **Assumptions:** `square_assumptions` and `sheet_axis_assumptions` in `assumptions.py`.
 - **Merges** need no rows: merged planes already share columns through the carrier map.
 
 **`SolveReport`:**
@@ -288,7 +288,7 @@ Once A–D agree on real joints.
 
 ## Left
 
-1. **Datum and conventions.** Callers pass the known features by hand. Decide which faces start known, and whether planes square to the reference faces start with their tilts known (see decisions).
+1. **Datum.** The caller of the solver passes the known features, e.g. the reference edge and one end face or shoulder plane. Nothing left to build here.
 2. **Recipes:**
    - `Own` recipes for free extra points and lines;
    - `PathExtrusion` carriers (it has no default features yet).
@@ -304,7 +304,6 @@ Decided:
 - **Non-real features** (an axis, a reference plane) are required by default.
 - **Solved tree:** carriers and required features come from the perfect-timber-within tree only. Drawings and measuring will be changed to reference features in that tree.
 - **Curved faces** are required, for now. No sampling.
+- **Square and sheet-aligned features** start known, as rows rather than measurements (`kumiki/drawings/assumptions.py`): features in one aligned set stay parallel or square, chained rather than paired; features along the sheet's right or up keep their direction.
+- **Datum** is the solver caller's input, not a policy in the solver.
 
-Open:
-1. **Datum:** do the 4 long perfect-timber-within faces plus one chosen end start known, with the timber's length as a measurement? Or all 6 faces? PTW or rough?
-2. **Square by convention:** do planes square to the reference faces start with their normals known, so only non-square angles are drawn?
