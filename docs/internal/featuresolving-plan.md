@@ -296,6 +296,7 @@ Once A–D agree on real joints.
 4. **Generator (Part 2 E):** greedy candidate measurements scored by remaining DOFs, using `free_motions` to rule out candidates that can't help. Output is `Measure`s with `MeasurementSource.PYTHON_GENERATED`.
 5. **Debug overlay in kigumi:** colour faces required or hidden, and by remaining DOFs.
 6. **Speed:** `required_features` takes about 2s for `tinyhouse120`'s 75 timbers (3,410 faces tested, 1,767 distinct planes). Walk each distinct plane once rather than once per face, compute each primitive's bounding planes once per timber, and skip primitives whose bounds miss the plane.
+7. **Drawings and measuring on the perfect tree:** `find_feature` and `timber_body_csg` still look up the rough body, so a `rough.*` handle can't be solved. Move them, and what drawings reference, to `render_perfect_timber_within_with_cuts_csg_local`.
 
 # Decisions
 
