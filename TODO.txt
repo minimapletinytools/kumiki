@@ -203,27 +203,14 @@ DONE-sliding dovetail (maybe you want tapered variants)
   -conisder just shippingthe defalut drawing with every frame by default 
     
 
-DONE-do joint rename to match what's in your new book  
-DONE-tenon edge lines not being cropped properly on doubel angled mortise and tenon joint
-IGNORE-create a header for the are below the 3d view main panel in kigumi so it appears a littlem or esensible. it should says "scroll here for more" as well. amybe you can stick some doc information there too.
-DONE-overlap priority is: non derived features first -> order by highest priority within derived group (derived group priority = enum index) -> feature priority -> feature name -> feature order
-DONE-you'll need line / face -> point derived features tooo
-DONE-add center axis feature to peg hole
-DONE-do code review
-  DONE-cutcsg/pathcsg
-  DONE-geometry
-  DONE-drawing
-  DONE-identity
-DONE-omg delete the useless docs or hmove them to a different folder
-DONE-add corner features
-IGNORE/DONE-if your' egonna do canonical face reordering on SimpleRectangularPrismFeature just use a ctor or assert, don't store it tiwce..
-DONE-its kinda weird that named features overriding default ones can declare themselves to be different feature so we should prevent that...
-DONE-test luban lock assembly for the purpose of video https://github.com/minimapletinytools/kumiki/pull/55 no need to merge the branch I guess cuz it's kind ahack
-
+-NEXT STEPS FOR auto drawing DRAWING
+  -figure out the measuring to rough thing.... I think all measurements should just go to PTW faces... so you need to make it so when selecting faces only PTW faces can be mesaured from/to
+  -pull out my cute frame test auto drawing solver into its own function
+  -move solver into its own thread and add in function to pass in slices I guess?
+  -do I need something that detects and warns on completely hidden timbers (and removes them)
+  -do potato measuring placement algorithm
 
 -do the standalone app 
--do the drawing solver :O
-  -as part of this, you need to figure out the measuring to rough thing.... I think all measurements should just go to PTW faces... so you need to make it so when selecting faces only PTW faces can be mesaured from/to
 
 -do measuring features doc
   DONE-explain CSG fetaure system
@@ -368,6 +355,23 @@ DONE-test luban lock assembly for the purpose of video https://github.com/minima
 
 
 :: TODONE 
+DONE-do joint rename to match what's in your new book  
+DONE-tenon edge lines not being cropped properly on doubel angled mortise and tenon joint
+IGNORE-create a header for the are below the 3d view main panel in kigumi so it appears a littlem or esensible. it should says "scroll here for more" as well. amybe you can stick some doc information there too.
+DONE-overlap priority is: non derived features first -> order by highest priority within derived group (derived group priority = enum index) -> feature priority -> feature name -> feature order
+DONE-you'll need line / face -> point derived features tooo
+DONE-add center axis feature to peg hole
+DONE-do code review
+  DONE-cutcsg/pathcsg
+  DONE-geometry
+  DONE-drawing
+  DONE-identity
+DONE-omg delete the useless docs or hmove them to a different folder
+DONE-add corner features
+DONE-do the drawing solver :O
+DONE-if your' egonna do canonical face reordering on SimpleRectangularPrismFeature just use a ctor or assert, don't store it tiwce..
+DONE-its kinda weird that named features overriding default ones can declare themselves to be different feature so we should prevent that...
+DONE-test luban lock assembly for the purpose of video https://github.com/minimapletinytools/kumiki/pull/55 no need to merge the branch I guess cuz it's kind ahack
 DONE-DO LHS MENU AND DRAWING INTERFACE DESIGN SPEC 
   DONE-after amesaurement is taken in drawing view, the camera snapping back breaks
   DONE-face to face non parallel measurements seem be mesauring distance not angle
