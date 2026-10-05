@@ -117,4 +117,26 @@ The CSG system has the following limitations
 
 # The Measurement/Drawing System 
 
-TODO
+The complex feature system above is primarily intended for supporting the drawing system.
+
+A drawing is a "page" that contains a set of views. Each view contains a camera and a set of measurements.
+
+A view can be 2d, in which case its camera is orthographic.
+
+There is a special 3d drawing that allows you to add visible measurements to the main 3d view, which is not intended for generating drawings a swell.
+
+Measurements are references to 2 measurable features together with the a "view" from which that measurement is meant to be seen and some cosmetic properties
+
+A drawing can contain one or more timbers. Typically a drawing will be one of the following:
+
+- Blueprint: A blueprint is typically a drawing of a single timber measuring every joint feature so that it can be cut
+- Plan: A plan is typically a "slice" of the frame containing multiple timbers and only the main dimensions of the timbers are measured.
+
+## Automatically Generating Drawings
+
+kumiki ships with a drawing generator. Pass a list of timbers you want to generate drawings for, and it will:
+
+- find all features that need to be "measured" in the drawing
+- create measurements such that each of those features can be "known" through the drawing
+- and do so in a "nice" way so that the drawing looks good both semantically and syntatically
+
