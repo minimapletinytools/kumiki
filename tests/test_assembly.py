@@ -982,6 +982,7 @@ class TestRotation:
         joints = [AssemblyJoint(name="j", members={1: spec(AssemblyFreedom(rotations=(rotation,))), 2: spec()})]
 
         solution = solve_assembly(members, joints)
+        assert solution is not None
 
         assert solution.failure is None
         assert len(solution.steps) == 1
@@ -989,6 +990,7 @@ class TestRotation:
         assert movement.member_key == 1
         assert not movement.dragged
         assert float(movement.distance) == 0.0
+        assert movement.rotation is not None
         assert float(movement.rotation.angle) == pytest.approx(0.5)
         assert_direction(movement, (0, 0, 1))
         assert [float(movement.rotation.axis_position[i, 0]) for i in range(3)] == [0, 1, 2]
@@ -1005,11 +1007,13 @@ class TestRotation:
         ]
 
         solution = solve_assembly(members, joints)
+        assert solution is not None
 
         assert solution.failure is None
         assert len(solution.steps) == 2
         (turned,) = solution.steps[0].movements
         assert turned.member_key == 1
+        assert turned.rotation is not None
         assert float(turned.rotation.angle) == pytest.approx(1.0)
         slid = movements_by_key(solution.steps[1])
         assert slid[2].rotation is None
@@ -1031,6 +1035,7 @@ class TestRotation:
         ]
 
         solution = solve_assembly(members, joints)
+        assert solution is not None
 
         assert solution.failure is None
         assert len(solution.steps) == 2
@@ -1051,6 +1056,7 @@ class TestRotation:
         ]
 
         solution = solve_assembly(members, joints)
+        assert solution is not None
 
         assert solution.failure is None
         turned = movements_by_key(solution.steps[0])
@@ -1067,6 +1073,7 @@ class TestRotation:
         joints = [AssemblyJoint(name="j", members={1: spec(freedom), 2: spec()})]
 
         solution = solve_assembly(members, joints)
+        assert solution is not None
 
         assert len(solution.steps) == 1
         assert all(movement.rotation is None for movement in solution.steps[0].movements)
@@ -1077,12 +1084,14 @@ class TestRotation:
 
         frame = example()
         solution = solve_frame_assembly(frame)
+        assert solution is not None
 
         key = {cut.timber.ticket.path: cut.timber.ticket.kumiki_id for cut in frame.cut_timbers}
         assert solution.failure is None
         assert len(solution.steps) == 3
         (turned,) = solution.steps[0].movements
         assert turned.member_key == key["x"]
+        assert turned.rotation is not None
         assert float(turned.rotation.angle) == pytest.approx(math.pi / 2)
         assert_direction(turned, (1, 0, 0))
         y_slide = movements_by_key(solution.steps[1])[key["y"]]
