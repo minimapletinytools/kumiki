@@ -106,6 +106,15 @@ def _candidates(anchors: Sequence[FeatureHandle], carriers) -> List[Candidate]:
     return candidates
 
 
+def _matrix(rows: Sequence[Row], columns: list) -> np.ndarray:
+    index = {column: i for i, column in enumerate(columns)}
+    out = np.zeros((len(rows), len(columns)))
+    for r, row in enumerate(rows):
+        for column, value in row.items():
+            out[r, index[column]] = value
+    return out
+
+
 def _rows(handles: Sequence[FeatureHandle], carriers) -> List[Row]:
     return [row for handle in handles for row in feature_handle_dof_rows(handle, carriers)]
 
@@ -136,38 +145,77 @@ def solve_cute_frame():
     anchors = [handle for handle in directed if not isinstance(handle.feature, PrismCenterplaneFeature)]
     candidates = _candidates(anchors, carriers)
 
-    report = [f"fixed: {FIXED_TIMBER} ({len(known)} faces known), {len(assumptions)} assumptions",
-              f"targets: {len(targets)} features, {len(candidates)} candidate dimensions",
-              f"left before dimensioning: {remaining(known_rows, target_rows).count}"]
+    # Everything below works on rows with the known rows' span projected out, carried from pick to
+    # pick: picking a row just removes its direction from every matrix (incremental Gram-Schmidt).
+    columns = list(dict.fromkeys(column for row in (*known_rows, *target_rows, *(c.row for c in candidates))
+                                 for column in row))
+    known_matrix, target_matrix = _matrix(known_rows, columns), _matrix(target_rows, columns)
+    candidate_matrix = _matrix([candidate.row for candidate in candidates], columns)
+    tolerance = 1e-9 * max(float(np.linalg.norm(np.vstack([known_matrix, target_matrix]), 2)), 1.0)
+
+    _, values, basis = np.linalg.svd(known_matrix, full_matrices=False)
+    basis = basis[values > tolerance]
+    target_left = target_matrix - target_matrix @ basis.T @ basis
+    candidate_left = candidate_matrix - candidate_matrix @ basis.T @ basis
+
+    # Which rows of the target matrix are each feature's.
+    spans: Dict[Tuple[int, str], slice] = {}
+    start = 0
+    for handle in targets:
+        count = len(feature_handle_dof_rows(handle, carriers))
+        spans[(id(handle.owner), handle.feature.name)] = slice(start, start + count)
+        start += count
 
     def solved(handle: FeatureHandle) -> bool:
-        return remaining(known_rows, feature_handle_dof_rows(handle, carriers)).count == 0
+        span = spans.get((id(handle.owner), handle.feature.name))
+        return span is None or float(np.linalg.norm(target_left[span])) < tolerance
+
+    def unsolved_basis() -> np.ndarray:
+        _, values, directions = np.linalg.svd(target_left, full_matrices=False)
+        return directions[values > tolerance]
+
+    report = [f"fixed: {FIXED_TIMBER} ({len(known)} faces known), {len(assumptions)} assumptions",
+              f"targets: {len(targets)} features, {len(candidates)} candidate dimensions",
+              f"left before dimensioning: {len(unsolved_basis())}"]
 
     picks: List[Candidate] = []
-    left = remaining(known_rows, target_rows).count
-    while left > 0:
-        best: Optional[Tuple[Tuple, Candidate, int]] = None
-        for candidate in candidates:
-            after = remaining(known_rows + [candidate.row], target_rows).count
-            if after >= left:
-                continue
-            # Fewest unknowns left, then measured from something already solved, then shortest.
-            from_solved = solved(candidate.measure.anchor_a) or solved(candidate.measure.anchor_b)
-            score = (after, not from_solved, candidate.length)
-            if best is None or score < best[0]:
-                best = (score, candidate, after)
-        if best is None:
-            report.append(f"stuck with {left} left: no candidate dimension helps")
+    available = list(range(len(candidates)))
+    while True:
+        unsolved = unsolved_basis()
+        if not len(unsolved):
             break
-        _, pick, left = best
+        best: Optional[Tuple[Tuple, int, np.ndarray]] = None
+        for index in available:
+            residual = candidate_left[index]
+            size = float(np.linalg.norm(residual))
+            if size < tolerance:
+                continue
+            direction = residual / size
+            # It helps exactly when what it adds to the known rows lies in what is still unsolved.
+            if float(np.linalg.norm(direction - unsolved.T @ (unsolved @ direction))) > 1e-6:
+                continue
+            candidate = candidates[index]
+            # Measured from something already solved, then shortest.
+            score = (not (solved(candidate.measure.anchor_a) or solved(candidate.measure.anchor_b)), candidate.length)
+            if best is None or score < best[0]:
+                best = (score, index, direction)
+        if best is None:
+            report.append(f"stuck with {len(unsolved)} left: no candidate dimension helps")
+            break
+        _, index, direction = best
+        target_left = target_left - np.outer(target_left @ direction, direction)
+        candidate_left = candidate_left - np.outer(candidate_left @ direction, direction)
+        available.remove(index)
+        pick = candidates[index]
         picks.append(pick)
         known_rows.append(pick.row)
-        candidates.remove(pick)
         report.append(f"[{pick.view:5}] {_name(pick.measure.anchor_a)} -> {_name(pick.measure.anchor_b)}"
-                      f"  {pick.length * 1000:.0f}mm  ({left} left)")
+                      f"  {pick.length * 1000:.0f}mm  ({len(unsolved) - 1} left)")
 
-    unsolved = [_name(handle) for handle in targets if not solved(handle)]
-    report.append(f"unsolved: {unsolved or 'none'}")
+    # Checked once more with the library's own rank test.
+    left = remaining(known_rows, target_rows).count
+    unsolved_names = [_name(handle) for handle in targets if not solved(handle)]
+    report.append(f"unsolved: {unsolved_names or 'none'} (rank test: {left} left)")
     return frame, picks, report
 
 
