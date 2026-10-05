@@ -86,6 +86,8 @@ addopts = "-m 'not gui'"
 
 [dependency-groups]
 dev = [
+    # The optional renderers too, so type checking and tests see what CI sees.
+    "kumiki[render,render-matplotlib]",
     "ty>=0.0.15",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",

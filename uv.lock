@@ -703,6 +703,7 @@ render-matplotlib = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "kumiki", extra = ["render", "render-matplotlib"] },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-mock" },
@@ -734,6 +735,7 @@ provides-extras = ["render", "render-matplotlib"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "kumiki", extras = ["render", "render-matplotlib"] },
     { name = "pytest", specifier = ">=7.0.0" },
     { name = "pytest-cov", specifier = ">=4.0.0" },
     { name = "pytest-mock", specifier = ">=3.10.0" },
