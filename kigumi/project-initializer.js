@@ -11,6 +11,7 @@ const {
     runCommand: spawnProcess,
     getVenvPython,
     getKigumiVersion,
+    isLocalDevKigumiVersion,
     kumikiCompatiblePipSpec,
     getMissingDependencies,
 } = require('./python-env');
@@ -499,7 +500,7 @@ async function installOrUpdateKumiki(workspaceRoot, pythonPath, isLocalDev) {
 
     const kigumiVersion = getKigumiVersion();
     const [kMajor, kMinor] = kigumiVersion.split('.').map(Number);
-    if (kMinor === 999) {
+    if (isLocalDevKigumiVersion(kigumiVersion)) {
         summary.push(`Local dev kigumi build (${kigumiVersion}); skipping kumiki version compatibility check.`);
     } else if (kumikiVersion !== 'unknown') {
         const [iMajor, iMinor] = kumikiVersion.split('.').map(Number);

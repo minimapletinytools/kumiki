@@ -12,6 +12,7 @@ const {
     runCommand: spawnProcess,
     getVenvPythonCandidates,
     getKigumiVersion,
+    isLocalDevKigumiVersion,
     kumikiCompatiblePipSpec,
     getMissingDependencies,
 } = require('./python-env');
@@ -219,7 +220,7 @@ class PythonRunnerSession {
     async checkKumikiVersionCompatibility(pythonCmd) {
         const kigummiVersion = getKigumiVersion(this.context.extensionPath);
         const [kigummiMajor, kigummiMinor] = kigummiVersion.split('.').map(Number);
-        if (kigummiMajor === 999 || kigummiMinor === 999) {
+        if (isLocalDevKigumiVersion(kigummiVersion)) {
             this.channel.appendLine(`[env] Local dev kigumi build (${kigummiVersion}), skipping kumiki version check`);
             return;
         }

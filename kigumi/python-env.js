@@ -22,9 +22,19 @@ function getKigumiVersion(extensionPath = __dirname) {
     return JSON.parse(fs.readFileSync(path.join(extensionPath, 'package.json'), 'utf8')).version;
 }
 
+// A local dev build of kigumi, which install.sh stamps 999.0.0. It matches no released kumiki.
+function isLocalDevKigumiVersion(kigumiVersion) {
+    const [major, minor] = kigumiVersion.split('.').map(Number);
+    return major >= 999 || minor >= 999;
+}
+
 // pip ~= spec constraining kumiki to the same major.minor as kigumi.
 // e.g. kigumi 0.3.2 → "kumiki~=0.3.0" (pip ~= means >=0.3.0, <0.4.0)
+// A local dev build takes the latest kumiki.
 function kumikiCompatiblePipSpec(kigumiVersion = getKigumiVersion()) {
+    if (isLocalDevKigumiVersion(kigumiVersion)) {
+        return 'kumiki';
+    }
     const [major, minor] = kigumiVersion.split('.').map(Number);
     return `kumiki~=${major}.${minor}.0`;
 }
@@ -99,6 +109,7 @@ async function getMissingDependencies(python, options = {}) {
 module.exports = {
     VIEWER_RUNTIME_DEPENDENCIES,
     getKigumiVersion,
+    isLocalDevKigumiVersion,
     kumikiCompatiblePipSpec,
     getVenvPythonCandidates,
     getVenvPython,
