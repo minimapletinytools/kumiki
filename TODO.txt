@@ -215,7 +215,7 @@ DONE-sliding dovetail (maybe you want tapered variants)
 -do measuring features doc
   DONE-explain CSG fetaure system
   DONE-leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
-  -describe the measuring system
+  DONE-describe the measuring system
   -explain fetaure hit priority system
   -explain feture solving system
   
