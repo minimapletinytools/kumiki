@@ -8,10 +8,36 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-05
+
+kumiki and kigumi move to 0.8 together: kigumi 0.8 needs kumiki 0.8's module layout, and refuses an older kumiki with a message to upgrade rather than skipping every timber's geometry with `No module named 'kumiki.csg'`.
+
+### kumiki
+
+#### Changed
+
+- **Breaking -- module layout.** The CSG system moved into `kumiki.csg` and drawings into `kumiki.drawings`. `from kumiki import *` is unchanged.
+  **Migrate:** `kumiki.cutcsg`, `kumiki.pathcsg`, `kumiki.cropcsg`, `kumiki.triangles` become `kumiki.csg.cutcsg`, `kumiki.csg.pathcsg`, `kumiki.csg.cropcsg`, `kumiki.csg.triangles`; `kumiki.drawing` and `kumiki.layout` become `kumiki.drawings.drawing` and `kumiki.drawings.layout`.
+- **Breaking -- measurements anchor to features, not paths.** `Measure.anchor_a` / `anchor_b` are `FeatureHandle`s (a timber object and the feature on it); the wire form, `FeaturePath`, lives in `kumiki.csg.feature_paths`.
+  **Migrate:** build anchors with `find_feature(cut_timber, csg_path, feature_name)` instead of writing a `FeaturePath`.
+- **Breaking -- drawings hold timbers.** `Drawing.timbers` holds the frame's own timber objects rather than member keys or paths, and `Frame` checks that they and every measurement's anchors are its own.
+  **Migrate:** pass `cut_timber.timber` (or the timber you created) instead of `"posts/fl#1"`.
+- `CutTimber` builds its rough and perfect prisms and its whole CSG tree once, at construction.
+- `Transform.local_to_global_direction` / `global_to_local_direction` rotate directions.
+
+#### Added
+
+- **Feature solver** (`kumiki.drawings`): which features of a timber need dimensioning (`required_features`, `planning_features`), turning measurements into rows over solving carriers (`measure_row`), and what they leave unsolved (`remaining_dofs`, `solve_report`, over any number of timbers). Default assumptions for square and sheet-aligned features (`kumiki.drawings.assumptions`).
+- Timber centerplanes: `ptw.centerplane_left_right` and `ptw.centerplane_front_back` on the perfect timber within.
+- Joints mark their shoulder planes (`FeaturePurpose.SHOULDER`).
+- Features have a kind (face, edge, point, curved face), and `FeatureHandle` / `OwnedFeatureHit` are generic in it.
+- Rotational degrees of freedom in the assembly solver (`luban_lock_2` comes apart).
+
 ### kigumi
 
 #### Changed
 
+- Requires kumiki 0.8.
 - **License:** kigumi is now under the Elastic License 2.0 rather than MPL-2.0. Using, modifying and redistributing it stay free, including commercially; offering it to others as a hosted or managed service is not permitted. Releases up to and including 0.7.2 remain under MPL-2.0. kumiki is unchanged and stays MPL-2.0.
 
 ### Project

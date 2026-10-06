@@ -57,7 +57,7 @@ describe('project-initializer', () => {
         return createMockChildProcess({ stdoutText: '' });
       }
       if (snippet.includes('m.version("kumiki")')) {
-        return createMockChildProcess({ stdoutText: '0.7.0\n' });
+        return createMockChildProcess({ stdoutText: '0.8.0\n' });
       }
       return createMockChildProcess();
     });
@@ -158,7 +158,7 @@ describe('project-initializer', () => {
           : createMockChildProcess({ exitCode: 1 });
       }
       if (snippet.includes('m.version("kumiki")')) {
-        return createMockChildProcess({ stdoutText: '0.7.0\n' });
+        return createMockChildProcess({ stdoutText: '0.8.0\n' });
       }
       return createMockChildProcess();
     });
@@ -225,15 +225,15 @@ describe('project-initializer', () => {
       if (snippet.includes('m.version("kumiki")')) {
         kumikiVersionProbeCall += 1;
         if (kumikiVersionProbeCall === 1) {
-          return createMockChildProcess({ stdoutText: '0.7.0\n' });
+          return createMockChildProcess({ stdoutText: '0.8.0\n' });
         }
-        return createMockChildProcess({ stdoutText: '0.7.1\n' });
+        return createMockChildProcess({ stdoutText: '0.8.1\n' });
       }
       return createMockChildProcess();
     });
 
     const initResult = await initializeWorkspaceProject(tmpRoot, null);
-    expect(initResult.kumikiVersion).toBe('0.7.0');
+    expect(initResult.kumikiVersion).toBe('0.8.0');
 
     const canonicalUpdatedContent = '# Kumiki Usage Instructions\n\nRefreshed by update flow.\n';
     fs.writeFileSync(usageInstructionsSourcePath, canonicalUpdatedContent, 'utf8');
@@ -244,7 +244,7 @@ describe('project-initializer', () => {
     const updateResult = await updateWorkspaceKumiki(tmpRoot, null);
     const refreshedWorkspaceContent = fs.readFileSync(workspaceUsagePath, 'utf8');
 
-    expect(updateResult.kumikiVersion).toBe('0.7.1');
+    expect(updateResult.kumikiVersion).toBe('0.8.1');
     expect(updateResult.copiedWorkspaceUsageInstructionsFile).toBe(true);
     expect(refreshedWorkspaceContent).toContain('Refreshed by update flow.');
   });
