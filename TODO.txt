@@ -210,6 +210,29 @@ DONE-sliding dovetail (maybe you want tapered variants)
   -do I need something that detects and warns on completely hidden timbers (and removes them)
   -do potato measuring placement algorithm
 
+-cut plain cross lap house joint pattern needs to be repositioned, its currently not crossing at all, it sohuld cross by 50%
+-move irrational_angles/mortise and tenon joint example with te rest of the mortise and tenon joint exmples
+-some of teh patterns are broken in relief/butt_arrangement can you try and run them all and see if any of them are broken
+
+
+
+
+
+-add multi frame support (decorators + multipl eframe function )
+-add additional methods (decotarator + buttons in the parameters section)
+-add units toggle for measurements
+-add export drawing button (how to do this?)
+-figure out xray joints (could be aper joint/direction property)
+-maybe add named collisions groups, rough perfect shoulderplane tenon. think about where else you need derived features...
+DONE-test derived points btw
+
+-hidden feature detection(featurelist, view) to see what's hidden
+-then you can see if all features are visible through the views and warn if not
+-allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
+
+
+
+
 -do the standalone app 
 
 -do measuring features doc
