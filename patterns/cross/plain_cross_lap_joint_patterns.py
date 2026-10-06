@@ -28,6 +28,11 @@ def make_house_joint_example(position: V3, use_round_timbers=False) -> list[CutT
     Create a housed joint (housing / dado joint).
     One timber (housing timber) gets a rectangular groove cut into it,
     and the other timber (housed timber) fits into that groove.
+
+    The two timbers cross by half their height: the housed timber's top face sits
+    at the housing timber's mid-height, so the housing cut is a 2.5" deep pocket
+    over a 4" wide channel rather than the zero-depth touch they had when the two
+    were stacked face to face.
     """
     half_length = TIMBER_LENGTH / 2
     offset = TIMBER_HEIGHT / 2
@@ -45,7 +50,9 @@ def make_house_joint_example(position: V3, use_round_timbers=False) -> list[CutT
         ticket="HouseJoint_Housed",
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
-        bottom_position=position - Matrix([0, half_length, 0]) - Matrix([0, 0, offset]),
+        # On the position's own plane, so the housing timber raised above it bites
+        # half the housed timber's height -- see the docstring.
+        bottom_position=position - Matrix([0, half_length, 0]),
         length_direction=Matrix([0, 1, 0]),
         width_direction=Matrix([-1, 0, 0])
     ), use_round_timbers)

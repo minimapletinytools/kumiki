@@ -356,6 +356,59 @@ NOTCH_STYLE = kiwari(
 )
 
 
+def example_mortise_and_tenon_at_irrational_angle(position=None):
+    """
+    A mortise and tenon between a 6"x6" vertical post and a 4"x6" beam raking at 37 degrees.
+
+    37 degrees is 37*pi/180 radians, an exact angle with no decimal form, so the timbers'
+    directions and every plane derived from them come out as long irrationals rather than
+    tidy numbers. This is the example that checks the CSG cuts still line up (no z-fighting,
+    no missed overlap) once those values reach floating point.
+
+    The beam meets the post at the post's mid-height and enters BOTTOM end first, so the
+    tenon is buried inside the post and the mortise is bored from the post's face.
+
+    Uses the deprecated tenon_size deliberately: it sizes the tenon in the BEAM's own local
+    axes, which is not the same thing as tenon_width/height_relative_to_joint once the beam
+    is raked, and the raked tenon is the point of the example.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    post = create_timber(
+        length=scalar(96),
+        size=Matrix([scalar(6), scalar(6)]),
+        bottom_position=position,
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        ticket="Vertical Post",
+    )
+
+    angle_37 = pi * scalar(37, 180)
+    beam = create_timber(
+        length=scalar(60),
+        size=Matrix([scalar(4), scalar(6)]),
+        bottom_position=position + create_v3(scalar(0), scalar(0), scalar(48)),
+        length_direction=create_v3(cos(angle_37), sin(angle_37), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="Angled Beam (37°)",
+    )
+
+    arrangement = ButtJointTimberArrangement(
+        receiving_timber=post,
+        butt_timber=beam,
+        butt_timber_end=TimberEnd.BOTTOM,
+        front_face_on_butt_timber=None,
+    )
+
+    return cut_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        tenon_size=Matrix([scalar(2), scalar(3)]),
+        tenon_length=scalar(4),
+        mortise_depth=scalar(4),
+    )
+
+
 def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(k: Optional[Kiwari] = None):
     """
     Mortise and tenon on plane-aligned timbers, tenon approaching at 45 degrees (in the
@@ -1028,6 +1081,7 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/face_aligned_inset_shoulder", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/double_angled", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/double_angled_with_notch_relief", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon_with_notch_relief), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/irrational_angle_37_degrees", lambda_=make_pattern_from_joint(example_mortise_and_tenon_at_irrational_angle), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/joint_plane_aligned_notched_2sided", lambda_=make_pattern_from_joint(example_mortise_and_tenon_joint_plane_aligned_notched_2sided), kiwari=NOTCH_STYLE, pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/compound_offset_parallel_shoulder", lambda_=make_pattern_from_joint(example_compound_angle_offset_parallel_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon", lambda_=make_pattern_from_frame(example_brace_joint), pattern_type='frame'),

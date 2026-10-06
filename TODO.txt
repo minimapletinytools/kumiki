@@ -210,9 +210,9 @@ DONE-sliding dovetail (maybe you want tapered variants)
   -do I need something that detects and warns on completely hidden timbers (and removes them)
   -do potato measuring placement algorithm
 
--cut plain cross lap house joint pattern needs to be repositioned, its currently not crossing at all, it sohuld cross by 50%
--move irrational_angles/mortise and tenon joint example with te rest of the mortise and tenon joint exmples
--some of teh patterns are broken in relief/butt_arrangement can you try and run them all and see if any of them are broken
+DONE-cut plain cross lap house joint pattern needs to be repositioned, its currently not crossing at all, it sohuld cross by 50%
+DONE-move irrational_angles/mortise and tenon joint example with te rest of the mortise and tenon joint exmples
+DONE-some of teh patterns are broken in relief/butt_arrangement can you try and run them all and see if any of them are broken
 
 
 

@@ -4,6 +4,10 @@ Relief algorithm test patterns (DEVELOPMENT ONLY)
 These patterns exist to exercise the relief-cut algorithm (chop_scribe_relief /
 the shoulder notch relief functions) across a range of butt-timber approach
 angles. All tagged 'poop' -- hidden from the sidebar, not curated examples.
+
+A rake about the butt timber's height axis takes the two timbers out of plane,
+and a mortise cannot be bored perpendicular to the receiving timber's face from
+there, so those examples take the default bore along the tenon axis instead.
 """
 
 from dataclasses import replace
@@ -112,13 +116,20 @@ def _build_relief_example(
         receiving_timber=receiving_timber,
     )
 
+    # Boring the mortise perpendicular to the receiving timber's face needs the two
+    # timbers plane-aligned, and a rake about the butt timber's height axis is what
+    # takes them out of plane (the width axis keeps both centre lines coplanar). Those
+    # arrangements get the default bore along the tenon axis instead -- the relief cuts
+    # are what these examples are for, and they are cut either way.
+    plane_aligned = rotated_arrangement.check_plane_aligned() is None
+
     return cut_mortise_and_tenon_joint(
         arrangement=rotated_arrangement,
         tenon_size=tenon_size,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
-        bore_mortise_perpendicular_to_face=True,
+        bore_mortise_perpendicular_to_face=plane_aligned,
     )
 
 
