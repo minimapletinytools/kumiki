@@ -108,6 +108,49 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         assert edge is not None and edge.name == f"shoulder\u00d7{cheek_name}"
         assert tenon_timber is not None
 
+    def test_the_mortise_is_a_hole_and_its_faces_can_be_found(self, simple_T_configuration):
+        """The receiving timber must not claim its own mortise cavity is material.
+
+        The profiles this joint builds are written clockwise, and ConvexPolygonExtrusion
+        used to read them as if they were counter-clockwise -- so contains_point answered
+        "no" for points inside a solid, and, because every hit is gated on its owner's
+        boundary, none of that solid's faces could be picked either. The mesher normalises
+        winding, so the mesh was always right and the point tests disagreed with it.
+        """
+        from kumiki.csg.cutcsg import ConvexPolygonExtrusion, csg_children
+
+        joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=self._make_arrangement(simple_T_configuration),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_depth=scalar(4),
+            dovetail_depth=scalar(1),
+            wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+                wedge_angle=_degrees(8),
+                wedge_back_extra_length=scalar(1, 2),
+            ),
+        )
+        cutting = joint.cuttings["mortise_timber"]
+        receiving = _render_cutting(cutting)
+
+        def walk(node):
+            yield node
+            for child in csg_children(node):
+                yield from walk(child)
+
+        holes = [node for node in walk(receiving) if isinstance(node, ConvexPolygonExtrusion)]
+        assert holes, "the mortise is cut by a profile extrusion"
+
+        for hole in holes:
+            xs = [float(point[0]) for point in hole.points]
+            ys = [float(point[1]) for point in hole.points]
+            middle_z = (float(hole.start_distance) + float(hole.end_distance)) / 2
+            centre = hole.transform.local_to_global(
+                create_v3(sum(xs) / len(xs), sum(ys) / len(ys), middle_z))
+
+            assert hole.contains_point(centre), f"{hole.label} does not contain its own centre"
+            assert not receiving.contains_point(centre), (
+                f"{hole.label}'s cavity reads as material in the finished timber")
+
     def test_an_inset_shoulder_notches_the_mortise_timber(self, simple_T_configuration):
         """With the shoulder set back from the entry face, the mortise timber
         gets a notch so the tenon's shoulder has somewhere to sit.

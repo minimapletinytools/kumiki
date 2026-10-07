@@ -1299,7 +1299,27 @@ class TestAnOperandIsNotGivenTwice:
 
 class TestConvexPolygonExtrusion:
     """Test ConvexPolygonExtrusion class."""
-    
+
+    def test_winding_does_not_change_what_is_inside(self):
+        """A profile written clockwise reads the same as one written counter-clockwise.
+
+        The mesher normalises winding, so the solid is the same either way; the point
+        tests used to assume counter-clockwise, and a clockwise profile therefore said
+        "no" for points inside it -- and no boundary, so no face of it could be picked.
+        """
+        counter_clockwise = [
+            Matrix([0, 0]), Matrix([4, 0]), Matrix([4, 4]), Matrix([0, 4]),
+        ]
+        clockwise = list(reversed(counter_clockwise))
+
+        for points in (counter_clockwise, clockwise):
+            extrusion = ConvexPolygonExtrusion(
+                points=points, start_distance=scalar(0), end_distance=scalar(10),
+                transform=Transform.identity())
+            assert extrusion.contains_point(Matrix([scalar(2), scalar(2), scalar(5)]))
+            assert not extrusion.contains_point(Matrix([scalar(6), scalar(2), scalar(5)]))
+            assert extrusion.is_point_on_boundary(Matrix([scalar(4), scalar(2), scalar(5)]))
+
     def test_constructor_square(self):
         """Test creating a square extrusion."""
         # Square with corners at (±1, ±1)
