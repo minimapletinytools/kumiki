@@ -146,6 +146,9 @@ def module_entries(module: Any) -> ModuleEntries:
     return ModuleEntries(tuple(frames), tuple(tools), tuple(rejected), parameters)
 
 
+# TODO merging into one Frame keeps kigumi working as is. Instead, kigumi should take several
+# frames: the frame list shows the frames at the top level, each opening to its timbers and
+# joints, with drawings still at the top level.
 def overlay_frames(frames: List[Any], name: Optional[str], parameters: Optional[Kiwari]) -> Any:
     """Several frames shown together, each where it was built, carrying the shared parameters."""
     from .timber import Frame
