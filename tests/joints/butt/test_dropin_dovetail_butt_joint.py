@@ -294,4 +294,51 @@ class TestHousedDovetailButtJoint:
                 dovetail_angle=atan(scalar(1, 4)),
             )
 
+    def test_the_tail_is_named_and_the_buried_and_flush_faces_are_not(self):
+        """The tail's own faces, and the two the joint deliberately leaves alone.
+
+        The tail is the material the housing cut leaves standing, so its prism's
+        faces are its own. Its two cheeks, its leading face and the cap it is
+        backed by are surfaces of the dovetail timber and are named in
+        FeatureGroup.TENON. The base at the shoulder is buried where the tail
+        leaves the timber, and the far cap lies in the timber's own face, which
+        rough.* already answers for -- naming it as well derives the same line
+        twice (see _drop_duplicate_derived). The receiving timber's socket is cut
+        with the plain prism, so it takes none of these names.
+        """
+        from kumiki.csg.cutcsg import FeatureGroup, csg_children
+
+        arrangement = _make_simple_butt_arrangement()
+
+        def named(cutting):
+            found = {}
+            stack = [_render_cutting(cutting)]
+            seen = set()
+            while stack:
+                node = stack.pop()
+                if id(node) in seen:
+                    continue
+                seen.add(id(node))
+                for feature in node.get_declared_features():
+                    if feature.name.startswith("dovetail_"):
+                        found[feature.name] = feature
+                stack.extend(csg_children(node))
+            return found
+
+        joint = cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            receiving_timber_shoulder_inset=scalar(1),
+            dovetail_length=scalar(4),
+            dovetail_small_width=scalar(2),
+            dovetail_angle=atan(scalar(1, 4)),
+        )
+
+        found = named(joint.cuttings[arrangement.butt_timber.ticket.path])
+
+        assert set(found) == {
+            "dovetail_right", "dovetail_left", "dovetail_front", "dovetail_bot"}
+        assert all(feature.group is FeatureGroup.TENON for feature in found.values())
+
+        assert not named(joint.cuttings[arrangement.receiving_timber.ticket.path])
+
 

@@ -2,14 +2,28 @@
 Kumiki - Rebated oblique and dadoed scarf joint (Kanawa Tsugi) construction functions
 """
 
+from dataclasses import replace
 from typing import Optional, Tuple
 
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from kumiki.measuring import locate_top_center_position
+from kumiki.csg.cutcsg import (
+    FeatureGroup,
+    FeatureOverride,
+    FeatureProperties,
+    PrismFace,
+    prism_face_key,
+)
 from ..shavings import decompose_simple_polygon_into_convex_pieces
 from ..shavings.relief import warn_if_arrangement_timbers_imperfect
+
+
+#: A stub tenon face is named and measurable. This joint has no shoulder plane, so the
+#: group pairs with nothing here -- it is what makes the stub a tenon to a drawing, and
+#: the same group the mortise and tenon joint gives its tenon faces.
+_STUB_TENON_FACE = FeatureProperties(group=FeatureGroup.TENON)
 
 
 def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
@@ -206,9 +220,30 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
         label=CutCSGLabel("stub_tenon"),
     )
 
+    # A stub tenon is the material the scarf cut leaves standing, so these faces are the
+    # stub's own: its two cheeks and the face it turns to the end of its timber. Its
+    # front face looks back into the standing timber, and its start cap lies in the
+    # timber's own long face, so neither is named -- a name there is one nothing can
+    # pick, or one the body's own face already answers for.
+    #
+    # Each stub is also the socket the other timber is cut with, so only the copy that
+    # stays is named: the plain prisms these are copied from still cut the sockets, and a
+    # socket wall is the receiving timber's surface, not a face of the stub.
+    stub_tenon_overrides = [
+        FeatureOverride(prism_face_key(PrismFace.RIGHT), "stub_tenon_right", _STUB_TENON_FACE),
+        FeatureOverride(prism_face_key(PrismFace.LEFT), "stub_tenon_left", _STUB_TENON_FACE),
+        FeatureOverride(prism_face_key(PrismFace.BACK), "stub_tenon_back", _STUB_TENON_FACE),
+    ]
+    timber1_stub_tenon_standing = replace(
+        timber1_stub_tenon_prism, feature_overrides=stub_tenon_overrides,
+    )
+    timber2_stub_tenon_standing = replace(
+        timber2_stub_tenon_prism, feature_overrides=stub_tenon_overrides,
+    )
+
     timber1_with_stubs_global = SolidUnion([
         Difference(
-            timber1_profile_csg_global, [timber1_stub_tenon_prism],
+            timber1_profile_csg_global, [timber1_stub_tenon_standing],
             label=CutCSGLabel("scarf_waste"),
         ),
         timber2_stub_tenon_prism,
@@ -217,7 +252,7 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
 
     timber2_with_stubs_global = SolidUnion([
         Difference(
-            timber2_profile_csg_global, [timber2_stub_tenon_prism],
+            timber2_profile_csg_global, [timber2_stub_tenon_standing],
             label=CutCSGLabel("scarf_waste"),
         ),
         timber1_stub_tenon_prism,

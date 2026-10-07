@@ -355,3 +355,57 @@ class TestDovetailCornerJoint:
         skew_arrangement = _make_corner_arrangement(create_v3(1, 0, 0), create_v3(1, 1, 0))
         with pytest.raises(KumikiArrangementError, match="orthogonal"):
             cut([scalar(3)], [_dovetail()], skew_arrangement)
+
+    def test_a_tail_is_named_on_the_timber_that_keeps_it(self):
+        """The tail's faces, and why the base and both caps are left unnamed.
+
+        A tail's cheeks and its leading face are surfaces of the dovetail timber,
+        so they are named and in FeatureGroup.TENON, and they meet the shoulder
+        plane along the tail's base -- an arris nothing else names. The base
+        itself is buried in that timber, and both caps lie in the planes of the
+        timber's own faces, where rough.* already answers: naming a cap as well
+        derives the same line twice (see _drop_duplicate_derived). The socket is
+        cut with the plain extrusions, so the receiving timber takes no names.
+        """
+        from kumiki.csg.cutcsg import (
+            DerivedEdgeFeature, FeatureGroup, OwnedFeatureHit, csg_children)
+
+        arrangement = _make_corner_arrangement(
+            create_v3(1, 0, 0), create_v3(0, 1, 0),
+            timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM,
+        )
+        joint = cut_dovetail_corner_joint(
+            arrangement, [scalar(3, 2), scalar(3)], [_dovetail(), _dovetail()])
+
+        def named(cutting):
+            found = {}
+            stack = [_render_cutting(cutting)]
+            seen = set()
+            while stack:
+                node = stack.pop()
+                if id(node) in seen:
+                    continue
+                seen.add(id(node))
+                for feature in node.get_declared_features():
+                    found.setdefault(feature.name, (feature, node))
+                stack.extend(csg_children(node))
+            return found
+
+        found = named(joint.cuttings["dovetail_timber"])
+        tail_names = {name for name in found if name.startswith("dovetail_")}
+
+        assert tail_names == {"dovetail_right", "dovetail_left", "dovetail_front"}
+        assert all(found[name][0].group is FeatureGroup.TENON for name in tail_names)
+        assert found["shoulder"][0].group is FeatureGroup.SHOULDER_PLANE
+
+        # The base arris of a cheek: only the pairing can name it.
+        shoulder, shoulder_owner = found["shoulder"]
+        cheek, cheek_owner = found["dovetail_right"]
+        edge = DerivedEdgeFeature.derive(
+            OwnedFeatureHit(feature=shoulder, owner=shoulder_owner),
+            OwnedFeatureHit(feature=cheek, owner=cheek_owner),
+        )
+        assert edge is not None and edge.name == "shoulder\u00d7dovetail_right"
+
+        socket_found = named(joint.cuttings["socket_timber"])
+        assert not [name for name in socket_found if name.startswith("dovetail_")]
