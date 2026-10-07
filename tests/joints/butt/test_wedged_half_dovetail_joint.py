@@ -49,6 +49,65 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
         )
 
+    def test_the_tenon_is_named_TENON_and_meets_the_shoulder_plane(self, simple_T_configuration):
+        """What the groups are for, on the joint build_a_butt makes a tenon for.
+
+        The tenon is a profile extrusion, so its cheeks are the extrusion's caps
+        and its tip is a profile edge. The names come from the timber face each
+        one turns to, which is why they read right whichever face it is cut into.
+        """
+        from kumiki.csg.cutcsg import (DerivedEdgeFeature, FeatureGroup, OwnedFeatureHit,
+                                       csg_children)
+
+        joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=self._make_arrangement(simple_T_configuration),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_depth=scalar(4),
+            dovetail_depth=scalar(1),
+            wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+                wedge_angle=_degrees(8),
+                wedge_back_extra_length=scalar(1, 2),
+            ),
+        )
+        tenon_timber = joint.cuttings["tenon_timber"].timber
+        rendered = _render_cutting(joint.cuttings["tenon_timber"])
+
+        found = {}
+        seen = set()
+        stack = [rendered]
+        while stack:
+            node = stack.pop()
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            for feature in node.get_declared_features():
+                if feature.name.startswith(("tenon_", "shoulder")):
+                    found[feature.name] = (feature, node)
+            stack.extend(csg_children(node))
+
+        tenon_names = {name for name in found if name.startswith("tenon_")}
+        # Four faces, named after the timber face each one turns to: the extrusion's
+        # caps are the cheeks (right/left/front/back) and one profile edge is the tip.
+        # Which is which follows the timber's own orientation, so the test asks for
+        # the vocabulary rather than for fixed names.
+        assert len(tenon_names) == 4
+        assert tenon_names <= {"tenon_right", "tenon_left", "tenon_front", "tenon_back",
+                               "tenon_top", "tenon_bot"}
+        assert len(tenon_names & {"tenon_top", "tenon_bot"}) == 1
+        assert all(found[name][0].group is FeatureGroup.TENON for name in tenon_names)
+        shoulder, shoulder_owner = found["shoulder"]
+        assert shoulder.group is FeatureGroup.SHOULDER_PLANE
+        assert shoulder.properties.purpose is FeaturePurpose.SHOULDER
+
+        # A cheek against the shoulder is the tenon's base arris.
+        cheek_name = next(name for name in ("tenon_right", "tenon_left", "tenon_front",
+                                            "tenon_back") if name in found)
+        cheek, cheek_owner = found[cheek_name]
+        edge = DerivedEdgeFeature.derive(OwnedFeatureHit(feature=shoulder, owner=shoulder_owner),
+                                         OwnedFeatureHit(feature=cheek, owner=cheek_owner))
+        assert edge is not None and edge.name == f"shoulder\u00d7{cheek_name}"
+        assert tenon_timber is not None
+
     def test_an_inset_shoulder_notches_the_mortise_timber(self, simple_T_configuration):
         """With the shoulder set back from the entry face, the mortise timber
         gets a notch so the tenon's shoulder has somewhere to sit.

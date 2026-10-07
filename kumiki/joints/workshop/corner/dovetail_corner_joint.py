@@ -4,7 +4,7 @@ Kumiki - Dovetail corner joint construction function
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import List, Optional, Tuple
 
 from kumiki.construction import CornerJointTimberArrangement
@@ -12,8 +12,12 @@ from kumiki.csg.cutcsg import (
     CutCSG,
     CutCSGLabel,
     Difference,
+    FeatureGroup,
+    FeatureOverride,
+    FeatureProperties,
     SolidUnion,
     adopt_csg,
+    side_key,
 )
 from kumiki.measuring import (
     get_center_point_on_face_global,
@@ -63,6 +67,23 @@ class SingleDovetailSizeParameter:
     angle: Numeric
     small_width: Numeric
     depth: Optional[Numeric] = None
+
+
+#: A dovetail face is named and measurable, and meets the shoulder plane where
+#: the dovetail leaves the timber -- that line is the tail's base arris, which is
+#: nowhere else, so it has to be derived from the pair.
+_DOVETAIL_FACE = FeatureProperties(group=FeatureGroup.TENON)
+
+#: A tail's sides run profile point n to point n+1, so side 1 and side 3 are its
+#: flared cheeks and side 2 is the wide leading face it is locked in by. Side 0 is
+#: the base, buried in the timber the tail grows out of, and both caps lie in the
+#: planes of that timber's own faces -- naming either would derive the same line
+#: as the body's own edge with the shoulder plane (see _drop_duplicate_derived).
+_DOVETAIL_FACE_OVERRIDES = (
+    FeatureOverride(side_key(1), "dovetail_right", _DOVETAIL_FACE),
+    FeatureOverride(side_key(2), "dovetail_front", _DOVETAIL_FACE),
+    FeatureOverride(side_key(3), "dovetail_left", _DOVETAIL_FACE),
+)
 
 
 # dovetail measurement starts from front_face_on_timber1
@@ -236,7 +257,13 @@ def cut_dovetail_corner_joint(arrangement: CornerJointTimberArrangement, distanc
             label=CutCSGLabel.NoLabel(),
         ))
 
-    dovetails_csg = SolidUnion(dovetail_csgs, label=CutCSGLabel("dovetails"))
+    # A tail's faces belong to the timber that keeps it, so they are named on copies
+    # made for the dovetail timber. The sockets are cut with the plain extrusions:
+    # the walls they leave are the receiving timber's own surfaces, not the tail's.
+    dovetails_csg = SolidUnion(
+        [replace(csg, feature_overrides=_DOVETAIL_FACE_OVERRIDES) for csg in dovetail_csgs],
+        label=CutCSGLabel("dovetails"),
+    )
     sockets_csg = SolidUnion(
         [adopt_csg(dovetail_timber.transform, socket_timber.transform, csg) for csg in dovetail_csgs],
         label=CutCSGLabel("dovetail_sockets"),

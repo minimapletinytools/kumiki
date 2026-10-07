@@ -332,7 +332,8 @@ def chop_timber_end_with_prism(
         start_distance=start_distance_local,
         end_distance=end_distance_local,
         label=label,
-        feature_overrides=[shoulder_override(prism_face_key(cut_face))] if is_shoulder else [],
+        feature_overrides=[shoulder_override(prism_face_key(cut_face), name="shoulder",
+                                             group=FeatureGroup.SHOULDER_PLANE)] if is_shoulder else [],
     )
 
 
@@ -402,7 +403,8 @@ def chop_timber_end_with_half_plane(
         offset = -distance_from_end_to_cut
     
     return HalfSpace(normal=normal, offset=offset, label=label,
-                     feature_overrides=[shoulder_override(HALF_SPACE_PLANE)] if is_shoulder else [])
+                     feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder",
+                                                          group=FeatureGroup.SHOULDER_PLANE)] if is_shoulder else [])
 
 def chop_lap_on_timber_end(
     lap_timber: TimberLike,

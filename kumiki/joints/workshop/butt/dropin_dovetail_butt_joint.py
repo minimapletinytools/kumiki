@@ -4,6 +4,7 @@ Kumiki - Drop-in dovetail butt joint construction functions (蟻仕口 / Ari Shi
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Optional, Union
 
 from kumiki.timber import (
@@ -31,8 +32,13 @@ from kumiki.measuring import (
 from kumiki.csg.cutcsg import (
     CutCSGLabel,
     Difference,
+    FeatureGroup,
+    FeatureOverride,
+    FeatureProperties,
     SolidUnion,
+    START_CAP,
     adopt_csg,
+    side_key,
 )
 from ..shavings.shavings import (
     chop_profile_on_timber_face,
@@ -45,6 +51,12 @@ from ..shavings.relief import (
     chop_shoulder_notch_on_timber_face,
     warn_if_arrangement_timbers_imperfect,
 )
+
+
+#: A dovetail face is named and measurable, and meets the shoulder plane where
+#: the dovetail leaves the timber -- that line is the tail's base arris, which is
+#: nowhere else, so it has to be derived from the pair.
+_DOVETAIL_FACE = FeatureProperties(group=FeatureGroup.TENON)
 
 
 def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
@@ -153,11 +165,33 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         label=CutCSGLabel("dovetail"),
     )
 
+    # The tail is the material the housing cut leaves standing, so this prism's
+    # faces are the tail's own. Its sides run profile point n to point n+1: side 0
+    # is the base, then the two flared cheeks, then the wide leading face. Only the
+    # faces that are a surface of the finished timber and are not already one of the
+    # timber's own are named. Side 0 is buried where the tail leaves the timber, and
+    # the end cap lies in the timber's own face, which rough.* already names --
+    # naming that one too would derive the same line as the body's own edge with the
+    # shoulder plane (see _drop_duplicate_derived).
+    dovetail_prism_csg = replace(
+        dovetail_profile_csg,
+        feature_overrides=[
+            FeatureOverride(side_key(1), "dovetail_right", _DOVETAIL_FACE),
+            FeatureOverride(side_key(2), "dovetail_front", _DOVETAIL_FACE),
+            FeatureOverride(side_key(3), "dovetail_left", _DOVETAIL_FACE),
+            FeatureOverride(START_CAP, "dovetail_bot", _DOVETAIL_FACE),
+        ],
+    )
+
     dovetail_housing_prism = chop_timber_end_with_prism(
         timber=dovetail_timber,
         end=dovetail_timber_end,
         distance_from_end_to_cut=shoulder_distance_from_end,
         label=CutCSGLabel("dovetail_housing"),
+        # The plane the tail leaves the timber at, so it is the joint's shoulder:
+        # marking it is what pairs it with the tail's own faces and derives the
+        # base arris (see FeatureGroup.SHOULDER_PLANE).
+        is_shoulder=True,
     )
 
     dovetail_centerline = scribe_centerline_onto_centerline(dovetail_timber)
@@ -176,6 +210,8 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
             notch_depth=notch_depth,
         )
 
+    # The plain prism, not the named copy above: the walls this cuts are the
+    # receiving timber's surfaces, and a socket wall is not a face of the tail.
     dovetail_socket_csg = adopt_csg(dovetail_timber.transform, receiving_timber.transform, dovetail_profile_csg)
 
     if dovetail_timber_end == TimberEnd.TOP:
@@ -189,7 +225,7 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         maybe_top_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=Difference(
-            dovetail_housing_prism, [dovetail_profile_csg],
+            dovetail_housing_prism, [dovetail_prism_csg],
             label=CutCSGLabel("dovetail_waste"),
         ),
         label=CutCSGLabel("dovetail_cut"),

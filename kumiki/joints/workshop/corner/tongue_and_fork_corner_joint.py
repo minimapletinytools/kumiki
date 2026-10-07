@@ -18,6 +18,11 @@ from ..shavings.build_a_butt import (
 )
 from ..shavings.relief import warn_if_arrangement_timbers_imperfect
 
+#: A tongue's faces are named, measurable, and meet the shoulder plane where the
+#: tongue leaves the timber it stands on -- its base arris, which is nowhere else.
+#: See FeatureGroup.TENON.
+_TONGUE_FACE = FeatureProperties(group=FeatureGroup.TENON)
+
 
 def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
     arrangement: CornerJointTimberArrangement,
@@ -138,13 +143,24 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         start_distance=-tongue_back_extension,
         end_distance=tongue_timber.length,
         label=CutCSGLabel("tongue"),
+        # The tongue itself: the waste is everything past the shoulder except this
+        # prism, so the surfaces it leaves are the tongue's. Only the two cheeks
+        # are named: the tongue spans the timber's full width, so its other two
+        # faces are flush with the timber's own and belong to those names --
+        # naming them as well derives the same line twice (see
+        # _drop_duplicate_derived).
+        feature_overrides=[
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "tongue_front", _TONGUE_FACE),
+            FeatureOverride(prism_face_key(PrismFace.BACK), "tongue_back", _TONGUE_FACE),
+        ],
     )
 
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
         label=CutCSGLabel("shoulder"),
-        feature_overrides=[shoulder_override(HALF_SPACE_PLANE)],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder",
+                                             group=FeatureGroup.SHOULDER_PLANE)],
     )
 
     tongue_prism_local = adopt_csg(None, tongue_timber.transform, tongue_prism_global)

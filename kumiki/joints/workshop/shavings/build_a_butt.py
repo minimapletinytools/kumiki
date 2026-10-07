@@ -32,7 +32,47 @@ from kumiki.measuring import (
 )
 from kumiki.construction import *
 from kumiki.rule import *
-from kumiki.csg.cutcsg import CutCSG, CutCSGLabel, HALF_SPACE_PLANE, shoulder_override
+from kumiki.csg.cutcsg import (
+    CutCSG,
+    CutCSGLabel,
+    END_CAP,
+    FeatureGroup,
+    FeatureOverride,
+    FeatureProperties,
+    HALF_SPACE_PLANE,
+    START_CAP,
+    side_key,
+    shoulder_override,
+)
+
+
+#: A dovetail tenon face is named and measurable, and meets exactly one other feature:
+#: the shoulder plane, where the tenon leaves the timber. The tenon's base arris is
+#: nowhere else, so it has to be derived from that pair -- the same group, and the same
+#: reason, as the mortise and tenon joint's own tenon faces.
+_TENON_FACE = FeatureProperties(group=FeatureGroup.TENON)
+
+#: The name a tenon face takes from the long face of its own timber that it turns to, so
+#: a dovetail tenon is named the way the mortise and tenon joint names its cheeks:
+#: right and left for the width faces, front and back for the height ones.
+_TENON_FACE_NAME_BY_TIMBER_FACE = {
+    TimberFace.RIGHT: "tenon_right",
+    TimberFace.LEFT: "tenon_left",
+    TimberFace.FRONT: "tenon_front",
+    TimberFace.BACK: "tenon_back",
+}
+
+
+def _tenon_face_name(timber: TimberLike, direction: Direction3D) -> str:
+    """What this timber's tenon face looking along *direction* is called.
+
+    The dovetail tenon is built in an extrusion frame of its own -- profile X along the
+    tenon, Y out of the face it is flush with, Z across it -- so its faces are keyed by
+    profile edge and by cap rather than by the timber's own faces. This reads the name
+    back off the timber face the direction points at.
+    """
+    long_face = timber.get_closest_oriented_long_face_from_global_direction(direction)
+    return _TENON_FACE_NAME_BY_TIMBER_FACE[long_face.to.face()]
 
 
 def _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_butt(
@@ -544,19 +584,40 @@ def dovetail_tenon_geometry(
     # Top edge (flush with dovetail_top_side) runs at Y = 0 from X = 0 to X = tenon_depth.
     # Bottom edge slopes from (0, -t) at the shoulder to (tenon_depth, -t - d) at the tip,
     # giving the dovetail its characteristic widening toward the tip.
+    #
+    # Wound counter-clockwise, which is what ConvexPolygonExtrusion's containment and
+    # boundary tests read (an inside point is left of every edge, in order). The mesher
+    # normalises the winding, so this changes no geometry -- but a clockwise profile
+    # fails its own boundary test, and that test is the gate a named face is picked
+    # through, so a tenon wound the other way has no pickable faces at all.
     tenon_bottom_at_shoulder = -tenon_top_to_bottom_dim
     tenon_bottom_at_tip = -(tenon_top_to_bottom_dim + dovetail_depth)
     tenon_profile_points = [
-        create_v2(scalar(0), tenon_bottom_at_shoulder),
-        create_v2(scalar(0), scalar(0)),
-        create_v2(tenon_depth, scalar(0)),
         create_v2(tenon_depth, tenon_bottom_at_tip),
+        create_v2(tenon_depth, scalar(0)),
+        create_v2(scalar(0), scalar(0)),
+        create_v2(scalar(0), tenon_bottom_at_shoulder),
+    ]
+
+    # The tip, the sloped side, and the two lateral caps. The face flush with
+    # dovetail_top_side is left unnamed: it lies in the timber's own face, which
+    # rough.*/perfect.* already name, and naming it too would derive the body's own edge
+    # with the shoulder plane a second time (see _drop_duplicate_derived). The profile
+    # edge on the shoulder plane is left unnamed as well -- the tenon leaves the timber
+    # there and the shoulder names that plane, so nothing is left to pick.
+    tenon_tip_name = "tenon_top" if arrangement.butt_timber_end == TimberEnd.TOP else "tenon_bot"
+    tenon_feature_overrides = [
+        FeatureOverride(side_key(0), tenon_tip_name, _TENON_FACE),
+        FeatureOverride(side_key(3), _tenon_face_name(tenon_timber, -top_face_dir), _TENON_FACE),
+        FeatureOverride(START_CAP, _tenon_face_name(tenon_timber, -lateral_dir), _TENON_FACE),
+        FeatureOverride(END_CAP, _tenon_face_name(tenon_timber, lateral_dir), _TENON_FACE),
     ]
     positive_tenon = ConvexPolygonExtrusion(
         points=tenon_profile_points,
         transform=extrusion_transform,
         start_distance=-half_lateral,
         end_distance=half_lateral,
+        feature_overrides=tenon_feature_overrides,
         label=CutCSGLabel("tenon"),
     )
 
@@ -568,7 +629,9 @@ def dovetail_tenon_geometry(
         normal=into_mortise_dir,
         offset=shoulder_offset,
         label=CutCSGLabel("shoulder"),
-        feature_overrides=[shoulder_override(HALF_SPACE_PLANE)],
+        feature_overrides=[
+            shoulder_override(HALF_SPACE_PLANE, name="shoulder", group=FeatureGroup.SHOULDER_PLANE),
+        ],
     )
 
     tenon_negative_csg = Difference(
@@ -687,6 +750,12 @@ def dovetail_tenon_geometry(
     # ---- Mortise negative prism ----
     # Same dovetail plane (same bottom slope), but the prism is longer so the mortise cavity
     # extends past the tenon tip by receiving_timber_mortise_extra_depth.
+    #
+    # Wound the other way round from the tenon profile above, and left that way here: the
+    # primitive reads counter-clockwise, so this prism reports its own cavity as outside
+    # itself, and the receiving timber reports its own mortise as material. Those walls
+    # are the receiving timber's surfaces and nothing here names them, so this change
+    # stays with the tenon; TODO unwind the mortise and the wedge slot the same way.
     mortise_total_depth = tenon_depth + receiving_timber_mortise_extra_depth
     # Extend the bottom-edge slope to the deeper tip (slope = -dovetail_depth / tenon_depth).
     mortise_bottom_at_tip = -tenon_top_to_bottom_dim - (

@@ -39,13 +39,18 @@ from kumiki.measuring import (
 from kumiki.csg.cutcsg import (
     CutCSG,
     CutCSGLabel,
+    FeatureGroup,
+    FeatureOverride,
+    FeatureProperties,
     HalfSpace,
+    PrismFace,
     RectangularPrism,
     Intersection,
     Difference,
     SolidUnion,
     adopt_csg,
     HALF_SPACE_PLANE,
+    prism_face_key,
     shoulder_override,
 )
 from ..shavings.relief import (
@@ -57,6 +62,11 @@ from ..shavings.build_a_butt import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
     convert_mortise_shoulder_inset_to_centerline_distance,
 )
+
+#: A tongue's faces are named, measurable, and meet the shoulder plane where the
+#: tongue leaves the timber it stands on -- its base arris, which is nowhere else.
+#: See FeatureGroup.TENON.
+_TONGUE_FACE = FeatureProperties(group=FeatureGroup.TENON)
 
 
 def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
@@ -182,7 +192,8 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, shoulder_point_global),
         label=CutCSGLabel("shoulder"),
-        feature_overrides=[shoulder_override(HALF_SPACE_PLANE)],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder",
+                                             group=FeatureGroup.SHOULDER_PLANE)],
     )
     shoulder_half_space_local = adopt_csg(None, fork_timber.transform, shoulder_half_space_global)
 
@@ -248,7 +259,8 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, shoulder_point_global),
         label=CutCSGLabel("shoulder"),
-        feature_overrides=[shoulder_override(HALF_SPACE_PLANE)],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder",
+                                             group=FeatureGroup.SHOULDER_PLANE)],
     )
     shoulder_half_space_tongue_local = adopt_csg(None, tongue_timber.transform, shoulder_half_space_tongue_global)
 
@@ -259,6 +271,12 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         start_distance=-overshoot,
         end_distance=fork_slot_depth + overshoot,
         label=CutCSGLabel("tongue_cheeks"),
+        # The two faces of the waste that become the tongue's own ends: the tongue
+        # runs the timber's full width, so these are what it is edged by.
+        feature_overrides=[
+            FeatureOverride(prism_face_key(PrismFace.RIGHT), "tongue_right", _TONGUE_FACE),
+            FeatureOverride(prism_face_key(PrismFace.LEFT), "tongue_left", _TONGUE_FACE),
+        ],
     )
     tongue_cheek_box_local = adopt_csg(None, tongue_timber.transform, tongue_cheek_box_global)
 
@@ -267,6 +285,12 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         transform=marking_space.transform,
         start_distance=-overshoot * scalar(2),
         end_distance=fork_slot_depth + overshoot * scalar(2),
+        # The tongue itself. Its two long faces are the cheeks, which is what the
+        # fork slot grips; the other two are buried in the timber it stands on.
+        feature_overrides=[
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "tongue_front", _TONGUE_FACE),
+            FeatureOverride(prism_face_key(PrismFace.BACK), "tongue_back", _TONGUE_FACE),
+        ],
     )
     tongue_central_prism_local = adopt_csg(None, tongue_timber.transform, tongue_central_prism_global)
 

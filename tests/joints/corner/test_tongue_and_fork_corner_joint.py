@@ -140,6 +140,44 @@ class TestTongueAndForkJoint:
         assert centered_render.contains_point(tongue_timber_a.transform.global_to_local(sample_point_global))
         assert not shifted_render.contains_point(tongue_timber_b.transform.global_to_local(sample_point_global))
 
+    def test_the_tongues_cheeks_are_TENON_and_the_shoulder_is_SHOULDER_PLANE(self):
+        """The corner joint names its tongue's two cheeks, and not its two ends.
+
+        The tongue spans the timber's full width, so those two faces are flush
+        with the timber's own and belong to its names -- naming them as well
+        would derive the same line twice (see _drop_duplicate_derived).
+        """
+        from kumiki.csg.cutcsg import FeatureGroup, csg_children
+
+        tongue = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
+        fork = create_standard_horizontal_timber(direction='y', length=100, size=(6, 6), position=(50, 0, 0))
+        joint = cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
+            CornerJointTimberArrangement(
+                timber1=tongue,
+                timber2=fork,
+                timber1_end=TimberEnd.BOTTOM,
+                timber2_end=TimberEnd.BOTTOM,
+            )
+        )
+
+        found = {}
+        stack = [_render_cutting(next(c for c in joint.cuttings.values() if c.timber is tongue))]
+        seen = set()
+        while stack:
+            node = stack.pop()
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            for feature in node.get_declared_features():
+                if feature.name.startswith(("tongue_", "shoulder")):
+                    found[feature.name] = feature
+            stack.extend(csg_children(node))
+
+        assert set(found) >= {"tongue_front", "tongue_back", "shoulder"}
+        assert all(found[name].group is FeatureGroup.TENON
+                   for name in found if name.startswith("tongue_"))
+        assert found["shoulder"].group is FeatureGroup.SHOULDER_PLANE
+
     def test_tongue_and_fork_joint_assertions(self):
         tongue_parallel = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
         fork_parallel = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))

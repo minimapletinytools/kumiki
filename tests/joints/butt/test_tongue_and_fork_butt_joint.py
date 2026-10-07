@@ -109,6 +109,52 @@ class TestTongueAndForkButtJoint:
 
 
 
+    def test_the_tongue_is_TENON_and_the_shoulder_is_SHOULDER_PLANE(self):
+        """What the groups are for, on a real tongue.
+
+        Every face of the tongue is named and in FeatureGroup.TENON, the shoulder
+        plane is in SHOULDER_PLANE, and the two meet along the tongue's base --
+        an arris nothing else names, so it falls out of the pairing.
+        """
+        from kumiki.csg.cutcsg import (DerivedEdgeFeature, FeatureGroup, OwnedFeatureHit,
+                                       csg_children)
+
+        fork_butt_timber = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
+        tongue_rec_timber = create_standard_horizontal_timber(direction='y', length=100, size=(6, 6), position=(0, -50, 0))
+        arrangement = ButtJointTimberArrangement(
+            butt_timber=fork_butt_timber,
+            receiving_timber=tongue_rec_timber,
+            butt_timber_end=TimberEnd.TOP,
+        )
+        joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
+
+        found = {}
+        stack = [_render_cutting(joint.cuttings["tongue_timber"])]
+        seen = set()
+        while stack:
+            node = stack.pop()
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            for feature in node.get_declared_features():
+                if feature.name.startswith(("tongue_", "shoulder")):
+                    found[feature.name] = (feature, node)
+            stack.extend(csg_children(node))
+
+        assert {name for name in found if name.startswith("tongue_")} == {
+            "tongue_front", "tongue_back", "tongue_left", "tongue_right"}
+        assert all(found[name][0].group is FeatureGroup.TENON
+                   for name in found if name.startswith("tongue_"))
+        shoulder, shoulder_owner = found["shoulder"]
+        assert shoulder.group is FeatureGroup.SHOULDER_PLANE
+
+        tongue, tongue_owner = found["tongue_front"]
+        edge = DerivedEdgeFeature.derive(OwnedFeatureHit(feature=shoulder, owner=shoulder_owner),
+                                        OwnedFeatureHit(feature=tongue, owner=tongue_owner))
+        assert edge is not None, "the tongue's base comes of the shoulder meeting a cheek"
+        assert edge.name == "shoulder\u00d7tongue_front"
+
+
 # NOTE: mortise-and-tenon joint tests (TestMortiseAndTenonGeometry, TestMortiseAndTenonRelativeTenonSizing,
 # TestPegStuff, TestMortiseAndTenonCSGHierarchy, TestWedgedHalfDovetailMortiseAndTenonJoint) live in
 # test_mortise_and_tenon_joints.py now.
