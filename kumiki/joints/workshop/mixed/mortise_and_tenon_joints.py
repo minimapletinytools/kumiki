@@ -440,19 +440,15 @@ def cut_mortise_and_tenon_joint(
         if fit_rough_shank or tenon_timber.is_perfect_timber():
             tenon_relief_local = None
         else:
-            # The fringe cutter is a plain copy of the timber's own rough body, without
-            # its rough.* names: that body is already in this timber's tree, and two
-            # features of one name on one plane derive the same edge twice -- the other
-            # half of what _drop_duplicate_derived refuses (see the shoulder bound above).
-            tenon_rough_body_local = replace(
-                tenon_timber.get_extended_actual_csg_local(extend_bot=extend_bot, extend_top=extend_top),
-                feature_overrides=[],
-            )
             tenon_imperfect_global = adopt_csg(
                 tenon_timber.transform,
                 None,
                 Difference(
-                    base=tenon_rough_body_local,
+                    # The timber's own rough body without its labels: that body is already
+                    # in this timber's tree, and one surface declared twice puts two
+                    # features of one name on one plane (see the shoulder bound above).
+                    base=tenon_timber.get_extended_actual_csg_local(
+                        extend_bot=extend_bot, extend_top=extend_top, with_feature_labels=False),
                     subtract=[tenon_timber.get_extended_perfect_csg_local(extend_bot=extend_bot, extend_top=extend_top)],
                     label=CutCSGLabel("rough_fringe"),
                 ),

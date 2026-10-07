@@ -687,7 +687,7 @@ class PerfectTimberWithin(ABC):
     def get_nominal_size(self) -> V2:
         return self.get_rough_size()
 
-    def get_perfect_timber_within_csg_local(self) -> RectangularPrism:
+    def get_perfect_timber_within_csg_local(self, with_feature_labels: bool = True) -> RectangularPrism:
         """
         Returns the perfect rectangular prism CSG in local coordinates.
 
@@ -698,11 +698,21 @@ class PerfectTimberWithin(ABC):
 
         Built once, at construction.
 
+        Args:
+            with_feature_labels: False to leave the override labels off, giving a
+                copy of the same prism whose faces carry the primitive's own default
+                names instead. For a caller with a second copy of this timber in one
+                tree, where two features of one name on one plane would be one
+                surface declared twice. The two centerplanes are declared features
+                of their own rather than overrides, and stay either way.
+
         Returns:
             RectangularPrism in local coordinates (relative to timber's bottom position)
         """
         assert self._perfect_timber_within_csg_local is not None
-        return self._perfect_timber_within_csg_local
+        if with_feature_labels:
+            return self._perfect_timber_within_csg_local
+        return dataclass_replace(self._perfect_timber_within_csg_local, feature_overrides=())
 
     @classmethod
     def csg_label_name(cls) -> str:
@@ -725,12 +735,16 @@ class PerfectTimberWithin(ABC):
         return CutCSGLabel(f"{cls.csg_label_name()} ({', '.join(qualifiers)})")
 
     # TODO rename to get_rough_csg_local
-    def get_actual_csg_local(self) -> CutCSG:
+    def get_actual_csg_local(self, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry for this timber.
         
         For the base PerfectTimberWithin class, this returns the perfect rectangular
         prism. Subclasses override this to return different geometries (cylinder, mesh, etc.).
+        
+        Args:
+            with_feature_labels: False to leave the override labels off -- see
+                get_perfect_timber_within_csg_local.
         
         Returns:
             CutCSG representing the actual geometry in local coordinates
@@ -738,12 +752,13 @@ class PerfectTimberWithin(ABC):
         # The base timber's rough shape is its perfect one, but it is still
         # the rough CSG in the tree, so it is named as such.
         return dataclass_replace(
-            self.get_perfect_timber_within_csg_local(),
+            self.get_perfect_timber_within_csg_local(with_feature_labels=with_feature_labels),
             label=self.csg_label("rough"),
         )
 
     # TODO rename to get_extended_rough_csg_local
-    def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
+    def get_extended_actual_csg_local(
+            self, extend_bot: bool, extend_top: bool, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry extended to infinity at specified ends.
         
@@ -753,12 +768,17 @@ class PerfectTimberWithin(ABC):
         Args:
             extend_bot: If True, extend to -infinity at bottom (z=0)
             extend_top: If True, extend to +infinity at top (z=length)
+            with_feature_labels: False to leave the override labels off, so the faces
+                carry the primitive's default names. This geometry is often a copy of
+                something already in the tree -- a cutter, a relief bound -- and one
+                surface declared twice puts two features of one name on one plane,
+                which derives the same edge twice.
             
         Returns:
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
-            face_tags=_rough_face_tags(),
+            face_tags=_rough_face_tags() if with_feature_labels else (),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -767,7 +787,8 @@ class PerfectTimberWithin(ABC):
         )
 
     @final
-    def get_extended_perfect_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
+    def get_extended_perfect_csg_local(
+            self, extend_bot: bool, extend_top: bool, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the PERFECT (finished-dimension) CSG geometry extended to infinity at
         specified ends -- always self.get_perfect_size(), regardless of any rough/actual
@@ -779,12 +800,14 @@ class PerfectTimberWithin(ABC):
         Args:
             extend_bot: If True, extend to -infinity at bottom (z=0)
             extend_top: If True, extend to +infinity at top (z=length)
+            with_feature_labels: False to leave the override labels off -- see
+                get_extended_actual_csg_local. The centerplanes stay.
 
         Returns:
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
-            face_tags=_ptw_face_tags(),
+            face_tags=_ptw_face_tags() if with_feature_labels else (),
             extra_features=_ptw_centerplanes(),
             size=self.get_perfect_size(),
             length=self.length,
@@ -835,17 +858,24 @@ class PerfectTimberWithin(ABC):
                 safe_equality_test(height_halves[0], h_half) and
                 safe_equality_test(height_halves[1], h_half))
 
-    def get_imperfect_fringe_csg_local(self) -> CutCSG:
+    def get_imperfect_fringe_csg_local(self, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the CSG (local coordinates) of the region where this timber's actual
         geometry sticks out beyond its perfect-timber-within boundary, i.e. actual
         minus perfect.
+
+        Args:
+            with_feature_labels: False to leave the override labels off both shapes.
+                A caller using this as a cutter wants the geometry, not a second copy
+                of names the timber's own body already carries (see
+                PerfectTimberWithin.get_extended_actual_csg_local).
         """
         if self.is_perfect_timber():
             return EmptyCSG()
         return Difference(
-            base=self.get_extended_actual_csg_local(extend_bot=False, extend_top=False),
-            subtract=[self.get_perfect_timber_within_csg_local()],
+            base=self.get_extended_actual_csg_local(
+                extend_bot=False, extend_top=False, with_feature_labels=with_feature_labels),
+            subtract=[self.get_perfect_timber_within_csg_local(with_feature_labels=with_feature_labels)],
         )
 
 
@@ -895,12 +925,16 @@ class Timber(PerfectTimberWithin):
         h_half = self.size[1] / scalar(2)
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
 
-    def get_actual_csg_local(self) -> CutCSG:
+    def get_actual_csg_local(self, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry for this timber.
 
         For Timber, this returns a rectangular prism using the rough half-sizes,
         offset from the centerline when the half-sizes are asymmetric.
+
+        Args:
+            with_feature_labels: False to leave the override labels off -- see
+                PerfectTimberWithin.get_extended_actual_csg_local.
 
         Returns:
             RectangularPrism representing the actual geometry in local coordinates
@@ -911,11 +945,12 @@ class Timber(PerfectTimberWithin):
             transform=Transform(position=offset, orientation=Orientation.identity()),
             start_distance=scalar(0),
             end_distance=self.length,
-            feature_overrides=_rough_face_tags(),
+            feature_overrides=_rough_face_tags() if with_feature_labels else (),
             label=self.csg_label("rough"),
         )
 
-    def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
+    def get_extended_actual_csg_local(
+            self, extend_bot: bool, extend_top: bool, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry extended to infinity at specified ends.
 
@@ -925,6 +960,8 @@ class Timber(PerfectTimberWithin):
         Args:
             extend_bot: If True, extend to -infinity at bottom (z=0)
             extend_top: If True, extend to +infinity at top (z=length)
+            with_feature_labels: False to leave the override labels off -- see
+                PerfectTimberWithin.get_extended_actual_csg_local.
 
         Returns:
             CutCSG representing the extended geometry in local coordinates
@@ -935,7 +972,7 @@ class Timber(PerfectTimberWithin):
             transform=Transform(position=offset, orientation=Orientation.identity()),
             start_distance=None if extend_bot else scalar(0),
             end_distance=None if extend_top else self.length,
-            feature_overrides=_rough_face_tags(),
+            feature_overrides=_rough_face_tags() if with_feature_labels else (),
             label=self.csg_label("rough", "extended"),
         )
     
@@ -968,7 +1005,8 @@ class Board(PerfectTimberWithin):
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
 
     # TODO rename to get_extended_rough_csg_local
-    def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
+    def get_extended_actual_csg_local(
+            self, extend_bot: bool, extend_top: bool, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry extended to infinity at specified ends.
         
@@ -977,12 +1015,14 @@ class Board(PerfectTimberWithin):
         Args:
             extend_bot: If True, extend to -infinity at bottom (z=0)
             extend_top: If True, extend to +infinity at top (z=length)
+            with_feature_labels: False to leave the override labels off -- see
+                PerfectTimberWithin.get_extended_actual_csg_local.
             
         Returns:
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
-            face_tags=_rough_face_tags(),
+            face_tags=_rough_face_tags() if with_feature_labels else (),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1045,11 +1085,16 @@ class RoundTimber(PerfectTimberWithin):
         half_d = self.diameter / scalar(2)
         return (create_v2(half_d, half_d), create_v2(half_d, half_d))
     
-    def get_actual_csg_local(self) -> CutCSG:
+    def get_actual_csg_local(self, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry for this timber.
         
         For RoundTimber, this returns a Cylinder with the specified diameter.
+        
+        Args:
+            with_feature_labels: Accepted so that callers can pass it to any timber.
+                A cylinder's round surface declares its own features and carries no
+                override labels, so there is nothing here for it to leave off.
         
         Returns:
             Cylinder representing the actual geometry in local coordinates
@@ -1063,7 +1108,8 @@ class RoundTimber(PerfectTimberWithin):
             label=self.csg_label("rough"),
         )
     
-    def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
+    def get_extended_actual_csg_local(
+            self, extend_bot: bool, extend_top: bool, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry extended to infinity at specified ends.
         
@@ -1072,6 +1118,8 @@ class RoundTimber(PerfectTimberWithin):
         Args:
             extend_bot: If True, extend to -infinity at bottom (z=0)
             extend_top: If True, extend to +infinity at top (z=length)
+            with_feature_labels: Accepted so that callers can pass it to any timber;
+                a cylinder carries no override labels to leave off.
             
         Returns:
             Cylinder representing the extended geometry in local coordinates
@@ -1105,7 +1153,8 @@ class MeshTimber(PerfectTimberWithin):
     def can_be_extended_for_joints(self) -> bool:
         return False
     
-    def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
+    def get_extended_actual_csg_local(
+            self, extend_bot: bool, extend_top: bool, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry extended to infinity at specified ends.
         
@@ -1115,12 +1164,14 @@ class MeshTimber(PerfectTimberWithin):
         Args:
             extend_bot: If True, extend to -infinity at bottom (z=0)
             extend_top: If True, extend to +infinity at top (z=length)
+            with_feature_labels: False to leave the override labels off -- see
+                PerfectTimberWithin.get_extended_actual_csg_local.
             
         Returns:
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
-            face_tags=_rough_face_tags(),
+            face_tags=_rough_face_tags() if with_feature_labels else (),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1181,11 +1232,16 @@ class RegularPolygonTimber(PerfectTimberWithin):
         h_half = self.size[1] / scalar(2)
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
     
-    def get_actual_csg_local(self) -> CutCSG:
+    def get_actual_csg_local(self, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry for this timber.
         
         For RegularPolygonTimber, this returns a ConvexPolygonExtrusion with the specified number of sides.
+        
+        Args:
+            with_feature_labels: Accepted so that callers can pass it to any timber.
+                This shape declares its own features and carries no override labels,
+                so there is nothing here for it to leave off.
         
         Returns:
             ConvexPolygonExtrusion representing the actual geometry in local coordinates
@@ -1198,7 +1254,8 @@ class RegularPolygonTimber(PerfectTimberWithin):
             label=self.csg_label("rough"),
         )
     
-    def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
+    def get_extended_actual_csg_local(
+            self, extend_bot: bool, extend_top: bool, with_feature_labels: bool = True) -> CutCSG:
         """
         Returns the actual CSG geometry extended to infinity at specified ends.
         
@@ -1207,6 +1264,8 @@ class RegularPolygonTimber(PerfectTimberWithin):
         Args:
             extend_bot: If True, extend to -infinity at bottom (z=0)
             extend_top: If True, extend to +infinity at top (z=length)
+            with_feature_labels: Accepted so that callers can pass it to any timber;
+                this shape carries no override labels to leave off.
             
         Returns:
             ConvexPolygonExtrusion representing the extended geometry in local coordinates
