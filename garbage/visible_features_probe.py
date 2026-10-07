@@ -63,6 +63,7 @@ def main() -> int:
     for index, path in enumerate(modules()):
         name = f"visible_{index}_{path.stem}"
         spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
         spec.loader.exec_module(module)

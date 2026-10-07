@@ -76,8 +76,13 @@ def face_samples(node, feature):
         if start is None or end is None:
             return []
         first, second = points[index], points[(index + 1) % len(points)]
-        return [_lift(node, *lerp(first, second, t), z)
-                for t in _steps() for z in (lerp(scalar(start), scalar(end), s) for s in _steps())]
+        samples = []
+        for along in _steps():
+            edge_point = lerp(first, second, along)
+            for across in _steps():
+                samples.append(_lift(node, edge_point[0], edge_point[1],
+                                     lerp(scalar(start), scalar(end), across)))
+        return samples
     return []
 
 
@@ -103,6 +108,7 @@ def main() -> int:
             continue
         name = f"exposed_{index}_{path.stem}"
         spec = importlib.util.spec_from_file_location(name, path)
+        assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
         spec.loader.exec_module(module)
