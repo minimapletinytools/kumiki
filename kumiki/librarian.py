@@ -20,7 +20,7 @@ statement is recognized as a **frame** entry if it is:
 
 A function decorated with ``@tool`` is recorded as a **tool**. Whether a
 decorated function's signature is right is only checked after import, by
-``kumiki.frame_entries``.
+``kumiki.frame_decorators``.
 
 A module-level statement is recognized as a **pattern list** entry only by
 name: ``patterns = [...]`` or ``patterns: ... = [...]``, list literal or

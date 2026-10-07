@@ -4103,7 +4103,7 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
         if _looks_like_pattern_list(pattern_list):
             return _frame_from_pattern_list(pattern_list)
 
-    from kumiki.frame_entries import module_entries, overlay_frames
+    from kumiki.frame_decorators import module_entries, overlay_frames
 
     entries = module_entries(module)
     for rejected in entries.rejected:
@@ -4172,7 +4172,7 @@ def load_slot_state(
         frame, patternbook = resolve_frame_from_module(
             module, _bind_kiwari_values(frame.kiwari, saved)
         )
-    from kumiki.frame_entries import module_entries
+    from kumiki.frame_decorators import module_entries
 
     entries = module_entries(module)
     return SlotState(
@@ -4227,7 +4227,7 @@ def _serialize_tools(slot_state: SlotState) -> Dict[str, Any]:
 
 def run_tool(slot_state: SlotState, name: str) -> Dict[str, Any]:
     """Run one of the slot's @tool functions on its frame and shared kiwari; its text is the result."""
-    from kumiki.frame_entries import module_parameters
+    from kumiki.frame_decorators import module_parameters
 
     entry = next((entry for entry in slot_state.tools if entry.name == name), None)
     if entry is None:

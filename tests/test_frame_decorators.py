@@ -6,7 +6,7 @@ from typing import Optional
 import pytest
 
 from kumiki import *
-from kumiki.frame_entries import module_entries, module_parameters, overlay_frames
+from kumiki.frame_decorators import module_entries, module_parameters, overlay_frames
 
 
 def _module(**members) -> types.ModuleType:

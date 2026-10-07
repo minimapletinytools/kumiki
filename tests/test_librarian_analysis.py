@@ -38,7 +38,7 @@ def test_decorators_by_name_alias_or_attribute():
     src = """
 import kumiki
 from kumiki import frame as view
-from kumiki.frame_entries import tool
+from kumiki.frame_decorators import tool
 
 @view
 def a(k): ...
