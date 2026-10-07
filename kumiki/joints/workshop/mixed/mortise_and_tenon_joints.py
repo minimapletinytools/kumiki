@@ -286,6 +286,14 @@ def cut_mortise_and_tenon_joint(
         label=CutCSGLabel("shoulder"),
     )
 
+    # The tenon-side relief below is bounded by the same plane, but with a copy that
+    # carries no shoulder feature. Using the one above put a second "shoulder" on the
+    # tenon timber -- the joint's own cutter plus the relief's -- and two features on
+    # one plane derive the same edge twice, which is what _drop_duplicate_derived
+    # trips over. The relief wants the plane, not the name. The scribe relief on the
+    # receiving timber keeps the named one, since it is that timber's only shoulder.
+    shoulder_relief_bound_global = replace(shoulder_half_space_global, feature_overrides=[])
+
     tenon_prism_cropped = (
         tenon_prism_global
         if tenon_prism_cropping_csgs is None
@@ -432,11 +440,19 @@ def cut_mortise_and_tenon_joint(
         if fit_rough_shank or tenon_timber.is_perfect_timber():
             tenon_relief_local = None
         else:
+            # The fringe cutter is a plain copy of the timber's own rough body, without
+            # its rough.* names: that body is already in this timber's tree, and two
+            # features of one name on one plane derive the same edge twice -- the other
+            # half of what _drop_duplicate_derived refuses (see the shoulder bound above).
+            tenon_rough_body_local = replace(
+                tenon_timber.get_extended_actual_csg_local(extend_bot=extend_bot, extend_top=extend_top),
+                feature_overrides=[],
+            )
             tenon_imperfect_global = adopt_csg(
                 tenon_timber.transform,
                 None,
                 Difference(
-                    base=tenon_timber.get_extended_actual_csg_local(extend_bot=extend_bot, extend_top=extend_top),
+                    base=tenon_rough_body_local,
                     subtract=[tenon_timber.get_extended_perfect_csg_local(extend_bot=extend_bot, extend_top=extend_top)],
                     label=CutCSGLabel("rough_fringe"),
                 ),
@@ -447,7 +463,7 @@ def cut_mortise_and_tenon_joint(
                 Intersection(
                     left=Difference(
                         base=tenon_imperfect_global,
-                        subtract=[shoulder_half_space_global],
+                        subtract=[shoulder_relief_bound_global],
                     ),
                     right=mortise_ptw_global,
                     label=CutCSGLabel("shoulder_rough_relief"),
