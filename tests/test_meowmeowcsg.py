@@ -5546,12 +5546,16 @@ class TestATimberBodyCarriesItsOwnGroup:
     def test_the_perfect_body_is_PERFECT(self):
         from kumiki.timber import _ptw_face_tags
 
-        assert {tag.properties.group for tag in _ptw_face_tags()} == {FeatureGroup.PERFECT}
+        tags = _ptw_face_tags()
+        assert all(tag.properties is not None for tag in tags)
+        assert {tag.properties.group for tag in tags if tag.properties} == {FeatureGroup.PERFECT}
 
     def test_the_rough_body_is_ROUGH(self):
         from kumiki.timber import _rough_face_tags
 
-        assert {tag.properties.group for tag in _rough_face_tags()} == {FeatureGroup.ROUGH}
+        tags = _rough_face_tags()
+        assert all(tag.properties is not None for tag in tags)
+        assert {tag.properties.group for tag in tags if tag.properties} == {FeatureGroup.ROUGH}
 
     def test_and_they_do_not_pair_with_each_other(self):
         assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.ROUGH)

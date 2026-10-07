@@ -27,6 +27,7 @@ sys.path.insert(0, str(REPO))
 
 def load(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     spec.loader.exec_module(module)
@@ -178,6 +179,7 @@ def main():
                             + abs(offset))
                     if best is None or cost < best[0]:
                         best = (cost, offset, box)
+            assert best is not None, "SIDES and LANES both offer at least one placement"
             _, offset, box = best
             placed.append(box)
             lanes.append(offset)
