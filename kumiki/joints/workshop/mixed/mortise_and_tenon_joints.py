@@ -102,7 +102,10 @@ class InsetShoulderReliefStyle(Enum):
     NoRelief = 2
 
 
-_TENON_FACE = FeatureProperties(group=FeatureGroup.NONE)
+#: A tenon face is named and measurable, and meets nothing: a tenon cheek against
+#: the mating timber's rough body is an edge nobody asked for, and the tenon's own
+#: arrises are the prism's defaults, so a derived pair would name them twice.
+_TENON_FACE = FeatureProperties(group=FeatureGroup.TENON)
 
 
 def cut_mortise_and_tenon_joint(
@@ -278,7 +281,7 @@ def cut_mortise_and_tenon_joint(
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
-        feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder", group=FeatureGroup.A)],
+        feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder", group=FeatureGroup.SHOULDER_PLANE)],
         label=CutCSGLabel("shoulder"),
     )
 

@@ -338,42 +338,52 @@ class FeatureGroup(Enum):
     nonsense -- a tenon cheek and the far end of the timber do not meet. Groups
     make the useful pairs declarable instead of searched for:
 
-        A  intersects with B1 and B2
-        B1 intersects with A only
-        B2 intersects with A, and with itself
-        C  intersects with itself only
+        SHOULDER_PLANE intersects with PERFECT and ROUGH
+        PERFECT        intersects with SHOULDER_PLANE only
+        ROUGH          intersects with SHOULDER_PLANE only
+        TENON          intersects with nothing, for now
 
     NONE is the exception to the scheme: it meets nothing, not even itself, and
     is how a feature says it forms no edges at all. Some geometry is worth
     naming and pointing at without every face of it turning into an arris.
 
-    Defaults today: a timber's perfect-timber-within and rough faces are B2,
-    and every named joint feature is A -- so joint geometry meets the timber
-    body, and the body meets itself, the latter being the timber's own four
-    long arrises, which drawing generation needs. B1 and C are defined but
-    unused until something needs them.
+    What carries what today: a timber's perfect-timber-within faces, arrises,
+    corners and centerplanes are PERFECT, and its rough body's are ROUGH. A
+    joint's shoulder plane is SHOULDER_PLANE, so a joint outlines itself against
+    both bodies. TENON is where a joint's tenon faces go; they are deliberately
+    in no pairing at all (a tenon cheek against the mating timber's rough body
+    was an edge nobody wanted -- see the coffee table note in TODO.txt), so the
+    name says what the faces are without yet saying what they meet.
 
-    A consequence of the body meeting itself: relief geometry embeds the MATING
-    timber's rough body to scribe against, and its faces carry the same reserved
-    rough.* names (see timber.ROUGH_FACE_PREFIX). Two timbers' faces then pair
-    into an edge that reads as one timber's -- rough.back x rough.back -- since
-    the name says nothing about whose body it is.
+    The two bodies do NOT meet themselves, which is why PERFECT and ROUGH pair
+    with the shoulder plane and nothing else: a timber's own arrises and corners
+    are declared outright (timber._long_arris_tags and friends), so letting the
+    faces pair as well would reach the same line two ways and offer it twice.
+    The rough body is where that would bite hardest, since relief geometry embeds
+    the MATING timber's rough body to scribe against and its faces carry the same
+    reserved rough.* names (see timber.ROUGH_FACE_PREFIX): two timbers' faces
+    would pair into an edge reading as one timber's -- rough.back x rough.back --
+    because the name says nothing about whose body it is.
+
+    The ranks are a preference order for picking, best first: a shoulder plane
+    is the feature a joint is about, then the perfect body a drawing measures
+    from, then the rough stock, then tenon faces, then anything forming no edges.
     """
-    A = 1
-    B1 = 2
-    B2 = 3
-    C = 4
+    SHOULDER_PLANE = 1
+    PERFECT = 2
+    ROUGH = 3
+    TENON = 4
     #: Forms no edges with anything, including itself.
     NONE = 5
 
 
 # Which groups each group forms edges with. Symmetric by construction; see
-# FeatureGroup for what the letters mean.
+# FeatureGroup for what the names mean.
 FEATURE_GROUP_PAIRS: dict = {
-    FeatureGroup.A: frozenset({FeatureGroup.B1, FeatureGroup.B2}),
-    FeatureGroup.B1: frozenset({FeatureGroup.A}),
-    FeatureGroup.B2: frozenset({FeatureGroup.A, FeatureGroup.B2}),
-    FeatureGroup.C: frozenset({FeatureGroup.C}),
+    FeatureGroup.SHOULDER_PLANE: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH}),
+    FeatureGroup.PERFECT: frozenset({FeatureGroup.SHOULDER_PLANE}),
+    FeatureGroup.ROUGH: frozenset({FeatureGroup.SHOULDER_PLANE}),
+    FeatureGroup.TENON: frozenset(),
     FeatureGroup.NONE: frozenset(),
 }
 
@@ -1924,7 +1934,13 @@ class FeatureOverride:
 
 def shoulder_override(key: FeatureKey, name: Optional[str] = None,
                       group: FeatureGroup = FeatureGroup.NONE) -> FeatureOverride:
-    """Marks the default feature at `key` as a joint's shoulder plane."""
+    """Marks the default feature at `key` as a joint's shoulder plane.
+
+    The group is the caller's to pass: SHOULDER_PLANE is what makes the shoulder
+    outline itself where it meets the timber's perfect and rough bodies, and the
+    default of NONE is a shoulder that is named and measurable but derives
+    nothing. Only the mortise and tenon passes SHOULDER_PLANE so far.
+    """
     return FeatureOverride(key, name, FeatureProperties(group=group, purpose=FeaturePurpose.SHOULDER))
 
 

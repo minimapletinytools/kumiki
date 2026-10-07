@@ -5928,7 +5928,7 @@ def _log_pick(member_key, local_pt, tolerances, feature_hits, result) -> None:
             f" {feature.feature_type().name:5}"
             f" {'derived ' if feature.is_derived() else 'declared'}"
             f" real={str(feature.real):5}"
-            f" group={feature.group.name:4}"
+            f" group={feature.group.name:14}"
             f" prio={feature.priority:<5}"
             f" {feature.name}"
         )

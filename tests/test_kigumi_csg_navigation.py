@@ -205,8 +205,9 @@ class TestCSGTreeSerialization:
         assert {"tenon_right", "tenon_left", "tenon_front", "tenon_back"} <= set(by_name)
         assert by_name["tenon_right"]["type"] == "FACE"
         assert by_name["tenon_right"]["real"] is True
-        # NONE: a tenon's faces are named and selectable and form no edges.
-        assert by_name["tenon_right"]["group"] == "NONE"
+        # TENON: a tenon's faces are named and selectable, and pair with nothing
+        # yet, so they still form no edges.
+        assert by_name["tenon_right"]["group"] == "TENON"
 
     def test_the_timber_body_carries_its_reserved_face_names(self, mortise_and_tenon_frame):
         tree = self._tree(mortise_and_tenon_frame, "butt_timber")
@@ -218,9 +219,9 @@ class TestCSGTreeSerialization:
         # The arrises at each end are named too, so a timber's body has a name
         # for every face and every edge it has.
         assert {"rough.bottom_right", "rough.top_back"} <= names
-        # B1: they meet joint geometry and not each other, since the arrises
-        # they used to make by meeting are named outright now.
-        assert all(f["group"] == "B1" for f in base["features"])
+        # ROUGH: the rough body meets a joint's shoulder plane and not itself,
+        # since the arrises it used to make by meeting are named outright now.
+        assert all(f["group"] == "ROUGH" for f in base["features"])
         # Six faces, four long arrises, eight at the ends, eight corners: every
         # slot the prism offers, so none of its anonymous defaults survive the
         # override.
@@ -1302,13 +1303,13 @@ class TestEdgeHighlightSpan:
             size=create_v2(scalar(0.1), scalar(0.2)),
             transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(1),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B1))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.ROUGH))],
         )
         # Parallel to the length and far past the end of it, so the line where
         # the two planes cross runs nowhere near the solid.
         far = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(9),
-            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
         )
         edge = DerivedEdgeFeature.derive(
             OwnedFeatureHit(feature=body.get_declared_features()[0], owner=body),

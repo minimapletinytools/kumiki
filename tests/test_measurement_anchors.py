@@ -520,13 +520,13 @@ class TestAFeatureKnowsItsOwnEnds:
                                    SimpleRectangularPrismFeature)
 
         box = self._box()
-        # Groups that are allowed to meet: A pairs with B2, which is what makes
-        # an edge between these two derivable at all.
+        # Groups that are allowed to meet: a shoulder plane pairs with a body
+        # face, which is what makes an edge between these two derivable at all.
         face = lambda which, group: SimpleRectangularPrismFeature(
             name=str(which), face=which, properties=FeatureProperties(group=group))
         edge = DerivedEdgeFeature.derive(
-            OwnedFeatureHit(feature=face(PrismFace.RIGHT, FeatureGroup.A), owner=box),
-            OwnedFeatureHit(feature=face(PrismFace.FRONT, FeatureGroup.B2), owner=box))
+            OwnedFeatureHit(feature=face(PrismFace.RIGHT, FeatureGroup.SHOULDER_PLANE), owner=box),
+            OwnedFeatureHit(feature=face(PrismFace.FRONT, FeatureGroup.ROUGH), owner=box))
         assert edge is not None, "adjacent faces in meeting groups form an edge"
 
         extent = present(edge.get_extent(box), "an extent")

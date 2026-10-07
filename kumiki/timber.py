@@ -1430,7 +1430,7 @@ _TIMBER_SHORT_ARRISES: List[Tuple[str, PrismFace, PrismFace]] = [
 ]
 
 
-def _long_arris_tags(prefix: str) -> List[FeatureOverride]:
+def _long_arris_tags(prefix: str, group: FeatureGroup) -> List[FeatureOverride]:
     """Named features for a timber's four long arrises.
 
     Declared rather than left to be derived from the two faces meeting. A
@@ -1439,18 +1439,21 @@ def _long_arris_tags(prefix: str) -> List[FeatureOverride]:
     worth naming once. It is also why the faces themselves no longer meet each
     other -- see _ptw_face_tags -- since otherwise the same line would be
     reachable two ways and show up twice.
+
+    `group` is whatever the body these arrises belong to carries: PERFECT for the
+    perfect timber within, ROUGH for the rough stock.
     """
     return [
         FeatureOverride(
             prism_arris_key(first, second),
             name=f"{prefix}{name}",
-            properties=FeatureProperties(group=FeatureGroup.B1),
+            properties=FeatureProperties(group=group),
         )
         for name, first, second in _TIMBER_LONG_ARRISES
     ]
 
 
-def _short_arris_tags(prefix: str) -> List[FeatureOverride]:
+def _short_arris_tags(prefix: str, group: FeatureGroup) -> List[FeatureOverride]:
     """Named features for the eight arrises around a timber's two ends.
 
     The same argument as _long_arris_tags: a timber HAS these, so they are
@@ -1469,7 +1472,7 @@ def _short_arris_tags(prefix: str) -> List[FeatureOverride]:
         FeatureOverride(
             prism_arris_key(first, second),
             name=f"{prefix}{name}",
-            properties=FeatureProperties(group=FeatureGroup.B1),
+            properties=FeatureProperties(group=group),
         )
         for name, first, second in _TIMBER_SHORT_ARRISES
     ]
@@ -1490,7 +1493,7 @@ _TIMBER_CORNERS: List[Tuple[str, PrismFace, PrismFace, PrismFace]] = [
 ]
 
 
-def _corner_tags(prefix: str) -> List[FeatureOverride]:
+def _corner_tags(prefix: str, group: FeatureGroup) -> List[FeatureOverride]:
     """Named features for a timber's eight corners.
 
     The same argument as the arrises: the prism underneath names them too, as
@@ -1502,7 +1505,7 @@ def _corner_tags(prefix: str) -> List[FeatureOverride]:
         FeatureOverride(
             prism_corner_key(cap, first, second),
             name=f"{prefix}{name}",
-            properties=FeatureProperties(group=FeatureGroup.B1),
+            properties=FeatureProperties(group=group),
         )
         for name, cap, first, second in _TIMBER_CORNERS
     ]
@@ -1512,11 +1515,11 @@ def _corner_tags(prefix: str) -> List[FeatureOverride]:
 def _ptw_face_tags() -> Tuple[FeatureOverride, ...]:
     """Named features for the 6 faces of a timber's perfect-timber-within prism.
 
-    Group B1: they form edges against joint features (group A) and not against
-    each other. The timber's own arrises used to come from faces meeting faces;
-    all twelve are declared outright now (see _long_arris_tags and
-    _short_arris_tags), so letting the faces pair as well would make the same
-    line reachable two ways and show it twice.
+    Group PERFECT: they form edges against joint features (SHOULDER_PLANE) and
+    not against each other. The timber's own arrises used to come from faces
+    meeting faces; all twelve are declared outright now (see _long_arris_tags
+    and _short_arris_tags), so letting the faces pair as well would make the
+    same line reachable two ways and show it twice.
 
     Between the faces, the long arrises and the short ones, this names every
     slot the prism underneath offers -- so a timber's body carries no anonymous
@@ -1527,10 +1530,12 @@ def _ptw_face_tags() -> Tuple[FeatureOverride, ...]:
         FeatureOverride(
             prism_face_key(face),
             name=PTW_FACE_PREFIX + face_name,
-            properties=FeatureProperties(group=FeatureGroup.B1),
+            properties=FeatureProperties(group=FeatureGroup.PERFECT),
         )
         for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(PTW_FACE_PREFIX) + _short_arris_tags(PTW_FACE_PREFIX) + _corner_tags(PTW_FACE_PREFIX))
+    ] + _long_arris_tags(PTW_FACE_PREFIX, FeatureGroup.PERFECT)
+      + _short_arris_tags(PTW_FACE_PREFIX, FeatureGroup.PERFECT)
+      + _corner_tags(PTW_FACE_PREFIX, FeatureGroup.PERFECT))
 
 
 @functools.lru_cache(maxsize=None)
@@ -1546,19 +1551,23 @@ def _ptw_centerplanes() -> Tuple[PrismCenterplaneFeature, ...]:
 def _rough_face_tags() -> Tuple[FeatureOverride, ...]:
     """Named features for the 6 faces of a timber's rough (as-sawn) prism.
 
-    Group B1 as well, but kept separately named: a rough face only coincides
-    with its perfect-timber-within counterpart on a reference face, and
+    Group ROUGH, kept apart from the perfect timber within's PERFECT: a rough
+    face only coincides with its perfect counterpart on a reference face, and
     measurements may never be taken from one that does not (see
-    PerfectTimberWithin.is_face_perfect).
+    PerfectTimberWithin.is_face_perfect). The two rank differently for picking
+    for the same reason -- the perfect body is what a joint and a drawing are
+    about.
     """
     return tuple([
         FeatureOverride(
             prism_face_key(face),
             name=ROUGH_FACE_PREFIX + face_name,
-            properties=FeatureProperties(group=FeatureGroup.B1),
+            properties=FeatureProperties(group=FeatureGroup.ROUGH),
         )
         for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(ROUGH_FACE_PREFIX) + _short_arris_tags(ROUGH_FACE_PREFIX) + _corner_tags(ROUGH_FACE_PREFIX))
+    ] + _long_arris_tags(ROUGH_FACE_PREFIX, FeatureGroup.ROUGH)
+      + _short_arris_tags(ROUGH_FACE_PREFIX, FeatureGroup.ROUGH)
+      + _corner_tags(ROUGH_FACE_PREFIX, FeatureGroup.ROUGH))
 
 
 def _create_extended_rectangular_prism(

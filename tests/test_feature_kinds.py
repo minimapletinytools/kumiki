@@ -39,11 +39,11 @@ def test_hit_of_kind_narrows_or_declines():
 
 
 def test_a_derived_point_knows_which_parent_is_the_edge():
-    grouped = FeatureProperties(group=FeatureGroup.A)
+    grouped = FeatureProperties(group=FeatureGroup.SHOULDER_PLANE)
     box = _box(feature_overrides=(FeatureOverride(prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT), "arris",
                                                   grouped),))
     cut = HalfSpace(normal=create_v3(0, 0, 1), offset=scalar(1),
-                    feature_overrides=(FeatureOverride(HALF_SPACE_PLANE, "cut", FeatureProperties(group=FeatureGroup.B2)),))
+                    feature_overrides=(FeatureOverride(HALF_SPACE_PLANE, "cut", FeatureProperties(group=FeatureGroup.ROUGH)),))
     arris = OwnedFeatureHit(feature=next(f for f in box.get_declared_features() if f.name == "arris"), owner=box)
     plane = OwnedFeatureHit(feature=cut.get_declared_features()[0], owner=cut)
 

@@ -213,18 +213,23 @@ DONE-sliding dovetail (maybe you want tapered variants)
 DONE-cut plain cross lap house joint pattern needs to be repositioned, its currently not crossing at all, it sohuld cross by 50%
 DONE-move irrational_angles/mortise and tenon joint example with te rest of the mortise and tenon joint exmples
 DONE-some of teh patterns are broken in relief/butt_arrangement can you try and run them all and see if any of them are broken
+DONE-test derived points btw
 
 
 
+-maybe add named collisions groups, rough perfect shoulderplane tenon. think about where else you need derived features...
+-tenon square peg holes need to intersect with the tenon prism for derived edges
+  -make a decision on derived edge groups
 
 
+
+-replace pattern with @pattern decorator?
 -add multi frame support (decorators + multipl eframe function )
 -add additional methods (decotarator + buttons in the parameters section)
 -add units toggle for measurements
 -add export drawing button (how to do this?)
 -figure out xray joints (could be aper joint/direction property)
--maybe add named collisions groups, rough perfect shoulderplane tenon. think about where else you need derived features...
-DONE-test derived points btw
+
 
 -hidden feature detection(featurelist, view) to see what's hidden
 -then you can see if all features are visible through the views and warn if not
@@ -251,9 +256,6 @@ DONE-test derived points btw
 
 
 
-
--tenon square peg holes need to intersect with the tenon prism for derived edges
-  -make a decision on derived edge groups
 
 -improve panel functions, think bout the simplest way to do this...
 -update shed example to include panels

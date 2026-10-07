@@ -2896,23 +2896,31 @@ class TestPointQueryTolerance:
 class TestFeatureGroups:
     """Which features may pair up to form an edge (see FeatureGroup)."""
 
-    def test_a_pairs_with_both_b_groups(self):
-        assert feature_groups_intersect(FeatureGroup.A, FeatureGroup.B1)
-        assert feature_groups_intersect(FeatureGroup.A, FeatureGroup.B2)
+    def test_a_shoulder_plane_pairs_with_both_bodies(self):
+        assert feature_groups_intersect(FeatureGroup.SHOULDER_PLANE, FeatureGroup.PERFECT)
+        assert feature_groups_intersect(FeatureGroup.SHOULDER_PLANE, FeatureGroup.ROUGH)
 
-    def test_a_does_not_pair_with_itself(self):
+    def test_a_shoulder_plane_does_not_pair_with_itself(self):
         """Joint features meet the timber body, not each other."""
-        assert not feature_groups_intersect(FeatureGroup.A, FeatureGroup.A)
+        assert not feature_groups_intersect(FeatureGroup.SHOULDER_PLANE, FeatureGroup.SHOULDER_PLANE)
 
-    def test_b1_pairs_only_with_a(self):
-        assert feature_groups_intersect(FeatureGroup.B1, FeatureGroup.A)
-        assert not feature_groups_intersect(FeatureGroup.B1, FeatureGroup.B1)
-        assert not feature_groups_intersect(FeatureGroup.B1, FeatureGroup.B2)
+    def test_the_perfect_body_pairs_only_with_a_shoulder_plane(self):
+        assert feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.SHOULDER_PLANE)
+        assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.PERFECT)
+        assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.ROUGH)
 
-    def test_b2_and_c_pair_with_themselves(self):
-        assert feature_groups_intersect(FeatureGroup.B2, FeatureGroup.B2)
-        assert feature_groups_intersect(FeatureGroup.C, FeatureGroup.C)
-        assert not feature_groups_intersect(FeatureGroup.C, FeatureGroup.A)
+    def test_each_body_and_a_tenon_pair_with_nothing(self):
+        """A body's own arrises are declared, so its faces must not pair as well.
+
+        Deriving them too would reach the same line two ways and offer it twice
+        (see timber._long_arris_tags). A tenon face is named and measurable, and
+        nothing derives from one yet.
+        """
+        assert not feature_groups_intersect(FeatureGroup.ROUGH, FeatureGroup.ROUGH)
+        assert not feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.TENON)
+        assert not feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.SHOULDER_PLANE)
+        assert not feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.PERFECT)
+        assert not feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.ROUGH)
 
     def test_pairing_is_symmetric(self):
         """Every declared pairing holds in both directions."""
@@ -2939,15 +2947,15 @@ class TestFeatureProperties:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "body_right", FeatureProperties(group=FeatureGroup.B1, real=False, priority=7))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "body_right", FeatureProperties(group=FeatureGroup.PERFECT, real=False, priority=7))],
         )
         hit = prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert hit is not None
         assert hit.name == "body_right"
-        assert hit.feature.group == FeatureGroup.B1
+        assert hit.feature.group == FeatureGroup.PERFECT
         assert hit.feature.real is False
         assert hit.feature.priority == 7
-        assert hit.properties.group == FeatureGroup.B1
+        assert hit.properties.group == FeatureGroup.PERFECT
 
     def test_priority_orders_competing_features(self):
         """find_first_feature returns the lowest-priority claimant at a point."""
@@ -3400,7 +3408,7 @@ class TestFeatureOverridesAndExtras:
         return next(f for f in prism.get_declared_features() if f.name == name)
 
     def test_an_override_is_the_default_with_a_new_name_and_properties(self):
-        properties = FeatureProperties(group=FeatureGroup.A, real=False, priority=3)
+        properties = FeatureProperties(group=FeatureGroup.SHOULDER_PLANE, real=False, priority=3)
         prism = self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "joint", properties)])
         default = prism.default_features()[prism_face_key(PrismFace.RIGHT)]
         joint = self._named(prism, "joint")
@@ -3522,10 +3530,10 @@ class TestCSGFeatureType:
         """What a feature *is* and how it should be *treated* are separate."""
         feature = SimpleRectangularPrismFeature(
             "r", face=PrismFace.RIGHT,
-            properties=FeatureProperties(group=FeatureGroup.B1, real=False),
+            properties=FeatureProperties(group=FeatureGroup.PERFECT, real=False),
         )
         assert feature.feature_type() == CSGFeatureType.FACE
-        assert feature.group == FeatureGroup.B1
+        assert feature.group == FeatureGroup.PERFECT
         assert feature.real is False
 
 
@@ -4125,7 +4133,7 @@ class TestDerivedEdges:
             feature_overrides=list(overrides),
         )
 
-    def _face(self, name, face, group=FeatureGroup.B2):
+    def _face(self, name, face, group=FeatureGroup.PERFECT):
         return FeatureOverride(prism_face_key(face), name, FeatureProperties(group=group))
 
     def _owned(self, prism, name):
@@ -4134,9 +4142,9 @@ class TestDerivedEdges:
 
     def test_two_meeting_faces_derive_an_edge(self):
         prism = self._prism(self._face("right", PrismFace.RIGHT),
-                            self._face("front", PrismFace.FRONT))
+                            self._face("shoulder", PrismFace.FRONT, FeatureGroup.SHOULDER_PLANE))
         edge = DerivedEdgeFeature.derive(self._owned(prism, "right"),
-                                         self._owned(prism, "front"))
+                                         self._owned(prism, "shoulder"))
         assert edge is not None
         assert edge.feature_type() == CSGFeatureType.EDGE
         line = edge.locate_simple_unbounded(prism)
@@ -4154,24 +4162,25 @@ class TestDerivedEdges:
                                          self._owned(prism, "left")) is None
 
     def test_groups_that_may_not_meet_derive_nothing(self):
-        """B1 pairs only with A, so two B1 faces form no edge."""
-        prism = self._prism(self._face("right", PrismFace.RIGHT, FeatureGroup.B1),
-                            self._face("front", PrismFace.FRONT, FeatureGroup.B1))
+        """The perfect body pairs with a shoulder plane only, so two of its own
+        faces form no edge."""
+        prism = self._prism(self._face("right", PrismFace.RIGHT, FeatureGroup.PERFECT),
+                            self._face("front", PrismFace.FRONT, FeatureGroup.PERFECT))
         assert DerivedEdgeFeature.derive(self._owned(prism, "right"),
                                          self._owned(prism, "front")) is None
 
     def test_a_joint_face_meets_a_timber_face(self):
-        """The motivating pair: group A meeting group B2."""
-        prism = self._prism(self._face("ptw.right", PrismFace.RIGHT, FeatureGroup.B2),
-                            self._face("shoulder", PrismFace.FRONT, FeatureGroup.A))
+        """The motivating pair: a shoulder plane meeting a body face."""
+        prism = self._prism(self._face("ptw.right", PrismFace.RIGHT, FeatureGroup.ROUGH),
+                            self._face("shoulder", PrismFace.FRONT, FeatureGroup.SHOULDER_PLANE))
         edge = DerivedEdgeFeature.derive(self._owned(prism, "ptw.right"),
                                          self._owned(prism, "shoulder"))
         assert edge is not None
 
     def test_the_name_does_not_depend_on_traversal_order(self):
         prism = self._prism(self._face("right", PrismFace.RIGHT),
-                            self._face("front", PrismFace.FRONT))
-        a, b = self._owned(prism, "right"), self._owned(prism, "front")
+                            self._face("shoulder", PrismFace.FRONT, FeatureGroup.SHOULDER_PLANE))
+        a, b = self._owned(prism, "right"), self._owned(prism, "shoulder")
         forward = DerivedEdgeFeature.derive(a, b)
         backward = DerivedEdgeFeature.derive(b, a)
         assert forward is not None and backward is not None
@@ -4181,7 +4190,7 @@ class TestDerivedEdges:
         prism = self._prism(
             self._face("right", PrismFace.RIGHT),
             FeatureOverride(prism_face_key(PrismFace.FRONT), "front",
-                            FeatureProperties(group=FeatureGroup.A, real=False)),
+                            FeatureProperties(group=FeatureGroup.SHOULDER_PLANE, real=False)),
         )
         edge = DerivedEdgeFeature.derive(self._owned(prism, "right"), self._owned(prism, "front"))
         assert edge is not None and edge.real is False
@@ -4204,7 +4213,7 @@ class TestDerivedEdges:
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             radius=scalar(2), position=create_v3(scalar(0), scalar(0), scalar(0)),
             start_distance=scalar(0), end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(CYLINDER_BARREL, "wall", FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(CYLINDER_BARREL, "wall", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
         )
         prism = self._prism(self._face("right", PrismFace.RIGHT))
 
@@ -4220,7 +4229,7 @@ class TestDerivedEdges:
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             radius=scalar(2), position=create_v3(scalar(0), scalar(0), scalar(0)),
             start_distance=scalar(0), end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(END_CAP, "lid", FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(END_CAP, "lid", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
         )
         prism = self._prism(self._face("right", PrismFace.RIGHT))
 
@@ -4233,9 +4242,9 @@ class TestDerivedEdges:
 
     def test_test_point_is_the_conjunction_of_both_faces(self):
         prism = self._prism(self._face("right", PrismFace.RIGHT),
-                            self._face("front", PrismFace.FRONT))
+                            self._face("shoulder", PrismFace.FRONT, FeatureGroup.SHOULDER_PLANE))
         edge = DerivedEdgeFeature.derive(self._owned(prism, "right"),
-                                         self._owned(prism, "front"))
+                                         self._owned(prism, "shoulder"))
         assert edge is not None
         on_arris = create_v3(scalar(2), scalar(3), scalar(5))
         on_one_face = create_v3(scalar(2), scalar(0), scalar(5))
@@ -4260,11 +4269,11 @@ class TestDerivedEdgesInAQuery:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.ROUGH))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
         )
         return Difference(base=body, subtract=[shoulder])
 
@@ -4327,7 +4336,7 @@ class TestDerivedEdgesInAQuery:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2)), FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.B2))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.ROUGH)), FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.ROUGH))],
         )
         best = prism.find_first_feature(create_v3(scalar(2), scalar(3), scalar(5)))
         assert best is not None
@@ -4349,7 +4358,7 @@ class TestDerivedEdgesInAQuery:
                 transform=Transform.identity(),
                 start_distance=scalar(0),
                 end_distance=scalar(10),
-                feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_side", FeatureProperties(group=FeatureGroup.B2))],
+                feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_side", FeatureProperties(group=FeatureGroup.ROUGH))],
             )
         # A narrow prism each way, so their two "tenon_side" faces are the
         # planes x=1 and y=1, and one shoulder across both makes an edge in
@@ -4362,11 +4371,11 @@ class TestDerivedEdgesInAQuery:
                                     create_v3(0, 0, 1), create_v3(-1, 0, 0))),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_side", FeatureProperties(group=FeatureGroup.B2))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_side", FeatureProperties(group=FeatureGroup.ROUGH))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
         )
         csg = Difference(base=SolidUnion(children=[across, along]), subtract=[shoulder])
         names = [h.name for h in csg.find_all_features(create_v3(scalar(1), scalar(1), scalar(5)))]
@@ -4460,7 +4469,7 @@ class TestACylindersAxis:
         body = RectangularPrism(
             size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(20),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.TOP), "cap", FeatureProperties(group=FeatureGroup.B1))])
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.TOP), "cap", FeatureProperties(group=FeatureGroup.PERFECT))])
         # A blind bore, so the cap is still there where the axis crosses it --
         # which is the only arrangement where a pair could form at all.
         csg = Difference(base=body, subtract=[self._bore(end=scalar(10))])
@@ -4479,9 +4488,9 @@ class TestACylindersAxis:
         body = RectangularPrism(
             size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(20),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.TOP), "cap", FeatureProperties(group=FeatureGroup.B1))])
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.TOP), "cap", FeatureProperties(group=FeatureGroup.PERFECT))])
         csg = Difference(base=body,
-                         subtract=[self._bore(group=FeatureGroup.A, end=scalar(10))])
+                         subtract=[self._bore(group=FeatureGroup.SHOULDER_PLANE, end=scalar(10))])
         at_cap = create_v3(scalar(2), scalar(3), scalar(20))
 
         points = [h.name for h in csg.find_all_features(at_cap)
@@ -4502,7 +4511,7 @@ class TestDerivedPoints:
             feature_overrides=list(overrides),
         )
 
-    def _arris(self, name="rough.front_right", group=FeatureGroup.B1):
+    def _arris(self, name="rough.front_right", group=FeatureGroup.PERFECT):
         body = self._body(FeatureOverride(
             prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT), name,
             FeatureProperties(group=group)))
@@ -4521,7 +4530,7 @@ class TestDerivedPoints:
         assert isinstance(located, Point)
         return located
 
-    def _plane(self, normal, offset, name="shoulder", group=FeatureGroup.A):
+    def _plane(self, normal, offset, name="shoulder", group=FeatureGroup.SHOULDER_PLANE):
         space = HalfSpace(
             normal=normal, offset=offset,
             feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, name, FeatureProperties(group=group))])
@@ -4558,15 +4567,15 @@ class TestDerivedPoints:
 
     def test_groups_that_may_not_meet_derive_nothing(self):
         assert DerivedPointFeature.derive(
-            self._arris(group=FeatureGroup.B1),
-            self._plane(create_v3(0, 0, 1), scalar(5), group=FeatureGroup.B1)) is None
+            self._arris(group=FeatureGroup.PERFECT),
+            self._plane(create_v3(0, 0, 1), scalar(5), group=FeatureGroup.PERFECT)) is None
 
     def test_two_faces_derive_no_point(self):
         """Three planes meet at a point too; this is not the pair that says so."""
         assert DerivedPointFeature.derive(
             self._plane(create_v3(0, 0, 1), scalar(5)),
             self._plane(create_v3(1, 0, 0), scalar(2), name="other",
-                        group=FeatureGroup.B1)) is None
+                        group=FeatureGroup.PERFECT)) is None
 
     def test_a_derived_edge_is_in_no_group_so_pairs_with_nothing(self):
         """Which is what keeps one vertex to one derived point.
@@ -4574,16 +4583,19 @@ class TestDerivedPoints:
         Three faces meeting define three edges, and each of those crosses the
         third face at the same vertex. Only the declared arris is in a pairing
         group, so only one of those routes is taken.
+
+        The two parents here are a shoulder plane against the perfect body, the
+        one pair that does meet.
         """
         right = OwnedFeatureHit(
             feature=SimpleRectangularPrismFeature(
-                "rough.right", face=PrismFace.RIGHT,
-                properties=FeatureProperties(group=FeatureGroup.B2)),
+                "ptw.right", face=PrismFace.RIGHT,
+                properties=FeatureProperties(group=FeatureGroup.PERFECT)),
             owner=self._body())
         front = OwnedFeatureHit(
             feature=SimpleRectangularPrismFeature(
-                "rough.front", face=PrismFace.FRONT,
-                properties=FeatureProperties(group=FeatureGroup.B2)),
+                "shoulder", face=PrismFace.FRONT,
+                properties=FeatureProperties(group=FeatureGroup.SHOULDER_PLANE)),
             owner=self._body())
         edge = DerivedEdgeFeature.derive(right, front)
 
@@ -4608,7 +4620,7 @@ class TestDerivedPoints:
         ghost = self._plane(create_v3(0, 0, 1), scalar(5))
         ghost = OwnedFeatureHit(
             feature=HalfSpaceFeature("shoulder", properties=FeatureProperties(
-                group=FeatureGroup.A, real=False)),
+                group=FeatureGroup.SHOULDER_PLANE, real=False)),
             owner=ghost.owner)
         point = DerivedPointFeature.derive(self._arris(), ghost)
 
@@ -4624,11 +4636,11 @@ class TestDerivedPointsInAQuery:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B1)), FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.B1)), FeatureOverride(prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT), "rough.front_right", FeatureProperties(group=FeatureGroup.B1))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.PERFECT)), FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.PERFECT)), FeatureOverride(prism_arris_key(PrismFace.FRONT, PrismFace.RIGHT), "rough.front_right", FeatureProperties(group=FeatureGroup.PERFECT))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
         )
         return Difference(base=body, subtract=[shoulder])
 
@@ -4688,8 +4700,8 @@ class TestThePreferredFeature:
         arris as a second way to say the same thing.
         """
         prism = self._prism(
-            FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2)),
-            FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.B2)),
+            FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.ROUGH)),
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.ROUGH)),
         )
         hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
         edges = [h for h in hits if h.feature_type() == CSGFeatureType.EDGE]
@@ -4708,8 +4720,8 @@ class TestThePreferredFeature:
         what makes dropping duplicates work at all.
         """
         prism = self._prism(
-            FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2)),
-            FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.B2)),
+            FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.ROUGH)),
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "rough.front", FeatureProperties(group=FeatureGroup.ROUGH)),
         )
         hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
         arris = next(h for h in hits if h.feature_type() == CSGFeatureType.EDGE)
@@ -4724,8 +4736,8 @@ class TestThePreferredFeature:
         faces genuinely land on one plane under one name. Collapsing those
         would eat a real feature.
         """
-        first = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B1)))
-        second = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B1)))
+        first = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.PERFECT)))
+        second = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.PERFECT)))
         union = SolidUnion(children=[first, second])
 
         faces = [h for h in union.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
@@ -4733,12 +4745,12 @@ class TestThePreferredFeature:
         assert len(faces) == 2
 
     def test_a_better_group_sorts_first(self):
-        """Group rank, by the enum's own index, with A ahead of B1."""
+        """Group rank, by the enum's own index, with a shoulder plane ahead of the body."""
         prism = self._prism(
             FeatureOverride(prism_face_key(PrismFace.RIGHT), "body_face",
-                            FeatureProperties(group=FeatureGroup.B1)),
+                            FeatureProperties(group=FeatureGroup.PERFECT)),
             extras=[ProgrammableFaceFeature(
-                "joint_face", properties=FeatureProperties(group=FeatureGroup.A),
+                "joint_face", properties=FeatureProperties(group=FeatureGroup.SHOULDER_PLANE),
                 predicate=lambda owner, point, eps: safe_equality_test(
                     owner._local_coords(point)[0], owner.size[0] / 2, eps=eps))],
         )
@@ -4749,24 +4761,24 @@ class TestThePreferredFeature:
     def test_a_derived_feature_answers_with_its_best_parents_rank(self):
         right = OwnedFeatureHit(
             feature=SimpleRectangularPrismFeature(
-                "a", face=PrismFace.RIGHT, properties=FeatureProperties(group=FeatureGroup.A)),
+                "a", face=PrismFace.RIGHT, properties=FeatureProperties(group=FeatureGroup.SHOULDER_PLANE)),
             owner=self._prism())
         front = OwnedFeatureHit(
             feature=SimpleRectangularPrismFeature(
-                "b", face=PrismFace.FRONT, properties=FeatureProperties(group=FeatureGroup.B1)),
+                "b", face=PrismFace.FRONT, properties=FeatureProperties(group=FeatureGroup.PERFECT)),
             owner=self._prism())
         edge = DerivedEdgeFeature.derive(right, front)
 
         assert edge is not None
-        assert edge.group_rank() == FeatureGroup.A.value
+        assert edge.group_rank() == FeatureGroup.SHOULDER_PLANE.value
         assert edge.is_derived()
 
     def test_two_derived_features_on_different_geometry_both_stand(self):
         """Dropping goes by geometry, so different lines are different features."""
-        body = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2)))
+        body = self._prism(FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.ROUGH)))
         near = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))])
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))])
         csg = Difference(base=body, subtract=[near])
         on_edge = create_v3(scalar(2), scalar(0), scalar(5))
         edges = [h for h in csg.find_all_features(on_edge)
@@ -4796,11 +4808,11 @@ class TestGatherRefineIsolation:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.ROUGH))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
         )
         return Difference(base=body, subtract=[shoulder])
 
@@ -4857,7 +4869,7 @@ class TestBuriedFacesAreNotReported:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "small.right", FeatureProperties(group=FeatureGroup.B2)), FeatureOverride(prism_face_key(PrismFace.FRONT), "small.front", FeatureProperties(group=FeatureGroup.B2))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "small.right", FeatureProperties(group=FeatureGroup.ROUGH)), FeatureOverride(prism_face_key(PrismFace.FRONT), "small.front", FeatureProperties(group=FeatureGroup.ROUGH))],
         )
 
     def _swallowing(self):
@@ -4983,7 +4995,7 @@ class TestAbuttingSolidsDoNotReportTheFaceTheyShare:
 
     def _post(self, z0, z1, name=None):
         overrides = [FeatureOverride(prism_face_key(PrismFace.TOP), name,
-                                     FeatureProperties(group=FeatureGroup.B1))] if name else []
+                                     FeatureProperties(group=FeatureGroup.PERFECT))] if name else []
         return RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]), transform=Transform.identity(),
             start_distance=scalar(z0), end_distance=scalar(z1), feature_overrides=overrides)
@@ -5308,13 +5320,14 @@ class TestAFeatureThatFormsNoEdges:
             assert not feature_groups_intersect(other, FeatureGroup.NONE)
 
     def test_not_even_itself(self):
-        # Unlike C, which is the group for geometry whose own faces do meet.
+        # No group pairs with itself any more: the bodies' own arrises are
+        # declared outright, and a tenon face derives nothing yet.
         assert not feature_groups_intersect(FeatureGroup.NONE, FeatureGroup.NONE)
 
     def test_a_pair_including_one_derives_no_edge(self):
         prism = self._prism(
             self._face("quiet", PrismFace.RIGHT, FeatureGroup.NONE),
-            self._face("body", PrismFace.FRONT, FeatureGroup.B1),
+            self._face("body", PrismFace.FRONT, FeatureGroup.PERFECT),
         )
         features = {f.name: f for f in prism.get_declared_features()}
 
@@ -5497,11 +5510,32 @@ class TestACornerIsNamedTheSameWayWhoeverNamesIt:
     def test_and_a_timber_tag_replaces_the_default_rather_than_joining_it(self):
         from kumiki.timber import _corner_tags
 
-        tags = _corner_tags("ptw.")
+        tags = _corner_tags("ptw.", FeatureGroup.PERFECT)
 
         assert len(tags) == 8
         assert {tag.key for tag in tags} == {
             key for key, _ in ((c.feature_key(), c) for c in self._prism_corners())}
+
+
+class TestATimberBodyCarriesItsOwnGroup:
+    """Which body a feature belongs to is the group it names (see FeatureGroup).
+
+    The perfect timber within is what a joint and a drawing are about, the rough
+    stock is not, so the two carry different groups rather than sharing one.
+    """
+
+    def test_the_perfect_body_is_PERFECT(self):
+        from kumiki.timber import _ptw_face_tags
+
+        assert {tag.properties.group for tag in _ptw_face_tags()} == {FeatureGroup.PERFECT}
+
+    def test_the_rough_body_is_ROUGH(self):
+        from kumiki.timber import _rough_face_tags
+
+        assert {tag.properties.group for tag in _rough_face_tags()} == {FeatureGroup.ROUGH}
+
+    def test_and_they_do_not_pair_with_each_other(self):
+        assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.ROUGH)
 
 
 class TestAnArrisIsNamedTheSameWayWhoeverNamesIt:
@@ -5625,11 +5659,11 @@ class TestADerivedFeatureIsOwnedByWhatMadeIt:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.B2))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "rough.right", FeatureProperties(group=FeatureGroup.ROUGH))],
         )
         shoulder = HalfSpace(
             normal=create_v3(0, 0, 1), offset=scalar(5),
-            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.A))],
+            feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder", FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
         )
         return Difference(base=body, subtract=[shoulder])
 
