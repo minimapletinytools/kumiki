@@ -543,30 +543,80 @@ def _names_same_geometry(one: 'OwnedFeatureHit', other: 'OwnedFeatureHit') -> bo
     return False
 
 
-def _drop_duplicate_derived(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
-    """removes derived features that coincide with non derived fetarues, expects _sort_feature_hits order.
+def owner_label_trails(root: 'CutCSG') -> Dict[int, Tuple[str, ...]]:
+    """Every node under *root*, keyed by id, with the trail of labels that reaches it.
+
+    The same trail a FeatureRef is written with, and numbered the same way when one
+    step names several nodes (`shoulder`, `shoulder#1`, ...), so two trails compare
+    as strings and never collide by accident. Used to order two hits that are the
+    same geometry: see _drop_duplicate_derived.
+    """
+    trails: Dict[int, Tuple[str, ...]] = {}
+    stack: List[Tuple['CutCSG', Tuple[str, ...]]] = [(root, ())]
+    while stack:
+        node, trail = stack.pop()
+        trails[id(node)] = trail
+        seen: Dict[str, int] = {}
+        children = csg_children(node)
+        for child in children:
+            name = getattr(getattr(child, 'label', None), 'name', None)
+            if name is None:
+                stack.append((child, trail))
+                continue
+            occurrence = seen.get(name, 0)
+            seen[name] = occurrence + 1
+            stack.append((child, trail + (name if occurrence == 0 else f"{name}#{occurrence}",)))
+    return trails
+
+
+def _drop_duplicate_derived(
+    hits: List['OwnedFeatureHit'],
+    root: Optional['CutCSG'] = None,
+) -> List['OwnedFeatureHit']:
+    """removes derived features that coincide with non derived features, expects _sort_feature_hits order.
+
+    Two *derived* hits can name the same geometry as well -- a tree holding one
+    surface twice derives its edge from either copy -- and then there is no declared
+    original to prefer. That is reported and resolved rather than refused: the
+    duplication is worth fixing, and fixing it is not a pick's job. The winner is the
+    one whose owner's label trail sorts first, then its name, so the same tree always
+    answers the same way. Pass *root* for that ordering; without it the first of the
+    two is kept.
     """
     kept: List['OwnedFeatureHit'] = []
+    trails = owner_label_trails(root) if root is not None else {}
     # It is NOT true in general that declared features come first: _sort_feature_hits
     # ranks specificity above declaredness on purpose, so a derived EDGE sorts ahead
     # of the declared FACE it was made from.
     #
-    # What makes this correct is narrower. _names_same_geometry only ever matches a
-    # pair of the same kind -- Point to Point, Line to Line, Plane to Plane -- and
-    # within one kind the specificity key ties, so declaredness is what decides.
-    # A derived hit therefore always meets its declared twin already in `kept`.
+    # What makes the drop correct is narrower. _names_same_geometry only ever matches
+    # a pair of the same kind -- Point to Point, Line to Line, Plane to Plane -- and
+    # within one kind the specificity key ties, so declaredness is what decides. So
+    # where a declared twin exists, it is already in `kept` and the derived hit goes.
+    # Where none exists, the twin is another derived hit: see the docstring.
     for hit in hits:
-        twin = next((other for other in kept if _names_same_geometry(hit, other)), None)
-        if hit.feature.is_derived() and twin is not None:
-            # The precondition above, checked rather than assumed: the thing it is
-            # a duplicate of must be the declared one, not another derived hit that
-            # happened to sort first.
-            assert not twin.feature.is_derived(), (
-                f"{hit.feature.name} was dropped against {twin.feature.name}, which is "
-                f"itself derived -- _sort_feature_hits no longer puts declared first "
-                f"within a kind, so this dedup is picking an arbitrary winner")
+        twin_index = next((index for index, other in enumerate(kept)
+                           if _names_same_geometry(hit, other)), None)
+        twin = None if twin_index is None else kept[twin_index]
+        if twin is None or not hit.feature.is_derived():
+            kept.append(hit)
             continue
-        kept.append(hit)
+        if not twin.feature.is_derived():
+            continue
+        # Both derived: the same geometry named twice over, from two copies of it.
+        def order(candidate: 'OwnedFeatureHit'):
+            return (trails.get(id(candidate.owner), ()), candidate.feature.name)
+        winner, loser = sorted((twin, hit), key=order)
+        if winner is hit:
+            kept[twin_index] = hit
+        warnings.warn(
+            f"{loser.feature.name} at "
+            f"{' > '.join(trails.get(id(loser.owner), ())) or '<unnamed>'} is the same "
+            f"geometry as {winner.feature.name} at "
+            f"{' > '.join(trails.get(id(winner.owner), ())) or '<unnamed>'}; keeping the "
+            f"first by path. One surface declared twice derives its edge twice -- worth "
+            f"fixing where the second copy is built, usually by leaving its feature "
+            f"labels off.", stacklevel=2)
     return kept
 
 
@@ -2240,7 +2290,8 @@ class CutCSG(ABC):
             ),
             point, tolerances)
 
-        return _drop_duplicate_derived(_sort_feature_hits(hits + derived_edges + derived_points))
+        return _drop_duplicate_derived(
+            _sort_feature_hits(hits + derived_edges + derived_points), root=self)
 
     def find_first_feature(
         self,
@@ -3197,22 +3248,13 @@ class SolidsAtPoint:
 
 
 def assert_distinct_children(kind: str, children: Sequence[CutCSG]) -> None:
-    """Refuse the same CSG object twice in one operand list.
-
-    A child used twice is not two operations: it is one node reachable by two paths,
-    which turns up later as one feature reported twice -- two derived edges with the
-    same name along the same line, which is what _drop_duplicate_derived trips over.
-    Writing the second use as a copy (dataclasses.replace, or another construction) is
-    the fix, and saying so here points at the line that made the mistake rather than
-    at a pick three layers away.
-    """
+    """Refuse the same CSG object twice in one operand list: two operands are two objects."""
     seen = set()
     for child in children:
         assert id(child) not in seen, (
-            f"{kind} was given the same {type(child).__name__} object twice. Two "
-            f"operands have to be two objects -- the same node reachable by two paths "
-            f"is one feature reported twice, which shows up much later as a duplicate "
-            f"derived edge. Build a copy for the second use.")
+            f"{kind} was given the same {type(child).__name__} object twice. The same "
+            f"node reachable by two paths is not two operations -- build a copy for the "
+            f"second use.")
         seen.add(id(child))
 
 

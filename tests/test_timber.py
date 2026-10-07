@@ -2354,6 +2354,48 @@ class TestTimberCSGLabels:
         assert pole.get_extended_actual_csg_local(False, True).label.name == (
             "regular_polygon_timber (rough, extended)")
 
+    def test_a_cutter_can_be_asked_for_without_the_feature_labels(self):
+        """The toggle joints use when they take a second copy of a timber's own body.
+
+        The geometry is the same shape either way; what changes is whether its faces
+        claim the timber's names. A copy that claims them declares one surface twice,
+        and two features of one name on one plane derive the same edge twice.
+        """
+        timber = self._timber(rough_half_sizes=(
+            create_v2(scalar(5), scalar(5)), create_v2(scalar(5), scalar(5))))
+
+        labelled = timber.get_extended_actual_csg_local(extend_bot=False, extend_top=False)
+        plain = timber.get_extended_actual_csg_local(
+            extend_bot=False, extend_top=False, with_feature_labels=False)
+
+        assert any(feature.name.startswith("rough.") for feature in labelled.get_declared_features())
+        assert not any(feature.name.startswith("rough.") for feature in plain.get_declared_features())
+        # Same shape, same place: the labels are all that was dropped.
+        assert plain.size == labelled.size
+        assert plain.end_distance == labelled.end_distance
+        inside = create_v3(scalar(0), scalar(0), timber.length / scalar(2))
+        assert plain.contains_point(inside) and labelled.contains_point(inside)
+
+    def test_the_perfect_body_can_be_asked_without_them_too(self):
+        timber = self._timber()
+        labelled = timber.get_perfect_timber_within_csg_local()
+        plain = timber.get_perfect_timber_within_csg_local(with_feature_labels=False)
+
+        overrides = lambda node: {feature.name for feature in node.get_declared_features()
+                                  if feature.name.startswith("ptw.")}
+        assert {"ptw.right", "ptw.back"} <= overrides(labelled)
+        # The centerplanes are declared features rather than overrides, so they stay.
+        assert overrides(plain) == {"ptw.centerplane_left_right", "ptw.centerplane_front_back"}
+        assert plain.size == labelled.size
+
+    def test_the_unlabelled_body_is_a_copy_not_the_cached_one(self):
+        """The cached body is shared -- handing it out unlabelled would rename it for everyone."""
+        timber = self._timber()
+        plain = timber.get_perfect_timber_within_csg_local(with_feature_labels=False)
+        assert plain is not timber.get_perfect_timber_within_csg_local()
+        assert any(feature.name.startswith("ptw.")
+                   for feature in timber.get_perfect_timber_within_csg_local().get_declared_features())
+
     def test_the_rendered_body_carries_the_label(self):
         # What the viewer actually navigates: the body node of a cut timber.
         timber = self._timber()

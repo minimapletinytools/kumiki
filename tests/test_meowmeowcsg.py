@@ -4440,6 +4440,92 @@ class TestDerivedEdgesInAQuery:
         names = [h.name for h in csg.find_all_features(create_v3(scalar(1), scalar(1), scalar(5)))]
         assert names.count("shoulder×tenon_side") > 1
 
+    def test_two_copies_of_one_surface_are_reported_not_refused(self):
+        """Two hits naming the same LINE, both derived, is a warned-about duplicate.
+
+        Nothing here is wrong geometrically -- a tree holding one surface twice (a
+        joint's shoulder plane and a relief cut bounded by a copy of it, say) derives
+        the same edge from either copy. There is no declared original to prefer, which
+        used to be an assertion failure at the pick. It is a warning now, and the pick
+        answers: one of them, chosen the same way every time.
+        """
+        def branch(label):
+            prism = RectangularPrism(
+                size=Matrix([scalar(4), scalar(6)]),
+                transform=Transform.identity(),
+                start_distance=scalar(0),
+                end_distance=scalar(10),
+                feature_overrides=[FeatureOverride(prism_face_key(PrismFace.FRONT), "body_front",
+                                                  FeatureProperties(group=FeatureGroup.ROUGH))],
+            )
+            # The half-space's plane crosses the prism's front face, so the two
+            # meet along a line -- and both branches produce that same line.
+            shoulder = HalfSpace(
+                normal=create_v3(0, 0, 1), offset=scalar(5),
+                feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder",
+                                                   FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
+            )
+            return Difference(base=prism, subtract=[shoulder], label=CutCSGLabel(label))
+
+        def edge_owner(csg):
+            with pytest.warns(UserWarning, match="same geometry"):
+                hits = csg.find_all_features(create_v3(scalar(0), scalar(3), scalar(5)))
+            edges = [hit for hit in hits if hit.name == "shoulder×body_front"]
+            assert len(edges) == 1, [hit.name for hit in hits]
+            return edges[0].owner
+
+        first = SolidUnion(children=[branch("a"), branch("b")], label=CutCSGLabel("both"))
+        second = SolidUnion(children=[branch("b"), branch("a")], label=CutCSGLabel("both"))
+
+        # The owner is the node the two parents meet under, so which one it is says
+        # which copy won -- and it is the same one whichever order they come in.
+        assert edge_owner(first).label.name == edge_owner(second).label.name
+
+    def test_the_winner_is_the_one_whose_path_sorts_first(self):
+        """The rule itself, on two derived hits that are one line: the owner's trail decides.
+
+        Plain lexicographic order on the trail, so a node reached by fewer steps
+        sorts first, then its name. Written the other way round the two are the
+        same two hits, so the answer must not move.
+        """
+        from kumiki.csg.cutcsg import DerivedEdgeFeature, _drop_duplicate_derived
+
+        def hits_of(branch_csg):
+            found = branch_csg.find_all_features(create_v3(scalar(0), scalar(3), scalar(5)))
+            shoulder = next(hit for hit in found if hit.name == "shoulder")
+            body = next(hit for hit in found if hit.name == "body_front")
+            return shoulder, body
+
+        def branch(label):
+            prism = RectangularPrism(
+                size=Matrix([scalar(4), scalar(6)]),
+                transform=Transform.identity(),
+                start_distance=scalar(0),
+                end_distance=scalar(10),
+                feature_overrides=[FeatureOverride(prism_face_key(PrismFace.FRONT), "body_front",
+                                                  FeatureProperties(group=FeatureGroup.ROUGH))],
+            )
+            shoulder = HalfSpace(
+                normal=create_v3(0, 0, 1), offset=scalar(5),
+                feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder",
+                                                   FeatureProperties(group=FeatureGroup.SHOULDER_PLANE))],
+            )
+            return Difference(base=prism, subtract=[shoulder], label=CutCSGLabel(label))
+
+        from kumiki.csg.cutcsg import OwnedFeatureHit
+
+        a, b = branch("a"), branch("b")
+        root = SolidUnion(children=[a, b], label=CutCSGLabel("both"))
+        edge_a = OwnedFeatureHit(feature=DerivedEdgeFeature.derive(*hits_of(a)), owner=a)
+        edge_b = OwnedFeatureHit(feature=DerivedEdgeFeature.derive(*hits_of(b)), owner=b)
+        assert edge_a.name == edge_b.name, "the two hits have to be the same feature"
+
+        for order in ((edge_a, edge_b), (edge_b, edge_a)):
+            with pytest.warns(UserWarning, match="same geometry"):
+                kept = _drop_duplicate_derived(list(order), root=root)
+            assert len(kept) == 1
+            assert kept[0].owner.label.name == "a"
+
 
 class TestACylindersAxis:
     """The centre line of a bore -- a feature in the void, not on a surface."""
