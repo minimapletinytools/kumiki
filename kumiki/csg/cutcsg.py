@@ -597,10 +597,10 @@ def _drop_duplicate_derived(
     for hit in hits:
         twin_index = next((index for index, other in enumerate(kept)
                            if _names_same_geometry(hit, other)), None)
-        twin = None if twin_index is None else kept[twin_index]
-        if twin is None or not hit.feature.is_derived():
+        if twin_index is None or not hit.feature.is_derived():
             kept.append(hit)
             continue
+        twin = kept[twin_index]
         if not twin.feature.is_derived():
             continue
         # Both derived: the same geometry named twice over, from two copies of it.

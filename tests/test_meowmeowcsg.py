@@ -4514,10 +4514,14 @@ class TestDerivedEdgesInAQuery:
 
         from kumiki.csg.cutcsg import OwnedFeatureHit
 
+        def derived_edge(node):
+            edge = DerivedEdgeFeature.derive(*hits_of(node))
+            assert edge is not None, "the two faces meet along a line"
+            return OwnedFeatureHit(feature=edge, owner=node)
+
         a, b = branch("a"), branch("b")
         root = SolidUnion(children=[a, b], label=CutCSGLabel("both"))
-        edge_a = OwnedFeatureHit(feature=DerivedEdgeFeature.derive(*hits_of(a)), owner=a)
-        edge_b = OwnedFeatureHit(feature=DerivedEdgeFeature.derive(*hits_of(b)), owner=b)
+        edge_a, edge_b = derived_edge(a), derived_edge(b)
         assert edge_a.name == edge_b.name, "the two hits have to be the same feature"
 
         for order in ((edge_a, edge_b), (edge_b, edge_a)):
