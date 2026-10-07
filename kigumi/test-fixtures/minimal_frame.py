@@ -33,3 +33,6 @@ def build_frame():
         additional_unjointed_timbers=[timber_a, timber_b],
         name="Runner Test Frame",
     )
+
+
+example = build_frame

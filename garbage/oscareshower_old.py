@@ -414,7 +414,7 @@ def example() -> Frame:
 
 
 if __name__ == "__main__":
-    frame = example()
-    print(f"Timbers: {len(frame.cut_timbers)}")
-    for ct in frame.cut_timbers:
+    built = example()
+    print(f"Timbers: {len(built.cut_timbers)}")
+    for ct in built.cut_timbers:
         print(f"  - {ct.timber.ticket.path}")

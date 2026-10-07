@@ -42,3 +42,6 @@ def build_frame():
         accessories=[peg],
         name=base_frame.name,
     )
+
+
+example = build_frame

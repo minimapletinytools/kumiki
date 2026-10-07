@@ -33,3 +33,6 @@ def build_frame():
 
     add_milestone("fixture:frame-ready")
     return frame
+
+
+example = build_frame

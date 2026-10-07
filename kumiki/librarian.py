@@ -10,25 +10,16 @@ Frame and pattern-list detection rules (see ``analyze_source``)
 ------------------------------------------------------------------
 
 Detection never imports the file — it's pure ``ast`` inspection. A module-level
-statement is recognized as a **frame** entry if either of these holds:
+statement is recognized as a **frame** entry if it is:
 
-* **Type-based** (the primary path): the statement's *type* resolves to
-  kumiki's canonical ``Frame`` (through aliases like ``from kumiki import
-  Frame as F``, dotted forms like ``kumiki.timber.Frame``, or string
-  annotations):
+* a function decorated with kumiki's ``@frame`` (any number per file, in source
+  order; kigumi builds them all with the file's shared kiwari and shows them
+  together), or
+* the legacy single entry: a function or variable named ``example``.
 
-  - ``name: Frame = ...`` — annotation is ``Frame``
-  - ``name = Frame(...)`` / ``name = Frame.from_joints(...)`` — RHS call
-    constructs a ``Frame`` (checked even when the annotation, if any, isn't
-    ``Frame``)
-  - ``def foo(...) -> Frame:`` — return annotation is ``Frame``
-
-* **Name-based fallback** (unconditional, ignores types entirely): a target
-  or function literally named ``example`` or ``build_frame`` is *always*
-  treated as a frame entry, whether or not it's annotated ``-> Frame``. This
-  is why ``docs/agent_usage_instructions.md`` can say "just call it
-  ``example``" as the simple convention, while the type-based rule is what
-  actually backs it.
+A function decorated with ``@tool`` is recorded as a **tool**. Whether a
+decorated function's signature is right is only checked after import, by
+``kumiki.frame_entries``.
 
 A module-level statement is recognized as a **pattern list** entry only by
 name: ``patterns = [...]`` or ``patterns: ... = [...]``, list literal or
@@ -36,7 +27,7 @@ call, no content type-checking at this stage (that happens after import, in
 ``_resolve_pattern_list``).
 
 When a file has multiple frame entries, ``ModuleStaticInfo.chosen_frame`` is
-the **last** one in source order — that's what downstream consumers render.
+the **last** one in source order.
 
 Two-phase scan (see ``_scan_single_file``)
 -------------------------------------------
@@ -122,24 +113,10 @@ _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
 # AST-driven static analysis (no imports)
 # ---------------------------------------------------------------------------
 #
-# Identifies module-level entries that produce a ``Frame`` or ``PatternBook``
-# — either by typed annotation, by known constructor call, or by function
-# return annotation. Detection is done without importing the file.
-# Recognition is **type-based, not name-based**: the local identifier is
-# irrelevant.
-#
-# The analyzer resolves identifiers through the file's ``import`` statements
-# so aliased imports (``from kumiki import Frame as F``) are handled
-# correctly.
-#
-# Frames and patternbooks are only detected when they refer to kumiki's
-# canonical ``Frame``/``PatternBook`` symbols. We accept any kumiki submodule
-# path (``kumiki``, ``kumiki.timber``, ``kumiki.patternbook``, etc.) as a
-# valid provider — kumiki re-exports both at the top level.
-
-# Canonical type names we recognize.  Module-of-origin checks are restricted to
-# kumiki and its submodules; any other origin is ignored.
-_FRAME_NAME = "Frame"
+# Frame entries are recognized by kumiki's ``@frame`` / ``@tool`` decorators, or by the
+# legacy name ``example``. The decorators may come in by ``from kumiki import *`` (the usual
+# form), by name, under an alias, or as ``kumiki.frame``.
+_DECORATORS = ("frame", "tool")
 
 
 @dataclass(frozen=True)
@@ -155,6 +132,7 @@ class ModuleStaticInfo:
     """Result of statically analyzing a single source file."""
     file_path: str
     frames: List[StaticEntry] = field(default_factory=list)
+    tools: List[StaticEntry] = field(default_factory=list)
     pattern_lists: List[StaticEntry] = field(default_factory=list)
     parse_error: Optional[str] = None
 
@@ -177,103 +155,33 @@ def _is_kumiki_module(module_name: Optional[str]) -> bool:
     return module_name == "kumiki" or module_name.startswith("kumiki.")
 
 
-def _collect_kumiki_aliases(tree: ast.Module) -> dict[str, str]:
-    """Map local identifier -> canonical kumiki symbol name.
+def _collect_decorator_aliases(tree: ast.Module) -> dict[str, str]:
+    """Map local identifier -> ``frame`` / ``tool`` for kumiki's decorators in scope.
 
-    Only module-level ``import`` / ``from ... import`` statements are inspected.
-    The mapping contains entries like ``{"F": "Frame", "PB": "PatternBook"}``.
-    Symbols not from kumiki, and kumiki names other than ``Frame``/``PatternBook``,
-    are ignored.
-
-    ``from kumiki[...] import *`` is treated as bringing ``Frame`` and
-    ``PatternBook`` into scope under their canonical names — kumiki re-exports
-    both at the top level via star imports in its package ``__init__``.
+    Only module-level ``from kumiki[...] import ...`` statements are inspected;
+    ``import *`` from kumiki brings both in under their own names.
     """
     aliases: dict[str, str] = {}
     for node in tree.body:
-        if isinstance(node, ast.ImportFrom):
-            if not _is_kumiki_module(node.module):
-                continue
+        if isinstance(node, ast.ImportFrom) and _is_kumiki_module(node.module):
             for alias in node.names:
                 if alias.name == "*":
-                    aliases[_FRAME_NAME] = _FRAME_NAME
-                    continue
-                if alias.name == _FRAME_NAME:
-                    local = alias.asname or alias.name
-                    aliases[local] = alias.name
+                    aliases.update({name: name for name in _DECORATORS})
+                elif alias.name in _DECORATORS:
+                    aliases[alias.asname or alias.name] = alias.name
     return aliases
 
 
-def _annotation_target(annotation: Optional[ast.expr], aliases: dict[str, str]) -> Optional[str]:
-    """If ``annotation`` ultimately references a kumiki ``Frame``,
-    return the canonical name; else ``None``.
-
-    Handles bare names (``Frame``), attribute access (``kumiki.Frame``,
-    ``kumiki.timber.Frame``), and string-form annotations (``"Frame"``).
-    Stripping of ``Optional[...]`` / ``list[...]`` / etc. is intentionally not
-    done — entries are only counted when the value *is* a Frame,
-    not a container of them.
-    """
-    if annotation is None:
-        return None
-    # PEP 563 string-form: "Frame"
-    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
-        text = annotation.value.strip()
-        if text in aliases:
-            return aliases[text]
-        if text == _FRAME_NAME:
-            return text
-        # accept dotted forms like "kumiki.Frame"
-        tail = text.rsplit(".", 1)[-1]
-        if tail == _FRAME_NAME:
-            return tail
-        return None
-    if isinstance(annotation, ast.Name):
-        return aliases.get(annotation.id)
-    if isinstance(annotation, ast.Attribute):
-        # Walk attribute chain, ensure root is "kumiki"
-        attr = annotation
-        parts: List[str] = []
-        while isinstance(attr, ast.Attribute):
-            parts.append(attr.attr)
-            attr = attr.value
-        if isinstance(attr, ast.Name) and attr.id == "kumiki":
-            if parts and parts[0] == _FRAME_NAME:
-                return parts[0]
-    return None
-
-
-def _call_target(call: ast.Call, aliases: dict[str, str]) -> Optional[str]:
-    """If ``call`` is a constructor or classmethod of ``Frame``,
-    return the canonical name; else ``None``.
-
-    Recognizes ``Frame(...)``, ``Frame.from_joints(...)``, ``kumiki.Frame(...)``,
-    ``kumiki.timber.Frame.from_joints(...)``, and the aliased equivalents.
-    """
-    func = call.func
-    # Direct: Frame(...) or alias F(...)
-    if isinstance(func, ast.Name):
-        canonical = aliases.get(func.id)
-        if canonical == _FRAME_NAME:
-            return canonical
-        return None
-    # Attribute: X.method(...) or kumiki[.sub].Frame(...)
-    if isinstance(func, ast.Attribute):
-        # Case A: <Frame-or-alias>.classmethod(...)
-        if isinstance(func.value, ast.Name):
-            canonical = aliases.get(func.value.id)
-            if canonical == _FRAME_NAME:
-                return canonical
-        # Case B: kumiki[.sub].Frame(...) — last attr is Frame, root is "kumiki"
-        parts: List[str] = []
-        node: ast.expr = func
-        while isinstance(node, ast.Attribute):
-            parts.append(node.attr)
-            node = node.value
-        if isinstance(node, ast.Name) and node.id == "kumiki":
-            for candidate in parts:
-                if candidate == _FRAME_NAME:
-                    return candidate
+def _decorator_kind(decorator: ast.expr, aliases: dict[str, str]) -> Optional[str]:
+    """``frame`` or ``tool`` if *decorator* is one of kumiki's, else None."""
+    if isinstance(decorator, ast.Name):
+        return aliases.get(decorator.id)
+    if isinstance(decorator, ast.Attribute) and decorator.attr in _DECORATORS:
+        root: ast.expr = decorator
+        while isinstance(root, ast.Attribute):
+            root = root.value
+        if isinstance(root, ast.Name) and root.id == "kumiki":
+            return decorator.attr
     return None
 
 
@@ -316,63 +224,33 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
         info.parse_error = f"SyntaxError: {exc}"
         return info
 
-    aliases = _collect_kumiki_aliases(tree)
+    aliases = _collect_decorator_aliases(tree)
 
     for node in tree.body:
-        # Typed assignment: name: Frame = ...
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            canonical = _annotation_target(node.annotation, aliases)
-            if canonical == _FRAME_NAME:
-                info.frames.append(StaticEntry(node.target.id, "var", node.lineno))
-                continue
-            # Also accept call-on-rhs even when annotated to something else
-            if isinstance(node.value, ast.Call):
-                rhs = _call_target(node.value, aliases)
-                if rhs == _FRAME_NAME:
-                    info.frames.append(StaticEntry(node.target.id, "var", node.lineno))
-            # patterns: List[Pattern] = [...] annotated assignment
-            if _is_pattern_list_ann_assign(node):
-                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
-            continue
-
-        # Untyped assignment: name = Frame(...) / Frame.from_joints(...)
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
-            canonical = _call_target(node.value, aliases)
-            if canonical == _FRAME_NAME:
-                for target in node.targets:
-                    for name in _record_target_names(target):
-                        info.frames.append(StaticEntry(name, "var", node.lineno))
-                continue
-            # Check for patterns = [...] (new pattern list system)
-            if _is_pattern_list_assignment(node):
-                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
-            continue
-
-        # patterns = [...] list literal assignment
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.List):
-            if _is_pattern_list_assignment(node):
-                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
-            continue
-
-        # Recognize example/build_frame assignments even if the RHS isn't a Frame() call
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                for name in _record_target_names(target):
-                    if name == "example" or name == "build_frame":
-                        info.frames.append(StaticEntry(name, "var", node.lineno))
-            continue
-
-        # def name(...) -> Frame: ...
+        # @frame / @tool def name(...): ...
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            canonical = _annotation_target(node.returns, aliases)
-            if canonical == _FRAME_NAME:
+            kinds = {_decorator_kind(decorator, aliases) for decorator in node.decorator_list}
+            if "frame" in kinds:
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
-            # Also recognize build_frame() even without explicit Frame annotation
-            elif node.name == "build_frame":
-                info.frames.append(StaticEntry(node.name, "function", node.lineno))
-            # Also recognize example() even without explicit Frame annotation
+            elif "tool" in kinds:
+                info.tools.append(StaticEntry(node.name, "function", node.lineno))
             elif node.name == "example":
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
+            continue
+
+        # patterns = [...] / patterns: ... = [...]
+        if isinstance(node, ast.AnnAssign) and _is_pattern_list_ann_assign(node):
+            info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
+            continue
+        if isinstance(node, ast.Assign) and _is_pattern_list_assignment(node):
+            info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
+            continue
+
+        # example = ...
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+        for target in targets:
+            if "example" in _record_target_names(target):
+                info.frames.append(StaticEntry("example", "var", node.lineno))
 
     return info
 
@@ -711,6 +589,7 @@ def _frame_record_for_index(
         "chosen_frame_kind": chosen_kind,
         "all_frame_names": all_frame_names,
         "multiple_frames": bool(static and static.multiple_frames),
+        "tools": [entry.name for entry in (static.tools if static else [])],
         "content_sha256": rec.content_sha256,
         "load_error": rec.load_error,
         "warnings": list(rec.warnings or []),
@@ -822,6 +701,7 @@ def _entry_from_record(rec: LibrarianModuleRecord) -> Dict[str, Any]:
         "chosen_frame_name": chosen.name if chosen is not None else None,
         "chosen_frame_kind": chosen.kind if chosen is not None else None,
         "multiple_frames": bool(static and static.multiple_frames),
+        "tools": [entry.name for entry in (static.tools if static else [])],
         "warnings": list(rec.warnings or []),
         "load_error": rec.load_error,
         "patternbook": _patternbook_payload(rec.pattern_list),

@@ -75,3 +75,6 @@ def build_frame(k=None):
         name=f"Kiwari Test Frame ({posts} posts)",
         kiwari=k,
     )
+
+
+example = build_frame

@@ -22,7 +22,8 @@ FRAME_SOURCE = """
 from kumiki import *
 
 
-def build_frame() -> Frame:
+@frame
+def build_frame(k: Kiwari) -> Frame:
     return Frame.from_joints([])
 """
 
@@ -41,7 +42,8 @@ from kumiki import *
 raise RuntimeError("this module must not be imported during scan")
 
 
-def build_frame() -> Frame:
+@frame
+def build_frame(k: Kiwari) -> Frame:
     return Frame.from_joints([])
 """
 

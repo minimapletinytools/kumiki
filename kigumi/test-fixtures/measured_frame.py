@@ -82,3 +82,6 @@ def build_frame():
             ),
         ],
     )
+
+
+example = build_frame

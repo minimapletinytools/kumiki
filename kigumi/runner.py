@@ -121,6 +121,9 @@ class SlotState:
     # only on the frame so a build that fails leaves the panel something to
     # dial back from.
     kiwari: Optional[Any] = None
+    # The file's @tool functions, and any @frame / @tool rejected for its signature.
+    tools: Tuple[Any, ...] = ()
+    rejected_entries: Tuple[Any, ...] = ()
     # Drawings made in this session and not yet saved. They live here rather
     # than in the viewer so python stays the one place a drawing comes from,
     # and they are lost on reload, which is what "unsaved" should mean.
@@ -4090,6 +4093,9 @@ def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
 def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tuple[Any, Optional[Any]]":
     """Resolve a frame from a loaded module, built with *kiwari* if it takes one.
 
+    In order: a `patterns` list, the file's `@frame` functions (all built with the file's
+    shared kiwari and shown together), or `example`.
+
     Returns (frame, patternbook_or_None).
     """
     if hasattr(module, "patterns"):
@@ -4097,9 +4103,21 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
         if _looks_like_pattern_list(pattern_list):
             return _frame_from_pattern_list(pattern_list)
 
-    if hasattr(module, "build_frame") and callable(module.build_frame):
-        frame = _call_frame_entry(module.build_frame, kiwari)
-        return _coerce_viewable_frame(frame, "build_frame"), None
+    from kumiki.frame_entries import module_entries, overlay_frames
+
+    entries = module_entries(module)
+    for rejected in entries.rejected:
+        log_stderr(f"Warning: @{rejected.kind} {rejected.name} is not used: {rejected.reason}")
+    if entries.frames:
+        parameters = entries.parameters.resolve(kiwari)
+        built = []
+        for entry in entries.frames:
+            with contextlib.redirect_stdout(sys.stderr):
+                result = entry.function(parameters)
+            built.append(_coerce_viewable_frame(result, entry.name))
+        name = built[0].name if len(built) == 1 else " + ".join(f.name or e.name for f, e in zip(built, entries.frames))
+        # A file that declares no parameters shows none, like a frame that takes no kiwari.
+        return overlay_frames(built, name, parameters if parameters.declarations else None), None
 
     if hasattr(module, "example"):
         example = getattr(module, "example")
@@ -4112,8 +4130,13 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
         except TypeError:
             pass
 
+    hint = ""
+    if callable(getattr(module, "build_frame", None)):
+        hint = (" 'build_frame' is no longer picked up on its own: add `example = build_frame`, "
+                "or mark it with @frame and annotate it (k: Kiwari) -> Frame.")
     raise AttributeError(
-        "Module must expose a module-level 'patterns' list, 'example' Frame, or a 'build_frame()' function"
+        "Module must expose a module-level 'patterns' list, @frame functions, or an 'example' Frame or function."
+        + hint
     )
 
 
@@ -4142,6 +4165,9 @@ def load_slot_state(
         frame, patternbook = resolve_frame_from_module(
             module, _bind_kiwari_values(frame.kiwari, saved)
         )
+    from kumiki.frame_entries import module_entries
+
+    entries = module_entries(module)
     return SlotState(
         file_path=resolved_path,
         module=module,
@@ -4149,6 +4175,8 @@ def load_slot_state(
         mesh_cache=previous_mesh_cache if previous_mesh_cache is not None else {},
         patternbook=patternbook,
         kiwari=getattr(frame, "kiwari", None),
+        tools=entries.tools,
+        rejected_entries=entries.rejected,
     )
 
 
@@ -4169,6 +4197,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
+            "list_tools", "run_tool",
             "shutdown",
         ],
         "frame": {
@@ -4177,7 +4206,32 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "accessories_count": frame_summary["accessories_count"],
         },
         "kiwari": _serialize_kiwari_for_slot(ss),
+        **_serialize_tools(ss),
     }
+
+
+def _serialize_tools(slot_state: SlotState) -> Dict[str, Any]:
+    """The slot's @tool functions, and the @frame / @tool functions rejected for their signature."""
+    return {
+        "tools": [{"name": entry.name} for entry in slot_state.tools],
+        "rejectedEntries": [{"name": r.name, "kind": r.kind, "reason": r.reason} for r in slot_state.rejected_entries],
+    }
+
+
+def run_tool(slot_state: SlotState, name: str) -> Dict[str, Any]:
+    """Run one of the slot's @tool functions on its frame and shared kiwari; its text is the result."""
+    from kumiki.frame_entries import module_parameters
+
+    entry = next((entry for entry in slot_state.tools if entry.name == name), None)
+    if entry is None:
+        available = [entry.name for entry in slot_state.tools]
+        raise ValueError(f"No tool named {name!r}. Available: {available}")
+    parameters = module_parameters(slot_state.module).resolve(slot_state.kiwari)
+    with contextlib.redirect_stdout(sys.stderr):
+        output = entry.function(slot_state.frame, parameters)
+    if not isinstance(output, str):
+        raise TypeError(f"tool {name!r} returned {type(output).__name__}, expected str")
+    return {"name": name, "output": output}
 
 
 def make_success_response(request_id: Any, command: str, result: Any) -> Dict[str, Any]:
@@ -6417,6 +6471,15 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             "slots": slot_info,
             "activeSlot": state.active_slot,
         }), False
+
+    # --- Tools ---
+
+    if command == "list_tools":
+        return state, make_success_response(request_id, command, _serialize_tools(_resolve_slot(state, payload))), False
+
+    if command == "run_tool":
+        name = _require_str(payload, "name", "run_tool requires payload.name")
+        return state, make_success_response(request_id, command, run_tool(_resolve_slot(state, payload), name)), False
 
     # --- Pattern discovery ---
 
