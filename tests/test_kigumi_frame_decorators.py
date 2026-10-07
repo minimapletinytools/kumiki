@@ -131,3 +131,15 @@ def test_a_file_without_parameters_shows_none(workspace):  # noqa: F811
 
     assert slot.frame.name == "empty" and slot.kiwari is None
     assert runner._serialize_kiwari_for_slot(slot) is None
+
+
+def test_a_kumiki_without_frame_decorators_still_loads_legacy_files(workspace, monkeypatch):  # noqa: F811
+    # kigumi 0.8.x also runs against kumiki 0.8.0, which has no kumiki.frame_decorators.
+    monkeypatch.setattr(runner, "_frame_decorators", lambda: None)
+    path = workspace / "old.py"
+    path.write_text("from kumiki import *\n\ndef build_frame():\n    return Frame(cut_timbers=[], name='old')\n")
+
+    slot = runner.load_slot_state(str(path))
+
+    assert slot.frame.name == "old"
+    assert runner._serialize_tools(slot) == {"tools": [], "rejectedEntries": []}

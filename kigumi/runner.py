@@ -4090,6 +4090,15 @@ def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
     )
 
 
+def _frame_decorators() -> Optional[Any]:
+    """kumiki.frame_decorators, or None on a kumiki from before @frame (0.8.0), where no file can use it."""
+    try:
+        import kumiki.frame_decorators as frame_decorators
+    except ImportError:
+        return None
+    return frame_decorators
+
+
 def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tuple[Any, Optional[Any]]":
     """Resolve a frame from a loaded module, built with *kiwari* if it takes one.
 
@@ -4103,12 +4112,11 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
         if _looks_like_pattern_list(pattern_list):
             return _frame_from_pattern_list(pattern_list)
 
-    from kumiki.frame_decorators import module_entries, overlay_frames
-
-    entries = module_entries(module)
-    for rejected in entries.rejected:
+    decorators = _frame_decorators()
+    entries = decorators.module_entries(module) if decorators is not None else None
+    for rejected in (entries.rejected if entries is not None else ()):
         log_stderr(f"Warning: @{rejected.kind} {rejected.name} is not used: {rejected.reason}")
-    if entries.frames:
+    if entries is not None and entries.frames:
         parameters = entries.parameters.resolve(kiwari)
         built = []
         for entry in entries.frames:
@@ -4117,7 +4125,7 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
             built.append(_coerce_viewable_frame(result, entry.name))
         name = built[0].name if len(built) == 1 else " + ".join(f.name or e.name for f, e in zip(built, entries.frames))
         # A file that declares no parameters shows none, like a frame that takes no kiwari.
-        return overlay_frames(built, name, parameters if parameters.declarations else None), None
+        return decorators.overlay_frames(built, name, parameters if parameters.declarations else None), None
 
     if hasattr(module, "build_frame") and callable(module.build_frame):
         _warn_legacy_entry("build_frame")
@@ -4172,9 +4180,8 @@ def load_slot_state(
         frame, patternbook = resolve_frame_from_module(
             module, _bind_kiwari_values(frame.kiwari, saved)
         )
-    from kumiki.frame_decorators import module_entries
-
-    entries = module_entries(module)
+    decorators = _frame_decorators()
+    entries = decorators.module_entries(module) if decorators is not None else None
     return SlotState(
         file_path=resolved_path,
         module=module,
@@ -4182,8 +4189,8 @@ def load_slot_state(
         mesh_cache=previous_mesh_cache if previous_mesh_cache is not None else {},
         patternbook=patternbook,
         kiwari=getattr(frame, "kiwari", None),
-        tools=entries.tools,
-        rejected_entries=entries.rejected,
+        tools=entries.tools if entries is not None else (),
+        rejected_entries=entries.rejected if entries is not None else (),
     )
 
 
@@ -4227,13 +4234,12 @@ def _serialize_tools(slot_state: SlotState) -> Dict[str, Any]:
 
 def run_tool(slot_state: SlotState, name: str) -> Dict[str, Any]:
     """Run one of the slot's @tool functions on its frame and shared kiwari; its text is the result."""
-    from kumiki.frame_decorators import module_parameters
-
     entry = next((entry for entry in slot_state.tools if entry.name == name), None)
     if entry is None:
         available = [entry.name for entry in slot_state.tools]
         raise ValueError(f"No tool named {name!r}. Available: {available}")
-    parameters = module_parameters(slot_state.module).resolve(slot_state.kiwari)
+    # A slot only has tools if its kumiki has frame_decorators.
+    parameters = _frame_decorators().module_parameters(slot_state.module).resolve(slot_state.kiwari)
     with contextlib.redirect_stdout(sys.stderr):
         output = entry.function(slot_state.frame, parameters)
     if not isinstance(output, str):
