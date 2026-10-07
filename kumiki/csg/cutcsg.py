@@ -338,10 +338,10 @@ class FeatureGroup(Enum):
     nonsense -- a tenon cheek and the far end of the timber do not meet. Groups
     make the useful pairs declarable instead of searched for:
 
-        SHOULDER_PLANE intersects with PERFECT and ROUGH
+        SHOULDER_PLANE intersects with PERFECT, ROUGH and TENON
         PERFECT        intersects with SHOULDER_PLANE only
         ROUGH          intersects with SHOULDER_PLANE only
-        TENON          intersects with nothing, for now
+        TENON          intersects with SHOULDER_PLANE only
 
     NONE is the exception to the scheme: it meets nothing, not even itself, and
     is how a feature says it forms no edges at all. Some geometry is worth
@@ -350,10 +350,13 @@ class FeatureGroup(Enum):
     What carries what today: a timber's perfect-timber-within faces, arrises,
     corners and centerplanes are PERFECT, and its rough body's are ROUGH. A
     joint's shoulder plane is SHOULDER_PLANE, so a joint outlines itself against
-    both bodies. TENON is where a joint's tenon faces go; they are deliberately
-    in no pairing at all (a tenon cheek against the mating timber's rough body
-    was an edge nobody wanted -- see the coffee table note in TODO.txt), so the
-    name says what the faces are without yet saying what they meet.
+    both bodies. TENON is a joint's tenon faces, and the one thing they meet is
+    that shoulder plane -- where a tenon cheek leaves the timber at the shoulder
+    is the tenon's base arris, which is nowhere else, so it has to be derived.
+    Nothing else pairs with a tenon: a tenon cheek against the MATING timber's
+    body was an edge nobody wanted (see the coffee table note in TODO.txt), and
+    the cheeks against each other are the tenon prism's own arrises, already
+    declared.
 
     The two bodies do NOT meet themselves, which is why PERFECT and ROUGH pair
     with the shoulder plane and nothing else: a timber's own arrises and corners
@@ -380,10 +383,11 @@ class FeatureGroup(Enum):
 # Which groups each group forms edges with. Symmetric by construction; see
 # FeatureGroup for what the names mean.
 FEATURE_GROUP_PAIRS: dict = {
-    FeatureGroup.SHOULDER_PLANE: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH}),
+    FeatureGroup.SHOULDER_PLANE: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH,
+                                            FeatureGroup.TENON}),
     FeatureGroup.PERFECT: frozenset({FeatureGroup.SHOULDER_PLANE}),
     FeatureGroup.ROUGH: frozenset({FeatureGroup.SHOULDER_PLANE}),
-    FeatureGroup.TENON: frozenset(),
+    FeatureGroup.TENON: frozenset({FeatureGroup.SHOULDER_PLANE}),
     FeatureGroup.NONE: frozenset(),
 }
 

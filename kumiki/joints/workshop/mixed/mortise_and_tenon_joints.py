@@ -102,9 +102,10 @@ class InsetShoulderReliefStyle(Enum):
     NoRelief = 2
 
 
-#: A tenon face is named and measurable, and meets nothing: a tenon cheek against
-#: the mating timber's rough body is an edge nobody asked for, and the tenon's own
-#: arrises are the prism's defaults, so a derived pair would name them twice.
+#: A tenon face is named and measurable, and meets exactly one other feature: the
+#: shoulder plane, at the tenon's base. It does not meet the mating timber's body
+#: (an edge nobody asked for), and its own arrises are the prism's defaults, so a
+#: derived pair of cheeks would name those twice.
 _TENON_FACE = FeatureProperties(group=FeatureGroup.TENON)
 
 

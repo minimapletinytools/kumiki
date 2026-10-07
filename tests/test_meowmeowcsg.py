@@ -2896,9 +2896,10 @@ class TestPointQueryTolerance:
 class TestFeatureGroups:
     """Which features may pair up to form an edge (see FeatureGroup)."""
 
-    def test_a_shoulder_plane_pairs_with_both_bodies(self):
+    def test_a_shoulder_plane_pairs_with_both_bodies_and_a_tenon(self):
         assert feature_groups_intersect(FeatureGroup.SHOULDER_PLANE, FeatureGroup.PERFECT)
         assert feature_groups_intersect(FeatureGroup.SHOULDER_PLANE, FeatureGroup.ROUGH)
+        assert feature_groups_intersect(FeatureGroup.SHOULDER_PLANE, FeatureGroup.TENON)
 
     def test_a_shoulder_plane_does_not_pair_with_itself(self):
         """Joint features meet the timber body, not each other."""
@@ -2909,18 +2910,26 @@ class TestFeatureGroups:
         assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.PERFECT)
         assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.ROUGH)
 
-    def test_each_body_and_a_tenon_pair_with_nothing(self):
-        """A body's own arrises are declared, so its faces must not pair as well.
+    def test_a_tenon_pairs_only_with_the_shoulder_plane(self):
+        """That pair is the tenon's base arris, which is nowhere else.
 
-        Deriving them too would reach the same line two ways and offer it twice
-        (see timber._long_arris_tags). A tenon face is named and measurable, and
-        nothing derives from one yet.
+        Where a cheek leaves the timber at the shoulder has to be derived; the
+        cheeks against each other would only rename the tenon prism's own
+        arrises, and a cheek against the mating timber's body is an edge nobody
+        asked for (see the coffee table note in TODO.txt).
         """
-        assert not feature_groups_intersect(FeatureGroup.ROUGH, FeatureGroup.ROUGH)
+        assert feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.SHOULDER_PLANE)
         assert not feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.TENON)
-        assert not feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.SHOULDER_PLANE)
         assert not feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.PERFECT)
         assert not feature_groups_intersect(FeatureGroup.TENON, FeatureGroup.ROUGH)
+
+    def test_a_body_pairs_with_nothing_but_a_shoulder_plane(self):
+        """Its own arrises are declared, so its faces must not pair as well.
+
+        Deriving them too would reach the same line two ways and offer it twice
+        (see timber._long_arris_tags).
+        """
+        assert not feature_groups_intersect(FeatureGroup.ROUGH, FeatureGroup.ROUGH)
 
     def test_pairing_is_symmetric(self):
         """Every declared pairing holds in both directions."""
@@ -4176,6 +4185,16 @@ class TestDerivedEdges:
         edge = DerivedEdgeFeature.derive(self._owned(prism, "ptw.right"),
                                          self._owned(prism, "shoulder"))
         assert edge is not None
+
+    def test_and_a_tenon_face_meets_the_shoulder_plane_too(self):
+        """A cheek against the shoulder is the tenon's base arris, and nothing
+        else names it: the tenon prism's own arrises are its corners."""
+        prism = self._prism(self._face("tenon_right", PrismFace.RIGHT, FeatureGroup.TENON),
+                            self._face("shoulder", PrismFace.FRONT, FeatureGroup.SHOULDER_PLANE))
+        edge = DerivedEdgeFeature.derive(self._owned(prism, "tenon_right"),
+                                         self._owned(prism, "shoulder"))
+        assert edge is not None
+        assert edge.name == "shoulder\u00d7tenon_right"
 
     def test_the_name_does_not_depend_on_traversal_order(self):
         prism = self._prism(self._face("right", PrismFace.RIGHT),
