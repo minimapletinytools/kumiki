@@ -140,7 +140,7 @@ In addition, invite them to open up a feature request issue on kumiki https://gi
 
 ## Combining everything into a Frame
 
-Your file should typically have some `example` function that returns a Frame. The function must be explicity typed to return type `Frame` in order for it be to picked up by the project scanner.
+Your file should typically have an `example` function that returns a Frame. Kigumi finds it by its name and renders it when your file is opened.
 
 Use `Frame.from_joints` to merge cuts on shared timbers across multiple joints.
 
@@ -153,7 +153,33 @@ def example() -> Frame:
     return Frame.from_joints([joint1, joint2, joint3], name="my_frame")
 ```
 
-The `example` function name is special, it is what kigumi will scan for and render when opening your file.
+### Several frames in one file, and tools
+
+A file can instead mark any number of frames with `@frame`. Kigumi builds them all and shows them together, each where it was built. They share the file's parameters: declare one module-level kiwari (see below), and every `@frame` receives it, bound to what the user set in the panel.
+
+A `@tool` is a function Kigumi runs on demand against the shown frame; the text it returns is displayed.
+
+```python
+params = kiwari(legs=kiwari.count(4, minimum=3, about="How many legs"))
+
+
+@frame
+def stool(k: Kiwari) -> Frame:
+    ...
+    return Frame.from_joints(joints, name="stool")
+
+
+@frame
+def bench(k: Kiwari) -> Frame:
+    ...
+
+
+@tool
+def leg_report(frame: Frame, k: Kiwari) -> str:
+    return f"{k.count('legs')} legs, {len(frame.cut_timbers)} timbers"
+```
+
+The annotations are required and checked: a `@frame` must be `(k: Kiwari) -> Frame` and a `@tool` `(frame: Frame, k: Kiwari) -> str` (`Optional[Kiwari]` is also accepted). One that doesn't match is not used, and Kigumi says why. A file with `@frame` functions should not also define `example`; the `@frame` functions win.
 
 ## Parameters (kiwari)
 
