@@ -3592,6 +3592,35 @@ def translate_profiles(profiles: Profiles, translation: V2) -> Profiles:
     return [translate_profile(profile, translation) for profile in profiles]
 
 
+def point_in_convex_profile(points: Sequence[V2], point_2d: V2, eps: Optional[Numeric] = None) -> bool:
+    """Whether a 2D point is inside a convex profile, whichever way it is wound.
+
+    Inside means "on the same side of every edge", and which side that is depends on
+    the winding -- so the winding is read off the profile rather than assumed. Assuming
+    counter-clockwise answered "no" for points inside a profile a caller had written
+    the other way round, which is not a small thing: a solid whose own contains_point
+    says no has no boundary either, so none of its faces can be picked, and the mesher
+    (which normalises winding) and the point tests disagree about the same solid.
+    build_a_butt's tenon, mortise, wedge and wedge-slot profiles were all like that.
+    """
+    signed_area = 0.0
+    for index, current in enumerate(points):
+        following = points[(index + 1) % len(points)]
+        signed_area += (float(current[0]) * float(following[1])
+                        - float(following[0]) * float(current[1]))
+    inside_is_positive = signed_area >= 0
+
+    for index, p1 in enumerate(points):
+        p2 = points[(index + 1) % len(points)]
+        edge = p2 - p1
+        to_point = point_2d - p1
+        cross = edge[0] * to_point[1] - edge[1] * to_point[0]
+        wrong_side = Comparison.GT if not inside_is_positive else Comparison.LT
+        if safe_compare(cross, 0, wrong_side, eps=eps):
+            return False
+    return True
+
+
 @dataclass(frozen=True)
 class ConvexPolygonExtrusion(HasFeatures, CutCSG):
     """
@@ -3745,31 +3774,9 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         if self.end_distance is not None and safe_compare(z_coord - self.end_distance, 0, Comparison.GT, eps=eps):
             return False
         
-        # Check if (x_coord, y_coord) is inside the convex polygon
-        # For a convex polygon, a point is inside if it's on the correct side
-        # of all edges
-        point_2d = Matrix([x_coord, y_coord])
-        
-        for i in range(len(self.points)):
-            p1 = self.points[i]
-            p2 = self.points[(i + 1) % len(self.points)]
-            
-            # Edge vector from p1 to p2
-            edge = p2 - p1
-            
-            # Vector from p1 to test point
-            to_point = point_2d - p1
-            
-            # Cross product in 2D: edge × to_point
-            # If polygon vertices are ordered counter-clockwise, 
-            # cross product should be >= 0 for point to be inside
-            cross = edge[0] * to_point[1] - edge[1] * to_point[0]
-            
-            # Use safe_compare with tolerance to handle Float vs Integer comparisons
-            if safe_compare(cross, 0, Comparison.LT, eps=eps):
-                return False
-        
-        return True
+        # Check if (x_coord, y_coord) is inside the convex polygon, whichever way the
+        # profile is wound -- see point_in_convex_profile.
+        return point_in_convex_profile(self.points, Matrix([x_coord, y_coord]), eps)
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
@@ -4188,18 +4195,8 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
             return False
 
         cross_section = self._cross_section_at(self._height_fraction(z_coord))
-        point_2d = Matrix([x_coord, y_coord])
 
-        for i in range(len(cross_section)):
-            p1 = cross_section[i]
-            p2 = cross_section[(i + 1) % len(cross_section)]
-            edge = p2 - p1
-            to_point = point_2d - p1
-            cross = edge[0] * to_point[1] - edge[1] * to_point[0]
-            if safe_compare(cross, 0, Comparison.LT, eps=eps):
-                return False
-
-        return True
+        return point_in_convex_profile(cross_section, Matrix([x_coord, y_coord]), eps)
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
