@@ -3196,6 +3196,26 @@ class SolidsAtPoint:
         return True
 
 
+def assert_distinct_children(kind: str, children: Sequence[CutCSG]) -> None:
+    """Refuse the same CSG object twice in one operand list.
+
+    A child used twice is not two operations: it is one node reachable by two paths,
+    which turns up later as one feature reported twice -- two derived edges with the
+    same name along the same line, which is what _drop_duplicate_derived trips over.
+    Writing the second use as a copy (dataclasses.replace, or another construction) is
+    the fix, and saying so here points at the line that made the mistake rather than
+    at a pick three layers away.
+    """
+    seen = set()
+    for child in children:
+        assert id(child) not in seen, (
+            f"{kind} was given the same {type(child).__name__} object twice. Two "
+            f"operands have to be two objects -- the same node reachable by two paths "
+            f"is one feature reported twice, which shows up much later as a duplicate "
+            f"derived edge. Build a copy for the second use.")
+        seen.add(id(child))
+
+
 @dataclass(frozen=True)
 class SolidUnion(CutCSG):
     """
@@ -3211,6 +3231,9 @@ class SolidUnion(CutCSG):
     def display_name(cls) -> str:
         return "union"
     children: List[CutCSG]
+
+    def __post_init__(self) -> None:
+        assert_distinct_children("SolidUnion", self.children)
 
     def __repr__(self) -> str:
         return f"SolidUnion({len(self.children)} children)"
@@ -3311,6 +3334,9 @@ class Intersection(CutCSG):
     left: CutCSG
     right: CutCSG
 
+    def __post_init__(self) -> None:
+        assert_distinct_children("Intersection", (self.left, self.right))
+
     def __repr__(self) -> str:
         return f"Intersection(left={self.left}, right={self.right})"
 
@@ -3391,6 +3417,9 @@ class Difference(CutCSG):
     """
     base: CutCSG
     subtract: List[CutCSG]
+
+    def __post_init__(self) -> None:
+        assert_distinct_children("Difference", self.subtract)
 
     def __repr__(self) -> str:
         return f"Difference(base={self.base}, subtract={len(self.subtract)} objects)"

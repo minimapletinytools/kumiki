@@ -1259,6 +1259,44 @@ class TestIntersectionNode:
         assert diff.is_point_on_boundary(Matrix([scalar(5), scalar(0), scalar(5)])) == True  # Side face
 
 
+class TestAnOperandIsNotGivenTwice:
+    """One CSG object twice in one operand list is refused at construction.
+
+    It is one node reachable by two paths rather than two operations, and it turns
+    up much later as one feature reported twice -- two derived edges with one name
+    along one line, which _drop_duplicate_derived then trips over. Saying so where
+    the compound is built points at the line that made the mistake.
+    """
+
+    def _box(self, start=0, end=10):
+        return RectangularPrism(
+            size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
+            start_distance=scalar(start), end_distance=scalar(end))
+
+    def test_a_union_refuses_the_same_child_twice(self):
+        box = self._box()
+        with pytest.raises(AssertionError, match="same RectangularPrism object twice"):
+            SolidUnion(children=[box, box])
+
+    def test_a_difference_refuses_the_same_subtrahend_twice(self):
+        box, cut = self._box(), self._box(0, 5)
+        with pytest.raises(AssertionError, match="same RectangularPrism object twice"):
+            Difference(base=box, subtract=[cut, cut])
+
+    def test_an_intersection_refuses_the_same_operand_twice(self):
+        box = self._box()
+        with pytest.raises(AssertionError, match="same RectangularPrism object twice"):
+            Intersection(left=box, right=box)
+
+    def test_but_two_copies_of_one_shape_are_two_operands(self):
+        """Which is what a caller means when it wants the same cut twice."""
+        box = self._box()
+        union = SolidUnion(children=[box, replace(box, transform=Transform.identity())])
+        assert len(union.children) == 2
+        difference = Difference(base=box, subtract=[self._box(0, 5), self._box(0, 5)])
+        assert len(difference.subtract) == 2
+
+
 class TestConvexPolygonExtrusion:
     """Test ConvexPolygonExtrusion class."""
     
@@ -3835,7 +3873,9 @@ class TestCompoundNodesOwnNoFeatures:
         prism = self._prism()
         assert SolidUnion(children=[prism]).get_declared_features() == []
         assert Difference(base=prism, subtract=[]).get_declared_features() == []
-        assert Intersection(left=prism, right=prism).get_declared_features() == []
+        # A copy, not the same object twice: Intersection refuses that (see
+        # assert_distinct_children), and this is only asking what a compound declares.
+        assert Intersection(left=prism, right=replace(prism)).get_declared_features() == []
 
     def test_compound_nodes_without_their_own_features_are_unaffected(self):
         """The normal path: children's features still come through."""

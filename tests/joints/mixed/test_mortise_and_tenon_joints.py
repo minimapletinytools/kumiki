@@ -445,6 +445,55 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
         just_beyond_q_reach_near_shoulder = self._mortise_local(3, 0, scalar(21, 10))
         assert not mortise_csg.contains_point(just_beyond_q_reach_near_shoulder)
 
+    def test_no_face_is_declared_twice_on_the_tenon_timber(self, simple_T_configuration):
+        """The relief cuts with copies of two things the timber already carries.
+
+        The shoulder plane, and the timber's own rough body: both used to keep their
+        names on the copy, so the tenon timber declared two shoulders and two
+        rough.* faces. Two features of one name on one plane derive the same edge
+        twice, and _drop_duplicate_derived refuses to choose between them -- a pick
+        anywhere along the shoulder's line raised AssertionError.
+        """
+        from dataclasses import replace
+
+        from kumiki.csg.cutcsg import csg_children
+
+        tenon_timber, mortise_timber = simple_T_configuration
+        imperfect_tenon = replace(
+            tenon_timber,
+            rough_half_sizes=(create_v2(scalar(5), scalar(5)), create_v2(scalar(2), scalar(2))),
+        )
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=mortise_timber, butt_timber=imperfect_tenon,
+                butt_timber_end=TimberEnd.BOTTOM,
+            ),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_inset=scalar(1),
+            relief=ButtJointNotchReliefConfig(),
+        )
+
+        cutting = joint.cuttings["tenon_timber"]
+        rendered = CutTimber(cutting.timber, cuts=[cutting]).render_timber_with_cuts_csg_local()
+        counts: dict = {}
+        seen = set()
+        stack = [rendered]
+        while stack:
+            node = stack.pop()
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            for feature in node.get_declared_features():
+                counts[feature.name] = counts.get(feature.name, 0) + 1
+            stack.extend(csg_children(node))
+
+        assert counts.get("shoulder") == 1
+        assert [name for name, count in counts.items()
+                if name.startswith("rough.") and count > 1] == []
+
     def test_forwards_through_face_aligned_to_plane_aligned_wrapper(self, simple_T_configuration):
         """cut_mortise_and_tenon_joint_on_face_aligned_timbers and
         cut_mortise_and_tenon_joint_on_plane_aligned_timbers must produce identical results
