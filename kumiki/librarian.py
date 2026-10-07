@@ -15,7 +15,8 @@ statement is recognized as a **frame** entry if it is:
 * a function decorated with kumiki's ``@frame`` (any number per file, in source
   order; kigumi builds them all with the file's shared kiwari and shows them
   together), or
-* the legacy single entry: a function or variable named ``example``.
+* a deprecated single entry: a function named ``build_frame``, or a function or
+  variable named ``example``.
 
 A function decorated with ``@tool`` is recorded as a **tool**. Whether a
 decorated function's signature is right is only checked after import, by
@@ -114,9 +115,11 @@ _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
 # ---------------------------------------------------------------------------
 #
 # Frame entries are recognized by kumiki's ``@frame`` / ``@tool`` decorators, or by the
-# legacy name ``example``. The decorators may come in by ``from kumiki import *`` (the usual
+# deprecated names ``build_frame`` and ``example``. The decorators may come in by ``from kumiki import *`` (the usual
 # form), by name, under an alias, or as ``kumiki.frame``.
 _DECORATORS = ("frame", "tool")
+# Deprecated: frames picked up by name rather than by @frame.
+_LEGACY_NAMES = ("build_frame", "example")
 
 
 @dataclass(frozen=True)
@@ -234,7 +237,7 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
             elif "tool" in kinds:
                 info.tools.append(StaticEntry(node.name, "function", node.lineno))
-            elif node.name == "example":
+            elif node.name in _LEGACY_NAMES:
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
             continue
 
@@ -246,11 +249,12 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
             info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
             continue
 
-        # example = ...
+        # example = ... / build_frame = ...
         targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
         for target in targets:
-            if "example" in _record_target_names(target):
-                info.frames.append(StaticEntry("example", "var", node.lineno))
+            for name in _record_target_names(target):
+                if name in _LEGACY_NAMES:
+                    info.frames.append(StaticEntry(name, "var", node.lineno))
 
     return info
 

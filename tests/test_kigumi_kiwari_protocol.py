@@ -52,9 +52,6 @@ def build_frame(k=None):
         name=f"{k.count('posts')} posts",
         kiwari=k,
     )
-
-
-example = build_frame
 '''
 
 PLAIN_SOURCE = '''
@@ -63,9 +60,6 @@ from kumiki import *
 
 def build_frame():
     return Frame(cut_timbers=[], name="no parameters")
-
-
-example = build_frame
 '''
 
 

@@ -114,13 +114,21 @@ def example():
     assert info.frames[0].kind == "function"
 
 
+def test_build_frame_is_still_listed():
+    src = """
+def build_frame():
+    return something()
+"""
+    info = analyze_source(src, "f.py")
+    assert [(e.name, e.kind) for e in info.frames] == [("build_frame", "function")]
+
+
 def test_forms_the_runner_never_built_are_not_listed():
     src = """
 from kumiki import *
 my_thing: Frame = Frame.from_joints([])
 giraffe = Frame()
 def build_anything() -> Frame: ...
-def build_frame(): ...
 """
     info = analyze_source(src, "f.py")
     assert info.frames == []

@@ -58,6 +58,3 @@ def build_frame():
         footprints=frame.footprints,
         drawings=[Drawing(name="timber A", timbers=[timber_a])],
     )
-
-
-example = build_frame

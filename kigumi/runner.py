@@ -4094,7 +4094,7 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
     """Resolve a frame from a loaded module, built with *kiwari* if it takes one.
 
     In order: a `patterns` list, the file's `@frame` functions (all built with the file's
-    shared kiwari and shown together), or `example`.
+    shared kiwari and shown together), or the deprecated `build_frame` / `example`.
 
     Returns (frame, patternbook_or_None).
     """
@@ -4119,7 +4119,13 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
         # A file that declares no parameters shows none, like a frame that takes no kiwari.
         return overlay_frames(built, name, parameters if parameters.declarations else None), None
 
+    if hasattr(module, "build_frame") and callable(module.build_frame):
+        _warn_legacy_entry("build_frame")
+        frame = _call_frame_entry(module.build_frame, kiwari)
+        return _coerce_viewable_frame(frame, "build_frame"), None
+
     if hasattr(module, "example"):
+        _warn_legacy_entry("example")
         example = getattr(module, "example")
         if callable(example):
             example = _call_frame_entry(example, kiwari)
@@ -4130,14 +4136,15 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
         except TypeError:
             pass
 
-    hint = ""
-    if callable(getattr(module, "build_frame", None)):
-        hint = (" 'build_frame' is no longer picked up on its own: add `example = build_frame`, "
-                "or mark it with @frame and annotate it (k: Kiwari) -> Frame.")
     raise AttributeError(
-        "Module must expose a module-level 'patterns' list, @frame functions, or an 'example' Frame or function."
-        + hint
+        "Module must expose a module-level 'patterns' list, @frame functions, "
+        "or (deprecated) a 'build_frame()' function or 'example'"
     )
+
+
+def _warn_legacy_entry(name: str) -> None:
+    log_stderr(f"Warning: picking up the frame by the name '{name}' is deprecated and will be removed. "
+               f"Mark it with @frame instead: @frame def {name}(k: Kiwari) -> Frame")
 
 
 def load_slot_state(

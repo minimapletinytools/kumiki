@@ -43,6 +43,3 @@ def build_frame():
         additional_unjointed_timbers=[*posts, plate],
         name="Tagged Fixture Frame",
     )
-
-
-example = build_frame

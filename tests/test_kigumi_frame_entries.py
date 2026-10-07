@@ -104,12 +104,22 @@ def test_an_unknown_tool_says_what_there_is(frames_file):
         runner.run_tool(slot, "nope")
 
 
-def test_a_file_with_only_build_frame_is_told_what_to_do(workspace):  # noqa: F811
+@pytest.mark.parametrize("name", ["build_frame", "example"])
+def test_a_frame_found_by_name_still_loads_but_warns(workspace, capsys, name):  # noqa: F811
     path = workspace / "old.py"
-    path.write_text("from kumiki import *\n\ndef build_frame():\n    return Frame(cut_timbers=[])\n")
+    path.write_text(f"from kumiki import *\n\ndef {name}():\n    return Frame(cut_timbers=[], name='old')\n")
 
-    with pytest.raises(AttributeError, match="example = build_frame"):
-        runner.load_slot_state(str(path))
+    slot = runner.load_slot_state(str(path))
+
+    assert slot.frame.name == "old"
+    warning = capsys.readouterr().err
+    assert f"'{name}' is deprecated" in warning and "@frame" in warning
+
+
+def test_a_decorated_file_does_not_warn(frames_file, capsys):
+    runner.load_slot_state(str(frames_file))
+
+    assert "deprecated" not in capsys.readouterr().err
 
 
 def test_a_file_without_parameters_shows_none(workspace):  # noqa: F811
