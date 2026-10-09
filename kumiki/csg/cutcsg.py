@@ -2861,6 +2861,7 @@ class RectangularPrism(HasFeatures, CutCSG):
         # Should not reach here if point is actually on boundary
         return
 
+    # returns the first outward normal on the CSG, use get_outward_normals if that's insufficient.
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         return next(self._each_outward_normal(point, eps=eps), None)
 
@@ -3127,6 +3128,7 @@ class Cylinder(HasFeatures, CutCSG):
         # Should not reach here if point is on boundary
         return
 
+    # returns the first outward normal on the CSG, use get_outward_normals if that's insufficient.
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         return next(self._each_outward_normal(point, eps=eps), None)
 
@@ -3550,20 +3552,11 @@ class Difference(CutCSG):
         True when a normal cannot be had, which excludes the point: the same
         conservative answer this has always given.
         """
-        # Every face at the point, not one normal a side. At an edge or a corner
-        # one normal is whichever face the shape happened to check first, and a
-        # cut whose own corner sits on the base's face then answers with the
-        # face it shares, reads as flush, and takes the surface surrounding it
-        # -- a tenon's base arris on its shoulder is exactly that.
+        # Flush only where every face the cut has at the point lies along one
+        # of the base's: at the cut's edge, that needs the base to turn the same
+        # corner there.
         #
-        # So the cut is flush only where EVERY face it has at the point lies
-        # along one of the base's. On a flat patch that is the old test. At the
-        # cut's edge it holds only if the base turns the same corner there, in
-        # which case the material really is gone.
-        #
-        # TODO exact for planar faces. A curved one facing the same way at the
-        # point still reads as flush whether or not it curves away from the
-        # base, which needs curvature to tell.
+        # NOTE only exact for planar surfaces, not curved surfaces.
         base_normals = self.base.get_outward_normals(point, eps=eps)
         if not base_normals:
             return True
@@ -3986,6 +3979,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
 
         return
 
+    # returns the first outward normal on the CSG, use get_outward_normals if that's insufficient.
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         return next(self._each_outward_normal(point, eps=eps), None)
 
@@ -4391,6 +4385,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
         return
 
+    # returns the first outward normal on the CSG, use get_outward_normals if that's insufficient.
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         return next(self._each_outward_normal(point, eps=eps), None)
 
