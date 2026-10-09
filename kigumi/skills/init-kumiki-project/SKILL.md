@@ -48,21 +48,16 @@ This command (title: **"Kigumi: Initialize Project"**) handles everything:
 - Writes `.kigumi/kigumi.yaml`
 - Creates `my_cute_frame.py` as a starter example
 - Adds `.gitignore` entries (`.venv/`, `kigumi_exports/`, `.kigumi/logs/`)
-- Creates agent instruction files (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `.cursorrules`)
+- Copies the Kumiki agent docs into `.kigumi/docs/` from the installed kumiki (Kigumi's folder: replaced on every update, so don't edit it)
+- Creates agent instruction files (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `.cursorrules`); in `AGENTS.md` Kigumi only manages its marked `kigumi:begin`/`kigumi:end` block
 
 Wait for the command to complete (it shows a progress notification in VS Code). On success you will see: *"Kigumi workspace initialized and Kumiki was updated to latest."*
 
 If it fails, check the Kigumi output channel for details and report the error to the user.
 
-## Step 4: Resolve the kumiki package path and read concepts
+## Step 4: Read concepts
 
-```bash
-.venv/bin/python3 -c "import kumiki, pathlib; print(pathlib.Path(kumiki.__file__).resolve().parent)"
-```
-
-On Windows: `.venv\Scripts\python.exe` instead of `.venv/bin/python3`.
-
-Read `<that_path>/docs/concepts.md` to load Kumiki core concepts and architecture before doing any design work.
+Read `.kigumi/docs/concepts.md` to load Kumiki core concepts and architecture before doing any design work.
 
 ## What an initialized project looks like
 
@@ -71,6 +66,7 @@ my-project/
 ├── .venv/                  # Python venv with kumiki installed
 ├── .kigumi/
 │   ├── kigumi.yaml         # Project metadata written by Kigumi on init
+│   ├── docs/               # Kumiki agent docs, kept in step with .venv by Kigumi
 │   └── logs/               # Session logs (created on first run)
 ├── .gitignore              # Includes .venv/, kigumi_exports/, .kigumi/logs/
 ├── AGENTS.md               # Agent instruction pointer (created by Kigumi)
@@ -81,5 +77,5 @@ my-project/
 
 Key markers:
 - `.venv/bin/python3` exists and `import kumiki` succeeds
-- Python files use `from kumiki import *` and define functions typed `-> Frame`
+- Python files use `from kumiki import *` and mark their frames with `@frame`
 - No `pyproject.toml` / `setup.py` for a library (these are scripts, not packages)
