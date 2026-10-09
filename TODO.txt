@@ -244,7 +244,12 @@ DONE-add multi frame support (decorators + multipl eframe function )
   -test this
 DONE-reset button in parameters in kigumi seems broken
 DONE-kiugmi update kumiki should update docs as well
-
+DONE-do measuring features doc
+  DONE-explain CSG fetaure system
+  DONE-leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
+  DONE-describe the measuring system
+  DONE-explain feture solving system
+  DONE-explain fetaure hit priority system
 
 
 -add support to run @tools from the parameter section
@@ -258,12 +263,7 @@ DONE-kiugmi update kumiki should update docs as well
 
 -do the standalone app 
 
--do measuring features doc
-  DONE-explain CSG fetaure system
-  DONE-leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
-  DONE-describe the measuring system
-  -explain fetaure hit priority system
-  -explain feture solving system
+
   
 
 -do the assembly system doc (placeholder doc basically)
