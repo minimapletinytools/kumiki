@@ -44,6 +44,32 @@ The function is checked when the file is loaded, and one that doesn't fit is ski
 
 The decorator only marks the function, so it is still an ordinary function to call from a script or a test.
 
+### Where a pattern is built
+
+A pattern function is not given a position. Kigumi always builds it at the origin, and `pattern.raise_at(center)` moves the result to `center` afterwards (the grid view uses this to lay patterns out side by side).
+
+A builder may still take an optional `position` so a script or a test can place it, as long as it defaults to the origin -- Kigumi never passes it. With a kiwari, `k` comes first and `position` after it, ideally keyword-only:
+
+```python
+@pattern("my_category/basic_joint")
+def basic_joint(position=None) -> Joint:
+    position = position if position is not None else create_v3(0, 0, 0)
+    ...
+
+
+@pattern("my_category/round_or_square", kiwari=ROUND_STOCK)
+def round_or_square(k: Optional[Kiwari] = None, *, position=None) -> Joint:
+    ...
+```
+
+A function that needs a position with no default, like `make_timbers(center)`, is wrapped in a pattern that calls it at the origin:
+
+```python
+@pattern("my_category/timber_list")
+def timber_list() -> Frame:
+    return Frame(cut_timbers=make_timbers(create_v3(0, 0, 0)), name="My Joint")
+```
+
 A file with `@pattern` functions is a pattern book: any `@frame` functions in it are not shown.
 
 ### Special tags
