@@ -103,7 +103,24 @@ Note that the feature derivation system currently does NOT support the following
 
 #### feature priority
 
-TODO fetaure hit priority system here
+Several features can be under the pointer at once -- an edge and the two faces that form it, a corner and its three faces, a centre axis inside a face. `_sort_feature_hits` in `cutcsg.py` orders them best first, and the first one is what a click takes:
+
+- **Non-real before real.** A centre axis or a centerplane is a deliberate snap, so the surface it happens to lie on does not steal the click.
+- **The more specific kind.** Point, then edge, then face (flat or curved). An edge beats the two faces that formed it, and a corner beats its edges.
+- **Declared before derived.** A feature something declared beats one derived from a pair of faces.
+- **Group rank** (`FeatureGroup`, lower is better): `SHOULDER_PLANE`, `PERFECT`, `ROUGH`, `TENON`, then `NONE`. A derived feature takes the better rank of its two parents.
+- **Author-set priority** (`FeatureProperties.priority`, lower wins). Default features carry a high value, so anything a joint names beats the prism's anonymous defaults.
+- **Name**, alphabetically.
+- **Gathering order**, as the last tie-break.
+
+Specificity comes before declaredness on purpose: the other way round, a click on an arris would go to one of the declared faces meeting there, which is exactly what deriving edges is meant to avoid.
+
+In Kigumi, while the pointer is over a feature:
+
+- **Tab** steps to the next feature under the pointer, wrapping round. The highlight shows what a click would now take. Moving the pointer forgets the choice.
+- **Right-click** (without dragging) lists every feature under the pointer, best first, with its kind; choosing a row selects that feature. With only one feature there, right-click opens the member menu instead.
+
+This is how to reach a face seen edge-on in an elevation: where it shows as a line, the edge it forms always wins, so the face is only reachable by Tab or the right-click menu.
 
 
 ## Limitations
