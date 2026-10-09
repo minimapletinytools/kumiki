@@ -10,10 +10,10 @@ from kumiki.example_shavings import (
     create_canonical_example_corner_joint_timbers,
     create_canonical_example_right_angle_corner_joint_timbers,
 )
-from kumiki.patternbook import Pattern, make_pattern_from_frame
 
 
-def create_mitered_and_keyed_lap_joint_example(position: Optional[V3] = None):
+@pattern("corner_joints/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_90")
+def create_mitered_and_keyed_lap_joint_example(position: Optional[V3]=None) -> Frame:
     """
     Create a mitered and keyed lap joint (箱相欠き車知栓仕口 / Hako Aikaki Shachi Sen Shikuchi)
     using canonical 4"x5"x4' timbers at 90 degrees.
@@ -45,7 +45,8 @@ def create_mitered_and_keyed_lap_joint_example(position: Optional[V3] = None):
     return frame
 
 
-def create_mitered_and_keyed_lap_joint_130deg_example(position: Optional[V3] = None):
+@pattern("corner_joints/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_130")
+def create_mitered_and_keyed_lap_joint_130deg_example(position: Optional[V3]=None) -> Frame:
     """
     Create a mitered and keyed lap joint at 130 degrees using canonical 4"x5"x4' timbers.
     """
@@ -77,7 +78,3 @@ def create_mitered_and_keyed_lap_joint_130deg_example(position: Optional[V3] = N
     return frame
 
 
-patterns = [
-    Pattern(path="corner_joints/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_90", lambda_=make_pattern_from_frame(create_mitered_and_keyed_lap_joint_example), pattern_type='frame'),
-    Pattern(path="corner_joints/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_130", lambda_=make_pattern_from_frame(create_mitered_and_keyed_lap_joint_130deg_example), pattern_type='frame'),
-]

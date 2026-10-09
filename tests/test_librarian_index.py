@@ -28,12 +28,12 @@ def build_frame(k: Kiwari) -> Frame:
 """
 
 PATTERN_LIST_SOURCE = """
-from kumiki.patternbook import Pattern
-from kumiki.timber import Frame
+from kumiki import Frame, pattern
 
-patterns = [
-    Pattern(path="things/a_thing", lambda_=lambda center: Frame(cut_timbers=[], name="Thing"), pattern_type='frame', tags=['main']),
-]
+
+@pattern("things/a_thing", tags=["main"])
+def a_thing() -> Frame:
+    return Frame(cut_timbers=[], name="Thing")
 """
 
 EXPLODING_FRAME_SOURCE = """

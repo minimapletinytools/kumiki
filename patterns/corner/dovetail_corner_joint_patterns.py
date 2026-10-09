@@ -4,7 +4,6 @@ Dovetail Corner Joint Patterns
 
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_right_angle_corner_joint_timbers
-from kumiki.patternbook import Pattern
 
 
 def _make_dovetail_corner_joint_example(position: V3, depth=None) -> list[CutTimber]:
@@ -37,7 +36,11 @@ def make_half_blind_dovetail_corner_joint_example(position: V3) -> list[CutTimbe
     return _make_dovetail_corner_joint_example(position, depth=inches(scalar(5, 2)))
 
 
-patterns = [
-    Pattern(path="corner_joints/dovetail_corner_joint/cut_dovetail_corner_joint", lambda_=lambda center: Frame(cut_timbers=make_through_dovetail_corner_joint_example(center), name="Through Dovetail Corner Joint"), pattern_type='frame'),
-    Pattern(path="corner_joints/dovetail_corner_joint/cut_dovetail_corner_joint_half_blind", lambda_=lambda center: Frame(cut_timbers=make_half_blind_dovetail_corner_joint_example(center), name="Half Blind Dovetail Corner Joint"), pattern_type='frame'),
-]
+@pattern("corner_joints/dovetail_corner_joint/cut_dovetail_corner_joint")
+def cut_dovetail_corner_joint_pattern() -> Frame:
+    return Frame(cut_timbers=make_through_dovetail_corner_joint_example(create_v3(0, 0, 0)), name='Through Dovetail Corner Joint')
+
+
+@pattern("corner_joints/dovetail_corner_joint/cut_dovetail_corner_joint_half_blind")
+def cut_dovetail_corner_joint_half_blind_pattern() -> Frame:
+    return Frame(cut_timbers=make_half_blind_dovetail_corner_joint_example(create_v3(0, 0, 0)), name='Half Blind Dovetail Corner Joint')

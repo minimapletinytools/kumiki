@@ -12,7 +12,6 @@ from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import Pattern, make_pattern_from_frame
 
 
 def _maybe_round_timber_config(use_round_timbers: bool):
@@ -23,7 +22,8 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-def create_dovetail_butt_joint_example(k=None, *, position: Optional[V3] = None):
+@pattern("butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", kiwari=ROUND_STOCK)
+def create_dovetail_butt_joint_example(k: Optional[Kiwari]=None, *, position: Optional[V3]=None) -> Frame:
     """
     Create a dovetail butt joint (蟻仕口 / Ari Shiguchi) using canonical 4"x5"x4' timbers.
     """
@@ -57,6 +57,3 @@ def create_dovetail_butt_joint_example(k=None, *, position: Optional[V3] = None)
     return frame
 
 
-patterns = [
-    Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), kiwari=ROUND_STOCK, pattern_type='frame'),
-]

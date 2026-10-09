@@ -4,9 +4,9 @@ Decorative Joints Patterns
 
 from kumiki import *
 from kumiki.csg.pathcsg import StraightSegment, ArcSegment
-from kumiki.patternbook import Pattern, make_pattern_from_joint
 
 
+@pattern("decorative_joints/roundover", tags=["main"])
 def example_roundover_decoration() -> Joint:
     """A single timber with all 12 edges rounded over."""
     timber = Timber(
@@ -22,6 +22,7 @@ def example_roundover_decoration() -> Joint:
     )
 
 
+@pattern("decorative_joints/roundover_imperfect", tags=["main"])
 def example_roundover_imperfect() -> Joint:
     """A single edge rounded over on an imperfect timber."""
     timber = Timber(
@@ -41,6 +42,7 @@ def example_roundover_imperfect() -> Joint:
     )
 
 
+@pattern("decorative_joints/rafter_tail_scallop", tags=["main"])
 def example_rafter_tail_scallop_decoration() -> Joint:
     """A rafter tail with a scalloped decorative cut on its underside near the tail end."""
     timber = Timber(
@@ -57,6 +59,7 @@ def example_rafter_tail_scallop_decoration() -> Joint:
     )
 
 
+@pattern("decorative_joints/path_extrusion_corner_end", tags=["main"])
 def example_path_extrusion_corner_end_decoration() -> Joint:
     """
     A carved corner scoop at the bottom-right end of a timber.
@@ -84,6 +87,7 @@ def example_path_extrusion_corner_end_decoration() -> Joint:
     )
 
 
+@pattern("decorative_joints/straight_angled_end_cut", tags=["main"])
 def example_straight_angled_end_cut_decoration() -> Joint:
     """A single timber with an angled cut decoration on its top end."""
     timber = Timber(
@@ -102,35 +106,3 @@ def example_straight_angled_end_cut_decoration() -> Joint:
     )
 
 
-patterns = [
-    Pattern(
-        path="decorative_joints/roundover",
-        lambda_=make_pattern_from_joint(example_roundover_decoration),
-        pattern_type='frame',
-        tags=['main'],
-    ),
-    Pattern(
-        path="decorative_joints/roundover_imperfect",
-        lambda_=make_pattern_from_joint(example_roundover_imperfect),
-        pattern_type='frame',
-        tags=['main'],
-    ),
-    Pattern(
-        path="decorative_joints/rafter_tail_scallop",
-        lambda_=make_pattern_from_joint(example_rafter_tail_scallop_decoration),
-        pattern_type='frame',
-        tags=['main'],
-    ),
-    Pattern(
-        path="decorative_joints/path_extrusion_corner_end",
-        lambda_=make_pattern_from_joint(example_path_extrusion_corner_end_decoration),
-        pattern_type='frame',
-        tags=['main'],
-    ),
-    Pattern(
-        path="decorative_joints/straight_angled_end_cut",
-        lambda_=make_pattern_from_joint(example_straight_angled_end_cut_decoration),
-        pattern_type='frame',
-        tags=['main'],
-    ),
-]

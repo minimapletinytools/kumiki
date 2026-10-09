@@ -20,6 +20,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from kumiki.frame_decorators import module_patterns
 from kumiki.csg.cutcsg import csg_children  # noqa: E402
 from kumiki.patternbook import Pattern  # noqa: E402
 from kumiki.rule import create_v3, scalar  # noqa: E402
@@ -96,7 +97,7 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"{path.relative_to(REPO)}: IMPORT FAILED {type(exc).__name__}: {exc}")
             continue
-        for pattern in getattr(module, "patterns", None) or []:
+        for pattern in module_patterns(module)[0]:
             if not isinstance(pattern, Pattern) or pattern.pattern_type != "frame":
                 continue
             if wanted and not any(term in pattern.path for term in wanted):

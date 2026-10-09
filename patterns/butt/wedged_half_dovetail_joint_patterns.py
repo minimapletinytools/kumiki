@@ -2,6 +2,7 @@
 Wedged Half-Dovetail Joint Patterns
 """
 
+from typing import Optional
 from dataclasses import replace
 
 from kumiki import *
@@ -14,7 +15,6 @@ from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import Pattern, make_pattern_from_joint
 
 
 def _maybe_round_timber_config(use_round_timbers: bool):
@@ -25,7 +25,8 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-def example_wedged_half_dovetail_mortise_and_tenon(k=None, *, position=None):
+@pattern("butt_joints/wedged_half_dovetail_mortise_and_tenon", kiwari=ROUND_STOCK)
+def example_wedged_half_dovetail_mortise_and_tenon(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Wedged half-dovetail mortise and tenon joint on the canonical 4"x5"x4'
     butt joint timbers. The dovetail's flat (top) side sits on the FRONT face
@@ -58,6 +59,3 @@ def example_wedged_half_dovetail_mortise_and_tenon(k=None, *, position=None):
     )
 
 
-patterns = [
-    Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), kiwari=ROUND_STOCK, pattern_type='frame'),
-]

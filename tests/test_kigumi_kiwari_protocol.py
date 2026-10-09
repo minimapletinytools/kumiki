@@ -232,11 +232,11 @@ def test_a_frame_with_no_parameters_has_nothing_to_save(workspace):
 
 PATTERN_SOURCE = '''
 from kumiki import *
-from kumiki.patternbook import Pattern
 from kumiki.ticket import TimberTicket
 
 
-def a_post(k):
+@pattern("probe/tall", kiwari=kiwari(height=kiwari.length(mm(1000), minimum=mm(100))))
+def a_post(k: Kiwari) -> Frame:
     return Frame(cut_timbers=[CutTimber(timber=create_timber(
         bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
         length=k.length("height"),
@@ -247,15 +247,9 @@ def a_post(k):
     ), cuts=[])], name="post")
 
 
-def a_plain_post():
+@pattern("probe/plain")
+def a_plain_post() -> Frame:
     return a_post(kiwari(height=kiwari.length(mm(1000))))
-
-
-patterns = [
-    Pattern(path="probe/tall", lambda_=make_pattern_from_frame(a_post),
-            kiwari=kiwari(height=kiwari.length(mm(1000), minimum=mm(100)))),
-    Pattern(path="probe/plain", lambda_=make_pattern_from_frame(a_plain_post)),
-]
 '''
 
 

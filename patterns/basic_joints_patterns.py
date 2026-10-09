@@ -3,6 +3,8 @@ Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py
 """
 
+from typing import Optional
+from kumiki import Frame, Joint, Kiwari, create_v3, pattern
 from kumiki.kiwari import kiwari
 from kumiki.rule import inches, Transform, scalar, create_v2, degrees, Matrix, sqrt, atan
 from kumiki.timber import (
@@ -42,7 +44,6 @@ from kumiki.example_shavings import (
     _CANONICAL_EXAMPLE_TIMBER_LENGTH,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import Pattern, make_pattern_from_joint
 
 
 # These two ask the round-stock question plus one of their own, so they
@@ -65,7 +66,8 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-def example_basic_miter_joint(position=None):
+@pattern("basic_joints/basic_miter_joint", tags=["main"])
+def example_basic_miter_joint(position=None) -> Joint:
     """
     Create a basic miter joint using canonical corner joint timbers at a 120-degree angle.
     """
@@ -81,7 +83,8 @@ def example_basic_miter_joint(position=None):
     return joint
 
 
-def example_basic_miter_joint_face_aligned(position=None):
+@pattern("basic_joints/basic_miter_joint_face_aligned")
+def example_basic_miter_joint_face_aligned(position=None) -> Joint:
     """
     Create a basic miter joint on face-aligned timbers using canonical corner joint timbers.
     """
@@ -94,7 +97,8 @@ def example_basic_miter_joint_face_aligned(position=None):
     return joint
 
 
-def example_basic_tongue_and_fork_joint(position=None):
+@pattern("basic_joints/basic_tongue_and_fork_corner_joint")
+def example_basic_tongue_and_fork_joint(position=None) -> Joint:
     """
     Create a basic tongue-and-fork corner joint using canonical corner joint timbers.
     """
@@ -107,7 +111,8 @@ def example_basic_tongue_and_fork_joint(position=None):
     return joint
 
 
-def example_basic_butt_joint(k=None, *, position=None):
+@pattern("basic_joints/basic_butt_joint", kiwari=ROUND_STOCK)
+def example_basic_butt_joint(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Create a basic butt joint using canonical butt joint timbers.
     """
@@ -123,7 +128,8 @@ def example_basic_butt_joint(k=None, *, position=None):
     return joint
 
 
-def example_basic_butt_splice_joint(position=None):
+@pattern("basic_joints/basic_butt_splice_joint")
+def example_basic_butt_splice_joint(position=None) -> Joint:
     """
     Create a basic butt splice joint using canonical splice joint timbers.
     """
@@ -136,7 +142,8 @@ def example_basic_butt_splice_joint(position=None):
     return joint
 
 
-def example_basic_cross_lap_joint(position=None):
+@pattern("basic_joints/basic_cross_lap_joint")
+def example_basic_cross_lap_joint(position=None) -> Joint:
     """
     Create a basic cross lap joint using canonical cross joint timbers.
     """
@@ -149,7 +156,8 @@ def example_basic_cross_lap_joint(position=None):
     return joint
 
 
-def example_basic_house_joint(position=None):
+@pattern("basic_joints/basic_house_joint")
+def example_basic_house_joint(position=None) -> Joint:
     """
     Create a basic house joint using canonical cross joint timbers.
     """
@@ -163,7 +171,8 @@ def example_basic_house_joint(position=None):
     return joint
 
 
-def example_basic_splined_opposing_double_butt_joint(position=None):
+@pattern("basic_joints/basic_splined_opposing_double_butt_joint")
+def example_basic_splined_opposing_double_butt_joint(position=None) -> Joint:
     """
     Create a basic splined opposing double butt joint using canonical timbers.
     """
@@ -179,7 +188,8 @@ def example_basic_splined_opposing_double_butt_joint(position=None):
     return joint
 
 
-def example_basic_splice_lap_joint(position=None):
+@pattern("basic_joints/basic_splice_lap_joint")
+def example_basic_splice_lap_joint(position=None) -> Joint:
     """
     Create a basic splice lap joint using canonical splice joint timbers.
     """
@@ -200,7 +210,8 @@ def example_basic_splice_lap_joint(position=None):
     return joint
 
 
-def example_basic_mortise_and_tenon_joint(k=None, *, position=None):
+@pattern("basic_joints/basic_mortise_and_tenon", tags=["main"], kiwari=MORTISE_AND_TENON_OPTIONS)
+def example_basic_mortise_and_tenon_joint(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Create a basic mortise and tenon joint using canonical butt joint timbers.
     """
@@ -223,7 +234,8 @@ def example_basic_mortise_and_tenon_joint(k=None, *, position=None):
     return joint
 
 
-def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(k=None, *, position=None):
+@pattern("basic_joints/basic_wedged_half_dovetail_mortise_and_tenon", tags=["main"], kiwari=WEDGED_DOVETAIL_OPTIONS)
+def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Create a basic wedged half-dovetail mortise and tenon joint using canonical butt joint timbers.
     """
@@ -244,7 +256,8 @@ def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(k=None, *, positi
     return joint
 
 
-def example_basic_lapped_gooseneck_joint(position=None):
+@pattern("basic_joints/basic_lapped_gooseneck_joint")
+def example_basic_lapped_gooseneck_joint(position=None) -> Joint:
     """
     Create a basic lapped gooseneck joint.
     Uses canonical splice joint timbers (parallel timbers meeting at position).
@@ -263,7 +276,8 @@ def example_basic_lapped_gooseneck_joint(position=None):
     return joint
 
 
-def example_basic_dropin_dovetail_butt_joint(position=None):
+@pattern("basic_joints/basic_dropin_dovetail_butt_joint")
+def example_basic_dropin_dovetail_butt_joint(position=None) -> Joint:
     """
     Create a basic housed dovetail butt joint.
     Uses canonical butt joint timbers (receiving along X, butt/dovetail along Y).
@@ -290,7 +304,8 @@ def example_basic_dropin_dovetail_butt_joint(position=None):
     return joint
 
 
-def example_basic_dropin_housed_butt_joint(position=None):
+@pattern("basic_joints/basic_dropin_housed_butt_joint")
+def example_basic_dropin_housed_butt_joint(position=None) -> Joint:
     """
     Create a basic housed drop-in butt joint.
     Uses canonical butt joint timbers (receiving along X, butt/housed along Y).
@@ -310,7 +325,8 @@ def example_basic_dropin_housed_butt_joint(position=None):
     return joint
 
 
-def example_basic_mitered_and_keyed_lap_joint(position=None):
+@pattern("basic_joints/basic_mitered_and_keyed_lap_joint")
+def example_basic_mitered_and_keyed_lap_joint(position=None) -> Joint:
     """
     Create a basic mitered and keyed lap joint using canonical corner joint timbers.
     """
@@ -325,7 +341,8 @@ def example_basic_mitered_and_keyed_lap_joint(position=None):
     return joint
 
 
-def example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint(position=None):
+@pattern("basic_joints/basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint")
+def example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint(position=None) -> Joint:
     """
     Create a basic half-blind tenoned, dadoed, rabbeted scarf joint (金輪継ぎ / Kanawa Tsugi)
     using canonical splice joint timbers.
@@ -347,7 +364,8 @@ def example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint(position=None):
     return joint
 
 
-def example_basic_tusked_mortise_and_tenon_joint(position=None):
+@pattern("basic_joints/basic_tusked_mortise_and_tenon")
+def example_basic_tusked_mortise_and_tenon_joint(position=None) -> Joint:
     """
     Create a basic tusked through mortise-and-tenon joint using canonical butt joint timbers.
     All sizing (tenon dimensions, stickout, and tusk shape) is derived automatically from the
@@ -363,22 +381,3 @@ def example_basic_tusked_mortise_and_tenon_joint(position=None):
     return joint
 
 
-patterns = [
-    Pattern(path="basic_joints/basic_miter_joint", lambda_=make_pattern_from_joint(example_basic_miter_joint), pattern_type='frame', tags=['main']),
-    Pattern(path="basic_joints/basic_miter_joint_face_aligned", lambda_=make_pattern_from_joint(example_basic_miter_joint_face_aligned), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_tongue_and_fork_corner_joint", lambda_=make_pattern_from_joint(example_basic_tongue_and_fork_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_butt_joint", lambda_=make_pattern_from_joint(example_basic_butt_joint), kiwari=ROUND_STOCK, pattern_type='frame'),
-    Pattern(path="basic_joints/basic_butt_splice_joint", lambda_=make_pattern_from_joint(example_basic_butt_splice_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_cross_lap_joint", lambda_=make_pattern_from_joint(example_basic_cross_lap_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_house_joint", lambda_=make_pattern_from_joint(example_basic_house_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_splined_opposing_double_butt_joint", lambda_=make_pattern_from_joint(example_basic_splined_opposing_double_butt_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_splice_lap_joint", lambda_=make_pattern_from_joint(example_basic_splice_lap_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint", lambda_=make_pattern_from_joint(example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint), kiwari=MORTISE_AND_TENON_OPTIONS, pattern_type='frame', tags=['main']),
-    Pattern(path="basic_joints/basic_lapped_gooseneck_joint", lambda_=make_pattern_from_joint(example_basic_lapped_gooseneck_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_dropin_dovetail_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_dovetail_butt_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_dropin_housed_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_housed_butt_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_mitered_and_keyed_lap_joint", lambda_=make_pattern_from_joint(example_basic_mitered_and_keyed_lap_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_wedged_half_dovetail_mortise_and_tenon_joint), kiwari=WEDGED_DOVETAIL_OPTIONS, pattern_type='frame', tags=['main']),
-    Pattern(path="basic_joints/basic_tusked_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_tusked_mortise_and_tenon_joint), pattern_type='frame'),
-]

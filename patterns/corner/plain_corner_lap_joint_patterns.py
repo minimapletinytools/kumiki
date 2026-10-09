@@ -8,7 +8,6 @@ from kumiki.example_shavings import (
     create_canonical_example_right_angle_corner_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import Pattern
 
 
 def _maybe_round_timber_config(use_round_timbers: bool):
@@ -40,6 +39,6 @@ def make_corner_lap_joint_example(position: V3, use_round_timbers=False) -> list
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-patterns = [
-    Pattern(path="corner_joints/cut_plain_corner_lap_joint_on_plane_aligned_timbers", lambda_=lambda center: Frame(cut_timbers=make_corner_lap_joint_example(center), name="Plain Corner Lap Joint"), pattern_type='frame'),
-]
+@pattern("corner_joints/cut_plain_corner_lap_joint_on_plane_aligned_timbers")
+def cut_plain_corner_lap_joint_on_plane_aligned_timbers_pattern() -> Frame:
+    return Frame(cut_timbers=make_corner_lap_joint_example(create_v3(0, 0, 0)), name='Plain Corner Lap Joint')

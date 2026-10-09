@@ -5,7 +5,6 @@ Rebated Oblique and Dadoed Scarf Joint Patterns (Kanawa Tsugi / 金輪継ぎ)
 from typing import Optional
 
 from kumiki import *
-from kumiki.patternbook import Pattern, make_pattern_from_frame
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -13,7 +12,8 @@ TIMBER_LENGTH = inches(48)
 TIMBER_SIZE_2D = create_v2(TIMBER_WIDTH, TIMBER_HEIGHT)
 
 
-def create_rebated_oblique_and_dadoed_scarf_example(position: Optional[V3] = None):
+@pattern("splice_joints/rebated_oblique_and_dadoed_scarf_joint")
+def create_rebated_oblique_and_dadoed_scarf_example(position: Optional[V3]=None) -> Frame:
     """
     Create a rebated oblique and dadoed scarf joint (Kanawa Tsugi
     style) example using two 4"x5"x4' timbers.
@@ -67,7 +67,6 @@ def create_rebated_oblique_and_dadoed_scarf_example(position: Optional[V3] = Non
 create_half_blind_tenoned_dadoed_rabbeted_scarf_example = create_rebated_oblique_and_dadoed_scarf_example
 
 
-patterns = [
-    Pattern(path="splice_joints/rebated_oblique_and_dadoed_scarf_joint", lambda_=make_pattern_from_frame(create_rebated_oblique_and_dadoed_scarf_example), pattern_type='frame'),
-    Pattern(path="splice_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint", lambda_=make_pattern_from_frame(create_half_blind_tenoned_dadoed_rabbeted_scarf_example), pattern_type='frame'),
-]
+@pattern("splice_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint")
+def half_blind_tenoned_dadoed_rabbeted_scarf_joint_pattern() -> Frame:
+    return create_half_blind_tenoned_dadoed_rabbeted_scarf_example()

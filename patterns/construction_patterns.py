@@ -4,7 +4,6 @@ with different reference features
 """
 
 from kumiki import *
-from kumiki.patternbook import Pattern
 
 def inches(value):
     """Convert inches to meters using exact rational arithmetic."""
@@ -408,17 +407,61 @@ def make_footprint_horizontal_example():
 
     return Frame(cut_timbers=cut_timbers, accessories=[], footprints=footprints)
 
-patterns = [
-    Pattern(path="construction/join_face_aligned_on_face_aligned_timbers", lambda_=lambda center: make_join_face_aligned_on_face_aligned_timbers_example(), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_face_aligned_timber", lambda_=lambda center: make_attach_face_aligned_timber_example(), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_face_aligned_timber_flush", lambda_=lambda center: make_attach_face_aligned_timber_flush_example(), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_face_aligned_timber/stickout/inside", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.INSIDE), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_face_aligned_timber/stickout/outside", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.OUTSIDE), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_face_aligned_timber/stickout/centerline", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_face_aligned_timber/stickout/centerline_with_stickout", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE, stickout_length=feet(1)), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_face_aligned_timber/make_attach_face_aligned_timber_target_projection_example", lambda_=lambda center: make_attach_face_aligned_timber_target_projection_example(), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_plane_aligned_timber_brace", lambda_=lambda center: make_attach_plane_aligned_timber_brace_example(), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/attach_timber", lambda_=lambda center: make_attach_timber_example(), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/footprint/vertical", lambda_=lambda center: make_footprint_vertical_example(), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/footprint/horizontal", lambda_=lambda center: make_footprint_horizontal_example(), pattern_type='frame', tags=['main']),
-]
+@pattern("construction/join_face_aligned_on_face_aligned_timbers", tags=["main"])
+def join_face_aligned_on_face_aligned_timbers_pattern() -> Frame:
+    return make_join_face_aligned_on_face_aligned_timbers_example()
+
+
+@pattern("construction/attach_face_aligned_timber", tags=["main"])
+def attach_face_aligned_timber_pattern() -> Frame:
+    return make_attach_face_aligned_timber_example()
+
+
+@pattern("construction/attach_face_aligned_timber_flush", tags=["main"])
+def attach_face_aligned_timber_flush_pattern() -> Frame:
+    return make_attach_face_aligned_timber_flush_example()
+
+
+@pattern("construction/attach_face_aligned_timber/stickout/inside", tags=["main"])
+def inside_pattern() -> Frame:
+    return make_attach_face_aligned_timber_stickout_example(StickoutReference.INSIDE)
+
+
+@pattern("construction/attach_face_aligned_timber/stickout/outside", tags=["main"])
+def outside_pattern() -> Frame:
+    return make_attach_face_aligned_timber_stickout_example(StickoutReference.OUTSIDE)
+
+
+@pattern("construction/attach_face_aligned_timber/stickout/centerline", tags=["main"])
+def centerline_pattern() -> Frame:
+    return make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE)
+
+
+@pattern("construction/attach_face_aligned_timber/stickout/centerline_with_stickout", tags=["main"])
+def centerline_with_stickout_pattern() -> Frame:
+    return make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE, stickout_length=feet(1))
+
+
+@pattern("construction/attach_face_aligned_timber/make_attach_face_aligned_timber_target_projection_example", tags=["main"])
+def make_attach_face_aligned_timber_target_projection_example_pattern() -> Frame:
+    return make_attach_face_aligned_timber_target_projection_example()
+
+
+@pattern("construction/attach_plane_aligned_timber_brace", tags=["main"])
+def attach_plane_aligned_timber_brace_pattern() -> Frame:
+    return make_attach_plane_aligned_timber_brace_example()
+
+
+@pattern("construction/attach_timber", tags=["main"])
+def attach_timber_pattern() -> Frame:
+    return make_attach_timber_example()
+
+
+@pattern("construction/footprint/vertical", tags=["main"])
+def vertical_pattern() -> Frame:
+    return make_footprint_vertical_example()
+
+
+@pattern("construction/footprint/horizontal", tags=["main"])
+def horizontal_pattern() -> Frame:
+    return make_footprint_horizontal_example()

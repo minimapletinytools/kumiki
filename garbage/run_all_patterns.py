@@ -3,7 +3,7 @@
 Walks ``patterns/**/*.py`` (skipping ``__pycache__`` and ``__init__.py``), imports each
 file by path, and:
 
-- if the module has a ``patterns`` list, raises every Pattern in it (``raise_at(origin)``),
+- if the module has @pattern functions, raises every pattern in it (``raise_at(origin)``),
 - if the module has a zero-argument ``example`` callable (the structures), calls it.
 
 Anything that raises is reported with the file, the pattern path and the exception. Exit
@@ -21,7 +21,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from kumiki.patternbook import Pattern  # noqa: E402
+from kumiki.frame_decorators import module_patterns  # noqa: E402
 from kumiki.rule import create_v3, scalar  # noqa: E402
 
 PATTERNS_DIR = REPO / "patterns"
@@ -61,11 +61,9 @@ def main() -> int:
             failures.append((relative, "<import>", f"{type(exc).__name__}: {exc}"))
             continue
 
-        patterns = getattr(module, "patterns", None)
-        if isinstance(patterns, list) and patterns:
+        patterns, _ = module_patterns(module)
+        if patterns:
             for pattern in patterns:
-                if not isinstance(pattern, Pattern):
-                    continue
                 checked += 1
                 try:
                     pattern.raise_at(ORIGIN)

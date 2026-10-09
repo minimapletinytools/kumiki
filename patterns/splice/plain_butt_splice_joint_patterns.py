@@ -10,7 +10,6 @@ from kumiki.example_shavings import (
     create_canonical_example_splice_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import Pattern
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -54,6 +53,6 @@ def make_splice_joint_example(position: V3, use_round_timbers=False) -> list[Cut
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-patterns = [
-    Pattern(path="splice_joints/plain_butt_splice_joint", lambda_=lambda center: Frame(cut_timbers=make_splice_joint_example(center), name="Plain Butt Splice Joint"), pattern_type='frame', tags=['main']),
-]
+@pattern("splice_joints/plain_butt_splice_joint", tags=["main"])
+def plain_butt_splice_joint_pattern() -> Frame:
+    return Frame(cut_timbers=make_splice_joint_example(create_v3(0, 0, 0)), name='Plain Butt Splice Joint')

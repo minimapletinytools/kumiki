@@ -20,7 +20,6 @@ from kumiki.joints.workshop.shavings.build_a_butt import (
 from kumiki.joints.workshop.mixed import (
     cut_mortise_and_tenon_joint,
 )
-from kumiki.patternbook import Pattern, make_pattern_from_joint
 
 _SHOULDER_INSET = inches(1, 2)
 
@@ -133,21 +132,25 @@ def _build_relief_example(
     )
 
 
+@pattern("relief/butt_arrangement/rotate_width_axis", tags=["poop"])
 def example_rotate_width_axis(position=None, use_round_timbers=False) -> Joint:
     """Butt timber rotated 45 deg around its width axis (in-plane raking angle)."""
     return _build_relief_example(True, False, False, use_round_timbers, position)
 
 
+@pattern("relief/butt_arrangement/rotate_height_axis", tags=["poop"])
 def example_rotate_height_axis(position=None, use_round_timbers=False) -> Joint:
     """Butt timber rotated 45 deg around its height axis (out-of-plane raking angle)."""
     return _build_relief_example(False, True, False, use_round_timbers, position)
 
 
+@pattern("relief/butt_arrangement/rotate_width_and_height_axis", tags=["poop"])
 def example_rotate_width_and_height_axis(position=None, use_round_timbers=False) -> Joint:
     """Butt timber rotated 45 deg around both its width and height axes (compound angle)."""
     return _build_relief_example(True, True, False, use_round_timbers, position)
 
 
+@pattern("relief/butt_arrangement/rotate_width_and_height_axis_parallel_shoulder", tags=["poop"])
 def example_rotate_width_and_height_axis_parallel_shoulder(position=None, use_round_timbers=False) -> Joint:
     """Butt timber rotated 45 deg around both its width and height axes with shoulder parallel to FRONT face."""
     if position is None:
@@ -175,27 +178,21 @@ def example_rotate_width_and_height_axis_parallel_shoulder(position=None, use_ro
     )
 
 
+@pattern("relief/butt_arrangement/rotate_width_axis_small_timbers", tags=["poop"])
 def example_rotate_width_axis_small_timbers(position=None, use_round_timbers=False) -> Joint:
     """Same as example_rotate_width_axis but with 1.5"x4" timbers."""
     return _build_relief_example(True, False, True, use_round_timbers, position)
 
 
+@pattern("relief/butt_arrangement/rotate_height_axis_small_timbers", tags=["poop"])
 def example_rotate_height_axis_small_timbers(position=None, use_round_timbers=False) -> Joint:
     """Same as example_rotate_height_axis but with 1.5"x4" timbers."""
     return _build_relief_example(False, True, True, use_round_timbers, position)
 
 
+@pattern("relief/butt_arrangement/rotate_width_and_height_axis_small_timbers", tags=["poop"])
 def example_rotate_width_and_height_axis_small_timbers(position=None, use_round_timbers=False) -> Joint:
     """Same as example_rotate_width_and_height_axis but with 1.5"x4" timbers."""
     return _build_relief_example(True, True, True, use_round_timbers, position)
 
 
-patterns = [
-    Pattern(path="relief/butt_arrangement/rotate_width_axis", lambda_=make_pattern_from_joint(example_rotate_width_axis), pattern_type='frame', tags=['poop']),
-    Pattern(path="relief/butt_arrangement/rotate_height_axis", lambda_=make_pattern_from_joint(example_rotate_height_axis), pattern_type='frame', tags=['poop']),
-    Pattern(path="relief/butt_arrangement/rotate_width_and_height_axis", lambda_=make_pattern_from_joint(example_rotate_width_and_height_axis), pattern_type='frame', tags=['poop']),
-    Pattern(path="relief/butt_arrangement/rotate_width_and_height_axis_parallel_shoulder", lambda_=make_pattern_from_joint(example_rotate_width_and_height_axis_parallel_shoulder), pattern_type='frame', tags=['poop']),
-    Pattern(path="relief/butt_arrangement/rotate_width_axis_small_timbers", lambda_=make_pattern_from_joint(example_rotate_width_axis_small_timbers), pattern_type='frame', tags=['poop']),
-    Pattern(path="relief/butt_arrangement/rotate_height_axis_small_timbers", lambda_=make_pattern_from_joint(example_rotate_height_axis_small_timbers), pattern_type='frame', tags=['poop']),
-    Pattern(path="relief/butt_arrangement/rotate_width_and_height_axis_small_timbers", lambda_=make_pattern_from_joint(example_rotate_width_and_height_axis_small_timbers), pattern_type='frame', tags=['poop']),
-]

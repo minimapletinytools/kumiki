@@ -15,6 +15,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from kumiki.frame_decorators import module_patterns
 from kumiki.csg.cutcsg import (  # noqa: E402
     csg_children, HasFeatures, RectangularPrism, ConvexPolygonExtrusion,
     SimpleRectangularPrismFeature, SimpleConvexPolygonExtrusionFeature,
@@ -112,7 +113,7 @@ def main() -> int:
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
         spec.loader.exec_module(module)
-        for pattern in getattr(module, "patterns", None) or []:
+        for pattern in module_patterns(module)[0]:
             if not isinstance(pattern, Pattern) or pattern.pattern_type != "frame":
                 continue
             if wanted not in pattern.path:

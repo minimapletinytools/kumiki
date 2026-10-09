@@ -2,12 +2,12 @@
 Splined Opposing Double Butt Joint Patterns
 """
 
+from kumiki import Frame, Joint, create_v3, pattern
 from kumiki.rule import V3, inches, mm, scalar
 from kumiki.timber import Frame, PegShape, TimberEnd
 from kumiki.joints.workshop.butt import cut_splined_opposing_double_butt_joint_on_face_aligned_timbers
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
 from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
-from kumiki.patternbook import Pattern
 
 
 def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:
@@ -40,6 +40,6 @@ def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:
     return Frame.from_joints([joint], name="Splined Opposing Double Butt Joint")
 
 
-patterns = [
-    Pattern(path="multi_butt_joints/splined_opposing_double_butt_joint", lambda_=make_splined_opposing_double_butt_joint_example, pattern_type='frame', tags=['main']),
-]
+@pattern("multi_butt_joints/splined_opposing_double_butt_joint", tags=["main"])
+def splined_opposing_double_butt_joint_pattern() -> Frame:
+    return make_splined_opposing_double_butt_joint_example(create_v3(0, 0, 0))

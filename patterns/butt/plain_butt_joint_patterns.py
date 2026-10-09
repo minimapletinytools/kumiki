@@ -12,7 +12,6 @@ from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import Pattern
 
 TIMBER_WIDTH = inches(4)
 TIMBER_HEIGHT = inches(5)
@@ -38,21 +37,6 @@ def _maybe_round_timber(timber, use_round_timbers: bool):
         ticket=timber.ticket,
         diameter=max(timber.size[0], timber.size[1]) * sqrt(2),
     )
-
-
-def _make_frame_pattern(pattern_func, name: str):
-    """A pattern lambda that hands its kiwari's round-stock flag to *pattern_func*.
-
-    The second argument is the kiwari, not a bool -- that is the contract a
-    Pattern declaring one is called under.
-    """
-    def pattern_lambda(center, kiwari=None):
-        on_round = ROUND_STOCK.resolve(kiwari).flag("round_timbers")
-        return Frame(
-            cut_timbers=pattern_func(center, use_round_timbers=on_round),
-            name=name,
-        )
-    return pattern_lambda
 
 
 def make_butt_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -129,7 +113,13 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-patterns = [
-    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint", lambda_=_make_frame_pattern(make_butt_joint_example, "Plain Butt Joint"), kiwari=ROUND_STOCK, pattern_type='frame'),
-    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint_3d", lambda_=_make_frame_pattern(make_butt_joint_3d_angles_example, "Plain Butt Joint (3D)"), kiwari=ROUND_STOCK, pattern_type='frame'),
-]
+@pattern("butt_joints/plain_butt_joint/plain_butt_joint", kiwari=ROUND_STOCK)
+def plain_butt_joint_pattern(k: Optional[Kiwari] = None) -> Frame:
+    on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
+    return Frame(cut_timbers=make_butt_joint_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Plain Butt Joint")
+
+
+@pattern("butt_joints/plain_butt_joint/plain_butt_joint_3d", kiwari=ROUND_STOCK)
+def plain_butt_joint_3d_pattern(k: Optional[Kiwari] = None) -> Frame:
+    on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
+    return Frame(cut_timbers=make_butt_joint_3d_angles_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Plain Butt Joint (3D)")

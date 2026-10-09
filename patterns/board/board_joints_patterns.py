@@ -10,13 +10,13 @@ from kumiki.example_shavings import (
     create_canonical_example_board_butt_joint_boards_side_to_face,
     create_canonical_example_board_butt_joint_boards_end_to_face,
 )
-from kumiki.patternbook import Pattern, make_pattern_from_joint, make_pattern_from_frame
 from kumiki.rule import degrees, feet, inches, Matrix
 from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.timber import Board, Frame, Orientation, Timber, TimberEnd, Transform, create_v3
 
 
-def example_tongue_and_groove(position=None):
+@pattern("board_joints/tongue_and_groove", tags=["main"])
+def example_tongue_and_groove(position=None) -> Joint:
     """Single tongue-and-groove pattern with one tongue board and one groove board."""
     if position is None:
         position = create_v3(inches(0), inches(0), inches(0))
@@ -69,7 +69,8 @@ GROOVED_FRAME = kiwari(
 )
 
 
-def example_board_in_grooved_frame(k: Optional[Kiwari] = None) -> Frame:
+@pattern("board_joints/board_in_grooved_frame", tags=["main"], kiwari=GROOVED_FRAME)
+def example_board_in_grooved_frame(k: Optional[Kiwari]=None) -> Frame:
     """Boards fitted into a grooved rectangular frame."""
     k = GROOVED_FRAME.resolve(k)
     frame_width = k.length("frame_width")
@@ -215,6 +216,7 @@ def _joint_with_ticket_prefix(joint, prefix: str):
     return replace(joint, cuttings=new_cuttings)
 
 
+@pattern("board_joints/sliding_dovetail", tags=["main"])
 def example_sliding_dovetail_boards() -> Frame:
     dovetail_depth = inches(1, 4)
     dovetail_small_width = inches(1, 2)
@@ -252,8 +254,3 @@ def example_sliding_dovetail_boards() -> Frame:
     )
 
 
-patterns = [
-    Pattern(path="board_joints/tongue_and_groove", lambda_=make_pattern_from_joint(example_tongue_and_groove), pattern_type='frame', tags=['main']),
-    Pattern(path="board_joints/board_in_grooved_frame", lambda_=make_pattern_from_frame(example_board_in_grooved_frame), kiwari=GROOVED_FRAME, pattern_type='frame', tags=['main']),
-    Pattern(path="board_joints/sliding_dovetail", lambda_=make_pattern_from_frame(example_sliding_dovetail_boards), pattern_type='frame', tags=['main']),
-]

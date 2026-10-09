@@ -7,10 +7,10 @@ from dataclasses import replace
 
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_splice_joint_timbers
-from kumiki.patternbook import Pattern, make_pattern_from_frame
 
 
-def create_simple_gooseneck_example(position: Optional[V3] = None):
+@pattern("splice_joints/lapped_gooseneck_splice_joint")
+def create_simple_gooseneck_example(position: Optional[V3]=None) -> Frame:
     """
     Create a gooseneck splice joint example using canonical 4"x5"x4' timbers.
     """
@@ -43,6 +43,3 @@ def create_simple_gooseneck_example(position: Optional[V3] = None):
     return frame
 
 
-patterns = [
-    Pattern(path="splice_joints/lapped_gooseneck_splice_joint", lambda_=make_pattern_from_frame(create_simple_gooseneck_example), pattern_type='frame'),
-]
