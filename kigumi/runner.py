@@ -3811,12 +3811,15 @@ def _looks_like_frame(value: Any) -> bool:
     return hasattr(value, "cut_timbers") and hasattr(value, "accessories")
 
 
-def _looks_like_pattern_list(value: Any) -> bool:
-    """True if value is a non-empty list of Pattern objects."""
-    if not isinstance(value, list) or not value:
-        return False
-    first = value[0]
-    return hasattr(first, "path") and hasattr(first, "lambda_") and hasattr(first, "tags")
+def _module_patterns(module: Any) -> List[Any]:
+    """The module's @pattern functions as Patterns, in source order. Empty if it marks none."""
+    decorators = _frame_decorators()
+    if decorators is None or not hasattr(decorators, "module_patterns"):
+        return []
+    patterns, rejected = decorators.module_patterns(module)
+    for entry in rejected:
+        log_stderr(f"Warning: @{entry.kind} {entry.name} is not used: {entry.reason}")
+    return patterns
 
 
 def _is_valid_module_part(name: str) -> bool:
@@ -4102,18 +4105,21 @@ def _frame_decorators() -> Optional[Any]:
 def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tuple[Any, Optional[Any]]":
     """Resolve a frame from a loaded module, built with *kiwari* if it takes one.
 
-    In order: a `patterns` list, the file's `@frame` functions (all built with the file's
-    shared kiwari and shown together), or the deprecated `build_frame` / `example`.
+    In order: the file's `@pattern` functions (a pattern book), its `@frame` functions (all
+    built with the file's shared kiwari and shown together), or the deprecated `build_frame` /
+    `example`.
 
     Returns (frame, patternbook_or_None).
     """
-    if hasattr(module, "patterns"):
-        pattern_list = getattr(module, "patterns")
-        if _looks_like_pattern_list(pattern_list):
-            return _frame_from_pattern_list(pattern_list)
-
     decorators = _frame_decorators()
     entries = decorators.module_entries(module) if decorators is not None else None
+    pattern_list = _module_patterns(module)
+    if pattern_list:
+        if entries is not None and entries.frames:
+            log_stderr("Warning: this file has @pattern functions, so it is a pattern book and its "
+                       f"@frame functions are not shown: {', '.join(e.name for e in entries.frames)}")
+        return _frame_from_pattern_list(pattern_list)
+
     for rejected in (entries.rejected if entries is not None else ()):
         log_stderr(f"Warning: @{rejected.kind} {rejected.name} is not used: {rejected.reason}")
     if entries is not None and entries.frames:
@@ -4145,7 +4151,7 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
             pass
 
     raise AttributeError(
-        "Module must expose a module-level 'patterns' list, @frame functions, "
+        "Module must have @pattern or @frame functions, "
         "or (deprecated) a 'build_frame()' function or 'example'"
     )
 
@@ -6134,9 +6140,8 @@ def _raise_specific_pattern(
     t0 = time.monotonic()
     module = load_module_from_path(resolved, verbose=True)
 
-    # --- New: List[Pattern] system ---
-    if hasattr(module, "patterns") and _looks_like_pattern_list(getattr(module, "patterns")):
-        pattern_list = getattr(module, "patterns")
+    pattern_list = _module_patterns(module)
+    if pattern_list:
         pattern = _find_pattern_in_list(pattern_list, pattern_name)
         if pattern is None:
             available = [getattr(p, "path", "") for p in pattern_list]
@@ -6176,8 +6181,8 @@ def _raise_specific_pattern(
         return slot, result
 
     raise ValueError(
-        f"No patterns list found in {source_file}. "
-        "Pattern files must expose a module-level 'patterns = [Pattern(...), ...]' list."
+        f"No patterns found in {source_file}. A pattern book marks each pattern with "
+        "@pattern(\"group/name\") above the function that builds it."
     )
 
 

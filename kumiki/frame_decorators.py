@@ -24,20 +24,32 @@ function to call from a script or a test.
 A marked function is admitted only if its annotations say exactly that: `(k: Kiwari) -> Frame`
 for a frame, `(frame: Frame, k: Kiwari) -> str` for a tool. `Optional[Kiwari]` is accepted
 for the parameters.
+
+A pattern book marks each of its patterns instead, with a path and, if it takes parameters,
+its own kiwari::
+
+    @pattern("basic_joints/basic_mortise_and_tenon", tags=["main"], kiwari=MORTISE_AND_TENON_OPTIONS)
+    def basic_mortise_and_tenon(k: Optional[Kiwari] = None) -> Joint:
+        ...
+
+A pattern takes `(k: Kiwari)` if it declares a kiwari and nothing otherwise, and returns a
+`Frame`, a `Joint` or a `CutCSG`. Further parameters are allowed if they have defaults.
 """
 
 import inspect
 import typing
 from dataclasses import dataclass, replace
-from typing import Any, Callable, List, Optional, Tuple, TypeVar
+from typing import Any, Callable, List, Optional, Sequence, Tuple, TypeVar
 
 from .kiwari import Kiwari, kiwari as _declare_kiwari
 
-__all__ = ["frame", "tool"]
+__all__ = ["frame", "tool", "pattern"]
 
 _MARK = "__kumiki_entry__"
 FRAME = "frame"
 TOOL = "tool"
+PATTERN = "pattern"
+_PATTERN_DECLARATION = "__kumiki_pattern__"
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -52,6 +64,30 @@ def tool(function: F) -> F:
     """Marks a function `(frame: Frame, k: Kiwari) -> str` as a tool to run on the file's frame."""
     setattr(function, _MARK, TOOL)
     return function
+
+
+@dataclass(frozen=True)
+class PatternDeclaration:
+    path: str
+    tags: Tuple[str, ...]
+    kiwari: Optional[Kiwari]
+
+
+def pattern(path: str, *, tags: Sequence[str] = (), kiwari: Optional[Kiwari] = None) -> Callable[[F], F]:
+    """Marks a function as one of a pattern book's patterns, at `path`, with its own kiwari if it takes one.
+
+    `path` is hierarchical ("corner_joints/plain_miter_joint"); each segment is also a tag. Of the
+    tags, 'main' shows the pattern when the file is opened and 'poop' hides it from the sidebar.
+    """
+    if not isinstance(path, str) or not path:
+        raise TypeError("@pattern needs a path, e.g. @pattern(\"corner_joints/plain_miter_joint\")")
+
+    def mark(function: F) -> F:
+        setattr(function, _MARK, PATTERN)
+        setattr(function, _PATTERN_DECLARATION, PatternDeclaration(path, tuple(tags), kiwari))
+        return function
+
+    return mark
 
 
 @dataclass(frozen=True)
@@ -92,7 +128,8 @@ def _is_kiwari(annotation: Any) -> bool:
 
 def _signature_problem(function: Callable[..., Any], kind: str) -> Optional[str]:
     """Why `function` does not have the signature its mark requires, or None if it does."""
-    from .timber import Frame
+    from .csg.cutcsg import CutCSG
+    from .timber import Frame, Joint
 
     try:
         hints = typing.get_type_hints(function)
@@ -100,21 +137,37 @@ def _signature_problem(function: Callable[..., Any], kind: str) -> Optional[str]
     except Exception as exc:  # an annotation that does not resolve, or no signature at all
         return f"its annotations could not be read: {exc}"
 
-    expected = ("k: Kiwari", "-> Frame") if kind == FRAME else ("frame: Frame, k: Kiwari", "-> str")
-    wanted = f"({expected[0]}) {expected[1]}"
+    is_frame = lambda annotation: _is_class(annotation, Frame)  # noqa: E731
+    if kind == FRAME:
+        wanted, checks, returns_ok = "(k: Kiwari) -> Frame", [_is_kiwari], is_frame
+    elif kind == TOOL:
+        wanted, checks, returns_ok = "(frame: Frame, k: Kiwari) -> str", [is_frame, _is_kiwari], lambda a: a is str
+    else:
+        takes_kiwari = getattr(function, _PATTERN_DECLARATION).kiwari is not None
+        wanted = f"({'k: Kiwari' if takes_kiwari else ''}) -> Frame | Joint | CutCSG"
+        checks = [_is_kiwari] if takes_kiwari else []
+        returns_ok = lambda a: is_frame(a) or _is_class(a, Joint) or _is_subclass(a, CutCSG)  # noqa: E731
+        # A pattern may keep extra parameters after these, so long as they have defaults.
+        extra = parameters[len(checks):]
+        if any(p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD) or p.default is p.empty for p in extra):
+            return f"it should be {wanted}; any further parameters need defaults"
+        parameters = parameters[:len(checks)]
+
     positional = [p for p in parameters if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
     if len(positional) != len(parameters):
         return f"it should be {wanted}, with no *args, **kwargs or keyword-only parameters"
-    checks = [_is_kiwari] if kind == FRAME else [lambda annotation: _is_class(annotation, Frame), _is_kiwari]
     if len(positional) != len(checks):
         return f"it should take {len(checks)} parameter(s): {wanted}"
     for parameter, check in zip(positional, checks):
         if parameter.name not in hints or not check(hints[parameter.name]):
             return f"parameter {parameter.name!r} should be annotated as in {wanted}"
-    returns = hints.get("return")
-    if (kind == FRAME and not _is_class(returns, Frame)) or (kind == TOOL and returns is not str):
+    if not returns_ok(hints.get("return")):
         return f"its return should be annotated as in {wanted}"
     return None
+
+
+def _is_subclass(value: Any, cls: type) -> bool:
+    return isinstance(value, type) and any(_is_class(base, cls) for base in value.__mro__)
 
 
 def module_parameters(module: Any) -> Kiwari:
@@ -126,11 +179,21 @@ def module_parameters(module: Any) -> Kiwari:
     return found[0][1] if found else _declare_kiwari()
 
 
+def _marked(module: Any, kinds: Tuple[str, ...]) -> List[Tuple[str, Callable[..., Any]]]:
+    """The module's own functions marked as one of `kinds`, in source order, each once under its first name."""
+    seen: set = set()
+    marked = []
+    for name, value in vars(module).items():
+        if (callable(value) and getattr(value, _MARK, None) in kinds and id(value) not in seen
+                and getattr(value, "__module__", None) == module.__name__):
+            seen.add(id(value))
+            marked.append((name, value))
+    return marked
+
+
 def module_entries(module: Any) -> ModuleEntries:
     """The frames and tools `module` marked, in source order, each admitted or rejected."""
-    marked = [(name, value) for name, value in vars(module).items()
-              if callable(value) and getattr(value, _MARK, None) in (FRAME, TOOL)
-              and getattr(value, "__module__", None) == module.__name__]
+    marked = _marked(module, (FRAME, TOOL))
     frames: List[Entry] = []
     tools: List[Entry] = []
     rejected: List[Rejected] = []
@@ -149,6 +212,32 @@ def module_entries(module: Any) -> ModuleEntries:
 # TODO merging into one Frame keeps kigumi working as is. Instead, kigumi should take several
 # frames: the frame list shows the frames at the top level, each opening to its timbers and
 # joints, with drawings still at the top level.
+def module_patterns(module: Any) -> Tuple[List[Any], Tuple[Rejected, ...]]:
+    """The patterns `module` marked with @pattern, in source order, and those rejected for their signature."""
+    from .csg.cutcsg import CutCSG
+    from .patternbook import Pattern, make_pattern_from_csg, make_pattern_from_frame, make_pattern_from_joint
+    from .timber import Joint
+
+    patterns: List[Any] = []
+    rejected: List[Rejected] = []
+    for name, function in _marked(module, (PATTERN,)):
+        problem = _signature_problem(function, PATTERN)
+        if problem is not None:
+            rejected.append(Rejected(name, PATTERN, problem))
+            continue
+        declaration: PatternDeclaration = getattr(function, _PATTERN_DECLARATION)
+        returns = typing.get_type_hints(function)["return"]
+        if _is_subclass(returns, CutCSG):
+            lambda_, pattern_type = make_pattern_from_csg(function), "csg"
+        elif _is_class(returns, Joint):
+            lambda_, pattern_type = make_pattern_from_joint(function), "frame"
+        else:
+            lambda_, pattern_type = make_pattern_from_frame(function), "frame"
+        patterns.append(Pattern(path=declaration.path, lambda_=lambda_, tags=list(declaration.tags),
+                                pattern_type=pattern_type, kiwari=declaration.kiwari))
+    return patterns, tuple(rejected)
+
+
 def overlay_frames(frames: List[Any], name: Optional[str], parameters: Optional[Kiwari]) -> Any:
     """Several frames shown together, each where it was built, carrying the shared parameters."""
     from .timber import Frame

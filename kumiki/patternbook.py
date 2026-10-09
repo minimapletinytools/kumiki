@@ -163,6 +163,7 @@ def make_pattern_from_frame(frame_func: Callable[..., Frame]) -> PatternLambda:
         return Frame(
             cut_timbers=translated_timbers,
             accessories=translated_accessories,
+            name=frame.name,
             kiwari=kiwari if kiwari is not None else frame.kiwari,
         )
 

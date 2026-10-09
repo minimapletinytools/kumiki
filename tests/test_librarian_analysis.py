@@ -132,3 +132,29 @@ def build_anything() -> Frame: ...
 """
     info = analyze_source(src, "f.py")
     assert info.frames == []
+
+
+def test_decorated_patterns_make_a_pattern_book():
+    src = """
+from kumiki import *
+
+@pattern("corner_joints/plain_miter", tags=["main"])
+def plain_miter() -> Joint: ...
+
+@kumiki.pattern("corner_joints/other")
+def other() -> Joint: ...
+
+@frame
+def not_shown(k: Kiwari) -> Frame: ...
+"""
+    info = analyze_source("import kumiki\n" + src, "f.py")
+    assert [e.name for e in info.pattern_functions] == ["plain_miter", "other"]
+    assert info.has_anything
+
+
+def test_a_patterns_list_is_no_longer_read():
+    src = """
+from kumiki import *
+patterns = [Pattern(path="a/b", lambda_=lambda center: None)]
+"""
+    assert analyze_source(src, "f.py").has_anything is False

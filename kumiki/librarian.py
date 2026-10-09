@@ -22,10 +22,8 @@ A function decorated with ``@tool`` is recorded as a **tool**. Whether a
 decorated function's signature is right is only checked after import, by
 ``kumiki.frame_decorators``.
 
-A module-level statement is recognized as a **pattern list** entry only by
-name: ``patterns = [...]`` or ``patterns: ... = [...]``, list literal or
-call, no content type-checking at this stage (that happens after import, in
-``_resolve_pattern_list``).
+A function decorated with ``@pattern`` makes the file a **pattern book**. Its
+signature is checked after import, in ``_resolve_pattern_list``.
 
 When a file has multiple frame entries, ``ModuleStaticInfo.chosen_frame`` is
 the **last** one in source order.
@@ -34,8 +32,8 @@ Two-phase scan (see ``_scan_single_file``)
 -------------------------------------------
 
 1. Static AST analysis always runs first and is cheap (no import).
-2. A file is only actually imported (``exec_module``) if its static info has
-   a ``patterns = [...]`` candidate (``needs_import = bool(static_info.pattern_lists)``).
+2. A file is only actually imported (``exec_module``) if it has ``@pattern``
+   functions (``needs_import = bool(static_info.pattern_functions)``).
    **Frame-only files are never imported during a scan** — only their static
    info (names/kinds/line numbers) is captured. Building the real ``Frame``
    object (calling ``example()``/``build_frame()``) is deferred entirely to
@@ -117,7 +115,7 @@ _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
 # Frame entries are recognized by kumiki's ``@frame`` / ``@tool`` decorators, or by the
 # deprecated names ``build_frame`` and ``example``. The decorators may come in by ``from kumiki import *`` (the usual
 # form), by name, under an alias, or as ``kumiki.frame``.
-_DECORATORS = ("frame", "tool")
+_DECORATORS = ("frame", "tool", "pattern")
 # Deprecated: frames picked up by name rather than by @frame.
 _LEGACY_NAMES = ("build_frame", "example")
 
@@ -136,12 +134,12 @@ class ModuleStaticInfo:
     file_path: str
     frames: List[StaticEntry] = field(default_factory=list)
     tools: List[StaticEntry] = field(default_factory=list)
-    pattern_lists: List[StaticEntry] = field(default_factory=list)
+    pattern_functions: List[StaticEntry] = field(default_factory=list)
     parse_error: Optional[str] = None
 
     @property
     def has_anything(self) -> bool:
-        return bool(self.frames) or bool(self.pattern_lists)
+        return bool(self.frames) or bool(self.pattern_functions)
 
     @property
     def chosen_frame(self) -> Optional[StaticEntry]:
@@ -176,7 +174,9 @@ def _collect_decorator_aliases(tree: ast.Module) -> dict[str, str]:
 
 
 def _decorator_kind(decorator: ast.expr, aliases: dict[str, str]) -> Optional[str]:
-    """``frame`` or ``tool`` if *decorator* is one of kumiki's, else None."""
+    """``frame``, ``tool`` or ``pattern`` if *decorator* is one of kumiki's, else None."""
+    if isinstance(decorator, ast.Call):  # @pattern("group/name", ...)
+        decorator = decorator.func
     if isinstance(decorator, ast.Name):
         return aliases.get(decorator.id)
     if isinstance(decorator, ast.Attribute) and decorator.attr in _DECORATORS:
@@ -186,25 +186,6 @@ def _decorator_kind(decorator: ast.expr, aliases: dict[str, str]) -> Optional[st
         if isinstance(root, ast.Name) and root.id == "kumiki":
             return decorator.attr
     return None
-
-
-def _is_pattern_list_assignment(node: ast.Assign) -> bool:
-    """True if this is a module-level `patterns = [...]` assignment."""
-    if not isinstance(node.value, (ast.List, ast.Call)):
-        return False
-    for target in node.targets:
-        for name in _record_target_names(target):
-            if name == "patterns":
-                return True
-    return False
-
-
-def _is_pattern_list_ann_assign(node: ast.AnnAssign) -> bool:
-    """True if this is a module-level `patterns: ... = [...]` annotation."""
-    return (
-        isinstance(node.target, ast.Name)
-        and node.target.id == "patterns"
-    )
 
 
 def _record_target_names(target: ast.expr) -> List[str]:
@@ -233,20 +214,14 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
         # @frame / @tool def name(...): ...
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             kinds = {_decorator_kind(decorator, aliases) for decorator in node.decorator_list}
-            if "frame" in kinds:
+            if "pattern" in kinds:
+                info.pattern_functions.append(StaticEntry(node.name, "function", node.lineno))
+            elif "frame" in kinds:
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
             elif "tool" in kinds:
                 info.tools.append(StaticEntry(node.name, "function", node.lineno))
             elif node.name in _LEGACY_NAMES:
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
-            continue
-
-        # patterns = [...] / patterns: ... = [...]
-        if isinstance(node, ast.AnnAssign) and _is_pattern_list_ann_assign(node):
-            info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
-            continue
-        if isinstance(node, ast.Assign) and _is_pattern_list_assignment(node):
-            info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
             continue
 
         # example = ... / build_frame = ...
@@ -464,24 +439,12 @@ def _load_module_from_path(
 
 
 def _resolve_pattern_list(module: Any, warnings: List[str]) -> Optional[List[Pattern]]:
-    """Return List[Pattern] from module.patterns if it's a valid pattern list."""
-    if not hasattr(module, "patterns"):
-        return None
-    candidate = getattr(module, "patterns")
-    if not isinstance(candidate, list):
-        warnings.append(
-            f"module.patterns exists but is {type(candidate).__name__}, expected list"
-        )
-        return None
-    patterns: List[Pattern] = []
-    for i, item in enumerate(candidate):
-        if not isinstance(item, Pattern):
-            warnings.append(
-                f"module.patterns[{i}] is {type(item).__name__}, expected Pattern — skipping"
-            )
-            continue
-        patterns.append(item)
-    return patterns if patterns else None
+    """The module's @pattern functions as Patterns, or None if it marks none."""
+    from .frame_decorators import module_patterns
+
+    patterns, rejected = module_patterns(module)
+    warnings.extend(f"@pattern {entry.name} is not used: {entry.reason}" for entry in rejected)
+    return patterns or None
 
 
 # ---------------------------------------------------------------------------
@@ -522,7 +485,7 @@ def _scan_single_file(
     if not static_info.has_anything:
         return record
 
-    needs_import = bool(static_info.pattern_lists)
+    needs_import = bool(static_info.pattern_functions)
     if not needs_import:
         return record
 
@@ -536,7 +499,7 @@ def _scan_single_file(
     if module is None:
         return record
 
-    if static_info.pattern_lists:
+    if static_info.pattern_functions:
         record.pattern_list = _resolve_pattern_list(module, record.warnings)
     return record
 
@@ -611,7 +574,7 @@ def build_scan_index(scan_result: LibrarianScanResult) -> Dict[str, Any]:
         warnings = list(rec.warnings or [])
         static = rec.static_info
 
-        if rec.pattern_list is not None or (static and static.pattern_lists):
+        if rec.pattern_list is not None or (static and static.pattern_functions):
             pl = rec.pattern_list or []
             patterns_payload = [
                 {"path": p.path, "tags": list(p.tags), "pattern_type": p.pattern_type}

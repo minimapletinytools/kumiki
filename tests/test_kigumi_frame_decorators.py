@@ -143,3 +143,25 @@ def test_a_kumiki_without_frame_decorators_still_loads_legacy_files(workspace, m
 
     assert slot.frame.name == "old"
     assert runner._serialize_tools(slot) == {"tools": [], "rejectedEntries": []}
+
+
+def test_a_pattern_book_ignores_its_frames(workspace, capsys):  # noqa: F811
+    path = workspace / "book.py"
+    path.write_text("from kumiki import *\n\n"
+                    "@pattern('g/a', tags=['main'])\ndef a() -> Frame:\n    return Frame(cut_timbers=[], name='a')\n\n"
+                    "@frame\ndef f(k: Kiwari) -> Frame:\n    return Frame(cut_timbers=[], name='f')\n")
+
+    slot = runner.load_slot_state(str(path))
+
+    assert slot.frame.name == "a"
+    assert "@frame functions are not shown: f" in capsys.readouterr().err
+
+
+def test_a_patterns_list_is_no_longer_read(workspace):  # noqa: F811
+    path = workspace / "old_book.py"
+    path.write_text("from kumiki import *\nfrom kumiki.patternbook import Pattern, make_pattern_from_frame\n\n"
+                    "def a():\n    return Frame(cut_timbers=[])\n\n"
+                    "patterns = [Pattern(path='g/a', lambda_=make_pattern_from_frame(a))]\n")
+
+    with pytest.raises(AttributeError, match="@pattern or @frame"):
+        runner.load_slot_state(str(path))

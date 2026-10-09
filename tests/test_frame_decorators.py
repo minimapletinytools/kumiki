@@ -138,3 +138,64 @@ class TestOverlay:
         shown = overlay_frames([only], None, params)
 
         assert shown.cut_timbers == only.cut_timbers and shown.name == "only" and shown.kiwari is params
+
+
+class TestPatterns:
+
+    def _patterns(self, source):
+        namespace = dict(vars(__import__("kumiki")))
+        namespace["__name__"] = "a_pattern_file"
+        exec(source, namespace)
+        module = types.ModuleType("a_pattern_file")
+        module.__dict__.update(namespace)
+        from kumiki.frame_decorators import module_patterns
+        return module_patterns(module)
+
+    def test_each_marked_function_is_a_pattern_in_source_order(self):
+        patterns, rejected = self._patterns(
+            "SIZES = kiwari(posts=kiwari.count(2))\n"
+            "@pattern('group/second', tags=['main'], kiwari=SIZES)\n"
+            "def b(k: Kiwari) -> Frame:\n"
+            "    return Frame(cut_timbers=[], name=f\"{k.count('posts')} posts\")\n"
+            "@pattern('group/first')\n"
+            "def a(position=None) -> Frame:\n"
+            "    return Frame(cut_timbers=[], name='a')\n")
+
+        assert rejected == ()
+        assert [(p.path, p.tags, p.kiwari is not None) for p in patterns] == [
+            ("group/second", ["main"], True), ("group/first", [], False)]
+        assert patterns[0].raise_at(kiwari={"posts": 3}).name == "3 posts"
+        assert patterns[1].raise_at().name == "a"
+
+    def test_the_return_annotation_decides_the_kind(self):
+        patterns, _ = self._patterns(
+            "@pattern('g/csg')\n"
+            "def shape() -> CutCSG:\n"
+            "    return HalfSpace(normal=create_v3(0, 0, 1))\n"
+            "@pattern('g/frame')\n"
+            "def whole() -> Frame:\n"
+            "    return Frame(cut_timbers=[])\n")
+
+        assert [p.pattern_type for p in patterns] == ["csg", "frame"]
+
+    @pytest.mark.parametrize("source, reason", [
+        ("@pattern('g/a')\ndef a(k: Kiwari) -> Frame: ...", "() -> Frame"),
+        ("@pattern('g/a', kiwari=kiwari(x=kiwari.count(1)))\ndef a() -> Frame: ...", "1 parameter"),
+        ("@pattern('g/a')\ndef a() -> str: ...", "return"),
+        ("@pattern('g/a')\ndef a(position) -> Frame: ...", "need defaults"),
+    ])
+    def test_a_wrong_signature_is_rejected_with_why(self, source, reason):
+        patterns, rejected = self._patterns(source)
+
+        assert patterns == []
+        assert reason in rejected[0].reason
+
+    def test_an_alias_is_one_pattern(self):
+        patterns, _ = self._patterns(
+            "@pattern('g/a')\ndef a() -> Frame:\n    return Frame(cut_timbers=[])\nalso_a = a\n")
+
+        assert [p.path for p in patterns] == ["g/a"]
+
+    def test_a_path_is_required(self):
+        with pytest.raises(TypeError, match="needs a path"):
+            pattern("")
