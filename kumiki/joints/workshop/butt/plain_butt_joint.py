@@ -112,10 +112,19 @@ def cut_plain_butt_joint(
         safe_dot_product(cut_normal_global, face_center)
         - safe_dot_product(cut_normal_global, butt_timber.get_bottom_position_global())
     )
-    end_cut_distance_from_bottom = safe_dot_product(
-        face_center - butt_timber.get_bottom_position_global(),
-        butt_timber.get_length_direction_global(),
-    )
+    # Where the stock is cut to length: the furthest any arris reaches before the
+    # cut plane, so an oblique cut keeps its long point.
+    half_width, half_height = butt_timber.size[0] / scalar(2), butt_timber.size[1] / scalar(2)
+    arris_reaches = [
+        (local_offset - local_normal[0] * x - local_normal[1] * y) / local_normal[2]
+        for x in (-half_width, half_width)
+        for y in (-half_height, half_height)
+    ]
+    end_cut_distance_from_bottom = arris_reaches[0]
+    for reach in arris_reaches[1:]:
+        further = Comparison.GT if butt_end == TimberEnd.TOP else Comparison.LT
+        if safe_compare(reach, end_cut_distance_from_bottom, further):
+            end_cut_distance_from_bottom = reach
 
     end_cut = HalfSpace(normal=local_normal, offset=local_offset)
 

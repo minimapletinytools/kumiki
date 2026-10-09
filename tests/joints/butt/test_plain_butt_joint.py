@@ -207,3 +207,35 @@ class TestButtJoint:
 
 
 
+
+
+class TestAnObliqueButtKeepsItsLongPoint:
+    """The stock is cut to length where its longest arris meets the cut plane."""
+
+    def _post_under_a_sloped_board(self):
+        # A 2x2 post standing at the origin, under a board climbing 3 in 4 towards +x
+        # whose underside passes through (0, 0, 10).
+        post = create_axis_aligned_timber(
+            bottom_position=create_v3(0, 0, 0), length=scalar(20),
+            size=Matrix([scalar(2), scalar(2)]), length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT, ticket="post")
+        up_the_slope = create_v3(scalar(4, 5), 0, scalar(3, 5))
+        outward = create_v3(scalar(-3, 5), 0, scalar(4, 5))
+        board = create_timber(
+            length=scalar(20), size=Matrix([scalar(6), scalar(1)]),
+            bottom_position=create_v3(0, 0, 10) - up_the_slope * 5 + outward * scalar(1, 2),
+            length_direction=up_the_slope, width_direction=create_v3(0, 1, 0), ticket="board")
+        return cut_plain_butt_joint(ButtJointTimberArrangement(
+            butt_timber=post, receiving_timber=board, butt_timber_end=TimberEnd.TOP))
+
+    def test_the_end_cut_is_at_the_long_point(self):
+        cutting = self._post_under_a_sloped_board().cuttings["butt_timber"]
+
+        # The underside is at z = 10 + 3/4 x, and the post reaches x = 1.
+        assert float(cutting.maybe_top_end_cut_distance_from_bottom) == pytest.approx(10.75)
+
+    def test_so_the_long_point_is_still_there(self):
+        rendered = _render_cutting(self._post_under_a_sloped_board().cuttings["butt_timber"])
+
+        assert rendered.contains_point(create_v3(scalar(9, 10), 0, scalar(21, 2)))
+        assert not rendered.contains_point(create_v3(scalar(-9, 10), 0, scalar(21, 2)))
