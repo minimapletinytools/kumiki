@@ -121,7 +121,8 @@ for EDITOR_CLI in code cursor; do
     fi
     if [ -d "$REPO_ROOT/docs" ] && [ -d "$EXT_DIR" ]; then
         mkdir -p "$EXT_DIR/.kigumi/docs"
-        rsync -a --delete "$REPO_ROOT/docs/" "$EXT_DIR/.kigumi/docs/"
+        # docs/internal/ is ours, not a user's; see kigumi/scripts/bundle-docs.js.
+        rsync -a --delete --exclude 'internal/' "$REPO_ROOT/docs/" "$EXT_DIR/.kigumi/docs/"
     fi
 done
 
