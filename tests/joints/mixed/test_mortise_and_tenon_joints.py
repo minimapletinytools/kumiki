@@ -1200,6 +1200,40 @@ class TestMortiseAndTenonFeatures:
         # Where the shoulder plane meets the timber's own faces.
         assert {edge for edge in edges if edge.startswith("shoulder\u00d7")}
 
+    def test_the_tenons_base_arris_is_selectable(self, simple_T_configuration):
+        """The inside corner where each cheek meets the shoulder.
+
+        The tenon prism starts ON the shoulder plane, so this arris is an edge
+        of the cut as well as a line on the base's face -- which the flush test
+        in Difference used to read as the cut taking the shoulder with it, and
+        nothing there could be picked.
+        """
+        from kumiki.csg.cutcsg import (CSGFeatureType, DerivedEdgeFeature, OwnedFeatureHit,
+                                       csg_children, shared_ancestor)
+
+        rendered = self._rendered(simple_T_configuration)["tenon_timber"]
+        declared = {}
+
+        def walk(node):
+            for feature in node.get_declared_features():
+                declared[feature.name] = OwnedFeatureHit(feature=feature, owner=node)
+            for child in csg_children(node):
+                walk(child)
+
+        walk(rendered)
+        for cheek in ("tenon_right", "tenon_left", "tenon_front", "tenon_back"):
+            arris = DerivedEdgeFeature.derive(declared["shoulder"], declared[cheek])
+            assert arris is not None
+            owner = shared_ancestor(rendered, declared["shoulder"].owner, declared[cheek].owner)
+            assert owner is not None
+            extent = arris.get_extent(owner)
+            assert extent is not None
+            middle = extent.anchor
+
+            hits = rendered.find_all_features(middle)
+            assert hits and hits[0].feature.feature_type() is CSGFeatureType.EDGE, cheek
+            assert {"shoulder", cheek} <= {hit.feature.name for hit in hits}
+
     def test_the_mortise_declares_its_walls_and_floor(self, simple_T_configuration):
         from kumiki.csg.cutcsg import CSGFeatureType
 
