@@ -258,24 +258,23 @@ Patterns are simple examples demonstrating joints or other deconstruted concepts
 - pattern should always use canonical arrangement in example_shavings.py when possible. 
 - each joint should have at least one pattern
 - if a joint has multiple patterns, they should all be in a subfolder named after the joint
-- a pattern takes exactly one argument, the `center` it is raised at. Anything
-  else the user may adjust is declared in a kiwari on the `Pattern` itself:
+- a pattern is a function marked with `@pattern`, directly above it. It takes
+  nothing, or `(k: Kiwari)` if it declares a kiwari of things the user may
+  adjust, and returns a `Joint`, `Frame` or `CutCSG`:
 
   ```python
-  Pattern(
-      path="butt_joints/plain_butt_joint",
-      lambda_=make_pattern_from_frame(make_butt_joint_example),
-      kiwari=kiwari(angle=kiwari.angle(degrees(90), minimum=degrees(30))),
-  )
+  @pattern("butt_joints/plain_butt_joint",
+           kiwari=kiwari(angle=kiwari.angle(degrees(90), minimum=degrees(30))))
+  def plain_butt_joint(k: Optional[Kiwari] = None) -> Frame:
+      ...
   ```
 
-  The lambda is then called with `(center, kiwari)`; a pattern that declares
-  none is called with `(center)` alone. Prefer a second `Pattern` over a
-  parameter where the variants are worth seeing side by side in the sidebar —
-  a round-timber version of a joint is a pattern, not a toggle.
+  Prefer a second pattern over a parameter where the variants are worth seeing
+  side by side in the sidebar -- a round-timber version of a joint is a
+  pattern, not a toggle. See docs/patternbook.md.
 
 Kumiki also ships with a few example Frames that demonstrate how to put everything together. In general, follow agent_usage_instructions.md for authoring patterns and example frames.
 
 ### How patterns and frames get discovered
 
-The librarian (`kumiki/librarian.py`) scans source files to find patterns and frame examples without importing them. In short: a module-level `patterns = [...]` list is how patterns are found, and a module-level `example` (or `build_frame`) — ideally, but not strictly required to be, annotated `-> Frame` — is how frame examples are found. See the module docstring in `kumiki/librarian.py` for the exact detection rules and how the pattern-index cache works.
+The librarian (`kumiki/librarian.py`) scans source files to find patterns and frame examples without importing them. In short: functions marked `@pattern("group/name")` are a file's patterns, and functions marked `@frame` are its frames (a module-level `example` or `build_frame` still works, with a deprecation warning). See the module docstring in `kumiki/librarian.py` for the exact detection rules and how the pattern-index cache works.

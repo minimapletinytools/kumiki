@@ -2,27 +2,49 @@
 
 ## Overview
 
-Pattern files expose a module-level `patterns` list containing `Pattern` objects. The Kigumi viewer scans these files and displays them in its sidebar.
+A pattern file marks each of its patterns with `@pattern`, directly above the function that builds it. The Kigumi viewer scans these files and lists the patterns in its sidebar.
 
-## Pattern dataclass
+## Writing a pattern file
 
 ```python
-from kumiki.patternbook import Pattern
+from typing import Optional
+from kumiki import *
 
-Pattern(
-    path="corner_joints/cut_plain_miter_joint",   # required
-    lambda_=my_lambda,                            # required
-    tags=["main"],                                # optional, default []
-    pattern_type="frame",                         # optional, default "frame"
-)
+ROUND_STOCK = kiwari(round_timbers=kiwari.flag(False, about="Use round timbers"))
+
+
+@pattern("my_category/basic_joint", tags=["main"])
+def basic_joint(position=None) -> Joint:
+    ...  # returns a joint
+
+
+@pattern("my_category/round_or_square", kiwari=ROUND_STOCK)
+def round_or_square(k: Optional[Kiwari] = None) -> Frame:
+    k = ROUND_STOCK.resolve(k)
+    ...  # returns a Frame, using k.flag("round_timbers")
+
+
+@pattern("my_category/csg_shape", tags=["poop"])
+def csg_shape() -> CutCSG:
+    ...  # returns a CutCSG
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `path` | `str` | Hierarchical path like `"category/name"`. Each segment is an implicit tag. |
-| `lambda_` | `PatternLambda` | `Callable[..., Frame \| CutCSG]` — first arg is `center: V3`. |
-| `tags` | `List[str]` | Explicit tags. See special tags below. |
-| `pattern_type` | `"frame"` or `"csg"` | Whether the lambda returns a `Frame` or `CutCSG`. |
+`@pattern(path, tags=[...], kiwari=...)`:
+
+| Argument | Description |
+|----------|-------------|
+| `path` | Required. Hierarchical, like `"category/name"`. Each segment is an implicit tag. |
+| `tags` | Optional. See special tags below. |
+| `kiwari` | Optional. The numbers this pattern can be adjusted by in Kigumi's parameters panel. Each pattern declares its own. |
+
+The function is checked when the file is loaded, and one that doesn't fit is skipped with the reason:
+
+- It takes `(k: Kiwari)` if the pattern declares a kiwari (`Optional[Kiwari]` is fine), and nothing otherwise. Further parameters are allowed if they have defaults, such as `position=None`.
+- Its return annotation is `Joint`, `Frame` or `CutCSG`. A joint is shown as a frame of its timbers; a `CutCSG` makes it a CSG pattern.
+
+The decorator only marks the function, so it is still an ordinary function to call from a script or a test.
+
+A file with `@pattern` functions is a pattern book: any `@frame` functions in it are not shown.
 
 ### Special tags
 
@@ -30,43 +52,6 @@ Pattern(
 |-----|---------|
 | `main` | Default pattern shown when file is first opened in viewer. |
 | `poop` | Hidden from sidebar (excluded at display level). |
-
-## Writing a pattern file
-
-```python
-from kumiki import *
-from kumiki.patternbook import Pattern, make_pattern_from_joint, make_pattern_from_frame, make_pattern_from_csg
-
-def my_joint(position=None):
-    ...  # returns a joint
-
-def my_frame(position=None):
-    ...  # returns a Frame
-
-def my_csg_func():
-    ...  # returns a CutCSG
-
-patterns = [
-    # function returning joint
-    Pattern(path="my_category/basic_joint", lambda_=make_pattern_from_joint(my_joint), pattern_type="frame", tags=["main"]),
-    # function returning Frame (takes optional position)
-    Pattern(path="my_category/frame_example", lambda_=make_pattern_from_frame(my_frame), pattern_type="frame"),
-    # function returning CutCSG
-    Pattern(path="my_category/csg_shape", lambda_=make_pattern_from_csg(my_csg_func), pattern_type="csg"),
-    # inline lambda for list[CutTimber] functions
-    Pattern(path="my_category/timber_list", lambda_=lambda center: Frame(cut_timbers=make_timbers(center), name="My Joint"), pattern_type="frame"),
-]
-```
-
-## Helper constructors
-
-| Helper | Use when function returns |
-|--------|--------------------------|
-| `make_pattern_from_joint(func)` | A joint object (has `.cuttings`) — wraps into `Frame.from_joints` |
-| `make_pattern_from_frame(func)` | A `Frame` directly — calls at origin |
-| `make_pattern_from_csg(func)` | A `CutCSG` object — calls with no args |
-
-All three accept functions with an optional `position` argument defaulting to origin.
 
 ## Path conventions
 
@@ -83,22 +68,13 @@ The Kigumi sidebar shows patterns in two modes:
 
 Patterns tagged `poop` are filtered out of the sidebar entirely. Patterns tagged `main` are raised first when a file is opened.
 
-## PatternLambda signature
+## Raising a pattern from code
+
+`kumiki.frame_decorators.module_patterns(module)` gives a module's patterns as `Pattern` objects, in source order:
 
 ```python
-PatternLambda = Callable[..., Union[Frame, CutCSG]]
-```
-
-The first positional argument must be `center: V3` (the build origin). Additional keyword arguments are allowed.
-
-```python
-# Valid lambda:
-lambda center, scale=1: my_joint(center, scale=scale)
-
-# Raise a pattern manually:
-pattern.raise_at(center=create_v3(0, 0, 0))
-# or at origin:
-pattern.raise_at()
+patterns, rejected = module_patterns(my_pattern_module)
+patterns[0].raise_at()  # at the origin
 ```
 
 ## Existing pattern files
