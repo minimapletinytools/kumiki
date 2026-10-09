@@ -165,32 +165,47 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 :: TODO
 
+
+-DRAWING NEXT TODO
+  DONE-fix face extents to not be AABB but rather corners 
+  -selecting parallel faces should not be permitted in drawing view
+  -figure out how to measure to PTW
+  -hidden feature detection in drawing view (featurelist, view) to see what's hidden
+
+-work out feature seleciton issues  
+  -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
+  -right now faces that are perpencdiluar to the camera can't seem to be selected (they dont show up in the right click menu), instead only the face parallel to the camera shows up, we actually don't want that one to show up cuz it's easy enough to click on it through other means. 
+      -conceivably we could disallow selection fo faces entierly in 2d view? but we need to be mindful about this when determining if all featuers of a timber are solved.
+
+-visual related issues
+  -do the render stack fro kigumi
+  -the selected timber blue thing is weird when we're in measuring mode, especially in 2d where there is no concept of selection and then drilling in
+  -timber goes into x-ray view when a feature is selected in drawing mode 
+  -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
+    -or maybe allow selectino of xrayed features?
+  -figure out xray joints tagging (could be a per joint/direction property)
+
+
 -MEASURING RELATED STUFF
+  DONE?-fix priority of feature selection in 2d view, it should prioritize on features closest to camera, just refine the rules in general
+  DONE-test edge face -> point derivation at some point...
+  DONE-when face is highlighted in green (for measure from) it's internal tris should not be highlighted. it should look like it was selected but in green like we do for regular selection
+  cases where the 2 features being measured are perpendicular
   -the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
-  -fix face extents to not be AABB but rather corners 
   -angle mesaurement anchor positon derivatino needs to be improved
     -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
     -definitely highlight the features being measured...
-  -the selected timber blue thing is weird when we're in measuring mode, especially in 2d where there is no concept of selection and then drilling in
-  -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
-  -fix priority of feature selection in 2d view, it should prioritize on features closest to camera, just refine the rules in general
-  -right now faces that are perpencdiluar to the camera can't seem to be selected (they dont show up in the right click menu), instead only the face parallel to the camera shows up, we actually don't want that one to show up cuz it's easy enough to click on it through other means. 
-    -conceivably we could disallow selection fo faces entierly in 2d view? but we need to be mindful about this when determining if all featuers of a timber are solved.
   -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
     -either add it as a separate menu after a divider
     -get rid of it in 2d drawing view
     -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
-  -for angle measurements you should be allowed to measure to axis aligned planes
-  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
-  -when face is highlighted in green (for measure from) it's internal tris should not be highlighted. it should look like it was selected but in green like we do for regular selection
-  cases where the 2 features being measured are perpendicular
   -add hotkey for "measure from this"
-  -timber goes into x-ray view when a feature is selected in drawing mode 
-  -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
-    -or maybe allow selectino of xrayed features?
-  -test edge face -> point derivation at some point...
+  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
 
 -DRAWING NONSENSE
+  -modifying python created measurements
+    -delete an original measurement should delete it, thus you need a way to override a measurement as "delteed"
+    -delete after modifying should reset to original measurement (or not)
   -do the drawing border and meta info stuff
     -add background border for drawing...
     -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
@@ -202,8 +217,11 @@ DONE-sliding dovetail (maybe you want tapered variants)
       for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
   -conisder just shippingthe defalut drawing with every frame by default 
     
+  
 
--NEXT STEPS FOR auto drawing DRAWING
+
+
+DONE-NEXT STEPS FOR auto drawing DRAWING
   -figure out the measuring to rough thing.... I think all measurements should just go to PTW faces... so you need to make it so when selecting faces only PTW faces can be mesaured from/to
   -pull out my cute frame test auto drawing solver into its own function
   -move solver into its own thread and add in function to pass in slices I guess?
@@ -225,12 +243,13 @@ DONE-replace pattern with @pattern decorator?
 DONE-add multi frame support (decorators + multipl eframe function )
   -test this
 DONE-reset button in parameters in kigumi seems broken
+DONE-kiugmi update kumiki should update docs as well
 
--kiugmi update kumiki should update docs as well
+
+
 -add support to run @tools from the parameter section
 -add export drawing button (how to do this?)
--figure out xray joints (could be aper joint/direction property)
--hidden feature detection(featurelist, view) to see what's hidden
+
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
 
