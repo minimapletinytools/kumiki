@@ -214,23 +214,22 @@ DONE-cut plain cross lap house joint pattern needs to be repositioned, its curre
 DONE-move irrational_angles/mortise and tenon joint example with te rest of the mortise and tenon joint exmples
 DONE-some of teh patterns are broken in relief/butt_arrangement can you try and run them all and see if any of them are broken
 DONE-test derived points btw
+DONE-add additional methods (decotarator + buttons in the parameters section)
+DONE-maybe add named collisions groups, rough perfect shoulderplane tenon. think about where else you need derived features...
+DONE-add units toggle for measurements
+DONE-tenon square peg holes need to intersect with the tenon prism for derived edges
+  DONE-make a decision on derived edge groups
+  -test this...
+DONE-replace pattern with @pattern decorator?
+  -test this
+DONE-add multi frame support (decorators + multipl eframe function )
+  -test this
+DONE-reset button in parameters in kigumi seems broken
 
-
-
--maybe add named collisions groups, rough perfect shoulderplane tenon. think about where else you need derived features...
--tenon square peg holes need to intersect with the tenon prism for derived edges
-  -make a decision on derived edge groups
-
-
-
--replace pattern with @pattern decorator?
--add multi frame support (decorators + multipl eframe function )
--add additional methods (decotarator + buttons in the parameters section)
--add units toggle for measurements
+-kiugmi update kumiki should update docs as well
+-add support to run @tools from the parameter section
 -add export drawing button (how to do this?)
 -figure out xray joints (could be aper joint/direction property)
-
-
 -hidden feature detection(featurelist, view) to see what's hidden
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
