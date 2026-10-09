@@ -34,19 +34,19 @@ export class MemberListPanel {
                 <div class="panel-title">${t('viewer.memberList.title')}</div>
                 <div id="member-list-options" aria-label=${t('viewer.memberList.ariaLabel')}>
                     <label>
-                        <input id="member-opt-rough-length" type="checkbox" ?checked=${this.options.showRoughLength}>
+                        <input id="member-opt-rough-length" type="checkbox" .checked=${this.options.showRoughLength}>
                         ${t('viewer.memberList.opt.roughLength', { allowance: this.roughLengthAllowanceMm })}
                     </label>
                     <label>
-                        <input id="member-opt-sizes" type="checkbox" ?checked=${this.options.showNominalSizes}>
+                        <input id="member-opt-sizes" type="checkbox" .checked=${this.options.showNominalSizes}>
                         ${t('viewer.memberList.opt.sizes')}
                     </label>
                     <label>
-                        <input id="member-opt-csg" type="checkbox" ?checked=${this.options.showCsgFeatureCount}>
+                        <input id="member-opt-csg" type="checkbox" .checked=${this.options.showCsgFeatureCount}>
                         ${t('viewer.memberList.opt.csg')}
                     </label>
                     <label>
-                        <input id="member-opt-tags" type="checkbox" ?checked=${this.options.showTags}>
+                        <input id="member-opt-tags" type="checkbox" .checked=${this.options.showTags}>
                         ${t('viewer.memberList.opt.tags')}
                     </label>
                 </div>

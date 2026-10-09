@@ -829,7 +829,7 @@ class ViewerSettingsPanel {
                         .value=${String(100 - this.app.selectedTransparencyPercent)}>
                 </label>
                 <label>
-                    <input id="left-click-rotate-toggle" type="checkbox" ?checked=${this.app.leftClickDragRotatesCamera}>
+                    <input id="left-click-rotate-toggle" type="checkbox" .checked=${this.app.leftClickDragRotatesCamera}>
                     ${t('viewer.options.leftClickRotate')}
                 </label>
                 <label>
@@ -839,21 +839,21 @@ class ViewerSettingsPanel {
                     </select>
                 </label>
                 <label>
-                    <input id="debug-toggle" type="checkbox" ?checked=${this.app.debugEnabled}>
+                    <input id="debug-toggle" type="checkbox" .checked=${this.app.debugEnabled}>
                     ${t('viewer.options.debugInfo')}
                 </label>
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.threeD')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.section.threeD')}</div>
                 <label>
-                    <input id="center-gizmo-toggle" type="checkbox" ?checked=${this.app.showCenterGizmo}>
+                    <input id="center-gizmo-toggle" type="checkbox" .checked=${this.app.showCenterGizmo}>
                     ${t('viewer.options.centerGizmo')}
                 </label>
                 <label>
-                    <input id="shadows-toggle" type="checkbox" ?checked=${this.app.shadowsEnabled}>
+                    <input id="shadows-toggle" type="checkbox" .checked=${this.app.shadowsEnabled}>
                     ${t('viewer.options.shadows')}
                 </label>
                 <label>
-                    <input id="reflections-toggle" type="checkbox" ?checked=${this.app.reflectionsEnabled}>
+                    <input id="reflections-toggle" type="checkbox" .checked=${this.app.reflectionsEnabled}>
                     ${t('viewer.options.reflection')}
                 </label>
                 <span class="swatch-group" role="group" aria-label=${t('viewer.options.footprint.ariaLabel')}>
@@ -870,7 +870,7 @@ class ViewerSettingsPanel {
                 </span>
                 ${ASSEMBLY_PREVIEW_ENABLED ? html`
                 <label>
-                    <input id="assembly-timeline-toggle" type="checkbox" ?checked=${this.app.showAssemblyTimeline}>
+                    <input id="assembly-timeline-toggle" type="checkbox" .checked=${this.app.showAssemblyTimeline}>
                     ${t('viewer.options.assemblyTimeline')}
                 </label>
                 <label>
@@ -887,7 +887,7 @@ class ViewerSettingsPanel {
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.drawing')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.section.drawing')}</div>
                 <label>
-                    <input id="drawing-ghosts-toggle" type="checkbox" ?checked=${this.app.showDrawingGhosts}>
+                    <input id="drawing-ghosts-toggle" type="checkbox" .checked=${this.app.showDrawingGhosts}>
                     ${t('viewer.options.drawingGhosts')}
                 </label>
                 <button
@@ -898,31 +898,31 @@ class ViewerSettingsPanel {
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.export.ariaLabel')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.export.subtitle')}</div>
                 <label>
-                    <input id="export-format-stl-toggle" type="checkbox" ?checked=${this.app.exportFormatStlEnabled}>
+                    <input id="export-format-stl-toggle" type="checkbox" .checked=${this.app.exportFormatStlEnabled}>
                     ${t('viewer.options.export.stl')}
                 </label>
                 <label>
-                    <input id="export-format-3mf-toggle" type="checkbox" ?checked=${this.app.exportFormat3mfEnabled}>
+                    <input id="export-format-3mf-toggle" type="checkbox" .checked=${this.app.exportFormat3mfEnabled}>
                     ${t('viewer.options.export.3mf')}
                 </label>
                 <label>
-                    <input id="export-format-obj-toggle" type="checkbox" ?checked=${this.app.exportFormatObjEnabled}>
+                    <input id="export-format-obj-toggle" type="checkbox" .checked=${this.app.exportFormatObjEnabled}>
                     ${t('viewer.options.export.obj')}
                 </label>
                 <label>
-                    <input id="export-format-step-toggle" type="checkbox" ?checked=${this.app.exportFormatStepEnabled}>
+                    <input id="export-format-step-toggle" type="checkbox" .checked=${this.app.exportFormatStepEnabled}>
                     ${t('viewer.options.export.step')}
                 </label>
                 <label>
-                    <input id="export-combined-toggle" type="checkbox" ?checked=${this.app.exportCombinedEnabled}>
+                    <input id="export-combined-toggle" type="checkbox" .checked=${this.app.exportCombinedEnabled}>
                     ${t('viewer.options.export.combinedFile')}
                 </label>
                 <label>
-                    <input id="export-individual-toggle" type="checkbox" ?checked=${this.app.exportIndividualsEnabled}>
+                    <input id="export-individual-toggle" type="checkbox" .checked=${this.app.exportIndividualsEnabled}>
                     ${t('viewer.options.export.individualFiles')}
                 </label>
                 <label>
-                    <input id="export-accessories-toggle" type="checkbox" ?checked=${this.app.exportAccessoriesEnabled}>
+                    <input id="export-accessories-toggle" type="checkbox" .checked=${this.app.exportAccessoriesEnabled}>
                     ${t('viewer.options.export.includeAccessories')}
                 </label>
                 <button
@@ -1213,7 +1213,7 @@ class ViewerKiwariPanel {
                     <input
                         id=${inputId}
                         type="checkbox"
-                        ?checked=${Boolean(draft)}
+                        .checked=${Boolean(draft)}
                         ?disabled=${disabled}
                         @change=${(event) => this.app.setKiwariDraft(parameter.key, event.target.checked)}>
                     <span>${t('common.enabled')}</span>
