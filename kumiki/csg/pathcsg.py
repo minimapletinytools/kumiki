@@ -36,6 +36,7 @@ from .cutcsg import (
     HasFeatures,
     LocatedFeatureGeometry,
     _finite_midpoint,
+    _side_region,
     ExtrusionCap,
     ExtrusionFeatureKey,
     OwnedFeatureHit,
@@ -944,9 +945,17 @@ class _PathExtrusionFeature(CSGFeature):
             distance = _finite_midpoint(owner.start_distance, owner.end_distance)
         local = Matrix([midpoint_2d[0], midpoint_2d[1], distance])
         orientation = owner.transform.orientation.matrix
+        # A straight side is a rectangle. A cap follows the path, which may be concave or curved,
+        # and a curved side is not flat, so neither has a convex outline to give.
+        region = None
+        plane = self.locate_simple_unbounded(owner)
+        if plane is not None and self.key not in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            segment = owner.path.segments[side_index(self.key)]
+            region = _side_region(owner, plane.normal, segment.start, segment.end,
+                                  owner.start_distance, owner.end_distance)
         return CSGFeatureExtent(
             anchor=owner.transform.position + safe_transform_vector(orientation, local),
-            aabb=owner.get_aabb(),
+            region=region,
         )
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:

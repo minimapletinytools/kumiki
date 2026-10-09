@@ -228,13 +228,11 @@ can land in either order; 3 wants both.
 
 ## 9. Known open
 
-- **Faces carry an AABB, not corners.** `CSGFeatureExtent` gives a face a box
-  that is axis-aligned in WORLD space, so a rotated prism's face extent is
-  larger than the face and never smaller — every rafter is one. This now matters
-  more than it did: a perpendicular dropped onto a face is **not clamped**,
-  because a span carries the plane's normal and a point on it rather than its
-  outline, so a distance to a face can land off the face. An edge carries its
-  `ends` for exactly this reason; a face wants the same.
+- **A distance to a face is not clamped to it.** Faces now carry their outline
+  (`CSGFeatureExtent.region`, replacing the old box), but a perpendicular dropped
+  onto a face still is not clamped, because a span carries the plane's normal and
+  a point on it rather than its outline, so a distance to a face can land off the
+  face. An edge's `ends` clamp it; a face's `region` should do the same.
 
 Closed since this was written, and recorded because the reasoning is the part
 worth keeping:

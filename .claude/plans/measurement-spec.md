@@ -361,7 +361,7 @@ editing: it makes a drag indistinguishable from a create on the undo stack.
 Plane derivation is python's, since it needs the features' geometry, and the
 camera plane arrives in the payload.
 
-## Extents: done for edges, still approximate for faces
+## Extents: edges and faces carry their bounds
 
 An edge now says where it ends. A prism's arris is two of its own corners, a
 derived edge reaches as far as both faces that form it, and measurement asks the
@@ -369,25 +369,30 @@ feature and then clips to the timber. Nothing is discovered by testing whether a
 point on a surface is inside the solid it lies on, which is the question that
 cannot be answered and which made a mortise hole's arris as long as the post.
 
-A FACE has not had the same treatment, and should:
+A FACE now carries its outline too: `CSGFeatureExtent.region`, a
+`ConvexPlanarRegion` (its plane and corners in order), in place of the old
+`aabb`. Prism faces give their four corners; extrusion and loft caps their
+profile; flat extrusion, loft and path-extrusion sides their rectangle. A face
+that runs to infinity, a path-extrusion cap (the path may be concave or curved)
+and a half space give `None`.
 
-- **Its bounds should be its four corners**, not a box. `get_extent` carries
-  `aabb`, which is axis-aligned in WORLD space, so a face of a rotated prism --
-  most timbers in a frame -- has a box substantially larger than the face, never
-  smaller. The corners are computed already (`SimpleRectangularPrismFeature.
-  corners`); `CSGFeatureExtent` needs somewhere to put them, the way `ends`
-  holds an edge's. Nothing reads `aabb` today except one test, so this costs
-  nothing to change and buys the face side what the edge side now has.
-- **Other primitives still return the owner's box** -- the polygon extrusion and
-  the loft. A half space genuinely has no bounded extent and should keep saying
-  so.
+(The old box was axis-aligned in the owner's space -- a timber's local frame --
+not world space, so a timber's own faces were already tight; it was loose for
+prisms turned within their timber, and extrusion and loft faces returned their
+whole solid's box.)
+
+- **Still open: clamping.** A distance dropped onto a face is not clamped to
+  it, because a `PlaneSpan` carries a point and a normal, not the outline, so it
+  can land off the face. The outline is there now to clamp against.
 - **Subtraction is the hard half, and separate.** A declared region cannot know
   that a housing removed part of it, and
   `approximately_crop_plane_to_area_on_csg` cannot subtract in the plane -- its
   own docstring calls that "worth doing, not yet done". So a face partly cut
   away still reports whole however exact its declared bounds are. That wants
   polygon booleans and should wait until something needs a face's extent to be
-  right where material has gone.
+  right where material has gone. `csg/planar_region.py` (from feature solving)
+  already sections a whole tree by a plane into convex polygons with subtract,
+  so the surviving part of a face is a list of `ConvexPlanarRegion`s away.
 
 ## Deferred
 

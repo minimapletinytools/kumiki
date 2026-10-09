@@ -25,7 +25,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, Flag
 import warnings
 from ..rule import *
-from ..geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
+from ..geometry import (ConvexPlanarRegion, Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
 from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Midplane, Recipe,
@@ -735,13 +735,26 @@ def _drop_real_hits_if_not_on_boundary(
     return [hit for hit in hits if not hit.feature.real]
 
 
-def _box_around(points: Sequence[V3]) -> 'AxisAlignedBoundingBox':
-    """The smallest axis-aligned box holding these points."""
-    reach = [[float(point[axis, 0]) for point in points] for axis in range(3)]
-    return AxisAlignedBoundingBox(
-        min_x=scalar(repr(min(reach[0]))), min_y=scalar(repr(min(reach[1]))),
-        min_z=scalar(repr(min(reach[2]))), max_x=scalar(repr(max(reach[0]))),
-        max_y=scalar(repr(max(reach[1]))), max_z=scalar(repr(max(reach[2]))))
+def _face_region(normal: V3, corners: Sequence[V3]) -> ConvexPlanarRegion:
+    """A flat face's outline: its plane, and its corners in order around it."""
+    return ConvexPlanarRegion(plane=Plane(normal=normal, point=corners[0]), boundary=tuple(corners))
+
+
+def _profile_at(owner: 'CutCSG', profile: Sequence[V2], z: Numeric) -> List[V3]:
+    """Points of a 2D profile at height `z` along a shape's own axis, in the owner's space."""
+    orientation = owner.transform.orientation.matrix  # type: ignore[attr-defined]
+    return [owner.transform.position + safe_transform_vector(orientation, Matrix([p[0], p[1], z]))  # type: ignore[attr-defined]
+            for p in profile]
+
+
+def _side_region(owner: 'CutCSG', normal: V3, start: V2, end: V2,
+                 low: Optional[Numeric], high: Optional[Numeric]) -> Optional[ConvexPlanarRegion]:
+    """The outline of an extruded side from `start` to `end`, or None if it runs to infinity."""
+    if low is None or high is None:
+        return None
+    bottom = _profile_at(owner, [start, end], low)
+    top = _profile_at(owner, [end, start], high)
+    return _face_region(normal, bottom + top)
 
 
 def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeric:
@@ -779,12 +792,12 @@ class CSGFeatureExtent:
         anchor: a representative point -- a face's centre, an edge's midpoint,
             or the point itself.
         ends: for an edge, its two endpoints.
-        aabb: for a face, a rough bounding box.
+        region: for a flat face, its outline -- its plane and its corners in
+            order. None where the face is unbounded, not flat, or not convex.
     """
     anchor: V3
     ends: Optional[Tuple[V3, V3]] = None
-    # TODO replace with ConvexPlanarRegion
-    aabb: Optional['AxisAlignedBoundingBox'] = None
+    region: Optional[ConvexPlanarRegion] = None
 
 
 @dataclass(frozen=True)
@@ -1333,18 +1346,10 @@ class SimpleRectangularPrismFeature(FaceFeature):
         frame = self._face_frame(owner)
         if frame is None:
             return None
-        _, centre = frame
+        normal, centre = frame
         corners = self.corners(owner)
-        # TODO: carry the corners themselves, not a box. An aabb is axis-aligned
-        # in WORLD space, so a face of a rotated prism gets a box substantially
-        # larger than the face and never smaller -- which is fine for hinting
-        # where to put an annotation and not good enough to measure against. An
-        # edge carries its `ends` for exactly this reason; a face wants the same.
-        # See .claude/plans/measurement-spec.md.
-        if corners is None:
-            # Unbounded in one direction, so the prism's own box is the most that can be said.
-            return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
-        return CSGFeatureExtent(anchor=centre, aabb=_box_around(corners))
+        # Unbounded in one direction, so there is no outline to give.
+        return CSGFeatureExtent(anchor=centre, region=None if corners is None else _face_region(normal, corners))
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, RectangularPrism):
@@ -1846,8 +1851,16 @@ class SimpleConvexPolygonExtrusionFeature(FaceFeature):
         frame = self._frame(owner)
         if frame is None:
             return None
-        _, centre = frame
-        return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
+        normal, centre = frame
+        points = owner.points
+        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            distance = owner.end_distance if self.key == ExtrusionCap.TOP else owner.start_distance
+            assert distance is not None  # _frame gave a plane, so this end is finite
+            region = _face_region(normal, _profile_at(owner, points, distance))
+        else:
+            region = _side_region(owner, normal, points[self.key], points[(self.key + 1) % len(points)],
+                                  owner.start_distance, owner.end_distance)
+        return CSGFeatureExtent(anchor=centre, region=region)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonExtrusion):
@@ -1932,9 +1945,21 @@ class SimpleLoftFeature(FaceFeature):
             p2 = profile[(self.key + 1) % len(profile)]
             centroid_2d = (p1 + p2) / scalar(2)
         local = Matrix([centroid_2d[0], centroid_2d[1], distance])
+        plane = self.locate_simple_unbounded(owner)
+        if plane is None:
+            region = None
+        elif self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            region = _face_region(plane.normal, _profile_at(owner, profile, distance))
+        else:
+            following = (self.key + 1) % len(owner.bottom_points)
+            region = _face_region(plane.normal, [
+                *_profile_at(owner, [owner.bottom_points[self.key], owner.bottom_points[following]],
+                             owner.bottom_points_z_pos),
+                *_profile_at(owner, [owner.top_points[following], owner.top_points[self.key]], owner.top_points_z_pos),
+            ])
         return CSGFeatureExtent(
             anchor=owner.transform.position + safe_transform_vector(orientation, local),
-            aabb=owner.get_aabb(),
+            region=region,
         )
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:

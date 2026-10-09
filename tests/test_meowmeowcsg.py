@@ -3756,7 +3756,7 @@ class TestFeatureExtent:
         assert float(extent.anchor[0]) == pytest.approx(2.0)
         assert float(extent.anchor[1]) == pytest.approx(0.0)
         assert float(extent.anchor[2]) == pytest.approx(5.0)
-        assert extent.aabb is not None
+        assert extent.region is not None
 
     def test_a_half_space_has_no_extent(self):
         """Its plane is unbounded, so there is no honest box or midpoint."""
@@ -4781,7 +4781,7 @@ class TestDerivedPoints:
         extent = point.get_extent(self._body())
 
         assert extent is not None
-        assert extent.ends is None and extent.aabb is None
+        assert extent.ends is None and extent.region is None
         assert points_are_coincident(
             Point(extent.anchor), Point(create_v3(scalar(2), scalar(3), scalar(5))))
 
