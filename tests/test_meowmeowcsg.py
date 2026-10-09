@@ -5322,13 +5322,82 @@ class TestAFlushCutIsOnlyFlushWhereItIsFlat:
 
         assert self._stepped().contains_point(just_outside)
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "the cut's corner and the base both answer with their top face, so the "
-        "cut reads as flush there -- see the TODO on _cut_is_flush_with_the_base"))
     def test_and_so_does_the_face_at_the_cuts_corner(self):
         corner = create_v3(scalar(5), scalar(-1), scalar(50))
 
         assert self._stepped().is_point_on_boundary(corner)
+
+    def test_and_along_the_cuts_edge(self):
+        """Two of the cut's faces meet here, and only one of them is the base's."""
+        along_the_edge = create_v3(scalar(5), scalar(0), scalar(50))
+
+        assert self._stepped().is_point_on_boundary(along_the_edge)
+
+    #: A cut out of the arm's corner instead, x 4..6, y -1..1, z 45..50.
+    def _rebated(self):
+        cut = RectangularPrism(
+            size=Matrix([scalar(2), scalar(2)]),
+            transform=Transform(position=create_v3(scalar(5), scalar(0), scalar(0)),
+                                orientation=Orientation.identity()),
+            start_distance=scalar(45), end_distance=scalar(50))
+        return Difference(base=self._arm(), subtract=[cut])
+
+    def test_a_cut_turning_the_bases_own_corner_takes_the_arris(self):
+        """The cut is on its edge here too, but the base turns the same corner,
+        so there is nothing left of the arris."""
+        on_the_arris = create_v3(scalar(6), scalar(0), scalar(50))
+
+        assert not self._rebated().contains_point(on_the_arris)
+
+    def test_and_the_arris_survives_where_that_cut_stops(self):
+        where_it_stops = create_v3(scalar(6), scalar(-1), scalar(50))
+
+        assert self._rebated().is_point_on_boundary(where_it_stops)
+
+
+class TestEveryOutwardNormalAtAPoint:
+    """get_outward_normal picks one face; get_outward_normals gives each of them."""
+
+    def _box(self):
+        return RectangularPrism(
+            size=Matrix([scalar(2), scalar(4)]),
+            transform=Transform(position=create_v3(scalar(0), scalar(0), scalar(0)),
+                                orientation=Orientation.identity()),
+            start_distance=scalar(0), end_distance=scalar(10))
+
+    def _as_tuples(self, normals):
+        return sorted(tuple(float(n) for n in normal) for normal in normals)
+
+    def test_one_on_a_face_two_on_an_edge_three_at_a_corner(self):
+        box = self._box()
+
+        assert self._as_tuples(box.get_outward_normals(create_v3(1, 0, 5))) == [(1, 0, 0)]
+        assert self._as_tuples(box.get_outward_normals(create_v3(1, 0, 10))) == [
+            (0, 0, 1), (1, 0, 0)]
+        assert self._as_tuples(box.get_outward_normals(create_v3(1, 2, 10))) == [
+            (0, 0, 1), (0, 1, 0), (1, 0, 0)]
+
+    def test_the_single_normal_is_still_the_first_of_them(self):
+        box = self._box()
+        corner = create_v3(1, 2, 10)
+
+        assert box.get_outward_normal(corner) == box.get_outward_normals(corner)[0]
+
+    def test_a_cylinders_rim_has_its_barrel_and_its_cap(self):
+        cylinder = Cylinder(axis_direction=create_v3(0, 0, 1), radius=scalar(1),
+                            position=create_v3(0, 0, 0),
+                            start_distance=scalar(0), end_distance=scalar(5))
+
+        assert self._as_tuples(cylinder.get_outward_normals(create_v3(1, 0, 5))) == [
+            (0, 0, 1), (1, 0, 0)]
+        assert self._as_tuples(cylinder.get_outward_normals(create_v3(1, 0, 2))) == [(1, 0, 0)]
+
+    def test_a_cut_passes_on_every_face_of_whatever_it_is_cut_from(self):
+        """So a difference used as a base can still be told from its edges."""
+        cut = Difference(base=self._box(), subtract=[HalfSpace(
+            normal=create_v3(0, 0, -1), offset=scalar(100))])
+
+        assert len(cut.get_outward_normals(create_v3(1, 2, 10))) == 3
 
 
 class TestCutCSGLabel:

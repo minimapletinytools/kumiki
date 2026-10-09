@@ -2359,6 +2359,17 @@ class CutCSG(ABC):
         """
         pass
 
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+        """The outward normal of every face meeting at a boundary point: one
+        on a smooth patch, more on an edge or a corner. Empty when none can be had.
+
+        get_outward_normal picks ONE of these, which is not enough to tell an
+        edge from the face beside it -- see _cut_is_flush_with_the_base. A shape
+        that cannot tell them apart answers with that one.
+        """
+        normal = self.get_outward_normal(point, eps=eps)
+        return [] if normal is None else [normal]
+
     @abstractmethod
     def get_aabb(self) -> 'AxisAlignedBoundingBox':
         """
@@ -2801,12 +2812,12 @@ class RectangularPrism(HasFeatures, CutCSG):
 
         return False
 
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def _each_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Iterator[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
 
-        Returns the normalized outward normal for the face that contains this point.
-        If the point is on multiple faces (edge or corner), returns one of the normals.
+        Yields the normalized outward normal of each face that contains this point:
+        one on a face, two on an edge, three at a corner.
 
         Args:
             point: A point on the boundary
@@ -2829,26 +2840,32 @@ class RectangularPrism(HasFeatures, CutCSG):
 
         # On length faces (top/bottom) - check these first
         if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance, eps=eps):
-            return -length_dir  # Bottom face, normal points in -length direction (outward)
+            yield -length_dir  # Bottom face, normal points in -length direction (outward)
         if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance, eps=eps):
-            return length_dir  # Top face, normal points in +length direction (outward)
+            yield length_dir  # Top face, normal points in +length direction (outward)
 
         # On width faces (right/left)
         if safe_equality_test(Abs(x_coord), half_width, eps=eps):
             if safe_compare(x_coord, 0, Comparison.GT, eps=eps):
-                return width_dir  # Right face, normal points in +width direction
+                yield width_dir  # Right face, normal points in +width direction
             else:
-                return -width_dir  # Left face, normal points in -width direction
+                yield -width_dir  # Left face, normal points in -width direction
 
         # On height faces (front/back)
         if safe_equality_test(Abs(y_coord), half_height, eps=eps):
             if safe_compare(y_coord, 0, Comparison.GT, eps=eps):
-                return height_dir  # Front face, normal points in +height direction
+                yield height_dir  # Front face, normal points in +height direction
             else:
-                return -height_dir  # Back face, normal points in -height direction
+                yield -height_dir  # Back face, normal points in -height direction
 
         # Should not reach here if point is actually on boundary
-        return None
+        return
+
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+        return next(self._each_outward_normal(point, eps=eps), None)
+
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+        return list(self._each_outward_normal(point, eps=eps))
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:
@@ -3063,7 +3080,7 @@ class Cylinder(HasFeatures, CutCSG):
 
         return False
     
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def _each_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Iterator[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
         
@@ -3097,18 +3114,24 @@ class Cylinder(HasFeatures, CutCSG):
                 # This might be an edge case on the cap center
                 pass
             else:
-                return radial_vector / radial_distance
+                yield radial_vector / radial_distance
 
         # Check if on end caps
         if self.start_distance is not None and safe_equality_test(axial_coord, self.start_distance, eps=eps):
             # Bottom cap, normal points in -axis direction (outward)
-            return -axis
+            yield -axis
         if self.end_distance is not None and safe_equality_test(axial_coord, self.end_distance, eps=eps):
             # Top cap, normal points in +axis direction (outward)
-            return axis
+            yield axis
 
         # Should not reach here if point is on boundary
-        return None
+        return
+
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+        return next(self._each_outward_normal(point, eps=eps), None)
+
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+        return list(self._each_outward_normal(point, eps=eps))
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         if self.start_distance is None or self.end_distance is None:
@@ -3188,6 +3211,18 @@ class SolidsAtPoint:
         """Each surface's outward normal at the point, in on_surface order."""
         return [solid.get_outward_normal(self.point, eps=self.eps)
                 for solid in self.on_surface]
+
+    def every_outward_normal(self) -> Optional[List[Direction3D]]:
+        """The faces of the ONE surface at the point, each with its own normal;
+        None when several solids meet there, or none does.
+
+        Several solids meeting is a different question -- which of their faces
+        still bound what they make together -- and average_outward_normal is
+        the answer on offer for it.
+        """
+        if len(self.on_surface) != 1:
+            return None
+        return self.on_surface[0].get_outward_normals(self.point, eps=self.eps)
 
     def average_outward_normal(self, negated: bool = False) -> Optional[Direction3D]:
         """The mean of those normals, or None when they cancel or none can say.
@@ -3336,6 +3371,10 @@ class SolidUnion(CutCSG):
         """
         return SolidsAtPoint(self.children, point, eps=eps).average_outward_normal()
 
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+        own = SolidsAtPoint(self.children, point, eps=eps).every_outward_normal()
+        return own if own is not None else super().get_outward_normals(point, eps=eps)
+
     def get_aabb(self) -> AxisAlignedBoundingBox:
         # Empty children contribute no points to the union, so they're excluded
         # before combining bounds — otherwise their degenerate zero-box would
@@ -3412,6 +3451,10 @@ class Intersection(CutCSG):
             if normal is not None:
                 return normal
         return None
+
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+        own = SolidsAtPoint([self.left, self.right], point, eps=eps).every_outward_normal()
+        return own if own is not None else super().get_outward_normals(point, eps=eps)
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         left_bbox = self.left.get_aabb()
@@ -3507,23 +3550,30 @@ class Difference(CutCSG):
         True when a normal cannot be had, which excludes the point: the same
         conservative answer this has always given.
         """
-        # TODO one normal from each side is not enough, and it now costs a real
-        # surface. A normal at an edge or a corner is whichever face the shape
-        # happened to check first, so where a cut's own corner sits on the
-        # base's face both sides answer with the same prioritised face, this
-        # calls the cut flush, and the face surrounding the cut is dropped --
-        # see TestAFlushCutIsOnlyFlushWhereItIsFlat, which has the case waiting.
+        # Every face at the point, not one normal a side. At an edge or a corner
+        # one normal is whichever face the shape happened to check first, and a
+        # cut whose own corner sits on the base's face then answers with the
+        # face it shares, reads as flush, and takes the surface surrounding it
+        # -- a tenon's base arris on its shoulder is exactly that.
         #
-        # It does not need a working normal on every shape to be worth fixing.
-        # Knowing whether the point sits on a SMOOTH patch or on an edge is most
-        # of the value: a point that is not smooth can refuse to claim flushness
-        # and be right, whatever its normal says.
-        base_normal = self.base.get_outward_normal(point, eps=eps)
-        for sub_normal in removed.outward_normals():
-            if base_normal is None or sub_normal is None:
+        # So the cut is flush only where EVERY face it has at the point lies
+        # along one of the base's. On a flat patch that is the old test. At the
+        # cut's edge it holds only if the base turns the same corner there, in
+        # which case the material really is gone.
+        #
+        # TODO exact for planar faces. A curved one facing the same way at the
+        # point still reads as flush whether or not it curves away from the
+        # base, which needs curvature to tell.
+        base_normals = self.base.get_outward_normals(point, eps=eps)
+        if not base_normals:
+            return True
+        for solid in removed.on_surface:
+            sub_normals = solid.get_outward_normals(point, eps=eps)
+            if not sub_normals:
                 return True
-            # TODO what were really wanting to chec khere is that the surfaces are the same locally which may not be the case if the normal was on an edge with this condition. To fix this you should introduce an is_on_edge function HOWEVER this also won't work in the case of stuff like cylinders, so to fix that you probably really need a surface_derivative (curvature) function...
-            if safe_equality_test(safe_dot_product(base_normal, sub_normal), 1, eps=eps):
+            if all(any(safe_equality_test(safe_dot_product(base_normal, sub_normal), 1, eps=eps)
+                       for base_normal in base_normals)
+                   for sub_normal in sub_normals):
                 return True
         return False
 
@@ -3565,6 +3615,11 @@ class Difference(CutCSG):
         # The normal should point inward to the subtract (which is outward from the difference)
         # So we negate the subtract's outward normal
         return SolidsAtPoint(self.subtract, point, eps=eps).average_outward_normal(negated=True)
+
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+        if self.base.is_point_on_boundary(point, eps=eps):
+            return self.base.get_outward_normals(point, eps=eps)
+        return super().get_outward_normals(point, eps=eps)
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         bbox = self.base.get_aabb()
@@ -3848,7 +3903,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         
         return False
     
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def _each_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Iterator[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
         
@@ -3872,13 +3927,13 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance, eps=eps):
             # Top face, normal points in +Z direction in local coords
             local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
-            return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+            yield safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
         # Check if on bottom face
         if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance, eps=eps):
             # Bottom face, normal points in -Z direction in local coords
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
-            return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+            yield safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
         # Otherwise, point is on a side face (edge of polygon extruded)
         # Find which edge it's on and compute the normal
@@ -3927,9 +3982,15 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
                     local_normal = Matrix([edge_normal_2d[0], edge_normal_2d[1], 0])
 
                     # Transform to global coordinates
-                    return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+                    yield safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
-        return None
+        return
+
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+        return next(self._each_outward_normal(point, eps=eps), None)
+
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+        return list(self._each_outward_normal(point, eps=eps))
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
         local_point = point - self.transform.position
@@ -4252,7 +4313,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
         return False
 
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def _each_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Iterator[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
 
@@ -4270,11 +4331,11 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
         if safe_zero_test(z_coord - self.top_points_z_pos, eps=eps):
             local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
-            return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+            yield safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
         if safe_zero_test(z_coord - self.bottom_points_z_pos, eps=eps):
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
-            return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+            yield safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
         t_height = self._height_fraction(z_coord)
         cross_section = self._cross_section_at(t_height)
@@ -4326,9 +4387,15 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
             if safe_compare(outward_dot, 0, Comparison.LT, eps=eps):
                 local_normal = -local_normal
 
-            return safe_normalize_vector(safe_transform_vector(self.transform.orientation.matrix, local_normal))
+            yield safe_normalize_vector(safe_transform_vector(self.transform.orientation.matrix, local_normal))
 
-        return None
+        return
+
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+        return next(self._each_outward_normal(point, eps=eps), None)
+
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+        return list(self._each_outward_normal(point, eps=eps))
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         corners_global = (
