@@ -16,38 +16,7 @@ const {
     getMissingDependencies,
 } = require('./python-env');
 const { ensureProjectVenv, pipInstall } = require('./python-toolchain');
-
-const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '.kigumi', 'docs');
-const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', 'docs');
-// Kigumi-only skills (e.g. init-kumiki-project) live directly under the extension's own
-// source tree, unlike the general docs above -- no dev/packaged-extension path split
-// needed here, since __dirname already resolves correctly in both cases (vsce packages
-// this directory as-is) and there's no separate staging step to fall back from.
-const SKILLS_SOURCE_PATH = path.resolve(__dirname, 'skills');
-
-function stripLeadingYamlFrontmatter(content) {
-    if (!content.startsWith('---')) {
-        return content;
-    }
-
-    const endMarker = content.indexOf('\n---', 3);
-    if (endMarker === -1) {
-        return content;
-    }
-
-    const afterFrontmatterIndex = endMarker + '\n---'.length;
-    return content.slice(afterFrontmatterIndex).replace(/^\s+/, '');
-}
-
-function getBundledDocsSourcePath() {
-    if (fs.existsSync(BUNDLED_DOCS_SOURCE_PATH)) {
-        return BUNDLED_DOCS_SOURCE_PATH;
-    }
-    if (fs.existsSync(CANONICAL_DOCS_SOURCE_PATH)) {
-        return CANONICAL_DOCS_SOURCE_PATH;
-    }
-    return null;
-}
+const { PROJECT_DOCS_DIR, removeLegacyDocs, syncProjectDocs, updateAgentsFile } = require('./project-docs');
 
 function writeFileIfMissing(filePath, content) {
     if (fs.existsSync(filePath)) {
@@ -59,95 +28,12 @@ function writeFileIfMissing(filePath, content) {
     return true;
 }
 
-function copyFileContent(filePath, content) {
-    const nextContent = content;
-    if (fs.existsSync(filePath)) {
-        const currentContent = fs.readFileSync(filePath, 'utf8');
-        if (currentContent === nextContent) {
-            return false;
-        }
-    }
-
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, nextContent, 'utf8');
-    return true;
-}
-
-function ensureAgentsInstructionsFile(agentsPath) {
-    const normalizedContent = [
-        '# Agent Instructions',
-        '',
-        'Always read and follow:',
-        '',
-        '- docs/agent_usage_instructions.md',
-        '',
-        'Note: the `docs/` folder was copied from the bundled Kigumi docs at project initialization',
-        'time and may be out of date. The kumiki library installed in `.venv` ships its own docs.',
-        'To check for a more recent version, resolve the library path:',
-        '',
-        '  .venv/bin/python3 -c "import kumiki, pathlib; print(pathlib.Path(kumiki.__file__).resolve().parent)"',
-        '  (Windows: .venv\\Scripts\\python.exe)',
-        '',
-        'Then read `<that_path>/docs/agent_usage_instructions.md` for the most up-to-date instructions.',
-        '',
-    ].join('\n');
-    fs.mkdirSync(path.dirname(agentsPath), { recursive: true });
-
-    if (!fs.existsSync(agentsPath)) {
-        fs.writeFileSync(agentsPath, normalizedContent, 'utf8');
-        return {
-            createdAgentsFile: true,
-            appendedToExistingAgentsFile: false,
-            warning: null,
-        };
-    }
-
-    const currentContent = fs.readFileSync(agentsPath, 'utf8');
-    if (currentContent.includes('docs/agent_usage_instructions.md')) {
-        return {
-            createdAgentsFile: false,
-            appendedToExistingAgentsFile: false,
-            warning: null,
-        };
-    }
-
-    const warning = `AGENTS.md already exists at ${agentsPath}; appending Kigumi setup instructions to the end.`;
-    console.warn(`[kigumi] ${warning}`);
-    fs.appendFileSync(agentsPath, `\n\n${normalizedContent}`, 'utf8');
-
-    return {
-        createdAgentsFile: false,
-        appendedToExistingAgentsFile: true,
-        warning,
-    };
-}
-
-function copyBundledDocsIntoWorkspace(workspaceRoot) {
-    const sourcePath = getBundledDocsSourcePath();
-    const targetPath = path.join(workspaceRoot, 'docs');
-    fs.mkdirSync(targetPath, { recursive: true });
-
-    if (sourcePath) {
-        fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
-    }
-
-    // Kigumi-only skills (see SKILLS_SOURCE_PATH above) live separately from the general
-    // docs source -- merge them into the same workspace docs/skills/ target so
-    // docs/skills/init-kumiki-project/SKILL.md (referenced from agent_usage_instructions.md)
-    // keeps resolving.
-    if (fs.existsSync(SKILLS_SOURCE_PATH)) {
-        fs.cpSync(SKILLS_SOURCE_PATH, path.join(targetPath, 'skills'), { recursive: true, force: true });
-    }
-
-    return sourcePath !== null;
-}
-
-function ensureAgentInstructionFiles(workspaceRoot, options = {}) {
-    const agentsPath = path.join(workspaceRoot, 'AGENTS.md');
-    const copilotPath = path.join(workspaceRoot, '.github', 'copilot-instructions.md');
-    const claudePath = path.join(workspaceRoot, 'CLAUDE.md');
-    const cursorPath = path.join(workspaceRoot, '.cursorrules');
-
+/**
+ * The agent docs in .kigumi/docs/ (from the installed kumiki), AGENTS.md's Kigumi block,
+ * and the pointer files other agents read. Old copies in docs/ are removed if untouched.
+ * A local dev checkout is the source of the docs, so nothing is written into it.
+ */
+async function ensureAgentInstructionFiles(workspaceRoot, pythonPath, kumikiVersion, { isLocalDev = false } = {}) {
     const pointerContent = [
         '# Agent Instructions',
         '',
@@ -158,18 +44,31 @@ function ensureAgentInstructionFiles(workspaceRoot, options = {}) {
         '- AGENTS.md',
         '',
     ].join('\n');
+    const pointers = {
+        createdCopilotInstructionsFile: writeFileIfMissing(path.join(workspaceRoot, '.github', 'copilot-instructions.md'), pointerContent),
+        createdClaudeInstructionsFile: writeFileIfMissing(path.join(workspaceRoot, 'CLAUDE.md'), pointerContent),
+        createdCursorRulesFile: writeFileIfMissing(path.join(workspaceRoot, '.cursorrules'), pointerContent),
+    };
+    if (isLocalDev) {
+        return { ...pointers, createdAgentsFile: false, updatedAgentsFile: false, docsSource: null,
+            removedLegacyDocs: [], keptLegacyDocs: [], instructionWarnings: [] };
+    }
 
-    const agentsResult = ensureAgentsInstructionsFile(agentsPath);
-    const copiedWorkspaceUsageInstructionsFile = copyBundledDocsIntoWorkspace(workspaceRoot);
-
+    const { source } = await syncProjectDocs(workspaceRoot, pythonPath, kumikiVersion);
+    const legacy = removeLegacyDocs(workspaceRoot);
+    const agents = updateAgentsFile(workspaceRoot);
+    const instructionWarnings = legacy.kept.length > 0
+        ? [`The Kumiki docs moved to ${PROJECT_DOCS_DIR}. These copies in docs/ were changed, so they were kept; `
+            + `delete them once you no longer need them: ${legacy.kept.join(', ')}`]
+        : [];
     return {
-        createdAgentsFile: agentsResult.createdAgentsFile,
-        appendedToExistingAgentsFile: agentsResult.appendedToExistingAgentsFile,
-        copiedWorkspaceUsageInstructionsFile,
-        createdCopilotInstructionsFile: writeFileIfMissing(copilotPath, pointerContent),
-        createdClaudeInstructionsFile: writeFileIfMissing(claudePath, pointerContent),
-        createdCursorRulesFile: writeFileIfMissing(cursorPath, pointerContent),
-        instructionWarnings: agentsResult.warning ? [agentsResult.warning] : [],
+        ...pointers,
+        createdAgentsFile: agents.created,
+        updatedAgentsFile: agents.changed,
+        docsSource: source,
+        removedLegacyDocs: legacy.removed,
+        keptLegacyDocs: legacy.kept,
+        instructionWarnings,
     };
 }
 
@@ -590,7 +489,8 @@ async function initializeWorkspaceProject(workspaceRoot, filePath) {
 
         const exampleResult = ensureExampleFrame(resolvedRoot);
         const gitignoreResult = ensureGitignore(resolvedRoot);
-        const instructionsResult = ensureAgentInstructionFiles(resolvedRoot);
+        const instructionsResult = await ensureAgentInstructionFiles(
+            resolvedRoot, envResult.pythonPath, installResult.kumikiVersion, { isLocalDev: env.isLocalDev });
 
         return {
             projectRoot: resolvedRoot,
@@ -640,9 +540,8 @@ async function updateWorkspaceKumiki(workspaceRoot, filePath) {
             isLocalDev: env.isLocalDev,
         });
 
-        const instructionsResult = ensureAgentInstructionFiles(resolvedRoot, {
-            forceRefreshUsageInstructions: true,
-        });
+        const instructionsResult = await ensureAgentInstructionFiles(
+            resolvedRoot, envResult.pythonPath, installResult.kumikiVersion, { isLocalDev: env.isLocalDev });
 
         return {
             projectRoot: resolvedRoot,

@@ -10,14 +10,15 @@ jest.mock('child_process', () => ({
 const { spawn } = require('child_process');
 const { initializeWorkspaceProject, getInlineExampleFrameContent } = require('../project-initializer');
 
-const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', '.kigumi', 'docs');
-const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', '..', 'docs');
-
-function getUsageInstructionsSourcePath() {
-  if (fs.existsSync(BUNDLED_DOCS_SOURCE_PATH)) {
-    return path.join(BUNDLED_DOCS_SOURCE_PATH, 'agent_usage_instructions.md');
-  }
-  return path.join(CANONICAL_DOCS_SOURCE_PATH, 'agent_usage_instructions.md');
+// A stand-in for the docs inside the kumiki installed in a project's .venv.
+function makeInstalledKumikiDocs(root) {
+  const docs = path.join(root, 'site-packages', 'kumiki', 'docs');
+  fs.mkdirSync(path.join(docs, 'internal'), { recursive: true });
+  fs.writeFileSync(path.join(docs, 'agent_usage_instructions.md'), '# Kumiki Usage Instructions\n\ninstalled copy\n');
+  fs.writeFileSync(path.join(docs, 'concepts.md'), '# Concepts\n');
+  fs.writeFileSync(path.join(docs, 'index.md'), '# Website home\n');
+  fs.writeFileSync(path.join(docs, 'internal', 'notes.md'), 'ours\n');
+  return docs;
 }
 
 function createMockChildProcess({ stdoutText = '', stderrText = '', exitCode = 0 } = {}) {
@@ -41,15 +42,13 @@ function createMockChildProcess({ stdoutText = '', stderrText = '', exitCode = 0
 describe('project-initializer', () => {
   let tmpRoot;
   let consoleWarnSpy;
-  let usageInstructionsSourcePath;
-  let usageInstructionsOriginalContent;
+  let installedDocs;
 
   beforeEach(() => {
     jest.clearAllMocks();
     consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-init-test-'));
-    usageInstructionsSourcePath = getUsageInstructionsSourcePath();
-    usageInstructionsOriginalContent = fs.readFileSync(usageInstructionsSourcePath, 'utf8');
+    installedDocs = makeInstalledKumikiDocs(fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-site-')));
 
     spawn.mockImplementation((command, args) => {
       const snippet = Array.isArray(args) && args[0] === '-c' ? String(args[1] || '') : '';
@@ -59,6 +58,9 @@ describe('project-initializer', () => {
       if (snippet.includes('m.version("kumiki")')) {
         return createMockChildProcess({ stdoutText: '0.8.0\n' });
       }
+      if (snippet.includes('find_spec("kumiki")')) {
+        return createMockChildProcess({ stdoutText: `${installedDocs}\n` });
+      }
       return createMockChildProcess();
     });
   });
@@ -67,8 +69,8 @@ describe('project-initializer', () => {
     if (consoleWarnSpy) {
       consoleWarnSpy.mockRestore();
     }
-    if (usageInstructionsSourcePath && usageInstructionsOriginalContent != null) {
-      fs.writeFileSync(usageInstructionsSourcePath, usageInstructionsOriginalContent, 'utf8');
+    if (installedDocs) {
+      fs.rmSync(path.resolve(installedDocs, '..', '..', '..'), { recursive: true, force: true });
     }
     if (tmpRoot && fs.existsSync(tmpRoot)) {
       fs.rmSync(tmpRoot, { recursive: true, force: true });
@@ -82,21 +84,22 @@ describe('project-initializer', () => {
     const copilotPath = path.join(tmpRoot, '.github', 'copilot-instructions.md');
     const claudePath = path.join(tmpRoot, 'CLAUDE.md');
     const cursorPath = path.join(tmpRoot, '.cursorrules');
-    const workspaceDocsPath = path.join(tmpRoot, 'docs');
-    const workspaceUsagePath = path.join(workspaceDocsPath, 'agent_usage_instructions.md');
+    const projectDocsPath = path.join(tmpRoot, '.kigumi', 'docs');
+    const workspaceUsagePath = path.join(projectDocsPath, 'agent_usage_instructions.md');
     const gitignorePath = path.join(tmpRoot, '.gitignore');
 
     expect(fs.existsSync(agentsPath)).toBe(true);
     expect(fs.existsSync(copilotPath)).toBe(true);
     expect(fs.existsSync(claudePath)).toBe(true);
     expect(fs.existsSync(cursorPath)).toBe(true);
-    expect(fs.existsSync(workspaceDocsPath)).toBe(true);
     expect(fs.existsSync(workspaceUsagePath)).toBe(true);
+    expect(fs.existsSync(path.join(tmpRoot, 'docs'))).toBe(false);
     expect(fs.existsSync(gitignorePath)).toBe(true);
 
     const agentsContent = fs.readFileSync(agentsPath, 'utf8');
     expect(agentsContent.startsWith('---')).toBe(false);
-    expect(agentsContent).toContain('docs/agent_usage_instructions.md');
+    expect(agentsContent).toContain('<!-- kigumi:begin -->');
+    expect(agentsContent).toContain('.kigumi/docs/agent_usage_instructions.md');
 
     const copilotContent = fs.readFileSync(copilotPath, 'utf8');
     const claudeContent = fs.readFileSync(claudePath, 'utf8');
@@ -107,7 +110,12 @@ describe('project-initializer', () => {
     expect(copilotContent).toContain('AGENTS.md');
     expect(claudeContent).toContain('AGENTS.md');
     expect(cursorContent).toContain('AGENTS.md');
-    expect(workspaceUsageContent).toContain('# Kumiki Usage Instructions');
+    expect(workspaceUsageContent).toContain('installed copy');
+    expect(fs.existsSync(path.join(projectDocsPath, 'concepts.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projectDocsPath, 'index.md'))).toBe(false);
+    expect(fs.existsSync(path.join(projectDocsPath, 'internal'))).toBe(false);
+    expect(fs.existsSync(path.join(projectDocsPath, 'skills', 'init-kumiki-project', 'SKILL.md'))).toBe(true);
+    expect(fs.readFileSync(path.join(projectDocsPath, 'kumiki-version.txt'), 'utf8').trim()).toBe('0.8.0');
     expect(gitignoreContent).toContain('.venv/');
     expect(gitignoreContent).toContain('kigumi_exports/');
     expect(gitignoreContent).toContain('.kigumi/logs/');
@@ -116,8 +124,7 @@ describe('project-initializer', () => {
     expect(gitignoreContent).not.toContain('.kigumi_readonly_sources/');
 
     expect(result.createdAgentsFile).toBe(true);
-    expect(result.appendedToExistingAgentsFile).toBe(false);
-    expect(result.copiedWorkspaceUsageInstructionsFile).toBe(true);
+    expect(result.docsSource).toBe(installedDocs);
     expect(result.instructionWarnings).toEqual([]);
     expect(result.createdGitignoreFile).toBe(true);
     expect(result.addedGitignoreEntries).toEqual(['.venv/', 'kigumi_exports/', '.kigumi/logs/']);
@@ -176,7 +183,7 @@ describe('project-initializer', () => {
     expect(calls.some(([, args]) => args.includes('install --upgrade uv'))).toBe(false);
   });
 
-  test('initializeWorkspaceProject appends to existing AGENTS.md and outputs warning', async () => {
+  test('initializeWorkspaceProject adds its block to an existing AGENTS.md and keeps the rest', async () => {
     const customAgentsPath = path.join(tmpRoot, 'AGENTS.md');
     const customAgentsContent = '# Existing instructions\n\nKeep this file.';
     fs.writeFileSync(customAgentsPath, customAgentsContent, 'utf8');
@@ -184,69 +191,61 @@ describe('project-initializer', () => {
     const result = await initializeWorkspaceProject(tmpRoot, null);
 
     const agentsContentAfterInit = fs.readFileSync(customAgentsPath, 'utf8');
-    expect(agentsContentAfterInit).toContain(customAgentsContent);
-    expect(agentsContentAfterInit).toContain('docs/agent_usage_instructions.md');
+    expect(agentsContentAfterInit.startsWith(customAgentsContent)).toBe(true);
+    expect(agentsContentAfterInit).toContain('.kigumi/docs/agent_usage_instructions.md');
 
     expect(result.createdAgentsFile).toBe(false);
-    expect(result.appendedToExistingAgentsFile).toBe(true);
-    expect(Array.isArray(result.instructionWarnings)).toBe(true);
-    expect(result.instructionWarnings.length).toBe(1);
-
-    expect(consoleWarnSpy).toHaveBeenCalled();
+    expect(result.updatedAgentsFile).toBe(true);
+    expect(result.instructionWarnings).toEqual([]);
   });
 
-  test('updateWorkspaceKumiki refreshes workspace usage instructions', async () => {
-    const { updateWorkspaceKumiki } = require('../project-initializer');
-
-    await initializeWorkspaceProject(tmpRoot, null);
-
-    const canonicalUpdatedContent = '# Kumiki Usage Instructions\n\nUpdated during test.\n';
-    fs.writeFileSync(usageInstructionsSourcePath, canonicalUpdatedContent, 'utf8');
-
-    const workspaceUsagePath = path.join(tmpRoot, 'docs', 'agent_usage_instructions.md');
-    fs.writeFileSync(workspaceUsagePath, 'stale content', 'utf8');
-
-    const result = await updateWorkspaceKumiki(tmpRoot, null);
-    const refreshedWorkspaceContent = fs.readFileSync(workspaceUsagePath, 'utf8');
-
-    expect(refreshedWorkspaceContent).toContain('Updated during test.');
-    expect(result.copiedWorkspaceUsageInstructionsFile).toBe(true);
-  });
-
-  test('updateWorkspaceKumiki upgrades version from old install and recopies instructions', async () => {
+  test('updateWorkspaceKumiki copies the newly installed kumiki\'s docs', async () => {
     const { updateWorkspaceKumiki } = require('../project-initializer');
 
     let kumikiVersionProbeCall = 0;
+    const baseSpawn = spawn.getMockImplementation();
     spawn.mockImplementation((command, args) => {
       const snippet = Array.isArray(args) && args[0] === '-c' ? String(args[1] || '') : '';
-      if (snippet.includes('required = ["sympy", "numpy", "trimesh", "manifold3d"]')) {
-        return createMockChildProcess({ stdoutText: '' });
-      }
       if (snippet.includes('m.version("kumiki")')) {
         kumikiVersionProbeCall += 1;
-        if (kumikiVersionProbeCall === 1) {
-          return createMockChildProcess({ stdoutText: '0.8.0\n' });
-        }
-        return createMockChildProcess({ stdoutText: '0.8.1\n' });
+        return createMockChildProcess({ stdoutText: kumikiVersionProbeCall === 1 ? '0.8.0\n' : '0.8.1\n' });
       }
-      return createMockChildProcess();
+      return baseSpawn(command, args);
     });
 
     const initResult = await initializeWorkspaceProject(tmpRoot, null);
     expect(initResult.kumikiVersion).toBe('0.8.0');
 
-    const canonicalUpdatedContent = '# Kumiki Usage Instructions\n\nRefreshed by update flow.\n';
-    fs.writeFileSync(usageInstructionsSourcePath, canonicalUpdatedContent, 'utf8');
-
-    const workspaceUsagePath = path.join(tmpRoot, 'docs', 'agent_usage_instructions.md');
-    fs.writeFileSync(workspaceUsagePath, 'stale instructions', 'utf8');
+    // The update installs a newer kumiki, with newer docs; a stray file in .kigumi/docs/ goes.
+    fs.writeFileSync(path.join(installedDocs, 'agent_usage_instructions.md'), '# Kumiki Usage Instructions\n\nnewer\n');
+    fs.writeFileSync(path.join(tmpRoot, '.kigumi', 'docs', 'stray.md'), 'edited by hand');
 
     const updateResult = await updateWorkspaceKumiki(tmpRoot, null);
-    const refreshedWorkspaceContent = fs.readFileSync(workspaceUsagePath, 'utf8');
+    const projectDocs = path.join(tmpRoot, '.kigumi', 'docs');
 
     expect(updateResult.kumikiVersion).toBe('0.8.1');
-    expect(updateResult.copiedWorkspaceUsageInstructionsFile).toBe(true);
-    expect(refreshedWorkspaceContent).toContain('Refreshed by update flow.');
+    expect(fs.readFileSync(path.join(projectDocs, 'agent_usage_instructions.md'), 'utf8')).toContain('newer');
+    expect(fs.existsSync(path.join(projectDocs, 'stray.md'))).toBe(false);
+    expect(fs.readFileSync(path.join(projectDocs, 'kumiki-version.txt'), 'utf8').trim()).toBe('0.8.1');
+  });
+
+  test('updateWorkspaceKumiki moves an old project off docs/, keeping what the user changed', async () => {
+    const { updateWorkspaceKumiki } = require('../project-initializer');
+    const { LEGACY_AGENTS_TEXTS } = require('../project-docs');
+
+    fs.writeFileSync(path.join(tmpRoot, 'AGENTS.md'), LEGACY_AGENTS_TEXTS[0]);
+    fs.mkdirSync(path.join(tmpRoot, 'docs'));
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'agent_usage_instructions.md'), 'my own edits');
+    fs.writeFileSync(path.join(tmpRoot, 'docs', 'my_notes.md'), 'not Kigumi\'s');
+
+    const result = await updateWorkspaceKumiki(tmpRoot, null);
+
+    const agents = fs.readFileSync(path.join(tmpRoot, 'AGENTS.md'), 'utf8');
+    expect(agents).not.toContain('- docs/agent_usage_instructions.md');
+    expect(agents).toContain('.kigumi/docs/agent_usage_instructions.md');
+    expect(result.keptLegacyDocs).toEqual(['docs/agent_usage_instructions.md']);
+    expect(result.instructionWarnings.join(' ')).toContain('docs/agent_usage_instructions.md');
+    expect(fs.readFileSync(path.join(tmpRoot, 'docs', 'my_notes.md'), 'utf8')).toBe('not Kigumi\'s');
   });
 });
 describe('inline example frame', () => {

@@ -17,6 +17,7 @@ const {
     getMissingDependencies,
 } = require('./python-env');
 const { ensureProjectVenv, pipInstall } = require('./python-toolchain');
+const { PROJECT_DOCS_DIR, syncProjectDocsIfStale } = require('./project-docs');
 
 const ENV_SETUP_CACHE = new Map();
 
@@ -209,12 +210,32 @@ class PythonRunnerSession {
         }
 
         await this.checkKumikiVersionCompatibility(pythonCmd);
+        await this.syncProjectDocsIfManaged(pythonCmd);
 
         this.writeProjectYaml(pythonCmd, {
             createdVenv,
             installedViewerDeps,
             missingBefore,
         });
+    }
+
+    /** Re-copy .kigumi/docs/ if Kigumi manages docs here and they came from another kumiki version. */
+    async syncProjectDocsIfManaged(pythonCmd) {
+        if (this.isLocalDev || !fs.existsSync(path.join(this.projectRoot, PROJECT_DOCS_DIR))) {
+            return;
+        }
+        try {
+            const { stdout } = await this.runCommand(pythonCmd, [
+                '-c', 'import importlib.metadata as m; print(m.version("kumiki"))',
+            ]);
+            const kumikiVersion = stdout.trim();
+            const synced = await syncProjectDocsIfStale(this.projectRoot, pythonCmd, kumikiVersion);
+            if (synced) {
+                this.channel.appendLine(`[env] Updated ${PROJECT_DOCS_DIR} for kumiki ${kumikiVersion} from ${synced.source}`);
+            }
+        } catch (error) {
+            this.channel.appendLine(`[env] Could not update ${PROJECT_DOCS_DIR}: ${error.message}`);
+        }
     }
 
     async checkKumikiVersionCompatibility(pythonCmd) {
