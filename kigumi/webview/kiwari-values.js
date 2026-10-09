@@ -19,7 +19,7 @@
         if (kind === 'angle') {
             return 'deg';
         }
-        return unitSystem === 'imperial' ? 'in' : 'mm';
+        return { imperial: 'in', shaku: 'shaku' }[unitSystem] || 'mm';
     }
 
     /** Whether an optional parameter is switched on. Others always are. */

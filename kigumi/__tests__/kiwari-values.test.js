@@ -170,6 +170,7 @@ describe('which unit a bare number means', () => {
     test('follows the viewer, and an angle is always degrees', () => {
         expect(values.defaultUnitFor('length', 'metric')).toBe('mm');
         expect(values.defaultUnitFor('length', 'imperial')).toBe('in');
+        expect(values.defaultUnitFor('length', 'shaku')).toBe('shaku');
         expect(values.defaultUnitFor('angle', 'imperial')).toBe('deg');
     });
 });

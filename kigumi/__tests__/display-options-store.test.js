@@ -59,6 +59,32 @@ describe('normalizing, which differs per option', () => {
     });
 });
 
+describe('unit precision', () => {
+    test('each system keeps its own, so switching units loses nothing', () => {
+        const options = store();
+        options.set('imperialPrecision', '1/16');
+        options.set('units', 'imperial');
+        options.set('units', 'metric');
+        expect(options.get('imperialPrecision')).toBe('1/16');
+        expect(options.get('metricPrecision')).toBe('0');
+        expect(options.get('shakuPrecision')).toBe('3');
+    });
+
+    test('a precision the system cannot be read to falls back to its default', () => {
+        const options = store();
+        options.set('metricPrecision', '2');
+        options.set('metricPrecision', '1/16');
+        expect(options.get('metricPrecision')).toBe('0');
+        options.set('shakuPrecision', '4');
+        expect(options.get('shakuPrecision')).toBe('3');
+    });
+
+    test('shaku is a system the viewer can be set to', () => {
+        const options = store();
+        expect(options.set('units', 'shaku')).toBe(true);
+    });
+});
+
 describe('saving and restoring', () => {
     test('the payload round-trips through a fresh store', () => {
         const saved = store();

@@ -207,6 +207,7 @@
         parseLength,
         parseAngle,
         formatLength,
+        formatFraction,
         formatAngle,
         whyNotALength,
         whyNotAnAngle,

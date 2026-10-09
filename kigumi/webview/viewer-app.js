@@ -279,6 +279,11 @@ const CSG_HIGHLIGHT_POINT_SIZE_PX = 11;
 // Metric stays the default, which is what the viewer always displayed.
 const { DEFAULT_UNIT_SYSTEM } = window.KigumiUnits;
 
+/** A precision as the step it reads to: '2' -> 0.01, '1/16' as it is. */
+function precisionLabel(precision) {
+    return precision.includes('/') ? precision : (10 ** -Number(precision)).toFixed(Number(precision));
+}
+
 /**
  * What a CSG selection is ABOUT, as one comparable value.
  *
@@ -753,8 +758,17 @@ class ViewerSettingsPanel {
                 <label>
                     ${t('viewer.options.units.label')}
                     <select id="units-select" .value=${this.app.units || 'metric'}>
-                        <option value="metric">${t('viewer.options.units.metric')}</option>
                         <option value="imperial">${t('viewer.options.units.imperial')}</option>
+                        <option value="metric">${t('viewer.options.units.metric')}</option>
+                        <option value="shaku">${t('viewer.options.units.shaku')}</option>
+                    </select>
+                    <!-- What it can be read to depends on the unit, so the
+                         choices are redrawn with it. -->
+                    <select id="unit-precision-select" title=${t('viewer.options.units.precision')}>
+                        ${KigumiUnits.PRECISIONS[this.app.unitSystem()].map((precision) => html`
+                            <option value=${precision} .selected=${precision === this.app.unitPrecision()}>
+                                ${precisionLabel(precision)}
+                            </option>`)}
                     </select>
                 </label>
                 <label>
@@ -957,6 +971,11 @@ class ViewerSettingsPanel {
                 id: 'units-select', on: 'change',
                 apply: (el) => app.setUnits(el.value),
                 sync: (el) => { el.value = app.units || DEFAULT_UNIT_SYSTEM; },
+            },
+            {
+                id: 'unit-precision-select', on: 'change',
+                apply: (el) => app.setUnitPrecision(el.value),
+                sync: (el) => { el.value = app.unitPrecision(); },
             },
             {
                 id: 'edge-mode-select', on: 'change',
@@ -2415,6 +2434,11 @@ class KigumiViewerApp extends LitElement {
         }
         if (typeof ui.units === 'string') {
             this.setUnits(ui.units);
+        }
+        for (const system of KigumiUnits.UNIT_SYSTEMS) {
+            if (typeof ui[`${system}Precision`] === 'string') {
+                this.setUnitPrecision(ui[`${system}Precision`], system);
+            }
         }
         if (typeof ui.shadowsEnabled === 'boolean') {
             this.setShadowsEnabled(ui.shadowsEnabled);
@@ -4757,15 +4781,39 @@ class KigumiViewerApp extends LitElement {
 
     /** A length in metres, in whichever units the viewer is set to. */
     fmt(value) {
-        return KigumiUnits.formatLength(value, this.units);
+        return KigumiUnits.formatLength(value, this.units, this.unitPrecision());
+    }
+
+    unitSystem() {
+        return this.units || KigumiUnits.DEFAULT_UNIT_SYSTEM;
+    }
+
+    /** What lengths are read to in the units the viewer is set to. */
+    unitPrecision() {
+        return this.displayOptions.get(`${this.unitSystem()}Precision`);
     }
 
     setUnits(units) {
         if (!this.displayOptions.set('units', units)) {
             return;
         }
+        this.onLengthFormatChanged();
+    }
+
+    setUnitPrecision(precision, system = this.unitSystem()) {
+        if (!this.displayOptions.set(`${system}Precision`, precision)) {
+            return;
+        }
+        this.onLengthFormatChanged();
+    }
+
+    /** Redraw everything that has a length written on it. */
+    onLengthFormatChanged() {
         this.memberListPanel.refresh();
         this.selectionPanel.updateInfo(this.currentFrameData);
+        this.renderMeasurements();
+        this._syncDrawingPanel();
+        this.requestUpdate();
     }
 
     clampPhi(value) {

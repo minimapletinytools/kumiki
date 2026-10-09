@@ -38,7 +38,9 @@
 
     const EDGE_MODES = ['none', 'overlay', 'noOverlay'];
     const FOOTPRINT_COLORS = ['slate', 'moss', 'orange', 'transparent'];
-    const UNIT_SYSTEMS = ['metric', 'imperial'];
+    const { UNIT_SYSTEMS, PRECISIONS, DEFAULT_PRECISIONS } = (typeof require === 'function' && typeof module !== 'undefined')
+        ? require('./units')
+        : globalScope.KigumiUnits;
 
     /**
      * The options, their defaults and how each takes a value.
@@ -61,6 +63,20 @@
             unselectedTransparencyPercent: { value: 70, normalize: percent(0, 95, 5, 70) },
             selectedTransparencyPercent: { value: 0, normalize: percent(0, 95, 5, 0) },
             units: { value: 'metric', normalize: oneOf(UNIT_SYSTEMS, 'metric') },
+            // What lengths are read to, kept per system so that going to inches
+            // and back does not lose the millimetre setting.
+            metricPrecision: {
+                value: DEFAULT_PRECISIONS.metric,
+                normalize: oneOf(PRECISIONS.metric, DEFAULT_PRECISIONS.metric),
+            },
+            imperialPrecision: {
+                value: DEFAULT_PRECISIONS.imperial,
+                normalize: oneOf(PRECISIONS.imperial, DEFAULT_PRECISIONS.imperial),
+            },
+            shakuPrecision: {
+                value: DEFAULT_PRECISIONS.shaku,
+                normalize: oneOf(PRECISIONS.shaku, DEFAULT_PRECISIONS.shaku),
+            },
         };
     }
 
