@@ -80,8 +80,9 @@ def _leg(k: Kiwari, beam: Timber, end: int, side: int):
         normal=create_v3(0, 0, -1), offset=scalar(0), label=CutCSGLabel("level_bottom")))
     cut_leg = CutTimber(leg, cuts=[joint.cuttings["dovetail_timber"],
                                    Cutting(timber=leg, negative_csg=level_top, label=CutCSGLabel("level_top")),
-                                   Cutting(timber=leg, negative_csg=level_bottom, label=CutCSGLabel("level_bottom"))])
-    return cut_leg, joint.cuttings["receiving_timber"]
+                                   Cutting(timber=leg, negative_csg=level_bottom, label=CutCSGLabel("level_bottom"))],
+                        joints=[joint])
+    return cut_leg, joint
 
 
 @frame
@@ -90,12 +91,16 @@ def dovetailed_sawhorse(k: Kiwari) -> Frame:
     beam = create_timber(bottom_position=create_v3(-length / 2, 0, k.length("sawhorse_height") - beam_size[1] / 2),
                          length=length, size=beam_size,
                          length_direction=create_v3(1, 0, 0), width_direction=create_v3(0, 1, 0), ticket="beam")
-    legs, sockets = [], []
+    legs, joints = [], []
     for end in (1, -1):
         for side in (1, -1):
-            leg, socket = _leg(k, beam, end, side)
+            leg, joint = _leg(k, beam, end, side)
             legs.append(leg)
-            sockets.append(socket)
+            joints.append(joint)
     # Each leg is let in by its thickness: the beam is housed to the leg's finished shape.
-    housing = cut_free_house_joint(beam, legs).cuttings["housing_timber"]
-    return Frame(cut_timbers=[CutTimber(beam, cuts=[*sockets, housing]), *legs], name="Dovetailed sawhorse")
+    joints.append(cut_free_house_joint(beam, legs))
+    # Built by hand rather than from the joints, for the legs' level trims; the joints ride along
+    # so Kigumi can list them.
+    beam_cuts = [cutting for joint in joints for cutting in joint.cuttings.values() if cutting.timber is beam]
+    return Frame(cut_timbers=[CutTimber(beam, cuts=beam_cuts, joints=joints), *legs],
+                 source_joints=joints, name="Dovetailed sawhorse")

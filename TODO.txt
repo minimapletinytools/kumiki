@@ -256,7 +256,9 @@ DONE-do measuring features doc
 DONE-do the assembly system doc (placeholder doc basically)
 
 
+-probably still include kiwari in teh output Frame... maybe just require all frames to use the same kiwari for multi frame stuff? I don't like the magical params = kiwari thing...
 -kiwari units should probbaly match kigumi units, or allow it to be specified?
+
 -free house joints not showing up in joints in tree view
 -add support to run @tools from the parameter section
 -update tree view for multi frame files
