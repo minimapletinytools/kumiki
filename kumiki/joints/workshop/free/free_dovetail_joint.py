@@ -72,9 +72,10 @@ def cut_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: Timbe
                             dovetail: FreeDovetailShape) -> Joint:
     """A dovetail of any shape and placement: the receiving timber gets the socket, the dovetail timber the tongue.
 
-    The dovetail timber keeps the tongue and everything on the +y side of the dovetail's wide face;
-    between the dovetail's ends, everything else on the -y side of that face is cut away. That
-    face is the joint's shoulder.
+    The tongue's neck is the dovetail's narrow face, at its origin, and it widens toward its tip
+    along +y -- so the dovetail timber should lie on the -y side of the origin, and the tongue holds
+    against being pulled back out along y. Between the dovetail's ends, everything of the dovetail
+    timber past the narrow face is cut away except the tongue. That face is the joint's shoulder.
     """
     # create a convex polygon extrusion from `dovetail`
     dovetail_csg = dovetail.csg()
@@ -82,8 +83,8 @@ def cut_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: Timbe
     # remove the extrusion CSG from receiving timber
     socket = adopt_csg(dovetail.origin, receiving_timber.transform, dovetail_csg)
 
-    # create a half space coincident the +y flat face of the dovetail pointing in the -y direction
-    region: CutCSG = HalfSpace(normal=create_v3(0, -1, 0), offset=-dovetail.depth,
+    # create a half space coincident the narrow (-y) face of the dovetail, its neck, covering the +y side
+    region: CutCSG = HalfSpace(normal=create_v3(0, 1, 0), offset=scalar(0),
                                feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder")],
                                label=CutCSGLabel("shoulder"))
     # then crop that half space with the forward backward ends of the dovetail shape forming a prism

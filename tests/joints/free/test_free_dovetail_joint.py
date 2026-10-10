@@ -20,9 +20,9 @@ def _post():
 
 
 def _dovetail(taper=0, forward=mm(50), backward=mm(50)):
-    """Slides along world x across the post: narrow (40) at z=20, flaring up to the beam's top face (depth 30)."""
-    origin = Transform(position=create_v3(0, 0, mm(20)),
-                       orientation=Orientation.from_x_and_y(create_v3(0, 1, 0), create_v3(0, 0, 1)))
+    """Slides along world x across the post: the neck (40 wide) at the beam's top face, flaring down 30 to z=20."""
+    origin = Transform(position=create_v3(0, 0, mm(50)),
+                       orientation=Orientation.from_x_and_y(create_v3(0, 1, 0), create_v3(0, 0, -1)))
     return FreeDovetailShape(origin=origin, width=mm(40), depth=mm(30), dovetail_angle=degrees(15),
                              forward_length=forward, backward_length=backward, taper_angle=degrees(taper))
 
@@ -64,19 +64,20 @@ class TestFreeDovetailJoint:
 
         assert _has(beam, 200, 0, 35)
 
-    def test_the_sides_flare_toward_the_wide_face(self):
-        # 27mm out: outside the 20mm half width at the narrow side, inside it near the wide face.
-        _, beam = _cut()
+    def test_the_tongue_widens_from_its_neck_so_it_cannot_pull_out(self):
+        # 24mm out: outside the 20mm half width at the neck, inside it near the tip.
+        post, beam = _cut()
 
-        assert _has(beam, 0, 27, 21)
-        assert not _has(beam, 0, 27, 49)
+        assert _has(beam, 0, 24, 49) and not _has(post, 0, 24, 49)
+        assert not _has(beam, 0, 24, 21) and _has(post, 0, 24, 21)
 
     def test_a_taper_narrows_it_toward_its_forward_end(self):
-        # 20mm out at the narrow side: inside at the backward end, outside at the forward end.
+        # The dovetail's +z runs along world -x. 18mm out, just below the neck: inside the tapered
+        # half width near the backward end (world +x), outside it near the forward end (world -x).
         _, beam = _cut(taper=5)
 
-        assert not _has(beam, -45, 20, 21)
-        assert _has(beam, 45, 20, 21)
+        assert not _has(beam, 45, 18, 49)
+        assert _has(beam, -45, 18, 49)
 
     def test_the_wide_face_is_the_post_s_shoulder(self):
         post, _ = _cut()

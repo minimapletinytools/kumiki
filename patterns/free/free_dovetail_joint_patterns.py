@@ -17,10 +17,11 @@ def _post_on_beam_with_dovetail(position, taper_angle):
                          width_direction=create_v3(0, 1, 0), ticket="beam")
     post = create_timber(bottom_position=position, length=mm(600), size=create_v2(mm(100), mm(100)),
                          length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="post")
-    # Slides along x: 40mm wide 20mm up, flaring at 15 degrees to the beam's top face, across the post's width.
+    # Slides along x, across the post's width. The neck is 40mm wide at the beam's top face and the
+    # tongue flares at 15 degrees down into the beam for 30mm, so the post cannot lift out.
     dovetail = FreeDovetailShape(
-        origin=Transform(position=position + create_v3(0, 0, mm(20)),
-                         orientation=Orientation.from_x_and_y(create_v3(0, 1, 0), create_v3(0, 0, 1))),
+        origin=Transform(position=position + create_v3(0, 0, mm(50)),
+                         orientation=Orientation.from_x_and_y(create_v3(0, 1, 0), create_v3(0, 0, -1))),
         width=mm(40), depth=mm(30), dovetail_angle=degrees(15),
         forward_length=mm(50), backward_length=mm(50), taper_angle=taper_angle,
     )
