@@ -729,6 +729,17 @@ canvas { display: block; width: 100%; height: 100%; }
     flex-direction: column;
     gap: 8px;
 }
+/* Which frames a kiwari's parameters build, when a file has more than one. */
+.kiwari-section-title {
+    margin-top: 4px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--hv-control-border-strong);
+    color: var(--hv-title);
+    font: 600 11px 'Segoe UI', sans-serif;
+}
+.kiwari-list > .kiwari-section-title:first-child {
+    margin-top: 0;
+}
 .kiwari-row {
     display: flex;
     flex-direction: column;

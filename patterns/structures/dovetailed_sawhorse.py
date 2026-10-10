@@ -9,7 +9,7 @@ bottom arris. The floor is at z=0.
 from kumiki import *
 
 
-params = kiwari(
+SAWHORSE = kiwari(
     leg_distance=kiwari.length(inches(25), about="Centre to centre along the beam, where the legs meet its top"),
     leg_y_splay_angle=kiwari.angle(degrees(12), about="How far the legs lean out toward the beam's ends"),
     leg_side_splay_angle=kiwari.angle(
@@ -86,7 +86,8 @@ def _leg(k: Kiwari, beam: Timber, end: int, side: int):
 
 
 @frame
-def dovetailed_sawhorse(k: Kiwari) -> Frame:
+def dovetailed_sawhorse(k: Optional[Kiwari] = None) -> Frame:
+    k = SAWHORSE.resolve(k)
     beam_size, length = k.v2("beam_size"), k.length("sawhorse_length")
     beam = create_timber(bottom_position=create_v3(-length / 2, 0, k.length("sawhorse_height") - beam_size[1] / 2),
                          length=length, size=beam_size,
@@ -103,4 +104,4 @@ def dovetailed_sawhorse(k: Kiwari) -> Frame:
     # so Kigumi can list them.
     beam_cuts = [cutting for joint in joints for cutting in joint.cuttings.values() if cutting.timber is beam]
     return Frame(cut_timbers=[CutTimber(beam, cuts=beam_cuts, joints=joints), *legs],
-                 source_joints=joints, name="Dovetailed sawhorse")
+                 source_joints=joints, name="Dovetailed sawhorse", kiwari=k)

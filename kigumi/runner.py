@@ -25,7 +25,7 @@ import traceback
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional, List, Sequence, Tuple
 
 if TYPE_CHECKING:
     # Annotations only. kumiki must NOT be imported at module scope for
@@ -107,6 +107,21 @@ os.environ["KIGUMI_VIEWER_MILESTONES"] = "1"
 TARGET_MODULE_NAME = "_kigumi_viewer_target"
 
 
+@dataclass(frozen=True)
+class KiwariGroup:
+    """One set of parameters, and the frames built from it.
+
+    Frames share one when their kiwari were resolved from the same declared kiwari.
+    """
+    frames: Tuple[str, ...]
+    kiwari: Any
+
+    @property
+    def id(self) -> str:
+        """What the viewer calls it: its frames, which stay the same from one build to the next."""
+        return ",".join(self.frames)
+
+
 @dataclass
 class SlotState:
     """State for a single named viewer slot (e.g. 'main' or a pattern)."""
@@ -116,11 +131,11 @@ class SlotState:
     mesh_cache: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     patternbook: Optional[Any] = None
     single_pattern_name: Optional[str] = None
-    # What this slot was last built from, bound. Read off the frame the builder
-    # returned, or off the Pattern for a pattern. Kept on the slot rather than
-    # only on the frame so a build that fails leaves the panel something to
-    # dial back from.
-    kiwari: Optional[Any] = None
+    # What this slot was last built from, bound: one group per kiwari its frames
+    # returned, or the Pattern's for a pattern. Kept on the slot rather than only
+    # on the frames so a build that fails leaves the panel something to dial
+    # back from.
+    kiwari_groups: Tuple[KiwariGroup, ...] = ()
     # The file's @tool functions, and any @frame / @tool rejected for its signature.
     tools: Tuple[Any, ...] = ()
     rejected_entries: Tuple[Any, ...] = ()
@@ -3989,18 +4004,32 @@ def _workspace_root() -> Optional[Path]:
     return Path(root).resolve() if root else None
 
 
-def _read_parameters_file(example_path: Path) -> "tuple[Dict[str, Any], Optional[Path]]":
-    """The saved values for *example_path*, and where they came from."""
+def _read_parameters_file(
+    example_path: Path,
+) -> "tuple[List[tuple[Optional[List[str]], Dict[str, Any]]], Optional[Path]]":
+    """The saved values for *example_path*, as (frames, values) per group, and where they came from.
+
+    A file from before groups has one set of values naming no frames.
+    """
     path = _parameters_file_path(example_path)
     if not path.exists():
-        return {}, None
+        return [], None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         log_stderr(f"[parameters] Ignoring {path.name}: {exc}")
-        return {}, None
-    values = data.get("values") if isinstance(data, dict) else None
-    return (values if isinstance(values, dict) else {}), path
+        return [], None
+    if not isinstance(data, dict):
+        return [], path
+    if isinstance(data.get("groups"), list):
+        saved = [
+            ([str(name) for name in group.get("frames", [])], group["values"])
+            for group in data["groups"]
+            if isinstance(group, dict) and isinstance(group.get("values"), dict)
+        ]
+        return saved, path
+    values = data.get("values")
+    return ([(None, values)] if isinstance(values, dict) and values else []), path
 
 
 def _write_parameters_file(slot_state: SlotState) -> str:
@@ -4009,23 +4038,28 @@ def _write_parameters_file(slot_state: SlotState) -> str:
     Writing every value out would mean changing a default in the source did
     nothing for anyone holding one of these files.
     """
-    if slot_state.kiwari is None:
+    if not slot_state.kiwari_groups:
         raise ValueError("This frame takes no parameters, so there is nothing to save")
     if not _can_save_parameters(slot_state):
         raise ValueError(
             "Parameters can only be saved beside a frame in your own workspace, "
             "not for a library pattern"
         )
-    changed = slot_state.kiwari.changed_from_defaults()
+    groups = [
+        {"frames": list(group.frames),
+         "values": {key: group.kiwari.value_payload(key) for key in group.kiwari.changed_from_defaults()}}
+        for group in slot_state.kiwari_groups
+    ]
+    groups = [group for group in groups if group["values"]]
     path = _parameters_file_path(slot_state.file_path)
-    if not changed:
+    if not groups:
         # Nothing differs any more, so the file has nothing left to say.
         if path.exists():
             path.unlink()
         return str(path)
     payload = {
-        "schema_version": 1,
-        "values": {key: slot_state.kiwari.value_payload(key) for key in changed},
+        "schema_version": 2,
+        "groups": groups,
     }
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return str(path)
@@ -4040,17 +4074,23 @@ def _bind_kiwari_values(kiwari: Optional[Any], values: Optional[Mapping[str, Any
     return kiwari.resolve(dict(values))
 
 
-def _serialize_kiwari_for_slot(slot_state: SlotState, *, stale: bool = False) -> Optional[Dict[str, Any]]:
-    """What the panel is built from, or None when the frame takes no parameters."""
-    if slot_state is None or slot_state.kiwari is None:
+def _serialize_kiwari_for_slot(slot_state: SlotState, *, stale: bool = False) -> Optional[List[Dict[str, Any]]]:
+    """What the panel is built from, one section per kiwari, or None when nothing takes parameters."""
+    if slot_state is None or not slot_state.kiwari_groups:
         return None
-    payload = slot_state.kiwari.to_payload()
-    payload["canSave"] = _can_save_parameters(slot_state)
-    if stale:
-        # Kept from the last build that worked, so the panel can say the values
-        # on screen are not the ones the frame in front of you was built from.
-        payload["stale"] = True
-    return payload
+    can_save = _can_save_parameters(slot_state)
+    sections = []
+    for group in slot_state.kiwari_groups:
+        payload = group.kiwari.to_payload()
+        payload["id"] = group.id
+        payload["frames"] = list(group.frames)
+        payload["canSave"] = can_save
+        if stale:
+            # Kept from the last build that worked, so the panel can say the values
+            # on screen are not the ones the frame in front of you was built from.
+            payload["stale"] = True
+        sections.append(payload)
+    return sections
 
 
 def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
@@ -4102,15 +4142,44 @@ def _frame_decorators() -> Optional[Any]:
     return frame_decorators
 
 
-def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tuple[Any, Optional[Any]]":
-    """Resolve a frame from a loaded module, built with *kiwari* if it takes one.
+def _build_frame_entry(function: Any, name: str, kiwari: Optional[Any]) -> Any:
+    """One @frame, built with the values for its own kiwari, or None on a first build."""
+    with contextlib.redirect_stdout(sys.stderr):
+        result = function(kiwari)
+    return _coerce_viewable_frame(result, name)
 
-    In order: the file's `@pattern` functions (a pattern book), its `@frame` functions (all
-    built with the file's shared kiwari and shown together), or the deprecated `build_frame` /
-    `example`.
 
-    Returns (frame, patternbook_or_None).
+def _origin_of(kiwari: Any) -> Any:
+    # A kumiki from before Kiwari.origin shares nothing between frames.
+    return getattr(kiwari, "origin", kiwari)
+
+
+def _group_kiwaris(built: List["tuple[str, Any]"]) -> Tuple[KiwariGroup, ...]:
+    """The frames' kiwari, one group per declared kiwari, in the order they were first built."""
+    groups: List["tuple[Any, List[str], Any]"] = []
+    for name, kiwari in built:
+        if kiwari is None:
+            continue
+        found = next((group for group in groups if group[0] is _origin_of(kiwari)), None)
+        if found is None:
+            groups.append((_origin_of(kiwari), [name], kiwari))
+        else:
+            found[1].append(name)
+    return tuple(KiwariGroup(tuple(names), kiwari) for _, names, kiwari in groups)
+
+
+def resolve_frame_from_module(
+    module: Any, incoming: Optional[Mapping[str, Any]] = None,
+) -> "tuple[Any, Optional[Any], Tuple[KiwariGroup, ...]]":
+    """Resolve a frame from a loaded module, each of its frames built with *incoming*'s kiwari.
+
+    In order: the file's `@pattern` functions (a pattern book), its `@frame` functions (each
+    built with the values for its own kiwari and shown together), or the deprecated `build_frame` /
+    `example`. *incoming* maps a frame's name to the kiwari to build it with.
+
+    Returns (frame, patternbook_or_None, kiwari_groups).
     """
+    incoming = incoming or {}
     decorators = _frame_decorators()
     entries = decorators.module_entries(module) if decorators is not None else None
     pattern_list = _module_patterns(module)
@@ -4118,37 +4187,46 @@ def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tup
         if entries is not None and entries.frames:
             log_stderr("Warning: this file has @pattern functions, so it is a pattern book and its "
                        f"@frame functions are not shown: {', '.join(e.name for e in entries.frames)}")
-        return _frame_from_pattern_list(pattern_list)
+        frame, patternbook = _frame_from_pattern_list(pattern_list)
+        return frame, patternbook, ()
 
     for rejected in (entries.rejected if entries is not None else ()):
         log_stderr(f"Warning: @{rejected.kind} {rejected.name} is not used: {rejected.reason}")
     if entries is not None and entries.frames:
-        parameters = entries.parameters.resolve(kiwari)
-        built = []
-        for entry in entries.frames:
-            with contextlib.redirect_stdout(sys.stderr):
-                result = entry.function(parameters)
-            built.append(_coerce_viewable_frame(result, entry.name))
-        name = built[0].name if len(built) == 1 else " + ".join(f.name or e.name for f, e in zip(built, entries.frames))
-        # A file that declares no parameters shows none, like a frame that takes no kiwari.
-        return decorators.overlay_frames(built, name, parameters if parameters.declarations else None), None
+        built = {entry.name: _build_frame_entry(entry.function, entry.name, incoming.get(entry.name))
+                 for entry in entries.frames}
+        groups = _group_kiwaris([(name, getattr(frame, "kiwari", None)) for name, frame in built.items()])
+        # One set of values per kiwari. A frame handed nothing -- new since the last build --
+        # is built again with what the rest of its group was handed.
+        for group in groups:
+            handed = next((incoming[name] for name in group.frames if incoming.get(name) is not None), None)
+            for name in group.frames:
+                if handed is not None and incoming.get(name) is None:
+                    entry = next(entry for entry in entries.frames if entry.name == name)
+                    built[name] = _build_frame_entry(entry.function, name, handed)
+        groups = _group_kiwaris([(name, getattr(frame, "kiwari", None)) for name, frame in built.items()])
+        frames = list(built.values())
+        name = frames[0].name if len(frames) == 1 else " + ".join(
+            frame.name or entry_name for entry_name, frame in built.items())
+        return decorators.overlay_frames(frames, name), None, groups
 
-    if hasattr(module, "build_frame") and callable(module.build_frame):
-        _warn_legacy_entry("build_frame")
-        frame = _call_frame_entry(module.build_frame, kiwari)
-        return _coerce_viewable_frame(frame, "build_frame"), None
-
-    if hasattr(module, "example"):
-        _warn_legacy_entry("example")
-        example = getattr(module, "example")
-        if callable(example):
-            example = _call_frame_entry(example, kiwari)
-        if _looks_like_frame(example):
-            return example, None
-        try:
-            return _coerce_viewable_frame(example, "example"), None
-        except TypeError:
-            pass
+    for legacy in ("build_frame", "example"):
+        if not hasattr(module, legacy):
+            continue
+        entry = getattr(module, legacy)
+        if legacy == "build_frame" and not callable(entry):
+            continue
+        _warn_legacy_entry(legacy)
+        if callable(entry):
+            entry = _call_frame_entry(entry, incoming.get(legacy))
+        if not _looks_like_frame(entry):
+            try:
+                entry = _coerce_viewable_frame(entry, legacy)
+            except TypeError:
+                if legacy == "example":
+                    continue
+                raise
+        return entry, None, _group_kiwaris([(legacy, getattr(entry, "kiwari", None))])
 
     raise AttributeError(
         "Module must have @pattern or @frame functions, "
@@ -4161,31 +4239,65 @@ def _warn_legacy_entry(name: str) -> None:
                f"Mark it with @frame instead: @frame def {name}(k: Kiwari) -> Frame")
 
 
+def _incoming_from_groups(
+    groups: Sequence[KiwariGroup], values_by_group: Optional[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    """Each frame's kiwari to build with: its group's last one, with the viewer's values laid over it."""
+    incoming: Dict[str, Any] = {}
+    for group in groups:
+        values = (values_by_group or {}).get(group.id)
+        bound = _bind_kiwari_values(group.kiwari, values if isinstance(values, Mapping) else None)
+        for name in group.frames:
+            incoming[name] = bound
+    return incoming
+
+
+def _incoming_from_saved(groups: Sequence[KiwariGroup], saved: List["tuple[Optional[List[str]], Dict[str, Any]]"]) -> Dict[str, Any]:
+    """Each frame's kiwari with its group's saved values laid over it.
+
+    A saved group is matched by the frames it names. A file from before groups names none, and
+    is every group's -- each taking only the keys it declares, when there are several.
+    """
+    incoming: Dict[str, Any] = {}
+    for group in groups:
+        bound = group.kiwari
+        for frames, values in saved:
+            if frames is not None and not set(frames) & set(group.frames):
+                continue
+            if frames is None and len(groups) > 1:
+                values = {key: value for key, value in values.items() if key in group.kiwari.declarations}
+            bound = _bind_kiwari_values(group.kiwari, values)
+            break
+        for name in group.frames:
+            incoming[name] = bound
+    return incoming
+
+
 def load_slot_state(
     file_path: str,
     previous_mesh_cache: Optional[Dict[str, Dict[str, Any]]] = None,
     kiwari_values: Optional[Mapping[str, Any]] = None,
-    previous_kiwari: Optional[Any] = None,
+    previous_groups: Sequence[KiwariGroup] = (),
 ) -> SlotState:
+    """Load *file_path* into a slot.
+
+    *kiwari_values* maps a group's id to the values the viewer wants for it, laid over what the
+    last good build of that group declared. On a first load there is nothing to lay them over
+    yet, and each frame's own declaration is all there is.
+    """
     resolved_path = Path(file_path).resolve()
     if not resolved_path.exists():
         raise FileNotFoundError(f"File not found: {resolved_path}")
 
     module = load_module_from_path(resolved_path, verbose=True)
 
-    # The values are laid over whatever the last good build declared, so the
-    # builder receives a bound kiwari and re-validates it against the
-    # declaration it makes on this run. On a first load there is nothing to lay
-    # them over yet, and the builder's own declaration is all there is.
-    incoming = _bind_kiwari_values(previous_kiwari, kiwari_values)
-    frame, patternbook = resolve_frame_from_module(module, incoming)
+    frame, patternbook, groups = resolve_frame_from_module(
+        module, _incoming_from_groups(previous_groups, kiwari_values))
     saved, saved_path = _read_parameters_file(resolved_path)
-    if saved and getattr(frame, "kiwari", None) is not None and not kiwari_values:
+    if saved and groups and not kiwari_values:
         # A companion file is the author's saved starting point, so it only
         # applies when the viewer has not already said what it wants.
-        frame, patternbook = resolve_frame_from_module(
-            module, _bind_kiwari_values(frame.kiwari, saved)
-        )
+        frame, patternbook, groups = resolve_frame_from_module(module, _incoming_from_saved(groups, saved))
     decorators = _frame_decorators()
     entries = decorators.module_entries(module) if decorators is not None else None
     return SlotState(
@@ -4194,7 +4306,7 @@ def load_slot_state(
         frame=frame,
         mesh_cache=previous_mesh_cache if previous_mesh_cache is not None else {},
         patternbook=patternbook,
-        kiwari=getattr(frame, "kiwari", None),
+        kiwari_groups=groups,
         tools=entries.tools if entries is not None else (),
         rejected_entries=entries.rejected if entries is not None else (),
     )
@@ -4239,15 +4351,13 @@ def _serialize_tools(slot_state: SlotState) -> Dict[str, Any]:
 
 
 def run_tool(slot_state: SlotState, name: str) -> Dict[str, Any]:
-    """Run one of the slot's @tool functions on its frame and shared kiwari; its text is the result."""
+    """Run one of the slot's @tool functions on its frame; its text is the result."""
     entry = next((entry for entry in slot_state.tools if entry.name == name), None)
     if entry is None:
         available = [entry.name for entry in slot_state.tools]
         raise ValueError(f"No tool named {name!r}. Available: {available}")
-    # A slot only has tools if its kumiki has frame_decorators.
-    parameters = _frame_decorators().module_parameters(slot_state.module).resolve(slot_state.kiwari)
     with contextlib.redirect_stdout(sys.stderr):
-        output = entry.function(slot_state.frame, parameters)
+        output = entry.function(slot_state.frame)
     if not isinstance(output, str):
         raise TypeError(f"tool {name!r} returned {type(output).__name__}, expected str")
     return {"name": name, "output": output}
@@ -6162,7 +6272,8 @@ def _raise_specific_pattern(
         # A pattern declares its kiwari on the Pattern, so the schema is
         # readable without building -- raise_at binds the values onto it and
         # hands the result in only if this pattern takes one.
-        bound = _bind_kiwari_values(pattern.kiwari, kiwari_values)
+        values = (kiwari_values or {}).get(pattern.path)
+        bound = _bind_kiwari_values(pattern.kiwari, values if isinstance(values, Mapping) else None)
         with contextlib.redirect_stdout(sys.stderr):
             pattern_result = pattern.raise_at(origin, bound)
         frame = _coerce_viewable_frame(pattern_result, f"Pattern '{pattern.name}'")
@@ -6175,7 +6286,7 @@ def _raise_specific_pattern(
             mesh_cache={},
             patternbook=pattern_list,
             single_pattern_name=pattern.path,
-            kiwari=bound,
+            kiwari_groups=(KiwariGroup((pattern.path,), bound),) if bound is not None else (),
         )
         result = {
             "examplePath": str(resolved),
@@ -6251,7 +6362,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 next_path,
                 old_cache,
                 kiwari_values=kiwari_values,
-                previous_kiwari=old_slot.kiwari if old_slot else None,
+                previous_groups=old_slot.kiwari_groups if old_slot else (),
             )
 
         reload_s = time.monotonic() - t0
@@ -6534,7 +6645,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         log_stderr(f"[parameters] Saved to {written}")
         return state, make_success_response(request_id, command, {
             "path": written,
-            "saved": list(ss.kiwari.changed_from_defaults()) if ss.kiwari else [],
+            "saved": {group.id: list(group.kiwari.changed_from_defaults()) for group in ss.kiwari_groups},
         }), False
 
     if command == "export_member":
@@ -6706,7 +6817,7 @@ def main() -> None:
             # back, rather than the panel emptying along with the frame.
             response = make_error_response(request_id, command, exc)
             failed_slot = state.slots.get(_resolve_slot_name(state, request.get("payload") or {}))
-            if failed_slot is not None and failed_slot.kiwari is not None:
+            if failed_slot is not None and failed_slot.kiwari_groups:
                 response["kiwari"] = _serialize_kiwari_for_slot(failed_slot, stale=True)
             emit_message(response)
 

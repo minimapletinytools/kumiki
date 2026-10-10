@@ -140,21 +140,22 @@ In addition, invite them to open up a feature request issue on kumiki https://gi
 
 ## Combining everything into a Frame
 
-Mark the function that builds your frame with `@frame`. Kigumi finds it and renders it when your file is opened. It takes the file's parameters (see below) and must be annotated exactly `(k: Kiwari) -> Frame`.
+Mark the function that builds your frame with `@frame`. Kigumi finds it and renders it when your file is opened. It takes the values for its parameters (see below), returns them on the Frame, and must be annotated exactly `(k: Kiwari) -> Frame` (`Optional[Kiwari]` is fine).
 
 Use `Frame.from_joints` to merge cuts on shared timbers across multiple joints.
 
 ```python
 @frame
-def my_frame(k: Kiwari) -> Frame:
+def my_frame(k: Optional[Kiwari] = None) -> Frame:
+    k = PARAMS.resolve(k)
     # establish footprint
     # create timbers
     # create joints
-    # merge into a frame and return the results
-    return Frame.from_joints([joint1, joint2, joint3], name="my_frame")
+    # merge into a frame and return the results, with the parameters it was built from
+    return Frame.from_joints([joint1, joint2, joint3], name="my_frame", kiwari=k)
 ```
 
-A file may mark any number of frames. Kigumi builds them all and shows them together, each where it was built. They share the file's parameters.
+A file may mark any number of frames. Kigumi builds them all and shows them together, each where it was built. Each has its own parameters, or shares them with the frames whose kiwari was resolved from the same kiwari object.
 
 Older files name their one frame `example` or `build_frame` instead of marking it. Kigumi still picks those up, with a warning; that will be removed, so write `@frame` in new files.
 
@@ -165,10 +166,10 @@ kumiki is a *programmatic CAD* tool hence all designs can be parameterized by co
 Create a new kiwari object with a list of user defined of parameters:
 
 ```python
-params = kiwari(legs=kiwari.count(4, minimum=3))
+PARAMS = kiwari(legs=kiwari.count(4, minimum=3))
 ```
 
-This object will then be passed in as the first argument to your frame function. It may have some of its parameters overriden (from the defaults) if set by kigumi.
+Your frame function resolves the values it is passed onto it (`k = PARAMS.resolve(k)`) and returns the result on its Frame (`kiwari=k`). Kigumi passes the values set in its panel, or None the first time, which leaves the defaults.
 
 Typed values are extracted by string key.
 
@@ -180,12 +181,12 @@ Please see `kiwari.py` and `dovetailed_sawhorse.py` for examples
 
 ### Tools
 
-A `@tool` is a function Kigumi runs on demand against the shown frame, with the file's parameters; the text it returns is displayed. It must be annotated exactly `(frame: Frame, k: Kiwari) -> str`.
+A `@tool` is a function Kigumi runs on demand against the shown frame; the text it returns is displayed. It must be annotated exactly `(frame: Frame) -> str`. The frame's parameters are `frame.kiwari` -- when every frame in the file shares one kiwari; otherwise it is None.
 
 ```python
 @tool
-def leg_report(frame: Frame, k: Kiwari) -> str:
-    return f"{k.count('legs')} legs, {len(frame.cut_timbers)} timbers"
+def leg_report(frame: Frame) -> str:
+    return f"{frame.kiwari.count('legs')} legs, {len(frame.cut_timbers)} timbers"
 ```
 
 The annotations on `@frame` and `@tool` are checked (`Optional[Kiwari]` is also accepted). One that doesn't match is not used, and Kigumi says why.
@@ -193,13 +194,13 @@ The annotations on `@frame` and `@tool` are checked (`Optional[Kiwari]` is also 
 ## Parameters (kiwari)
 
 A file can expose numbers for the user to adjust in Kigumi's parameters panel.
-Declare them once, at module level, with a **kiwari** (木割 -- the traditional
-system that sets every member's dimension from a small set of base numbers).
-Every `@frame` and `@tool` in the file receives it, with the user's values laid
-over your defaults:
+Declare them with a **kiwari** (木割 -- the traditional system that sets every
+member's dimension from a small set of base numbers). A `@frame` lays the values
+it is handed over your defaults with `resolve`, and returns the result on its
+Frame:
 
 ```python
-params = kiwari(
+STOOL = kiwari(
     legs=kiwari.count(4, minimum=3, maximum=12, about="How many legs"),
     seat_height=kiwari.length(mm(450), about="Floor to the top of the seat"),
     splay=kiwari.angle(degrees(10)),
@@ -208,14 +209,17 @@ params = kiwari(
 
 
 @frame
-def stool(k: Kiwari) -> Frame:
+def stool(k: Optional[Kiwari] = None) -> Frame:
+    k = STOOL.resolve(k)
     for i in range(k.count("legs")):
         ...
-    return Frame.from_joints(joints, name="stool")
+    return Frame.from_joints(joints, name="stool", kiwari=k)
 ```
 
-A file has at most one module-level kiwari. To build a frame from a script or a
-test, call it with the defaults: `stool(params)`.
+Frames resolved from the same kiwari object share one set of parameters; any
+other kiwari gets a section of its own in the panel, named by its frames. So a
+file can give every frame one set, each its own, or anything between. To build
+a frame from a script or a test, call it bare for the defaults: `stool()`.
 
 Declare with `kiwari.length`, `.angle`, `.count`, `.number`, `.flag`, `.text`,
 `.choice` (pass the Enum class), `.point2` and `.point3`. Read back with the
@@ -239,12 +243,12 @@ in the panel. With no default it starts switched off; give it one and it starts
 on and can be turned off.
 
 ```python
-params = kiwari(
+PARAMS = kiwari(
     cap=kiwari.length(optional=True, about="Thickness of a cap board; off for none"),
     chamfer=kiwari.length(mm(6), optional=True),
 )
 
-# inside a @frame, with k the file's parameters:
+# inside a @frame, with k = PARAMS.resolve(k):
 cap = k.length("cap")
 if cap is not None:
     ...  # build the cap

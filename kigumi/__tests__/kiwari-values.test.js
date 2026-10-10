@@ -282,3 +282,39 @@ describe('an optional parameter switched on with nothing in it', () => {
         expect(values.problems(state(), 'metric')).toEqual({});
     });
 });
+
+describe('one section per kiwari', () => {
+    const SECTIONS = [
+        { ...PAYLOAD, id: 'cottage,tower', frames: ['cottage', 'tower'] },
+        {
+            id: 'pavilion', frames: ['pavilion'],
+            schema: [{ key: 'posts', kind: 'count', default: { value: 4 } }],
+            applied: { posts: { value: 4 } },
+        },
+    ];
+
+    test('each section knows its frames, and each parameter its section', () => {
+        const [shared, own] = values.sectionsFromPayload(SECTIONS);
+        expect(shared.frames).toEqual(['cottage', 'tower']);
+        expect(own.schema[0].section).toBe('pavilion');
+    });
+
+    test('a section that declares nothing is left out', () => {
+        expect(values.sectionsFromPayload([{ id: 'empty', schema: [] }])).toEqual([]);
+        expect(values.sectionsFromPayload(null)).toEqual([]);
+    });
+
+    test('editing one section leaves the others alone', () => {
+        const sections = values.withSection(values.sectionsFromPayload(SECTIONS), 'pavilion',
+            (s) => values.withDraft(s, 'posts', '6'));
+        const wire = values.sectionsToWire(sections, 'metric');
+        expect(wire.pavilion.posts).toEqual({ value: 6 });
+        expect(wire['cottage,tower'].posts).toEqual({ value: 2 });
+    });
+
+    test('a box that does not read in any section sends nothing', () => {
+        const sections = values.withSection(values.sectionsFromPayload(SECTIONS), 'cottage,tower',
+            (s) => values.withDraft(s, 'height', 'yea high'));
+        expect(values.sectionsToWire(sections, 'metric')).toBeNull();
+    });
+});

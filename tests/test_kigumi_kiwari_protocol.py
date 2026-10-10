@@ -96,12 +96,13 @@ def test_a_frame_that_takes_no_parameters_sends_no_kiwari(workspace):
     path = workspace / "plain.py"
     path.write_text(PLAIN_SOURCE)
     slot = runner.load_slot_state(str(path))
-    assert slot.kiwari is None
+    assert slot.kiwari_groups == ()
     assert runner._serialize_kiwari_for_slot(slot) is None
 
 
 def test_the_schema_reaches_the_viewer_off_the_frame_that_was_built(frame_file):
-    payload = runner._serialize_kiwari_for_slot(runner.load_slot_state(str(frame_file)))
+    (payload,) = runner._serialize_kiwari_for_slot(runner.load_slot_state(str(frame_file)))
+    assert payload["id"] == "build_frame" and payload["frames"] == ["build_frame"]
     kinds = {entry["key"]: entry["kind"] for entry in payload["schema"]}
     assert kinds == {"posts": "count", "post_height": "length", "capped": "flag", "end": "choice"}
     posts = next(e for e in payload["schema"] if e["key"] == "posts")
@@ -115,20 +116,21 @@ def test_values_from_the_viewer_build_a_different_frame(frame_file):
     first = runner.load_slot_state(str(frame_file))
     again = runner.load_slot_state(
         str(frame_file),
-        kiwari_values={"posts": 5, "post_height": "10ft"},
-        previous_kiwari=first.kiwari,
+        kiwari_values={"build_frame": {"posts": 5, "post_height": "10ft"}},
+        previous_groups=first.kiwari_groups,
     )
     assert again.frame.name == "5 posts"
     assert len(again.frame.cut_timbers) == 5
-    assert again.kiwari.length("post_height") == pytest.approx(3.048)
-    assert set(again.kiwari.changed_from_defaults()) == {"posts", "post_height"}
+    (group,) = again.kiwari_groups
+    assert group.kiwari.length("post_height") == pytest.approx(3.048)
+    assert set(group.kiwari.changed_from_defaults()) == {"posts", "post_height"}
 
 
 def test_a_value_the_frame_refuses_is_reported_not_swallowed(frame_file):
     first = runner.load_slot_state(str(frame_file))
     with pytest.raises(ValueError, match="at most 8"):
-        runner.load_slot_state(str(frame_file), kiwari_values={"posts": 99},
-                               previous_kiwari=first.kiwari)
+        runner.load_slot_state(str(frame_file), kiwari_values={"build_frame": {"posts": 99}},
+                               previous_groups=first.kiwari_groups)
 
 
 def test_a_builder_that_takes_no_argument_is_told_what_to_add(workspace):
@@ -136,8 +138,8 @@ def test_a_builder_that_takes_no_argument_is_told_what_to_add(workspace):
     path.write_text(PLAIN_SOURCE)
     from kumiki.kiwari import kiwari
     with pytest.raises(TypeError, match="takes no argument to receive them"):
-        runner.load_slot_state(str(path), kiwari_values={"posts": 3},
-                               previous_kiwari=kiwari(posts=kiwari.count(2)))
+        runner.load_slot_state(str(path), kiwari_values={"build_frame": {"posts": 3}},
+                               previous_groups=(runner.KiwariGroup(("build_frame",), kiwari(posts=kiwari.count(2))),))
 
 
 # --- the file beside the source ---------------------------------------------
@@ -147,47 +149,49 @@ def test_saving_writes_only_what_differs_from_the_code(frame_file):
     first = runner.load_slot_state(str(frame_file))
     changed = runner.load_slot_state(
         str(frame_file),
-        kiwari_values={"posts": 5, "post_height": {"value": 3.048, "text": "10ft"}},
-        previous_kiwari=first.kiwari,
+        kiwari_values={"build_frame": {"posts": 5, "post_height": {"value": 3.048, "text": "10ft"}}},
+        previous_groups=first.kiwari_groups,
     )
     written = Path(runner._write_parameters_file(changed))
     assert written.name == "myframe.parameters.json"
     saved = json.loads(written.read_text())
-    assert saved["schema_version"] == 1
+    assert saved["schema_version"] == 2
+    (group,) = saved["groups"]
+    assert group["frames"] == ["build_frame"]
     # capped and end were never touched, so they are not in the file.
-    assert set(saved["values"]) == {"posts", "post_height"}
-    assert saved["values"]["post_height"]["text"] == "10ft"
+    assert set(group["values"]) == {"posts", "post_height"}
+    assert group["values"]["post_height"]["text"] == "10ft"
 
 
 def test_a_saved_file_is_loaded_without_the_viewer_asking(frame_file):
     first = runner.load_slot_state(str(frame_file))
     runner._write_parameters_file(runner.load_slot_state(
-        str(frame_file), kiwari_values={"posts": 5}, previous_kiwari=first.kiwari))
+        str(frame_file), kiwari_values={"build_frame": {"posts": 5}}, previous_groups=first.kiwari_groups))
 
     fresh = runner.load_slot_state(str(frame_file))
     assert fresh.frame.name == "5 posts"
-    assert fresh.kiwari.changed_from_defaults() == ("posts",)
+    assert fresh.kiwari_groups[0].kiwari.changed_from_defaults() == ("posts",)
 
 
 def test_what_the_viewer_says_beats_what_the_file_says(frame_file):
     first = runner.load_slot_state(str(frame_file))
     runner._write_parameters_file(runner.load_slot_state(
-        str(frame_file), kiwari_values={"posts": 5}, previous_kiwari=first.kiwari))
+        str(frame_file), kiwari_values={"build_frame": {"posts": 5}}, previous_groups=first.kiwari_groups))
 
-    fresh = runner.load_slot_state(str(frame_file), kiwari_values={"posts": 3},
-                                   previous_kiwari=first.kiwari)
+    fresh = runner.load_slot_state(str(frame_file), kiwari_values={"build_frame": {"posts": 3}},
+                                   previous_groups=first.kiwari_groups)
     assert fresh.frame.name == "3 posts"
 
 
 def test_putting_everything_back_to_default_removes_the_file(frame_file):
     first = runner.load_slot_state(str(frame_file))
-    changed = runner.load_slot_state(str(frame_file), kiwari_values={"posts": 5},
-                                     previous_kiwari=first.kiwari)
+    changed = runner.load_slot_state(str(frame_file), kiwari_values={"build_frame": {"posts": 5}},
+                                     previous_groups=first.kiwari_groups)
     written = Path(runner._write_parameters_file(changed))
     assert written.exists()
 
-    back = runner.load_slot_state(str(frame_file), kiwari_values={"posts": 2},
-                                  previous_kiwari=changed.kiwari)
+    back = runner.load_slot_state(str(frame_file), kiwari_values={"build_frame": {"posts": 2}},
+                                  previous_groups=changed.kiwari_groups)
     runner._write_parameters_file(back)
     assert not written.exists()
 
@@ -200,6 +204,12 @@ def test_a_saved_value_for_a_key_the_code_dropped_is_ignored_with_a_warning(fram
     assert slot.frame.name == "2 posts"
 
 
+def test_a_file_saved_before_groups_still_loads(frame_file):
+    runner._parameters_file_path(frame_file).write_text(
+        json.dumps({"schema_version": 1, "values": {"posts": {"value": 4}}}))
+    assert runner.load_slot_state(str(frame_file)).frame.name == "4 posts"
+
+
 def test_a_parameters_file_that_is_not_json_is_ignored(frame_file):
     runner._parameters_file_path(frame_file).write_text("{ not json")
     assert runner.load_slot_state(str(frame_file)).frame.name == "2 posts"
@@ -209,7 +219,7 @@ def test_a_pattern_may_not_write_to_the_library_it_came_from(frame_file):
     slot = runner.load_slot_state(str(frame_file))
     slot.single_pattern_name = "butt_joints/something"
     assert runner._can_save_parameters(slot) is False
-    assert runner._serialize_kiwari_for_slot(slot)["canSave"] is False
+    assert runner._serialize_kiwari_for_slot(slot)[0]["canSave"] is False
     with pytest.raises(ValueError, match="not for a library pattern|library pattern"):
         runner._write_parameters_file(slot)
 
@@ -258,12 +268,14 @@ def test_a_pattern_declares_its_kiwari_and_is_built_with_it(workspace):
     path.write_text(PATTERN_SOURCE)
 
     slot, result = runner._raise_specific_pattern(str(path), "probe/tall")
-    assert result["kiwari"]["applied"]["height"] == {"value": 1.0, "text": "1000mm"}
-    assert result["kiwari"]["canSave"] is False
+    (section,) = result["kiwari"]
+    assert section["id"] == "probe/tall"
+    assert section["applied"]["height"] == {"value": 1.0, "text": "1000mm"}
+    assert section["canSave"] is False
 
     taller, _ = runner._raise_specific_pattern(str(path), "probe/tall",
-                                               kiwari_values={"height": "3m"})
-    assert taller.kiwari.length("height") == pytest.approx(3.0)
+                                               kiwari_values={"probe/tall": {"height": "3m"}})
+    assert taller.kiwari_groups[0].kiwari.length("height") == pytest.approx(3.0)
     assert taller.frame.cut_timbers[0].timber.length == pytest.approx(3.0)
 
 

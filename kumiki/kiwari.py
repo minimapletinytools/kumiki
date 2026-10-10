@@ -257,6 +257,8 @@ class Kiwari:
     # written "1 1/4"" comes back that way rather than as 32mm -- writing a
     # length back out is lossy in inches, so the text is the better record.
     texts: Mapping[str, str] = field(default_factory=dict)
+    # The kiwari this one was resolved from, at the root. See `origin`.
+    _origin: Optional["Kiwari"] = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         # Frozen stops the attributes being rebound, not the dicts behind them
@@ -326,6 +328,16 @@ class Kiwari:
         """Three lengths."""
         return self._look_up(key, POINT3)
 
+    @property
+    def origin(self) -> "Kiwari":
+        """The kiwari as declared, before any values were laid over it.
+
+        Resolving makes a new object, so two frames built from one declared
+        kiwari never hold the same one. They do share its origin, which is how
+        kigumi tells they share their parameters.
+        """
+        return self._origin if self._origin is not None else self
+
     # -- binding ----------------------------------------------------------
 
     def resolve(self, incoming: Union["Kiwari", Mapping[str, Any], None]) -> "Kiwari":
@@ -381,7 +393,7 @@ class Kiwari:
                 texts[key] = written
             else:
                 texts.pop(key, None)
-        return replace(self, values=values, texts=texts)
+        return replace(self, values=values, texts=texts, _origin=self.origin)
 
     # -- describing -------------------------------------------------------
 

@@ -185,13 +185,17 @@
     }
 
     /**
-     * The panel's state, rebuilt whenever the runner sends a kiwari.
+     * The panel's state for one kiwari, rebuilt whenever the runner sends it.
      * `schema` is what may be adjusted, `applied` is what the frame on screen
-     * was built from, and `drafts` is what is currently in the boxes.
+     * was built from, and `drafts` is what is currently in the boxes. `id` and
+     * `frames` say which kiwari it is and what was built from it; each schema
+     * entry carries the id as `section`, so a control knows whose it is.
      */
     function fromPayload(payload) {
+        const id = payload && payload.id !== undefined ? payload.id : null;
         const schema = (payload && Array.isArray(payload.schema) ? payload.schema : [])
-            .filter((entry) => entry && typeof entry.key === 'string' && entry.key.length);
+            .filter((entry) => entry && typeof entry.key === 'string' && entry.key.length)
+            .map((entry) => ({ ...entry, section: id }));
         const applied = (payload && payload.applied) || {};
         const drafts = {};
         const enabled = new Set();
@@ -203,6 +207,8 @@
             }
         }
         return {
+            id,
+            frames: payload && Array.isArray(payload.frames) ? payload.frames : [],
             schema,
             applied,
             drafts,
@@ -311,8 +317,35 @@
         return { ...state, drafts, enabled };
     }
 
+    /** One state per kiwari the runner sent, leaving out any that declares nothing. */
+    function sectionsFromPayload(payload) {
+        const sent = Array.isArray(payload) ? payload : (payload ? [payload] : []);
+        return sent.map(fromPayload).filter((state) => state.schema.length);
+    }
+
+    /** Those sections with the one called *id* changed by *change*. */
+    function withSection(sections, id, change) {
+        return sections.map((state) => (state.id === id ? change(state) : state));
+    }
+
+    /** What to send on a refresh, by section id, or null if any box does not read. */
+    function sectionsToWire(sections, unitSystem) {
+        const values = {};
+        for (const state of sections) {
+            const wire = toWire(state, unitSystem);
+            if (wire === null) {
+                return null;
+            }
+            values[state.id] = wire;
+        }
+        return values;
+    }
+
     const KigumiKiwariValues = {
         fromPayload,
+        sectionsFromPayload,
+        withSection,
+        sectionsToWire,
         withDraft,
         withAxisDraft,
         withEnabled,

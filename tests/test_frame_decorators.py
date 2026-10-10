@@ -6,7 +6,7 @@ from typing import Optional
 import pytest
 
 from kumiki import *
-from kumiki.frame_decorators import module_entries, module_parameters, overlay_frames
+from kumiki.frame_decorators import module_entries, overlay_frames
 
 
 def _module(**members) -> types.ModuleType:
@@ -47,7 +47,7 @@ class TestAdmission:
             return Frame(cut_timbers=[])
 
         @tool
-        def report(frame: Frame, k: Kiwari) -> str:
+        def report(frame: Frame) -> str:
             return ""
 
         entries = module_entries(_module(first=first, second=second, report=report))
@@ -61,9 +61,9 @@ class TestAdmission:
         ("@frame\ndef f(k: Kiwari): ...", "return"),
         ("@frame\ndef f(k: Kiwari, extra: int) -> Frame: ...", "1 parameter"),
         ("@frame\ndef f(*k: Kiwari) -> Frame: ...", "no *args"),
-        ("@tool\ndef f(frame: Frame, k: Kiwari) -> int: ...", "return"),
-        ("@tool\ndef f(k: Kiwari, frame: Frame) -> str: ...", "parameter 'k'"),
-        ("@tool\ndef f(frame: Frame) -> str: ...", "2 parameter"),
+        ("@tool\ndef f(frame: Frame) -> int: ...", "return"),
+        ("@tool\ndef f(k: Kiwari) -> str: ...", "parameter 'k'"),
+        ("@tool\ndef f(frame: Frame, k: Kiwari) -> str: ...", "1 parameter"),
         ("@frame\ndef f(k: 'NoSuchType') -> Frame: ...", "could not be read"),
     ])
     def test_a_wrong_signature_is_rejected_with_why(self, source, reason):
@@ -99,45 +99,35 @@ class TestAdmission:
         assert module_entries(module).frames == ()
 
 
-class TestParameters:
-
-    def test_the_one_module_level_kiwari(self):
-        params = kiwari(posts=kiwari.count(2))
-
-        assert module_parameters(_module(params=params)) is params
-
-    def test_none_means_empty_parameters(self):
-        assert dict(module_parameters(_module()).values) == {}
-
-    def test_more_than_one_is_an_error(self):
-        with pytest.raises(TypeError, match="one set of parameters"):
-            module_parameters(_module(a=kiwari(x=kiwari.count(1)), b=kiwari(y=kiwari.count(2))))
-
-    def test_a_file_that_marks_nothing_is_not_held_to_one(self):
-        module = _module(a=kiwari(x=kiwari.count(1)), b=kiwari(y=kiwari.count(2)))
-
-        assert module_entries(module).frames == ()
-
-
 class TestOverlay:
 
-    def test_every_frame_shown_together_with_the_shared_parameters(self):
-        params = kiwari(posts=kiwari.count(2))
+    def test_every_frame_shown_together(self):
         left = Frame(cut_timbers=[_post("a", 0), _post("b", 1)], name="left")
         right = Frame(cut_timbers=[_post("c", 5)], name="right")
 
-        shown = overlay_frames([left, right], "both", params)
+        shown = overlay_frames([left, right], "both")
 
         assert [cut.timber.ticket.path for cut in shown.cut_timbers] == ["a", "b", "c"]
-        assert shown.name == "both" and shown.kiwari is params
+        assert shown.name == "both" and shown.kiwari is None
 
-    def test_one_frame_is_itself_with_the_parameters(self):
+    def test_one_frame_is_itself(self):
         params = kiwari(posts=kiwari.count(2))
-        only = Frame(cut_timbers=[_post("a", 0)], name="only")
+        only = Frame(cut_timbers=[_post("a", 0)], name="only", kiwari=params)
 
-        shown = overlay_frames([only], None, params)
+        assert overlay_frames([only], None) is only
 
-        assert shown.cut_timbers == only.cut_timbers and shown.name == "only" and shown.kiwari is params
+    def test_frames_from_one_kiwari_carry_it(self):
+        params = kiwari(posts=kiwari.count(2))
+        left = Frame(cut_timbers=[_post("a", 0)], kiwari=params.resolve({"posts": 3}))
+        right = Frame(cut_timbers=[_post("b", 1)], kiwari=params.resolve({"posts": 3}))
+
+        assert overlay_frames([left, right], "both").kiwari is left.kiwari
+
+    def test_frames_from_different_kiwari_carry_none(self):
+        left = Frame(cut_timbers=[_post("a", 0)], kiwari=kiwari(posts=kiwari.count(2)))
+        right = Frame(cut_timbers=[_post("b", 1)], kiwari=kiwari(posts=kiwari.count(2)))
+
+        assert overlay_frames([left, right], "both").kiwari is None
 
 
 class TestPatterns:

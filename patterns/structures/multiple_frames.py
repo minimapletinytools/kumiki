@@ -1,7 +1,9 @@
 """Multiple frames in one file: a little yard of four structures.
 
 Each `@frame` below builds one structure, and Kigumi shows them all together,
-each where it was built. They share the file's one kiwari.
+each where it was built. Each returns its kiwari on its Frame. The three models
+are all resolved from MODELS, so they share one set of parameters; the pavilion
+has PAVILION to itself. The parameters panel shows one section for each.
 
 Three are supporting "models" -- neighbours that only need to look about right
 (see `Creating supporting "Models"` in docs/agent_usage_instructions.md): one
@@ -12,9 +14,11 @@ into the walls.
 The fourth is an actual timber frame: four posts and a ring of beams, joined
 with pegged mortise and tenons.
 
-    cottage (-x, +y)     tower (+x, +y)
+    cottage (0, +y)      tower (+x, +y)
 
-    pavilion (-x, -y)    shed (+x, -y)
+    pavilion (0, 0)      shed (+x, 0)
+
+Measured from the pavilion, so changing the spacing moves only the models.
 """
 
 from dataclasses import replace
@@ -22,9 +26,17 @@ from dataclasses import replace
 from kumiki import *
 
 
-params = kiwari(
+MODELS = kiwari(
     spacing=kiwari.length(m(7), minimum=m(5), about="Centre to centre distance between neighbouring structures"),
+    height=kiwari.length(m(2.4), minimum=m(1.5), about="The cottage's wall height; the others are in proportion"),
 )
+PAVILION = kiwari(
+    post_size=kiwari.point2(create_v2(mm(150), mm(150)), about="The posts' cross section"),
+    beam_size=kiwari.point2(create_v2(mm(100), mm(150)), about="The beams' cross section, width by height"),
+)
+
+# The height every model is drawn at when MODELS's height is left alone.
+_MODEL_HEIGHT = m(2.4)
 
 roof_board_thickness = mm(100)
 opening_recess = mm(150)
@@ -72,6 +84,11 @@ def _opening(wall: TimberFace, along: Numeric, sill: Numeric, width: Numeric, he
 
 def _door(wall: TimberFace, along: Numeric, width: Numeric = mm(900), height: Numeric = m(2)):
     return _opening(wall, along, scalar(0), width, height)
+
+
+def _taller(openings, scale: Numeric):
+    """The openings with their heights and sills scaled with the building."""
+    return [(wall, along, sill * scale, width, height * scale) for wall, along, sill, width, height in openings]
 
 
 def _opening_block(opening, center_x: Numeric, center_y: Numeric, width: Numeric, depth: Numeric) -> Timber:
@@ -149,57 +166,64 @@ def _model_building(name: str, center_x: Numeric, center_y: Numeric, width: Nume
 
 
 @frame
-def cottage(k: Kiwari) -> Frame:
-    half = k.length("spacing") / 2
-    return _model_building("Cottage", -half, half, width=m(4), depth=m(5),
-                           wall_height=m(2.4), pitch=regular_pitch, overhang=mm(400), openings=[
+def cottage(k: Optional[Kiwari] = None) -> Frame:
+    k = MODELS.resolve(k)
+    scale = k.length("height") / _MODEL_HEIGHT
+    frame = _model_building("Cottage", scalar(0), k.length("spacing"), width=m(4), depth=m(5),
+                            wall_height=m(2.4) * scale, pitch=regular_pitch, overhang=mm(400), openings=_taller([
                                _door(TimberFace.BACK, mm(-900)),
                                _opening(TimberFace.BACK, mm(900), mm(900), m(1), m(1)),
                                _opening(TimberFace.BACK, scalar(0), m(2.7), mm(600), mm(600)),
                                _opening(TimberFace.RIGHT, m(-1.2), mm(900), m(1), m(1)),
                                _opening(TimberFace.RIGHT, m(1.2), mm(900), m(1), m(1)),
                                _opening(TimberFace.LEFT, mm(400), mm(1100), m(1.6), mm(700)),
-                           ])
+                           ], scale))
+    return replace(frame, kiwari=k)
 
 
 @frame
-def tower(k: Kiwari) -> Frame:
-    half = k.length("spacing") / 2
-    return _model_building("Tower", half, half, width=m(2.5), depth=m(2.5),
-                           wall_height=m(5), pitch=steep_pitch, overhang=mm(300), openings=[
+def tower(k: Optional[Kiwari] = None) -> Frame:
+    k = MODELS.resolve(k)
+    scale = k.length("height") / _MODEL_HEIGHT
+    spacing = k.length("spacing")
+    frame = _model_building("Tower", spacing, spacing, width=m(2.5), depth=m(2.5),
+                            wall_height=m(5) * scale, pitch=steep_pitch, overhang=mm(300), openings=_taller([
                                _door(TimberFace.LEFT, scalar(0), width=mm(800)),
                                _opening(TimberFace.LEFT, scalar(0), m(3.4), mm(600), mm(900)),
                                _opening(TimberFace.BACK, scalar(0), m(3.4), mm(600), mm(900)),
                                _opening(TimberFace.BACK, scalar(0), m(5.3), mm(500), mm(500)),
                                _opening(TimberFace.RIGHT, mm(-400), m(1.4), mm(600), mm(900)),
                                _opening(TimberFace.RIGHT, mm(400), m(3.4), mm(600), mm(900)),
-                           ])
+                           ], scale))
+    return replace(frame, kiwari=k)
 
 
 @frame
-def shed(k: Kiwari) -> Frame:
-    half = k.length("spacing") / 2
-    return _model_building("Shed", half, -half, width=m(3), depth=m(2),
-                           wall_height=m(1.8), pitch=gentle_pitch, overhang=mm(250), gabled=False,
-                           openings=[
+def shed(k: Optional[Kiwari] = None) -> Frame:
+    k = MODELS.resolve(k)
+    scale = k.length("height") / _MODEL_HEIGHT
+    frame = _model_building("Shed", k.length("spacing"), scalar(0), width=m(3), depth=m(2),
+                            wall_height=m(1.8) * scale, pitch=gentle_pitch, overhang=mm(250), gabled=False,
+                            openings=_taller([
                                _door(TimberFace.BACK, mm(700)),
                                _opening(TimberFace.BACK, mm(-800), mm(800), mm(700), mm(700)),
                                _opening(TimberFace.RIGHT, scalar(0), m(1.2), mm(800), m(1)),
-                           ])
+                           ], scale))
+    return replace(frame, kiwari=k)
 
 
 @frame
-def pavilion(k: Kiwari) -> Frame:
+def pavilion(k: Optional[Kiwari] = None) -> Frame:
     """The one real timber frame: four posts and a ring of pegged beams."""
-    half = k.length("spacing") / 2
-    post_size = Matrix([mm(150), mm(150)])
-    beam_size = Matrix([mm(100), mm(150)])
+    k = PAVILION.resolve(k)
+    post_size = k.v2("post_size")
+    beam_size = k.v2("beam_size")
     post_height = m(2.4)
     # The two pairs sit at different heights so their tenons pass each other in the post.
     side_beam_height = m(2.2)
     cross_beam_height = m(1.95)
 
-    footprint = _rectangle(-half, -half, m(3), m(3))
+    footprint = _rectangle(scalar(0), scalar(0), m(3), m(3))
     back_left, back_right, front_right, front_left = [
         create_vertical_timber_on_footprint_corner(
             footprint, corner, post_height, FootprintLocation.INSIDE, post_size,
@@ -226,4 +250,4 @@ def pavilion(k: Kiwari) -> Frame:
         joints.append(cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
             spanning, top_post, TimberEnd.TOP, use_peg=True))
 
-    return replace(Frame.from_joints(joints, name="Pavilion"), footprints=[footprint])
+    return replace(Frame.from_joints(joints, name="Pavilion", kiwari=k), footprints=[footprint])

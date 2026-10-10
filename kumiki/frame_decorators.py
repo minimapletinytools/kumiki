@@ -1,29 +1,35 @@
 """Marking the frames and tools in a file for kigumi to find.
 
-A file may declare any number of frames and tools, sharing one set of parameters::
+A file may declare any number of frames and tools. Each frame declares its own parameters,
+resolves the values it is handed onto them, and returns them on the Frame::
 
-    params = kiwari(legs=kiwari.count(4, minimum=3))
+    STOOL = kiwari(legs=kiwari.count(4, minimum=3))
 
     @frame
-    def stool(k: Kiwari) -> Frame:
+    def stool(k: Optional[Kiwari] = None) -> Frame:
+        k = STOOL.resolve(k)
         ...
+        return Frame.from_joints(joints, kiwari=k)
 
     @frame
-    def bench(k: Kiwari) -> Frame:
+    def bench(k: Optional[Kiwari] = None) -> Frame:
+        k = STOOL.resolve(k)    # the same kiwari object: one set of parameters for both
         ...
 
     @tool
-    def leg_report(frame: Frame, k: Kiwari) -> str:
-        return f"{k.count('legs')} legs"
+    def leg_report(frame: Frame) -> str:
+        return f"{frame.kiwari.count('legs')} legs"
 
-Kigumi builds every `@frame` with the file's one module-level `Kiwari`, bound to the values
-in its parameters panel, and shows them together. A `@tool` runs on demand against the shown
-frame and its text is displayed. The decorators only mark a function; it is still an ordinary
-function to call from a script or a test.
+Kigumi builds every `@frame` and shows them together. Frames whose kiwari were resolved from
+the same kiwari object share one set of parameters (see `Kiwari.origin`); each different one
+gets its own section in the parameters panel. A frame is handed back the values for its own
+kiwari, or None on the first build. A `@tool` runs on demand against the shown frame and its
+text is displayed. The decorators only mark a function; it is still an ordinary function to
+call from a script or a test.
 
 A marked function is admitted only if its annotations say exactly that: `(k: Kiwari) -> Frame`
-for a frame, `(frame: Frame, k: Kiwari) -> str` for a tool. `Optional[Kiwari]` is accepted
-for the parameters.
+for a frame, `(frame: Frame) -> str` for a tool. `Optional[Kiwari]` is accepted for the
+parameters.
 
 A pattern book marks each of its patterns instead, with a path and, if it takes parameters,
 its own kiwari::
@@ -41,7 +47,7 @@ import typing
 from dataclasses import dataclass, replace
 from typing import Any, Callable, List, Optional, Sequence, Tuple, TypeVar
 
-from .kiwari import Kiwari, kiwari as _declare_kiwari
+from .kiwari import Kiwari
 
 __all__ = ["frame", "tool", "pattern"]
 
@@ -55,13 +61,16 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def frame(function: F) -> F:
-    """Marks a function `(k: Kiwari) -> Frame` as one of the file's frames."""
+    """Marks a function `(k: Kiwari) -> Frame` as one of the file's frames.
+
+    It returns its parameters on the Frame: `Frame(..., kiwari=k)`.
+    """
     setattr(function, _MARK, FRAME)
     return function
 
 
 def tool(function: F) -> F:
-    """Marks a function `(frame: Frame, k: Kiwari) -> str` as a tool to run on the file's frame."""
+    """Marks a function `(frame: Frame) -> str` as a tool to run on the file's frame."""
     setattr(function, _MARK, TOOL)
     return function
 
@@ -105,11 +114,10 @@ class Rejected:
 
 @dataclass(frozen=True)
 class ModuleEntries:
-    """What a module marked: its admitted frames and tools, those rejected, and its parameters."""
+    """What a module marked: its admitted frames and tools, and those rejected."""
     frames: Tuple[Entry, ...]
     tools: Tuple[Entry, ...]
     rejected: Tuple[Rejected, ...]
-    parameters: Kiwari
 
 
 def _is_class(value: Any, cls: type) -> bool:
@@ -141,7 +149,7 @@ def _signature_problem(function: Callable[..., Any], kind: str) -> Optional[str]
     if kind == FRAME:
         wanted, checks, returns_ok = "(k: Kiwari) -> Frame", [_is_kiwari], is_frame
     elif kind == TOOL:
-        wanted, checks, returns_ok = "(frame: Frame, k: Kiwari) -> str", [is_frame, _is_kiwari], lambda a: a is str
+        wanted, checks, returns_ok = "(frame: Frame) -> str", [is_frame], lambda a: a is str
     else:
         takes_kiwari = getattr(function, _PATTERN_DECLARATION).kiwari is not None
         wanted = f"({'k: Kiwari' if takes_kiwari else ''}) -> Frame | Joint | CutCSG"
@@ -170,15 +178,6 @@ def _is_subclass(value: Any, cls: type) -> bool:
     return isinstance(value, type) and any(_is_class(base, cls) for base in value.__mro__)
 
 
-def module_parameters(module: Any) -> Kiwari:
-    """The module's one module-level Kiwari, or empty parameters if it declares none."""
-    found = [(name, value) for name, value in vars(module).items() if _is_class(type(value), Kiwari)]
-    if len(found) > 1:
-        names = ", ".join(name for name, _ in found)
-        raise TypeError(f"a file shares one set of parameters, but this one declares several Kiwari: {names}")
-    return found[0][1] if found else _declare_kiwari()
-
-
 def _marked(module: Any, kinds: Tuple[str, ...]) -> List[Tuple[str, Callable[..., Any]]]:
     """The module's own functions marked as one of `kinds`, in source order, each once under its first name."""
     seen: set = set()
@@ -204,9 +203,7 @@ def module_entries(module: Any) -> ModuleEntries:
             rejected.append(Rejected(name, kind, problem))
         else:
             (frames if kind == FRAME else tools).append(Entry(name, function))
-    # Only a file that marks something is held to one shared kiwari.
-    parameters = module_parameters(module) if marked else _declare_kiwari()
-    return ModuleEntries(tuple(frames), tuple(tools), tuple(rejected), parameters)
+    return ModuleEntries(tuple(frames), tuple(tools), tuple(rejected))
 
 
 # TODO merging into one Frame keeps kigumi working as is. Instead, kigumi should take several
@@ -238,12 +235,19 @@ def module_patterns(module: Any) -> Tuple[List[Any], Tuple[Rejected, ...]]:
     return patterns, tuple(rejected)
 
 
-def overlay_frames(frames: List[Any], name: Optional[str], parameters: Optional[Kiwari]) -> Any:
-    """Several frames shown together, each where it was built, carrying the shared parameters."""
+def overlay_frames(frames: List[Any], name: Optional[str]) -> Any:
+    """Several frames shown together, each where it was built.
+
+    The overlay carries a kiwari only when every frame was built from the same one; otherwise
+    each frame's parameters are its own, and stay on it.
+    """
     from .timber import Frame
 
     if len(frames) == 1:
-        return replace(frames[0], kiwari=parameters)
+        return frames[0]
+    kiwaris = [getattr(built, "kiwari", None) for built in frames]
+    origins = {id(k.origin) for k in kiwaris if k is not None}
+    shared = kiwaris[0] if None not in kiwaris and len(origins) == 1 else None
     joints = [joint for built in frames for joint in (built.source_joints or [])]
     return Frame(
         cut_timbers=[timber for built in frames for timber in built.cut_timbers],
@@ -252,5 +256,5 @@ def overlay_frames(frames: List[Any], name: Optional[str], parameters: Optional[
         drawings=[drawing for built in frames for drawing in built.drawings],
         source_joints=joints or None,
         name=name,
-        kiwari=parameters,
+        kiwari=shared,
     )
