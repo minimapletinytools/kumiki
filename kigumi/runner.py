@@ -4715,6 +4715,10 @@ def _edge_tolerance() -> Any:
     return FEATURE_EDGE_TOLERANCE
 
 
+#: Floating point error: how far off the cut surface a declared edge may compute.
+_DECLARED_EDGE_FLOAT_NOISE = 1e-6
+
+
 def _cropped_edge_segments(
     edge_feature: Any,
     line: Any,
@@ -4830,9 +4834,15 @@ def _cropped_edge_segments(
     # own corners and sits exactly where it says. Widening for one anyway
     # resurrected stretches the exact reading had correctly called absent, which
     # is how a bore's end arris came back as a 6mm stub floating off the piece.
+    #
+    # The declared-edge retry is for FLOATING POINT ERROR only, not tolerance: off
+    # axis, an arris lying exactly on the cut surface (a cross lap's inside edge on
+    # a pitched rafter) computes a few nanometres off it and clips away entirely.
+    # TODO consider one clip at _DECLARED_EDGE_FLOAT_NOISE for declared edges instead
+    # of exact-then-retry: simpler, at the cost of padding every end by a micron.
     cropped = clipped(0.0)
-    if not cropped and derived:
-        cropped = clipped(float(_edge_tolerance()))
+    if not cropped:
+        cropped = clipped(float(_edge_tolerance()) if derived else _DECLARED_EDGE_FLOAT_NOISE)
     if cropped is None:
         # A solid it cannot describe: no answer, rather than a wrong one.
         return (None, False)

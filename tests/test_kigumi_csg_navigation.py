@@ -1560,6 +1560,43 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
         assert checked > 0
 
 
+class TestAHousingsInsideEdgeOnAPitchedRafter:
+    """A cross lap's inside edge is the crossing prism's own arris, lying exactly on the cut.
+
+    Off axis, float error puts it a few nanometres off that surface, and an exact clip
+    lost it entirely: picked, then nothing drawn (oscarshed's top plates).
+    """
+
+    def test_it_is_picked_and_drawn(self):
+        from kumiki import (CrossJointTimberArrangement, CutTimber, create_timber, create_v2,
+                            cross_product, cut_plain_cross_lap_house_joint, mm, safe_normalize_vector)
+        from kumiki.csg.cutcsg import CSGFeatureType
+
+        plate = create_timber(bottom_position=create_v3(mm(-500), 0, 0), length=mm(1000),
+                              size=create_v2(mm(100), mm(150)), length_direction=create_v3(1, 0, 0),
+                              width_direction=create_v3(0, 1, 0), ticket="plate")
+        # A 5:12 rafter across the plate, its underside let 40mm into the plate's top.
+        up = safe_normalize_vector(create_v3(0, 12, 5))
+        down = safe_normalize_vector(cross_product(up, create_v3(1, 0, 0)))
+        centre = create_v3(0, 0, mm(35)) - down * mm(50)
+        rafter = create_timber(bottom_position=centre - up * mm(500), length=mm(1000),
+                               size=create_v2(mm(100), mm(100)), length_direction=up,
+                               width_direction=create_v3(1, 0, 0), ticket="rafter")
+        joint = cut_plain_cross_lap_house_joint(CrossJointTimberArrangement(timber1=plate, timber2=rafter))
+        root = CutTimber(plate, cuts=[joint.cuttings["timberA"]]).render_timber_with_cuts_csg_local()
+
+        # Where the housing's floor meets its wall, across the middle of the plate.
+        local = plate.transform.global_to_local(create_v3(mm(50), 0, mm(35)))
+        best = runner._features_at_point(root, [float(v) for v in local], PICK_EPS)[0]
+        assert best.feature.feature_type() == CSGFeatureType.EDGE
+
+        segments, absent = runner._edge_highlight_segments(best.feature, best.owner, plate, root)
+
+        assert not absent and segments, "the inside edge was picked but nothing was drawn"
+        start, end = runner._to_v3(segments[0]["start"]), runner._to_v3(segments[0]["end"])
+        assert abs(float((end - start).norm()) - 0.1 / float(12 / 13)) < 1e-3, "it runs across the plate"
+
+
 class TestTheRayReachesASegment:
     """The snap test behind picking a feature that lies in a void.
 
