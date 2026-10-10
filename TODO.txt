@@ -216,6 +216,9 @@ DONE-sliding dovetail (maybe you want tapered variants)
     -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
       for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
   -conisder just shippingthe defalut drawing with every frame by default 
+  -solver optimization, the expensive part is face_reaches_surface
+    -cache solid_bounds
+    -add broadphase
     
   
 
@@ -253,9 +256,16 @@ DONE-do measuring features doc
 DONE-do the assembly system doc (placeholder doc basically)
 
 -add support to run @tools from the parameter section
+-update tree view for multi frame files
 -add export drawing button (how to do this?)
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
+
+-BUGS
+  -lap cuts from half lap joint isn't a shoulder so dosen't create derived edges :(
+  -actually oddly enough the inner edge isn't selectable either even though that should be a built in feature?
+  -if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulder (right clicking doesn't show the feature, it's probably only detecting features on the first timber it hit)
+
 -do the standalone app 
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
 -maybe review runner.py ;__;
