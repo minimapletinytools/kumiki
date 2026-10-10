@@ -1,19 +1,63 @@
 .shell {
     display: grid;
     grid-template-columns: var(--left-width, 300px) 4px minmax(0, 1fr) auto auto;
-    grid-template-rows: minmax(0, 1fr) 24px;
+    grid-template-rows: 35px minmax(0, 1fr) 24px;
     height: 100vh;
     overflow: hidden;
 }
 
-.slot-left {
+/* Custom Title Bar */
+
+.titlebar {
     grid-row: 1;
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    position: relative;
+    height: 35px;
+    background: var(--ka-chrome-bg);
+    border-bottom: 1px solid var(--ka-border);
+    user-select: none;
+    -webkit-app-region: drag;
+    padding-left: 78px; /* Offset for macOS traffic light buttons */
+    padding-right: 8px;
+    z-index: 10;
+}
+
+.titlebar-drag-region {
+    position: absolute;
+    inset: 0;
+    -webkit-app-region: drag;
+    pointer-events: auto;
+}
+
+.titlebar-center {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    color: var(--ka-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.titlebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 2;
+    -webkit-app-region: no-drag;
+}
+
+.slot-left {
+    grid-row: 2;
     grid-column: 1;
     background: var(--ka-chrome-bg);
 }
 
 .slot-right {
-    grid-row: 1;
+    grid-row: 2;
     grid-column: 5;
     width: var(--right-width, 360px);
     background: var(--ka-chrome-bg);
@@ -30,7 +74,7 @@
 }
 
 .splitter {
-    grid-row: 1;
+    grid-row: 2;
     cursor: col-resize;
     background: var(--ka-chrome-bg);
 }
@@ -52,7 +96,7 @@
 }
 
 .main {
-    grid-row: 1;
+    grid-row: 2;
     grid-column: 3;
     display: flex;
     flex-direction: column;
@@ -97,14 +141,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 35px;
-    height: 35px;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
     background: transparent;
     border: none;
     color: var(--ka-muted);
     cursor: pointer;
     flex: none;
     padding: 0;
+    -webkit-app-region: no-drag;
 }
 
 .layout-toggle:hover {

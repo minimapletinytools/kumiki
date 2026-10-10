@@ -11,13 +11,19 @@
 </head>
 <body>
     <div class="shell" id="shell">
+        <header class="titlebar" id="titlebar">
+            <div class="titlebar-drag-region"></div>
+            <div class="titlebar-center" id="titlebar-title">Kigumi</div>
+            <div class="titlebar-actions">
+                <button class="layout-toggle" id="toggle-left" title="Toggle Primary Side Bar (Explorer)"><span class="codicon codicon-layout-sidebar-left"></span></button>
+                <button class="layout-toggle" id="toggle-right" title="Toggle Secondary Side Bar (Agent)"><span class="codicon codicon-sparkle"></span></button>
+            </div>
+        </header>
         <aside class="slot slot-left" id="slot-left" aria-label="Explorer"></aside>
         <div class="splitter" id="splitter-left" role="separator" aria-orientation="vertical" aria-label="Resize explorer"></div>
         <main class="main">
             <header class="tabs-bar">
-                <button class="layout-toggle" id="toggle-left" title="Toggle Primary Side Bar (Explorer)"><span class="codicon codicon-layout-sidebar-left"></span></button>
                 <nav class="tabs" id="tabs" role="tablist" aria-label="Open panels"></nav>
-                <button class="layout-toggle" id="toggle-right" title="Toggle Secondary Side Bar (Agent)"><span class="codicon codicon-sparkle"></span></button>
             </header>
             <section class="slot slot-center" id="slot-center">
                 <div class="welcome" id="welcome">

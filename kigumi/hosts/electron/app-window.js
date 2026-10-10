@@ -11,6 +11,7 @@ const SHELL_PRELOAD = path.join(__dirname, 'shell-preload.js');
 
 function createAppWindow({ origin, log = () => {} }) {
     const shellUrl = `${origin}/webview/shell/shell.html`;
+    const isMac = process.platform === 'darwin';
     const window = new BrowserWindow({
         width: 1400,
         height: 900,
@@ -18,6 +19,7 @@ function createAppWindow({ origin, log = () => {} }) {
         minHeight: 480,
         title: 'Kigumi',
         show: false,
+        ...(isMac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 12, y: 10 } } : {}),
         webPreferences: { preload: SHELL_PRELOAD, contextIsolation: true, backgroundThrottling: false },
     });
     // A scripted test run shouldn't take focus from whoever is at the keyboard.

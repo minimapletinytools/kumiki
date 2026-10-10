@@ -203,7 +203,17 @@
         $('status-version').textContent = state.version ? `v${state.version}` : '';
     }
 
+    function renderTitlebar() {
+        const active = state.panels.find((panel) => panel.slot === 'center' && panel.id === state.activeId);
+        const parts = [];
+        if (active && active.title) parts.push(active.title);
+        if (state.workspace && state.workspace.name) parts.push(state.workspace.name);
+        parts.push('Kigumi');
+        $('titlebar-title').textContent = parts.join(' — ');
+    }
+
     function render() {
+        renderTitlebar();
         renderPanels();
         renderTabs();
         renderWelcome();
