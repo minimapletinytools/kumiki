@@ -1,37 +1,47 @@
 
+:: 10/10/2026 selecting second feature via drilling notes
 
-:: 9/19/2026 kumiki next setps
 
-0. understand and cleanup csg code (done)
+❯ ok change gears othe apprcoah, right now you can "drill into" a timbers CSG allowing yo uto be specifci about which timber you areselecting on. this only works for the first         
+  feature, the second fetaure does not do this. what would it take to be able to toggle this selection mode for the second feature? it's weird because the current drilling works by    
+  drilling into whatever is selected, so etiher we need a second selection for the second feature we're finding, or we unselect the timber we are measuring from, what do you think?    
+  
+⏺ I'll look at how a measurement's first end is taken and held, and what that does to the selection.
 
-1. add ability for named/default features on a csg node to "depend" on each other, so basically on rectangular prism a face is entirely solved by its 4 edges, an edge is entirely solved by its 2 constituent points, we should be able to express this somehow
+  Ran 2 shell commands 
 
-2. refactor features to support this. some stuff we maybe want (done)
-  - add points to default features
-  - joints can name how specific features be solved (measured)
+⏺ I'd go with unselecting. The measuring flow was already designed for it: measure-draft.js says the held end "is NOT the selection" and has to survive the focus moving off it. A
+  second selection would duplicate machinery that exists once today. That covers the selection itself, the focus inside a timber, which timber is dimmed, and what Tab and ctrl-click
+  act on. You'd also need a rule for which selection each click goes to.
 
-3. finalize the derived feature priority rule (done)
-  - non derivde features take precedence over derivde featuers
-  - do derived features "belong" to highest or lowest element in the tree?
-    - what if there's a tie? 
-    - maybe better just to say it belongs to "both" or "neither"?
-  - figure out why mortise and tenon joint doesn't produce inside edges between the shoulder plane and the tenon prism
-  - what happens when thehre are multiple overlapping derived features?
-    - note that they map overlap but may not be identical, in which case both need to be solved
+  How it works today:
+  - Normal mode: choosePickAction (webview/selection-store.js) looks for a selected timber anywhere along the ray. If it finds one, it drills into that timber even when something else
+    is in front. That's what lets you be specific about the first end.
+  - While an end is held: a separate branch skips that and always goes to the nearest timber. That was done so the second end can be on a timber you never selected. It's also why the
+    second end can't be pinned to a timber.
+  - The first timber stays selected while you measure, but measuring ignores the selection, so nothing currently conflicts.
+    
+  What it would take:
+  1. Clear the timber selection when the first end is taken (in startMeasurementFromFocus). The held end keeps its own green highlight and doesn't depend on the selection. This step is
+     required, not just tidy. If the first timber stayed selected, a second end anywhere in front of it would drill through to the first timber, which breaks measuring between
+     timbers.
+  2. While measuring, let selection steer the pick, in choosePickAction: if a selected timber is on the ray, drill into it the way normal mode does. If nothing is selected, use the
+     nearest timber as now. So the default stays the same, and the drill-through mode is on whenever you've selected a target timber.
+  3. A way to select a timber mid-measurement without taking it as the end. A plain click is already the end, so either:
+     - Shift-click selects the timber under the pointer while measuring. Today shift toggles timber selection in normal mode, and while measuring it's swallowed by the measuring
+       branch, so this is just reordering two checks.
+     - The timber list: clicking a timber there selects it, so this should work once step 2 is in.
+  
+     Clicking empty space or pressing Escape would clear the target. Escape currently also drops the held end, so that needs deciding: perhaps the first Escape clears the target and
+     the second releases the end.
+  4. Hover: it already runs the same choosePickAction, so it would follow automatically. The right-click candidate list would then come from the selected timber, which is exactly your
+     housing case. Select the plate, and the rafter in front of its walls no longer wins.
+  5. Tests: choosePickAction cases for measuring with and without a selected timber on the ray, plus clearing the selection on hold.
+     
+  It's a small change: mostly choosePickAction, the hold handler and the shift-click path, plus tests. No runner changes. Want me to go ahead in a worktree, with shift-click as the
+  gesture?
 
-4. figure out the overlapping fetaure situation in general
-  - overlapping vertices lines and planes fully solve each other.
-  - you can go a little fineg rained too, but probably not worth the complexity
-    - a line/point on a plane is solved in 1 DOF if the plane is solved
-    - a point on a line is solved in 1 DOF if the line is solved
-
-5. determine which features need to be solved...
-  - face -> lines -> points
-  - if all lines of a foce, or all points of a line are not on the boundary, then that feature is internal and does not need to be solved
-  - the scary part is that the same rules apply for derived fetaures
-    - this is made easier if we say we don't support derived features further producing more derived features, I guess we can look into this in the future.
-  - derived features can be solved if both parent features are solved
-
+  
 
 :: 9/12/2026 do kumiki vid 
 
@@ -54,77 +64,6 @@ So until the kumki's assembly feature can really live up to its own name
 - 6 pcs chinese cross puzzle https://www.youtube.com/watch?v=Vxw2LPQ8c4c
 - gordian knot puzzle lol https://sketchfab.com/3d-models/gordian-knot-assembly-cf579718b14649839d5f04beef1c6e2b
  
-
-
-
-
-:: 9/11/2026
-
-lets look into refactoring kigumi into a STANDALONE viewer (i.e. not a VScode extensions)
-
-1. the same code with 2 deployment taregts, a standalone electron app and the vscode extension
-2. We do need to recreate the kigumi sidebar in the app though, so that part needs to refactored out so as much code is shared as possible, the in app sidebar is not used in the vs code extension because we use the vscode bulit in sidebar. Take this opportunity to rewrite the sidebar a bit though as we use the vscode layout components in the sidebar and those seem limiting so if ew're going ot rewrite them for the standalone app may as well use them in vscode as well
-3. the dependency installer path needs improvement. It should detect ify ou have uv or python installe,d and if neither is installed, it should try and install one or the other for you
-
-
-:: 9/8/2026 project notes
-
-Subject: Kumiki Project Ideas — Disassembly Solver + 3D-to-Code “Pullbacks”
-
-1. Improved disassembly solver
-Goal: Expand Kumiki’s current disassembly system from simple one-axis separation into a general system capable of planning and visualizing multi-step disassemblies.
-
-Solver requirements:
-
-Basic: Continue supporting existing single step disassembly.
-Multi-step motion: Support joints where one motion unlocks another degree of freedom.
-Three-piece interlocking “3D plus” Kumiki puzzle, where a piece must first twist before the others can separate. (3 piece burr puzzle https://www.instructables.com/3-Piece-Burr-Puzzle/)
-Kanawa Tsugi and similar joints where pieces must first move along one axis and then separate along another.
-Stretch goal — complex Kumiki puzzles: Handle highly interlocking assemblies where the available degrees of freedom change continuously based on the positions of multiple pieces. The constraints may effectively be functions of the geometry/state of several interacting timbers and need to be incorporated into the solver.   (do the gordian knot puzzle and a puzzle box example)
-Visualization / UX requirements:
-
-Allow timbers to be grouped into disassembly stages, so an assembly can be demonstrated step-by-step.
-Support symmetric disassembly. For example, the four sides of a frame should move outward simultaneously at equal speeds/distances rather than arbitrarily moving one at a time.
-Ideally symmetry can be auto-discovered.
-Users could also explicitly specify symmetry/grouping when necessary.
-Once a piece has moved far enough to become unconstrained, continue moving it a little farther to create a visually clean exploded/disassembled view.
-
-you should also be able to manually override any dissably, either becaues yo uwant it solevd in your own way or because it can't besolved or sometihng.
-
-2. 3D-to-code “pullbacks”
-Goal: Make the 3D viewer an interactive interface for discovering and modifying the code that generated the model, without trying to turn Kumiki into a conventional GUI CAD system.
-
-Many useful dimensions in programmatic CAD ultimately come from simple literals or constants—for example, tenon width, timber length, or timber position. When that is the case, Kumiki should be able to connect geometry in the viewer back to the relevant source code. If a value is derived in a way that can’t reasonably be traced/editable, it’s fine for the feature simply not to be available.
-
-Source metadata:
-
-Timber and joint creation should retain metadata identifying the relevant source location (file/line, etc.).
-This lets the viewer connect rendered geometry back to the code responsible for it.
-Editable properties / gizmos:
-
-Timber and joint definitions should be able to expose specific modifier capabilities, such as:
-Change timber length.
-Change timber position between two posts.
-Change tenon width.
-Change a joint dimension.
-When authoring a timber or joint, these properties can be associated with geometric features in the resulting model.
-For example, “tenon width” could be associated with the two sides/faces that define the tenon’s width.
-Phase 1 — viewer → source code:
-
-The viewer exposes/highlights these editable features.
-Hovering/selecting a modifier visually shows exactly which geometry the property controls.
-The user can select something like “Change tenon width.”
-A Go to source action jumps directly to the relevant parameter in the code.
-This gives useful visual editing affordances without requiring Kumiki to actually modify the program automatically.
-Phase 2 / stretch goal — direct manipulation:
-
-Add conventional CAD-like handles/gizmos that can be dragged directly in the 3D viewer.
-Dragging changes the corresponding literal/constant in the source code and reruns/re-renders the model.
-Ideally this feels close to real-time, although this depends on whether Kumiki’s code → geometry update loop can be made fast enough.
-The key idea is that the code remains the source of truth. The 3D viewer becomes a visual interface into that code rather than a separate modeling system.
-
-
-
 
 
 ::: 7/29 board notes
@@ -220,58 +159,30 @@ DONE-sliding dovetail (maybe you want tapered variants)
     -cache solid_bounds
     -add broadphase
     
-  
+
+DONE-BUGS
+  DONE-lap cuts from half lap joint isn't a shoulder so dosen't create derived edges :(
+  DONE-actually oddly enough the inner edge isn't selectable either even though that should be a built in feature?
+DONE-probably still include kiwari in teh output Frame... maybe just require all frames to use the same kiwari for multi frame stuff? I don't like the magical params = kiwari thing...
+DONE-kiwari units should probbaly match kigumi units, or allow it to be specified?
+DONE-update tree view for multi frame files
+DONE-frames in list view should have little house emoji icon next to them
+DONE-don't show > next to empty top level and gray them out (e.g. no drawnigs, tags measurements, then drawings tags measurements should be like greyed out or something)
+DONE-drawings are as such, if a drawing contains members from multilpe frames, it shows at the top level drawing, if it has only members from a as nigle frame it goes under that frame. OBviosuly these are the same if there is only 1 frame.
+  -if they have more than 1 frame involevd they should go at top level, otherwise at frame level
 
 
-
-DONE-NEXT STEPS FOR auto drawing DRAWING
-  -figure out the measuring to rough thing.... I think all measurements should just go to PTW faces... so you need to make it so when selecting faces only PTW faces can be mesaured from/to
-  -pull out my cute frame test auto drawing solver into its own function
-  -move solver into its own thread and add in function to pass in slices I guess?
-  -do I need something that detects and warns on completely hidden timbers (and removes them)
-  -do potato measuring placement algorithm
-
-DONE-cut plain cross lap house joint pattern needs to be repositioned, its currently not crossing at all, it sohuld cross by 50%
-DONE-move irrational_angles/mortise and tenon joint example with te rest of the mortise and tenon joint exmples
-DONE-some of teh patterns are broken in relief/butt_arrangement can you try and run them all and see if any of them are broken
-DONE-test derived points btw
-DONE-add additional methods (decotarator + buttons in the parameters section)
-DONE-maybe add named collisions groups, rough perfect shoulderplane tenon. think about where else you need derived features...
-DONE-add units toggle for measurements
-DONE-tenon square peg holes need to intersect with the tenon prism for derived edges
-  DONE-make a decision on derived edge groups
-  -test this...
-DONE-replace pattern with @pattern decorator?
-  -test this
-DONE-add multi frame support (decorators + multipl eframe function )
-  -test this
-DONE-reset button in parameters in kigumi seems broken
-DONE-kiugmi update kumiki should update docs as well
-DONE-do measuring features doc
-  DONE-explain CSG fetaure system
-  DONE-leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
-  DONE-describe the measuring system
-  DONE-explain feture solving system
-  DONE-explain fetaure hit priority system
-DONE-do the assembly system doc (placeholder doc basically)
-DONE-free house joints not showing up in joints in tree view
-
--probably still include kiwari in teh output Frame... maybe just require all frames to use the same kiwari for multi frame stuff? I don't like the magical params = kiwari thing...
--kiwari units should probbaly match kigumi units, or allow it to be specified?
 
 
 -add support to run @tools from the parameter section
--update tree view for multi frame files
 -add export drawing button (how to do this?)
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
-
--BUGS
-  -lap cuts from half lap joint isn't a shoulder so dosen't create derived edges :(
-  -actually oddly enough the inner edge isn't selectable either even though that should be a built in feature?
-  -if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulder (right clicking doesn't show the feature, it's probably only detecting features on the first timber it hit)
+-decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
 
 -do the standalone app 
+
+
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
 -maybe review runner.py ;__;
 -add types to runner.py
@@ -284,7 +195,7 @@ DONE-free house joints not showing up in joints in tree view
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
   
--rename/reorg all mortise and tenon joints
+IGNORE-rename/reorg all mortise and tenon joints
   DONE-mortise_and_tenon_join/...
   DONE-delete 45 degree relative tenon size, basic, 
   -face_aligned
@@ -397,6 +308,38 @@ DONE-free house joints not showing up in joints in tree view
 
 
 :: TODONE 
+
+DONE-NEXT STEPS FOR auto drawing DRAWING
+  -figure out the measuring to rough thing.... I think all measurements should just go to PTW faces... so you need to make it so when selecting faces only PTW faces can be mesaured from/to
+  -pull out my cute frame test auto drawing solver into its own function
+  -move solver into its own thread and add in function to pass in slices I guess?
+  -do I need something that detects and warns on completely hidden timbers (and removes them)
+  -do potato measuring placement algorithm
+
+DONE-cut plain cross lap house joint pattern needs to be repositioned, its currently not crossing at all, it sohuld cross by 50%
+DONE-move irrational_angles/mortise and tenon joint example with te rest of the mortise and tenon joint exmples
+DONE-some of teh patterns are broken in relief/butt_arrangement can you try and run them all and see if any of them are broken
+DONE-test derived points btw
+DONE-add additional methods (decotarator + buttons in the parameters section)
+DONE-maybe add named collisions groups, rough perfect shoulderplane tenon. think about where else you need derived features...
+DONE-add units toggle for measurements
+DONE-tenon square peg holes need to intersect with the tenon prism for derived edges
+  DONE-make a decision on derived edge groups
+  -test this...
+DONE-replace pattern with @pattern decorator?
+  -test this
+DONE-add multi frame support (decorators + multipl eframe function )
+  -test this
+DONE-reset button in parameters in kigumi seems broken
+DONE-kiugmi update kumiki should update docs as well
+DONE-do measuring features doc
+  DONE-explain CSG fetaure system
+  DONE-leave a notes somewher explaining that an edge cut in half by a difference does not become 2 edges. it's still treated as one edge. same for faces. splitting of features is deliberatly NOT supported 
+  DONE-describe the measuring system
+  DONE-explain feture solving system
+  DONE-explain fetaure hit priority system
+DONE-do the assembly system doc (placeholder doc basically)
+DONE-free house joints not showing up in joints in tree view
 DONE-do joint rename to match what's in your new book  
 DONE-tenon edge lines not being cropped properly on doubel angled mortise and tenon joint
 IGNORE-create a header for the are below the 3d view main panel in kigumi so it appears a littlem or esensible. it should says "scroll here for more" as well. amybe you can stick some doc information there too.
@@ -1783,6 +1726,111 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: ARCHIVE
+
+
+
+
+
+:: 9/19/2026 kumiki next setps
+
+0. understand and cleanup csg code (done)
+
+1. add ability for named/default features on a csg node to "depend" on each other, so basically on rectangular prism a face is entirely solved by its 4 edges, an edge is entirely solved by its 2 constituent points, we should be able to express this somehow
+
+2. refactor features to support this. some stuff we maybe want (done)
+  - add points to default features
+  - joints can name how specific features be solved (measured)
+
+3. finalize the derived feature priority rule (done)
+  - non derivde features take precedence over derivde featuers
+  - do derived features "belong" to highest or lowest element in the tree?
+    - what if there's a tie? 
+    - maybe better just to say it belongs to "both" or "neither"?
+  - figure out why mortise and tenon joint doesn't produce inside edges between the shoulder plane and the tenon prism
+  - what happens when thehre are multiple overlapping derived features?
+    - note that they map overlap but may not be identical, in which case both need to be solved
+
+4. figure out the overlapping fetaure situation in general
+  - overlapping vertices lines and planes fully solve each other.
+  - you can go a little fineg rained too, but probably not worth the complexity
+    - a line/point on a plane is solved in 1 DOF if the plane is solved
+    - a point on a line is solved in 1 DOF if the line is solved
+
+5. determine which features need to be solved...
+  - face -> lines -> points
+  - if all lines of a foce, or all points of a line are not on the boundary, then that feature is internal and does not need to be solved
+  - the scary part is that the same rules apply for derived fetaures
+    - this is made easier if we say we don't support derived features further producing more derived features, I guess we can look into this in the future.
+  - derived features can be solved if both parent features are solved
+
+
+:: 9/11/2026
+
+lets look into refactoring kigumi into a STANDALONE viewer (i.e. not a VScode extensions)
+
+1. the same code with 2 deployment taregts, a standalone electron app and the vscode extension
+2. We do need to recreate the kigumi sidebar in the app though, so that part needs to refactored out so as much code is shared as possible, the in app sidebar is not used in the vs code extension because we use the vscode bulit in sidebar. Take this opportunity to rewrite the sidebar a bit though as we use the vscode layout components in the sidebar and those seem limiting so if ew're going ot rewrite them for the standalone app may as well use them in vscode as well
+3. the dependency installer path needs improvement. It should detect ify ou have uv or python installe,d and if neither is installed, it should try and install one or the other for you
+
+
+:: 9/8/2026 project notes
+
+Subject: Kumiki Project Ideas — Disassembly Solver + 3D-to-Code “Pullbacks”
+
+1. Improved disassembly solver
+Goal: Expand Kumiki’s current disassembly system from simple one-axis separation into a general system capable of planning and visualizing multi-step disassemblies.
+
+Solver requirements:
+
+Basic: Continue supporting existing single step disassembly.
+Multi-step motion: Support joints where one motion unlocks another degree of freedom.
+Three-piece interlocking “3D plus” Kumiki puzzle, where a piece must first twist before the others can separate. (3 piece burr puzzle https://www.instructables.com/3-Piece-Burr-Puzzle/)
+Kanawa Tsugi and similar joints where pieces must first move along one axis and then separate along another.
+Stretch goal — complex Kumiki puzzles: Handle highly interlocking assemblies where the available degrees of freedom change continuously based on the positions of multiple pieces. The constraints may effectively be functions of the geometry/state of several interacting timbers and need to be incorporated into the solver.   (do the gordian knot puzzle and a puzzle box example)
+Visualization / UX requirements:
+
+Allow timbers to be grouped into disassembly stages, so an assembly can be demonstrated step-by-step.
+Support symmetric disassembly. For example, the four sides of a frame should move outward simultaneously at equal speeds/distances rather than arbitrarily moving one at a time.
+Ideally symmetry can be auto-discovered.
+Users could also explicitly specify symmetry/grouping when necessary.
+Once a piece has moved far enough to become unconstrained, continue moving it a little farther to create a visually clean exploded/disassembled view.
+
+you should also be able to manually override any dissably, either becaues yo uwant it solevd in your own way or because it can't besolved or sometihng.
+
+2. 3D-to-code “pullbacks”
+Goal: Make the 3D viewer an interactive interface for discovering and modifying the code that generated the model, without trying to turn Kumiki into a conventional GUI CAD system.
+
+Many useful dimensions in programmatic CAD ultimately come from simple literals or constants—for example, tenon width, timber length, or timber position. When that is the case, Kumiki should be able to connect geometry in the viewer back to the relevant source code. If a value is derived in a way that can’t reasonably be traced/editable, it’s fine for the feature simply not to be available.
+
+Source metadata:
+
+Timber and joint creation should retain metadata identifying the relevant source location (file/line, etc.).
+This lets the viewer connect rendered geometry back to the code responsible for it.
+Editable properties / gizmos:
+
+Timber and joint definitions should be able to expose specific modifier capabilities, such as:
+Change timber length.
+Change timber position between two posts.
+Change tenon width.
+Change a joint dimension.
+When authoring a timber or joint, these properties can be associated with geometric features in the resulting model.
+For example, “tenon width” could be associated with the two sides/faces that define the tenon’s width.
+Phase 1 — viewer → source code:
+
+The viewer exposes/highlights these editable features.
+Hovering/selecting a modifier visually shows exactly which geometry the property controls.
+The user can select something like “Change tenon width.”
+A Go to source action jumps directly to the relevant parameter in the code.
+This gives useful visual editing affordances without requiring Kumiki to actually modify the program automatically.
+Phase 2 / stretch goal — direct manipulation:
+
+Add conventional CAD-like handles/gizmos that can be dragged directly in the 3D viewer.
+Dragging changes the corresponding literal/constant in the source code and reruns/re-renders the model.
+Ideally this feels close to real-time, although this depends on whether Kumiki’s code → geometry update loop can be made fast enough.
+The key idea is that the code remains the source of truth. The 3D viewer becomes a visual interface into that code rather than a separate modeling system.
+
+
+
 
 
 :: 9/12/2026 NEW LHS AND DRAWING SPEC
