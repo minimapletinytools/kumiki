@@ -158,6 +158,26 @@ A file may mark any number of frames. Kigumi builds them all and shows them toge
 
 Older files name their one frame `example` or `build_frame` instead of marking it. Kigumi still picks those up, with a warning; that will be removed, so write `@frame` in new files.
 
+## Parameterizing with Kiwari
+
+kumiki is a *programmatic CAD* tool hence all designs can be parameterized by code. To make this even easier, `kiwari` allows you to expose some parameters in one of the kigumi panels.
+
+Create a new kiwari object with a list of user defined of parameters:
+
+```python
+params = kiwari(legs=kiwari.count(4, minimum=3))
+```
+
+This object will then be passed in as the first argument to your frame function. It may have some of its parameters overriden (from the defaults) if set by kigumi.
+
+Typed values are extracted by string key.
+
+```python
+legs = k.count("legs")
+```
+
+Please see `kiwari.py` and `dovetailed_sawhorse.py` for examples
+
 ### Tools
 
 A `@tool` is a function Kigumi runs on demand against the shown frame, with the file's parameters; the text it returns is displayed. It must be annotated exactly `(frame: Frame, k: Kiwari) -> str`.
