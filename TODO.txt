@@ -250,36 +250,19 @@ DONE-do measuring features doc
   DONE-describe the measuring system
   DONE-explain feture solving system
   DONE-explain fetaure hit priority system
-
+DONE-do the assembly system doc (placeholder doc basically)
 
 -add support to run @tools from the parameter section
 -add export drawing button (how to do this?)
-
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
-
-
-
-
 -do the standalone app 
-
-
-  
-
--do the assembly system doc (placeholder doc basically)
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
-
 -maybe review runner.py ;__;
 -add types to runner.py
-
-
-
-
 -improve panel functions, think bout the simplest way to do this...
 -update shed example to include panels
   -make a video about this maybe after you do some more edge joints
-
-
 -add srcibe notching ot more joints...
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
 -add support for multilpe frames in jigumi (returns list of frames but you'll need to figure out how to do kiwari...)
