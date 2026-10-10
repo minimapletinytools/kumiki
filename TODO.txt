@@ -255,6 +255,8 @@ DONE-do measuring features doc
   DONE-explain fetaure hit priority system
 DONE-do the assembly system doc (placeholder doc basically)
 
+
+-kiwari units should probbaly match kigumi units, or allow it to be specified?
 -free house joints not showing up in joints in tree view
 -add support to run @tools from the parameter section
 -update tree view for multi frame files
