@@ -78,14 +78,18 @@ def _sawhorse_leg(beam, end, side, position):
                         ticket=f"leg {'+x' if end > 0 else '-x'} {'+y' if side > 0 else '-y'}")
 
     # The dovetail: its width square to the beam, sliding up an axis tilted outward from vertical,
-    # its +y into the beam.
+    # its +y into the beam. The tongue is cut from the leg's thickness, so the leg must stay behind
+    # the neck (-y) all the way down. The axis leans more than the leg does, so the neck starts on
+    # the leg's outer face at the beam's bottom and runs inward as it rises: the tongue gets
+    # shallower toward the top as well as narrower.
     slide = create_v3(0, -side * sin(DOVETAIL_TILT), cos(DOVETAIL_TILT))
     across = create_v3(-side, 0, 0)
+    length = BEAM_SIZE / cos(DOVETAIL_TILT)
+    at_bottom = arris + create_v3(0, BEAM_SIZE * outward[2] / outward[1], -BEAM_SIZE)
     dovetail = FreeDovetailShape(
-        origin=Transform(position=arris, orientation=Orientation.from_z_and_x(slide, across)),
+        origin=Transform(position=at_bottom + slide * length, orientation=Orientation.from_z_and_x(slide, across)),
         width=DOVETAIL_WIDTH, depth=DOVETAIL_DEPTH, dovetail_angle=DOVETAIL_FLARE,
-        forward_length=scalar(0), backward_length=BEAM_SIZE / cos(DOVETAIL_TILT) + inches(1, 2),
-        taper_angle=DOVETAIL_TAPER,
+        forward_length=scalar(0), backward_length=length, taper_angle=DOVETAIL_TAPER,
     )
     joint = cut_free_dovetail_joint(leg, beam, dovetail)
     level_top = adopt_csg(None, leg.transform, HalfSpace(
