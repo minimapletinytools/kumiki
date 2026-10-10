@@ -69,9 +69,8 @@ def _sawhorse_leg(beam, end, side, position):
     width = safe_normalize_vector(along_beam - up * safe_dot_product(along_beam, up))
 
 
-    #TODO make side*mm(2)  exact
     # Where the leg's centre crosses the beam's top arris on its side.
-    arris = position + create_v3(end * (BEAM_LENGTH / 2 - LEG_INSET), side * BEAM_WIDTH / 2 + side*mm(2), BEAM_HEIGHT)
+    arris = position + create_v3(end * (BEAM_LENGTH / 2 - LEG_INSET), side * (BEAM_WIDTH / 2), BEAM_HEIGHT)
     # The leg's centreline at the top, half its thickness in from the outer face, and an inch past
     # each end so the level trims have something to take off.
     top = arris - outward * (LEG_SIZE[1] / 2) + up * inches(1)
