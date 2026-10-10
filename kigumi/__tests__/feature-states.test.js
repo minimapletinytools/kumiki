@@ -1,4 +1,6 @@
-const { ROLES, featureKeyOf, featureStatesFor, featureStateSummary } = require('../webview/feature-states.js');
+const {
+    ROLES, featureKeyOf, featureStatesFor, featureStateSummary, leadingRole,
+} = require('../webview/feature-states.js');
 
 describe('feature states', () => {
     test('a selection focus and a hover answer name the same feature the same way', () => {
@@ -31,5 +33,25 @@ describe('feature states', () => {
 
         expect(featureStateSummary(state)).toEqual(['a', ['selection', 'hover'], true]);
         expect(ROLES).toEqual(['selection', 'hover', 'held']);
+    });
+});
+
+describe('which role a feature is drawn as', () => {
+    const lead = (sources) => {
+        const leading = leadingRole(featureStatesFor(sources)[0]);
+        return leading && leading.role;
+    };
+
+    test.each([
+        ['selection alone', { selection: { key: 'k' } }, 'selection'],
+        ['hover over selection', { selection: { key: 'k' }, hover: { key: 'k' } }, 'hover'],
+        ['held over hover', { hover: { key: 'k' }, held: { key: 'k' } }, 'held'],
+        ['a refused hover over held', { hover: { key: 'k', refused: true }, held: { key: 'k' } }, 'hover'],
+    ])('%s', (_name, sources, role) => {
+        expect(lead(sources)).toBe(role);
+    });
+
+    test('no roles, no lead', () => {
+        expect(leadingRole({ key: 'k', roles: {} })).toBeNull();
     });
 });

@@ -299,9 +299,9 @@ describe('identity is what the reconciler keeps', () => {
 
     test('every id is unique, so nothing overwrites anything', () => {
         const lit = drawn({
-            csg: { key: 'k', featureLabel: 'front', mesh: MESH, parentMesh: MESH, edgePositions: EDGES },
-            hover: { key: 'k', mesh: MESH, edgePositions: EDGES },
-            held: { key: 'k', mesh: MESH, edgePositions: EDGES },
+            csg: { key: 'a', featureLabel: 'front', mesh: MESH, parentMesh: MESH, edgePositions: EDGES },
+            hover: { key: 'b', mesh: MESH, edgePositions: EDGES },
+            held: { key: 'c', mesh: MESH, edgePositions: EDGES },
             policy: POLICY,
         });
 
@@ -469,17 +469,41 @@ describe('a selection highlight outliving its selection', () => {
     });
 });
 
-describe('a feature lit for several reasons at once', () => {
-    test('still gets an overlay per role, until overlays are resolved per feature', () => {
-        const key = 'post#0|cut|front';
+describe('a feature lit for several reasons at once is drawn once, as its leading role', () => {
+    const key = 'post#0|cut|front';
+    const selection = () => ({ key, featureLabel: 'front', mesh: MESH, parentMesh: MESH });
+
+    test('hovering a selected feature draws the hover, keeping the parent as context', () => {
+        const lit = drawn({ csg: selection(), hover: { key, mesh: MESH }, policy: POLICY });
+
+        expect(ids(lit)).toEqual([`csg-parent:${key}`, `hover-mesh:${key}`]);
+    });
+
+    test('the held end beats the hover', () => {
+        const lit = drawn({ hover: { key, mesh: MESH }, held: { key, mesh: MESH }, policy: POLICY });
+
+        expect(ids(lit)).toEqual([`held-mesh:${key}`]);
+        expect(lit[0].color).toBe(HELD_COLOR);
+    });
+
+    test('but a refused hover beats everything, since the click would refuse it', () => {
         const lit = drawn({
-            csg: { key, featureLabel: 'front', mesh: MESH, parentMesh: MESH },
-            hover: { key, mesh: MESH },
-            held: { key, mesh: MESH },
-            policy: POLICY,
+            csg: selection(), hover: { key, mesh: MESH, refused: true }, held: { key, mesh: MESH }, policy: POLICY,
         });
 
-        expect(ids(lit)).toEqual([
-            `csg-parent:${key}`, `csg-feature:${key}`, `hover-mesh:${key}`, `held-mesh:${key}`]);
+        expect(ids(lit)).toEqual([`csg-parent:${key}`, `hover-mesh:${key}`]);
+        expect(lit[1].color).toBe(HOVER_REFUSED_COLOR);
+    });
+
+    test('the selection alone still draws as before', () => {
+        const lit = drawn({ csg: selection(), policy: POLICY });
+
+        expect(ids(lit)).toEqual([`csg-parent:${key}`, `csg-feature:${key}`]);
+    });
+
+    test('different features keep their own looks', () => {
+        const lit = drawn({ csg: selection(), hover: { key: 'girt#0||back', mesh: MESH }, policy: POLICY });
+
+        expect(ids(lit)).toEqual([`csg-parent:${key}`, `csg-feature:${key}`, 'hover-mesh:girt#0||back']);
     });
 });

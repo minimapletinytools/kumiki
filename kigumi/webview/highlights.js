@@ -1,5 +1,9 @@
 (function (globalScope) {
     'use strict';
+
+    const { leadingRole } = (typeof module !== 'undefined' && module.exports)
+        ? require('./feature-states.js')
+        : globalScope.KigumiFeatureStates;
     // What should be lit, given what is selected, hovered and held.
     //
     // A LIST, not seven lifetimes. Each overlay used to be built when the
@@ -100,28 +104,53 @@
      * `features` are FeatureStates (feature-states.js): each lit feature with
      * its roles -- selection, hover, held -- and for each the geometry the
      * runner sent, `{ key, mesh, parentMesh, edgePositions, pointAt,
-     * featureLabel, refused }`. One overlay per role for now, listed role by
-     * role. `policy` carries the opacities the current selection asks for.
+     * featureLabel, refused }`. `policy` carries the opacities the current
+     * selection asks for.
+     *
+     * One look per feature: a feature with several roles is drawn as its
+     * leading role (FeatureStates.leadingRole), not as a stack of translucent
+     * copies. A selected feature's parent is other geometry, so it stays as
+     * context whichever role leads.
      */
     function highlightsFor(state) {
         const found = state || {};
         const policy = found.policy || {};
-        const features = found.features || [];
         const out = [];
-        const sources = (role) => features.map((feature) => feature.roles[role]).filter(Boolean);
-        for (const csg of sources('selection')) {
-            selectionOverlays(csg, policy, out);
-        }
-        for (const hover of sources('hover')) {
-            hoverOverlays(hover, out);
-        }
-        for (const held of sources('held')) {
-            heldOverlays(held, out);
+        for (const feature of found.features || []) {
+            const selection = feature.roles.selection;
+            if (selection) {
+                parentOverlay(selection, policy, out);
+            }
+            const leading = leadingRole(feature);
+            if (!leading) {
+                continue;
+            }
+            if (leading.role === 'selection') {
+                selectionOverlays(leading.source, policy, out);
+            } else if (leading.role === 'hover') {
+                hoverOverlays(leading.source, out);
+            } else {
+                heldOverlays(leading.source, out);
+            }
         }
         return out;
     }
 
-    /** The selection: the tagged node, or a feature and its parent. */
+    /** A selected feature's parent, dim, so which is which is visible. */
+    function parentOverlay(csg, policy, out) {
+        if (csg.featureLabel && hasMesh(csg.parentMesh)) {
+            out.push({
+                id: `csg-parent:${csg.key}`,
+                shape: 'mesh',
+                mesh: csg.parentMesh,
+                color: CSG_COLORS.tagged,
+                opacity: policy.parentHighlightOpacity,
+                renderOrder: ORDER.csgMesh,
+            });
+        }
+    }
+
+    /** The selection: the tagged node, or a feature (its parent is parentOverlay's). */
     function selectionOverlays(csg, policy, out) {
         if (hasPoint(csg.pointAt)) {
             // A vertex is a position and nothing else -- neither triangles
@@ -150,16 +179,7 @@
             });
         }
         if (csg.featureLabel && hasMesh(csg.parentMesh)) {
-            // A feature inside something: the parent dim, the feature
-            // bright, so which is which is visible.
-            out.push({
-                id: `csg-parent:${csg.key}`,
-                shape: 'mesh',
-                mesh: csg.parentMesh,
-                color: CSG_COLORS.tagged,
-                opacity: policy.parentHighlightOpacity,
-                renderOrder: ORDER.csgMesh,
-            });
+            // A feature inside something: bright, over its dim parent.
             if (hasMesh(csg.mesh)) {
                 out.push({
                     id: `csg-feature:${csg.key}`,

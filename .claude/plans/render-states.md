@@ -51,10 +51,12 @@ overlays are extra geometry from the runner drawn over them.
    one feature key: `{ key, roles: { selection, hover, held } }`, each role
    carrying the geometry its source sent. `highlightsFor` draws from these, one
    overlay per role as today. No visible change.
-3. **One overlay per feature.** Resolve a feature's roles to one look by a
-   priority list (e.g. refused > held > hovered > selected feature > selected
-   node > parent) instead of stacking copies. The first visible change, so the
-   combinations need deciding.
+3. **One overlay per feature.** A feature's roles resolve to one look by
+   `ROLE_PRIORITY` in feature-states.js, first match wins: a refused hover
+   (red, the click would refuse it), then the held end (green), then the hover
+   (orange), then the selection (blue). A selected feature's dim parent is other
+   geometry, so it stays as context whichever role leads. Changing the order is
+   editing that list.
 4. **New roles and states**: locked/fixed members; a feature that is an end of
    an existing measurement. Each becomes a row in the tables above.
 
@@ -67,5 +69,5 @@ are scene-wide settings or transforms, not per-thing styling.
 
 - [x] 1. `MemberState` + `appearanceFor`
 - [x] 2. `FeatureState`, drawn one overlay per role
-- [ ] 3. One overlay per feature
+- [x] 3. One overlay per feature
 - [ ] 4. Locked/fixed, measurement-end roles

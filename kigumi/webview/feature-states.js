@@ -11,8 +11,32 @@
     //
     // Pure. highlights.js draws from these. See .claude/plans/render-states.md.
 
-    /** The roles a feature can have, in the order their overlays are listed. */
+    /** The roles a feature can have. */
     const ROLES = Object.freeze(['selection', 'hover', 'held']);
+
+    /**
+     * Which role's look a feature takes when it has several, first match wins.
+     * A refused hover leads, because the click would refuse it; then the held
+     * end being measured from; then what a click would take; then the selection.
+     */
+    const ROLE_PRIORITY = Object.freeze([
+        { role: 'hover', when: (source) => Boolean(source.refused) },
+        { role: 'held' },
+        { role: 'hover' },
+        { role: 'selection' },
+    ]);
+
+    /** The role a feature is drawn as, and its source: { role, source }, or null with no roles. */
+    function leadingRole(state) {
+        const roles = (state && state.roles) || {};
+        for (const { role, when } of ROLE_PRIORITY) {
+            const source = roles[role];
+            if (source && (!when || when(source))) {
+                return { role, source };
+            }
+        }
+        return null;
+    }
 
     /**
      * One key for a feature, whichever source names it: member, CSG path and
@@ -59,7 +83,9 @@
         ];
     }
 
-    const KigumiFeatureStates = { ROLES, featureKeyOf, featureStatesFor, featureStateSummary };
+    const KigumiFeatureStates = {
+        ROLES, ROLE_PRIORITY, featureKeyOf, featureStatesFor, featureStateSummary, leadingRole,
+    };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = KigumiFeatureStates;
