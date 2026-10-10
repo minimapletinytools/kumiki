@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:;">
+    <script src="../shell/panel-bridge.js"></script>
+    <title>Kigumi Editor</title>
+    <link rel="stylesheet" href="../shell/theme.css">
+    <link rel="stylesheet" href="../vendor/monaco/vs/editor/editor.main.css">
+    <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+    <div id="editor-container" class="editor-container"></div>
+    <script src="../vendor/monaco/vs/loader.js"></script>
+    <script src="editor-app.js"></script>
+</body>
+</html>

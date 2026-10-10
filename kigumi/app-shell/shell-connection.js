@@ -34,6 +34,9 @@ class PanelSurface {
 
     set title(value) {
         this._title = value;
+        if (this.slot === 'center') {
+            this.connection.tabs.update(this.id, { title: value });
+        }
         this.connection.pushState();
     }
 
@@ -119,13 +122,14 @@ class ShellConnection {
      * @param {() => boolean} [options.isFocused]
      * @param {(line: string) => void} [options.log]
      */
-    constructor({ transport, pages, status = () => ({}), onCommand = () => {}, isFocused = () => true, log = () => {} }) {
+    constructor({ transport, pages, status = () => ({}), onCommand = () => {}, isFocused = () => true, log = () => {}, closeRequest = null }) {
         this.transport = transport;
         this.pages = pages;
         this.status = status;
         this.onCommand = onCommand;
         this.isFocused = isFocused;
         this.log = log;
+        this.closeRequest = closeRequest;
         this.panels = new Map();
         this.tabs = new TabList();
         this.sides = { left: null, right: null };
@@ -238,7 +242,13 @@ class ShellConnection {
                 this.activate(message.id);
                 break;
             case 'tab:close':
-                this.closePanel(message.id);
+                if (this.closeRequest) {
+                    Promise.resolve(this.closeRequest(message.id)).then((shouldClose) => {
+                        if (shouldClose !== false) this.closePanel(message.id);
+                    });
+                } else {
+                    this.closePanel(message.id);
+                }
                 break;
             case 'panel:message':
                 if (panel) panel.deliver(message.message);

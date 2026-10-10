@@ -42,8 +42,8 @@ function languageOf(filePath) {
  * @param {(level: string, text: string) => void} options.setStatus
  * @param {(title: string|null) => void} options.setProgress
  */
-function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress }) {
-    function openInEditor(filePath, line = 1) {
+function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress, openEditor = null }) {
+    function openExternalEditor(filePath, line = 1) {
         const template = settings.get('app.editorCommand', '');
         if (template) {
             const command = template.replace(/\{file\}/g, JSON.stringify(filePath)).replace(/\{line\}/g, String(line));
@@ -57,6 +57,14 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
         }
         electronShell.showItemInFolder(filePath);
         setStatus('info', `Set "app.editorCommand" in Kigumi settings to open files in your editor (e.g. code -g {file}:{line}).`);
+    }
+
+    function openInEditor(filePath, line = 1) {
+        if (openEditor) {
+            openEditor(filePath, line);
+            return;
+        }
+        openExternalEditor(filePath, line);
     }
 
     function watchFiles(baseDir, glob, { onCreate, onChange, onDelete } = {}) {

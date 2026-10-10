@@ -210,6 +210,55 @@ function openLogTab() {
     surface.loadUrl(`${ORIGIN}/webview/shell/log.html`);
 }
 
+function openEditorTab(filePath, line = 1) {
+    const existing = connection.findPanel((panel) => panel.type === 'editor' && panel.filePath === filePath);
+    if (existing) {
+        existing.reveal();
+        if (line > 1) {
+            void existing.postMessage({ type: 'revealLine', line });
+        }
+        return existing;
+    }
+
+    let fileContent = '';
+    try {
+        fileContent = fs.readFileSync(filePath, 'utf8');
+    } catch (error) {
+        logChannel.appendLine(`[editor] Failed to read ${filePath}: ${error.message}`);
+        setStatus('error', `Cannot open ${path.basename(filePath)}: ${error.message}`);
+        return null;
+    }
+
+    const baseName = path.basename(filePath);
+    const surface = connection.createPanel('editor', { title: baseName, filePath });
+    let isDirty = false;
+    let pendingContent = fileContent;
+
+    surface.onMessage(async (message) => {
+        if (!message) return;
+        if (message.type === 'editorReady') {
+            void surface.postMessage({ type: 'init', filePath, content: fileContent, line });
+        } else if (message.type === 'editorDirty') {
+            isDirty = !!message.isDirty;
+            surface.title = isDirty ? `● ${baseName}` : baseName;
+        } else if (message.type === 'editorSave') {
+            try {
+                fs.writeFileSync(filePath, message.content, 'utf8');
+                fileContent = message.content;
+                pendingContent = message.content;
+                isDirty = false;
+                surface.title = baseName;
+                void surface.postMessage({ type: 'saved' });
+            } catch (error) {
+                setStatus('error', `Failed to save ${baseName}: ${error.message}`);
+            }
+        }
+    });
+
+    surface.loadUrl(`${ORIGIN}/webview/editor/editor.html`);
+    return surface;
+}
+
 // Opens settings.json, listing every setting with its current value.
 async function openSettingsFile() {
     settings.seedDefaults();
@@ -340,6 +389,7 @@ async function start() {
         runCommand: runAppCommand,
         setStatus,
         setProgress,
+        openEditor: openEditorTab,
     }));
 
     kigumiApp = createKigumiApp({
