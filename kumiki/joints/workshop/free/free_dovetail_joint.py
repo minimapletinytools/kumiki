@@ -75,9 +75,8 @@ def cut_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: Timbe
     """A dovetail of any shape and placement: the receiving timber gets the socket, the dovetail timber the tongue.
 
     The tongue's neck is the dovetail's narrow face, at its origin, and it widens toward its tip
-    along +y -- so the dovetail timber should lie on the -y side of the origin, and the tongue holds
-    against being pulled back out along y. Between the dovetail's ends, everything of the dovetail
-    timber past the narrow face is cut away except the tongue. That face is the joint's shoulder.
+    along +y -- so the dovetail timber should lie on the -y side of the dovetail shape origin, and it tapers towards +y.
+    Between the dovetail's ends, everything of the dovetail timber past the narrow face in +y is cut away except the tongue. That face is the joint's shoulder.
     """
     # create a convex polygon extrusion from `dovetail`
     dovetail_csg = dovetail.csg()
@@ -89,6 +88,8 @@ def cut_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: Timbe
     region: CutCSG = HalfSpace(normal=create_v3(0, 1, 0), offset=scalar(0),
                                feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder")],
                                label=CutCSGLabel("shoulder"))
+
+    # TODO use Difference not intersection, Difference is more efficient
     # then crop that half space with the forward backward ends of the dovetail shape forming a prism
     # that's infinite in 3 directions
     if dovetail.forward_length is not None:
