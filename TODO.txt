@@ -255,6 +255,7 @@ DONE-do measuring features doc
   DONE-explain fetaure hit priority system
 DONE-do the assembly system doc (placeholder doc basically)
 
+-free house joints not showing up in joints in tree view
 -add support to run @tools from the parameter section
 -update tree view for multi frame files
 -add export drawing button (how to do this?)

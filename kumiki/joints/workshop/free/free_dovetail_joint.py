@@ -37,6 +37,8 @@ class FreeDovetailShape:
     def __post_init__(self):
         assert safe_compare(self.width, 0, Comparison.GT), "a dovetail needs a positive width"
         assert safe_compare(self.depth, 0, Comparison.GT), "a dovetail needs a positive depth"
+        assert safe_compare(self.dovetail_angle, 0, Comparison.GT), \
+            "a dovetail's angle must be positive: it widens away from its neck, toward +y"
         if not safe_zero_test(self.taper_angle):
             assert self.forward_length is not None and self.backward_length is not None, \
                 "a tapered dovetail needs finite forward and backward lengths"

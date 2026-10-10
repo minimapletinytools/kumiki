@@ -91,6 +91,12 @@ class TestFreeDovetailJoint:
         with pytest.raises(AssertionError, match="finite"):
             _dovetail(taper=5, forward=None)
 
+    def test_the_dovetail_angle_must_be_positive(self):
+        origin = _dovetail().origin
+        for angle in (0, -15):
+            with pytest.raises(AssertionError, match="positive"):
+                FreeDovetailShape(origin=origin, width=mm(40), depth=mm(30), dovetail_angle=degrees(angle))
+
     def test_it_builds_into_a_frame(self):
         frame = Frame.from_joints([cut_free_dovetail_joint(_post(), _beam(), _dovetail())])
 

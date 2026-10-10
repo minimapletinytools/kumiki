@@ -21,7 +21,7 @@ def _post_on_beam_with_dovetail(position, taper_angle):
     # tongue flares at 15 degrees down into the beam for 30mm, so the post cannot lift out.
     dovetail = FreeDovetailShape(
         origin=Transform(position=position + create_v3(0, 0, mm(50)),
-                         orientation=Orientation.from_x_and_y(create_v3(0, 1, 0), create_v3(0, 0, -1))),
+                         orientation=Orientation.from_x_and_y(create_v3(1, 0, 0), create_v3(0, 0, -1))),
         width=mm(40), depth=mm(30), dovetail_angle=degrees(15),
         forward_length=mm(50), backward_length=mm(50), taper_angle=taper_angle,
     )
@@ -40,36 +40,37 @@ def example_free_tapered_dovetail(position=None) -> Joint:
     return _post_on_beam_with_dovetail(position, degrees(5))
 
 
-# --- Sawhorse: four splayed 1x6 legs, each in a tapered, angled sliding dovetail ---------------------------
+# --- Sawhorse: four splayed 1x6 legs, each a tapered sliding dovetail let into the beam's arris ---------------
 
 BEAM_SIZE = inches(7, 2)          # a 4x4, actual 3.5" x 3.5"
 BEAM_LENGTH = inches(36)
 LEG_SIZE = create_v2(inches(11, 2), inches(3, 4))  # a 1x6, actual 5.5" x 0.75"
 LEG_LENGTH = inches(30)
 LEG_INSET = inches(6)             # each leg's top, centred this far in from its end of the beam
-LEG_SPLAY = degrees(10)           # outward from the beam, and along it toward its end
-DOVETAIL_TILT = degrees(18)       # the dovetail's slide axis, outward from vertical
+LEG_SPLAY = degrees(10)           # along the beam, toward its end
 DOVETAIL_TAPER = degrees(10)      # narrowing toward the top: point end up
 DOVETAIL_FLARE = atan(scalar(1) / scalar(6))
-DOVETAIL_WIDTH = inches(3, 2)     # at the top
-DOVETAIL_DEPTH = inches(1, 2)     # into the beam
 
 
 def _sawhorse_leg(beam, end, side, position):
-    """One leg, let into the beam's side by its thickness, and its dovetail.
+    """One leg and its dovetail.
 
-    `end` is +1/-1 for the beam's +x/-x end, `side` +1/-1 for its +y/-y side. The leg's outer face
-    lies on the beam's top arris on its side, and its top is trimmed level with the beam's top.
+    `end` is +1/-1 for the beam's +x/-x end, `side` +1/-1 for its +y/-y side. Seen along the beam,
+    the leg leans out just so its outer face runs through the beam's top arris and its inner face
+    through the bottom one. The dovetail is the leg's whole thickness between those faces.
     """
-    up = safe_normalize_vector(create_v3(-end * tan(LEG_SPLAY), -side * tan(LEG_SPLAY), 1))
+    # Seen along the beam, the faces through both arrises are a thickness apart: sin = thickness / height.
+    lean_sin = LEG_SIZE[1] / BEAM_SIZE
+    lean_cos = sqrt(1 - lean_sin * lean_sin)
+    up = safe_normalize_vector(create_v3(-end * tan(LEG_SPLAY), -side * lean_sin / lean_cos, 1))
+    outward = create_v3(0, side * lean_cos, lean_sin)  # the leg's face normal, square to the beam
     along_beam = create_v3(1, 0, 0)
     width = safe_normalize_vector(along_beam - up * safe_dot_product(along_beam, up))
-    outward = safe_normalize_vector(cross_product(width, up))
-    if safe_compare(outward[1] * side, 0, Comparison.LT):
-        outward = -outward
 
-    # Where the leg's centre meets the beam's top arris on its side.
-    arris = position + create_v3(end * (BEAM_LENGTH / 2 - LEG_INSET), side * BEAM_SIZE / 2, BEAM_SIZE)
+
+    # TODO replace side * BEAM_SIZE / 2 + mm(1) with proper trig
+    # Where the leg's centre crosses the beam's top arris on its side.
+    arris = position + create_v3(end * (BEAM_LENGTH / 2 - LEG_INSET), side * BEAM_SIZE / 2 + side*mm(1), BEAM_SIZE)
     # The leg's centreline at the top, half its thickness in from the outer face, and an inch past the
     # top so the level trim has something to take off.
     top = arris - outward * (LEG_SIZE[1] / 2) + up * inches(1)
@@ -77,19 +78,22 @@ def _sawhorse_leg(beam, end, side, position):
                         size=LEG_SIZE, length_direction=up, width_direction=width,
                         ticket=f"leg {'+x' if end > 0 else '-x'} {'+y' if side > 0 else '-y'}")
 
-    # The dovetail: its width square to the beam, sliding up an axis tilted outward from vertical,
-    # its +y into the beam. The tongue is cut from the leg's thickness, so the leg must stay behind
-    # the neck (-y) all the way down. The axis leans more than the leg does, so the neck starts on
-    # the leg's outer face at the beam's bottom and runs inward as it rises: the tongue gets
-    # shallower toward the top as well as narrower.
-    slide = create_v3(0, -side * sin(DOVETAIL_TILT), cos(DOVETAIL_TILT))
-    across = create_v3(-side, 0, 0)
-    length = BEAM_SIZE / cos(DOVETAIL_TILT)
-    at_bottom = arris + create_v3(0, BEAM_SIZE * outward[2] / outward[1], -BEAM_SIZE)
+    # The dovetail: its width square to the beam, its neck on the leg's outer face with its top edge
+    # on the top arris, its wide face on the leg's inner face. It runs down to the bottom arris.
+    across, into_beam = create_v3(-side, 0, 0), -outward
+    slide = cross_product(across, into_beam)
+    length = BEAM_SIZE * lean_cos
+    # There the neck is exactly as wide as the leg is along the beam, and centred on it.
+    at_bottom = arris + up * (-length / safe_dot_product(slide, up))
+    width_at_bottom = LEG_SIZE[0] / sqrt(1 - up[0] * up[0])
     dovetail = FreeDovetailShape(
-        origin=Transform(position=at_bottom + slide * length, orientation=Orientation.from_z_and_x(slide, across)),
-        width=DOVETAIL_WIDTH, depth=DOVETAIL_DEPTH, dovetail_angle=DOVETAIL_FLARE,
-        forward_length=scalar(0), backward_length=length, taper_angle=DOVETAIL_TAPER,
+        origin=Transform(position=create_v3(at_bottom[0], arris[1], arris[2]),
+                         orientation=Orientation.from_x_and_y(across, into_beam)),
+        width=width_at_bottom - cos(DOVETAIL_TAPER)*LEG_SIZE[1] - 2 * length * tan(DOVETAIL_TAPER), depth=LEG_SIZE[1],
+        dovetail_angle=DOVETAIL_FLARE,
+        # Up past the beam's top for good -- above it is only the leg, trimmed level. The taper
+        # needs finite ends, so "for good" is the beam's height.
+        forward_length=BEAM_SIZE, backward_length=LEG_LENGTH, taper_angle=DOVETAIL_TAPER,
     )
     joint = cut_free_dovetail_joint(leg, beam, dovetail)
     level_top = adopt_csg(None, leg.transform, HalfSpace(
@@ -101,8 +105,8 @@ def _sawhorse_leg(beam, end, side, position):
 
 @pattern("free_joints/free_dovetail_joint/angled_tapered", tags=["main"])
 def example_sawhorse_angled_tapered_dovetails(position=None) -> Frame:
-    """A 4x4 sawhorse beam with four 1x6 legs splayed 10 degrees both ways, each let in by its
-    thickness and held by a dovetail tapered 10 degrees (point up) and tilted 18 degrees outward."""
+    """A 4x4 sawhorse beam with four 1x6 legs splayed both ways, each let into the beam's arris
+    as a sliding dovetail tapered 10 degrees, point up."""
     if position is None:
         position = create_v3(0, 0, 0)
     beam = create_timber(bottom_position=position + create_v3(-BEAM_LENGTH / 2, 0, BEAM_SIZE / 2),
