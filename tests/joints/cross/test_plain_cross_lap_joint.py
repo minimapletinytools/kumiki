@@ -173,3 +173,44 @@ class TestCrossLapJoint:
         assert _render_cutting(joint.cuttings["timberB"]).contains_point(timberB.transform.global_to_local(origin))
 
 
+
+
+class TestCrossLapFeatures:
+    """What a lap removes is named, and outlines the lap where it meets the timber."""
+
+    def _lapped(self):
+        # A along x, 100 square; B along y, 60 wide and taller than A, crossing it at the origin.
+        timberA = create_timber(bottom_position=create_v3(mm(-500), 0, 0), length=mm(1000),
+                                size=create_v2(mm(100), mm(100)), length_direction=create_v3(1, 0, 0),
+                                width_direction=create_v3(0, 1, 0), ticket="A")
+        timberB = create_timber(bottom_position=create_v3(0, mm(-500), 0), length=mm(1000),
+                                size=create_v2(mm(60), mm(160)), length_direction=create_v3(0, 1, 0),
+                                width_direction=create_v3(-1, 0, 0), ticket="B")
+        joint = cut_plain_cross_lap_joint(CrossJointTimberArrangement(timber1=timberA, timber2=timberB))
+        return timberA, _render_cutting(joint.cuttings["timberA"])
+
+    def _derived_at(self, timber, csg, x, y, z):
+        local = timber.transform.global_to_local(create_v3(mm(x), mm(y), mm(z)))
+        return [hit.feature.name for hit in csg.find_all_features(local) if hit.feature.is_derived()]
+
+    def test_the_crossing_faces_are_CROSSING(self):
+        from kumiki.csg.cutcsg import FeatureGroup, csg_children
+        _, csg = self._lapped()
+
+        found = {}
+        def walk(node):
+            for feature in getattr(node, "get_declared_features", lambda: [])():
+                found[feature.name] = feature.properties.group
+            for child in csg_children(node):
+                walk(child)
+        walk(csg)
+
+        for name in ("crossing_right", "crossing_front", "crossing_left", "crossing_back", "lap_depth"):
+            assert found.get(name) is FeatureGroup.CROSSING, name
+
+    def test_the_lap_s_walls_meet_the_timber_s_faces_in_derived_edges(self):
+        # A's lap is on its top: B's side wall at x=30 crosses A's top face and its side face.
+        timberA, csg = self._lapped()
+
+        assert any("crossing_" in name for name in self._derived_at(timberA, csg, 30, 0, 50))
+        assert any("crossing_" in name for name in self._derived_at(timberA, csg, 30, 50, 25))

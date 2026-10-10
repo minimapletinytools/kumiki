@@ -9,12 +9,25 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from kumiki.measuring import get_center_point_on_face_global
+from kumiki.csg.cutcsg import (
+    HALF_SPACE_PLANE, FeatureGroup, FeatureOverride, FeatureProperties, PrismFace, prism_face_key,
+)
 from ..shavings import *
 from ..shavings.relief import (
     CrossJointScribeReliefConfig,
     chop_scribe_relief_and_apply,
     warn_if_arrangement_timbers_imperfect,
 )
+
+
+#: The faces of what a lap removes -- the crossing timber's sides and the lap's depth plane. They
+#: meet the lapped timber's bodies along the lap's outline; see FeatureGroup.CROSSING.
+_CROSSING_FACE = FeatureProperties(group=FeatureGroup.CROSSING)
+_CROSSING_SIDES = [
+    FeatureOverride(prism_face_key(face), f"crossing_{face.name.lower()}", _CROSSING_FACE)
+    for face in (PrismFace.RIGHT, PrismFace.FRONT, PrismFace.LEFT, PrismFace.BACK)
+]
+_LAP_DEPTH = [FeatureOverride(HALF_SPACE_PLANE, "lap_depth", _CROSSING_FACE)]
 
 
 def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace) -> V3:
@@ -161,6 +174,7 @@ def cut_plain_cross_lap_joint(
             transform=transform_B_in_A,
             start_distance=None,
             end_distance=None,
+            feature_overrides=_CROSSING_SIDES,
             label=CutCSGLabel("crossing_timber"),
         )
 
@@ -171,6 +185,7 @@ def cut_plain_cross_lap_joint(
         inverse_half_plane_A = HalfSpace(
             normal=-cutting_plane_normal_in_A,
             offset=-cutting_plane_offset_in_A,
+            feature_overrides=_LAP_DEPTH,
             label=CutCSGLabel("lap_depth_plane"),
         )
 
@@ -197,6 +212,7 @@ def cut_plain_cross_lap_joint(
             transform=transform_A_in_B,
             start_distance=None,
             end_distance=None,
+            feature_overrides=_CROSSING_SIDES,
             label=CutCSGLabel("crossing_timber"),
         )
 
@@ -207,6 +223,7 @@ def cut_plain_cross_lap_joint(
         half_plane_B = HalfSpace(
             normal=cutting_plane_normal_in_B,
             offset=cutting_plane_offset_in_B,
+            feature_overrides=_LAP_DEPTH,
             label=CutCSGLabel("lap_depth_plane"),
         )
 

@@ -2963,10 +2963,18 @@ class TestFeatureGroups:
         """Joint features meet the timber body, not each other."""
         assert not feature_groups_intersect(FeatureGroup.SHOULDER_PLANE, FeatureGroup.SHOULDER_PLANE)
 
-    def test_the_perfect_body_pairs_only_with_a_shoulder_plane(self):
+    def test_the_perfect_body_pairs_only_with_joint_features(self):
         assert feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.SHOULDER_PLANE)
+        assert feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.CROSSING)
         assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.PERFECT)
         assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.ROUGH)
+
+    def test_a_crossing_pairs_with_both_bodies_and_nothing_else(self):
+        """A cross lap's faces outline the lap where they meet the timber, and nowhere else."""
+        assert feature_groups_intersect(FeatureGroup.CROSSING, FeatureGroup.PERFECT)
+        assert feature_groups_intersect(FeatureGroup.CROSSING, FeatureGroup.ROUGH)
+        for other in (FeatureGroup.CROSSING, FeatureGroup.SHOULDER_PLANE, FeatureGroup.TENON, FeatureGroup.NONE):
+            assert not feature_groups_intersect(FeatureGroup.CROSSING, other), other
 
     def test_a_tenon_pairs_only_with_the_shoulder_plane(self):
         """That pair is the tenon's base arris, which is nowhere else.

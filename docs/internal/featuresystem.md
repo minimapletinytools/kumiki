@@ -108,7 +108,7 @@ Several features can be under the pointer at once -- `_sort_feature_hits` in `cu
 - **Non-real before real.** A centre axis or a centerplane is a deliberate snap, so the surface it happens to lie on does not steal the click.
 - **The more specific kind.** Point, then edge, then face (flat or curved). An edge beats the two faces that formed it, and a corner beats its edges.
 - **Declared before derived.** A feature something declared beats one derived from a pair of faces.
-- **Group rank** (`FeatureGroup`, lower is better): `SHOULDER_PLANE`, `PERFECT`, `ROUGH`, `TENON`, then `NONE`. A derived feature takes the better rank of its two parents.
+- **Group rank** (`FeatureGroup`, lower is better): `SHOULDER_PLANE`, `PERFECT`, `ROUGH`, `TENON`, `CROSSING`, then `NONE`. A derived feature takes the better rank of its two parents.
 - **Author-set priority** (`FeatureProperties.priority`, lower wins). Default features carry a high value, so anything a joint names beats the prism's anonymous defaults.
 - **Name**, alphabetically.
 - **Gathering order**, as the last tie-break.

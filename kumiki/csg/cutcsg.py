@@ -339,9 +339,10 @@ class FeatureGroup(Enum):
     make the useful pairs declarable instead of searched for:
 
         SHOULDER_PLANE intersects with PERFECT, ROUGH and TENON
-        PERFECT        intersects with SHOULDER_PLANE only
-        ROUGH          intersects with SHOULDER_PLANE only
+        PERFECT        intersects with SHOULDER_PLANE and CROSSING
+        ROUGH          intersects with SHOULDER_PLANE and CROSSING
         TENON          intersects with SHOULDER_PLANE only
+        CROSSING       intersects with PERFECT and ROUGH
 
     NONE is the exception to the scheme: it meets nothing, not even itself, and
     is how a feature says it forms no edges at all. Some geometry is worth
@@ -358,8 +359,12 @@ class FeatureGroup(Enum):
     the cheeks against each other are the tenon prism's own arrises, already
     declared.
 
+    CROSSING is the faces of what a cross lap removes: the crossing timber's
+    sides and the lap's depth plane. They are not shoulders, but they meet the
+    timber's bodies all the same, and where they do is the lap's outline.
+
     The two bodies do NOT meet themselves, which is why PERFECT and ROUGH pair
-    with the shoulder plane and nothing else: a timber's own arrises and corners
+    with joint features and nothing else: a timber's own arrises and corners
     are declared outright (timber._long_arris_tags and friends), so letting the
     faces pair as well would reach the same line two ways and offer it twice.
     The rough body is where that would bite hardest, since relief geometry embeds
@@ -370,14 +375,16 @@ class FeatureGroup(Enum):
 
     The ranks are a preference order for picking, best first: a shoulder plane
     is the feature a joint is about, then the perfect body a drawing measures
-    from, then the rough stock, then tenon faces, then anything forming no edges.
+    from, then the rough stock, then tenon faces, then a cross lap's faces, then
+    anything forming no edges.
     """
     SHOULDER_PLANE = 1
     PERFECT = 2
     ROUGH = 3
     TENON = 4
+    CROSSING = 5
     #: Forms no edges with anything, including itself.
-    NONE = 5
+    NONE = 6
 
 
 # Which groups each group forms edges with. Symmetric by construction; see
@@ -385,9 +392,10 @@ class FeatureGroup(Enum):
 FEATURE_GROUP_PAIRS: dict = {
     FeatureGroup.SHOULDER_PLANE: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH,
                                             FeatureGroup.TENON}),
-    FeatureGroup.PERFECT: frozenset({FeatureGroup.SHOULDER_PLANE}),
-    FeatureGroup.ROUGH: frozenset({FeatureGroup.SHOULDER_PLANE}),
+    FeatureGroup.PERFECT: frozenset({FeatureGroup.SHOULDER_PLANE, FeatureGroup.CROSSING}),
+    FeatureGroup.ROUGH: frozenset({FeatureGroup.SHOULDER_PLANE, FeatureGroup.CROSSING}),
     FeatureGroup.TENON: frozenset({FeatureGroup.SHOULDER_PLANE}),
+    FeatureGroup.CROSSING: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH}),
     FeatureGroup.NONE: frozenset(),
 }
 
