@@ -92,6 +92,18 @@
 
         setHierarchy(hierarchy) {
             this.hierarchy = hierarchy || { timbers: [], joints: [] };
+            // A frame seen for the first time opens the way the top-level sections do;
+            // one already seen keeps however it was left.
+            this._seenFrameSections = this._seenFrameSections || new Set();
+            (this._frames() || []).forEach((frame, index) => {
+                const id = 'section:' + this._frameSectionId(index);
+                if (!this._seenFrameSections.has(id)) {
+                    this._seenFrameSections.add(id);
+                    for (const open of [id, id + ':timbers', id + ':joints']) {
+                        this.expandedNodes.add(open);
+                    }
+                }
+            });
             this.tagIndex = TagIndex.buildTagIndex(this.hierarchy);
             this.tagEntriesById = new Map(this.tagIndex.map((entry) => [entry.id, entry]));
             // New frame data means the cached CSG could be stale -- an edit to
@@ -215,18 +227,31 @@
             if (!this._treeEl) return;
             this._rememberTreeScroll();
             this._treeEl.innerHTML = '';
+            const frames = this._frames();
+            // With several frames, a drawing of one frame's timbers goes under that frame;
+            // only one that spans frames, or has none, is listed up here.
+            const strayDrawings = frames
+                ? (this.drawings || []).filter((drawing) => this._drawingFrameIndex(drawing) < 0)
+                : null;
             if (this.drawingsEnabled) {
                 // No save button here. Saving is offered in the drawing panel,
                 // beside the drawing being saved; two of them is two places to
                 // look and one to forget to update.
                 this._renderSection(
                     this._treeEl, 'drawings', t('viewer.layers.section.drawings'),
-                    () => this._buildDrawingRows(),
+                    () => this._buildDrawingRows(frames ? (drawing) => strayDrawings.includes(drawing) : null),
                 );
             }
             this._renderSection(this._treeEl, 'tags', t('viewer.layers.section.tags'), () => this._buildTagRows());
-            this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
-            this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
+            if (frames) {
+                frames.forEach((frame, index) => this._renderSection(
+                    this._treeEl, this._frameSectionId(index), '\u{1F3E0} ' + frame.name,
+                    () => this._buildFrameSections(frame, index),
+                ));
+            } else {
+                this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
+                this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
+            }
             // Last, and only in the 3D view. These measurements are about the
             // model rather than about any drawing of it, so inside a drawing
             // they are neither shown nor drawable -- which is why this is the
@@ -261,18 +286,88 @@
             }
         }
 
+        // ------------------------------------------------------------------
+        // Several frames: each its own section, holding its drawings, timbers and joints
+        // ------------------------------------------------------------------
+
+        /** The file's frames when it shows more than one, else null. */
+        _frames() {
+            const frames = this.hierarchy && this.hierarchy.frames;
+            return Array.isArray(frames) && frames.length > 1 ? frames : null;
+        }
+
+        _frameSectionId(index) {
+            const frames = this._frames();
+            return 'frame:' + index + ':' + (frames ? frames[index].name : '');
+        }
+
+        /** The one frame *drawing*'s timbers are from, or -1 when they are from several, or none. */
+        _drawingFrameIndex(drawing) {
+            const frames = this._frames();
+            if (!frames || !drawing) {
+                return -1;
+            }
+            const members = Array.isArray(drawing.members) && drawing.members.length
+                ? drawing.members
+                : (drawing.viewports || []).flatMap((pane) => pane.members || []);
+            if (!members.length) {
+                return -1;
+            }
+            const involved = frames
+                .map((frame, index) => (members.some((key) => frame.timberKeys.includes(key)) ? index : -1))
+                .filter((index) => index >= 0);
+            return involved.length === 1 ? involved[0] : -1;
+        }
+
+        /** Which frame *timberKey* or *jointId* is in, or -1. */
+        _frameIndexOf({ timberKey, jointId }) {
+            const frames = this._frames();
+            if (!frames) {
+                return -1;
+            }
+            return frames.findIndex((frame) => (jointId !== undefined && jointId !== null
+                ? frame.jointIds.includes(String(jointId))
+                : frame.timberKeys.includes(timberKey)));
+        }
+
+        /** The sections inside one frame's, as rows of its body. */
+        _buildFrameSections(frame, index) {
+            const body = document.createElement('div');
+            body.className = 'lp-frame-body';
+            const id = this._frameSectionId(index);
+            if (this.drawingsEnabled) {
+                const drawings = (this.drawings || []).filter((drawing) => this._drawingFrameIndex(drawing) === index);
+                if (drawings.length) {
+                    this._renderSection(body, id + ':drawings', t('viewer.layers.section.drawings'),
+                        () => this._buildDrawingRows((drawing) => drawings.includes(drawing)));
+                }
+            }
+            const timberKeys = new Set(frame.timberKeys);
+            const jointIds = new Set(frame.jointIds);
+            this._renderSection(body, id + ':timbers', t('viewer.layers.section.timbers'),
+                () => this._buildTimberRows(timberKeys));
+            this._renderSection(body, id + ':joints', t('viewer.layers.section.joints'),
+                () => this._buildJointRows(jointIds));
+            return [body];
+        }
+
         _renderSection(parent, sectionId, title, buildRows, buildAction) {
             const nodeId = 'section:' + sectionId;
-            const expanded = this.expandedNodes.has(nodeId);
+            // Built whether or not the section is open, to know whether there is anything in it:
+            // an empty section is greyed and cannot be opened.
+            const rows = Array.from(buildRows());
+            const empty = rows.length === 0;
+            const expanded = !empty && this.expandedNodes.has(nodeId);
 
             const section = document.createElement('div');
             section.className = 'lp-section';
 
             const sectionHeader = document.createElement('div');
-            sectionHeader.className = 'lp-section-header' + (expanded ? ' lp-open' : '');
+            sectionHeader.className = 'lp-section-header' + (expanded ? ' lp-open' : '')
+                + (empty ? ' lp-section-empty' : '');
             const chevSpan = document.createElement('span');
             chevSpan.className = 'lp-chev';
-            chevSpan.textContent = expanded ? '▾' : '▸';
+            chevSpan.textContent = empty ? '' : (expanded ? '▾' : '▸');
             sectionHeader.appendChild(chevSpan);
             const titleSpan = document.createElement('span');
             titleSpan.textContent = ' ' + title;
@@ -283,15 +378,17 @@
                     sectionHeader.appendChild(action);
                 }
             }
-            sectionHeader.addEventListener('click', () => {
-                this._toggle(nodeId);
-            });
+            if (!empty) {
+                sectionHeader.addEventListener('click', () => {
+                    this._toggle(nodeId);
+                });
+            }
             section.appendChild(sectionHeader);
 
             if (expanded) {
                 const body = document.createElement('div');
                 body.className = 'lp-section-body';
-                for (const row of buildRows()) {
+                for (const row of rows) {
                     body.appendChild(row);
                 }
                 section.appendChild(body);
@@ -425,8 +522,9 @@
             return { glyph: '\u25cf', title: t('viewer.layers.drawing.fromFile') };
         }
 
-        _buildDrawingRows() {
+        _buildDrawingRows(include = null) {
             return (this.drawings || [])
+                .filter((drawing) => !include || include(drawing))
                 // The 3D measurements are held in a drawing so that the file
                 // merge, saving and identity all apply to them unchanged -- but
                 // it is not a drawing you open, and listing it among the ones
@@ -598,11 +696,12 @@
             return row;
         }
 
-        _buildTimberRows() {
+        _buildTimberRows(onlyKeys = null) {
             const rows = [];
             if (!this.hierarchy) return rows;
 
             for (const timber of this.hierarchy.timbers) {
+                if (onlyKeys && !onlyKeys.has(timber.key)) continue;
                 if (!this._matchesFilter(timber.name, timber.tags)) continue;
                 const nodeId = 'timber:' + timber.key;
                 rows.push(this._makeRow({
@@ -790,7 +889,7 @@
             this._renderTree();
         }
 
-        _buildJointRows() {
+        _buildJointRows(onlyIds = null) {
             const rows = [];
             if (!this.hierarchy) return rows;
 
@@ -798,6 +897,7 @@
             for (const t of this.hierarchy.timbers) nameByKey[t.key] = t.name;
 
             for (const joint of (this.hierarchy.joints || [])) {
+                if (onlyIds && !onlyIds.has(joint.id)) continue;
                 if (!this._matchesFilter(joint.name)) continue;
 
                 const jointNodeId = 'joint:' + joint.id;
@@ -966,7 +1066,14 @@
             }
 
             // Everything between the section header and the node itself.
-            this.expandedNodes.add(inJoints ? 'section:joints' : 'section:timbers');
+            const frameIndex = this._frameIndexOf({ timberKey, jointId: inJoints ? jointId : null });
+            if (frameIndex >= 0) {
+                const frameSection = 'section:' + this._frameSectionId(frameIndex);
+                this.expandedNodes.add(frameSection);
+                this.expandedNodes.add(frameSection + (inJoints ? ':joints' : ':timbers'));
+            } else {
+                this.expandedNodes.add(inJoints ? 'section:joints' : 'section:timbers');
+            }
             if (inJoints) {
                 this.expandedNodes.add('joint:' + jointId);
                 this.expandedNodes.add('jcut:' + jointId + ':' + timberKey + ':' + cutIndex);
@@ -1262,9 +1369,22 @@
                     .filter((key) => typeof key === 'string'),
             }));
 
+            // Only when a file shows several frames: which timbers and joints are each one's.
+            const frames = Array.isArray(payload.frames) && payload.frames.length > 1
+                ? payload.frames.map((frame) => ({
+                    name: frame.name || 'frame',
+                    timberKeys: (Array.isArray(frame.timberKumikiEphemeralIds) ? frame.timberKumikiEphemeralIds : [])
+                        .map((kid) => timberKeyByKumikiEphemeralId.get(kid))
+                        .filter((key) => typeof key === 'string'),
+                    jointIds: (Array.isArray(frame.jointKumikiEphemeralIds) ? frame.jointKumikiEphemeralIds : [])
+                        .map((kid) => String(kid)),
+                }))
+                : null;
+
             return {
                 timbers: hierarchyTimbers,
                 joints: hierarchyJoints,
+                frames,
             };
         }
     }

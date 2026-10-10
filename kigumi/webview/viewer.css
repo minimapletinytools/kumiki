@@ -1554,9 +1554,23 @@ kigumi-layers-view:has(.lp-collapsed) {
     background: var(--hv-layers-hover-bg);
 }
 
+/* Nothing in it: greyed, with no chevron, and does not open. */
+.lp-section-header.lp-section-empty {
+    opacity: 0.45;
+    cursor: default;
+}
+.lp-section-header.lp-section-empty:hover {
+    background: transparent;
+}
+
 .lp-section-body {
     padding: 0 0 2px;
     min-width: max-content;
+}
+
+/* One frame's drawings, timbers and joints, when a file shows several frames. */
+.lp-frame-body {
+    padding-left: 10px;
 }
 
 .lp-row {

@@ -209,3 +209,22 @@ def test_a_patterns_list_is_no_longer_read(workspace):  # noqa: F811
 
     with pytest.raises(AttributeError, match="@pattern or @frame"):
         runner.load_slot_state(str(path))
+
+
+def test_the_layers_say_which_timbers_are_each_frame_s(frames_file):
+    slot = runner.load_slot_state(str(frames_file))
+    layers = runner.serialize_layers(slot.frame, slot.frame_parts)
+
+    names = {timber["kumikiEphemeralId"]: timber["name"] for timber in layers["timbers"]}
+    assert [(part["name"], sorted(names[i] for i in part["timberKumikiEphemeralIds"])) for part in layers["frames"]] == [
+        ("west", ["west 0", "west 1"]), ("north", ["north 0"]), ("east", ["east 0", "east 1"])]
+    json.dumps(layers)
+
+
+def test_one_frame_has_no_frames_in_its_layers(workspace):  # noqa: F811
+    path = workspace / "one.py"
+    path.write_text("from kumiki import *\n\n@frame\ndef only(k: Kiwari) -> Frame:\n"
+                    "    return Frame(cut_timbers=[], name='only')\n")
+    slot = runner.load_slot_state(str(path))
+
+    assert slot.frame_parts == () and runner.serialize_layers(slot.frame, slot.frame_parts)["frames"] is None
