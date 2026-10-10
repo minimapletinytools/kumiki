@@ -367,9 +367,10 @@ DONE-free house joints not showing up in joints in tree view
     -where 1 CutTimber is just substracted from another timber, useful for making modifications not readily supported... 
     -may as well do a union joint then? (these would really be decorative joints...)
     -or would it be better just to have folsk make custom joints
-  -tapered dovetail joint for that cool sawhores
-  -finish dovetail jonit
+  DONE-tapered dovetail joint for that cool sawhores
 
+
+  -finish dovetail jonit
   -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
