@@ -4489,15 +4489,12 @@ class KigumiViewerApp extends LitElement {
         // asking the same question twice and allocating the edge positions
         // twice with it.
         const lit = state || this._highlightState();
-        const drawn = this.activeSceneMembers;
+        // Each member's whole state, so anything memberStateFor learns to read
+        // is folded without being listed here as well.
+        const visualContext = this._getSelectionVisualContext();
         const members = [];
         for (const [key, bundle] of this.sceneManager.entries()) {
-            members.push([
-                key,
-                bundle.profileId || '',
-                this.isMemberHidden(key),
-                Boolean(drawn && !drawn.has(key)),
-            ]);
+            members.push([key, bundle.profileId || '', this._memberState(key, visualContext)]);
         }
         // Gathered here, folded there. The reading is what makes this pulled;
         // the folding is a pure function and is tested as one.
@@ -4675,66 +4672,26 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    /**
-     * Which appearance class a member is in, and what that resolves to.
-     *
-     * The class is the useful half: it is what an implementation sharing one
-     * material per class would group on. The numbers depend on what else is
-     * selected, so they are computed per pass rather than stored.
-     */
+    /** What a member looks like: its state, resolved with the current settings. See member-states.js. */
     _memberAppearance(memberKey, bundle, { baseSelectedOpacity, visualContext, policy }) {
-        // Nothing selected behaves like "everything selected" for the
-        // selected-visibility slider -- it's the default appearance, so it
-        // should respect the slider too, not silently stay at 1.0.
-        let name = 'normal';
-        let opacity = baseSelectedOpacity;
+        return window.KigumiMemberStates.appearanceFor(this._memberState(memberKey, visualContext), {
+            baseSelectedOpacity,
+            policy,
+            profile: this.resolveRenderProfile(bundle.profileId),
+            edgeLineVisibilityPercent: this.edgeLineVisibilityPercent,
+            edgeMode: this.edgeMode,
+            showDrawingGhosts: this.showDrawingGhosts,
+            drawingContextOpacity: DRAWING_CONTEXT_OPACITY,
+        });
+    }
 
-        if (this.isMemberHidden(memberKey)) {
-            name = 'hidden';
-        } else if (visualContext.state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
-            const selected = visualContext.selectedTimberSet.has(memberKey);
-            name = selected ? 'selected' : 'ghost';
-            opacity = selected ? baseSelectedOpacity : policy.dimmedOpacity;
-        } else if (visualContext.hasSubselection) {
-            const selected = visualContext.subselectionTimberKey === memberKey;
-            name = selected ? 'selected' : 'ghost';
-            opacity = selected ? policy.selectedTimberOpacity : policy.dimmedOpacity;
-        }
-
-        // A drawing is about the members it names; the rest of the frame is
-        // there for context and is ghosted whatever the selection says. Far
-        // fainter than a ghost in the 3D scene -- there it is one of several
-        // things you are looking at, here it is the wrong piece on a sheet, and
-        // it should barely register. The 3D scene names nobody, so this does
-        // nothing there.
-        const drawnMembers = this.activeSceneMembers;
-        const isDrawingContext = name !== 'hidden' && Boolean(drawnMembers) && !drawnMembers.has(memberKey);
-        if (isDrawingContext) {
-            name = this.showDrawingGhosts ? 'ghost' : 'hidden';
-            opacity = Math.min(opacity, DRAWING_CONTEXT_OPACITY);
-        }
-
-        const profile = this.resolveRenderProfile(bundle.profileId);
-        // Edge opacity is independent of face opacity: a member with
-        // transparent faces keeps its edge lines at full strength, relative to
-        // the edge visibility slider. Context in a drawing is the exception --
-        // faded faces behind crisp outlines would read as another piece of the
-        // drawing rather than as something behind it.
-        const edgeOpacity = (profile
-            ? profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100)
-            : (this.edgeLineVisibilityPercent / 100))
-            * (isDrawingContext ? DRAWING_CONTEXT_OPACITY : 1);
-
-        return {
-            name,
-            opacity,
-            edgeOpacity,
-            edgesVisible: this.edgeMode !== 'none',
-            // Reflections fade together with face opacity. Whether one shows
-            // at all is applyRenderMode's, since it also turns on whether a
-            // sheet is open.
-            reflectionOpacity: (profile ? profile.reflectionOpacity : 0.14) * opacity,
-        };
+    /** What state a member is in. See member-states.js; the signature folds it per member. */
+    _memberState(memberKey, visualContext) {
+        return window.KigumiMemberStates.memberStateFor(memberKey, {
+            hidden: this.isMemberHidden(memberKey),
+            visualContext,
+            drawnMembers: this.activeSceneMembers,
+        });
     }
 
     onGizmoPointerMove(event) {

@@ -17,6 +17,7 @@ const WEBVIEW_ASSETS = [
     ['__I18N_JS_URI__', 'i18n.js'],
     ['__SELECTION_STORE_JS_URI__', 'selection-store.js'],
     ['__SELECTION_VISUALS_JS_URI__', 'selection-visuals.js'],
+    ['__MEMBER_STATES_JS_URI__', 'member-states.js'],
     ['__HIGHLIGHTS_JS_URI__', 'highlights.js'],
     ['__LAYER_STATE_STORE_JS_URI__', 'layer-state-store.js'],
     ['__LAYERS_PANEL_JS_URI__', 'layers-panel.js'],

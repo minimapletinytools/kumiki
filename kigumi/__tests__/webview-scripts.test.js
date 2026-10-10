@@ -395,6 +395,8 @@ describe('everything the frame is drawn from is in the signature it is drawn for
         // Pure, from a state and a base opacity: the state comes from the
         // context above and the opacity from a slider the signature folds.
         _getSelectionVisualPolicy: true,
+        // Each member's state, which the signature folds whole, per member.
+        _memberState: true,
     };
 
     const signature = methodBody(app, 'visualSignature');

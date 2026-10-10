@@ -170,7 +170,7 @@ describe('folding the state into something comparable', () => {
         selected: ['post#0'],
         focus: { timberKey: 'post#0', path: ['cut'], featureLabel: 'front' },
         lit: { csg: { key: 'post#0|cut|front' }, hover: null, held: null },
-        members: [['post#0', 'timber-default', false, false]],
+        members: [['post#0', 'timber-default', { hidden: false, selection: 'drilledInto', drawing: 'none' }]],
     });
 
     test('the same state folds the same way', () => {
@@ -217,7 +217,8 @@ describe('folding the state into something comparable', () => {
 
     test('a timber appearing or leaving changes it', () => {
         // A geometry rebuild, without anyone having to say so.
-        const more = { ...base(), members: [...base().members, ['girt#0', 'timber-default', false, false]] };
+        const more = { ...base(), members: [...base().members,
+            ['girt#0', 'timber-default', { hidden: false, selection: 'dimmed', drawing: 'none' }]] };
 
         expect(visualSignatureOf(more)).not.toBe(visualSignatureOf(base()));
         expect(visualSignatureOf({ ...base(), members: [] }))
@@ -225,11 +226,10 @@ describe('folding the state into something comparable', () => {
     });
 
     test.each([
-        ['being hidden', 2],
-        ['leaving the drawing', 3],
-    ])('a member %s changes it', (_what, index) => {
-        const members = base().members.map((row) => [...row]);
-        members[0][index] = true;
+        ['being hidden', { hidden: true }],
+        ['leaving the drawing', { drawing: 'context' }],
+    ])('a member %s changes it', (_what, change) => {
+        const members = base().members.map(([key, profile, state]) => [key, profile, { ...state, ...change }]);
 
         expect(visualSignatureOf({ ...base(), members }))
             .not.toBe(visualSignatureOf(base()));
