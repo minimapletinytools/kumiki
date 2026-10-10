@@ -16,6 +16,7 @@ const WEBVIEW_ASSETS = [
     ['__BOOT_DIAGNOSTICS_JS_URI__', 'boot-diagnostics.js'],
     ['__I18N_JS_URI__', 'i18n.js'],
     ['__SELECTION_STORE_JS_URI__', 'selection-store.js'],
+    ['__FEATURE_STATES_JS_URI__', 'feature-states.js'],
     ['__SELECTION_VISUALS_JS_URI__', 'selection-visuals.js'],
     ['__MEMBER_STATES_JS_URI__', 'member-states.js'],
     ['__HIGHLIGHTS_JS_URI__', 'highlights.js'],

@@ -3418,6 +3418,13 @@ class KigumiViewerApp extends LitElement {
         // this pair admits nothing from here. See .claude/plans/measuring-states.md.
         const verdict = message.verdict || null;
         return {
+            // The same key the selection and the hover name this feature by,
+            // so a held end merges with them into one feature state.
+            featureKey: window.KigumiFeatureStates.featureKeyOf({
+                memberKey: message.memberKey || (this.selectionManager.csgFocus || {}).timberKey,
+                path: message.path,
+                featureLabel: message.featureLabel,
+            }),
             reference: message.reference || null,
             geometry: message.geometry || null,
             at: message.at || null,
@@ -4543,21 +4550,24 @@ class KigumiViewerApp extends LitElement {
         const source = this._csgHighlightSource;
         const held = this.measureDraft && this.measureDraft.heldEnd;
         const hover = this._hover && this._hover.drawn;
+        const { featureKeyOf, featureStatesFor } = window.KigumiFeatureStates;
         return {
-            csg: window.KigumiHighlights.sourceForFocus(source, csgFocusKey(focus)),
-            hover: hover ? {
-                key: `${hover.memberKey}|${(hover.path || []).join('/')}|${hover.featureLabel || ''}`,
-                mesh: hover.highlightMesh,
-                edgePositions: edgeSegmentPositions(hover.highlightEdgeSegments),
-                pointAt: window.KigumiHighlights.pointHighlightAt(hover),
-                refused: window.KigumiHover.HoverState.isRefused(hover),
-            } : null,
-            held: (held && held.highlight) ? {
-                key: heldHighlightKey(held.reference),
-                mesh: held.highlight.highlightMesh,
-                edgePositions: edgeSegmentPositions(held.highlight.highlightEdgeSegments),
-                pointAt: window.KigumiHighlights.pointHighlightAt(held),
-            } : null,
+            features: featureStatesFor({
+                selection: window.KigumiHighlights.sourceForFocus(source, csgFocusKey(focus)),
+                hover: hover ? {
+                    key: featureKeyOf(hover),
+                    mesh: hover.highlightMesh,
+                    edgePositions: edgeSegmentPositions(hover.highlightEdgeSegments),
+                    pointAt: window.KigumiHighlights.pointHighlightAt(hover),
+                    refused: window.KigumiHover.HoverState.isRefused(hover),
+                } : null,
+                held: (held && held.highlight) ? {
+                    key: held.featureKey || heldHighlightKey(held.reference),
+                    mesh: held.highlight.highlightMesh,
+                    edgePositions: edgeSegmentPositions(held.highlight.highlightEdgeSegments),
+                    pointAt: window.KigumiHighlights.pointHighlightAt(held),
+                } : null,
+            }),
             policy: this._getSelectionVisualPolicy(
                 this._getSelectionVisualContext().state,
                 1 - (this.unselectedTransparencyPercent / 100)),

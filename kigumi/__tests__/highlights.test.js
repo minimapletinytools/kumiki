@@ -1,5 +1,10 @@
 const { highlightsFor, pointHighlightAt, CSG_COLORS, HOVER_COLOR, HOVER_REFUSED_COLOR,
     HELD_COLOR, ORDER } = require('../webview/highlights.js');
+const { featureStatesFor } = require('../webview/feature-states.js');
+
+/** The overlays for these sources, by way of the feature states the viewer builds from them. */
+const drawn = ({ csg, hover, held, policy } = {}) =>
+    highlightsFor({ features: featureStatesFor({ selection: csg, hover, held }), policy });
 
 // What should be lit, as a list. The old shape built each overlay when its
 // message arrived and tore it down by one of seven scattered calls, so there was
@@ -27,7 +32,7 @@ describe('nothing is lit when nothing asks to be', () => {
 
     test('a source with no geometry lights nothing', () => {
         // A cylinder's barrel is selectable and has no mesh to light.
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: { key: 'post#0', mesh: null, parentMesh: null, edgePositions: [] },
             policy: POLICY,
         });
@@ -38,7 +43,7 @@ describe('nothing is lit when nothing asks to be', () => {
 
 describe('what a selection lights', () => {
     test('a tagged node on its own is one mesh, in the tagged colour', () => {
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: { key: 'post#0/cut', mesh: MESH, featureLabel: null }, policy: POLICY,
         });
 
@@ -48,7 +53,7 @@ describe('what a selection lights', () => {
     });
 
     test('a feature inside one lights both, the parent dim and the feature bright', () => {
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: {
                 key: 'post#0/cut/front', featureLabel: 'front',
                 mesh: MESH, parentMesh: MESH,
@@ -63,7 +68,7 @@ describe('what a selection lights', () => {
     });
 
     test('a feature whose parent has no mesh falls back to the node rule', () => {
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: { key: 'post#0/cut/front', featureLabel: 'front', mesh: MESH, parentMesh: null },
             policy: POLICY,
         });
@@ -73,7 +78,7 @@ describe('what a selection lights', () => {
 
     test('an edge is lit as a line, not as the triangles beside it', () => {
         // Shading those lit a stray wedge that read as geometry.
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: { key: 'post#0/arris.1', edgePositions: EDGES, mesh: null }, policy: POLICY,
         });
 
@@ -84,7 +89,7 @@ describe('what a selection lights', () => {
 
 describe('what the pointer lights', () => {
     test('a candidate the click will take, in the hover colour', () => {
-        const lit = highlightsFor({
+        const lit = drawn({
             hover: { key: 'girt#0/back', mesh: MESH, refused: false }, policy: POLICY,
         });
 
@@ -92,7 +97,7 @@ describe('what the pointer lights', () => {
     });
 
     test('and one it will refuse, in red', () => {
-        const lit = highlightsFor({
+        const lit = drawn({
             hover: { key: 'girt#0/back', mesh: MESH, refused: true }, policy: POLICY,
         });
 
@@ -103,8 +108,8 @@ describe('what the pointer lights', () => {
         // Identity is WHICH thing is lit. The colour rides alongside, so a
         // verdict changing under a resting pointer recolours rather than
         // rebuilds -- and cannot be missed, because the list is asked again.
-        const allowed = highlightsFor({ hover: { key: 'girt#0/back', mesh: MESH }, policy: POLICY });
-        const refused = highlightsFor({
+        const allowed = drawn({ hover: { key: 'girt#0/back', mesh: MESH }, policy: POLICY });
+        const refused = drawn({
             hover: { key: 'girt#0/back', mesh: MESH, refused: true }, policy: POLICY,
         });
 
@@ -116,7 +121,7 @@ describe('what the pointer lights', () => {
 
 describe('what a held end lights', () => {
     test('its own colour, so held does not read as selected', () => {
-        const lit = highlightsFor({ held: { key: 'post#0/left', mesh: MESH }, policy: POLICY });
+        const lit = drawn({ held: { key: 'post#0/left', mesh: MESH }, policy: POLICY });
 
         expect(byId(lit, 'held-mesh').color).toBe(HELD_COLOR);
     });
@@ -124,7 +129,7 @@ describe('what a held end lights', () => {
     test('and it outlives the selection moving off it', () => {
         // The first end is HELD, not selected: picking the second moves the
         // focus away, and it has to survive that.
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: { key: 'girt#0/front', featureLabel: 'front', mesh: MESH },
             held: { key: 'post#0/left', mesh: MESH },
             policy: POLICY,
@@ -137,7 +142,7 @@ describe('what a held end lights', () => {
 
 describe('what is drawn over what', () => {
     test('held over hover over selection', () => {
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: { key: 'a', mesh: MESH },
             hover: { key: 'b', mesh: MESH },
             held: { key: 'c', mesh: MESH },
@@ -180,20 +185,20 @@ describe('what a point lights', () => {
     const AT = [1.5, -2, 3];
 
     test('a selected corner is a marker at its position', () => {
-        const lit = highlightsFor({ csg: { key: 'post#0', pointAt: AT }, policy: POLICY });
+        const lit = drawn({ csg: { key: 'post#0', pointAt: AT }, policy: POLICY });
 
         expect(ids(lit)).toEqual(['csg-point:post#0']);
         expect(lit[0]).toMatchObject({ shape: 'point', at: AT, color: CSG_COLORS.feature });
     });
 
     test('a hovered one takes the hover colour', () => {
-        const lit = highlightsFor({ hover: { key: 'h', pointAt: AT }, policy: POLICY });
+        const lit = drawn({ hover: { key: 'h', pointAt: AT }, policy: POLICY });
 
         expect(byId(lit, 'hover-point')).toMatchObject({ at: AT, color: HOVER_COLOR });
     });
 
     test('and the refused colour when the click would refuse it', () => {
-        const lit = highlightsFor({
+        const lit = drawn({
             hover: { key: 'h', pointAt: AT, refused: true }, policy: POLICY,
         });
 
@@ -201,7 +206,7 @@ describe('what a point lights', () => {
     });
 
     test('a held one is green like the rest of a held end', () => {
-        const lit = highlightsFor({ held: { key: 'x', pointAt: AT }, policy: POLICY });
+        const lit = drawn({ held: { key: 'x', pointAt: AT }, policy: POLICY });
 
         expect(byId(lit, 'held-point')).toMatchObject({ at: AT, color: HELD_COLOR });
     });
@@ -209,7 +214,7 @@ describe('what a point lights', () => {
     test('a corner on an edge lights both', () => {
         // Which is the ordinary case: the corner is where three arrises meet,
         // and the runner sends the segments for whichever one was resolved.
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: { key: 'post#0', pointAt: AT, edgePositions: EDGES }, policy: POLICY,
         });
 
@@ -218,7 +223,7 @@ describe('what a point lights', () => {
 
     test('no position lights no point', () => {
         for (const at of [null, undefined, [], [1, 2], [1, 2, 3, 4]]) {
-            expect(highlightsFor({ csg: { key: 'a', pointAt: at }, policy: POLICY })).toEqual([]);
+            expect(drawn({ csg: { key: 'a', pointAt: at }, policy: POLICY })).toEqual([]);
         }
     });
 
@@ -226,7 +231,7 @@ describe('what a point lights', () => {
         // A missing anchor arrives as nulls rather than as no anchor, and a
         // marker at (0,0,0) is worse than none: it lights the model origin.
         for (const at of [[null, null, null], [1, 'x', 3], [1, NaN, 3]]) {
-            expect(highlightsFor({ csg: { key: 'a', pointAt: at }, policy: POLICY })).toEqual([]);
+            expect(drawn({ csg: { key: 'a', pointAt: at }, policy: POLICY })).toEqual([]);
         }
     });
 });
@@ -288,11 +293,12 @@ describe('identity is what the reconciler keeps', () => {
             policy: POLICY,
         };
 
-        expect(ids(highlightsFor(state))).toEqual(ids(highlightsFor(state)));
+        expect(ids(drawn(state)).length).toBeGreaterThan(0);
+        expect(ids(drawn(state))).toEqual(ids(drawn(state)));
     });
 
     test('every id is unique, so nothing overwrites anything', () => {
-        const lit = highlightsFor({
+        const lit = drawn({
             csg: { key: 'k', featureLabel: 'front', mesh: MESH, parentMesh: MESH, edgePositions: EDGES },
             hover: { key: 'k', mesh: MESH, edgePositions: EDGES },
             held: { key: 'k', mesh: MESH, edgePositions: EDGES },
@@ -304,8 +310,8 @@ describe('identity is what the reconciler keeps', () => {
     });
 
     test('a different feature is a different id', () => {
-        const one = highlightsFor({ hover: { key: 'girt#0/back', mesh: MESH } });
-        const other = highlightsFor({ hover: { key: 'girt#0/front', mesh: MESH } });
+        const one = drawn({ hover: { key: 'girt#0/back', mesh: MESH } });
+        const other = drawn({ hover: { key: 'girt#0/front', mesh: MESH } });
 
         expect(ids(one)).not.toEqual(ids(other));
     });
@@ -313,8 +319,8 @@ describe('identity is what the reconciler keeps', () => {
     test('opacity is not part of identity', () => {
         // It follows the selection state, so folding it into the id would
         // rebuild the geometry every time the selection deepened.
-        const dim = highlightsFor({ csg: { key: 'k', mesh: MESH }, policy: POLICY });
-        const bright = highlightsFor({
+        const dim = drawn({ csg: { key: 'k', mesh: MESH }, policy: POLICY });
+        const bright = drawn({
             csg: { key: 'k', mesh: MESH }, policy: { ...POLICY, csgHighlightOpacity: 0.2 },
         });
 
@@ -460,5 +466,20 @@ describe('a selection highlight outliving its selection', () => {
 
     test('and no source is no highlight', () => {
         expect(sourceForFocus(null, 'post#0|cut|front')).toBeNull();
+    });
+});
+
+describe('a feature lit for several reasons at once', () => {
+    test('still gets an overlay per role, until overlays are resolved per feature', () => {
+        const key = 'post#0|cut|front';
+        const lit = drawn({
+            csg: { key, featureLabel: 'front', mesh: MESH, parentMesh: MESH },
+            hover: { key, mesh: MESH },
+            held: { key, mesh: MESH },
+            policy: POLICY,
+        });
+
+        expect(ids(lit)).toEqual([
+            `csg-parent:${key}`, `csg-feature:${key}`, `hover-mesh:${key}`, `held-mesh:${key}`]);
     });
 });

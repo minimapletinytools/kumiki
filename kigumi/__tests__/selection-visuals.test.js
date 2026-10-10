@@ -160,6 +160,7 @@ describe('folding the state into something comparable', () => {
     // checked, by a test that reads the source; what it actually does with what
     // it is given was not checked at all until it came out of viewer-app.js.
     const { visualSignatureOf } = require('../webview/selection-visuals.js');
+    const hoverOn = (key, refused) => ({ key, roles: { hover: { key, refused } } });
 
     const base = () => ({
         unselectedTransparencyPercent: 60,
@@ -169,7 +170,7 @@ describe('folding the state into something comparable', () => {
         showDrawingGhosts: true,
         selected: ['post#0'],
         focus: { timberKey: 'post#0', path: ['cut'], featureLabel: 'front' },
-        lit: { csg: { key: 'post#0|cut|front' }, hover: null, held: null },
+        lit: { features: [{ key: 'post#0|cut|front', roles: { selection: { key: 'post#0|cut|front' } } }] },
         members: [['post#0', 'timber-default', { hidden: false, selection: 'drilledInto', drawing: 'none' }]],
     });
 
@@ -236,14 +237,14 @@ describe('folding the state into something comparable', () => {
     });
 
     test('what is lit changes it', () => {
-        const hovering = { ...base(), lit: { ...base().lit, hover: { key: 'girt#0|', refused: false } } };
+        const hovering = { ...base(), lit: { features: [...base().lit.features, hoverOn('girt#0||', false)] } };
 
         expect(visualSignatureOf(hovering)).not.toBe(visualSignatureOf(base()));
     });
 
     test('and so does the same thing turning red under a resting pointer', () => {
-        const allowed = { ...base(), lit: { hover: { key: 'girt#0|', refused: false } } };
-        const refused = { ...base(), lit: { hover: { key: 'girt#0|', refused: true } } };
+        const allowed = { ...base(), lit: { features: [hoverOn('girt#0||', false)] } };
+        const refused = { ...base(), lit: { features: [hoverOn('girt#0||', true)] } };
 
         expect(visualSignatureOf(allowed)).not.toBe(visualSignatureOf(refused));
     });
@@ -259,4 +260,16 @@ describe('folding the state into something comparable', () => {
         expect(visualSignatureOf(one)).not.toBe(visualSignatureOf(other));
     });
 
+});
+
+describe('a feature taking on another role changes the signature', () => {
+    const { visualSignatureOf } = require('../webview/selection-visuals.js');
+    const key = 'post#0|cut|front';
+
+    test('being hovered as well as selected', () => {
+        const selected = { lit: { features: [{ key, roles: { selection: { key } } }] } };
+        const alsoHovered = { lit: { features: [{ key, roles: { selection: { key }, hover: { key } } }] } };
+
+        expect(visualSignatureOf(alsoHovered)).not.toBe(visualSignatureOf(selected));
+    });
 });

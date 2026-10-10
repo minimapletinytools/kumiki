@@ -12,6 +12,10 @@
     // what that state does to the opacities. Neither touches the scene: the
     // caller walks the members and applies what this returns.
 
+    const { featureStateSummary } = (typeof module !== 'undefined' && module.exports)
+        ? require('./feature-states.js')
+        : globalScope.KigumiFeatureStates;
+
     const SELECTION_VISUAL_STATES = Object.freeze({
         NOTHING_SELECTED: 'nothing_selected',
         TIMBER_SELECTED_NO_SUB: 'timber_selected_no_sub',
@@ -140,11 +144,10 @@
             found.selected || [],
             focus ? [focus.timberKey || '', (focus.path || []).join('/'),
                      focus.featureLabel || ''] : null,
-            // What is LIT. Identity only -- the colours follow the policy,
-            // which the opacities above already stand for.
-            lit.csg ? lit.csg.key : null,
-            lit.hover ? [lit.hover.key, Boolean(lit.hover.refused)] : null,
-            lit.held ? lit.held.key : null,
+            // What is LIT: each feature's key, roles and whether the hover is
+            // refused. Identity only -- the colours follow the policy, which
+            // the opacities above already stand for.
+            (lit.features || []).map(featureStateSummary),
             // The member set itself, so a rebuild that adds or drops timbers
             // changes this without anyone having to say so.
             found.members || [],

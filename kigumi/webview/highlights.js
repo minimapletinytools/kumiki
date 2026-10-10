@@ -97,148 +97,165 @@
     /**
      * Which overlays should exist, given the state.
      *
-     * `csg`, `hover` and `held` are each null or
-     * `{ key, mesh, parentMesh, edgePositions, featureLabel, refused }` -- the
-     * geometry the runner sent, kept by the caller for as long as the state it
-     * belongs to is still the state. `policy` carries the opacities the current
-     * selection asks for.
+     * `features` are FeatureStates (feature-states.js): each lit feature with
+     * its roles -- selection, hover, held -- and for each the geometry the
+     * runner sent, `{ key, mesh, parentMesh, edgePositions, pointAt,
+     * featureLabel, refused }`. One overlay per role for now, listed role by
+     * role. `policy` carries the opacities the current selection asks for.
      */
     function highlightsFor(state) {
         const found = state || {};
         const policy = found.policy || {};
+        const features = found.features || [];
         const out = [];
+        const sources = (role) => features.map((feature) => feature.roles[role]).filter(Boolean);
+        for (const csg of sources('selection')) {
+            selectionOverlays(csg, policy, out);
+        }
+        for (const hover of sources('hover')) {
+            hoverOverlays(hover, out);
+        }
+        for (const held of sources('held')) {
+            heldOverlays(held, out);
+        }
+        return out;
+    }
 
-        const csg = found.csg;
-        if (csg) {
-            if (hasPoint(csg.pointAt)) {
-                // A vertex is a position and nothing else -- neither triangles
-                // nor a line runs through it -- so it is drawn as a marker held
-                // at a fixed size on screen, the way a snap target has to be
-                // findable however far out the camera is.
+    /** The selection: the tagged node, or a feature and its parent. */
+    function selectionOverlays(csg, policy, out) {
+        if (hasPoint(csg.pointAt)) {
+            // A vertex is a position and nothing else -- neither triangles
+            // nor a line runs through it -- so it is drawn as a marker held
+            // at a fixed size on screen, the way a snap target has to be
+            // findable however far out the camera is.
+            out.push({
+                id: `csg-point:${csg.key}`,
+                shape: 'point',
+                at: csg.pointAt,
+                color: CSG_COLORS.feature,
+                opacity: 1,
+                renderOrder: ORDER.csgPoint,
+            });
+        }
+        if (hasEdges(csg.edgePositions)) {
+            // An edge is a line: shading the triangles beside it lit a
+            // stray wedge that read as geometry rather than as a selection.
+            out.push({
+                id: `csg-edges:${csg.key}`,
+                shape: 'edges',
+                positions: csg.edgePositions,
+                color: CSG_COLORS.feature,
+                opacity: 1,
+                renderOrder: ORDER.csgEdges,
+            });
+        }
+        if (csg.featureLabel && hasMesh(csg.parentMesh)) {
+            // A feature inside something: the parent dim, the feature
+            // bright, so which is which is visible.
+            out.push({
+                id: `csg-parent:${csg.key}`,
+                shape: 'mesh',
+                mesh: csg.parentMesh,
+                color: CSG_COLORS.tagged,
+                opacity: policy.parentHighlightOpacity,
+                renderOrder: ORDER.csgMesh,
+            });
+            if (hasMesh(csg.mesh)) {
                 out.push({
-                    id: `csg-point:${csg.key}`,
-                    shape: 'point',
-                    at: csg.pointAt,
-                    color: CSG_COLORS.feature,
-                    opacity: 1,
-                    renderOrder: ORDER.csgPoint,
-                });
-            }
-            if (hasEdges(csg.edgePositions)) {
-                // An edge is a line: shading the triangles beside it lit a
-                // stray wedge that read as geometry rather than as a selection.
-                out.push({
-                    id: `csg-edges:${csg.key}`,
-                    shape: 'edges',
-                    positions: csg.edgePositions,
-                    color: CSG_COLORS.feature,
-                    opacity: 1,
-                    renderOrder: ORDER.csgEdges,
-                });
-            }
-            if (csg.featureLabel && hasMesh(csg.parentMesh)) {
-                // A feature inside something: the parent dim, the feature
-                // bright, so which is which is visible.
-                out.push({
-                    id: `csg-parent:${csg.key}`,
-                    shape: 'mesh',
-                    mesh: csg.parentMesh,
-                    color: CSG_COLORS.tagged,
-                    opacity: policy.parentHighlightOpacity,
-                    renderOrder: ORDER.csgMesh,
-                });
-                if (hasMesh(csg.mesh)) {
-                    out.push({
-                        id: `csg-feature:${csg.key}`,
-                        shape: 'mesh',
-                        mesh: csg.mesh,
-                        color: CSG_COLORS.feature,
-                        opacity: policy.featureHighlightOpacity,
-                        renderOrder: ORDER.csgMesh,
-                    });
-                }
-            } else if (hasMesh(csg.mesh)) {
-                out.push({
-                    id: `csg-node:${csg.key}`,
+                    id: `csg-feature:${csg.key}`,
                     shape: 'mesh',
                     mesh: csg.mesh,
-                    color: CSG_COLORS.tagged,
-                    opacity: policy.csgHighlightOpacity,
+                    color: CSG_COLORS.feature,
+                    opacity: policy.featureHighlightOpacity,
                     renderOrder: ORDER.csgMesh,
                 });
             }
+        } else if (hasMesh(csg.mesh)) {
+            out.push({
+                id: `csg-node:${csg.key}`,
+                shape: 'mesh',
+                mesh: csg.mesh,
+                color: CSG_COLORS.tagged,
+                opacity: policy.csgHighlightOpacity,
+                renderOrder: ORDER.csgMesh,
+            });
         }
 
-        const hover = found.hover;
-        if (hover) {
-            // One colour decides both: what is drawn red is what the click
-            // refuses, so they cannot disagree about the same feature.
-            const color = hover.refused ? HOVER_REFUSED_COLOR : HOVER_COLOR;
-            if (hasPoint(hover.pointAt)) {
-                out.push({
-                    id: `hover-point:${hover.key}`,
-                    shape: 'point',
-                    at: hover.pointAt,
-                    color,
-                    opacity: 1,
-                    renderOrder: ORDER.hoverPoint,
-                });
-            }
-            if (hasEdges(hover.edgePositions)) {
-                out.push({
-                    id: `hover-edges:${hover.key}`,
-                    shape: 'edges',
-                    positions: hover.edgePositions,
-                    color,
-                    opacity: 1,
-                    renderOrder: ORDER.hoverEdges,
-                });
-            }
-            if (hasMesh(hover.mesh)) {
-                out.push({
-                    id: `hover-mesh:${hover.key}`,
-                    shape: 'mesh',
-                    mesh: hover.mesh,
-                    color,
-                    opacity: HOVER_OPACITY,
-                    renderOrder: ORDER.hoverMesh,
-                });
-            }
+
+    }
+
+    /** The pointer: orange, or red over a pair the click will refuse. */
+    function hoverOverlays(hover, out) {
+        // One colour decides both: what is drawn red is what the click
+        // refuses, so they cannot disagree about the same feature.
+        const color = hover.refused ? HOVER_REFUSED_COLOR : HOVER_COLOR;
+        if (hasPoint(hover.pointAt)) {
+            out.push({
+                id: `hover-point:${hover.key}`,
+                shape: 'point',
+                at: hover.pointAt,
+                color,
+                opacity: 1,
+                renderOrder: ORDER.hoverPoint,
+            });
+        }
+        if (hasEdges(hover.edgePositions)) {
+            out.push({
+                id: `hover-edges:${hover.key}`,
+                shape: 'edges',
+                positions: hover.edgePositions,
+                color,
+                opacity: 1,
+                renderOrder: ORDER.hoverEdges,
+            });
+        }
+        if (hasMesh(hover.mesh)) {
+            out.push({
+                id: `hover-mesh:${hover.key}`,
+                shape: 'mesh',
+                mesh: hover.mesh,
+                color,
+                opacity: HOVER_OPACITY,
+                renderOrder: ORDER.hoverMesh,
+            });
         }
 
-        const held = found.held;
-        if (held) {
-            if (hasPoint(held.pointAt)) {
-                out.push({
-                    id: `held-point:${held.key}`,
-                    shape: 'point',
-                    at: held.pointAt,
-                    color: HELD_COLOR,
-                    opacity: 1,
-                    renderOrder: ORDER.heldPoint,
-                });
-            }
-            if (hasEdges(held.edgePositions)) {
-                out.push({
-                    id: `held-edges:${held.key}`,
-                    shape: 'edges',
-                    positions: held.edgePositions,
-                    color: HELD_COLOR,
-                    opacity: 1,
-                    renderOrder: ORDER.heldEdges,
-                });
-            }
-            if (hasMesh(held.mesh)) {
-                out.push({
-                    id: `held-mesh:${held.key}`,
-                    shape: 'mesh',
-                    mesh: held.mesh,
-                    color: HELD_COLOR,
-                    opacity: HELD_OPACITY,
-                    renderOrder: ORDER.heldMesh,
-                });
-            }
+
+    }
+
+    /** The first end of a measurement, held: green. */
+    function heldOverlays(held, out) {
+        if (hasPoint(held.pointAt)) {
+            out.push({
+                id: `held-point:${held.key}`,
+                shape: 'point',
+                at: held.pointAt,
+                color: HELD_COLOR,
+                opacity: 1,
+                renderOrder: ORDER.heldPoint,
+            });
         }
+        if (hasEdges(held.edgePositions)) {
+            out.push({
+                id: `held-edges:${held.key}`,
+                shape: 'edges',
+                positions: held.edgePositions,
+                color: HELD_COLOR,
+                opacity: 1,
+                renderOrder: ORDER.heldEdges,
+            });
+        }
+        if (hasMesh(held.mesh)) {
+            out.push({
+                id: `held-mesh:${held.key}`,
+                shape: 'mesh',
+                mesh: held.mesh,
+                color: HELD_COLOR,
+                opacity: HELD_OPACITY,
+                renderOrder: ORDER.heldMesh,
+            });
+        }
+
 
         return out;
     }
