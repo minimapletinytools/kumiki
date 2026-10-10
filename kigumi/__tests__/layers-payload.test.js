@@ -88,7 +88,7 @@ describe('layers payload conversion', () => {
     });
 
     test('an empty payload converts to empty lists rather than throwing', () => {
-        expect(convert({})).toEqual({ timbers: [], joints: [] });
+        expect(convert({})).toEqual({ timbers: [], joints: [], frames: null });
     });
 });
 

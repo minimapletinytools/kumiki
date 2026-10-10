@@ -136,6 +136,8 @@ class SlotState:
     # on the frames so a build that fails leaves the panel something to dial
     # back from.
     kiwari_groups: Tuple[KiwariGroup, ...] = ()
+    # Each @frame's name and its own frame, when a file shows several as one.
+    frame_parts: Tuple[Tuple[str, Any], ...] = ()
     # The file's @tool functions, and any @frame / @tool rejected for its signature.
     tools: Tuple[Any, ...] = ()
     rejected_entries: Tuple[Any, ...] = ()
@@ -3425,8 +3427,11 @@ def _anchor_payload(feature, node, timber, located, root_csg, plane, solid_space
     }, span)
 
 
-def serialize_layers(frame: Any) -> Dict[str, Any]:
+def serialize_layers(frame: Any, frame_parts: Sequence[Tuple[str, Any]] = ()) -> Dict[str, Any]:
     """Build the data payload consumed by the viewer's Layers panel.
+
+    With several *frame_parts* -- a file's @frame functions shown as one -- it also says
+    which timbers and joints are each frame's, so the panel can list them frame by frame.
 
     Stable identities use ``ticket.kumiki_id`` for tickets-bearing entities
     (timbers, joints, accessories). Cuts have no ticket and are referenced as
@@ -3538,8 +3543,29 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
         "timbers": timbers_payload,
         "accessories": accessories_payload,
         "joints": joints_payload,
+        "frames": _serialize_frame_parts(frame_parts, timber_to_kumiki_and_cut),
         "assembly": {"pending": True} if _frame_has_assembly_freedoms(frame) else None,
     }
+
+
+def _serialize_frame_parts(
+    frame_parts: Sequence[Tuple[str, Any]],
+    timber_to_kumiki_and_cut: Dict[int, Any],
+) -> Optional[List[Dict[str, Any]]]:
+    """Which timbers and joints are each frame's, or None when there is only the one frame."""
+    if len(frame_parts) < 2:
+        return None
+    parts = []
+    for name, part in frame_parts:
+        timber_ids = [timber_to_kumiki_and_cut[id(cut.timber)][0] for cut in part.cut_timbers
+                      if id(cut.timber) in timber_to_kumiki_and_cut]
+        parts.append({
+            "name": getattr(part, "name", None) or name,
+            "timberKumikiEphemeralIds": timber_ids,
+            "jointKumikiEphemeralIds": [int(getattr(joint.ticket, "kumiki_id", 0)) for joint in (part.source_joints or [])
+                                        if getattr(joint, "ticket", None) is not None],
+        })
+    return parts
 
 
 def _frame_has_assembly_freedoms(frame: Any) -> bool:
@@ -4170,14 +4196,15 @@ def _group_kiwaris(built: List["tuple[str, Any]"]) -> Tuple[KiwariGroup, ...]:
 
 def resolve_frame_from_module(
     module: Any, incoming: Optional[Mapping[str, Any]] = None,
-) -> "tuple[Any, Optional[Any], Tuple[KiwariGroup, ...]]":
+) -> "tuple[Any, Optional[Any], Tuple[KiwariGroup, ...], Tuple[tuple[str, Any], ...]]":
     """Resolve a frame from a loaded module, each of its frames built with *incoming*'s kiwari.
 
     In order: the file's `@pattern` functions (a pattern book), its `@frame` functions (each
     built with the values for its own kiwari and shown together), or the deprecated `build_frame` /
     `example`. *incoming* maps a frame's name to the kiwari to build it with.
 
-    Returns (frame, patternbook_or_None, kiwari_groups).
+    Returns (frame, patternbook_or_None, kiwari_groups, frame_parts): frame_parts is each
+    @frame's name and its own frame, when there are several shown as one.
     """
     incoming = incoming or {}
     decorators = _frame_decorators()
@@ -4188,7 +4215,7 @@ def resolve_frame_from_module(
             log_stderr("Warning: this file has @pattern functions, so it is a pattern book and its "
                        f"@frame functions are not shown: {', '.join(e.name for e in entries.frames)}")
         frame, patternbook = _frame_from_pattern_list(pattern_list)
-        return frame, patternbook, ()
+        return frame, patternbook, (), ()
 
     for rejected in (entries.rejected if entries is not None else ()):
         log_stderr(f"Warning: @{rejected.kind} {rejected.name} is not used: {rejected.reason}")
@@ -4208,7 +4235,8 @@ def resolve_frame_from_module(
         frames = list(built.values())
         name = frames[0].name if len(frames) == 1 else " + ".join(
             frame.name or entry_name for entry_name, frame in built.items())
-        return decorators.overlay_frames(frames, name), None, groups
+        parts = tuple(built.items()) if len(built) > 1 else ()
+        return decorators.overlay_frames(frames, name), None, groups, parts
 
     for legacy in ("build_frame", "example"):
         if not hasattr(module, legacy):
@@ -4226,7 +4254,7 @@ def resolve_frame_from_module(
                 if legacy == "example":
                     continue
                 raise
-        return entry, None, _group_kiwaris([(legacy, getattr(entry, "kiwari", None))])
+        return entry, None, _group_kiwaris([(legacy, getattr(entry, "kiwari", None))]), ()
 
     raise AttributeError(
         "Module must have @pattern or @frame functions, "
@@ -4291,13 +4319,13 @@ def load_slot_state(
 
     module = load_module_from_path(resolved_path, verbose=True)
 
-    frame, patternbook, groups = resolve_frame_from_module(
+    frame, patternbook, groups, parts = resolve_frame_from_module(
         module, _incoming_from_groups(previous_groups, kiwari_values))
     saved, saved_path = _read_parameters_file(resolved_path)
     if saved and groups and not kiwari_values:
         # A companion file is the author's saved starting point, so it only
         # applies when the viewer has not already said what it wants.
-        frame, patternbook, groups = resolve_frame_from_module(module, _incoming_from_saved(groups, saved))
+        frame, patternbook, groups, parts = resolve_frame_from_module(module, _incoming_from_saved(groups, saved))
     decorators = _frame_decorators()
     entries = decorators.module_entries(module) if decorators is not None else None
     return SlotState(
@@ -4307,6 +4335,7 @@ def load_slot_state(
         mesh_cache=previous_mesh_cache if previous_mesh_cache is not None else {},
         patternbook=patternbook,
         kiwari_groups=groups,
+        frame_parts=parts,
         tools=entries.tools if entries is not None else (),
         rejected_entries=entries.rejected if entries is not None else (),
     )
@@ -6476,7 +6505,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "get_layers_tree":
         ss = _resolve_slot(state, payload)
-        return state, make_success_response(request_id, command, serialize_layers(ss.frame)), False
+        return state, make_success_response(request_id, command, serialize_layers(ss.frame, ss.frame_parts)), False
 
     if command == "get_assembly":
         # Deferred from get_layers_tree so the frame renders before the

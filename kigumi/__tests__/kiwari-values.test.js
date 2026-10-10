@@ -318,3 +318,43 @@ describe('one section per kiwari', () => {
         expect(values.sectionsToWire(sections, 'metric')).toBeNull();
     });
 });
+
+describe('written in the units the viewer is set to', () => {
+    // Nothing typed: the runner sends numbers only.
+    const UNTYPED = {
+        schema: [
+            { key: 'height', kind: 'length', default: { value: 2.4, text: '2400mm' } },
+            { key: 'size', kind: 'point2', default: { value: { x: 0.0508, y: 0.1143 } } },
+        ],
+        applied: { height: { value: 2.4 }, size: { value: { x: 0.0508, y: 0.1143 } } },
+    };
+
+    test('a value nobody typed is written in inches when the viewer is imperial', () => {
+        const s = values.fromPayload(UNTYPED, 'imperial');
+        expect(s.drafts.height).toBe('94 1/2in');
+        expect(s.drafts.size).toEqual({ x: '2in', y: '4 1/2in' });
+    });
+
+    test('what somebody typed stays as typed', () => {
+        const typed = { ...UNTYPED, applied: { ...UNTYPED.applied, height: { value: 2.4, text: '2400mm' } } };
+        expect(values.fromPayload(typed, 'imperial').drafts.height).toBe('2400mm');
+    });
+
+    test('an untouched box sends its exact value, not its rounded text', () => {
+        const s = values.fromPayload(UNTYPED, 'imperial');
+        expect(values.toWire(s, 'imperial').height).toEqual({ value: 2.4 });
+        expect(values.isEdited(s, s.schema[0], 'imperial')).toBe(false);
+    });
+
+    test('changing units rewrites untouched boxes and leaves edited ones', () => {
+        const edited = values.withDraft(values.fromPayload(UNTYPED, 'metric'), 'height', '3m');
+        const s = values.withUnits(edited, 'imperial');
+        expect(s.drafts.height).toBe('3m');
+        expect(s.drafts.size).toEqual({ x: '2in', y: '4 1/2in' });
+    });
+
+    test('reset writes the defaults in the viewer’s units', () => {
+        expect(values.resetToDefaults(values.fromPayload(UNTYPED, 'metric'), 'imperial').drafts.height)
+            .toBe('94 1/2in');
+    });
+});

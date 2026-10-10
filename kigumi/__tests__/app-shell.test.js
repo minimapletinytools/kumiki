@@ -137,6 +137,18 @@ describe('shell connection', () => {
     expect(transport.last('shell:state').panels).toEqual([]);
   });
 
+  test('editor panel is created in center slot and title update syncs to tabs', () => {
+    const { connection, transport } = connect();
+    const editor = connection.createPanel('editor', { title: 'frame.py', filePath: '/path/frame.py' });
+    expect(editor.slot).toBe('center');
+    expect(connection.tabs.tabs[0].title).toBe('frame.py');
+
+    editor.title = '● frame.py';
+    expect(connection.tabs.tabs[0].title).toBe('● frame.py');
+    const state = transport.last('shell:state');
+    expect(state.panels.find((p) => p.id === editor.id).title).toBe('● frame.py');
+  });
+
   test('visible and active follow the active tab and window focus', () => {
     let focused = true;
     const { connection } = connect({ isFocused: () => focused });

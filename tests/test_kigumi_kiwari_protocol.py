@@ -107,7 +107,7 @@ def test_the_schema_reaches_the_viewer_off_the_frame_that_was_built(frame_file):
     assert kinds == {"posts": "count", "post_height": "length", "capped": "flag", "end": "choice"}
     posts = next(e for e in payload["schema"] if e["key"] == "posts")
     assert posts["about"] == "How many posts" and posts["minimum"] == 1 and posts["maximum"] == 8
-    assert payload["applied"]["post_height"] == {"value": 2.4, "text": "2400mm"}
+    assert payload["applied"]["post_height"] == {"value": 2.4}
     assert payload["changed"] == []
     json.dumps(payload)
 
@@ -270,7 +270,7 @@ def test_a_pattern_declares_its_kiwari_and_is_built_with_it(workspace):
     slot, result = runner._raise_specific_pattern(str(path), "probe/tall")
     (section,) = result["kiwari"]
     assert section["id"] == "probe/tall"
-    assert section["applied"]["height"] == {"value": 1.0, "text": "1000mm"}
+    assert section["applied"]["height"] == {"value": 1.0}
     assert section["canSave"] is False
 
     taller, _ = runner._raise_specific_pattern(str(path), "probe/tall",

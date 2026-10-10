@@ -113,6 +113,22 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         connection().activePanel.dispose();
         check('closing a tab activates a neighbour', connection().tabs.tabs.length === 2 && connection().tabs.activeId !== null);
 
+        // Test Monaco editor panel opening
+        await runAppCommand('kigumi.viewPatternSource', { data: { sourceFile: FRAME } });
+        const editorPanel = await waitFor(() => {
+            const active = connection().activePanel;
+            return active && active.type === 'editor' ? active : null;
+        });
+        check('viewPatternSource opens a file in the Monaco editor panel', !!editorPanel && editorPanel.filePath === FRAME);
+        const editorReady = await waitFor(() => inShell(`(() => {
+            const frame = document.querySelector('#slot-center iframe:not([hidden])');
+            return !!(frame && frame.contentDocument && frame.contentDocument.querySelector('.monaco-editor'));
+        })()`), { timeoutMs: 15000 });
+        check('Monaco editor initializes and renders inside iframe', editorReady);
+
+        connection().activePanel.dispose();
+        check('closing editor tab succeeds', connection().tabs.tabs.length === 2);
+
         const errors = logLines().filter((line) => /traceback|uncaught|\[error\]/i.test(line));
         check('no errors in the log', errors.length === 0, errors.slice(0, 3).join(' / '));
     } catch (error) {
