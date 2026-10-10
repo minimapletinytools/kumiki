@@ -163,10 +163,17 @@ Older files name their one frame `example` or `build_frame` instead of marking i
 
 kumiki is a *programmatic CAD* tool hence all designs can be parameterized by code. To make this even easier, `kiwari` allows you to expose some parameters in one of the kigumi panels.
 
-Create a new kiwari object with a list of user defined of parameters:
+Create a new kiwari object with a list of user defined parameters, and return it as part of the frame:
 
 ```python
 PARAMS = kiwari(legs=kiwari.count(4, minimum=3))
+
+
+@frame
+def my_frame(k: Optional[Kiwari] = None) -> Frame:
+    k = PARAMS.resolve(k)
+    ...
+    return Frame(..., kiwari=k)
 ```
 
 Your frame function resolves the values it is passed onto it (`k = PARAMS.resolve(k)`) and returns the result on its Frame (`kiwari=k`). Kigumi passes the values set in its panel, or None the first time, which leaves the defaults.
