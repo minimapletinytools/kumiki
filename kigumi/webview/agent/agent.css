@@ -1,0 +1,162 @@
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font-family: var(--ka-font);
+    font-size: var(--ka-font-size);
+}
+
+.agent-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.agent-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--ka-chrome-bg);
+    border-bottom: 1px solid var(--ka-border);
+    flex: none;
+    font-weight: 600;
+}
+
+.agent-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--ka-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 4px;
+}
+
+.icon-btn:hover {
+    background: var(--ka-hover);
+    color: var(--ka-fg);
+}
+
+.agent-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.agent-welcome {
+    text-align: center;
+    margin: auto 0;
+    padding: 24px 12px;
+    color: var(--ka-muted);
+}
+
+.agent-welcome h3 {
+    margin: 0 0 8px;
+    color: var(--ka-fg);
+}
+
+.suggestions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 16px;
+}
+
+.suggestion-chip {
+    background: var(--ka-chrome-bg);
+    border: 1px solid var(--ka-border);
+    color: var(--ka-fg);
+    border-radius: 6px;
+    padding: 6px 12px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.suggestion-chip:hover {
+    background: var(--ka-hover);
+    border-color: var(--ka-focus);
+}
+
+.message-bubble {
+    padding: 8px 12px;
+    border-radius: 8px;
+    max-width: 90%;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.message-bubble.user {
+    align-self: flex-end;
+    background: var(--ka-accent);
+    color: var(--ka-accent-fg);
+}
+
+.message-bubble.assistant {
+    align-self: flex-start;
+    background: var(--ka-chrome-bg);
+    border: 1px solid var(--ka-border);
+}
+
+.agent-footer {
+    padding: 10px 12px;
+    border-top: 1px solid var(--ka-border);
+    background: var(--ka-chrome-bg);
+    flex: none;
+}
+
+.input-box {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    background: var(--ka-bg);
+    border: 1px solid var(--ka-border);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.input-box:focus-within {
+    border-color: var(--ka-focus);
+}
+
+textarea {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--ka-fg);
+    font-family: inherit;
+    font-size: 13px;
+    resize: none;
+    outline: none;
+    max-height: 120px;
+}
+
+.send-btn {
+    border: none;
+    background: var(--ka-accent);
+    color: var(--ka-accent-fg);
+    border-radius: 4px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.send-btn:hover {
+    opacity: 0.9;
+}

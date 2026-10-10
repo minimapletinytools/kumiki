@@ -16,6 +16,7 @@ app-shell/**
 webview/shell/**
 webview/editor/**
 webview/vendor/monaco/**
+webview/agent/**
 scripts/legacy-doc-hashes.js
 .kigumi/**
 .artifacts/**

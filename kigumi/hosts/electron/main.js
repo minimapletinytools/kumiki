@@ -350,11 +350,22 @@ async function openSettingsFile() {
     }
 }
 
+function toggleAgentPanel() {
+    const existing = connection.findPanel((panel) => panel.type === 'agent');
+    if (existing) {
+        existing.dispose();
+        return;
+    }
+    const surface = connection.createPanel('agent', { title: 'Agent' });
+    surface.loadUrl(`${ORIGIN}/webview/agent/agent.html`);
+}
+
 function onShellCommand(id, ...args) {
     if (id === 'openFolder') return chooseWorkspaceFolder();
     if (id === 'openFrameFile') return chooseFrameFile();
     if (id === 'openLog') return openLogTab();
     if (id === 'openSettings') return openSettingsFile();
+    if (id === 'toggleAgent') return toggleAgentPanel();
     if (id === 'run' && typeof args[0] === 'string') return runAppCommand(args[0], ...args.slice(1));
     return undefined;
 }

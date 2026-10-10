@@ -156,6 +156,35 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         } finally {
             fs.rmSync(scratch, { force: true });
         }
+        // Test layout toggles: explorer (left) and agent (right)
+        await inShell(`(() => { document.querySelector('#toggle-left').click(); })()`);
+        const leftHidden = await waitFor(() => inShell(`(() => {
+            const slot = document.querySelector('#slot-left');
+            return slot && slot.hidden;
+        })()`));
+        check('clicking toggle-left hides the explorer sidebar', leftHidden);
+
+        await inShell(`(() => { document.querySelector('#toggle-left').click(); })()`);
+        const leftRestored = await waitFor(() => inShell(`(() => {
+            const slot = document.querySelector('#slot-left');
+            return slot && !slot.hidden;
+        })()`));
+        check('clicking toggle-left restores the explorer sidebar', leftRestored);
+
+        await inShell(`(() => { document.querySelector('#toggle-right').click(); })()`);
+        const agentOpened = await waitFor(() => inShell(`(() => {
+            const slot = document.querySelector('#slot-right');
+            const frame = slot ? slot.querySelector('iframe') : null;
+            return slot && !slot.hidden && frame !== null;
+        })()`));
+        check('clicking toggle-right opens the agent sidebar', agentOpened && connection().findPanel((p) => p.type === 'agent') !== undefined);
+
+        await inShell(`(() => { document.querySelector('#toggle-right').click(); })()`);
+        const agentClosed = await waitFor(() => inShell(`(() => {
+            const slot = document.querySelector('#slot-right');
+            return !slot || slot.hidden;
+        })()`));
+        check('clicking toggle-right again closes the agent sidebar', agentClosed && !connection().findPanel((p) => p.type === 'agent'));
 
         const errors = logLines().filter((line) => /traceback|uncaught|\[error\]/i.test(line));
         check('no errors in the log', errors.length === 0, errors.slice(0, 3).join(' / '));

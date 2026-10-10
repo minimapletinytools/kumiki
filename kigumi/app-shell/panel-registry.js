@@ -10,6 +10,7 @@ const PANEL_TYPES = Object.freeze({
     viewer: { slot: 'center', icon: 'fish2-very-sad', redrawAfterReload: true },
     log: { slot: 'center', icon: 'output' },
     editor: { slot: 'center', icon: 'file-code' },
+    agent: { slot: 'right', icon: 'sparkle' },
 });
 
 function panelType(type) {

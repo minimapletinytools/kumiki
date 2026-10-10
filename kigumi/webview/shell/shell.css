@@ -19,9 +19,14 @@
     background: var(--ka-chrome-bg);
 }
 
+.slot-left[hidden],
 .slot-right[hidden],
 .splitter[hidden] {
     display: none;
+}
+
+.shell.is-left-hidden {
+    grid-template-columns: 0px 0px minmax(0, 1fr) auto auto;
 }
 
 .splitter {
@@ -77,15 +82,47 @@
     pointer-events: none;
 }
 
-/* Tabs */
+/* Tabs Bar & Controls */
+
+.tabs-bar {
+    display: flex;
+    align-items: center;
+    height: 35px;
+    background: var(--ka-tab-bg);
+    border-bottom: 1px solid var(--ka-border);
+    flex: none;
+}
+
+.layout-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 35px;
+    height: 35px;
+    background: transparent;
+    border: none;
+    color: var(--ka-muted);
+    cursor: pointer;
+    flex: none;
+    padding: 0;
+}
+
+.layout-toggle:hover {
+    color: var(--ka-fg);
+    background: var(--ka-hover);
+}
+
+.layout-toggle.is-active {
+    color: var(--ka-accent);
+}
 
 .tabs {
     display: flex;
-    flex: none;
-    height: 35px;
+    flex: 1;
+    height: 100%;
     overflow-x: auto;
-    background: var(--ka-tab-bg);
-    border-bottom: 1px solid var(--ka-border);
+    background: transparent;
+    border-bottom: none;
     scrollbar-width: none;
 }
 

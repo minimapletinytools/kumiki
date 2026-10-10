@@ -81,6 +81,8 @@
         }
     });
 
+    let leftVisible = true;
+
     function renderPanels() {
         const live = new Set(state.panels.map((panel) => panel.id));
         for (const [id, frame] of frames) {
@@ -93,9 +95,17 @@
             const frame = ensureFrame(panel);
             frame.iframe.hidden = panel.slot === 'center' && panel.id !== state.activeId;
         }
+        const hasLeft = state.panels.some((panel) => panel.slot === 'left');
+        const showLeft = hasLeft && leftVisible;
+        $('slot-left').hidden = !showLeft;
+        $('splitter-left').hidden = !showLeft;
+        $('shell').classList.toggle('is-left-hidden', !showLeft);
+        $('toggle-left').classList.toggle('is-active', showLeft);
+
         const hasRight = state.panels.some((panel) => panel.slot === 'right');
         $('slot-right').hidden = !hasRight;
         $('splitter-right').hidden = !hasRight;
+        $('toggle-right').classList.toggle('is-active', hasRight);
     }
 
     // ---------------------------------------------------------------------
@@ -344,6 +354,11 @@
         $('status-log').addEventListener('click', () => command('openLog'));
         $('status-settings').addEventListener('click', () => command('openSettings'));
         $('status-autorefresh').addEventListener('click', () => command('run', 'kigumi.toggleAutoRefreshOnFileChange'));
+        $('toggle-left').addEventListener('click', () => {
+            leftVisible = !leftVisible;
+            renderPanels();
+        });
+        $('toggle-right').addEventListener('click', () => command('toggleAgent'));
         setupSplitter('left');
         setupSplitter('right');
         setupQuickPick();

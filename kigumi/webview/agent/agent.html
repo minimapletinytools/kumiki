@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:;">
+    <script src="../shell/panel-bridge.js"></script>
+    <title>Kigumi Agent</title>
+    <link rel="stylesheet" href="../vendor/codicon.css">
+    <link rel="stylesheet" href="../shell/theme.css">
+    <link rel="stylesheet" href="agent.css">
+</head>
+<body>
+    <div class="agent-panel">
+        <header class="agent-header">
+            <span class="agent-title"><span class="codicon codicon-sparkle"></span> Claude Agent</span>
+            <div class="agent-actions">
+                <button id="btn-clear" class="icon-btn" title="Clear chat"><span class="codicon codicon-clear-all"></span></button>
+            </div>
+        </header>
+
+        <div id="messages" class="agent-messages">
+            <div class="agent-welcome">
+                <h3>Kumiki Assistant</h3>
+                <p>Ask questions about your timber structures, request joint or frame edits, or diagnose runner errors.</p>
+                <div class="suggestions">
+                    <button class="suggestion-chip">Explain active frame parameters</button>
+                    <button class="suggestion-chip">Check for joint errors</button>
+                    <button class="suggestion-chip">List available joint patterns</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="agent-footer">
+            <div class="input-box">
+                <textarea id="prompt-input" placeholder="Ask Claude about your model…" rows="1"></textarea>
+                <button id="send-btn" class="send-btn" title="Send message"><span class="codicon codicon-send"></span></button>
+            </div>
+        </footer>
+    </div>
+    <script src="agent-app.js"></script>
+</body>
+</html>
