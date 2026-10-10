@@ -2517,7 +2517,7 @@ class KigumiViewerApp extends LitElement {
 
     /** One section per kiwari the frames were built from. */
     setKiwariFromFrame(frameData) {
-        this.kiwariSections = KigumiKiwariValues.sectionsFromPayload(frameData && frameData.kiwari);
+        this.kiwariSections = KigumiKiwariValues.sectionsFromPayload(frameData && frameData.kiwari, this.unitSystem());
         this.requestUpdate();
     }
 
@@ -2539,7 +2539,8 @@ class KigumiViewerApp extends LitElement {
     }
 
     resetKiwariToDefaults() {
-        this.kiwariSections = this.kiwariSections.map(KigumiKiwariValues.resetToDefaults);
+        this.kiwariSections = this.kiwariSections.map(
+            (state) => KigumiKiwariValues.resetToDefaults(state, this.unitSystem()));
         this.requestUpdate();
     }
 
@@ -4773,6 +4774,8 @@ class KigumiViewerApp extends LitElement {
 
     /** Redraw everything that has a length written on it. */
     onLengthFormatChanged() {
+        this.kiwariSections = (this.kiwariSections || []).map(
+            (state) => KigumiKiwariValues.withUnits(state, this.unitSystem()));
         this.memberListPanel.refresh();
         this.selectionPanel.updateInfo(this.currentFrameData);
         this.renderMeasurements();

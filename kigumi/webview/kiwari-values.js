@@ -27,18 +27,29 @@
         return !parameter.optional || state.enabled.has(parameter.key);
     }
 
+    /** A measurement nobody typed, written in the units the viewer is set to. */
+    function written(kind, value, unitSystem) {
+        return kind === 'angle'
+            ? dimensionText.formatAngle(Number(value), defaultUnitFor(kind, unitSystem))
+            : dimensionText.formatLength(Number(value), defaultUnitFor('length', unitSystem));
+    }
+
     /**
      * A parameter's value as text, ready to put in an input.
+     *
+     * What someone typed comes back as they typed it. A measurement nobody
+     * typed is written in the viewer's units -- the runner only sends a number
+     * for one, since anything it wrote would be in mm.
      *
      * An optional parameter that is switched off still gets a draft — whatever
      * the code would have given it — so that switching it back on puts
      * something in the box rather than leaving it empty.
      */
-    function toDraft(parameter, entry) {
+    function toDraft(parameter, entry, unitSystem) {
         if (!entry || entry.value === null || entry.value === undefined) {
             if (parameter.optional && parameter.default
                 && parameter.default.value !== null && parameter.default.value !== undefined) {
-                return toDraft(parameter, parameter.default);
+                return toDraft(parameter, { value: parameter.default.value }, unitSystem);
             }
             return parameter.kind === 'flag' ? false : '';
         }
@@ -52,14 +63,43 @@
             for (const axis of axes) {
                 drafts[axis] = vector[axis] === undefined || vector[axis] === null
                     ? ''
-                    : dimensionText.formatLength(Number(vector[axis]));
+                    : written('length', vector[axis], unitSystem);
             }
             return drafts;
         }
         if (typeof entry.text === 'string' && entry.text.length) {
             return entry.text;
         }
+        if (MEASURED[parameter.kind]) {
+            return written(parameter.kind, entry.value, unitSystem);
+        }
         return String(entry.value);
+    }
+
+    /**
+     * The exact value behind a box the viewer wrote, keyed by parameter.
+     *
+     * Writing is lossy -- inches snap to a 1/32 -- so a box nobody has touched
+     * sends this rather than reading its own text back, which would nudge the
+     * value and call it edited.
+     */
+    function untouchedFor(parameter, entry, draft) {
+        const typed = entry && typeof entry.text === 'string' && entry.text.length;
+        if (typed || !entry || entry.value === null || entry.value === undefined) {
+            return null;
+        }
+        if (!MEASURED[parameter.kind] && !VECTOR_AXES[parameter.kind]) {
+            return null;
+        }
+        return { draft, wire: { value: entry.value } };
+    }
+
+    function hasValue(entry) {
+        return Boolean(entry) && entry.value !== null && entry.value !== undefined;
+    }
+
+    function sameDraft(one, other) {
+        return JSON.stringify(one) === JSON.stringify(other);
     }
 
     /**
@@ -161,6 +201,10 @@
         if (!isEnabled(state, parameter)) {
             return { value: null };
         }
+        const untouched = (state.untouched || {})[parameter.key];
+        if (untouched && sameDraft(untouched.draft, state.drafts[parameter.key])) {
+            return untouched.wire;
+        }
         return toWireValue(parameter, state.drafts[parameter.key], unitSystem);
     }
 
@@ -191,16 +235,24 @@
      * `frames` say which kiwari it is and what was built from it; each schema
      * entry carries the id as `section`, so a control knows whose it is.
      */
-    function fromPayload(payload) {
+    function fromPayload(payload, unitSystem) {
         const id = payload && payload.id !== undefined ? payload.id : null;
         const schema = (payload && Array.isArray(payload.schema) ? payload.schema : [])
             .filter((entry) => entry && typeof entry.key === 'string' && entry.key.length)
             .map((entry) => ({ ...entry, section: id }));
         const applied = (payload && payload.applied) || {};
         const drafts = {};
+        const untouched = {};
         const enabled = new Set();
         for (const parameter of schema) {
-            drafts[parameter.key] = toDraft(parameter, applied[parameter.key]);
+            const entry = parameter.optional && !hasValue(applied[parameter.key])
+                ? { value: parameter.default && parameter.default.value }
+                : applied[parameter.key];
+            drafts[parameter.key] = toDraft(parameter, entry, unitSystem);
+            const exact = untouchedFor(parameter, entry, drafts[parameter.key]);
+            if (exact) {
+                untouched[parameter.key] = exact;
+            }
             const value = applied[parameter.key] && applied[parameter.key].value;
             if (!parameter.optional || (value !== null && value !== undefined)) {
                 enabled.add(parameter.key);
@@ -212,6 +264,7 @@
             schema,
             applied,
             drafts,
+            untouched,
             // Which optional parameters are switched on. A parameter that is
             // off is nothing, whatever its box still says.
             enabled,
@@ -304,23 +357,47 @@
     }
 
     /** Every box back to what the code says. */
-    function resetToDefaults(state) {
+    function resetToDefaults(state, unitSystem) {
         const drafts = {};
+        const untouched = {};
         const enabled = new Set();
         for (const parameter of state.schema) {
-            drafts[parameter.key] = toDraft(parameter, parameter.default);
+            const entry = parameter.default && { value: parameter.default.value };
+            drafts[parameter.key] = toDraft(parameter, entry, unitSystem);
+            const exact = untouchedFor(parameter, entry, drafts[parameter.key]);
+            if (exact) {
+                untouched[parameter.key] = exact;
+            }
             const value = parameter.default && parameter.default.value;
             if (!parameter.optional || (value !== null && value !== undefined)) {
                 enabled.add(parameter.key);
             }
         }
-        return { ...state, drafts, enabled };
+        return { ...state, drafts, untouched, enabled };
+    }
+
+    /**
+     * That state written in other units: every box the viewer wrote and nobody
+     * has touched since is written again. Typed ones stay as typed.
+     */
+    function withUnits(state, unitSystem) {
+        const drafts = { ...state.drafts };
+        const untouched = {};
+        for (const parameter of state.schema) {
+            const exact = (state.untouched || {})[parameter.key];
+            if (!exact || !sameDraft(exact.draft, state.drafts[parameter.key])) {
+                continue;
+            }
+            drafts[parameter.key] = toDraft(parameter, exact.wire, unitSystem);
+            untouched[parameter.key] = { draft: drafts[parameter.key], wire: exact.wire };
+        }
+        return { ...state, drafts, untouched };
     }
 
     /** One state per kiwari the runner sent, leaving out any that declares nothing. */
-    function sectionsFromPayload(payload) {
+    function sectionsFromPayload(payload, unitSystem) {
         const sent = Array.isArray(payload) ? payload : (payload ? [payload] : []);
-        return sent.map(fromPayload).filter((state) => state.schema.length);
+        return sent.map((one) => fromPayload(one, unitSystem)).filter((state) => state.schema.length);
     }
 
     /** Those sections with the one called *id* changed by *change*. */
@@ -360,6 +437,7 @@
         whyNotValid,
         sameValue,
         resetToDefaults,
+        withUnits,
         defaultUnitFor,
         VECTOR_AXES,
     };

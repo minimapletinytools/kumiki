@@ -231,7 +231,8 @@ def test_the_payload_carries_the_schema_the_values_and_what_changed() -> None:
     legs = payload["schema"][0]
     assert legs["kind"] == "count" and legs["minimum"] == 3 and legs["about"] == "Number of legs"
     assert payload["applied"]["legs"] == {"value": 6}
-    assert payload["applied"]["seat_height"]["text"] == "450mm"
+    # Nobody typed it, so it goes as a number for the viewer to write in its own units.
+    assert payload["applied"]["seat_height"] == {"value": 0.45}
     assert payload["changed"] == ["legs"]
 
 

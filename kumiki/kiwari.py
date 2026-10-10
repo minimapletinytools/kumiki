@@ -439,13 +439,15 @@ class Kiwari:
         }
 
     def value_payload(self, key: str) -> Dict[str, Any]:
-        """One value, as the viewer holds it: the number and how it was typed."""
+        """One value, as the viewer holds it: the number, and how it was typed if anyone typed it.
+
+        Only typed text: anything written out here would be in mm, and the viewer writes
+        an untyped value in the units it is set to.
+        """
         declaration = self.declarations[key]
         value = self.values.get(key, declaration.default)
         payload: Dict[str, Any] = {"value": _plain(declaration, value)}
         written = self.texts.get(key)
-        if written is None and value is not None and declaration.kind in _MEASURED:
-            written = _write(declaration, value)
         if written is not None:
             payload["text"] = written
         return payload
