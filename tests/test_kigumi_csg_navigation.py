@@ -213,15 +213,16 @@ class TestCSGTreeSerialization:
         tree = self._tree(mortise_and_tenon_frame, "butt_timber")
         base = tree["children"][0]
         names = {f["name"] for f in base["features"]}
-        assert {"rough.right", "rough.left", "rough.top"} <= names
+        assert {"rptw.right", "rptw.left", "rptw.top"} <= names
         # The four long arrises are declared alongside the faces.
-        assert {"rough.front_left", "rough.back_right"} <= names
+        assert {"rptw.front_left", "rptw.back_right"} <= names
         # The arrises at each end are named too, so a timber's body has a name
         # for every face and every edge it has.
-        assert {"rough.bottom_right", "rough.top_back"} <= names
-        # ROUGH: the rough body meets a joint's shoulder plane and not itself,
+        assert {"rptw.bottom_right", "rptw.top_back"} <= names
+        # PERFECT: a timber with no rough allowance has its rough body lying on its
+        # perfect one (rptw.*). It meets a joint's shoulder plane and not itself,
         # since the arrises it used to make by meeting are named outright now.
-        assert all(f["group"] == "ROUGH" for f in base["features"])
+        assert all(f["group"] == "PERFECT" for f in base["features"])
         # Six faces, four long arrises, eight at the ends, eight corners: every
         # slot the prism offers, so none of its anonymous defaults survive the
         # override.
@@ -330,7 +331,7 @@ class TestNavigateToLeaf:
         )
 
         body_faces = {face for path, face in found if path == body_path}
-        assert body_faces >= {"rough.left", "rough.right", "rough.front", "rough.back"}
+        assert body_faces >= {"rptw.left", "rptw.right", "rptw.front", "rptw.back"}
         assert not any(f.startswith("ptw.") for f in body_faces)
 
     def test_mortise_hole_faces_resolve_to_a_labeled_path(
@@ -657,7 +658,7 @@ class TestJointAttribution:
         half_width = float(cut_timber.timber.size[0]) / 2
 
         target, label = self._leaf_at(csg, [half_width, 0.0, 0.3])
-        assert label.startswith("rough.")
+        assert label.startswith("rptw.")
         assert runner._joint_name_for_node(csg, cut_timber, target) is None
 
     def test_a_hand_built_cut_timber_declines_rather_than_guesses(self):
@@ -957,16 +958,16 @@ class TestPickDescription:
         self, mortise_and_tenon_frame,
     ):
         point = self._point_on(mortise_and_tenon_frame, "butt_timber",
-                               lambda label: label == "rough.right")
+                               lambda label: label == "rptw.right")
         described = self._describe(mortise_and_tenon_frame, "butt_timber", point)
         assert described["nodeKind"] == "RectangularPrism"
         assert described["nodeLabel"] == "timber (rough, extended)"
 
     def test_a_timber_face_describes_itself(self, mortise_and_tenon_frame):
         point = self._point_on(mortise_and_tenon_frame, "butt_timber",
-                               lambda label: label == "rough.right")
+                               lambda label: label == "rptw.right")
         described = self._describe(mortise_and_tenon_frame, "butt_timber", point)
-        assert described["featureLabel"] == "rough.right"
+        assert described["featureLabel"] == "rptw.right"
         assert described["featureType"] == "FACE"
         assert described["jointName"] is None
         assert described["facesToward"] == "right"
@@ -1270,7 +1271,7 @@ class TestEdgeHighlightSpan:
         # The shoulder against the timber's own front face: the line you would
         # square across before sawing, and the one pairing the library asks for.
         edge, owner, timber, root = self._edge(
-            mortise_and_tenon_frame, "shoulder", "rough.front")
+            mortise_and_tenon_frame, "shoulder", "rptw.front")
 
         segment, absent = runner._edge_highlight_segments(edge, owner, timber, root)
 
@@ -1357,7 +1358,7 @@ class TestEdgeHighlightSpan:
     def test_the_timbers_own_edge_still_runs_its_full_length(self, mortise_and_tenon_frame):
         # The crop must not shorten an edge that really is that long.
         edge, owner, timber, root = self._declared_edge(
-            mortise_and_tenon_frame, "rough.front_left")
+            mortise_and_tenon_frame, "rptw.front_left")
 
         segments, absent = runner._edge_highlight_segments(edge, owner, timber, root)
 
@@ -1945,7 +1946,7 @@ class TestResolvingADerivedEdge:
         body = runner._timber_body_csg(cut_timber)
 
         assert body is not None
-        assert any(f.name.startswith("rough.") for f in body.get_declared_features())
+        assert any(f.name.startswith("rptw.") for f in body.get_declared_features())
 
 
 class TestSameNamedSiblings:
@@ -2215,7 +2216,7 @@ class TestHoveringOverAFeature:
         }, slot)
 
         assert clicked["featureType"] == "POINT"
-        assert clicked["featureLabel"].startswith("shoulder\u00d7rough.")
+        assert clicked["featureLabel"].startswith("shoulder\u00d7rptw.")
 
         reference = clicked["reference"]
         assert reference is not None

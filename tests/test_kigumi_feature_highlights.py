@@ -88,7 +88,7 @@ class TestFeatureHighlights:
 
     def test_an_edge_end_is_its_line(self):
         slot = self._slot()
-        reference = {"timber": self._member_key(slot), "csgPath": [], "feature": "rough.front_right", "type": "EDGE"}
+        reference = {"timber": self._member_key(slot), "csgPath": [], "feature": "rptw.front_right", "type": "EDGE"}
 
         (lit,) = runner.feature_highlights(slot, [reference])
 
@@ -96,7 +96,7 @@ class TestFeatureHighlights:
 
     def test_a_point_end_is_where_it_is(self):
         slot = self._slot()
-        reference = {"timber": self._member_key(slot), "csgPath": [], "feature": "rough.top_right_front", "type": "POINT"}
+        reference = {"timber": self._member_key(slot), "csgPath": [], "feature": "rptw.top_right_front", "type": "POINT"}
 
         (lit,) = runner.feature_highlights(slot, [reference])
 

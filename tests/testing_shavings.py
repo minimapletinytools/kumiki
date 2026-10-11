@@ -433,7 +433,7 @@ def mortise_and_tenon_handles():
         "tenon_left": find_feature(butt, tenon, "tenon_left"),
         "tenon_right": find_feature(butt, tenon, "tenon_right"),
         "shoulder": find_feature(butt, ("mortise_and_tenon", "tenon_waste", "shoulder"), "shoulder"),
-        "rough_front": find_feature(butt, body, "rough.front"),
+        "rough_front": find_feature(butt, body, "rptw.front"),
         "mortise_bottom": find_feature(receiving, ("mortise_and_tenon", "mortise_hole"), "mortise_bottom"),
         "mortise_front": find_feature(receiving, ("mortise_and_tenon", "mortise_hole"), "mortise_front"),
     }

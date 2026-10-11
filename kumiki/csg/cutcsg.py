@@ -139,7 +139,7 @@ def default_feature_name(key: FeatureKey) -> str:
     Deterministic, so a default is referenceable -- from a drawing, a
     measurement, an override -- without anyone having authored a name for it.
     Lower case and dotted to sit alongside the authored names already in use,
-    which look like "ptw.front" and "rough.back_right".
+    which look like "ptw.front", "rptw.front" and "rough.back_right".
     """
     category, index = key
     return f"{category.name.lower()}.{index}"
@@ -349,7 +349,10 @@ class FeatureGroup(Enum):
     naming and pointing at without every face of it turning into an arris.
 
     What carries what today: a timber's perfect-timber-within faces, arrises,
-    corners and centerplanes are PERFECT, and its rough body's are ROUGH. A
+    corners and centerplanes are PERFECT, and its rough body's are ROUGH --
+    except where the rough body lies on the perfect timber within (rptw.*, see
+    timber.RPTW_FACE_PREFIX), which is PERFECT too, as is every face of a
+    timber with no rough allowance. A
     joint's shoulder plane is SHOULDER_PLANE, so a joint outlines itself against
     both bodies. TENON is a joint's tenon faces, and the one thing they meet is
     that shoulder plane -- where a tenon cheek leaves the timber at the shoulder

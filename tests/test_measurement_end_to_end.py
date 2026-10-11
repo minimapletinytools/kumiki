@@ -192,8 +192,8 @@ class TestAMeasurementMadeInTheThreeDView:
 
     def test_two_parallel_faces_admit_a_distance(self, viewer):
         member = viewer.members[0]
-        first = viewer.pick(member, "rough.front")
-        second = viewer.pick(member, "rough.back",
+        first = viewer.pick(member, "rptw.front")
+        second = viewer.pick(member, "rptw.back",
                              viewer.holding(first, LOOK, "3d"))
 
         verdict = second["verdict"]
@@ -202,8 +202,8 @@ class TestAMeasurementMadeInTheThreeDView:
 
     def test_and_it_says_where_both_ends_attach(self, viewer):
         member = viewer.members[0]
-        first = viewer.pick(member, "rough.front")
-        second = viewer.pick(member, "rough.back",
+        first = viewer.pick(member, "rptw.front")
+        second = viewer.pick(member, "rptw.back",
                              viewer.holding(first, LOOK, "3d"))
 
         anchors = second["verdict"]["anchors"]
@@ -212,8 +212,8 @@ class TestAMeasurementMadeInTheThreeDView:
 
     def test_two_faces_that_meet_admit_an_angle(self, viewer):
         one, other = viewer.members
-        first = viewer.pick(one, "rough.front")
-        second = viewer.pick(other, "rough.front",
+        first = viewer.pick(one, "rptw.front")
+        second = viewer.pick(other, "rptw.front",
                              viewer.holding(first, LOOK, "3d"))
 
         verdict = second["verdict"]
@@ -223,8 +223,8 @@ class TestAMeasurementMadeInTheThreeDView:
         # A vertex, two rays, and the plane they span -- so the arc is placed
         # from the features rather than from wherever two screen lines cross.
         one, other = viewer.members
-        first = viewer.pick(one, "rough.front")
-        second = viewer.pick(other, "rough.front",
+        first = viewer.pick(one, "rptw.front")
+        second = viewer.pick(other, "rptw.front",
                              viewer.holding(first, LOOK, "3d"))
 
         angle = second["verdict"]["angle"]
@@ -236,9 +236,9 @@ class TestAMeasurementMadeInTheThreeDView:
         # Neither gets the other's placement: they are placed by different
         # rules and carrying both would mean one of them is never right.
         one, other = viewer.members
-        held = viewer.pick(one, "rough.front")
-        distance = viewer.pick(one, "rough.back", viewer.holding(held, LOOK, "3d"))
-        angle = viewer.pick(other, "rough.front", viewer.holding(held, LOOK, "3d"))
+        held = viewer.pick(one, "rptw.front")
+        distance = viewer.pick(one, "rptw.back", viewer.holding(held, LOOK, "3d"))
+        angle = viewer.pick(other, "rptw.front", viewer.holding(held, LOOK, "3d"))
 
         assert distance["verdict"]["angle"] is None
         assert angle["verdict"]["anchors"] is None
@@ -249,16 +249,16 @@ class TestAMeasurementMadeInTheThreeDView:
         member = viewer.members[0]
         assert viewer.has_drawing(THREE_D) is False
 
-        first = viewer.pick(member, "rough.front")
-        second = viewer.pick(member, "rough.back", viewer.holding(first, LOOK, "3d"))
+        first = viewer.pick(member, "rptw.front")
+        second = viewer.pick(member, "rptw.back", viewer.holding(first, LOOK, "3d"))
         viewer.write(THREE_D, THREE_D_VIEWPORT, first, second, second["verdict"])
 
         assert viewer.has_drawing(THREE_D) is True
 
     def test_writing_one_makes_it_appear_where_it_was_asked_for(self, viewer):
         member = viewer.members[0]
-        first = viewer.pick(member, "rough.front")
-        second = viewer.pick(member, "rough.back", viewer.holding(first, LOOK, "3d"))
+        first = viewer.pick(member, "rptw.front")
+        second = viewer.pick(member, "rptw.back", viewer.holding(first, LOOK, "3d"))
 
         before = len(viewer.measurements(THREE_D, THREE_D_VIEWPORT))
         viewer.write(THREE_D, THREE_D_VIEWPORT, first, second, second["verdict"])
@@ -270,8 +270,8 @@ class TestAMeasurementMadeInTheThreeDView:
         is a measurement that appears and is immediately broken -- which is what
         every timber with a labelled root used to do."""
         member = viewer.members[0]
-        first = viewer.pick(member, "rough.front")
-        second = viewer.pick(member, "rough.back", viewer.holding(first, LOOK, "3d"))
+        first = viewer.pick(member, "rptw.front")
+        second = viewer.pick(member, "rptw.back", viewer.holding(first, LOOK, "3d"))
         viewer.write(THREE_D, THREE_D_VIEWPORT, first, second, second["verdict"])
 
         written = viewer.measurements(THREE_D, THREE_D_VIEWPORT)[-1]
@@ -284,8 +284,8 @@ class TestAMeasurementMadeInTheThreeDView:
         # Structured, and in 3D -- a bare name could not say which of the
         # two angles it meant, and the space decides what the pair admits.
         member = viewer.members[0]
-        first = viewer.pick(member, "rough.front")
-        second = viewer.pick(member, "rough.back", viewer.holding(first, LOOK, "3d"))
+        first = viewer.pick(member, "rptw.front")
+        second = viewer.pick(member, "rptw.back", viewer.holding(first, LOOK, "3d"))
         viewer.write(THREE_D, THREE_D_VIEWPORT, first, second, second["verdict"])
 
         written = viewer.measurements(THREE_D, THREE_D_VIEWPORT)[-1]
@@ -303,8 +303,8 @@ class TestAMeasurementMadeInTheThreeDView:
         placing each end on its own leans the dimension.
         """
         member = viewer.members[0]
-        first = viewer.pick(member, "rough.front")
-        second = viewer.pick(member, "rough.back", viewer.holding(first, LOOK, "3d"))
+        first = viewer.pick(member, "rptw.front")
+        second = viewer.pick(member, "rptw.back", viewer.holding(first, LOOK, "3d"))
         viewer.write(THREE_D, THREE_D_VIEWPORT, first, second, second["verdict"])
 
         written = viewer.measurements(THREE_D, THREE_D_VIEWPORT)[-1]
@@ -381,9 +381,9 @@ class TestAPairWithNothingBetweenThem:
     def test_a_pair_with_something_between_them_is_untouched(self, viewer):
         # The rule must not reach past the case it is for.
         member = viewer.members[0]
-        held = viewer.pick(member, "rough.front")
+        held = viewer.pick(member, "rptw.front")
 
-        verdict = viewer.pick(member, "rough.back",
+        verdict = viewer.pick(member, "rptw.back",
                               viewer.holding(held, LOOK, "3d"))["verdict"]
 
         assert [kind["operation"] for kind in verdict["kinds"]] == ["distance"]

@@ -222,7 +222,7 @@ def solve_cute_frame():
 def _drawable(handle: FeatureHandle, frame: Frame) -> FeatureHandle:
     """The same face on the rough body, which is what a drawing can reference today.
 
-    The cute frame's timbers have no rough allowance, so ptw.X and rough.X are the same plane.
+    The cute frame's timbers have no rough allowance, so the rough body's face is rptw.X, on ptw.X's plane.
     """
     if not handle.feature.name.startswith("ptw."):
         return handle
@@ -230,7 +230,7 @@ def _drawable(handle: FeatureHandle, frame: Frame) -> FeatureHandle:
     assert cut is not None
     rendered = cut.render_timber_with_cuts_csg_local()
     rough_body = rendered.base if isinstance(rendered, Difference) else rendered
-    wanted = "rough." + handle.feature.name.removeprefix("ptw.")
+    wanted = "rptw." + handle.feature.name.removeprefix("ptw.")
     feature = next(f for f in rough_body.get_declared_features() if f.name == wanted)
     return FeatureHandle(timber=handle.timber, hit=OwnedFeatureHit(feature=feature, owner=rough_body))
 

@@ -19,7 +19,7 @@ kumiki implements its own CSG (constructive solid geometry) system to generate a
 
 ## How kumiki CSGs are created 
 
-`Timber`s produce a `RectangularPrism` CSG representing its volume. It actually produces 2 CSGs, one for its rough volume and one for its "perfect timber within" (PTW). Note that its ends may be extended to infinity if any Joint on it declares itself to be an end joint.
+`Timber`s produce a `RectangularPrism` CSG representing its volume. It actually produces 2 CSGs, one for its rough volume and one for its "perfect timber within" (PTW). The PTW prism's features are named `ptw.*`. The rough prism's are named `rough.*`, except a face that lies on the PTW -- and an arris or corner all of whose faces do -- which is named `rptw.*` and grouped `PERFECT`: it is the rough body's own face, but measuring from it is measuring from the PTW. A timber with no rough allowance is `rptw.*` throughout. Note that its ends may be extended to infinity if any Joint on it declares itself to be an end joint.
 
 `Joint`s on a timber produce a `negative_csg` that is cut of the timber's prism to produce the joint.
 

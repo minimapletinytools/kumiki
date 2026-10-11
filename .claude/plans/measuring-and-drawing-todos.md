@@ -59,6 +59,8 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 
 ## 6. Perfect vs rough features
 
+- Done for Q3: a rough face lying on the perfect timber within is named `rptw.*` and grouped
+  PERFECT (and so is an arris or corner whose faces all are). No backwards compatibility.
 - Every timber has `ptw.*` and `rough.*` faces; with no rough allowance they coincide. Picking
   ranks perfect first, but derived edges can still be named after rough faces.
 - `FeatureMarkingStatus.NEVER_MARK` exists but nothing reads it yet.

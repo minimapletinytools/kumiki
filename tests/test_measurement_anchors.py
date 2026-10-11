@@ -433,7 +433,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         spans, length = self._spans(runner, entry, [0, 0, 1])
 
         rough = [span for name, span in spans.items()
-                 if name.startswith("rough.") and span is not None and not isinstance(span, PointSpan)]
+                 if name.startswith("rptw.") and span is not None and not isinstance(span, PointSpan)]
         assert rough, "the timber should declare some arrises"
         assert max(high - low for low, high in (span.interval for span in rough)) \
             > length / 2

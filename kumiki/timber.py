@@ -778,7 +778,7 @@ class PerfectTimberWithin(ABC):
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
-            face_tags=_rough_face_tags() if with_feature_labels else (),
+            face_tags=self.rough_face_tags() if with_feature_labels else (),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -815,6 +815,11 @@ class PerfectTimberWithin(ABC):
             extend_top=extend_top,
             label=self.csg_label("perfect", "extended"),
         )
+
+    def rough_face_tags(self) -> Tuple[FeatureOverride, ...]:
+        """This timber's names for its rough prism: rptw.* wherever it lies on the perfect timber within."""
+        perfect = frozenset(PrismFace(face.value) for face in TimberFace if self.is_face_perfect(face))
+        return _rough_face_tags(perfect)
 
     def is_face_perfect(self, face: TimberFace) -> bool:
         """
@@ -945,7 +950,7 @@ class Timber(PerfectTimberWithin):
             transform=Transform(position=offset, orientation=Orientation.identity()),
             start_distance=scalar(0),
             end_distance=self.length,
-            feature_overrides=_rough_face_tags() if with_feature_labels else (),
+            feature_overrides=self.rough_face_tags() if with_feature_labels else (),
             label=self.csg_label("rough"),
         )
 
@@ -972,7 +977,7 @@ class Timber(PerfectTimberWithin):
             transform=Transform(position=offset, orientation=Orientation.identity()),
             start_distance=None if extend_bot else scalar(0),
             end_distance=None if extend_top else self.length,
-            feature_overrides=_rough_face_tags() if with_feature_labels else (),
+            feature_overrides=self.rough_face_tags() if with_feature_labels else (),
             label=self.csg_label("rough", "extended"),
         )
     
@@ -1022,7 +1027,7 @@ class Board(PerfectTimberWithin):
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
-            face_tags=_rough_face_tags() if with_feature_labels else (),
+            face_tags=self.rough_face_tags() if with_feature_labels else (),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1171,7 +1176,7 @@ class MeshTimber(PerfectTimberWithin):
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
-            face_tags=_rough_face_tags() if with_feature_labels else (),
+            face_tags=self.rough_face_tags() if with_feature_labels else (),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1439,7 +1444,7 @@ def _get_rough_size_and_offset(timber: PerfectTimberWithin) -> Tuple[V2, V3]:
 # which made a feature called "right" ambiguous between the two prisms -- and
 # only the rough prism ever appears in the rendered CSG tree, so the ambiguity
 # resolved silently and wrongly.
-# RESERVED. Nothing outside this module may name a feature with either prefix:
+# RESERVED. Nothing outside this module may name a feature with any of these prefixes:
 # they mean "a face of a timber's own body", and picking, edge derivation and
 # drawing all read them that way.
 #
@@ -1451,6 +1456,11 @@ def _get_rough_size_and_offset(timber: PerfectTimberWithin) -> Tuple[V2, V3]:
 # body it is.
 PTW_FACE_PREFIX = "ptw."
 ROUGH_FACE_PREFIX = "rough."
+# A face of the rough prism that lies on the perfect timber within -- every face of a timber
+# with no rough allowance. It is the rough body's own face, so it is told apart from the
+# perfect prism's ptw.* name, but it is treated as perfect (group PERFECT): measuring from it
+# is measuring from the perfect timber.
+RPTW_FACE_PREFIX = "rptw."
 
 _TIMBER_FACES: List[Tuple[str, PrismFace]] = [
     ("right", PrismFace.RIGHT),
@@ -1607,26 +1617,34 @@ def _ptw_centerplanes() -> Tuple[PrismCenterplaneFeature, ...]:
 
 
 @functools.lru_cache(maxsize=None)
-def _rough_face_tags() -> Tuple[FeatureOverride, ...]:
-    """Named features for the 6 faces of a timber's rough (as-sawn) prism.
+def _rough_face_tags(perfect: frozenset = frozenset()) -> Tuple[FeatureOverride, ...]:
+    """Named features for a timber's rough (as-sawn) prism: faces, arrises and corners.
 
-    Group ROUGH, kept apart from the perfect timber within's PERFECT: a rough
-    face only coincides with its perfect counterpart on a reference face, and
-    measurements may never be taken from one that does not (see
-    PerfectTimberWithin.is_face_perfect). The two rank differently for picking
-    for the same reason -- the perfect body is what a joint and a drawing are
-    about.
+    Group ROUGH, kept apart from the perfect timber within's PERFECT: measurements
+    may never be taken from a rough face that does not coincide with its perfect
+    counterpart (see PerfectTimberWithin.is_face_perfect), and the perfect body is
+    what a joint and a drawing are about.
+
+    Except where it does coincide. A face in *perfect* (the PrismFaces lying on the
+    perfect timber within) is named rptw.* and grouped PERFECT, and so is an arris or a
+    corner every one of whose faces is. See RPTW_FACE_PREFIX.
     """
-    return tuple([
-        FeatureOverride(
-            prism_face_key(face),
-            name=ROUGH_FACE_PREFIX + face_name,
-            properties=FeatureProperties(group=FeatureGroup.ROUGH),
-        )
-        for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(ROUGH_FACE_PREFIX, FeatureGroup.ROUGH)
-      + _short_arris_tags(ROUGH_FACE_PREFIX, FeatureGroup.ROUGH)
-      + _corner_tags(ROUGH_FACE_PREFIX, FeatureGroup.ROUGH))
+    def named(name: str, faces: Tuple[PrismFace, ...]) -> Tuple[str, FeatureProperties]:
+        on_perfect = all(face in perfect for face in faces)
+        prefix = RPTW_FACE_PREFIX if on_perfect else ROUGH_FACE_PREFIX
+        group = FeatureGroup.PERFECT if on_perfect else FeatureGroup.ROUGH
+        return prefix + name, FeatureProperties(group=group)
+
+    def override(key: FeatureKey, name: str, faces: Tuple[PrismFace, ...]) -> FeatureOverride:
+        full_name, properties = named(name, faces)
+        return FeatureOverride(key, name=full_name, properties=properties)
+
+    return tuple(
+        [override(prism_face_key(face), name, (face,)) for name, face in _TIMBER_FACES]
+        + [override(prism_arris_key(first, second), name, (first, second))
+           for name, first, second in _TIMBER_LONG_ARRISES + _TIMBER_SHORT_ARRISES]
+        + [override(prism_corner_key(cap, first, second), name, (cap, first, second))
+           for name, cap, first, second in _TIMBER_CORNERS])
 
 
 def _create_extended_rectangular_prism(

@@ -492,7 +492,7 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
 
         assert counts.get("shoulder") == 1
         assert [name for name, count in counts.items()
-                if name.startswith("rough.") and count > 1] == []
+                if name.startswith("rptw.") and count > 1] == []
 
     def test_forwards_through_face_aligned_to_plane_aligned_wrapper(self, simple_T_configuration):
         """cut_mortise_and_tenon_joint_on_face_aligned_timbers and
@@ -1262,13 +1262,13 @@ class TestMortiseAndTenonFeatures:
 
     def test_the_timbers_own_arrises_are_still_reachable(self, simple_T_configuration):
         # They used to come from two rough faces meeting. They are declared now
-        # -- rough.front_left rather than rough.front x rough.left -- and the
+        # -- rptw.front_left rather than rptw.front x rptw.left -- and the
         # point of the test is unchanged: joint geometry must not crowd them out.
         from kumiki.csg.cutcsg import CSGFeatureType
 
         edges = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
                              CSGFeatureType.EDGE)
-        assert {edge for edge in edges if edge.startswith("rough.") and "\u00d7" not in edge}
+        assert {edge for edge in edges if edge.startswith("rptw.") and "\u00d7" not in edge}
 
 
 class TestThePegHoleCentreline:

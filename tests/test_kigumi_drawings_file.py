@@ -237,8 +237,8 @@ class TestCollectDrawings:
 
         def drawings(timber):
             other_tree = CutTimber(timber("posts/fl"))
-            front = present(find_feature(other_tree, BODY, "rough.front"), "rough.front")
-            back = present(find_feature(other_tree, BODY, "rough.back"), "rough.back")
+            front = present(find_feature(other_tree, BODY, "rptw.front"), "rptw.front")
+            back = present(find_feature(other_tree, BODY, "rptw.back"), "rptw.back")
             return [Drawing(name="d", timbers=[timber("posts/fl")],
                             measurements={FRONT: [Measure(front, back)]})]
 
@@ -416,7 +416,7 @@ class TestMeasurementsThroughADrawing:
     def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
         frame = _posts_with(lambda face, timber: [Drawing(
             name="post", timbers=[timber("posts/fl")],
-            measurements={FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))]},
+            measurements={FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))]},
         )])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -432,8 +432,8 @@ class TestMeasurementsThroughADrawing:
         frame = _posts_with(lambda face, timber: [Drawing(
             name="post", timbers=[timber("posts/fl")],
             measurements={
-                FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
-                RIGHT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
+                FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))],
+                RIGHT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))],
             },
         )])
 
@@ -447,14 +447,14 @@ class TestMeasurementsThroughADrawing:
         frame = _posts_with(lambda face, timber: [Drawing(
             name="post", timbers=[timber("posts/fl")],
             measurements={
-                FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
-                RIGHT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
+                FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))],
+                RIGHT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))],
             },
         )])
         _write_file(example, [_override("sheet", "post", [
             {"id": str(FRONT), "measurements": [
-                {"a": _ref("rough.front", timber="posts/fl#0", csg_path=UNCUT),
-                 "b": _ref("rough.back", timber="posts/fl#0", csg_path=UNCUT)}]},
+                {"a": _ref("rptw.front", timber="posts/fl#0", csg_path=UNCUT),
+                 "b": _ref("rptw.back", timber="posts/fl#0", csg_path=UNCUT)}]},
         ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -468,7 +468,7 @@ class TestMeasurementsThroughADrawing:
         # override of the whole drawing would take its layout with it.
         frame = _posts_with(lambda face, timber: [Drawing(
             name="post", timbers=[timber("posts/fl")],
-            measurements={FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))]},
+            measurements={FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))]},
         )])
         _write_file(example, [_override("sheet", "post", [
             {"id": str(FRONT), "measurements": [{"a": _ref("p"), "b": _ref("q")}]},
@@ -628,7 +628,7 @@ class TestSingleFeaturePath:
 
     def test_a_measurement_is_the_same_measured_either_way_round(self):
         found = {}
-        frame = _posts_with(lambda face, timber: found.update(x=face("rough.front"), y=face("rough.back")) or [])
+        frame = _posts_with(lambda face, timber: found.update(x=face("rptw.front"), y=face("rptw.back")) or [])
         there = Measure(anchor_a=found["x"], anchor_b=found["y"])
         back = Measure(anchor_a=found["y"], anchor_b=found["x"])
 
@@ -636,7 +636,7 @@ class TestSingleFeaturePath:
 
     def test_an_id_still_separates_two_of_the_same_pair(self):
         found = {}
-        frame = _posts_with(lambda face, timber: found.update(x=face("rough.front"), y=face("rough.back")) or [])
+        frame = _posts_with(lambda face, timber: found.update(x=face("rptw.front"), y=face("rptw.back")) or [])
 
         assert (Measure(anchor_a=found["x"], anchor_b=found["y"]).identity(frame)
                 != Measure(anchor_a=found["x"], anchor_b=found["y"],
@@ -1008,7 +1008,7 @@ class TestDerivedFeaturePath:
         return DerivedFeaturePath(
             timber=timber,
             a=self._ref(("mortise_and_tenon#0", "mortise_hole"), "mortise_right"),
-            b=self._ref(("timber (rough, extended)",), "rough.left"),
+            b=self._ref(("timber (rough, extended)",), "rptw.left"),
         )
 
     def test_either_way_round_is_the_same_edge(self):
@@ -1017,7 +1017,7 @@ class TestDerivedFeaturePath:
         forwards = self._edge()
         backwards = DerivedFeaturePath(
             timber=ResolvedTimberPath("posts/fl"),
-            a=self._ref(("timber (rough, extended)",), "rough.left"),
+            a=self._ref(("timber (rough, extended)",), "rptw.left"),
             b=self._ref(("mortise_and_tenon#0", "mortise_hole"), "mortise_right"),
         )
 
@@ -1163,13 +1163,13 @@ class TestDeletingAMeasurementTheCodeAsksFor:
             name="plan",
             timbers=(timber("post"),),
             measurements={ViewportId(VIEWPORT): [
-                Measure(anchor_a=face("rough.left", "post"), anchor_b=face("rough.right", "post"))]},
+                Measure(anchor_a=face("rptw.left", "post"), anchor_b=face("rptw.right", "post"))]},
         )], paths=("post",))
 
     def _wire(self):
         return {
-            "a": _ref("rough.left", timber="post#0", csg_path=UNCUT),
-            "b": _ref("rough.right", timber="post#0", csg_path=UNCUT),
+            "a": _ref("rptw.left", timber="post#0", csg_path=UNCUT),
+            "b": _ref("rptw.right", timber="post#0", csg_path=UNCUT),
             "measureId": None,
         }
 
