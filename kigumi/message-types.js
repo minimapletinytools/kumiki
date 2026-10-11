@@ -28,6 +28,7 @@ const TO_EXTENSION = Object.freeze([
     'requestDrawings',
     'requestExportFiles',
     'requestExportMember',
+    'requestFeatureHighlights',
     'requestInstallCadqueryOcp',
     'requestRefresh',
     'requestSaveDrawings',

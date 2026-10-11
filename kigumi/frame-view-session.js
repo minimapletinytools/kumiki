@@ -396,6 +396,12 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'requestFeatureHighlights') {
+                this._handleRequestFeatureHighlights(message).catch((err) => {
+                    this.log(`[highlight] requestFeatureHighlights error: ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'requestCSGByPath') {
                 this._handleRequestCSGByPath(message).catch((err) => {
                     this.log(`[layers] requestCSGByPath error: ${err.message || err}`);
@@ -1065,6 +1071,21 @@ class FrameViewSession {
         const payload = { memberKey: message.memberKey };
         const result = await this.runnerSession.slotRequest('get_csg_tree', this.slotName, payload);
         this._postToWebview({ type: 'csgTree', payload: result });
+    }
+
+    /** What to light for features nobody is pointing at -- a selected measurement's ends. */
+    async _handleRequestFeatureHighlights(message) {
+        if (!this.runnerSession) {
+            return;
+        }
+        const references = Array.isArray(message.references) ? message.references : [];
+        const result = await this.runnerSession.slotRequest(
+            'feature_highlights', this.slotName, { references });
+        this._postToWebview({
+            type: 'featureHighlights',
+            keys: Array.isArray(message.keys) ? message.keys : [],
+            highlights: (result && result.highlights) || [],
+        });
     }
 
     async _handleRequestCSGByPath(message) {

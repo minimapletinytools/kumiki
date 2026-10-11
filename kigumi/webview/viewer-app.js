@@ -773,6 +773,18 @@ class ViewerSettingsPanel {
                     </select>
                 </label>
                 <label>
+                    <input id="feature-parent-toggle" type="checkbox" .checked=${Boolean(this.app.showFeatureParent)}>
+                    ${t('viewer.options.featureParent')}
+                </label>
+                <label>
+                    ${t('viewer.options.referenceFeatures.label')}
+                    <select id="reference-features-select" .value=${this.app.referenceFeatures || 'drawings'}>
+                        <option value="drawings">${t('viewer.options.referenceFeatures.drawings')}</option>
+                        <option value="always">${t('viewer.options.referenceFeatures.always')}</option>
+                        <option value="never">${t('viewer.options.referenceFeatures.never')}</option>
+                    </select>
+                </label>
+                <label>
                     ${t('viewer.options.edges.label')}
                     <select id="edge-mode-select" .value=${this.app.edgeMode || 'noOverlay'}>
                         <option value="none">${t('viewer.options.edges.none')}</option>
@@ -1000,6 +1012,16 @@ class ViewerSettingsPanel {
                         debugEl.style.display = app.debugEnabled ? 'block' : 'none';
                     }
                 },
+            },
+            {
+                id: 'feature-parent-toggle', on: 'change',
+                apply: (el) => app.setShowFeatureParent(el.checked),
+                sync: (el) => { el.checked = Boolean(app.showFeatureParent); },
+            },
+            {
+                id: 'reference-features-select', on: 'change',
+                apply: (el) => app.setReferenceFeatures(el.value),
+                sync: (el) => { el.value = app.referenceFeatures || 'drawings'; },
             },
             {
                 id: 'drawing-ghosts-toggle', on: 'change',
@@ -1482,6 +1504,10 @@ class KigumiViewerApp extends LitElement {
         // What the frame on screen may be adjusted by, or null when it takes
         // nothing. The shape is kiwari-values.js's, not this file's.
         this.kiwariSections = [];
+        // Highlights for features nobody is pointing at. See _highlightState.
+        this._referenceFeaturesByMember = new Map();
+        this._measurementEndHighlights = new Map();
+        this._measurementEndAsked = new Set();
         this.kiwariPanel = new ViewerKiwariPanel(this);
         this.memberListPanel = new MemberListPanel(this, { t });
         this.selectionPanel = new SelectionPanel(this, {
@@ -2644,6 +2670,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'featureHighlights') {
+            this._setMeasurementEndHighlights(message);
+            return;
+        }
+
         if (message.type === 'csgSelectionResult') {
             this.handleCSGSelectionResult(message);
             return;
@@ -2667,6 +2698,13 @@ class KigumiViewerApp extends LitElement {
             // have a different CSG, so cached trees must not outlive it.
             this.csgTreesByKey.clear();
             this.csgTreeRequests.clear();
+            // A new frame: its reference features, and nothing kept from the last one.
+            this._referenceFeaturesByMember = new Map(
+                ((message.payload && message.payload.timbers) || [])
+                    .filter((timber) => Array.isArray(timber.referenceFeatures) && timber.referenceFeatures.length)
+                    .map((timber) => [timber.memberKey, timber.referenceFeatures]));
+            this._measurementEndHighlights.clear();
+            this._measurementEndAsked.clear();
             if (this._layersView && typeof this._layersView.setLayersPayload === 'function') {
                 this._layersView.setLayersPayload(message.payload || {});
             }
@@ -4564,6 +4602,7 @@ class KigumiViewerApp extends LitElement {
             edgeLineVisibilityPercent: this.edgeLineVisibilityPercent,
             edgeMode: this.edgeMode,
             showDrawingGhosts: this.showDrawingGhosts,
+            showFeatureParent: this.showFeatureParent,
             selected: this.selectionManager.getSelectedTimbers() || [],
             focus: this.selectionManager.csgFocus,
             lit,
@@ -4598,6 +4637,93 @@ class KigumiViewerApp extends LitElement {
      * while the state it belongs to is still the state: a selection highlight
      * from before the focus moved describes a selection nobody has.
      */
+    /**
+     * The ends of the selected measurements, lit.
+     *
+     * Their geometry comes from the runner, asked once per end and kept until the
+     * frame changes. An end not yet answered is asked for here and drawn when the
+     * answer comes back.
+     */
+    _measurementEndSources() {
+        const marks = this.selectionManager ? this.selectionManager.getMarkedMeasurements() : [];
+        const sources = [];
+        const missing = [];
+        for (const mark of marks) {
+            const found = this.focusedMeasurement(mark.viewportId, mark.measureKey);
+            if (!found || KigumiMeasurements.isDeleted(found.measure)) {
+                continue;
+            }
+            for (const anchor of [found.measure.a, found.measure.b]) {
+                const reference = KigumiMeasurements.anchorReference(anchor);
+                if (!reference) {
+                    continue;
+                }
+                const key = 'end:' + JSON.stringify(reference);
+                const lit = this._measurementEndHighlights.get(key);
+                if (lit) {
+                    sources.push(lit);
+                } else if (!this._measurementEndAsked.has(key)) {
+                    this._measurementEndAsked.add(key);
+                    missing.push({ key, reference });
+                }
+            }
+        }
+        if (missing.length && typeof vscode !== 'undefined') {
+            vscode.postMessage({
+                type: 'requestFeatureHighlights',
+                keys: missing.map((one) => one.key),
+                references: missing.map((one) => one.reference),
+            });
+        }
+        return sources;
+    }
+
+    /** The runner's answer for measurement ends: kept by key, drawn from the next frame. */
+    _setMeasurementEndHighlights(message) {
+        const keys = message.keys || [];
+        (message.highlights || []).forEach((highlight, index) => {
+            const key = keys[index];
+            if (!key) {
+                return;
+            }
+            this._measurementEndHighlights.set(key, {
+                key,
+                mesh: highlight.highlightMesh,
+                edgePositions: edgeSegmentPositions(highlight.highlightEdgeSegments),
+                pointAt: window.KigumiHighlights.pointHighlightAt(highlight),
+            });
+        });
+        this.requestUpdate();
+    }
+
+    /**
+     * The timbers' reference features, lit where the option says: in drawings, on
+     * the members the drawing is about; everywhere, on every visible member; or not.
+     */
+    _referenceSources() {
+        const mode = this.referenceFeatures;
+        const inDrawing = Boolean(this.selectionManager && this.selectionManager.inDrawing);
+        if (mode === 'never' || (mode === 'drawings' && !inDrawing)) {
+            return [];
+        }
+        const drawn = this.activeSceneMembers;
+        const { featureKeyOf } = window.KigumiFeatureStates;
+        const sources = [];
+        for (const [memberKey, features] of this._referenceFeaturesByMember) {
+            if (this.isMemberHidden(memberKey) || (drawn && !drawn.has(memberKey))) {
+                continue;
+            }
+            for (const feature of features) {
+                sources.push({
+                    key: featureKeyOf({ memberKey, path: ['reference'], featureLabel: feature.name }),
+                    edgePositions: feature.edgePositions,
+                    primary: Boolean(feature.primary),
+                });
+            }
+        }
+        return sources;
+    }
+
     _highlightState() {
         const focus = this.selectionManager && this.selectionManager.csgFocus;
         const source = this._csgHighlightSource;
@@ -4620,7 +4746,10 @@ class KigumiViewerApp extends LitElement {
                     edgePositions: edgeSegmentPositions(held.highlight.highlightEdgeSegments),
                     pointAt: window.KigumiHighlights.pointHighlightAt(held),
                 } : null,
+                measurementEnd: this._measurementEndSources(),
+                reference: this._referenceSources(),
             }),
+            showFeatureParent: Boolean(this.showFeatureParent),
             policy: this._getSelectionVisualPolicy(
                 this._getSelectionVisualContext().state,
                 1 - (this.unselectedTransparencyPercent / 100)),
@@ -4752,6 +4881,7 @@ class KigumiViewerApp extends LitElement {
     _memberState(memberKey, visualContext) {
         return window.KigumiMemberStates.memberStateFor(memberKey, {
             hidden: this.isMemberHidden(memberKey),
+            locked: this.isMemberLocked(memberKey),
             visualContext,
             drawnMembers: this.activeSceneMembers,
         });
@@ -7400,6 +7530,20 @@ class KigumiViewerApp extends LitElement {
      * On, they sit far back so the piece can be placed among its neighbours;
      * off, the sheet holds only what is drawn.
      */
+    /** Light a selected feature's parent node as well as the feature. */
+    setShowFeatureParent(enabled) {
+        if (this.displayOptions.set('showFeatureParent', Boolean(enabled))) {
+            this.requestUpdate();
+        }
+    }
+
+    /** Where reference features are lit: 'drawings', 'always' or 'never'. */
+    setReferenceFeatures(mode) {
+        if (this.displayOptions.set('referenceFeatures', mode)) {
+            this.requestUpdate();
+        }
+    }
+
     setDrawingGhostsVisible(enabled) {
         if (!this.displayOptions.set('showDrawingGhosts', Boolean(enabled))) {
             return;

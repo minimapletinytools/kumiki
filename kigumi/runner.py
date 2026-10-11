@@ -3471,6 +3471,102 @@ def _anchor_payload(feature, node, timber, located, root_csg, plane, solid_space
     }, span)
 
 
+def _reference_features_payload(timber: Any) -> List[Dict[str, Any]]:
+    """A timber's reference features, as world-space lines for the viewer to light.
+
+    Of the perfect timber, so where it would be measured from rather than what the cuts
+    left: a line runs the timber's length, and a face or center plane is its outline.
+    The first is the primary reference, which a drawing marks.
+    """
+    from kumiki.measuring import (locate_center_plane, locate_edge, locate_face,
+                                  locate_long_face_centerline)
+
+    references = getattr(getattr(timber, "ticket", None), "reference_features", ()) or ()
+    if not references:
+        return []
+    vector = lambda v: [float(v[i]) for i in range(3)]  # noqa: E731
+    dot = lambda a, b: sum(x * y for x, y in zip(a, b))  # noqa: E731
+    plus = lambda a, b, k=1.0: [x + k * y for x, y in zip(a, b)]  # noqa: E731
+    origin = vector(timber.get_bottom_position_global())
+    along = vector(timber.get_length_direction_global())
+    length = float(timber.length)
+    axes = [vector(timber.orientation.matrix[:, column]) for column in (0, 1)]
+    sizes = [float(timber.size[0]), float(timber.size[1])]
+
+    def run(point):
+        """The line through *point* along the timber, from its bottom end to its top."""
+        start = plus(point, along, dot(plus(origin, point, -1.0), along))
+        return start, plus(start, along, length)
+
+    found = []
+    for index, feature in enumerate(references):
+        name = feature.name
+        if name.endswith("_FACE") or name.endswith("_CENTER_PLANE"):
+            plane = (locate_face(timber, feature.long_face()) if name.endswith("_FACE")
+                     else locate_center_plane(timber, feature.center_plane()))
+            normal = vector(plane.normal)
+            across = [normal[1] * along[2] - normal[2] * along[1],
+                      normal[2] * along[0] - normal[0] * along[2],
+                      normal[0] * along[1] - normal[1] * along[0]]
+            half = 0.5 * sum(abs(dot(across, axis)) * size for axis, size in zip(axes, sizes))
+            bottom, top = run(vector(plane.point))
+            corners = [plus(bottom, across, -half), plus(bottom, across, half),
+                       plus(top, across, half), plus(top, across, -half)]
+            segments = [(corners[i], corners[(i + 1) % 4]) for i in range(4)]
+        else:
+            line = (locate_long_face_centerline(timber, feature.long_face_centerline())
+                    if name.endswith("_FACE_CENTERLINE")
+                    else locate_edge(timber, feature.centerline() if name == "CENTERLINE" else feature.edge()))
+            segments = [run(vector(line.point))]
+        found.append({
+            "name": name.lower(),
+            "primary": index == 0,
+            "edgePositions": [value for segment in segments for end in segment for value in end],
+        })
+    return found
+
+
+def feature_highlights(slot_state: Any, references: Sequence[Any]) -> List[Dict[str, Any]]:
+    """What to light for each feature reference, in the shape a pick answer has.
+
+    For features nobody is pointing at -- a measurement's ends. A reference that no
+    longer finds its feature gets an empty highlight rather than an error.
+    """
+    return [_feature_highlight(slot_state, reference) for reference in references]
+
+
+def _feature_highlight(slot_state: Any, reference: Any) -> Dict[str, Any]:
+    from kumiki.csg.feature_paths import resolve_feature_path
+    from kumiki.identity import SingleFeaturePath
+
+    result: Dict[str, Any] = {"highlightMesh": {"vertices": [], "indices": []}}
+    path = deserialize_feature_path(reference)
+    handle = resolve_feature_path(path, slot_state.frame) if path is not None else None
+    if handle is None:
+        return result
+    cached = slot_state.mesh_cache.get(str((reference or {}).get("timber") or "")) or {}
+    timber = handle.timber
+    root = cached.get("local_csg") or slot_state.frame.cut_timber_of(timber).render_timber_with_cuts_csg_local()
+    feature_type = handle.feature.feature_type().name
+    result["featureType"] = feature_type
+    if feature_type == "POINT":
+        located = handle.feature.locate_simple_unbounded(handle.owner)
+        result["at"] = _feature_anchor(handle.feature, handle.owner, timber, located, root)
+    elif feature_type == "EDGE":
+        segments, _absent = _edge_highlight_segments(handle.feature, handle.owner, timber, root)
+        if segments:
+            result["highlightEdgeSegments"] = segments
+    elif cached.get("mesh") is not None and isinstance(path, SingleFeaturePath):
+        rotation, position = _build_inv_transform_float(timber.transform)
+        vertices, indices, _matched, _total = _extract_highlight_mesh(
+            cached["mesh"]["vertices"], cached["mesh"]["indices"], handle.owner, rotation, position,
+            5e-4, root_csg=root, selected_path=list(path.ref.csg_path), selected_ref=handle.owner,
+            feature_label=handle.feature.name, feature_type=feature_type,
+        )
+        result["highlightMesh"] = {"vertices": vertices, "indices": indices}
+    return result
+
+
 def serialize_layers(frame: Any, frame_parts: Sequence[Tuple[str, Any]] = ()) -> Dict[str, Any]:
     """Build the data payload consumed by the viewer's Layers panel.
 
@@ -3566,6 +3662,7 @@ def serialize_layers(frame: Any, frame_parts: Sequence[Tuple[str, Any]] = ()) ->
             "name": entry["displayName"],
             "tags": list(timber_tags_by_kumiki_id.get(entry["kumikiEphemeralId"], [])),
             "cuts": cuts_meta,
+            "referenceFeatures": _reference_features_payload(entry["timber"]),
         })
 
     accessories_payload: List[Dict[str, Any]] = []
@@ -4398,7 +4495,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
             "get_drawings", "save_drawings", "add_measurement",
-            "update_measurement", "delete_measurement", "restore_measurement",
+            "update_measurement", "delete_measurement", "restore_measurement", "feature_highlights",
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
@@ -6510,6 +6607,15 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         )
         return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
+    if command == "feature_highlights":
+        ss = _resolve_slot(state, payload)
+        references = payload.get("references")
+        if not isinstance(references, list):
+            raise ValueError("feature_highlights requires payload.references, a list")
+        return state, make_success_response(request_id, command, {
+            "highlights": feature_highlights(ss, references),
         }), False
 
     if command == "restore_measurement":

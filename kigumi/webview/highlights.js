@@ -38,8 +38,21 @@
     const HOVER_OPACITY = 0.8;
     const HELD_OPACITY = 0.8;
 
+    /** An end of a selected measurement: what it is measured between. */
+    const MEASUREMENT_END_COLOR = 0xab47bc;
+    const MEASUREMENT_END_OPACITY = 0.7;
+
+    /** A timber's reference features: the primary in red, as a drawing marks it, the rest fainter. */
+    const REFERENCE_COLOR = 0xd32f2f;
+    const REFERENCE_OTHER_COLOR = 0xff8a65;
+
     /** Over the selection, and over each other in this order. */
     const ORDER = Object.freeze({
+        // Beneath the selection: background to what you are doing.
+        referenceEdges: 990,
+        measurementEndMesh: 993,
+        measurementEndEdges: 994,
+        measurementEndPoint: 995,
         csgMesh: 999,
         csgEdges: 1000,
         // A point sits on the edges that meet at it and on the faces behind
@@ -110,7 +123,7 @@
      * One look per feature: a feature with several roles is drawn as its
      * leading role (FeatureStates.leadingRole), not as a stack of translucent
      * copies. A selected feature's parent is other geometry, so it stays as
-     * context whichever role leads.
+     * context whichever role leads -- when `showFeatureParent` asks for it.
      */
     function highlightsFor(state) {
         const found = state || {};
@@ -118,7 +131,7 @@
         const out = [];
         for (const feature of found.features || []) {
             const selection = feature.roles.selection;
-            if (selection) {
+            if (selection && found.showFeatureParent) {
                 parentOverlay(selection, policy, out);
             }
             const leading = leadingRole(feature);
@@ -129,8 +142,19 @@
                 selectionOverlays(leading.source, policy, out);
             } else if (leading.role === 'hover') {
                 hoverOverlays(leading.source, out);
-            } else {
+            } else if (leading.role === 'held') {
                 heldOverlays(leading.source, out);
+            } else if (leading.role === 'measurementEnd') {
+                styledOverlays(leading.source, 'measurement-end', {
+                    color: MEASUREMENT_END_COLOR, opacity: MEASUREMENT_END_OPACITY,
+                    mesh: ORDER.measurementEndMesh, edges: ORDER.measurementEndEdges, point: ORDER.measurementEndPoint,
+                }, out);
+            } else {
+                styledOverlays(leading.source, 'reference', {
+                    color: leading.source.primary ? REFERENCE_COLOR : REFERENCE_OTHER_COLOR,
+                    opacity: leading.source.primary ? 1 : 0.7,
+                    edges: ORDER.referenceEdges,
+                }, out);
             }
         }
         return out;
@@ -243,6 +267,22 @@
 
     }
 
+    /** A feature's overlays in one look: its point, its edges and its faces, where it has them. */
+    function styledOverlays(source, prefix, look, out) {
+        if (look.point !== undefined && hasPoint(source.pointAt)) {
+            out.push({ id: `${prefix}-point:${source.key}`, shape: 'point', at: source.pointAt,
+                       color: look.color, opacity: 1, renderOrder: look.point });
+        }
+        if (look.edges !== undefined && hasEdges(source.edgePositions)) {
+            out.push({ id: `${prefix}-edges:${source.key}`, shape: 'edges', positions: source.edgePositions,
+                       color: look.color, opacity: look.opacity, renderOrder: look.edges });
+        }
+        if (look.mesh !== undefined && hasMesh(source.mesh)) {
+            out.push({ id: `${prefix}-mesh:${source.key}`, shape: 'mesh', mesh: source.mesh,
+                       color: look.color, opacity: look.opacity, renderOrder: look.mesh });
+        }
+    }
+
     /** The first end of a measurement, held: green. */
     function heldOverlays(held, out) {
         if (hasPoint(held.pointAt)) {
@@ -352,6 +392,9 @@
         HELD_COLOR,
         HOVER_OPACITY,
         HELD_OPACITY,
+        MEASUREMENT_END_COLOR,
+        REFERENCE_COLOR,
+        REFERENCE_OTHER_COLOR,
         ORDER,
     };
 

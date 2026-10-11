@@ -1,10 +1,16 @@
 const { highlightsFor, pointHighlightAt, CSG_COLORS, HOVER_COLOR, HOVER_REFUSED_COLOR,
-    HELD_COLOR, ORDER } = require('../webview/highlights.js');
+    HELD_COLOR, MEASUREMENT_END_COLOR, REFERENCE_COLOR, REFERENCE_OTHER_COLOR, ORDER } = require('../webview/highlights.js');
 const { featureStatesFor } = require('../webview/feature-states.js');
 
-/** The overlays for these sources, by way of the feature states the viewer builds from them. */
-const drawn = ({ csg, hover, held, policy } = {}) =>
-    highlightsFor({ features: featureStatesFor({ selection: csg, hover, held }), policy });
+/**
+ * The overlays for these sources, by way of the feature states the viewer builds from them.
+ * With the parent highlight on, since most of these are about how it looks when drawn.
+ */
+const drawn = ({ csg, hover, held, measurementEnd, reference, policy, showFeatureParent = true } = {}) =>
+    highlightsFor({
+        features: featureStatesFor({ selection: csg, hover, held, measurementEnd, reference }),
+        policy, showFeatureParent,
+    });
 
 // What should be lit, as a list. The old shape built each overlay when its
 // message arrived and tore it down by one of seven scattered calls, so there was
@@ -505,5 +511,51 @@ describe('a feature lit for several reasons at once is drawn once, as its leadin
         const lit = drawn({ csg: selection(), hover: { key: 'girt#0||back', mesh: MESH }, policy: POLICY });
 
         expect(ids(lit)).toEqual([`csg-parent:${key}`, `csg-feature:${key}`, 'hover-mesh:girt#0||back']);
+    });
+});
+
+
+describe('a selected feature\u2019s parent', () => {
+    const csg = { key: 'post#0|cut|front', featureLabel: 'front', mesh: MESH, parentMesh: MESH };
+
+    test('is not lit unless asked for', () => {
+        expect(ids(drawn({ csg, policy: POLICY, showFeatureParent: false })))
+            .toEqual(['csg-feature:post#0|cut|front']);
+    });
+
+    test('is lit, dim, when it is', () => {
+        expect(ids(drawn({ csg, policy: POLICY }))).toContain('csg-parent:post#0|cut|front');
+    });
+});
+
+describe('the ends of a selected measurement', () => {
+    test('each is lit, in its own colour, beneath the selection', () => {
+        const lit = drawn({ measurementEnd: [
+            { key: 'end:a', edgePositions: EDGES },
+            { key: 'end:b', mesh: MESH },
+        ] });
+        expect(ids(lit)).toEqual(['measurement-end-edges:end:a', 'measurement-end-mesh:end:b']);
+        expect(lit.every((one) => one.color === MEASUREMENT_END_COLOR)).toBe(true);
+        expect(byId(lit, 'measurement-end-edges').renderOrder).toBeLessThan(ORDER.csgMesh);
+    });
+
+    test('give way to the selection on the same feature', () => {
+        const key = 'post#0|cut|front';
+        const lit = drawn({ csg: { key, mesh: MESH }, measurementEnd: [{ key, mesh: MESH }], policy: POLICY });
+        expect(ids(lit)).toEqual([`csg-node:${key}`]);
+    });
+});
+
+describe('reference features', () => {
+    test('the primary is red and the rest fainter, drawn as lines', () => {
+        const lit = drawn({ reference: [
+            { key: 'ref:edge', edgePositions: EDGES, primary: true },
+            { key: 'ref:face', edgePositions: EDGES, primary: false },
+        ] });
+        expect(lit.map((one) => [one.id, one.color])).toEqual([
+            ['reference-edges:ref:edge', REFERENCE_COLOR],
+            ['reference-edges:ref:face', REFERENCE_OTHER_COLOR],
+        ]);
+        expect(lit[0].renderOrder).toBeLessThan(ORDER.measurementEndMesh);
     });
 });

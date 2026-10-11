@@ -82,7 +82,7 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 - [x] 1. Measuring fixes
 - [x] 2. Code-made measurement overrides
 - [ ] 3. Selection modes
-- [ ] 4. Highlighting
+- [x] 4. Highlighting
 - [ ] 5. Hidden features
 - [ ] 6. Perfect vs rough
 - [ ] 7. X-ray

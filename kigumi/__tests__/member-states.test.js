@@ -107,3 +107,41 @@ describe('member states', () => {
         expect(JSON.parse(JSON.stringify(state))).toEqual(state);
     });
 });
+
+describe('a locked member', () => {
+    const { LOCKED_OPACITY_FACTOR } = require('../webview/member-states.js');
+    const visualContext = computeSelectionVisualContext([], null);
+    const settings = {
+        baseSelectedOpacity: 1,
+        policy: selectionVisualPolicy(visualContext.state, 0.3),
+        profile: PROFILE,
+        edgeLineVisibilityPercent: 100,
+        edgeMode: 'noOverlay',
+        showDrawingGhosts: true,
+        drawingContextOpacity: DRAWING_CONTEXT_OPACITY,
+    };
+
+    test('is a state of its own', () => {
+        expect(memberStateFor('post', { locked: true, visualContext }).locked).toBe(true);
+        expect(memberStateFor('post', { visualContext }).locked).toBe(false);
+    });
+
+    test('is faded, faces and edges both', () => {
+        const free = appearanceFor(memberStateFor('post', { visualContext }), settings);
+        const locked = appearanceFor(memberStateFor('post', { locked: true, visualContext }), settings);
+
+        expect(locked.name).toBe('locked');
+        expect(locked.opacity).toBeCloseTo(free.opacity * LOCKED_OPACITY_FACTOR, 9);
+        expect(locked.edgeOpacity).toBeCloseTo(free.edgeOpacity * LOCKED_OPACITY_FACTOR, 9);
+    });
+
+    test('hidden still wins', () => {
+        expect(appearanceFor(memberStateFor('post', { hidden: true, locked: true, visualContext }), settings).name)
+            .toBe('hidden');
+    });
+
+    test('in a drawing’s context it is context, capped like any other', () => {
+        const state = memberStateFor('girt', { locked: true, visualContext, drawnMembers: new Set(['post']) });
+        expect(appearanceFor(state, settings).opacity).toBeLessThanOrEqual(DRAWING_CONTEXT_OPACITY);
+    });
+});
