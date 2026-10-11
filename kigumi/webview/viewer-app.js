@@ -3075,6 +3075,14 @@ class KigumiViewerApp extends LitElement {
             }
             return;
         }
+        if ((event.key === 'm' || event.key === 'M') && !accel && !event.altKey) {
+            // Measure from this: the same as the button, when it would be offered.
+            if (!this.measureDraft.isActive && this.canStartMeasurement) {
+                event.preventDefault();
+                this.startMeasurementFromFocus();
+            }
+            return;
+        }
         if (event.key !== 'f' && event.key !== 'F') {
             return;
         }
@@ -3388,13 +3396,8 @@ class KigumiViewerApp extends LitElement {
 
     /** A pick came back while a measurement is being made. Offers it to the draft. */
     _measurePicked(message) {
+        // A pick the hover painted red never gets here: handleCSGSelectionResult stops it.
         const anchor = this._anchorFromPick(message);
-        // The same verdict the hover painted red. Refusing here is not a second
-        // judgement: it is the one the colour already promised.
-        if (window.KigumiHover.HoverState.isRefused(message)) {
-            this.reportMeasureRefusal((message.verdict || {}).reason || 'no-kind');
-            return;
-        }
         const viewport = this._resolvePointer(this._lastClientX, this._lastClientY);
         const result = this.measureDraft.confirm(
             anchor, viewport ? viewport.viewport.id : this.activeViewportId);
@@ -4370,6 +4373,12 @@ class KigumiViewerApp extends LitElement {
     }
 
     handleCSGSelectionResult(message) {
+        // While measuring, a click the hover showed as refused does nothing but say why.
+        // Selecting it anyway left a feature selected and no measurement.
+        if (window.KigumiHover.HoverState.clickDoesNothing(message, this.measureDraft.isActive)) {
+            this.reportMeasureRefusal((message.verdict || {}).reason || 'no-kind');
+            return;
+        }
         const path = Array.isArray(message.path) ? message.path : [];
         const featureLabel = message.featureLabel || null;
         // Kept so that "measure from this" has something to start from without

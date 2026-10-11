@@ -213,7 +213,7 @@
   "viewer.measure.kind.projected_angle": "角度",
   "viewer.measure.kind.perpendicular_distance": "距離",
   "viewer.measure.kind.angle": "角度",
-  "viewer.selection.measureFrom.title": "この特徴から寸法を開始する",
+  "viewer.selection.measureFrom.title": "この特徴から寸法を開始する (M)",
   "viewer.selection.measureCancel": "寸法を取り消す",
   "viewer.selection.measureCancel.title": "寸法をやめて、保持中の特徴を解放する",
   "viewer.selection.counts": "材 ({selectedTimbers}/{timbers})  金物 ({selectedAccessories}/{accessories})",

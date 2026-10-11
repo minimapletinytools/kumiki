@@ -315,6 +315,15 @@
         }
 
         /**
+         * Whether a click with this answer should do nothing at all: while a
+         * measurement is being made, one the hover showed as refused. Selecting
+         * it anyway left a feature selected and no measurement.
+         */
+        static clickDoesNothing(answer, measuring) {
+            return Boolean(measuring) && HoverState.isRefused(answer);
+        }
+
+        /**
          * Whether drawing this answer would put the same thing on screen.
          *
          * The feature AND the verdict. What is drawn is geometry plus a colour,

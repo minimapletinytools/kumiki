@@ -78,7 +78,7 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 
 ## Status
 
-- [ ] 1. Measuring fixes
+- [x] 1. Measuring fixes
 - [ ] 2. Code-made measurement overrides
 - [ ] 3. Selection modes
 - [ ] 4. Highlighting
