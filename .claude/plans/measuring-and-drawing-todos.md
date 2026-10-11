@@ -51,11 +51,23 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 
 ## 5. Hidden features in drawing views
 
-- Walk the pointer's ray through the drawing's timbers (exact intervals from the CSG), look for
-  features at every surface crossing, and mark each visible or hidden by depth.
-- Visible first in pick and Tab order; the right-click list split into Visible and Hidden; hidden
-  highlights dashed.
-- The same test places a measurement only in a view that shows its features on the surface.
+Selection stays global; measuring is per view. In a drawing's orthographic view, both ends of
+a measurement have to be visible in that view, or the click is refused ("hidden"). Finishing a
+measurement in another view than the end was picked in stays allowed. X-ray (7) is the way to
+measure what is hidden, deliberately.
+
+`kumiki/drawings/visibility.py`, exact for points and lines (all a 2D view can measure):
+- a point: the line from it to the camera, cropped against each member's solid;
+- a line: the plane of sight through it cuts each member in a region whose outline is that plane
+  against every flat face plane, cropped exactly to the surface; the outline's camera side,
+  projected back onto the line, is what is hidden -- a union of intervals;
+- a face seen edge-on: visible if any of its edges is;
+- each is first nudged off its own timber into free space, sideways to the view first, so an
+  outline counts as visible;
+- a curved primitive the lines of sight could reach makes it "visible, not exact" -- no sampling.
+
+Later: place a measurement's anchor on the visible part (the stretches are returned); draw
+hidden lines dashed; cache per view for auto drawing.
 
 ## 6. Perfect vs rough features
 
@@ -90,7 +102,7 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 - [x] 2. Code-made measurement overrides
 - [x] 3. Selection modes
 - [x] 4. Highlighting
-- [ ] 5. Hidden features
+- [x] 5. Hidden features
 - [ ] 6. Perfect vs rough
 - [ ] 7. X-ray
 - [ ] 8. Auto drawing

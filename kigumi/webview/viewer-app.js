@@ -4186,6 +4186,7 @@ class KigumiViewerApp extends LitElement {
             'degenerate': 'those two are in the same place, so there is nothing '
                 + 'between them to measure -- an arris lying on a face is the '
                 + 'usual way to land here',
+            'hidden': 'that one is hidden in this view -- measure it in a view that shows it',
         }[reason] || reason;
         // Through the viewer log, which the extension does listen for. It used
         // to post a `log` message as well, which nothing has ever handled -- so
@@ -4226,6 +4227,12 @@ class KigumiViewerApp extends LitElement {
             // sheet; the 3D view projects nothing, so a face there is a plane
             // rather than whatever it looks like from where the reader stands.
             space: this.isInDrawing ? 'projected' : '3d',
+            // In a drawing's orthographic view only what it shows can be measured:
+            // the runner checks both ends are visible, hidden only by the drawing's members.
+            orthographic: Boolean(this.isInDrawing && viewport
+                && viewport.spec && viewport.spec.camera && viewport.spec.projection === 'orthographic'),
+            members: this.isInDrawing && this.activeSceneMembers
+                ? Array.from(this.activeSceneMembers) : null,
         };
     }
 

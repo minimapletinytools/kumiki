@@ -1983,6 +1983,11 @@ def _pick_verdict(
         # both following from the verdict without either knowing this rule.
         return {"kinds": [], "plane": plane, "anchors": None, "angle": None,
                 "reason": "degenerate"}
+    # A drawing's view measures only what it shows: both ends have to be visible in
+    # it. Asked last, being the costliest question.
+    if _an_end_is_hidden(located_pick, timber, payload, slot_state):
+        return {"kinds": [], "plane": plane, "anchors": None, "angle": None,
+                "reason": "hidden"}
     # Where it would sit: anchors for a distance, a corner for an angle. By the
     # rules that place it once written, so the preview IS the measurement rather
     # than a likeness of one.
@@ -1993,6 +1998,36 @@ def _pick_verdict(
         **placement,
         "reason": None,
     }
+
+
+def _an_end_is_hidden(located_pick: Any, timber: Any, payload: Dict[str, Any], slot_state: Any) -> bool:
+    """Whether either end of the measurement is hidden in the drawing view it is being made in.
+
+    Only an orthographic view of a drawing says: the viewer sends `orthographic` and the
+    drawing's `members`, which are what can hide something (its faded context cannot).
+    Elsewhere nothing is hidden. What cannot be decided exactly is not hidden either.
+    """
+    from kumiki.csg.cutcsg import OwnedFeatureHit
+    from kumiki.csg.feature_paths import FeatureHandle, resolve_feature_path
+    from kumiki.drawings.visibility import feature_visibility
+    from kumiki.identity import ResolvedTimberPath
+
+    members = payload.get("members")
+    if not payload.get("orthographic") or not isinstance(members, list) or slot_state is None:
+        return False
+    frame = slot_state.frame
+    occluders = [cut for cut in (
+        frame.cut_timber_at(ResolvedTimberPath.parse(key)) for key in members
+        if isinstance(key, str) and not key.startswith(ACCESSORY_KEY_PREFIX)) if cut is not None]
+    look = payload["look"]
+    picked = FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=located_pick[0], owner=located_pick[1]))
+    path = deserialize_feature_path(payload.get("heldReference"))
+    held = resolve_feature_path(path, frame) if path is not None else None
+    for handle in (picked, held):
+        own = frame.cut_timber_of(handle.timber) if handle is not None else None
+        if own is not None and not feature_visibility(handle, own, look, occluders).visible:
+            return True
+    return False
 
 
 def _pick_space(payload: Dict[str, Any]) -> Any:
