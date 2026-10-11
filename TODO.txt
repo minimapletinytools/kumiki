@@ -105,18 +105,35 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 :: TODO
 
--measuring
-  -when measuring, if you highlight an invalid face tom easure to, clicking should do nothing, right now it selects the feature and makes no measurement whic his weird.
-  -faces should nto be selectable in 2d measuring view, it seems like it's already impossible to measure faces in 2d view but you can still select them, figure out what's going on here.
+
+-2D VIEW EQUIVALENCY GROUPS
+
+
+DONE-measuring
+  DONE-when measuring, if you highlight an invalid face tom easure to, clicking should do nothing, right now it selects the feature and makes no measurement whic his weird.
+  IGNORE-faces should nto be selectable in 2d measuring view, it seems like it's already impossible to measure faces in 2d view but you can still select them, figure out what's going on here.
     -the one weird part about this is that youc an't measure faces in the 3d view in the 2d view... but that's fine for now...
       -if you really wanted to fixt his you'd have to restrict measuring/selecting per view, or anyways make measuring from face to anything always invalid in a 2d view is fine too. 
 
+DONE-selection highlighting
+  -CSG selection still does the light blue highlight
+  -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
+    -feature selection no longer does the light blue highlight on CSG (at least not in drawing view)
+
+DONE-and you should highlight the refreence edge as wel if there is one in drawing mode
+  -or just add an option in general to highlight the reference edge for 3d view mode as well
+
+DONE-add hotkey for "measure from this" (maybe m)
+DONE-modifying python created measurements
+  -delete an original measurement should delete it, thus you need a way to override a measurement as "delteed"
+  -delete after modifying should reset to original measurement (or not)
+
+  
 -2 seleciton modes in 3d view, timber and feature
-  -holding shift switches to timber seleciton mode laways
-  -fetaure selection mode by default selecting fetaure ot measure to
-    -can shift click to select a timber first (note that then fetaure select mode only works on the selected timber)
-    -when shift is held, fetaure highlighting is disabled
-    -when entering mesaurement mode it will deselect the original timber, ideallly cancel should reselect it but no big deal if it doesn't...
+  selection mode, the rules are as follows:
+  -in 2d drawing view, feature mode is the default. timber mode is disabled, although we may want to enabel it in the future so make sure it techincally still works.
+  -in 3d view, timber mode is the default when not measuring from anything, once mesauring from something, it switches to feature mode, but you can hold shift to enter timber mode
+    -when shift is held, fetaure highlighting is disabled on timbers that aren't selected, so you can keep holding shift if you want to select a fetaure on the selected timber, when in feature mode, th eselection iignored basically
 
 -PTW stuff
   -rough faces matching PTW faces should be given PTW labels?
@@ -132,13 +149,7 @@ DONE-sliding dovetail (maybe you want tapered variants)
     -you need this so mesaurements only get created in the viwe that shows the feature on the surface
     -ask agent what its currentyl doing though
 
--selection highlighting
-  -CSG selection still does the light blue highlight
-  -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
-    -feature selection no longer does the light blue highlight on CSG (at least not in drawing view)
 
--and you should highlight the refreence edge as wel if there is one in drawing mode
-      -or just add an option in general to highlight the reference edge for 3d view mode as well
 -XRAY feature
   -timber goes into x-ray view when a feature is selected in drawing mode 
   -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
@@ -149,10 +160,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 
--add hotkey for "measure from this" (maybe m)
--modifying python created measurements
-  -delete an original measurement should delete it, thus you need a way to override a measurement as "delteed"
-  -delete after modifying should reset to original measurement (or not)
 
 
 -MEASURING/DRAWING BACKLOG
@@ -201,7 +208,7 @@ DONE-drawings are as such, if a drawing contains members from multilpe frames, i
 
 
 
-
+-diagonal brace notiching broken in learn to timber frame shed
 -add support to run @tools from the parameter section
 -add export drawing button (how to do this?)
 -then you can see if all features are visible through the views and warn if not
