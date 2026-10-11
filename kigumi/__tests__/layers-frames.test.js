@@ -80,6 +80,8 @@ global.document = { createElement: () => fakeElement() };
 global.CSS = { escape: (value) => value };
 
 require('../webview/csg-tree-view.js');
+// Loaded before any row is built, as in the viewer.
+require('../webview/measurements.js');
 require('../webview/tags.js');
 require('../webview/tag-index.js');
 const { SelectionStore } = require('../webview/selection-store.js');

@@ -22,8 +22,9 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 - Deleting a measurement the Python code made writes a "deleted" marker in the drawings file, the
   way drawings already mark an override.
 - Deleting one that was edited removes the edit, putting the original back; deleting again deletes
-  it. **Q1:** or should one delete always remove it?
-- A deleted one comes back by undo, or by removing its marker from the file.
+  it. (Q1: decided.)
+- A deleted one is listed greyed and not drawn; right-click "put back" restores it, as does undo.
+  Deleting one already deleted does nothing.
 
 ## 3. Two selection modes in 3D
 
@@ -79,7 +80,7 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 ## Status
 
 - [x] 1. Measuring fixes
-- [ ] 2. Code-made measurement overrides
+- [x] 2. Code-made measurement overrides
 - [ ] 3. Selection modes
 - [ ] 4. Highlighting
 - [ ] 5. Hidden features

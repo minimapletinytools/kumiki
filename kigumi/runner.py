@@ -1622,6 +1622,8 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
 ORIGIN_CODE = "code"
 ORIGIN_OVERRIDDEN = "overridden"
 ORIGIN_FILE = "file"
+# A code measurement the file has deleted. Still listed -- greyed, to be put back -- but not drawn.
+ORIGIN_DELETED = "deleted"
 
 
 # --- measurements -----------------------------------------------------------
@@ -2156,9 +2158,10 @@ def merge_measurements(
 
     A file entry with the same identity as a code one replaces it and is marked
     as overriding; one with an identity nothing else has is the file's own. An
-    entry marked suppressed removes the code measurement instead of replacing
-    it, which is how a measurement an algorithm produced and nobody wants goes
-    away without the algorithm being changed.
+    entry marked suppressed deletes the code measurement instead of replacing
+    it, which is how a measurement the code asks for and nobody wants goes
+    away without the code being changed. It is kept, marked deleted, so it can
+    be listed and put back.
 
     A repeated identity within a tier is a mistake rather than a case to
     resolve, so the later one wins. Refusing the file outright would cost
@@ -2202,6 +2205,7 @@ def merge_measurements(
             continue
         used.add(identity)
         if override.get(MEASURE_SUPPRESSED) is True:
+            merged.append({**measure, MEASURE_SUPPRESSED: True, "origin": ORIGIN_DELETED})
             continue
         merged.append({**measure, **override, "origin": ORIGIN_OVERRIDDEN})
 
@@ -2422,6 +2426,23 @@ def update_measurement(
     return holder
 
 
+def _merged_measurement(
+    frame: Any, example_path: Optional[Path], pending: List[Dict[str, Any]],
+    drawing_id: str, viewport_id: str, measure: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """The measurement as the viewer sees it, tiers merged, or None if it is not there."""
+    identity = _viewer_measure_identity(measure)
+    return next((
+        m
+        for drawing in collect_drawings(frame, example_path, pending)
+        if drawing["id"] == drawing_id
+        for viewport in drawing.get("viewports") or []
+        if viewport.get("id") == viewport_id
+        for m in viewport.get("measurements") or []
+        if _viewer_measure_identity(m) == identity
+    ), None)
+
+
 def delete_measurement(
     frame: Any,
     example_path: Optional[Path],
@@ -2429,46 +2450,50 @@ def delete_measurement(
     drawing_id: str,
     viewport_id: str,
     measure: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Take a measurement off a viewport. Only one the file owns.
+) -> Optional[Dict[str, Any]]:
+    """Take a measurement off a viewport, according to where it comes from.
 
-    A measurement the code asks for cannot be deleted: the code will ask again
-    the next time it runs, so the most this tier could do is write down that it
-    is not wanted, and a drawing whose python says one thing and whose file
-    quietly says another is worse than a delete that does not happen. It is
-    removed by editing the python that asks for it.
+    - One the file owns is removed.
+    - One the code asks for and the file has changed loses the change: the
+      code's own comes back.
+    - One the code asks for, untouched, is marked deleted in the file. The code
+      still asks for it, so it is listed greyed and can be put back
+      (restore_measurement).
+    - One already deleted is left as it is.
 
-    So the viewer offers no delete for one, and this refuses if asked anyway.
-    The file format still understands suppression for a hand-written entry; this
-    does not produce one.
-
-    Whether the code asks for it is not read off the declarations a second way:
-    the entry is dropped, the drawings are collected again, and if it is still
-    there then the code is what produces it.
+    Returns the file entry that now holds it, or None if nothing changed.
     """
+    current = _merged_measurement(frame, example_path, pending, drawing_id, viewport_id, measure)
+    if current is None or current.get("origin") == ORIGIN_DELETED:
+        return None
     holder, measures = _measurement_slot(
         frame, example_path, pending, drawing_id, viewport_id)
     identity = _viewer_measure_identity(measure)
-    dropped = [m for m in measures if _viewer_measure_identity(m) == identity]
+    if current.get("origin") == ORIGIN_CODE:
+        # The kind goes with it: an override matches the code measurement on it.
+        measures.append({**measure, "kind": current.get("kind"), MEASURE_SUPPRESSED: True})
+        return holder
     measures[:] = [m for m in measures if _viewer_measure_identity(m) != identity]
+    return holder
 
-    still_there = any(
-        _viewer_measure_identity(m) == identity
-        for drawing in collect_drawings(frame, example_path, pending)
-        if drawing["id"] == drawing_id
-        for viewport in drawing.get("viewports") or []
-        if viewport.get("id") == viewport_id
-        for m in viewport.get("measurements") or []
-    )
-    if still_there:
-        # Put back whatever was removed: an override of a code measurement is
-        # somebody's placement or kind, and losing it to a refused delete would
-        # be a quiet edit of its own.
-        measures.extend(dropped)
-        raise ValueError(
-            "That measurement is declared in the frame's code, so it cannot be "
-            "deleted here. Remove it from the python that asks for it."
-        )
+
+def restore_measurement(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: List[Dict[str, Any]],
+    drawing_id: str,
+    viewport_id: str,
+    measure: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Put back a code measurement the file deleted. Returns None if it was not deleted."""
+    current = _merged_measurement(frame, example_path, pending, drawing_id, viewport_id, measure)
+    if current is None or current.get("origin") != ORIGIN_DELETED:
+        return None
+    holder, measures = _measurement_slot(
+        frame, example_path, pending, drawing_id, viewport_id)
+    identity = _viewer_measure_identity(measure)
+    measures[:] = [m for m in measures
+                   if not (_viewer_measure_identity(m) == identity and m.get(MEASURE_SUPPRESSED) is True)]
     return holder
 
 
@@ -3132,6 +3157,23 @@ def _attach_measurements(
     scene["unplaceableMeasurements"] = unplaceable
 
 
+def _savable_override(scene: Dict[str, Any]) -> Dict[str, Any]:
+    """A code drawing the file overrides, as the file holds it: the override, not the drawing.
+
+    The scene here is the merge -- the code's layout with the file's measurements -- so
+    saving it as it is wrote a copy of the whole drawing that no longer said what it
+    overrides. Read back, that was a second drawing of the same name, and the code one
+    had lost every change.
+    """
+    saved = _savable_drawing({**scene, OVERRIDES_KEY: scene["id"]})
+    return {
+        "id": scene.get("overriddenBy") or f"{scene['id']}-measurements",
+        "name": scene.get("name", scene["id"]),
+        OVERRIDES_KEY: scene["id"],
+        "viewports": saved["viewports"],
+    }
+
+
 def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
     """One drawing as the file should hold it.
 
@@ -3149,7 +3191,7 @@ def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
         return [
             {key: value for key, value in measure.items() if key != "origin"}
             for measure in (measures or [])
-            if measure.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)
+            if measure.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE, ORIGIN_DELETED)
         ]
 
     # Written back the way the file holds them: on the viewports. An override
@@ -3183,7 +3225,9 @@ def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> s
     """
     path = _drawings_file_path(example_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    keep = [_savable_drawing(drawing) for drawing in drawings
+    keep = [_savable_override(drawing) if drawing.get("origin") == ORIGIN_OVERRIDDEN
+            else _savable_drawing(drawing)
+            for drawing in drawings
             if drawing.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)]
     path.write_text(json.dumps({"drawings": keep}, indent=2) + "\n", encoding="utf-8")
     return str(path)
@@ -4354,7 +4398,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
             "get_drawings", "save_drawings", "add_measurement",
-            "update_measurement", "delete_measurement",
+            "update_measurement", "delete_measurement", "restore_measurement",
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
@@ -6463,6 +6507,19 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             {"a": payload.get("a"), "b": payload.get("b"),
              "measureId": payload.get("measureId")},
             payload.get("changes") or {},
+        )
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
+    if command == "restore_measurement":
+        ss = _resolve_slot(state, payload)
+        restore_measurement(
+            ss.frame, ss.file_path, ss.pending_drawings,
+            str(payload.get("drawingId") or ""),
+            str(payload.get("viewportId") or ""),
+            {"a": payload.get("a"), "b": payload.get("b"),
+             "measureId": payload.get("measureId")},
         )
         return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),

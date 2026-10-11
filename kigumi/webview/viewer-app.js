@@ -35,10 +35,11 @@ const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 // to it without a second implementation; reserved so nothing in python declares
 // one. See .claude/plans/measurement-spec.md.
 const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
-// Only a measurement the file owns can be deleted here. 'code' and 'overridden'
-// both mean the frame's python is still asking for it, and an override is
-// somebody's placement or kind on top of one the code owns.
-const MEASUREMENT_FILE_ORIGIN = 'file';
+// What deleting a measurement does depends on where it comes from. The file's own
+// goes; an override goes and the code's measurement comes back; a code one is
+// marked deleted in the file -- listed greyed, to be put back -- and one already
+// deleted is left alone.
+const MEASUREMENT_CODE_ORIGIN = 'code';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
 const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
@@ -1640,6 +1641,9 @@ class KigumiViewerApp extends LitElement {
             this._layersView.addEventListener('kigumi-save-drawings', this.onSaveDrawingsRequested);
             this._layersView.addEventListener('kigumi-focus-measurement', (event) => {
                 this._focusMeasurementFrom(event.detail);
+            });
+            this._layersView.addEventListener('kigumi-measurement-contextmenu', (event) => {
+                this.showMeasurementContextMenu(event.detail || {});
             });
             this._layersView.addEventListener('kigumi-toggle-measurements', (event) => {
                 this.setMeasurementsHidden(event.detail && event.detail.hidden);
@@ -3631,12 +3635,8 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * Delete every measurement picked out, where it is the file's own.
-     *
-     * A measurement the frame's code asks for is not the viewer's to remove --
-     * the code asks again the next time it runs -- so it is passed over rather
-     * than refused with a message. The key does nothing for one, which is the
-     * whole of what "there is no delete for it" means.
+     * Delete every measurement picked out. See MEASUREMENT_CODE_ORIGIN for what that
+     * does to each; one already deleted is passed over.
      */
     deleteMarkedMeasurements() {
         if (this.measureDraft.isActive) {
@@ -3645,7 +3645,7 @@ class KigumiViewerApp extends LitElement {
         const drawingId = this.measurementDrawingId;
         const removable = this.selectionManager.getMarkedMeasurements()
             .map((mark) => this.focusedMeasurement(mark.viewportId, mark.measureKey))
-            .filter((found) => found && found.measure.origin === MEASUREMENT_FILE_ORIGIN);
+            .filter((found) => found && !KigumiMeasurements.isDeleted(found.measure));
         if (removable.length === 0) {
             return false;
         }
@@ -3664,21 +3664,67 @@ class KigumiViewerApp extends LitElement {
             this.undoStacks.push(this.frameKey, drawingId, {
                 label: 'delete measurement',
                 redo: payload,
-                undo: {
-                    type: 'addMeasurement',
-                    drawingId,
-                    viewportId: found.viewportId,
-                    a,
-                    b,
-                    measureId: measure.measureId || null,
-                    kind: measure.kind || null,
-                    plane: measure.plane || null,
-                    placement: measure.placement || null,
-                },
+                // A code one was marked deleted, so undoing puts it back. Any other
+                // was taken out of the file, so undoing writes it there again --
+                // for an override, the change it carried.
+                undo: measure.origin === MEASUREMENT_CODE_ORIGIN
+                    ? { ...payload, type: 'restoreMeasurement' }
+                    : {
+                        type: 'addMeasurement',
+                        drawingId,
+                        viewportId: found.viewportId,
+                        a,
+                        b,
+                        measureId: measure.measureId || null,
+                        kind: measure.kind || null,
+                        plane: measure.plane || null,
+                        placement: measure.placement || null,
+                    },
             });
             this._sendMeasurementCommand(payload);
         }
         this.selectionManager.clearMeasurementMarks();
+        return true;
+    }
+
+    /** Put back a code measurement the drawings file deleted. */
+    restoreMeasurement(viewportId, measureKey) {
+        const found = this.focusedMeasurement(viewportId, measureKey);
+        if (!found || !KigumiMeasurements.isDeleted(found.measure)) {
+            return false;
+        }
+        const drawingId = this.measurementDrawingId;
+        const payload = {
+            type: 'restoreMeasurement',
+            drawingId,
+            viewportId: found.viewportId,
+            a: KigumiMeasurements.anchorReference(found.measure.a),
+            b: KigumiMeasurements.anchorReference(found.measure.b),
+            measureId: found.measure.measureId || null,
+        };
+        this.undoStacks.push(this.frameKey, drawingId, {
+            label: 'put back measurement',
+            redo: payload,
+            undo: { ...payload, type: 'deleteMeasurement' },
+        });
+        this._sendMeasurementCommand(payload);
+        return true;
+    }
+
+    /** Right-click on a measurement in a list: a deleted one can be put back. */
+    showMeasurementContextMenu({ viewportId, measureKey, clientX, clientY }) {
+        const found = this.focusedMeasurement(viewportId, measureKey);
+        if (!found || !KigumiMeasurements.isDeleted(found.measure)) {
+            return false;
+        }
+        this.contextMenu.open({
+            x: clientX,
+            y: clientY,
+            title: t('viewer.contextMenu.deletedMeasurement'),
+            items: [{ id: 'restore', label: t('viewer.contextMenu.putBack') }],
+            onChoose: () => this.restoreMeasurement(viewportId, measureKey),
+        });
+        this.requestUpdate();
         return true;
     }
 
@@ -6813,7 +6859,9 @@ class KigumiViewerApp extends LitElement {
 
         for (const viewport of this.viewports) {
             for (const measure of (viewport.spec.measurements || [])) {
-                this._drawMeasurement(overlay, viewport, pageRect, measure);
+                if (!KigumiMeasurements.isDeleted(measure)) {
+                    this._drawMeasurement(overlay, viewport, pageRect, measure);
+                }
             }
         }
         if (!this.activePage) {
@@ -6858,7 +6906,9 @@ class KigumiViewerApp extends LitElement {
         }
         for (const pane of drawing.viewports || []) {
             for (const measure of pane.measurements || []) {
-                this._drawMeasurement(overlay, viewport, pageRect, measure);
+                if (!KigumiMeasurements.isDeleted(measure)) {
+                    this._drawMeasurement(overlay, viewport, pageRect, measure);
+                }
             }
         }
     }
@@ -7415,6 +7465,9 @@ class KigumiViewerApp extends LitElement {
             host.addEventListener('kigumi-save-drawings', () => this.saveDrawings());
             host.addEventListener('kigumi-focus-measurement', (event) => {
                 this._focusMeasurementFrom(event.detail);
+            });
+            host.addEventListener('kigumi-measurement-contextmenu', (event) => {
+                this.showMeasurementContextMenu(event.detail || {});
             });
             host.addEventListener('kigumi-select-drawing-member', (event) => {
                 this.selectionManager.selectTimber(

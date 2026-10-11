@@ -344,7 +344,7 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'addMeasurement' || message.type === 'updateMeasurement'
-                || message.type === 'deleteMeasurement') {
+                || message.type === 'deleteMeasurement' || message.type === 'restoreMeasurement') {
                 // Through the same path every other drawings command takes, so
                 // the whole set comes back as one 'scenes' message and the
                 // panels redraw from one answer. Posting a shape of its own is
@@ -357,6 +357,7 @@ class FrameViewSession {
                     addMeasurement: 'add_measurement',
                     updateMeasurement: 'update_measurement',
                     deleteMeasurement: 'delete_measurement',
+                    restoreMeasurement: 'restore_measurement',
                 }[message.type];
                 this._handleDrawingsCommand(command, {
                     drawingId: message.drawingId,

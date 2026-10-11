@@ -281,7 +281,9 @@ class TestSaveDrawings:
         ])
 
         saved = json.loads(Path(written).read_text())
-        assert [d["id"] for d in saved["drawings"]] == ["overridden", "from file"]
+        # An overridden code drawing is saved as its override, naming the drawing it overrides.
+        assert [(d["id"], d.get(runner.OVERRIDES_KEY)) for d in saved["drawings"]] == [
+            ("overridden-measurements", "overridden"), ("from file", None)]
 
     def test_an_untouched_code_drawing_is_not_frozen_into_the_file(self, example):
         # Writing it out would stop it following the code that asked for it.
@@ -368,14 +370,14 @@ class TestMergeMeasurements:
 
         assert [m["origin"] for m in merged] == [runner.ORIGIN_FILE]
 
-    def test_the_file_may_suppress_one_the_algorithm_produced(self):
-        # Without this, the only way to be rid of a generated measurement is to
-        # change the algorithm.
+    def test_the_file_may_delete_one_the_code_asks_for(self):
+        # Without this, the only way to be rid of a code measurement is to change the code.
+        # It is kept, marked deleted, so the viewer can list it greyed and put it back.
         merged = runner.merge_measurements(
             [self._code("x", "y")], [{"a": _ref("x"), "b": _ref("y"), "suppressed": True}],
         )
 
-        assert merged == []
+        assert [(m["origin"], m["suppressed"]) for m in merged] == [(runner.ORIGIN_DELETED, True)]
 
     def test_suppressing_something_that_is_not_there_adds_nothing(self):
         merged = runner.merge_measurements([], [{"a": _ref("x"), "b": _ref("y"), "suppressed": True}])
@@ -1154,7 +1156,7 @@ class TestChangingAndRemovingAMeasurement:
 
 
 class TestDeletingAMeasurementTheCodeAsksFor:
-    """It cannot be done. The code asks again the next time it runs."""
+    """Marked deleted in the file: listed greyed, and can be put back."""
 
     def _frame(self):
         return _posts_with(lambda face, timber: [Drawing(
@@ -1176,41 +1178,94 @@ class TestDeletingAMeasurementTheCodeAsksFor:
         plan = next(d for d in drawings if d["id"] == "plan")
         return next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]
 
+    def _origins(self, frame, pending):
+        return [m["origin"] for m in self._measurements(frame, pending)]
+
     def test_the_code_measurement_is_there_to_begin_with(self):
-        assert len(self._measurements(self._frame(), [])) == 1
+        assert self._origins(self._frame(), []) == [runner.ORIGIN_CODE]
 
-    def test_deleting_it_is_refused(self):
+    def test_deleting_it_marks_it_deleted(self):
         frame, pending = self._frame(), []
 
-        with pytest.raises(ValueError, match="declared in the frame's code"):
-            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
 
-    def test_and_it_is_still_there_afterwards(self):
+        assert self._origins(frame, pending) == [runner.ORIGIN_DELETED]
+
+    def test_deleting_one_already_deleted_does_nothing(self):
+        frame, pending = self._frame(), []
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        before = [dict(d) for d in pending]
+
+        assert runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire()) is None
+        assert self._origins(frame, pending) == [runner.ORIGIN_DELETED]
+        assert [dict(d) for d in pending] == before
+
+    def test_putting_it_back_brings_the_code_s_own(self):
+        frame, pending = self._frame(), []
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        runner.restore_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        assert self._origins(frame, pending) == [runner.ORIGIN_CODE]
+
+    def test_putting_back_one_that_is_not_deleted_does_nothing(self):
         frame, pending = self._frame(), []
 
-        with pytest.raises(ValueError):
-            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        assert runner.restore_measurement(frame, None, pending, "plan", VIEWPORT, self._wire()) is None
+        assert pending == []
 
-        assert len(self._measurements(frame, pending)) == 1
-
-    def test_a_refused_delete_does_not_quietly_drop_an_override(self):
-        # The file may hold this measurement's placement or kind. Losing that to
-        # a delete that did not happen would be an edit nobody asked for.
+    def test_deleting_a_changed_one_puts_the_code_s_back(self):
         frame, pending = self._frame(), []
         runner.update_measurement(
             frame, None, pending, "plan", VIEWPORT, self._wire(),
             {"placement": {"offset": 9.0}})
+        assert self._origins(frame, pending) == [runner.ORIGIN_OVERRIDDEN]
 
-        with pytest.raises(ValueError):
-            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
 
-        assert self._measurements(frame, pending)[0]["placement"] == {"offset": 9.0}
+        (back,) = self._measurements(frame, pending)
+        assert back["origin"] == runner.ORIGIN_CODE and back.get("placement") != {"offset": 9.0}
 
-    def test_the_file_still_says_which_it_is(self):
-        # What the viewer reads to decide whether to offer a delete at all.
-        frame = self._frame()
+    def test_and_deleting_it_again_deletes_it(self):
+        frame, pending = self._frame(), []
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._wire(),
+            {"placement": {"offset": 9.0}})
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
 
-        assert self._measurements(frame, [])[0]["origin"] == runner.ORIGIN_CODE
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        assert self._origins(frame, pending) == [runner.ORIGIN_DELETED]
+
+    def test_a_deletion_is_saved_and_comes_back(self, tmp_path):
+        frame, pending = self._frame(), []
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        source = tmp_path / "frame.py"
+
+        runner.write_drawings_file(source, runner.collect_drawings(frame, None, pending))
+
+        assert self._origins_from_file(frame, source) == [runner.ORIGIN_DELETED]
+
+    def test_a_change_is_saved_and_comes_back(self, tmp_path):
+        # Saving used to write the merged drawing whole, without saying what it
+        # overrides: read back it was a second drawing, and the change was gone.
+        frame, pending = self._frame(), []
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._wire(),
+            {"placement": {"offset": 9.0}})
+        source = tmp_path / "frame.py"
+
+        runner.write_drawings_file(source, runner.collect_drawings(frame, None, pending))
+
+        drawings = runner.collect_drawings(frame, source, [])
+        assert [(d["id"], d["origin"]) for d in drawings] == [("plan", runner.ORIGIN_OVERRIDDEN)]
+        (measure,) = next(v for v in drawings[0]["viewports"] if v["id"] == VIEWPORT)["measurements"]
+        assert measure["placement"] == {"offset": 9.0}
+
+    def _origins_from_file(self, frame, source):
+        drawings = runner.collect_drawings(frame, source, [])
+        plan = next(d for d in drawings if d["id"] == "plan")
+        return [m["origin"] for m in next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]]
 
 
 class TestAddingAMeasurement:

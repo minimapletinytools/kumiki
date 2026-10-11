@@ -16,6 +16,7 @@ const TO_EXTENSION = Object.freeze([
     'addMeasurement',
     'assemblyFailureLog',
     'deleteMeasurement',
+    'restoreMeasurement',
     'findCSGAtPoint',
     'hoverFeatureAtPoint',
     'openKigumiOutput',
