@@ -106,8 +106,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
 :: TODO
 
 
--2D VIEW EQUIVALENCY GROUPS
-
 
 DONE-measuring
   DONE-when measuring, if you highlight an invalid face tom easure to, clicking should do nothing, right now it selects the feature and makes no measurement whic his weird.
@@ -128,12 +126,16 @@ DONE-modifying python created measurements
   -delete an original measurement should delete it, thus you need a way to override a measurement as "delteed"
   -delete after modifying should reset to original measurement (or not)
 
-  
--2 seleciton modes in 3d view, timber and feature
+DONE-2 seleciton modes in 3d view, timber and feature
   selection mode, the rules are as follows:
   -in 2d drawing view, feature mode is the default. timber mode is disabled, although we may want to enabel it in the future so make sure it techincally still works.
   -in 3d view, timber mode is the default when not measuring from anything, once mesauring from something, it switches to feature mode, but you can hold shift to enter timber mode
     -when shift is held, fetaure highlighting is disabled on timbers that aren't selected, so you can keep holding shift if you want to select a fetaure on the selected timber, when in feature mode, th eselection iignored basically
+
+
+
+-2D VIEW EQUIVALENCY GROUPS
+  -paus eher for a moment, one thing I realized is that in 2d view, there are sorta equivalency groups for measurements when locked to an orthographic view. so for example, a pirsm has 6 faces, and a bunch of edgse/vertices. When we measure betwene 2 edges on a face that's parallel with the viewport plane, we are also measuring the distance bteew all other edges, vertices of the perpendicular face that edge is a part of. IN the measurement, we say it's just the edge being measured, but in. thesolver wesay that a DOF got removed from all the features I mentioned. Is there some way to solve for all features that had their DOfs solved in this way even though just teh edge was measured. 
 
 -PTW stuff
   -rough faces matching PTW faces should be given PTW labels?
@@ -150,20 +152,9 @@ DONE-modifying python created measurements
     -ask agent what its currentyl doing though
 
 
--XRAY feature
-  -timber goes into x-ray view when a feature is selected in drawing mode 
-  -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
-    -or maybe allow selectino of xrayed features?
-  -figure out xray joints tagging (could be a per joint/direction property)
-    -XRAY_FROM_AXIS (enum face aligned timber directions) 
-    -we can add more sophistitacted filter sin the future
-
-
-
 
 
 -MEASURING/DRAWING BACKLOG
-  
   -the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
   -angle mesaurement anchor positon derivatino needs to be improved
     -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
@@ -176,6 +167,13 @@ DONE-modifying python created measurements
   -do the drawing border and meta info stuff
     -add background border for drawing...
     -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
+  -XRAY feature
+    -timber goes into x-ray view when a feature is selected in drawing mode 
+    -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
+      -or maybe allow selectino of xrayed features?
+    -figure out xray joints tagging (could be a per joint/direction property)
+      -XRAY_FROM_AXIS (enum face aligned timber directions) 
+      -we can add more sophistitacted filter sin the future
   -simple function for creating the default drawing and solving it (full frame, 3 views, only measure what's visible)
   -solver optimization, the expensive part is face_reaches_surface
     -cache solid_bounds
@@ -206,7 +204,9 @@ DONE-don't show > next to empty top level and gray them out (e.g. no drawnigs, t
 DONE-drawings are as such, if a drawing contains members from multilpe frames, it shows at the top level drawing, if it has only members from a as nigle frame it goes under that frame. OBviosuly these are the same if there is only 1 frame.
   -if they have more than 1 frame involevd they should go at top level, otherwise at frame level
 
-
+-do a pass on why kigumi install takes forever and bundling warning
+  Prepared bundled instructions: /Users/giraffe/kitchen/faucet/kumiki/kigumi/.generated/bundled-usage-instructions.md
+ WARNING  This extension consists of 490 files, out of which 130 are JavaScript files. For performance reasons, you should bundle your extension: https://aka.ms/vscode-bundle-extension. You should also exclude unnecessary files by adding them to your .vscodeignore: https://aka.ms/vscode-vscodeignore.
 
 -diagonal brace notiching broken in learn to timber frame shed
 -add support to run @tools from the parameter section
