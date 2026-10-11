@@ -558,4 +558,20 @@ describe('reference features', () => {
         ]);
         expect(lit[0].renderOrder).toBeLessThan(ORDER.measurementEndMesh);
     });
+
+    test('are a subtle mark on the timber: thin, faint, and hidden by what is in front', () => {
+        const [primary, other] = drawn({ reference: [
+            { key: 'ref:edge', edgePositions: EDGES, primary: true },
+            { key: 'ref:face', edgePositions: EDGES, primary: false },
+        ] });
+        expect(primary.depthTest).toBe(true);
+        expect(primary.linewidth).toBeLessThan(5);
+        expect(primary.opacity).toBeLessThan(1);
+        expect(other.opacity).toBeLessThan(primary.opacity);
+    });
+
+    test('every other highlight is still drawn over everything', () => {
+        const lit = drawn({ measurementEnd: [{ key: 'end:a', edgePositions: EDGES }] });
+        expect(lit[0].depthTest).toBeUndefined();
+    });
 });

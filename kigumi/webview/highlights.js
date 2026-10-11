@@ -42,9 +42,16 @@
     const MEASUREMENT_END_COLOR = 0xab47bc;
     const MEASUREMENT_END_OPACITY = 0.7;
 
-    /** A timber's reference features: the primary in red, as a drawing marks it, the rest fainter. */
-    const REFERENCE_COLOR = 0xd32f2f;
-    const REFERENCE_OTHER_COLOR = 0xff8a65;
+    /**
+     * A timber's reference features: the primary in red, as a drawing marks it, the rest
+     * fainter. Subtle on purpose -- a mark on the timber, not a highlight -- so thin, faint and
+     * depth tested: it shows on the surface and not through what is in front of it.
+     */
+    const REFERENCE_COLOR = 0xc0392b;
+    const REFERENCE_OTHER_COLOR = 0xe57373;
+    const REFERENCE_OPACITY = 0.7;
+    const REFERENCE_OTHER_OPACITY = 0.45;
+    const REFERENCE_EDGE_WIDTH_PX = 3;
 
     /** Over the selection, and over each other in this order. */
     const ORDER = Object.freeze({
@@ -152,8 +159,10 @@
             } else {
                 styledOverlays(leading.source, 'reference', {
                     color: leading.source.primary ? REFERENCE_COLOR : REFERENCE_OTHER_COLOR,
-                    opacity: leading.source.primary ? 1 : 0.7,
+                    opacity: leading.source.primary ? REFERENCE_OPACITY : REFERENCE_OTHER_OPACITY,
                     edges: ORDER.referenceEdges,
+                    depthTest: true,
+                    linewidth: REFERENCE_EDGE_WIDTH_PX,
                 }, out);
             }
         }
@@ -267,19 +276,30 @@
 
     }
 
-    /** A feature's overlays in one look: its point, its edges and its faces, where it has them. */
+    /**
+     * A feature's overlays in one look: its point, its edges and its faces, where it has them.
+     * `look.depthTest` and `look.linewidth`, when given, go on the overlays: the rest are
+     * drawn over everything, at the usual width.
+     */
     function styledOverlays(source, prefix, look, out) {
+        const drawn = {};
+        if (look.depthTest) {
+            drawn.depthTest = true;
+        }
+        if (look.linewidth) {
+            drawn.linewidth = look.linewidth;
+        }
         if (look.point !== undefined && hasPoint(source.pointAt)) {
             out.push({ id: `${prefix}-point:${source.key}`, shape: 'point', at: source.pointAt,
-                       color: look.color, opacity: 1, renderOrder: look.point });
+                       color: look.color, opacity: 1, renderOrder: look.point, ...drawn });
         }
         if (look.edges !== undefined && hasEdges(source.edgePositions)) {
             out.push({ id: `${prefix}-edges:${source.key}`, shape: 'edges', positions: source.edgePositions,
-                       color: look.color, opacity: look.opacity, renderOrder: look.edges });
+                       color: look.color, opacity: look.opacity, renderOrder: look.edges, ...drawn });
         }
         if (look.mesh !== undefined && hasMesh(source.mesh)) {
             out.push({ id: `${prefix}-mesh:${source.key}`, shape: 'mesh', mesh: source.mesh,
-                       color: look.color, opacity: look.opacity, renderOrder: look.mesh });
+                       color: look.color, opacity: look.opacity, renderOrder: look.mesh, ...drawn });
         }
     }
 

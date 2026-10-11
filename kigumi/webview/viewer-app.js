@@ -4816,13 +4816,20 @@ class KigumiViewerApp extends LitElement {
             geometry.setPositions(descriptor.positions);
             const material = new THREE.LineMaterial({
                 color: descriptor.color,
-                linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
+                linewidth: descriptor.linewidth || CSG_HIGHLIGHT_EDGE_WIDTH_PX,
                 // Pixel thickness is computed against this, so it tracks the
                 // canvas the way the timbers' own edges do. Kept in step on
                 // resize for EVERY overlay now -- only the selection's line
                 // used to be, so the hover and the held one went thin.
                 resolution: this._getRendererResolution(),
-                depthTest: false,
+                // Over everything, unless the overlay is a mark ON the timber (a
+                // reference feature): then hidden by what is in front, and pulled
+                // a little toward the camera so it does not fight the surface it lies on.
+                depthTest: Boolean(descriptor.depthTest),
+                depthWrite: false,
+                polygonOffset: Boolean(descriptor.depthTest),
+                polygonOffsetFactor: -1,
+                polygonOffsetUnits: -4,
                 transparent: true,
                 opacity: descriptor.opacity,
             });

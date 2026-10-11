@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-from kumiki import CutTimber, Frame, TimberFeature, create_timber, create_v2, create_v3, m, mm
+from kumiki import CutTimber, Cutting, Frame, HalfSpace, TimberFeature, create_timber, create_v2, create_v3, m, mm
 from kumiki.ticket import TimberTicket
 
 
@@ -56,6 +56,18 @@ class TestReferenceFeatures:
 
         assert [(f["name"], f["primary"]) for f in found] == [("centerline", True), ("front_face", False)]
         assert _segments(found[0]) == [[0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]
+
+    def test_they_are_cropped_to_what_the_cuts_left(self):
+        # The top 400mm cut away: the arris stops where the wood does, as a selected edge would.
+        timber = _post(TimberFeature.RIGHT_FRONT_EDGE, TimberFeature.CENTERLINE)
+        above = HalfSpace(normal=create_v3(0, 0, 1), offset=mm(600))
+        root = CutTimber(timber, cuts=[Cutting(timber=timber, negative_csg=above)]).render_timber_with_cuts_csg_local()
+
+        edge, axis = runner._reference_features_payload(timber, root)
+
+        assert _segments(edge) == [[0.05, 0.1, 0.0, 0.05, 0.1, 0.6]]
+        # The axis runs through the wood rather than on its surface, and is cropped to the wood.
+        assert _segments(axis) == [[0.0, 0.0, 0.0, 0.0, 0.0, 0.6]]
 
     def test_they_reach_the_layers_payload(self):
         frame = Frame(cut_timbers=[CutTimber(_post(TimberFeature.RIGHT_FRONT_EDGE), cuts=[])])

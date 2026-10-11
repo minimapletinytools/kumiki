@@ -3471,11 +3471,12 @@ def _anchor_payload(feature, node, timber, located, root_csg, plane, solid_space
     }, span)
 
 
-def _reference_features_payload(timber: Any) -> List[Dict[str, Any]]:
+def _reference_features_payload(timber: Any, root_csg: Any = None) -> List[Dict[str, Any]]:
     """A timber's reference features, as world-space lines for the viewer to light.
 
-    Of the perfect timber, so where it would be measured from rather than what the cuts
-    left: a line runs the timber's length, and a face or center plane is its outline.
+    Of the perfect timber: a line runs the timber's length, and a face or center plane
+    is its outline. With *root_csg* -- the cut timber, in its local space -- each line is
+    cropped to it the way a selected edge is, so it stops where a cut took the wood.
     The first is the primary reference, which a drawing marks.
     """
     from kumiki.measuring import (locate_center_plane, locate_edge, locate_face,
@@ -3518,12 +3519,55 @@ def _reference_features_payload(timber: Any) -> List[Dict[str, Any]]:
                     if name.endswith("_FACE_CENTERLINE")
                     else locate_edge(timber, feature.centerline() if name == "CENTERLINE" else feature.edge()))
             segments = [run(vector(line.point))]
+        if root_csg is not None:
+            # The axis runs through the wood; everything else lies on its surface.
+            segments = _cropped_reference_segments(
+                timber, root_csg, segments, through_material=name == "CENTERLINE")
         found.append({
             "name": name.lower(),
             "primary": index == 0,
             "edgePositions": [value for segment in segments for end in segment for value in end],
         })
     return found
+
+
+def _cropped_reference_segments(
+    timber: Any, root_csg: Any, segments: List[Any], through_material: bool,
+) -> List[Any]:
+    """*segments* (world space) cut down to where the cut timber still has them.
+
+    On its surface, or -- *through_material* -- inside it. Exact first, then at float
+    noise, as a declared edge is (see _cropped_edge_segments).
+    """
+    from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
+                                    crop_line_to_segments_on_csg)
+    from kumiki.geometry import Line, unit_vector
+    from kumiki.rule import create_v3
+
+    crop = crop_line_to_segments_on_csg if through_material else crop_line_to_boundary_segments_on_csg
+    near = timber.get_perfect_timber_within_csg_local().transform.position
+    reach = float(timber.length) * 4
+    kept = []
+    for start, end in segments:
+        a = timber.transform.global_to_local(create_v3(*start))
+        b = timber.transform.global_to_local(create_v3(*end))
+        span = float(((b - a).T * (b - a))[0, 0]) ** 0.5
+        if span <= 0:
+            continue
+        line = Line(direction=unit_vector(b - a), point=a)
+        station = lambda point: float(((point - a).T * line.direction)[0, 0])  # noqa: E731
+        pieces = crop(line, root_csg, seed_reach=reach, near=near, tolerance=0.0)
+        if not pieces:
+            pieces = crop(line, root_csg, seed_reach=reach, near=near, tolerance=_DECLARED_EDGE_FLOAT_NOISE)
+        for piece in pieces or []:
+            low, high = sorted((station(piece.start), station(piece.end)))
+            low, high = max(low, 0.0), min(high, span)
+            if high - low <= 1e-9:
+                continue
+            at = lambda distance: [float(v) for v in timber.transform.local_to_global(  # noqa: E731
+                a + line.direction * distance)]
+            kept.append((at(low), at(high)))
+    return kept
 
 
 def feature_highlights(slot_state: Any, references: Sequence[Any]) -> List[Dict[str, Any]]:
@@ -3662,7 +3706,8 @@ def serialize_layers(frame: Any, frame_parts: Sequence[Tuple[str, Any]] = ()) ->
             "name": entry["displayName"],
             "tags": list(timber_tags_by_kumiki_id.get(entry["kumikiEphemeralId"], [])),
             "cuts": cuts_meta,
-            "referenceFeatures": _reference_features_payload(entry["timber"]),
+            "referenceFeatures": _reference_features_payload(
+                entry["timber"], entry["cutTimber"].render_timber_with_cuts_csg_local()),
         })
 
     accessories_payload: List[Dict[str, Any]] = []
