@@ -266,12 +266,10 @@ def project_geometry_for_measuring(
         # Edge-on, so it draws as a line along the face, square to its normal
         # and to the line of sight.
         #
-        # TODO mostly redundant. Edges outrank faces at a point, and a face seen
-        # edge-on nearly always lies along an edge already there -- a declared
-        # arris or a derived one -- which stands for it on the sheet. Only a few
-        # faces have no line edge to stand for them, e.g. a cylinder's cap, whose
-        # rim is a circle but draws as a line edge-on. Label those features, so
-        # they are the only faces projected here.
+        # TODO mostly redundant. Edges outrank projected faces, and most faces are
+        # fully determined by declared or derived edges. Only things like a
+        # Cylinder's cap are not covered. We should label these exceptional
+        # features and only project those ones.
         return Line(direction=_cross(facing, gaze), point=geometry.point)
     return None
 
