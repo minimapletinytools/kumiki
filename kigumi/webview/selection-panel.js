@@ -65,26 +65,39 @@ export class SelectionPanel {
         const action = document.createElement('button');
         action.type = 'button';
         action.className = 'ip-action ip-measure';
-        const making = this.app.measureDraft.isActive;
-        // There is nothing to confirm: the second feature is confirmed by being
-        // clicked, and what the click takes is already drawn under the pointer.
-        // So while an end is held this is the way OUT, which is otherwise only
-        // on the Escape key.
-        action.textContent = making
-            ? this.t('viewer.selection.measureCancel')
-            : this.t('viewer.selection.measureFrom');
-        action.title = making
-            ? this.t('viewer.selection.measureCancel.title')
-            : this.t('viewer.selection.measureFrom.title');
+        action.textContent = this.t('viewer.selection.measureFrom');
+        action.title = this.t('viewer.selection.measureFrom.title');
         action.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (making) {
-                this.app.escapeMeasurement();
-            } else {
-                this.app.startMeasurementFromFocus();
-            }
+            this.app.startMeasurementFromFocus();
         });
         return action;
+    }
+
+    /**
+     * While an end is held: how to pick the second feature, one line each, and the
+     * way out below it -- a button, or Escape. There is nothing to confirm: the
+     * second feature is confirmed by being clicked.
+     */
+    _measuringHint() {
+        const box = document.createElement('div');
+        box.className = 'ip-measure-hint';
+        for (const key of ['pick', 'byTimber']) {
+            const line = document.createElement('div');
+            line.textContent = this.t(`viewer.selection.measuring.${key}`);
+            box.appendChild(line);
+        }
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'ip-action ip-measure';
+        cancel.textContent = this.t('viewer.selection.measuring.cancel');
+        cancel.title = this.t('viewer.selection.measuring.cancel.title');
+        cancel.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.app.escapeMeasurement();
+        });
+        box.appendChild(cancel);
+        return box;
     }
 
     /**
@@ -341,8 +354,8 @@ export class SelectionPanel {
         // made too, since that is when it becomes the way to finish one.
         if (this.app.canStartMeasurement || this.app.measureDraft.isActive) {
             const line = document.createElement('div');
-            line.className = 'ip-detail';
-            line.appendChild(this._measureButton());
+            line.className = 'ip-detail ip-measure-line';
+            line.appendChild(this.app.measureDraft.isActive ? this._measuringHint() : this._measureButton());
             body.appendChild(line);
         }
 

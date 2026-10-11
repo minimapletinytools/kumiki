@@ -26,15 +26,20 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 - A deleted one is listed greyed and not drawn; right-click "put back" restores it, as does undo.
   Deleting one already deleted does nothing.
 
-## 3. Two selection modes in 3D
+## 3. Two selection modes
 
-- **Feature mode (default):** a click goes straight to the feature on the nearest timber, or, when a
-  timber is selected, drills into that timber wherever it is along the ray.
-- **Shift held = timber mode:** feature hover highlighting is off, and a click selects the timber
-  (shift-click still adds to or removes from the selection).
-- Taking a first measurement end clears the timber selection; cancelling restores it.
-- **Q2:** this changes what a plain click does: today the first click selects the timber and the
-  next drills in. Everywhere, or only while measuring or in drawings?
+`pickMode` in selection-store.js. Decided (Q2):
+
+- **Feature mode:** a click goes straight to the feature on the nearest timber; the selection is
+  ignored.
+- **Timber mode:** a click selects a timber; a click on one already selected picks the feature on
+  it, wherever it is along the ray. Features light only on selected timbers.
+- **In a drawing:** feature mode. Timber mode is off behind `TIMBER_MODE_IN_DRAWINGS`, and works if
+  turned on (then as in 3D).
+- **In 3D:** timber mode while nothing is held to measure from. Once measuring: feature mode, and
+  shift held for timber mode -- a click selects a timber in place of the selection, and with shift
+  still held a click on it picks its feature. Outside measuring, shift-click still adds or removes
+  a timber from the selection.
 
 ## 4. Highlighting
 
@@ -81,7 +86,7 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 
 - [x] 1. Measuring fixes
 - [x] 2. Code-made measurement overrides
-- [ ] 3. Selection modes
+- [x] 3. Selection modes
 - [x] 4. Highlighting
 - [ ] 5. Hidden features
 - [ ] 6. Perfect vs rough

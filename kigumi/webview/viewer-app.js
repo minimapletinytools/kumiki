@@ -1526,6 +1526,11 @@ class KigumiViewerApp extends LitElement {
         this.onLightDialPointerMove = this.onLightDialPointerMove.bind(this);
         this.onLightDialPointerUp = this.onLightDialPointerUp.bind(this);
         this.onWindowKeyDown = this.onWindowKeyDown.bind(this);
+        this.onWindowKeyUp = this.onWindowKeyUp.bind(this);
+        this.onWindowBlur = this.onWindowBlur.bind(this);
+        // Whether shift is held: it switches the selection mode, which hover has to follow
+        // while the pointer rests. See pickMode in selection-store.js.
+        this._shiftHeld = false;
         this.onLayerStateChanged = this.onLayerStateChanged.bind(this);
         this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
         this.onCsgTreeRequested = this.onCsgTreeRequested.bind(this);
@@ -1699,6 +1704,8 @@ class KigumiViewerApp extends LitElement {
         window.removeEventListener('mousedown', this.onWindowContextMenuDismiss);
         window.removeEventListener('resize', this.onWindowResize);
         window.removeEventListener('keydown', this.onWindowKeyDown);
+        window.removeEventListener('keyup', this.onWindowKeyUp);
+        window.removeEventListener('blur', this.onWindowBlur);
         window.removeEventListener('pointermove', this.onGizmoPointerMove);
         window.removeEventListener('pointerup', this.onGizmoPointerUp);
         window.removeEventListener('pointermove', this.onLightDialPointerMove);
@@ -1910,6 +1917,8 @@ class KigumiViewerApp extends LitElement {
         window.addEventListener('pointerup', this.onLightDialPointerUp);
         window.addEventListener('resize', this.onWindowResize);
         window.addEventListener('keydown', this.onWindowKeyDown);
+        window.addEventListener('keyup', this.onWindowKeyUp);
+        window.addEventListener('blur', this.onWindowBlur);
     }
 
     setupThreeScene() {
@@ -3036,7 +3045,34 @@ class KigumiViewerApp extends LitElement {
         this.updateCamera();
     }
 
+    /** Shift pressed or released: the selection mode may have changed, so ask the hover again. */
+    _setShiftHeld(held) {
+        if (this._shiftHeld === held) {
+            return;
+        }
+        this._shiftHeld = held;
+        // A hover that found nothing to light has forgotten where it was, so it is
+        // given the pointer again rather than asked again.
+        if (this._hover && !this._hover.askAgain() && this._lastClientX !== undefined) {
+            this._hover.pointerAt(this._lastClientX, this._lastClientY);
+        }
+    }
+
+    onWindowKeyUp(event) {
+        if (event.key === 'Shift') {
+            this._setShiftHeld(false);
+        }
+    }
+
+    /** A key released while the window is away is never heard, so let go of shift here. */
+    onWindowBlur() {
+        this._setShiftHeld(false);
+    }
+
     onWindowKeyDown(event) {
+        if (event.key === 'Shift') {
+            this._setShiftHeld(true);
+        }
         // Tab is checked BEFORE the defaultPrevented guard: it is the focus key,
         // so something else may well have claimed it, and this only acts while
         // the pointer is over a feature -- which is not a moment anyone is
@@ -3277,6 +3313,8 @@ class KigumiViewerApp extends LitElement {
         // arrives long after the click that asked.
         this._lastClientX = event.clientX;
         this._lastClientY = event.clientY;
+        // The pointer says whether shift is down, which catches a press the window missed.
+        this._setShiftHeld(Boolean(event.shiftKey));
         // Both thresholds at once: forget a cycled choice on any movement, ask
         // again only once past the slop. See HoverState.pointerAt.
         this._hover.pointerAt(event.clientX, event.clientY);
@@ -3298,9 +3336,10 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         // The same decision a click makes, so hover shows what a click would do
-        // rather than something else. Clicking an unselected timber selects the
-        // whole timber; clicking one already selected drills into it. Only the
-        // second has a feature to ask the runner about.
+        // rather than something else -- shift included, since it switches the
+        // selection mode. Only a pick that reaches a feature has one to ask the
+        // runner about: in timber mode that is a timber already selected, so
+        // with shift held while measuring nothing else lights.
         //
         // The decision also says WHICH member, which is not the nearest one: a
         // click drills into the selected timber wherever it sits along the ray.
@@ -3308,7 +3347,7 @@ class KigumiViewerApp extends LitElement {
         const decision = choosePickAction({
             hits: along.hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
-            shiftKey: false,
+            shiftKey: this._shiftHeld,
             inDrawing: this.selectionManager.inDrawing,
             measuring: this.measureDraft.isActive,
         });
@@ -3433,6 +3472,17 @@ class KigumiViewerApp extends LitElement {
             feature: this._lastPickAnchor.reference.feature || null,
         });
         this._reaskHover();
+        this._measureStateChanged();
+    }
+
+    /**
+     * A measurement started, finished or was let go of. The info pane says which, and it is
+     * built from scratch rather than bound, so it has to be told.
+     */
+    _measureStateChanged() {
+        if (this.selectionPanel) {
+            this.selectionPanel.updateInfo(this.currentFrameData);
+        }
         this.requestUpdate();
     }
 
@@ -3452,6 +3502,7 @@ class KigumiViewerApp extends LitElement {
         }
         this._writeMeasurement(
             result.measurement, (message.verdict && message.verdict.kinds) || null);
+        this._measureStateChanged();
     }
 
     /** What a pick offers as one end of a measurement. */
@@ -3573,7 +3624,7 @@ class KigumiViewerApp extends LitElement {
         this.renderMeasurements();
         this.emitViewerLog('measure-escape', { action: released.action });
         this._reaskHover();
-        this.requestUpdate();
+        this._measureStateChanged();
         return true;
     }
 
@@ -3583,6 +3634,7 @@ class KigumiViewerApp extends LitElement {
         this._measurePreview = null;
         this.undoStacks.suspend(false);
         this._reaskHover();
+        this._measureStateChanged();
     }
 
     _sendMeasurementCommand(payload) {
@@ -4216,13 +4268,11 @@ class KigumiViewerApp extends LitElement {
             hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
             shiftKey: !!event.shiftKey,
-            // A drawing has no timber selection to drill in from, so a click
-            // goes straight to the feature. Hover asks the same question above
-            // and must get the same answer, or it lights what a click will not
-            // take -- which in a drawing was nothing at all.
+            // The selection mode (pickMode): feature mode in a drawing and while
+            // measuring, timber mode otherwise and with shift held while measuring.
+            // Hover asks the same question above and must get the same answer, or
+            // it lights what a click will not take.
             inDrawing: this.selectionManager.inDrawing,
-            // While an end is held, a click reaches the feature directly, so
-            // the second end can be on a timber that was never selected.
             measuring: this.measureDraft.isActive,
         });
 
@@ -4271,6 +4321,11 @@ class KigumiViewerApp extends LitElement {
         this.emitViewerLog('selection-changed', {
             selectedTimbers: this.selectionManager.getSelectedTimbers(),
         });
+        // What the pointer rests on may light differently now: in timber mode a
+        // timber just selected offers its features.
+        if (this._hover) {
+            this._hover.askAgain();
+        }
     }
 
     // ------------------------------------------------------------------
