@@ -5619,7 +5619,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     renderAssemblyTimeline() {
-        if (!ASSEMBLY_PREVIEW_ENABLED || !this.showAssemblyTimeline) {
+        if (!ASSEMBLY_PREVIEW_ENABLED || !this.showAssemblyTimeline || this.isInDrawing) {
             return '';
         }
         if (this.assemblySolving) {
@@ -7557,6 +7557,11 @@ class KigumiViewerApp extends LitElement {
             this.isInDrawing
                 ? window.SELECTION_MODES.DRAWING
                 : window.SELECTION_MODES.MODEL);
+        // A drawing is of the frame assembled. Scrubbed apart in 3D, it goes
+        // back together on the way in, and stays so when you come back out.
+        if (this.isInDrawing) {
+            this.setAssemblyScrubValue(0);
+        }
         this._lastPickAnchor = null;
         this.rebuildViewports();
         this.syncCameraControls();
