@@ -103,4 +103,4 @@ docs = [
 ]
 
 [tool.ty.src]
-exclude = ["oldcrap", "fusion360/libs", "kigumi", "fusion360", "freecad", "patterns", "tools/gen_ref_pages.py"]
+exclude = ["oldcrap", "fusion360/libs", "kigumi/**", "!kigumi/runner.py", "fusion360", "freecad", "patterns", "tools/gen_ref_pages.py"]

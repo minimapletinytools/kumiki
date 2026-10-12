@@ -35,7 +35,8 @@ if TYPE_CHECKING:
     # comparing against a stale class object after a reload. Under
     # TYPE_CHECKING there is no runtime import at all, so annotations can be
     # concrete while every isinstance check still imports inside its function.
-    from kumiki.csg.cutcsg import CutCSG
+    from kumiki.csg.cutcsg import CSGParity, CutCSG
+    from kumiki.drawings.drawing import VectorLike
     from kumiki.timber import CutTimber, Cutting, Joint
 
 
@@ -1676,7 +1677,7 @@ def _measure_pair_identity(measure: Dict[str, Any]) -> Tuple[Any, Any]:
     return (_feature_path_identity(first), _feature_path_identity(second))
 
 
-def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
+def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, Any, str]:
     """What makes a measurement itself, within the viewport it is drawn in.
 
     The anchors unordered, since measuring A to B is measuring B to A. Then the
@@ -1795,8 +1796,8 @@ def _plane_normal(constraints: List[List[float]], look: List[float]) -> Optional
 def _measurement_plane(
     one: Dict[str, Any],
     other: Dict[str, Any],
-    at_one: List[float],
-    at_other: List[float],
+    at_one: Optional[List[float]],
+    at_other: Optional[List[float]],
     look: List[float],
 ) -> Dict[str, Any]:
     """Where a measurement between these two features is taken and drawn.
@@ -1818,7 +1819,7 @@ def _measurement_plane(
         if (geometry or {}).get("kind") == "point" and geometry.get("at"):
             at = [float(part) for part in geometry["at"]]
             break
-    if at is None and len(at_one or []) == 3 and len(at_other or []) == 3:
+    if at is None and at_one and at_other and len(at_one) == 3 and len(at_other) == 3:
         at = [(float(at_one[i]) + float(at_other[i])) / 2 for i in range(3)]
 
     return {"at": at or [0.0, 0.0, 0.0], "normal": normal}
@@ -2169,7 +2170,7 @@ def merge_measurements(
     file parser already makes.
     """
     global _duplicate_warning_given
-    from_file: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    from_file: Dict[Tuple[Any, Any, Any, str], Dict[str, Any]] = {}
     for measure in file_measures:
         identity = _measure_identity(measure)
         if identity in from_file and not _duplicate_warning_given:
@@ -2385,7 +2386,7 @@ def _measurement_slot(
         raise ValueError(f"No drawing {drawing_id!r} to measure on")
 
     holder = _measurement_holder(existing, pending, target)
-    viewport = next(
+    viewport: Optional[Dict[str, Any]] = next(
         (v for v in holder.setdefault("viewports", []) if v.get("id") == viewport_id), None)
     if viewport is None:
         viewport = {"id": viewport_id, "measurements": []}
@@ -2781,11 +2782,13 @@ def _measure_span(
         crop_line_to_segments_on_csg,
     )
     from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
+    from kumiki.rule import Matrix
 
     to_world = lambda v: tuple(_vector3_to_floats(timber.transform.local_to_global(v)))
+    v3 = lambda parts: Matrix([float(part) for part in parts])
 
     if isinstance(located, Point):
-        return PointSpan(at=to_world(located.position))
+        return PointSpan(at=v3(to_world(located.position)))
 
     solid = timber.get_perfect_timber_within_csg_local()
     reach = float(timber.length) * 4
@@ -2819,46 +2822,48 @@ def _measure_span(
                 # to be given: a line whose length is all depth has no direction
                 # on the sheet to be square to, and treating it as one put a
                 # point-and-line pair through the parallel-lines rule.
-                middle = tuple((start[i] + end[i]) / 2 for i in range(3))
-                return PointSpan(at=middle)
+                return PointSpan(at=v3((start[i] + end[i]) / 2 for i in range(3)))
+            outward = _edge_outward_normal(feature, node, timber)
             return LineSpan(
-                at=start, direction=tuple(direction),
+                at=v3(start), direction=v3(direction),
                 interval=(0.0, math.dist(start, end)),
-                outward=_edge_outward_normal(feature, node, timber))
+                outward=None if outward is None else v3(outward))
 
     if isinstance(located, Plane):
         cropped = approximately_crop_plane_to_area_on_csg(
             located, [node, solid], seed_reach=reach, near=solid.transform.position)
-        middle = cropped.centroid() if cropped is not None and not cropped.is_empty else None
-        if middle is None:
+        if cropped is None or cropped.is_empty:
+            return None
+        middle = cropped.centroid()
+        geometry = _located_geometry(located, timber)
+        if middle is None or geometry is None:
             return None
         at = to_world(middle)
-        normal = _normalize(_vector3_to_floats(
-            _located_geometry(located, timber).normal))
+        normal = _normalize(_vector3_to_floats(geometry.normal))
         if in_three_d:
             # A plane, not a line: measurable from anywhere rather than only
             # edge-on, and square to its normal in two directions rather than
             # one.
-            return PlaneSpan(at=at, normal=tuple(normal))
+            return PlaneSpan(at=v3(at), normal=v3(normal))
         if plane_normal is None:
-            return PointSpan(at=at)
+            return PointSpan(at=v3(at))
         # Edge-on, so it draws as a line running along the face, square to its
         # own normal and to the way we are looking.
         along = _cross(normal, _normalize(list(plane_normal)))
         if not any(abs(part) > 1e-9 for part in along):
             # Facing the reader rather than edge-on: it covers the view and
             # admits no measurement, so there is no line to give.
-            return PointSpan(at=at)
+            return PointSpan(at=v3(at))
         along = _normalize(along)
         # The region is timber-local and the direction is world, so the boundary
         # is brought over rather than the direction sent back. Mixing the two
         # spaces is the kind of wrong that still looks plausible on screen.
         if not cropped.boundary:
-            return PointSpan(at=at)
+            return PointSpan(at=v3(at))
         reach = [_dot(list(to_world(corner)), along) for corner in cropped.boundary]
         here = _dot(list(at), along)
         return LineSpan(
-            at=at, direction=tuple(along),
+            at=v3(at), direction=v3(along),
             interval=(min(reach) - here, max(reach) - here))
 
     return None
@@ -2924,9 +2929,7 @@ def _resolve_measurement(
     # rather than at each of the four places below that ask something of them.
     ends = {key: _geometry_from_wire((resolved.get(key) or {}).get("geometry"))
             for key in ("a", "b")}
-    placeable = (
-        spans.get("a") is not None and spans.get("b") is not None and plane is not None)
-    if placeable:
+    if spans.get("a") is not None and spans.get("b") is not None and plane is not None:
         # What this pair admits from here, so the anchors are placed for the
         # measurement that will actually be drawn. Defaulting to perpendicular
         # instead put two crossing faces -- which admit an ANGLE and nothing
@@ -3328,7 +3331,9 @@ def _geometry_from_wire(value: Optional[Dict[str, Any]]) -> Optional[Any]:
     def vector(parts: Any) -> Any:
         return create_v3(*(float(part) for part in parts))
 
-    kind = (value or {}).get("kind")
+    if value is None:
+        return None
+    kind = value.get("kind")
     if kind == "point":
         return Point(position=vector(value["at"]))
     if kind == "line":
@@ -3436,7 +3441,7 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
 
 
 def _resolve_anchor_placed(
-    frame: Any, anchor: Dict[str, Any], plane: Optional[Sequence[float]],
+    frame: Any, anchor: Optional[Dict[str, Any]], plane: Optional['VectorLike'],
     solid_space: bool = False,
 ):
     """Where the feature an anchor names actually is, in world space.
@@ -3629,7 +3634,7 @@ def serialize_layers(frame: Any, frame_parts: Sequence[Tuple[str, Any]] = ()) ->
         timber_id = id(entry["timber"])
         timber_to_kumiki_and_cut[timber_id] = (entry["kumikiEphemeralId"], entry["cutTimber"])
 
-    timber_tags_by_kumiki_id: Dict[int, List[str]] = {}
+    timber_tags_by_kumiki_id: Dict[int, List[Dict[str, str]]] = {}
     for entry in timber_entries:
         timber_ticket = getattr(entry.get("timber"), "ticket", None)
         timber_tags_by_kumiki_id[entry["kumikiEphemeralId"]] = _serialize_timber_tags(timber_ticket)
@@ -4405,7 +4410,7 @@ def resolve_frame_from_module(
 
     for rejected in (entries.rejected if entries is not None else ()):
         log_stderr(f"Warning: @{rejected.kind} {rejected.name} is not used: {rejected.reason}")
-    if entries is not None and entries.frames:
+    if decorators is not None and entries is not None and entries.frames:
         built = {entry.name: _build_frame_entry(entry.function, entry.name, incoming.get(entry.name))
                  for entry in entries.frames}
         groups = _group_kiwaris([(name, getattr(frame, "kiwari", None)) for name, frame in built.items()])
@@ -5304,7 +5309,7 @@ def _non_real_features_along_ray(root, local_ray, tolerances):
     from kumiki.geometry import Line
 
     origin, direction = local_ray
-    direction = _normalize(direction)
+    direction = _unit_or_none(direction)
     if direction is None:
         return []
     tolerance = float(tolerances.edge)
@@ -5333,7 +5338,7 @@ def _non_real_features_along_ray(root, local_ray, tolerances):
     return found
 
 
-def _normalize(vector: List[float]) -> Optional[List[float]]:
+def _unit_or_none(vector: List[float]) -> Optional[List[float]]:
     """A unit copy of *vector*, or None if it has no direction."""
     length = math.sqrt(sum(float(c) * float(c) for c in vector))
     if length <= 0:
@@ -5631,8 +5636,8 @@ def _navigate_csg_one_level(
     if segments is None:
         segments = _candidate_segments(node)
 
-    def step(child: Any) -> Optional[Tuple[List[str], Any, Optional[str]]]:
-        """The move onto *child*, or None if it is not one a path can name."""
+    def step(child: Any) -> Tuple[List[str], Any, Optional[str]]:
+        """The move onto *child*."""
         segment = segments.get(id(child))
         if segment:
             return (current_path + [segment], child, None)
@@ -5793,12 +5798,9 @@ def _extract_highlight_mesh(
     out_idx: List[int] = []
     matched = 0
 
-    enforce_owner = (
-        root_csg is not None
-        and selected_ref is not None
-        and selected_path is not None
-        and len(selected_path) > 0
-    )
+    # The path to hold each triangle's owner to, or None to keep every triangle.
+    owner_path = (selected_path if root_csg is not None and selected_ref is not None and selected_path
+                  else None)
 
     # Broadphase: a triangle whose centroid is outside the target's own box
     # cannot be on its boundary, and a box test is far cheaper than asking the
@@ -5839,8 +5841,8 @@ def _extract_highlight_mesh(
         if inside_box is not None and not inside_box(local_c):
             continue
         if _csg_point_on_boundary(target_csg, local_c, eps):
-            if enforce_owner:
-                owner = _resolve_csg_at_path(root_csg, selected_path, local_c, eps)
+            if owner_path is not None:
+                owner = _resolve_csg_at_path(root_csg, owner_path, local_c, eps)
                 if owner is not selected_ref:
                     continue
             if edge_feature is not None:
