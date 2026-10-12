@@ -31,6 +31,7 @@ from .rule import (
     Matrix,
     Transform,
     V3,
+    create_v3,
     scalar,
     are_vectors_parallel,
     cross_product,
@@ -315,13 +316,30 @@ class ConvexPlanarRegion:
         return len(self.boundary) < 3
 
     def centroid(self) -> Optional[V3]:
-        """A point in the middle of it, for a dimension to attach to."""
+        """The middle of it by area, for a dimension to attach to.
+
+        By area rather than by averaging corners: a clip can repeat a corner, or leave one where an
+        edge was cut short, and every corner then pulled the middle its way.
+        """
         if not self.boundary:
             return None
-        total = self.boundary[0]
-        for point in self.boundary[1:]:
-            total = total + point
-        return total / scalar(len(self.boundary))
+        corners = [[float(point[i, 0]) for i in range(3)] for point in self.boundary]
+        unique = [corner for index, corner in enumerate(corners)
+                  if all(max(abs(a - b) for a, b in zip(corner, earlier)) > 1e-12 for earlier in corners[:index])]
+        origin = unique[0]
+        total, weighted = 0.0, [0.0, 0.0, 0.0]
+        for first, second in zip(unique[1:], unique[2:]):
+            u = [a - o for a, o in zip(first, origin)]
+            v = [b - o for b, o in zip(second, origin)]
+            cross = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+            area = sum(c * c for c in cross) ** 0.5 / 2
+            total += area
+            weighted = [w + area * (o + a + b) / 3 for w, o, a, b in zip(weighted, origin, first, second)]
+        if total <= 1e-18:
+            middle = [sum(values) / len(unique) for values in zip(*unique)]
+        else:
+            middle = [w / total for w in weighted]
+        return create_v3(*middle)
 
     def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
         """How far it reaches along any direction, as (min, max).

@@ -218,6 +218,27 @@ class TestRegionInPlane:
         assert ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
                              boundary=()).centroid() is None
 
+    def test_a_repeated_corner_does_not_pull_the_centroid(self):
+        # Clipping can hand back a closed outline, its first corner again at the end. Averaged as
+        # corners, that corner counted twice and a dimension attached off the middle of a face.
+        square = (_v(1, -1, 0), _v(-1, -1, 0), _v(-1, 1, 0), _v(1, 1, 0), _v(1, -1, 0))
+        centre = ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
+                                    boundary=square).centroid()
+
+        assert centre is not None
+        assert [float(centre[i, 0]) for i in range(3)] == pytest.approx([0, 0, 0], abs=1e-12)
+
+    def test_the_centroid_is_the_middle_by_area(self):
+        # A trapezoid's corners average to the middle of its height; its area doesn't.
+        trapezoid = (_v(0, 0, 0), _v(4, 0, 0), _v(3, 1, 0), _v(1, 1, 0))
+        centre = ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
+                                    boundary=trapezoid).centroid()
+        assert centre is not None
+
+        # Area-weighted: y = h (b1 + 2 b2) / (3 (b1 + b2)) with b1 = 4, b2 = 2.
+        assert float(centre[1, 0]) == pytest.approx(8 / 18)
+        assert float(centre[0, 0]) == pytest.approx(2)
+
 
 class TestLoftedSolids:
     """A loft's sides are planar only when the taper is a pure per-axis scale."""

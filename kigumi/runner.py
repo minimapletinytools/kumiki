@@ -3256,144 +3256,6 @@ def scalar_of(value: float) -> float:
     return scalar(repr(float(value)))
 
 
-def _line_intervals(located: 'Line', csg: 'CutCSG', reach: float, near: Any) -> Optional[List[Interval]]:
-    """Where a line lies on one solid, as intervals along its own direction.
-
-    None when the solid cannot say -- which is different from an empty list,
-    since "I do not know" must not read as "nowhere".
-
-    No slack: this is only ever asked of the TIMBER now, which a feature's line
-    passes through rather than lies on, so there is no boundary for an inside
-    test to be uncertain about. What the feature itself reaches is asked of the
-    feature -- see _declared_line_span.
-    """
-    from kumiki.csg.cropcsg import crop_line_to_segments_on_csg
-
-    pieces = crop_line_to_segments_on_csg(located, csg, seed_reach=reach, near=near)
-    if pieces is None:
-        return None
-    station = lambda point: float(
-        ((point - located.point).T * located.direction)[0, 0])
-    return [tuple(sorted((station(piece.start), station(piece.end))))
-            for piece in pieces]
-
-
-def _declared_line_span(feature: 'CSGFeature', node: 'CutCSG', located: 'Line') -> Optional[Interval]:
-    """Where a feature says its own line ends, as an interval along it, or None.
-
-    Exact, and asked of the feature rather than found by clipping, so there is
-    no inside test at a boundary to go wrong.
-    """
-    extent = feature.get_extent(node)
-    ends = getattr(extent, "ends", None) if extent is not None else None
-    if not ends:
-        return None
-    station = lambda point: float(
-        ((point - located.point).T * located.direction)[0, 0])
-    reach = sorted(station(end) for end in ends)
-    return (reach[0], reach[-1])
-
-
-def _intersected_spans(one: List[Any], other: List[Any]) -> List[Any]:
-    """The stretches covered by both sets of intervals.
-
-    Empty intervals are dropped rather than kept as zero-length ones: two
-    bounds that only touch describe a point, and a point is not a piece of a
-    line anything wants to draw or measure.
-    """
-    return [
-        (max(a[0], b[0]), min(a[1], b[1]))
-        for a in one for b in other
-        if max(a[0], b[0]) < min(a[1], b[1])
-    ]
-
-
-def _intersected_line_pieces(
-    located: 'Line', solids: List[Any], reach: float, near: Any, declared: Optional[Interval] = None,
-) -> List[Interval]:
-    """Where a line lies on all of these solids, as intervals along it.
-
-    Intervals rather than segments because that is what makes this exact: a line
-    clipped by a convex solid is an interval, and intervals intersect cleanly.
-    A solid that cannot answer is skipped rather than treated as empty.
-
-    `declared` is what the feature says about itself, which bounds the result
-    without anything having to be clipped.
-    """
-    intervals = [declared] if declared is not None else None
-    for solid in solids:
-        if solid is None:
-            continue
-        found = _line_intervals(located, solid, reach, near)
-        if found is None:
-            continue
-        if intervals is None:
-            intervals = found
-            continue
-        intervals = _intersected_spans(intervals, found)
-    return intervals or []
-
-
-def _projects_to_a_point(direction: Sequence[float], plane_normal: 'VectorLike') -> bool:
-    """Whether a line seen from this plane draws as a point rather than a line.
-
-    The same threshold the viewer projects by -- a line a hair off end-on still
-    draws as a very short line, and calling it a point would refuse a dimension
-    that is drawable.
-    """
-    from kumiki.drawings.drawing import ALIGNMENT_EPSILON
-
-    return abs(_dot(_normalize(list(direction)), _normalize(list(plane_normal)))) \
-        > 1 - ALIGNMENT_EPSILON
-
-
-def _edge_outward_normal(feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin') -> Optional[Tuple[float, ...]]:
-    """Which way is out of the material across an edge, or None.
-
-    An arris bisects the two faces that form it, so the way out of it is the
-    average of their outward normals. Both kinds of edge can say which two
-    faces those are: a declared arris names them, and a derived edge IS the
-    meeting of two face hits and carries both.
-
-    Only ever used to decide which of two supplementary angles is meant, and
-    only when where the features REACH cannot say -- so None is a fair answer
-    and the caller falls back to that.
-    """
-    from kumiki.csg.cutcsg import (DerivedEdgeFeature, SimpleRectangularPrismEdgeFeature,
-                               SimpleRectangularPrismFeature)
-    from kumiki.geometry import Plane
-
-    located = []
-    if isinstance(feature, DerivedEdgeFeature):
-        for parent in feature.parents:
-            if parent is not None:
-                located.append(parent.locate_simple_unbounded())
-    elif isinstance(feature, SimpleRectangularPrismEdgeFeature):
-        for face in feature.faces:
-            located.append(SimpleRectangularPrismFeature(name=feature.name, face=face).locate_simple_unbounded(node))
-    else:
-        return None
-
-    normals = []
-    for found in located:
-        if isinstance(found, Plane):
-            normals.append(_normalize(_direction_to_world(found.normal, timber)))
-    if len(normals) != 2:
-        return None
-    total = [normals[0][i] + normals[1][i] for i in range(3)]
-    if not any(abs(part) > 1e-9 for part in total):
-        # Two faces looking opposite ways do not form an edge, and their
-        # average says nothing about a side.
-        return None
-    return tuple(_normalize(total))
-
-
-def _direction_to_world(direction: Any, timber: 'PerfectTimberWithin') -> List[float]:
-    """A direction rotated into world space."""
-    rotated = timber.transform.local_to_global_direction(direction)
-    return [rotated[i, 0] for i in range(3)]
-
-
 def _measure_span(
     feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
     root_csg: Optional['CutCSG'],
@@ -3416,103 +3278,12 @@ def _measure_span(
     sheet's, and applying them there put an edge and the face it runs parallel
     to through the two-lines rule, which leaned the dimension.
     """
-    from kumiki.geometry import Line, Plane, Point
-    from kumiki.csg.cropcsg import (
-        approximately_crop_plane_to_area_on_csg,
-        crop_line_to_segments_on_csg,
-    )
-    from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
-    from kumiki.rule import Matrix
+    from kumiki.csg.cutcsg import OwnedFeatureHit
+    from kumiki.csg.feature_paths import FeatureHandle
+    from kumiki.drawings.feature_span import feature_span
 
-    to_world = lambda v: tuple(_vector3_to_floats(timber.transform.local_to_global(v)))
-    v3 = lambda parts: Matrix([float(part) for part in parts])
-
-    if isinstance(located, Point):
-        return PointSpan(at=v3(to_world(located.position)))
-
-    solid = timber.get_perfect_timber_within_csg_local()
-    reach = float(timber.length) * 4
-
-    if isinstance(located, Line) and root_csg is not None:
-        # Where the feature itself says it ends, and where the timber leaves it.
-        #
-        # The feature first, because it knows: a prism's arris is a pair of its
-        # own corners, and a derived edge reaches as far as both the faces that
-        # form it. Asking a solid instead means clipping a line that lies
-        # exactly ON that solid's surface, which is the one place an inside test
-        # cannot be trusted -- it answered "nowhere" for a mortise hole's own
-        # arris, and the fallback was the whole length of the post.
-        #
-        # Then the timber, which is what a feature declared on a cutter that
-        # runs past the piece needs and the feature cannot know. Not for a
-        # non-real line: a bore's axis lies in the bore, where there is no timber.
-        pieces = _intersected_line_pieces(
-            located, [root_csg] if feature.real else [], reach, solid.transform.position,
-            declared=_declared_line_span(feature, node, located))
-        if pieces:
-            # The longest. A cut can leave an edge in several, and a dimension
-            # has to attach to one of them -- the biggest is the one a reader
-            # would point at.
-            low, high = max(pieces, key=lambda piece: piece[1] - piece[0])
-            start = to_world(located.point + located.direction * scalar_of(low))
-            end = to_world(located.point + located.direction * scalar_of(high))
-            direction = _normalize([end[i] - start[i] for i in range(3)])
-            if (not in_three_d and plane_normal is not None
-                    and _projects_to_a_point(direction, plane_normal)):
-                # Seen end-on it IS a point, and a point is what the rules have
-                # to be given: a line whose length is all depth has no direction
-                # on the sheet to be square to, and treating it as one put a
-                # point-and-line pair through the parallel-lines rule.
-                return PointSpan(at=v3((start[i] + end[i]) / 2 for i in range(3)))
-            outward = _edge_outward_normal(feature, node, timber)
-            return LineSpan(
-                at=v3(start), direction=v3(direction),
-                interval=(0.0, math.dist(start, end)),
-                outward=None if outward is None else v3(outward))
-
-    if isinstance(located, Plane):
-        cropped = approximately_crop_plane_to_area_on_csg(
-            located, [node, solid], seed_reach=reach, near=solid.transform.position)
-        if cropped is None or cropped.is_empty:
-            # A face lying on the timber's own boundary -- a tenon's end, flush with the end of
-            # the piece -- crops to nothing against it. Its own primitive still bounds it.
-            cropped = approximately_crop_plane_to_area_on_csg(
-                located, [node], seed_reach=reach, near=solid.transform.position)
-        if cropped is None or cropped.is_empty:
-            return None
-        middle = cropped.centroid()
-        geometry = _located_geometry(located, timber)
-        if middle is None or not isinstance(geometry, Plane):
-            return None
-        at = to_world(middle)
-        normal = _normalize(_vector3_to_floats(geometry.normal))
-        if in_three_d:
-            # A plane, not a line: measurable from anywhere rather than only
-            # edge-on, and square to its normal in two directions rather than
-            # one.
-            return PlaneSpan(at=v3(at), normal=v3(normal))
-        if plane_normal is None:
-            return PointSpan(at=v3(at))
-        # Edge-on, so it draws as a line running along the face, square to its
-        # own normal and to the way we are looking.
-        along = _cross(normal, _normalize(list(plane_normal)))
-        if not any(abs(part) > 1e-9 for part in along):
-            # Facing the reader rather than edge-on: it covers the view and
-            # admits no measurement, so there is no line to give.
-            return PointSpan(at=v3(at))
-        along = _normalize(along)
-        # The region is timber-local and the direction is world, so the boundary
-        # is brought over rather than the direction sent back. Mixing the two
-        # spaces is the kind of wrong that still looks plausible on screen.
-        if not cropped.boundary:
-            return PointSpan(at=v3(at))
-        reach = [_dot(list(to_world(corner)), along) for corner in cropped.boundary]
-        here = _dot(list(at), along)
-        return LineSpan(
-            at=v3(at), direction=v3(along),
-            interval=(min(reach) - here, max(reach) - here))
-
-    return None
+    handle = FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=node))
+    return feature_span(handle, root_csg, plane_normal, in_three_d)
 
 
 def _resolve_measurement(
@@ -3998,6 +3769,7 @@ def _feature_anchor(
     Falls back to the declared extent when neither can be worked out -- a curved
     primitive, say -- since somewhere approximate beats nowhere.
     """
+    from kumiki.drawings.feature_span import declared_line_span, line_pieces
     from kumiki.geometry import Line, Plane, Point
     from kumiki.csg.cropcsg import (
         approximately_crop_plane_to_area_on_csg,
@@ -4030,9 +3802,9 @@ def _feature_anchor(
             # alone gave a mortise hole's arris the length of the whole post,
             # and its midpoint the middle of the post, which is where a
             # half-made measurement was being drawn.
-            pieces = _intersected_line_pieces(
+            pieces = line_pieces(
                 located, [root_csg] if feature.real else [], reach, solid.transform.position,
-                declared=_declared_line_span(feature, node, located))
+                declared=declared_line_span(feature, node, located))
             if pieces:
                 # The longest piece. A cut can leave an edge in several, and a
                 # dimension has to attach to one of them -- the biggest is the
@@ -5696,6 +5468,7 @@ def _cropped_edge_segments(
     a parent made the parent's own face count as boundary, which is the whole
     length of the arris.
     """
+    from kumiki.drawings.feature_span import declared_line_span, intersected_intervals
     from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
                                 crop_line_to_segments_on_csg)
     from kumiki.geometry import Line, unit_vector
@@ -5726,7 +5499,7 @@ def _cropped_edge_segments(
     if not parents:
         parents = [owner] if owner is not None else []
 
-    declared = _declared_line_span(edge_feature, owner, line) if owner is not None else None
+    declared = declared_line_span(edge_feature, owner, line) if owner is not None else None
 
     def clipped(tolerance: float) -> Optional[List[Interval]]:
         found = spans(crop_line_to_boundary_segments_on_csg(
@@ -5746,7 +5519,7 @@ def _cropped_edge_segments(
                 return None
             bounds.append(within)
         for bound in bounds:
-            found = _intersected_spans(found, bound)
+            found = intersected_intervals(found, bound)
         return found
 
     # Two questions, one number, and only one of them wants it.

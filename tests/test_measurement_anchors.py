@@ -332,22 +332,20 @@ class TestAFeatureSeenEndOn:
     def test_a_line_along_the_view_is_a_point_to_the_rules(self):
         from pathlib import Path
 
-        root = Path(__file__).resolve().parent.parent
-        runner = load_module("kigumi_runner_endon", root / "kigumi" / "runner.py")
+        from kumiki.drawings.feature_span import projects_to_a_point
 
-        assert runner._projects_to_a_point((0, 1, 0), (0, 1, 0)) is True
-        assert runner._projects_to_a_point((0, -1, 0), (0, 1, 0)) is True
-        assert runner._projects_to_a_point((1, 0, 0), (0, 1, 0)) is False
+        assert projects_to_a_point((0, 1, 0), (0, 1, 0)) is True
+        assert projects_to_a_point((0, -1, 0), (0, 1, 0)) is True
+        assert projects_to_a_point((1, 0, 0), (0, 1, 0)) is False
 
     def test_a_hair_off_end_on_is_still_a_line(self):
         # It draws as a very short line, and calling it a point would refuse a
         # dimension that is drawable.
         from pathlib import Path
 
-        root = Path(__file__).resolve().parent.parent
-        runner = load_module("kigumi_runner_endon2", root / "kigumi" / "runner.py")
+        from kumiki.drawings.feature_span import projects_to_a_point
 
-        assert runner._projects_to_a_point((0.05, 1, 0), (0, 1, 0)) is False
+        assert projects_to_a_point((0.05, 1, 0), (0, 1, 0)) is False
 
     def test_a_point_and_a_line_do_not_go_through_the_parallel_rule(self):
         # The point stays where it is and the line takes the foot. The parallel
@@ -541,14 +539,15 @@ class TestAFeatureKnowsItsOwnEnds:
 
         from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
-        root = Path(__file__).resolve().parent.parent
-        runner = load_module("kigumi_runner_declared", root / "kigumi" / "runner.py")
+        from kumiki.drawings.feature_span import declared_line_span
 
         box = self._box()
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
-        span = runner._declared_line_span(arris, box, arris.locate_simple_unbounded(box))
+        line = arris.locate_simple_unbounded(box)
+        assert line is not None
+        span = declared_line_span(arris, box, line)
 
         assert span is not None
         assert span[1] - span[0] == pytest.approx(0.4)
@@ -561,8 +560,7 @@ class TestAFeatureKnowsItsOwnEnds:
         from kumiki.csg.cutcsg import SimpleRectangularPrismEdgeFeature
         from kumiki.rule import create_v2, scalar
 
-        root = Path(__file__).resolve().parent.parent
-        runner = load_module("kigumi_runner_declared2", root / "kigumi" / "runner.py")
+        from kumiki.drawings.feature_span import declared_line_span
 
         endless = RectangularPrism(
             size=create_v2(scalar("0.1"), scalar("0.2")),
@@ -570,7 +568,9 @@ class TestAFeatureKnowsItsOwnEnds:
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
-        assert runner._declared_line_span(arris, endless, arris.locate_simple_unbounded(endless)) is None
+        line = arris.locate_simple_unbounded(endless)
+        assert line is not None
+        assert declared_line_span(arris, endless, line) is None
 
 
 class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
