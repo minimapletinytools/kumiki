@@ -1155,6 +1155,70 @@ class TestChangingAndRemovingAMeasurement:
         assert [m["b"]["feature"] for m in held] == ["top"]
 
 
+class TestMovingAMeasurementTheCodeNamesTheKindOf:
+    """A move overrides it rather than drawing a second one beside it.
+
+    An override matches on kind too, so the entry a move makes has to carry the code's kind.
+    It once carried only the anchors, and a measurement whose code named its kind was drawn twice.
+    """
+
+    def _frame(self):
+        from kumiki.drawings.drawing import MeasurementKind
+
+        kind = MeasurementKind.parse("projected_perpendicular_distance")
+        return _posts_with(lambda face, timber: [Drawing(
+            name="plan",
+            timbers=(timber("post"),),
+            measurements={ViewportId(VIEWPORT): [
+                Measure(anchor_a=face("rptw.left", "post"), anchor_b=face("rptw.right", "post"), kind=kind)]},
+        )], paths=("post",))
+
+    def _wire(self):
+        # What the viewer sends with a move: the ends and the id, not the kind.
+        return {
+            "a": _ref("rptw.left", timber="post#0", csg_path=UNCUT),
+            "b": _ref("rptw.right", timber="post#0", csg_path=UNCUT),
+            "measureId": None,
+        }
+
+    def _measurements(self, frame, pending, source=None):
+        drawings = runner.collect_drawings(frame, source, pending)
+        plan = next(d for d in drawings if d["id"] == "plan")
+        return next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]
+
+    def _move(self, frame, pending, offset):
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._wire(), {"placement": {"offset": offset}})
+
+    def test_moving_it_overrides_it(self):
+        frame, pending = self._frame(), []
+
+        self._move(frame, pending, 9.0)
+
+        (moved,) = self._measurements(frame, pending)
+        assert moved["origin"] == runner.ORIGIN_OVERRIDDEN
+        assert moved["placement"] == {"offset": 9.0}
+
+    def test_moving_it_again_moves_the_same_one(self):
+        frame, pending = self._frame(), []
+
+        self._move(frame, pending, 9.0)
+        self._move(frame, pending, 12.0)
+
+        (moved,) = self._measurements(frame, pending)
+        assert moved["placement"] == {"offset": 12.0}
+
+    def test_the_move_is_saved_and_comes_back_as_one(self, tmp_path):
+        frame, pending = self._frame(), []
+        self._move(frame, pending, 9.0)
+        source = tmp_path / "frame.py"
+
+        runner.write_drawings_file(source, runner.collect_drawings(frame, None, pending))
+
+        (moved,) = self._measurements(frame, [], source)
+        assert moved["origin"] == runner.ORIGIN_OVERRIDDEN and moved["placement"] == {"offset": 9.0}
+
+
 class TestDeletingAMeasurementTheCodeAsksFor:
     """Marked deleted in the file: listed greyed, and can be put back."""
 

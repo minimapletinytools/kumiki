@@ -3052,8 +3052,11 @@ def update_measurement(
     push a create.
 
     A measurement the code declares has no entry here to change, so one is made
-    carrying the anchors and the change. That is what an override is for: the
-    code keeps asking for the measurement, and the file says what to do with it.
+    carrying the anchors, its kind and the change. That is what an override is for:
+    the code keeps asking for the measurement, and the file says what to do with it.
+    The kind is what makes it an override -- one matches on kind too -- so without
+    it, moving a code measurement that names its kind left the code's in place and
+    drew the moved one beside it.
     """
     holder, measures = _measurement_slot(
         frame, example_path, pending, drawing_id, viewport_id)
@@ -3062,7 +3065,9 @@ def update_measurement(
         if _viewer_measure_identity(entry) == identity:
             entry.update(changes)
             return holder
-    measures.append({**measure, **changes})
+    current = _merged_measurement(frame, example_path, pending, drawing_id, viewport_id, measure)
+    kind = current.get("kind") if current is not None else None
+    measures.append({**measure, "kind": kind, **changes} if kind is not None else {**measure, **changes})
     return holder
 
 
