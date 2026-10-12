@@ -289,6 +289,137 @@ class DrawingWire(TypedDict, total=False):
     dirty: bool
     unplaceableMeasurements: Dict[str, List[MeasureWire]]
 
+
+# --- frame and geometry --------------------------------------------------------
+
+# What serialize_sympy turns a number into: a float, or a string for an expression.
+Scalar = Union[str, int, float, bool, None]
+
+
+class TagWire(TypedDict):
+    kind: str
+    name: str
+
+
+class TimberSummaryWire(TypedDict):
+    name: str
+    length: Scalar
+    width: Scalar
+    height: Scalar
+    bottom_position: Any  # serialize_vector
+    length_direction: Any
+    width_direction: Any
+    height_direction: Any
+    cuts_count: int
+
+
+class FrameSummaryWire(TypedDict, total=False):
+    name: Optional[str]
+    timber_count: int
+    accessories_count: int
+    timbers: List[TimberSummaryWire]
+    accessories: List[Dict[str, str]]
+    kiwari: Optional[List[Dict[str, Any]]]
+
+
+class CylinderAxisWire(TypedDict):
+    axisStart: Vec3
+    axisEnd: Vec3
+    radius: float
+
+
+class MemberMeshWire(TypedDict, total=False):
+    """One member's mesh and what the viewer shows about it. See _base_member_payload."""
+    name: str
+    memberName: str
+    memberType: str  # "timber" | "accessory"
+    memberKey: str
+    timberKey: str
+    kumikiEphemeralId: int
+    tags: List[TagWire]
+    vertices: List[float]
+    indices: List[int]
+    prism_length: float
+    prism_width: float
+    prism_height: float
+    perfect_width: float
+    perfect_height: float
+    nominal_width: float
+    nominal_height: float
+    csg_nodes: int
+    csg_features: int
+    timberClass: str
+    isPerfectTimber: bool
+    cut_length: Optional[float]
+    meshSource: str
+    hasActualGeometryDifferentFromPerfect: bool
+    perfectTimberWithinVertices: List[float]
+    perfectTimberWithinIndices: List[int]
+    perfectBoxNoJointsVertices: List[float]
+    perfectBoxNoJointsIndices: List[int]
+    roughBoxNoJointsVertices: List[float]
+    roughBoxNoJointsIndices: List[int]
+    cylinderAxis: CylinderAxisWire
+
+
+class TriangulatedMesh(TypedDict):
+    vertices: List[float]
+    indices: List[int]
+    bounds: Any  # numpy (2, 3): low corner, high corner
+
+
+class MeshCacheEntry(TypedDict, total=False):
+    """Not a wire form: what a slot keeps per member between builds."""
+    mesh: MemberMeshWire
+    local_csg: Optional['CutCSG']
+    cut_timber: 'CutTimber'
+
+
+class RemeshMetricWire(TypedDict, total=False):
+    timberKey: str
+    memberType: str
+    remesh_s: float
+    csg_depth: int
+    triangle_count: int
+
+
+class FootprintWire(TypedDict):
+    key: str
+    corners: List[Vec3]
+
+
+class FrameGeometryWire(TypedDict, total=False):
+    kind: str
+    meshes: List[MemberMeshWire]
+    footprints: List[FootprintWire]
+    changedKeys: List[str]
+    removedKeys: List[str]
+    remeshMetrics: List[RemeshMetricWire]
+    counts: Dict[str, int]
+    profiling: Dict[str, float]
+
+
+class CuttingSummaryWire(TypedDict):
+    cutIndex: int
+    label: Optional[str]
+    hasCSG: bool
+    hasEndCut: bool
+    displayName: str
+
+
+class HighlightWire(TypedDict, total=False):
+    """What to light for a feature reference. See _feature_highlight."""
+    highlightMesh: MeshWire
+    featureType: str
+    at: Optional[Vec3]
+    highlightEdgeSegments: List[SegmentWire]
+
+
+class ReferenceLineWire(TypedDict):
+    name: str
+    primary: bool
+    edgePositions: List[float]
+
 # --- member entries -------------------------------------------------------------
 #
 # Not wire forms: what _assign_member_keys pairs each member's key with.
@@ -421,7 +552,7 @@ class SlotState:
     file_path: Path
     module: Any
     frame: Any
-    mesh_cache: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    mesh_cache: Dict[str, MeshCacheEntry] = field(default_factory=dict)
     patternbook: Optional[Any] = None
     single_pattern_name: Optional[str] = None
     # What this slot was last built from, bound: one group per kiwari its frames
@@ -464,7 +595,7 @@ class RunnerState:
         return self._active.frame
 
     @property
-    def mesh_cache(self) -> Dict[str, Dict[str, Any]]:
+    def mesh_cache(self) -> Dict[str, MeshCacheEntry]:
         return self._active.mesh_cache
 
     def get_slot(self, slot: str) -> SlotState:
@@ -491,7 +622,7 @@ def emit_message(payload: Dict[str, Any]) -> None:
         print(json.dumps(payload), flush=True)
 
 
-def serialize_sympy(obj: Any) -> Any:
+def serialize_sympy(obj: Any) -> Scalar:
     if hasattr(obj, "evalf"):
         return str(obj)
     if hasattr(obj, "__float__"):
@@ -565,7 +696,7 @@ def _count_csg_nodes_and_features(csg: 'CutCSG') -> Tuple[int, int]:
     return (nodes, features)
 
 
-def serialize_cut_timber(cut_timber: 'CutTimber') -> Dict[str, Any]:
+def serialize_cut_timber(cut_timber: 'CutTimber') -> TimberSummaryWire:
     timber = cut_timber.timber
     return {
         "name": get_timber_display_name(timber),
@@ -580,7 +711,7 @@ def serialize_cut_timber(cut_timber: 'CutTimber') -> Dict[str, Any]:
     }
 
 
-def prism_to_mesh(prism: Any) -> Dict[str, Any]:
+def prism_to_mesh(prism: Any) -> MeshWire:
     """Convert a RectangularPrism to a flat vertex list + index list triangle mesh.
 
     Vertex layout (8 corners, indices 0-7):
@@ -640,7 +771,7 @@ def _build_perfect_timber_within_csg_local(cut_timber: 'CutTimber') -> 'CutCSG':
     return cut_timber.render_perfect_timber_within_with_cuts_csg_local()
 
 
-def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> Dict[str, Any]:
+def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> TriangulatedMesh:
     """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
     from kumiki.csg.cutcsg import adopt_csg
     from kumiki.rule import Transform
@@ -669,9 +800,9 @@ def _base_member_payload(
     member_type: str,
     member_key: str,
     kumiki_id: int,
-    tags: Any,
-    vertices: Any,
-    indices: Any,
+    tags: List[TagWire],
+    vertices: List[float],
+    indices: List[int],
     prism_length: Any,
     prism_width: Any,
     prism_height: Any,
@@ -679,7 +810,7 @@ def _base_member_payload(
     perfect_height: Any,
     nominal_width: Any,
     nominal_height: Any,
-) -> Dict[str, Any]:
+) -> MemberMeshWire:
     """Common member-mesh payload shared by every geometry serializer.
 
     Callers add type-specific extras (csg counts, timber class, fallback
@@ -727,7 +858,7 @@ def _cut_timber_to_triangle_mesh_payload(
     cut_timber: 'CutTimber',
     local_csg: 'CutCSG',
     timber_key: str,
-) -> Dict[str, Any]:
+) -> MemberMeshWire:
     actual = _triangulate_local_csg(cut_timber, local_csg)
     vertices = actual["vertices"]
     indices = actual["indices"]
@@ -751,7 +882,7 @@ def _cut_timber_to_triangle_mesh_payload(
 
     # Top-level vertices/indices remain the actual-geometry mesh for
     # backwards compatibility with viewers that pre-date the dual mesh.
-    payload: Dict[str, Any] = _base_member_payload(
+    payload = _base_member_payload(
         name=get_timber_display_name(timber),
         member_type="timber",
         member_key=timber_key,
@@ -767,13 +898,13 @@ def _cut_timber_to_triangle_mesh_payload(
         nominal_width=nominal_size[0],
         nominal_height=nominal_size[1],
     )
-    payload.update({
-        "csg_nodes": csg_nodes,
-        "csg_features": csg_features,
-        "timberClass": timber_class,
-        "isPerfectTimber": is_perfect,
-        "cut_length": _cut_length(cut_timber),
-    })
+    payload.update(
+        csg_nodes=csg_nodes,
+        csg_features=csg_features,
+        timberClass=timber_class,
+        isPerfectTimber=is_perfect,
+        cut_length=_cut_length(cut_timber),
+    )
 
     # For non-rectangular-actual timbers, also triangulate the perfect-AABB CSG
     # so the viewer can swap meshes locally without round-tripping to Python.
@@ -826,7 +957,7 @@ def _accessory_to_triangle_mesh_payload(
     local_csg: 'CutCSG',
     accessory_key: str,
     accessory_name: str,
-) -> Dict[str, Any]:
+) -> MemberMeshWire:
     import math
 
     from kumiki.csg.cutcsg import Cylinder, adopt_csg
@@ -897,7 +1028,7 @@ def _accessory_to_triangle_mesh_payload(
 def _cut_timber_to_bbox_mesh_payload(
     cut_timber: 'CutTimber',
     timber_key: str,
-) -> Dict[str, Any]:
+) -> MemberMeshWire:
     """Fallback mesh payload based on a cut timber's oriented bounding prism.
 
     This path avoids trimesh boolean triangulation and keeps rendering usable
@@ -932,25 +1063,25 @@ def _cut_timber_to_bbox_mesh_payload(
         nominal_width=nominal_size[0],
         nominal_height=nominal_size[1],
     )
-    payload.update({
-        "csg_nodes": csg_nodes,
-        "csg_features": csg_features,
-        "meshSource": "bounding-prism-fallback",
-        "timberClass": timber_class,
-        "isPerfectTimber": is_perfect,
-        "hasActualGeometryDifferentFromPerfect": False,
-        "cut_length": _cut_length(cut_timber),
-    })
+    payload.update(
+        csg_nodes=csg_nodes,
+        csg_features=csg_features,
+        meshSource="bounding-prism-fallback",
+        timberClass=timber_class,
+        isPerfectTimber=is_perfect,
+        hasActualGeometryDifferentFromPerfect=False,
+        cut_length=_cut_length(cut_timber),
+    )
     return payload
 
 
-def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
+def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = None) -> FrameGeometryWire:
     """Build triangle mesh geometry for every cut timber."""
     ss = slot_state if slot_state is not None else state._active
     frame = ss.frame
-    meshes = []
-    changed_keys = []
-    remesh_metrics = []
+    meshes: List[MemberMeshWire] = []
+    changed_keys: List[str] = []
+    remesh_metrics: List[RemeshMetricWire] = []
     seen_keys = set()
     key_counts: Dict[str, int] = {}
 
@@ -1067,7 +1198,7 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
         except Exception as exc:
             log_stderr(f"Warning: skipping geometry for accessory {type(accessory).__name__}: {exc}")
 
-    removed_keys = []
+    removed_keys: List[str] = []
     for cached_key in list(ss.mesh_cache.keys()):
         if cached_key not in seen_keys:
             removed_keys.append(cached_key)
@@ -1075,7 +1206,7 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
 
     # Footprints are flat polygons in the XY (z=0) ground plane. We send their corners (as
     # [x, y, 0] points) and let the viewer build a light fill + darkened edge.
-    footprints_payload = []
+    footprints_payload: List[FootprintWire] = []
     frame_footprints = list(getattr(frame, "footprints", None) or [])
     for index, footprint in enumerate(frame_footprints):
         try:
@@ -1106,7 +1237,7 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
     }
 
 
-def serialize_frame(frame: 'Frame') -> Dict[str, Any]:
+def serialize_frame(frame: 'Frame') -> FrameSummaryWire:
     accessories = list(frame.accessories) if hasattr(frame, "accessories") and frame.accessories else []
     timbers = [serialize_cut_timber(cut_timber) for cut_timber in frame.cut_timbers]
     return {
@@ -1170,8 +1301,8 @@ def _assign_member_keys(frame: 'Frame') -> Tuple[List[TimberEntry], List[Accesso
     return timber_entries, accessory_entries
 
 
-def _serialize_cutting_summary(cut_timber: 'CutTimber') -> List[Dict[str, Any]]:
-    cuts_meta: List[Dict[str, Any]] = []
+def _serialize_cutting_summary(cut_timber: 'CutTimber') -> List[CuttingSummaryWire]:
+    cuts_meta: List[CuttingSummaryWire] = []
     cuts = list(getattr(cut_timber, "cuts", []) or [])
     for idx, cut in enumerate(cuts):
         label = _label_name(cut)
@@ -1208,7 +1339,7 @@ def _timber_tag_kinds() -> List[Tuple[type, str]]:
     return [(SliceTag, "slice"), (MemberTag, "member"), (GenericTag, "generic")]
 
 
-def _serialize_timber_tags(ticket: Optional['Ticket']) -> List[Dict[str, str]]:
+def _serialize_timber_tags(ticket: Optional['Ticket']) -> List[TagWire]:
     """Typed tags off a timber ticket, as {"kind", "name"} sorted by both.
 
     Only TimberTicket carries tags. A tag class with no wire name is skipped
@@ -1221,7 +1352,7 @@ def _serialize_timber_tags(ticket: Optional['Ticket']) -> List[Dict[str, str]]:
         return []
 
     kinds = _timber_tag_kinds()
-    tags: List[Dict[str, str]] = []
+    tags: List[TagWire] = []
     seen: set[Tuple[str, str]] = set()
     for tag in raw_tags:
         if isinstance(tag, str):
@@ -3806,7 +3937,7 @@ def _anchor_payload(
     }, span)
 
 
-def _reference_features_payload(timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None) -> List[Dict[str, Any]]:
+def _reference_features_payload(timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None) -> List[ReferenceLineWire]:
     """A timber's reference features, as world-space lines for the viewer to light.
 
     Of the perfect timber: a line runs the timber's length, and a face or center plane
@@ -3905,7 +4036,7 @@ def _cropped_reference_segments(
     return kept
 
 
-def feature_highlights(slot_state: SlotState, references: Sequence[Any]) -> List[Dict[str, Any]]:
+def feature_highlights(slot_state: SlotState, references: Sequence[AnchorWire]) -> List[HighlightWire]:
     """What to light for each feature reference, in the shape a pick answer has.
 
     For features nobody is pointing at -- a measurement's ends. A reference that no
@@ -3914,11 +4045,11 @@ def feature_highlights(slot_state: SlotState, references: Sequence[Any]) -> List
     return [_feature_highlight(slot_state, reference) for reference in references]
 
 
-def _feature_highlight(slot_state: SlotState, reference: Any) -> Dict[str, Any]:
+def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> HighlightWire:
     from kumiki.csg.feature_paths import resolve_feature_path
     from kumiki.identity import SingleFeaturePath
 
-    result: Dict[str, Any] = {"highlightMesh": {"vertices": [], "indices": []}}
+    result: HighlightWire = {"highlightMesh": {"vertices": [], "indices": []}}
     path = deserialize_feature_path(reference)
     handle = resolve_feature_path(path, slot_state.frame) if path is not None else None
     if handle is None:
@@ -3964,7 +4095,7 @@ def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()
         timber_id = id(entry["timber"])
         timber_to_kumiki_and_cut[timber_id] = (entry["kumikiEphemeralId"], entry["cutTimber"])
 
-    timber_tags_by_kumiki_id: Dict[int, List[Dict[str, str]]] = {}
+    timber_tags_by_kumiki_id: Dict[int, List[TagWire]] = {}
     for entry in timber_entries:
         timber_ticket = getattr(entry.get("timber"), "ticket", None)
         timber_tags_by_kumiki_id[entry["kumikiEphemeralId"]] = _serialize_timber_tags(timber_ticket)
@@ -4824,7 +4955,7 @@ def _incoming_from_saved(groups: Sequence[KiwariGroup], saved: List["tuple[Optio
 
 def load_slot_state(
     file_path: str,
-    previous_mesh_cache: Optional[Dict[str, Dict[str, Any]]] = None,
+    previous_mesh_cache: Optional[Dict[str, MeshCacheEntry]] = None,
     kiwari_values: Optional[Mapping[str, Any]] = None,
     previous_groups: Sequence[KiwariGroup] = (),
 ) -> SlotState:
