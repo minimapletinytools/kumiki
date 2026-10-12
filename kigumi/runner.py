@@ -292,6 +292,9 @@ class DrawingWire(TypedDict, total=False):
 
 # --- frame and geometry --------------------------------------------------------
 
+# Kiwari.to_payload(), plus the id, frames, canSave and stale the runner adds.
+KiwariSectionWire = Dict[str, Any]
+
 # What serialize_sympy turns a number into: a float, or a string for an expression.
 Scalar = Union[str, int, float, bool, None]
 
@@ -319,7 +322,7 @@ class FrameSummaryWire(TypedDict, total=False):
     accessories_count: int
     timbers: List[TimberSummaryWire]
     accessories: List[Dict[str, str]]
-    kiwari: Optional[List[Dict[str, Any]]]
+    kiwari: Optional[List[KiwariSectionWire]]
 
 
 class CylinderAxisWire(TypedDict):
@@ -419,6 +422,192 @@ class ReferenceLineWire(TypedDict):
     name: str
     primary: bool
     edgePositions: List[float]
+
+
+# --- trees: layers, assembly, CSG ---------------------------------------------------
+
+class LayerTimberWire(TypedDict):
+    kumikiEphemeralId: int
+    memberKey: str
+    name: str
+    tags: List[TagWire]
+    cuts: List[CuttingSummaryWire]
+    referenceFeatures: List[ReferenceLineWire]
+
+
+class LayerAccessoryWire(TypedDict):
+    kumikiEphemeralId: int
+    memberKey: str
+    name: str
+    type: str
+    jointKumikiEphemeralId: Optional[int]
+
+
+class JointMemberWire(TypedDict):
+    timberKumikiEphemeralId: int
+    cutIndices: List[int]
+
+
+class LayerJointWire(TypedDict):
+    kumikiEphemeralId: int
+    name: str
+    jointType: Optional[str]
+    members: List[JointMemberWire]
+    accessoryKumikiEphemeralIds: List[int]
+
+
+class FramePartWire(TypedDict):
+    """One @frame of several drawn together."""
+    name: str
+    timberKumikiEphemeralIds: List[int]
+    jointKumikiEphemeralIds: List[int]
+
+
+class LayersWire(TypedDict):
+    frameName: Optional[str]
+    timbers: List[LayerTimberWire]
+    accessories: List[LayerAccessoryWire]
+    joints: List[LayerJointWire]
+    frames: Optional[List[FramePartWire]]
+    assembly: Optional[Dict[str, bool]]
+
+
+class RotationWire(TypedDict):
+    axisPosition: Vec3
+    axisDirection: Vec3
+    angle: float
+
+
+class MovementWire(TypedDict, total=False):
+    kumikiEphemeralId: int
+    memberKey: Optional[str]
+    direction: Vec3
+    distance: float
+    dragged: bool
+    rotation: RotationWire
+
+
+class AssemblyStepWire(TypedDict):
+    order: int
+    suborder: int
+    substep: int
+    movements: List[MovementWire]
+
+
+class AssemblyFailureWire(TypedDict):
+    order: Optional[int]
+    suborder: int
+    message: str
+    diagnostics: List[str]
+
+
+class AssemblyWire(TypedDict):
+    steps: List[AssemblyStepWire]
+    warnings: List[str]
+    failure: Optional[AssemblyFailureWire]
+
+
+class FeatureWire(TypedDict):
+    name: str
+    type: str
+    group: str
+    real: bool
+
+
+class CSGNodeWire(TypedDict):
+    kind: str
+    displayName: str
+    label: Optional[str]
+    path: List[str]
+    role: Optional[str]
+    parity: str
+    jointName: Optional[str]
+    jointId: Optional[str]
+    cutIndex: Optional[int]
+    features: List[FeatureWire]
+    children: List['CSGNodeWire']
+
+
+class CSGTreeWire(TypedDict, total=False):
+    tree: CSGNodeWire
+    memberKey: str
+
+
+# --- slots, patterns, tools and responses ----------------------------------------------
+
+
+
+class FrameCountsWire(TypedDict):
+    name: Optional[str]
+    timber_count: int
+    accessories_count: int
+
+
+class SlotLoadedWire(TypedDict, total=False):
+    slot: str
+    examplePath: str
+    patternName: str
+    frame: FrameCountsWire
+    kiwari: Optional[List[KiwariSectionWire]]
+    profiling: Dict[str, float]
+
+
+class PatternEntryWire(TypedDict):
+    path: str
+    name: str
+    tags: List[str]
+    groups: List[str]
+    source_file: Optional[str]
+
+
+class PatternSourceWire(TypedDict):
+    source: str  # "shipped" | "local"
+    folder: str
+    patterns: List[PatternEntryWire]
+
+
+class PatternListWire(TypedDict):
+    sources: List[PatternSourceWire]
+    scan_s: float
+
+
+class ToolsWire(TypedDict):
+    tools: List[Dict[str, str]]
+    rejectedEntries: List[Dict[str, str]]
+
+
+class ToolRunWire(TypedDict):
+    name: str
+    output: str
+
+
+class MemberResultWire(TypedDict):
+    member: TimberSummaryWire
+    geometry: Dict[str, str]
+
+
+class ReadyEventWire(ToolsWire):
+    type: str
+    examplePath: str
+    commands: List[str]
+    frame: FrameCountsWire
+    kiwari: Optional[List[KiwariSectionWire]]
+
+
+class ErrorWire(TypedDict):
+    message: str
+    type: str
+    traceback: str
+
+
+class ResponseWire(TypedDict, total=False):
+    """Every answer to a request: `result` when ok, `error` when not."""
+    id: Any
+    ok: bool
+    command: str
+    result: Any
+    error: ErrorWire
+    kiwari: Optional[List[KiwariSectionWire]]  # a failed reload's, marked stale
 
 # --- member entries -------------------------------------------------------------
 #
@@ -617,7 +806,7 @@ def log_stderr(message: str) -> None:
 _stdout_lock = threading.Lock()
 
 
-def emit_message(payload: Dict[str, Any]) -> None:
+def emit_message(payload: Mapping[str, Any]) -> None:
     with _stdout_lock:
         print(json.dumps(payload), flush=True)
 
@@ -3413,7 +3602,7 @@ def _resolve_measurement(
 
 
 def _unplaceable_measurement(
-    measure: MeasureWire, spans: Dict[str, Any], plane: Any,
+    measure: MeasureWire, spans: Dict[str, Optional['MeasureSpan']], plane: Optional['VectorLike'],
 ) -> SettledWire:
     """A measurement that resolved but cannot be worked out, and why.
 
@@ -4077,7 +4266,7 @@ def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> Highligh
     return result
 
 
-def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()) -> Dict[str, Any]:
+def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()) -> LayersWire:
     """Build the data payload consumed by the viewer's Layers panel.
 
     With several *frame_parts* -- a file's @frame functions shown as one -- it also says
@@ -4104,7 +4293,7 @@ def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()
     source_joints = list(getattr(frame, "source_joints", ()) or ())
     accessory_kumiki_ephemeral_to_joint: Dict[int, int] = {}
 
-    joints_payload: List[Dict[str, Any]] = []
+    joints_payload: List[LayerJointWire] = []
     for joint in source_joints:
         joint_ticket = getattr(joint, "ticket", None)
         if joint_ticket is None:
@@ -4115,7 +4304,7 @@ def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()
         joint_type = getattr(joint_ticket, "joint_type", None)
         
         # Extract members (timbers) from cuttings
-        members_list: List[Dict[str, Any]] = []
+        members_list: List[JointMemberWire] = []
         cuttings_dict = getattr(joint, "cuttings", {})
         for cutting in cuttings_dict.values():
             timber = getattr(cutting, "timber", None)
@@ -4163,7 +4352,7 @@ def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()
             "accessoryKumikiEphemeralIds": accessory_kumiki_ids,
         })
 
-    timbers_payload: List[Dict[str, Any]] = []
+    timbers_payload: List[LayerTimberWire] = []
     for entry in timber_entries:
         cuts_meta = _serialize_cutting_summary(entry["cutTimber"])
         timbers_payload.append({
@@ -4176,7 +4365,7 @@ def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()
                 entry["timber"], entry["cutTimber"].render_timber_with_cuts_csg_local()),
         })
 
-    accessories_payload: List[Dict[str, Any]] = []
+    accessories_payload: List[LayerAccessoryWire] = []
     for entry in accessory_entries:
         accessories_payload.append({
             "kumikiEphemeralId": entry["kumikiEphemeralId"],
@@ -4203,7 +4392,7 @@ def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()
 def _serialize_frame_parts(
     frame_parts: Sequence[Tuple[str, Any]],
     timber_to_kumiki_and_cut: Dict[int, Any],
-) -> Optional[List[Dict[str, Any]]]:
+) -> Optional[List[FramePartWire]]:
     """Which timbers and joints are each frame's, or None when there is only the one frame."""
     if len(frame_parts) < 2:
         return None
@@ -4247,7 +4436,7 @@ def _build_assembly_payload(
     timber_entries: List[TimberEntry],
     accessory_entries: List[AccessoryEntry],
     should_cancel: Optional[Any] = None,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[AssemblyWire]:
     """Solve the frame's assembly sequence for the viewer's preview timeline.
 
     Returns None when no member of any joint declares an assembly freedom
@@ -4292,15 +4481,15 @@ def _build_assembly_payload(
     if solution is None:
         return None
 
-    steps_payload: List[Dict[str, Any]] = []
+    steps_payload: List[AssemblyStepWire] = []
     for step in solution.steps:
-        movements_payload: List[Dict[str, Any]] = []
+        movements_payload: List[MovementWire] = []
         for movement in step.movements:
             member_key = member_key_by_kumiki_id.get(movement.member_key)
             if member_key is None:
                 # Member not rendered (e.g. filtered out of the frame); skip defensively.
                 continue
-            movement_payload = {
+            movement_payload: MovementWire = {
                 "kumikiEphemeralId": int(movement.member_key),
                 "memberKey": member_key,
                 "direction": [_assembly_float(movement.direction[i, 0]) for i in range(3)],
@@ -4322,7 +4511,7 @@ def _build_assembly_payload(
             "movements": movements_payload,
         })
 
-    failure_payload = None
+    failure_payload: Optional[AssemblyFailureWire] = None
     if solution.failure is not None:
         failure_payload = {
             "order": int(solution.failure.ordering.order),
@@ -4338,7 +4527,7 @@ def _build_assembly_payload(
     }
 
 
-def _serialize_feature(feature: 'CSGFeature') -> Dict[str, Any]:
+def _serialize_feature(feature: 'CSGFeature') -> FeatureWire:
     """One declared feature, with the metadata the tree view wants to show."""
     return {
         "name": feature.name,
@@ -4357,7 +4546,7 @@ def _serialize_csg_node(
     parity: 'CSGParity',
     path_label: Optional[str] = None,
     segments: Optional[Dict[int, str]] = None,
-) -> Dict[str, Any]:
+) -> CSGNodeWire:
     """One CSG node and everything beneath it.
 
     Nested rather than flattened, and every node rather than only labelled
@@ -4384,7 +4573,7 @@ def _serialize_csg_node(
     segment = path_label
     node_path = path + [segment] if segment else path
 
-    node: Dict[str, Any] = {
+    node: CSGNodeWire = {
         # kind is the class name and stays machine-readable -- the viewer keys
         # structural decisions off it. displayName is the word people read.
         "kind": type(csg).__name__,
@@ -4433,7 +4622,7 @@ def _serialize_csg_node(
     return node
 
 
-def serialize_cut_csg_tree(cut_timber: 'CutTimber') -> Dict[str, Any]:
+def serialize_cut_csg_tree(cut_timber: 'CutTimber') -> CSGTreeWire:
     """The whole rendered CSG of a timber, as a nested tree.
 
     Deliberately the rendered tree -- what picking actually runs against --
@@ -4743,7 +4932,7 @@ def _write_parameters_file(slot_state: SlotState) -> str:
     return str(path)
 
 
-def _bind_kiwari_values(kiwari: Optional['Kiwari'], values: Optional[Mapping[str, Any]]) -> Optional[Any]:
+def _bind_kiwari_values(kiwari: Optional['Kiwari'], values: Optional[Mapping[str, Any]]) -> Optional['Kiwari']:
     """*kiwari* with *values* laid over it, or None if there is no kiwari yet."""
     if kiwari is None:
         return None
@@ -4752,7 +4941,7 @@ def _bind_kiwari_values(kiwari: Optional['Kiwari'], values: Optional[Mapping[str
     return kiwari.resolve(dict(values))
 
 
-def _serialize_kiwari_for_slot(slot_state: SlotState, *, stale: bool = False) -> Optional[List[Dict[str, Any]]]:
+def _serialize_kiwari_for_slot(slot_state: SlotState, *, stale: bool = False) -> Optional[List[KiwariSectionWire]]:
     """What the panel is built from, one section per kiwari, or None when nothing takes parameters."""
     if slot_state is None or not slot_state.kiwari_groups:
         return None
@@ -4921,9 +5110,9 @@ def _warn_legacy_entry(name: str) -> None:
 
 def _incoming_from_groups(
     groups: Sequence[KiwariGroup], values_by_group: Optional[Mapping[str, Any]],
-) -> Dict[str, Any]:
+) -> Dict[str, Optional['Kiwari']]:
     """Each frame's kiwari to build with: its group's last one, with the viewer's values laid over it."""
-    incoming: Dict[str, Any] = {}
+    incoming: Dict[str, Optional['Kiwari']] = {}
     for group in groups:
         values = (values_by_group or {}).get(group.id)
         bound = _bind_kiwari_values(group.kiwari, values if isinstance(values, Mapping) else None)
@@ -4932,13 +5121,13 @@ def _incoming_from_groups(
     return incoming
 
 
-def _incoming_from_saved(groups: Sequence[KiwariGroup], saved: List["tuple[Optional[List[str]], Dict[str, Any]]"]) -> Dict[str, Any]:
+def _incoming_from_saved(groups: Sequence[KiwariGroup], saved: List["tuple[Optional[List[str]], Dict[str, Any]]"]) -> Dict[str, Optional['Kiwari']]:
     """Each frame's kiwari with its group's saved values laid over it.
 
     A saved group is matched by the frames it names. A file from before groups names none, and
     is every group's -- each taking only the keys it declares, when there are several.
     """
-    incoming: Dict[str, Any] = {}
+    incoming: Dict[str, Optional['Kiwari']] = {}
     for group in groups:
         bound = group.kiwari
         for frames, values in saved:
@@ -4993,9 +5182,10 @@ def load_slot_state(
     )
 
 
-def make_ready_event(state: RunnerState) -> Dict[str, Any]:
+def make_ready_event(state: RunnerState) -> ReadyEventWire:
     ss = state._active
     frame_summary = serialize_frame(ss.frame)
+    tools = _serialize_tools(ss)
     return {
         "type": "ready",
         "examplePath": str(ss.file_path),
@@ -5019,11 +5209,12 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "accessories_count": frame_summary["accessories_count"],
         },
         "kiwari": _serialize_kiwari_for_slot(ss),
-        **_serialize_tools(ss),
+        "tools": tools["tools"],
+        "rejectedEntries": tools["rejectedEntries"],
     }
 
 
-def _serialize_tools(slot_state: SlotState) -> Dict[str, Any]:
+def _serialize_tools(slot_state: SlotState) -> ToolsWire:
     """The slot's @tool functions, and the @frame / @tool functions rejected for their signature."""
     return {
         "tools": [{"name": entry.name} for entry in slot_state.tools],
@@ -5031,7 +5222,7 @@ def _serialize_tools(slot_state: SlotState) -> Dict[str, Any]:
     }
 
 
-def run_tool(slot_state: SlotState, name: str) -> Dict[str, Any]:
+def run_tool(slot_state: SlotState, name: str) -> ToolRunWire:
     """Run one of the slot's @tool functions on its frame; its text is the result."""
     entry = next((entry for entry in slot_state.tools if entry.name == name), None)
     if entry is None:
@@ -5044,7 +5235,7 @@ def run_tool(slot_state: SlotState, name: str) -> Dict[str, Any]:
     return {"name": name, "output": output}
 
 
-def make_success_response(request_id: Any, command: str, result: Any) -> Dict[str, Any]:
+def make_success_response(request_id: Any, command: str, result: Any) -> ResponseWire:
     return {
         "id": request_id,
         "ok": True,
@@ -5053,7 +5244,7 @@ def make_success_response(request_id: Any, command: str, result: Any) -> Dict[st
     }
 
 
-def make_error_response(request_id: Any, command: str, exc: Exception) -> Dict[str, Any]:
+def make_error_response(request_id: Any, command: str, exc: Exception) -> ResponseWire:
     return {
         "id": request_id,
         "ok": False,
@@ -5066,7 +5257,7 @@ def make_error_response(request_id: Any, command: str, exc: Exception) -> Dict[s
     }
 
 
-def get_member_result(frame: 'Frame', member_name: str) -> Dict[str, Any]:
+def get_member_result(frame: 'Frame', member_name: str) -> MemberResultWire:
     for cut_timber in frame.cut_timbers:
         if get_timber_display_name(cut_timber.timber) == member_name:
             return {
@@ -5931,7 +6122,7 @@ def _describe_pick(
     """
     from kumiki.csg.cutcsg import CSGFeatureType, FeatureTestTolerances
 
-    described: Dict[str, Any] = {
+    described: NodeDescriptionWire = {
         "nodeKind": type(target).__name__,
         "nodeDisplayName": type(target).display_name(),
         "nodeLabel": _label_name(target),
@@ -6857,10 +7048,10 @@ def _resolve_slot_name(state: RunnerState, payload: Dict[str, Any]) -> str:
 # Pattern discovery
 # ---------------------------------------------------------------------------
 
-_patterns_cache: Optional[Dict[str, Any]] = None
+_patterns_cache: Optional[PatternListWire] = None
 
 
-def _list_available_patterns(force_rescan: bool = False) -> Dict[str, Any]:
+def _list_available_patterns(force_rescan: bool = False) -> PatternListWire:
     """Scan shipped and local pattern folders and return pattern metadata.
 
     Results are cached after the first scan. Pass *force_rescan=True* (or
@@ -6873,12 +7064,12 @@ def _list_available_patterns(force_rescan: bool = False) -> Dict[str, Any]:
     t0 = time.monotonic()
     from kumiki.librarian import scan_library_index
 
-    sources: List[Dict[str, Any]] = []
+    sources: List[PatternSourceWire] = []
 
     # Shipped patterns — bundled inside the kumiki package as kumiki/patterns/
     # (pip-installed) or at the sibling patterns/ folder in a dev checkout.
-    def _extract_patterns_from_index(index: Any) -> List[Any]:
-        items = []
+    def _extract_patterns_from_index(index: Any) -> List[PatternEntryWire]:
+        items: List[PatternEntryWire] = []
         for pb_record in index.get("patternbooks", []):
             source_file = pb_record.get("file_path")
             for p in (pb_record.get("patterns") or []):
@@ -6925,7 +7116,7 @@ def _list_available_patterns(force_rescan: bool = False) -> Dict[str, Any]:
     scan_s = time.monotonic() - t0
     total_patterns = sum(len(s["patterns"]) for s in sources)
     log_stderr(f"[patterns] Scanned {total_patterns} patterns in {scan_s:.2f}s")
-    result = {"sources": sources, "scan_s": scan_s}
+    result = PatternListWire(sources=sources, scan_s=scan_s)
     _patterns_cache = result
     return result
 
@@ -6943,7 +7134,7 @@ def _raise_specific_pattern(
     source_file: str,
     pattern_name: str,
     kiwari_values: Optional[Mapping[str, Any]] = None,
-) -> "tuple[SlotState, Dict[str, Any]]":
+) -> Tuple[SlotState, SlotLoadedWire]:
     """Load a specific pattern from a source file and return (SlotState, result_dict)."""
     resolved = Path(source_file).resolve()
     if not resolved.exists():
@@ -6980,7 +7171,7 @@ def _raise_specific_pattern(
             single_pattern_name=pattern.path,
             kiwari_groups=(KiwariGroup((pattern.path,), bound),) if bound is not None else (),
         )
-        result = {
+        result: SlotLoadedWire = {
             "examplePath": str(resolved),
             "patternName": pattern.path,
             "frame": {
@@ -7021,7 +7212,7 @@ def _cancel_active_assembly(slot_name: str) -> None:
         event.set()
 
 
-def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerState, Dict[str, Any], bool]:
+def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerState, ResponseWire, bool]:
     request_id = request.get("id")
     command = request.get("command")
     payload = request.get("payload") or {}
