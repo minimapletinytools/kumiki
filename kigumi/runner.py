@@ -581,11 +581,6 @@ class ToolRunWire(TypedDict):
     output: str
 
 
-class MemberResultWire(TypedDict):
-    member: TimberSummaryWire
-    geometry: Dict[str, str]
-
-
 class ReadyEventWire(ToolsWire):
     type: str
     examplePath: str
@@ -3899,26 +3894,9 @@ def write_drawings_file(example_path: Path, drawings: List[DrawingWire]) -> str:
 # compares nothing meaningful otherwise.
 
 
-def _labelled_candidates(node: 'CutCSG', label: str) -> List[Any]:
-    from kumiki.csg.feature_paths import labelled_candidates
-    return labelled_candidates(node, label)
-
-
 def _candidate_segments(node: 'CutCSG') -> Dict[int, str]:
     from kumiki.csg.feature_paths import candidate_segments
     return candidate_segments(node)
-
-
-def _find_csg_by_labels(csg: 'CutCSG', labels: Tuple[str, ...]) -> Optional['CutCSG']:
-    from kumiki.csg.feature_paths import find_csg_by_labels
-    return find_csg_by_labels(csg, labels)
-
-
-def _csg_roots_of(cut_timber: 'CutTimber') -> List[Any]:
-    return [
-        cut.negative_csg for cut in (getattr(cut_timber, "cuts", None) or [])
-        if getattr(cut, "negative_csg", None) is not None
-    ]
 
 
 def _located_geometry(located: Optional['Located'], timber: 'PerfectTimberWithin') -> Optional['Located']:
@@ -4068,32 +4046,6 @@ def _feature_anchor(
     if extent is None:
         return None
     return _vector3_to_floats(timber.transform.local_to_global(extent.anchor))
-
-
-def _timber_body_csg(cut_timber: 'CutTimber') -> Optional['CutCSG']:
-    from kumiki.csg.feature_paths import timber_body_csg
-    try:
-        return timber_body_csg(cut_timber)
-    except Exception:
-        return None
-
-
-def _roots_for_path(cut_timber: 'CutTimber', labels: Tuple[str, ...]) -> Tuple[List[Any], Tuple[str, ...]]:
-    from kumiki.csg.feature_paths import roots_for_path
-    return roots_for_path(cut_timber, labels)
-
-
-def _find_declared_feature(cut_timber: 'CutTimber', ref: Any) -> Optional[Tuple[Any, Any]]:
-    """The feature a FeatureRef names, with the node declaring it."""
-    from kumiki.csg.feature_paths import find_declared_feature
-    hit = find_declared_feature(cut_timber, ref)
-    return None if hit is None else (hit.feature, hit.owner)
-
-
-def resolve_anchor(frame: 'Frame', anchor: AnchorWire) -> Optional[AnchorWire]:
-    """Where one feature is, on its own. See _resolve_anchor_placed for the pair."""
-    placed = _resolve_anchor_placed(frame, anchor, None)
-    return None if placed is None else placed[0]
 
 
 def _resolve_anchor_placed(
@@ -5202,7 +5154,7 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
         "examplePath": str(ss.file_path),
         "commands": [
             "ping", "reload_example", "get_frame", "get_geometry",
-            "get_member", "find_csg_at_point", "hover_feature_at_point", "find_csg_by_path",
+            "find_csg_at_point", "hover_feature_at_point", "find_csg_by_path",
             "get_layers_tree", "get_csg_tree",
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
@@ -5266,19 +5218,6 @@ def make_error_response(request_id: Any, command: str, exc: Exception) -> Respon
             "traceback": traceback.format_exc(),
         },
     }
-
-
-def get_member_result(frame: 'Frame', member_name: str) -> MemberResultWire:
-    for cut_timber in frame.cut_timbers:
-        if get_timber_display_name(cut_timber.timber) == member_name:
-            return {
-                "member": serialize_cut_timber(cut_timber),
-                "geometry": {
-                    "kind": "placeholder-member-geometry",
-                    "name": member_name,
-                },
-            }
-    raise KeyError(f"No timber named '{member_name}' in frame")
 
 
 # ===========================================================================
@@ -7448,11 +7387,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         geometry_s = time.monotonic() - t0
         geometry["profiling"] = {"geometry_s": geometry_s}
         return state, make_success_response(request_id, command, geometry), False
-
-    if command == "get_member":
-        ss = _resolve_slot(state, payload)
-        member_name = _require_str(payload, "name", "get_member requires payload.name")
-        return state, make_success_response(request_id, command, get_member_result(ss.frame, member_name)), False
 
     if command == "hover_feature_at_point":
         ss = _resolve_slot(state, payload)

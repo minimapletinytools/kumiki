@@ -46,6 +46,7 @@ from kumiki.rule import Matrix, Transform, create_v3, inches, scalar
 from kumiki.timber import Frame, PegShape
 from kumiki.csg.triangles import triangulate_cutcsg
 
+from kumiki.csg.feature_paths import find_csg_by_labels, find_declared_feature, roots_for_path, timber_body_csg
 # Generous epsilon: mesh vertices come out of a boolean op, so surface points
 # are only approximately on the analytic primitives. Matches the runner's own
 # raycast epsilon.
@@ -56,6 +57,12 @@ PICK_EPS = 5e-4
 # A segment is numbered only when something shares its label -- the first is
 # bare, which reads as #0. Nothing is doubled here, so every segment is plain.
 TENON_PATH = ["mortise_and_tenon", "tenon_waste", "tenon"]
+
+
+def _resolve_anchor(runner, frame, anchor):
+    """Where one end of a measurement is, on its own."""
+    placed = runner._resolve_anchor_placed(frame, anchor, None)
+    return None if placed is None else placed[0]
 
 
 def _load_runner():
@@ -1865,7 +1872,7 @@ class TestResolvingADerivedEdge:
         local, edge = self._picked_edge(mortise_and_tenon_frame)
         reference = self._reference(mortise_and_tenon_frame, local, edge, entry["memberKey"])
 
-        resolved = runner.resolve_anchor(
+        resolved = _resolve_anchor(runner,
             mortise_and_tenon_frame, runner.serialize_feature_path(reference))
 
         assert resolved is not None, f"{reference.describe()} did not resolve"
@@ -1906,7 +1913,7 @@ class TestResolvingADerivedEdge:
         assert wire["kind"] == "point" and wire["type"] == "POINT"
         assert runner.deserialize_feature_path(wire).identity() == reference.identity()
 
-        resolved = runner.resolve_anchor(mortise_and_tenon_frame, wire)
+        resolved = _resolve_anchor(runner, mortise_and_tenon_frame, wire)
         assert resolved is not None, f"{reference.describe()} did not resolve"
         assert resolved["at"] is not None
         assert resolved["geometry"]["kind"] == "point"
@@ -1935,7 +1942,7 @@ class TestResolvingADerivedEdge:
             b=FeatureRef(good.b.csg_path, "renamed_since"),
         )
 
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             mortise_and_tenon_frame, runner.serialize_feature_path(broken)) is None
 
     def test_the_timbers_own_body_is_reachable(self, mortise_and_tenon_frame):
@@ -1943,7 +1950,7 @@ class TestResolvingADerivedEdge:
         # base of the rendered Difference rather than one of the cuts.
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
 
-        body = runner._timber_body_csg(cut_timber)
+        body = timber_body_csg(cut_timber)
 
         assert body is not None
         assert any(f.name.startswith("rptw.") for f in body.get_declared_features())
@@ -2004,8 +2011,8 @@ class TestSameNamedSiblings:
         local = cut_timber.render_timber_with_cuts_csg_local()
         beyond = list(paths[0][:-1]) + [paths[0][-1].split("#")[0] + "#7"]
 
-        roots, labels = runner._roots_for_path(cut_timber, tuple(beyond))
-        found = [runner._find_csg_by_labels(root, labels) for root in roots]
+        roots, labels = roots_for_path(cut_timber, tuple(beyond))
+        found = [find_csg_by_labels(root, labels) for root in roots]
 
         assert all(node is None for node in found)
 
@@ -2073,7 +2080,7 @@ class TestPickYieldsAMeasurementReference:
         reference = runner._pick_reference(
             local, "butt_timber#0", [], edge.name, "EDGE", edge)
 
-        resolved = runner.resolve_anchor(mortise_and_tenon_frame, reference)
+        resolved = _resolve_anchor(runner, mortise_and_tenon_frame, reference)
 
         assert resolved is not None and resolved["at"] is not None
 
@@ -2224,7 +2231,7 @@ class TestHoveringOverAFeature:
         assert reference["a"]["feature"] and reference["b"]["feature"]
 
         # And it resolves back to somewhere, which is what makes it measurable.
-        resolved = runner.resolve_anchor(mortise_and_tenon_frame, reference)
+        resolved = _resolve_anchor(runner, mortise_and_tenon_frame, reference)
         assert resolved is not None
         assert resolved["geometry"]["kind"] == "point"
 
@@ -2312,7 +2319,7 @@ class TestHoveringOverAFeature:
 
 
         assert result["reference"] is not None
-        assert runner.resolve_anchor(mortise_and_tenon_frame, result["reference"]) is not None
+        assert _resolve_anchor(runner, mortise_and_tenon_frame, result["reference"]) is not None
 
     def test_it_drills_from_where_the_selection_already_is(self, mortise_and_tenon_frame):
         # Hover has to follow the same rules as clicking, or it shows something
@@ -2384,18 +2391,20 @@ class TestTheBroadphase:
     def test_a_box_rejects_what_is_outside_it(self, mortise_and_tenon_frame):
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()
-        node = runner._find_csg_by_labels(
-            runner._roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+        node = find_csg_by_labels(
+            roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
 
+        assert node is not None
         inside = runner._aabb_filter(node, 5e-4)
 
         assert inside is not None
         box = node.get_aabb()
-        middle = [(float(box.min_x) + float(box.max_x)) / 2,
-                  (float(box.min_y) + float(box.max_y)) / 2,
-                  (float(box.min_z) + float(box.max_z)) / 2]
+        low = [float(v) for v in (box.min_x, box.min_y, box.min_z) if v is not None]
+        high = [float(v) for v in (box.max_x, box.max_y, box.max_z) if v is not None]
+        assert len(low) == len(high) == 3
+        middle = [(a + b) / 2 for a, b in zip(low, high)]
         assert inside(middle)
-        assert not inside([float(box.max_x) + 1.0, middle[1], middle[2]])
+        assert not inside([high[0] + 1.0, middle[1], middle[2]])
 
     def test_an_unbounded_solid_cannot_be_filtered(self):
         # A half space has no box worth having, so the walk goes ahead
@@ -2432,8 +2441,8 @@ class TestTheBroadphase:
                 verts.extend([float(world[i, 0]) for i in range(3)])
         indices = list(range(len(verts) // 3))
         rot, pos = runner._build_inv_transform_float(timber.transform)
-        node = runner._find_csg_by_labels(
-            runner._roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+        node = find_csg_by_labels(
+            roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
 
         with_filter = runner._extract_highlight_mesh(
             verts, indices, node, rot, pos, 5e-4, root_csg=local)
@@ -2463,7 +2472,7 @@ class TestAFeatureOnALabelledRoot:
     def _labelled_root(self, frame):
         """A cut timber whose root carries a label AND declares features."""
         for cut_timber in frame.cut_timbers:
-            roots, _ = runner._roots_for_path(cut_timber, ())
+            roots, _ = roots_for_path(cut_timber, ())
             for root in roots:
                 if runner._label_name(root) is not None and root.get_declared_features():
                     return cut_timber, root
@@ -2489,19 +2498,19 @@ class TestAFeatureOnALabelledRoot:
     def test_an_empty_path_means_the_node_you_are_on(self, rooted):
         _, root = self._labelled_root(rooted)
 
-        assert runner._find_csg_by_labels(root, ()) is root
+        assert find_csg_by_labels(root, ()) is root
 
     def test_so_a_feature_it_declares_can_be_found_again(self, rooted):
         cut_timber, root = self._labelled_root(rooted)
         name = root.get_declared_features()[0].name
 
-        found = runner._find_declared_feature(
+        found = find_declared_feature(
             cut_timber,
             runner.deserialize_feature_path(
                 {"timber": cut_timber.name, "csgPath": [], "feature": name}).ref)
 
         assert found is not None
-        assert found[0].name == name
+        assert found.feature.name == name
 
 
 class TestChoosingAmongTheFeaturesAtAPoint:
@@ -2619,7 +2628,7 @@ class TestChoosingAmongTheFeaturesAtAPoint:
         second = runner._handle_find_csg_at_point(
             state, dict(payload, candidateIndex=1), slot)
 
-        assert runner.resolve_anchor(mortise_and_tenon_frame, second["reference"]) is not None
+        assert _resolve_anchor(runner, mortise_and_tenon_frame, second["reference"]) is not None
 
 
 class TestWhatAPickCarriesBack:
@@ -2671,7 +2680,7 @@ class TestWhatAPickCarriesBack:
         # a pair accepted while hovering can be drawn reading zero.
         pick = self._first_pick(mortise_and_tenon_frame, "receiving_timber")
 
-        resolved = runner.resolve_anchor(mortise_and_tenon_frame, pick["reference"])
+        resolved = _resolve_anchor(runner, mortise_and_tenon_frame, pick["reference"])
 
         assert pick["at"] == pytest.approx(resolved["at"])
 

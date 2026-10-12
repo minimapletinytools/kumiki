@@ -19,6 +19,7 @@ from kumiki.drawings.drawing import (LineSpan, PlaneSpan, PointSpan, Measurement
 from kumiki.rule import create_v3
 from tests.testing_shavings import load_module, present
 
+from kumiki.csg.feature_paths import find_csg_by_labels, find_declared_feature, roots_for_path
 
 def v(triple):
     """A triple as the vector a span holds. Written out so the tests need not."""
@@ -1002,7 +1003,7 @@ class TestAFeatureOnALabelledRoot:
     def _labelled_root(self, runner, frame):
         """A cut timber whose root carries a label AND declares features."""
         for cut_timber in frame.cut_timbers:
-            roots, _ = runner._roots_for_path(cut_timber, ())
+            roots, _ = roots_for_path(cut_timber, ())
             for root in roots:
                 if runner._label_name(root) is not None and root.get_declared_features():
                     return cut_timber, root
@@ -1021,19 +1022,19 @@ class TestAFeatureOnALabelledRoot:
         runner, frame = self._runner_and_frame()
         _, root = self._labelled_root(runner, frame)
 
-        assert runner._find_csg_by_labels(root, ()) is root
+        assert find_csg_by_labels(root, ()) is root
 
     def test_so_a_feature_it_declares_can_be_found(self):
         runner, frame = self._runner_and_frame()
         cut_timber, root = self._labelled_root(runner, frame)
         name = root.get_declared_features()[0].name
 
-        found = runner._find_declared_feature(
+        found = find_declared_feature(
             cut_timber, runner.deserialize_feature_path(
                 {"timber": cut_timber.name, "csgPath": [], "feature": name}).ref)
 
         assert found is not None
-        assert found[0].name == name
+        assert found.feature.name == name
 
     def test_and_a_measurement_to_it_resolves(self):
         # The whole point: picked, written, and still findable afterwards.

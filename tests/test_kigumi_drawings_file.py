@@ -25,6 +25,12 @@ from kumiki.csg.feature_paths import find_feature
 from tests.testing_shavings import load_module, mortise_and_tenon_handles, present
 
 
+def _resolve_anchor(runner, frame, anchor):
+    """Where one end of a measurement is, on its own."""
+    placed = runner._resolve_anchor_placed(frame, anchor, None)
+    return None if placed is None else placed[0]
+
+
 def _load_runner():
     """Import kigumi/runner.py by path -- kigumi is not an installed package."""
     runner_path = Path(__file__).resolve().parent.parent / "kigumi" / "runner.py"
@@ -800,7 +806,7 @@ class TestResolvingAnchors:
         return {"timber": timber, "csgPath": list(csg_path), "feature": feature, "type": "FACE"}
 
     def test_it_finds_a_declared_face(self, measured):
-        found = runner.resolve_anchor(
+        found = _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "tenon_top"),
         )
 
@@ -833,7 +839,7 @@ class TestResolvingAnchors:
                     walk(one.negative_csg)
             return found[0]
 
-        world = runner.resolve_anchor(
+        world = _resolve_anchor(runner,
             measured, self._anchor("receiving_timber#0", ("mortise_hole",), "mortise_bottom"),
         )["at"]
 
@@ -842,24 +848,24 @@ class TestResolvingAnchors:
     def test_a_path_steps_through_unlabelled_nodes(self, measured):
         # A path names the labelled nodes only; the intermediates are what it
         # skips, and they are the ones most likely to move.
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "tenon_left"),
         ) is not None
 
     def test_a_feature_that_is_not_there_does_not_resolve(self, measured):
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "no_such_face"),
         ) is None
 
     def test_a_wrong_path_does_not_find_the_feature_elsewhere(self, measured):
         # A labelled node that does not match means the wrong branch, so the
         # walk stops rather than hunting the whole tree for the name.
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("mortise_hole",), "tenon_top"),
         ) is None
 
     def test_a_timber_that_is_gone_does_not_resolve(self, measured):
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             measured, self._anchor("no_such_timber#0", ("tenon_waste",), "tenon_top"),
         ) is None
 
@@ -867,7 +873,7 @@ class TestResolvingAnchors:
         # The shoulder is a half space: a plane to measure against, and no
         # bounded extent to hang a label on. Where to draw it has to come from
         # the geometry and the other anchor instead.
-        found = runner.resolve_anchor(
+        found = _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "shoulder"), "shoulder"),
         )
 
@@ -894,7 +900,7 @@ class TestResolvingAnchors:
         # The mortise cutter is extended past the timber so the cut comes out
         # clean, which puts its declared face anchor hundreds of metres away.
         # The anchor has to come from the region cropped to the timber instead.
-        found = runner.resolve_anchor(
+        found = _resolve_anchor(runner,
             measured, self._anchor("receiving_timber#0", ("mortise_hole",), "mortise_front"),
         )
 
@@ -903,7 +909,7 @@ class TestResolvingAnchors:
     def test_an_unbounded_feature_still_gets_an_anchor(self, measured):
         # A half space has no extent of its own; cropping to the timber gives
         # it one.
-        found = runner.resolve_anchor(
+        found = _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "shoulder"), "shoulder"),
         )
 
@@ -929,7 +935,7 @@ class TestTellingIdenticalJointsApart:
 
     def _anchor(self, runner, frame, first):
         path = (first,) + self.INNER if first else self.INNER
-        return runner.resolve_anchor(frame, {
+        return _resolve_anchor(runner, frame, {
             "timber": "brace_timber#0",
             "csgPath": list(path),
             "feature": "tenon_front",
