@@ -15,3 +15,16 @@ scripts/bundle-docs.js
 app-shell/**
 webview/shell/**
 scripts/legacy-doc-hashes.js
+.kigumi/**
+.artifacts/**
+__tests__/**
+test-fixtures/**
+**/__pycache__/**
+**/*.pyc
+scripts/**
+install
+uninstall.sh
+jest.config.js
+check-extension.md
+tag-search-plan.txt
+tempsidebaricon.png
