@@ -3444,9 +3444,10 @@ def _measure_span(
         # arris, and the fallback was the whole length of the post.
         #
         # Then the timber, which is what a feature declared on a cutter that
-        # runs past the piece needs and the feature cannot know.
+        # runs past the piece needs and the feature cannot know. Not for a
+        # non-real line: a bore's axis lies in the bore, where there is no timber.
         pieces = _intersected_line_pieces(
-            located, [root_csg], reach, solid.transform.position,
+            located, [root_csg] if feature.real else [], reach, solid.transform.position,
             declared=_declared_line_span(feature, node, located))
         if pieces:
             # The longest. A cut can leave an edge in several, and a dimension
@@ -3472,6 +3473,11 @@ def _measure_span(
     if isinstance(located, Plane):
         cropped = approximately_crop_plane_to_area_on_csg(
             located, [node, solid], seed_reach=reach, near=solid.transform.position)
+        if cropped is None or cropped.is_empty:
+            # A face lying on the timber's own boundary -- a tenon's end, flush with the end of
+            # the piece -- crops to nothing against it. Its own primitive still bounds it.
+            cropped = approximately_crop_plane_to_area_on_csg(
+                located, [node], seed_reach=reach, near=solid.transform.position)
         if cropped is None or cropped.is_empty:
             return None
         middle = cropped.centroid()
@@ -4042,7 +4048,7 @@ def _feature_anchor(
             # and its midpoint the middle of the post, which is where a
             # half-made measurement was being drawn.
             pieces = _intersected_line_pieces(
-                located, [root_csg], reach, solid.transform.position,
+                located, [root_csg] if feature.real else [], reach, solid.transform.position,
                 declared=_declared_line_span(feature, node, located))
             if pieces:
                 # The longest piece. A cut can leave an edge in several, and a
