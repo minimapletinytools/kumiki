@@ -22,7 +22,6 @@ import sys
 import threading
 import time
 import traceback
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -638,7 +637,6 @@ if TYPE_CHECKING:
     from kumiki.geometry import Line, Plane, Point
     from kumiki.identity import FeaturePath
     from kumiki.kiwari import Kiwari
-    from kumiki.rule import V3, Transform
     from kumiki.ticket import Ticket
     from kumiki.timber import Accessory, CutTimber, Cutting, Frame, Joint, PerfectTimberWithin
 
@@ -1486,10 +1484,11 @@ def _assign_member_keys(frame: 'Frame') -> Tuple[List[TimberEntry], List[Accesso
 
 
 def _serialize_cutting_summary(cut_timber: 'CutTimber') -> List[CuttingSummaryWire]:
+    from kumiki.picking import label_name
     cuts_meta: List[CuttingSummaryWire] = []
     cuts = list(getattr(cut_timber, "cuts", []) or [])
     for idx, cut in enumerate(cuts):
-        label = _label_name(cut)
+        label = label_name(cut)
         has_csg = getattr(cut, "negative_csg", None) is not None
         has_top = getattr(cut, "maybe_top_end_cut_distance_from_bottom", None) is not None
         has_bot = getattr(cut, "maybe_bottom_end_cut_distance_from_bottom", None) is not None
@@ -2471,17 +2470,18 @@ def _pick_from_candidate(
     feature's owner cannot be placed in the tree, which leaves the caller with
     what it had.
     """
+    from kumiki.picking import derived_feature_owner, node_positions
     from kumiki.csg.cutcsg import CSGFeatureType
 
     feature = hit.feature
-    positions = _node_positions(local_csg)
+    positions = node_positions(local_csg)
     if feature.feature_type() in (CSGFeatureType.EDGE, CSGFeatureType.POINT):
         # A derived feature is placed by the deeper of the two parents that
         # form it; a declared one belongs to whoever declared it, and has no
-        # such pair for _derived_feature_owner to read. Trying derived first
+        # such pair for derived_feature_owner to read. Trying derived first
         # tells them apart.
         kind = feature.feature_type().name
-        owned = _derived_feature_owner(local_csg, feature)
+        owned = derived_feature_owner(local_csg, feature)
         if owned is not None:
             return (owned[1], owned[0], feature.name, kind, feature, None)
         placed = positions.get(id(hit.owner))
@@ -3927,8 +3927,9 @@ def _cropped_reference_segments(
     """*segments* (world space) cut down to where the cut timber still has them.
 
     On its surface, or -- *through_material* -- inside it. Exact first, then at float
-    noise, as a declared edge is (see _cropped_edge_segments).
+    noise, as a declared edge is (see cropped_edge_segments).
     """
+    from kumiki.picking import DECLARED_EDGE_FLOAT_NOISE
     from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
                                     crop_line_to_segments_on_csg)
     from kumiki.geometry import Line, unit_vector
@@ -3948,7 +3949,7 @@ def _cropped_reference_segments(
         station = lambda point: float(((point - a).T * line.direction)[0, 0])  # noqa: E731
         pieces = crop(line, root_csg, seed_reach=reach, near=near, tolerance=0.0)
         if not pieces:
-            pieces = crop(line, root_csg, seed_reach=reach, near=near, tolerance=_DECLARED_EDGE_FLOAT_NOISE)
+            pieces = crop(line, root_csg, seed_reach=reach, near=near, tolerance=DECLARED_EDGE_FLOAT_NOISE)
         for piece in pieces or []:
             low, high = sorted((station(piece.start), station(piece.end)))
             low, high = max(low, 0.0), min(high, span)
@@ -3970,6 +3971,7 @@ def feature_highlights(slot_state: SlotState, references: Sequence[AnchorWire]) 
 
 
 def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> HighlightWire:
+    from kumiki.picking import build_inv_transform_float, edge_highlight_segments, extract_highlight_mesh
     from kumiki.csg.feature_paths import resolve_feature_path
     from kumiki.identity import SingleFeaturePath
 
@@ -3987,12 +3989,12 @@ def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> Highligh
         located = handle.feature.locate_simple_unbounded(handle.owner)
         result["at"] = _feature_anchor(handle.feature, handle.owner, timber, located, root)
     elif feature_type == "EDGE":
-        segments, _absent = _edge_highlight_segments(handle.feature, handle.owner, timber, root)
+        segments, _absent = edge_highlight_segments(handle.feature, handle.owner, timber, root)
         if segments:
             result["highlightEdgeSegments"] = segments
     elif cached.get("mesh") is not None and isinstance(path, SingleFeaturePath):
-        rotation, position = _build_inv_transform_float(timber.transform)
-        vertices, indices, _matched, _total = _extract_highlight_mesh(
+        rotation, position = build_inv_transform_float(timber.transform)
+        vertices, indices, _matched, _total = extract_highlight_mesh(
             cached["mesh"]["vertices"], cached["mesh"]["indices"], handle.owner, rotation, position,
             5e-4, root_csg=root, selected_path=list(path.ref.csg_path), selected_ref=handle.owner,
             feature_label=handle.feature.name, feature_type=feature_type,
@@ -4290,6 +4292,7 @@ def _serialize_csg_node(
     gone wrong. `path` still carries labels only, since that is what
     find_csg_by_path navigates by.
     """
+    from kumiki.picking import label_name
     from kumiki.csg.cutcsg import (
         Difference, Intersection, SolidUnion, csg_children, csg_children_with_parity,
     )
@@ -4302,7 +4305,7 @@ def _serialize_csg_node(
         for child, child_par in csg_children_with_parity(csg, parity)
     }
 
-    label = _label_name(csg)
+    label = label_name(csg)
     # `label` stays the bare name people read; the path segment carries the
     # occurrence that tells same-named siblings apart.
     segment = path_label
@@ -4993,44 +4996,9 @@ def make_error_response(request_id: Any, command: str, exc: Exception) -> Respon
 
 
 # ===========================================================================
-# CSG navigation + highlight-mesh extraction (Phase B)
+# Picking: the requests. What a point or ray lands on, and what to light for it,
+# is kumiki.picking; this turns its answers into wire forms.
 # ===========================================================================
-
-def _build_inv_transform_float(transform: 'Transform') -> Tuple[List[List[float]], List[float]]:
-    """Pre-compute float data for global→local.  Returns (rot_cols, position).
-    local = R^T * (global - pos) where rot_cols is the FORWARD rotation matrix."""
-    M = transform.orientation.matrix
-    P = transform.position
-    rot = [[float(M[r, c]) for c in range(3)] for r in range(3)]
-    pos = [float(P[i]) for i in range(3)]
-    return rot, pos
-
-
-def _inv_transform_point(rot: List[List[float]], pos: List[float], global_pt: List[float]) -> List[float]:
-    """Apply inverse transform: local = R^T * (global_pt - pos)."""
-    dx = global_pt[0] - pos[0]
-    dy = global_pt[1] - pos[1]
-    dz = global_pt[2] - pos[2]
-    return [
-        rot[0][0]*dx + rot[1][0]*dy + rot[2][0]*dz,
-        rot[0][1]*dx + rot[1][1]*dy + rot[2][1]*dz,
-        rot[0][2]*dx + rot[1][2]*dy + rot[2][2]*dz,
-    ]
-
-
-def _inv_transform_direction(rot: List[List[float]], global_dir: List[float]) -> List[float]:
-    """Apply inverse transform to a DIRECTION: local = R^T * d, no translation.
-
-    A direction has no position, so the offset that _inv_transform_point applies
-    would tilt it. Kept beside that one so the pair is read together.
-    """
-    dx, dy, dz = (float(component) for component in global_dir)
-    return [
-        rot[0][0]*dx + rot[1][0]*dy + rot[2][0]*dz,
-        rot[0][1]*dx + rot[1][1]*dy + rot[2][1]*dz,
-        rot[0][2]*dx + rot[1][2]*dy + rot[2][2]*dz,
-    ]
-
 
 def _local_ray_from_payload(
     payload: PickRequest, rot: List[List[float]], pos: List[float],
@@ -5041,6 +5009,7 @@ def _local_ray_from_payload(
     tests do, and so does any caller that has only a point), and everything on
     a surface is found from the point alone.
     """
+    from kumiki.picking import inv_transform_direction, inv_transform_point
     ray = payload.get("ray")
     if not isinstance(ray, dict):
         return None
@@ -5050,21 +5019,9 @@ def _local_ray_from_payload(
     if len(origin) != 3 or len(direction) != 3:
         return None
     return (
-        _inv_transform_point(rot, pos, [float(c) for c in origin]),
-        _inv_transform_direction(rot, [float(c) for c in direction]),
+        inv_transform_point(rot, pos, [float(c) for c in origin]),
+        inv_transform_direction(rot, [float(c) for c in direction]),
     )
-
-
-def _subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
-    """Whether *target* is *root* or somewhere beneath it.
-
-    """
-    from kumiki.csg.cutcsg import csg_children
-
-    # note this is identity comparison, not quality as 2 CutCSGs can be `==` equivalent but not the same
-    if root is target:
-        return True
-    return any(_subtree_contains(child, target) for child in csg_children(root))
 
 
 def _joint_by_cutting_id(cut_timber: 'CutTimber') -> Dict[int, 'Joint']:
@@ -5098,6 +5055,7 @@ def _cutting_for_node(
     single function, so this reads it in a single function; everything else
     here is identity-based.
     """
+    from kumiki.picking import subtree_contains
     from kumiki.csg.cutcsg import Difference
 
     if not isinstance(local_csg, Difference):
@@ -5106,7 +5064,7 @@ def _cutting_for_node(
     if len(local_csg.subtract) != len(cuts):
         return None  # shape changed under us; decline rather than guess
     for subtree, cutting in zip(local_csg.subtract, cuts):
-        if _subtree_contains(subtree, target):
+        if subtree_contains(subtree, target):
             return cutting
     return None
 
@@ -5196,18 +5154,6 @@ def _joint_name_for_node(
     return _joint_name_for_cutting(cut_timber, cutting)
 
 
-def _label_name(labeled: Any) -> Optional[str]:
-    """The name a CSG node or a Cutting carries, or None if nobody named it.
-
-    Both hold a CutCSGLabel, never a bare string and never None, so the name
-    lives one level in. Kept in one place because the runner reads it from a
-    dozen spots while navigating -- and because a CutCSGLabel that reaches the
-    payload unwrapped would serialize as an object where the viewer expects a
-    string.
-    """
-    return getattr(getattr(labeled, "label", None), "name", None)
-
-
 def _declared_feature_names(csg: 'CutCSG') -> List[str]:
     """Names of the features *csg* declares, in declaration order."""
     names: List[str] = []
@@ -5215,581 +5161,6 @@ def _declared_feature_names(csg: 'CutCSG') -> List[str]:
         if declared.name not in names:
             names.append(declared.name)
     return names
-
-
-def _to_v3(pt: List[float]) -> 'V3':
-    """Wrap a plain [x, y, z] in the V3 kumiki's CSG API expects."""
-    from kumiki.rule import create_v3
-    return create_v3(float(pt[0]), float(pt[1]), float(pt[2]))
-
-
-def _csg_contains_point(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> bool:
-    """True if *local_pt* (timber-local floats) is inside *csg*, within *eps*."""
-    return csg.contains_point(_to_v3(local_pt), eps)
-
-
-def _csg_point_on_boundary(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> bool:
-    """True if *local_pt* (timber-local floats) lies on the boundary of *csg*, within *eps*.
-
-    These two are thin adapters over kumiki's own CutCSG methods. kigumi used to
-    carry a parallel float reimplementation of both, from when kumiki was
-    sympy-backed and a symbolic point test was too slow to run per raycast.
-    kumiki is plain floats now, so the shadow copy bought nothing but drift --
-    it covered only HalfSpace, RectangularPrism and Cylinder, which silently
-    made every ConvexPolygonExtrusion, PathExtrusion, ConvexPolygonSimpleLoft
-    and Intersection surface unselectable (the click fell through to the timber
-    body and reported a bare "face").
-    """
-    return csg.is_point_on_boundary(_to_v3(local_pt), eps)
-
-
-# Timber-local outward directions, used to name an unnamed face by whichever of
-# the timber's own six faces it most points toward.
-_TIMBER_LOCAL_FACE_NORMALS = (
-    ("right", (1.0, 0.0, 0.0)), ("left", (-1.0, 0.0, 0.0)),
-    ("front", (0.0, 1.0, 0.0)), ("back", (0.0, -1.0, 0.0)),
-    ("top", (0.0, 0.0, 1.0)), ("bottom", (0.0, 0.0, -1.0)),
-)
-
-
-def _nearest_timber_local_face_name(normal: Any) -> str:
-    """Name an outward *normal* (in timber-local space) by the timber face it
-    most closely points along.
-
-    A CSG primitive often lives in its own local frame, unrelated to the
-    timber's length axis -- a tenon's marking_space local Z points along
-    whichever way the tenon protrudes, not the timber's own top/bottom. Someone
-    browsing a timber's faces only ever wants an answer relative to THAT
-    timber, so the answer is always reported in the timber's own six
-    directions.
-    """
-    n = [float(normal[0]), float(normal[1]), float(normal[2])]
-    best_name, best_dot = "face", -2.0
-    for name, direction in _TIMBER_LOCAL_FACE_NORMALS:
-        dot = n[0] * direction[0] + n[1] * direction[1] + n[2] * direction[2]
-        if dot > best_dot:
-            best_dot, best_name = dot, name
-    return best_name
-
-
-def _feature_at(csg: 'CutCSG', point: Any, eps: float) -> Optional['CSGFeature']:
-    """The best feature at a point, preferring one somebody named.
-
-    Two passes over the same hit list rather than find_first_feature, because the
-    ranking wanted here is not the one find_first_feature applies: it sorts by how
-    specific a feature is, and an anonymous default sits at the same
-    specificity as the authored feature covering the same surface. Asking for
-    the authored layer first says which of those two a person would rather
-    read.
-    """
-    from kumiki.csg.cutcsg import FeatureSource, FeatureTestTolerances
-
-    hits = csg.find_all_features(point, FeatureTestTolerances(face=eps))
-    if not hits:
-        return None
-    # By name: authored features are rebuilt on each call, and names are unique
-    # within a primitive.
-    authored = {
-        feature.name
-        for feature in csg.get_declared_features(FeatureSource.OVERRIDES)
-    }
-    for hit in hits:
-        if not hit.feature.is_derived() and hit.feature.name in authored:
-            return hit.feature
-    return hits[0].feature
-
-def _describe_leaf_csg(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> str:
-    """What to call the part of primitive *csg* that *local_pt* lies on.
-
-    A leaf's own account of itself: one primitive, one point, one string, and
-    no tree. _describe_pick is the other half -- it walks from the root to say
-    which joint made this node and which way the surface really faces, neither
-    of which a primitive can know about itself. This one runs per triangle
-    during highlight extraction, so it stays a lookup.
-
-    Whatever names the point, preferring the name someone chose. An AUTHORED
-    feature wins outright -- a prism built in its own local frame (a tenon's
-    marking_space, say) has a "top" that is not the timber's top, so a name
-    written on purpose beats anything worked out from geometry. Failing that,
-    the primitive's own default: "side.0" says where the face is on the shape
-    that has it, which is a true answer even if it is not a friendly one.
-
-    Everything after that is a fallback for a shape that names nothing, and
-    warns, because there should not be one. They are kept rather than removed
-    so a gap shows up as a poor label rather than as a crash.
-
-    WHAT THE FALLBACKS KNEW THAT THE DEFAULTS DO NOT. Each of them answered in
-    terms of something outside the primitive: "cut_plane" says what a half
-    space is FOR, "cylindrical_surface" says what shape the surface is, and the
-    timber-local direction says where the face is on the TIMBER rather than on
-    the little prism that happens to carry it. A default cannot say any of
-    that -- "side.0" is true, and about the wrong frame of reference.
-
-    Which is an argument for composing, not for choosing. The name says which
-    surface; the outward normal, read in the timber's frame, says which way it
-    faces. "side.0 (facing timber top)" carries both, and neither the feature
-    nor the primitive is the right place to work that out -- only here is the
-    timber in scope. Left undone deliberately; the shape of that string is a
-    decision, not a detail.
-    """
-    from kumiki.csg.cutcsg import Cylinder, HalfSpace
-    from kumiki.rule import are_vectors_perpendicular
-
-    point = _to_v3(local_pt)
-
-    # The raycast tolerance is a surface tolerance: it covers the gap between
-    # the analytic face and the triangulated mesh the ray actually hit. Edges
-    # and points keep their (wider) defaults, since hitting one is a snap
-    # rather than a direct hit.
-    feature = _feature_at(csg, point, eps)
-    if feature is not None:
-        return feature.name
-
-    # Everything past here is a fallback, and every primitive names its own
-    # boundary now, so reaching one means a shape whose default_features() is
-    # still empty -- PathExtrusion, today. They are kept rather than deleted
-    # because a gap should show up as a poor label rather than as a crash, and
-    # they warn because a poor label is otherwise invisible.
-    warnings.warn(
-        f"No feature named the point on {type(csg).__name__}, so its label is "
-        "being guessed. Every primitive should name its own boundary through "
-        "default_features(); this one does not."
-    )
-
-    if isinstance(csg, HalfSpace):
-        return "cut_plane"
-
-    normal = csg.get_outward_normal(point, eps)
-    if normal is None:
-        return "unknown feature"
-
-    # A barrel is not a face, and saying so beats calling it one. Unreachable
-    # for a Cylinder as things stand, since a cylinder names its own barrel --
-    # it is here for the shape that gains a curved side and no defaults.
-    if isinstance(csg, Cylinder) and are_vectors_perpendicular(normal, csg.axis_direction):
-        return "cylindrical_surface"
-
-    return "unknown face feature"
-
-
-def _node_positions(root: 'CutCSG') -> Dict[int, Tuple[int, int, List[str]]]:
-    from kumiki.csg.feature_paths import node_positions
-    return node_positions(root)
-
-
-def _derived_feature_owner(root: 'CutCSG', derived: 'CSGFeature') -> Optional[Tuple[Any, List[str]]]:
-    """Which node a derived edge or point is shown under, and its path.
-
-    A plane-plane edge belongs to two CSGs at once -- the shoulder half-space
-    and the timber body, say -- and a tree can only show it in one place. The
-    rule is the deeper of its two parents, with document order breaking a tie.
-    A derived point is the same shape of problem, an arris and a plane rather
-    than two planes, and takes the same rule.
-
-    That is sufficient for now: the features worth marking are the ones where
-    joint geometry meets a timber face, and the timber body sits at the top of
-    every tree, so the joint side is always deeper and always wins. One between
-    two nodes at the same depth is not something the joint library produces
-    today; when it does, this is the rule to revisit.
-    """
-    parents = [hit for hit in getattr(derived, "parents", ())
-               if hit is not None]
-    if len(parents) != 2:
-        return None
-
-    positions = _node_positions(root)
-    ranked = []
-    for hit in parents:
-        position = positions.get(id(hit.owner))
-        if position is None:
-            return None
-        depth, order, path = position
-        ranked.append(((depth, order), hit.owner, path))
-
-    _rank, owner, path = max(ranked, key=lambda entry: entry[0])
-    return owner, path
-
-
-def _edge_tolerance() -> float:
-    """How close a vertex must be to an edge to count as on it.
-
-    The same tolerance the edge was found with -- an edge is selected by
-    snapping to it, so the highlight has to be as forgiving as the pick was.
-    """
-    from kumiki.csg.cutcsg import FEATURE_EDGE_TOLERANCE
-
-    return FEATURE_EDGE_TOLERANCE
-
-
-#: Floating point error: how far off the cut surface a declared edge may compute.
-_DECLARED_EDGE_FLOAT_NOISE = 1e-6
-
-
-def _cropped_edge_segments(
-    edge_feature: 'CSGFeature',
-    line: 'Line',
-    timber: 'PerfectTimberWithin',
-    root_csg: 'CutCSG',
-    owner: Optional['CutCSG'] = None,
-) -> Tuple[Optional[List[SegmentWire]], bool]:
-    """The edge's line, clipped to where the edge actually exists.
-
-    Returns (segments, absent). Each segment is a {"start", "end"} pair in world
-    space, in order along the line; there is more than one when a cut crosses
-    the middle of the edge and leaves a piece either side of it.
-
-    `absent` says the line was cropped away to nothing, which is a real answer:
-    the two planes cross somewhere that is not on either face. A mortise
-    floor's plane run sideways meets the timber's side a foot away from the
-    mortise, and that is not an edge of anything.
-
-    Three conditions, all necessary, so all three are intersected:
-
-      - the SURFACE is there. Not merely the material: an arris runs along the
-        face of the piece and is never buried in the middle of it, so asking
-        where there is wood keeps every stretch the line is swallowed by. A
-        tenon's arris is the case -- the cutter that shaped it is extended back
-        past the shoulder on purpose, and the shank is solid around it there,
-        so a material test drew the arris carrying on down the timber.
-      - both parent faces are there. A derived edge is where two faces MEET,
-        and a face is bounded by the solid that declared it. Without this the
-        line runs the length of the timber, since a mortise wall's plane
-        carries on long after the mortise stops. Surface alone does not cover
-        it: a mortise floor's plane meets the timber's own side a foot away,
-        and that line is on the surface without being an edge of anything.
-      - the feature says so itself. Exact, and free -- a prism's arris is a
-        pair of its own corners and a derived edge reaches as far as both its
-        faces do. _measure_span has asked this all along; an edge highlight
-        did not, and so had nothing to hold the ends but a tolerant clip.
-
-    The bounds are intersected as intervals rather than written as one CSG
-    Intersection, because the first condition is about the surface of ONE solid
-    and an intersection's surface includes the other's. Intersecting root with
-    a parent made the parent's own face count as boundary, which is the whole
-    length of the arris.
-    """
-    from kumiki.drawings.feature_span import declared_line_span, intersected_intervals
-    from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
-                                crop_line_to_segments_on_csg)
-    from kumiki.geometry import Line, unit_vector
-
-    # Normalised first, because everything below measures along it in metres:
-    # stations are compared against the edge tolerance and against what the
-    # feature declares, and cropcsg parameterises by its own unit direction. A
-    # Line does not promise that its direction is one.
-    line = Line(direction=unit_vector(line.direction), point=line.point)
-
-    near = timber.get_perfect_timber_within_csg_local().transform.position
-    reach = float(timber.length) * 4
-    station = lambda point: float(((point - line.point).T * line.direction)[0, 0])
-    spans = lambda pieces: None if pieces is None else [
-        tuple(sorted((station(piece.start), station(piece.end))))
-        for piece in pieces
-    ]
-
-    # A derived edge is bounded by the two solids its parent faces belong to.
-    # A declared one -- a timber's own arris -- belongs to a single primitive,
-    # which is the owner it was found on.
-    hits = list(getattr(edge_feature, "parents", (None, None)))
-    parents = [
-        hit.owner for hit in hits
-        if hit is not None and getattr(hit, "owner", None) is not None
-    ]
-    derived = bool(parents)
-    if not parents:
-        parents = [owner] if owner is not None else []
-
-    declared = declared_line_span(edge_feature, owner, line) if owner is not None else None
-
-    def clipped(tolerance: float) -> Optional[List[Interval]]:
-        found = spans(crop_line_to_boundary_segments_on_csg(
-            line, root_csg, seed_reach=reach, near=near, tolerance=tolerance))
-        if found is None:
-            return None
-        bounds = []
-        if declared is not None:
-            # Widened with everything else: a derived edge found by a tolerant
-            # test has parents whose corners are that far from its line, so an
-            # unwidened declared span would undo the fallback it is part of.
-            bounds.append([(declared[0] - tolerance, declared[1] + tolerance)])
-        for parent in parents:
-            within = spans(crop_line_to_segments_on_csg(
-                line, parent, seed_reach=reach, near=near, tolerance=tolerance))
-            if within is None:
-                return None
-            bounds.append(within)
-        for bound in bounds:
-            found = intersected_intervals(found, bound)
-        return found
-
-    # Two questions, one number, and only one of them wants it.
-    #
-    # WHETHER the edge is there needs the tolerance it was found by: two faces
-    # count as meeting within that distance, so a real edge's line can sit a
-    # fraction outside the solids that formed it and clip away to nothing.
-    #
-    # HOW FAR it runs does not. Widening the bounds to answer the first question
-    # also pushed both ends out by that tolerance, so every edge was drawn long
-    # at each end -- a fifth again on a 19mm arris.
-    #
-    # So take the exact spans where there are any, and fall back to the tolerant
-    # ones only for the edge that exact clipping loses entirely.
-    #
-    # Only a DERIVED edge, though. The tolerance belongs to how that edge was
-    # found -- two faces counted as meeting because they came within it -- and a
-    # declared arris was not found that way at all: its line is the primitive's
-    # own corners and sits exactly where it says. Widening for one anyway
-    # resurrected stretches the exact reading had correctly called absent, which
-    # is how a bore's end arris came back as a 6mm stub floating off the piece.
-    #
-    # The declared-edge retry is for FLOATING POINT ERROR only, not tolerance: off
-    # axis, an arris lying exactly on the cut surface (a cross lap's inside edge on
-    # a pitched rafter) computes a few nanometres off it and clips away entirely.
-    # TODO consider one clip at _DECLARED_EDGE_FLOAT_NOISE for declared edges instead
-    # of exact-then-retry: simpler, at the cost of padding every end by a micron.
-    cropped = clipped(0.0)
-    if not cropped:
-        cropped = clipped(float(_edge_tolerance()) if derived else _DECLARED_EDGE_FLOAT_NOISE)
-    if cropped is None:
-        # A solid it cannot describe: no answer, rather than a wrong one.
-        return (None, False)
-    if not cropped:
-        return (None, True)
-
-    at = lambda reached: timber.transform.local_to_global(
-        line.point + line.direction * scalar_of(reached))
-    return ([
-        {
-            "start": _vector3_to_floats(at(low)),
-            "end": _vector3_to_floats(at(high)),
-        }
-        for low, high in cropped
-    ], False)
-
-
-def _edge_highlight_segments(
-    edge_feature: 'CSGFeature',
-    owner: 'CutCSG',
-    timber: 'PerfectTimberWithin',
-    root_csg: 'CutCSG',
-) -> Tuple[Optional[List[SegmentWire]], bool]:
-    """Where a selected edge runs, in world space, and whether it is there at all.
-
-    An edge is a line, and a highlight built out of triangles can only ever
-    approximate one -- it lights the strip beside it, which reads as a stray
-    wedge rather than as the edge. The viewer draws lines instead, and this says
-    where they run.
-
-    Cropped from the CSG, because asking the edge where it is does not bound
-    it: a face feature's test_point_unbounded checks the face's PLANE and nothing
-    so an edge made of two of them answers yes all the way along its line --
-    a metre past the joint that formed it. Picking never noticed, since a
-    click is one point that is on the timber anyway.
-
-    A list, because a cut through the middle of an edge leaves a piece either
-    side of it. None when the tree holds a primitive cropcsg cannot
-    describe, and the caller falls back to lighting triangles.
-
-    The second return says the edge was cropped away entirely. The caller wants
-    that separately: with no line to draw it would otherwise light the triangles
-    beside the edge instead, and those are found by the same unbounded test.
-    """
-    from kumiki.geometry import Line
-
-    line = edge_feature.locate_simple_unbounded(owner)
-    if timber is None or root_csg is None or not isinstance(line, Line):
-        return (None, False)
-    if not edge_feature.real:
-        return (_non_real_highlight_segments(edge_feature, owner, timber), False)
-    return _cropped_edge_segments(edge_feature, line, timber, root_csg, owner)
-
-
-def _non_real_highlight_segments(
-    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
-) -> Optional[List[SegmentWire]]:
-    """Where a non-real feature is drawn: its own extent, in world space.
-
-    NOT cropped to the cut solid the way a real edge is. A bore's axis lies in
-    the void the bore made, so clipping it to what the cuts left finds no
-    boundary anywhere along it and reports the whole feature absent -- which is
-    a selected peg hole axis with no line to draw.
-
-    Its own extent is the right bound and an exact one: a cylinder's axis runs
-    between the cylinder's own two ends, which are the depth that was drilled.
-    The uncut body would bound it as well (see D5 in the feature-selection plan)
-    and is the fallback if something ever declares a non-real feature that
-    reaches past the piece; nothing does, and the clip is not free on a hover.
-    """
-    extent = feature.get_extent(owner)
-    if extent is None or extent.ends is None:
-        return None
-    to_world = lambda point: _vector3_to_floats(timber.transform.local_to_global(point))
-    return [{"start": to_world(extent.ends[0]), "end": to_world(extent.ends[1])}]
-
-
-def _features_at_point(
-    root: 'CutCSG', local_pt: List[float], eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
-    local_ray: Optional[LocalRay] = None,
-) -> List['OwnedFeatureHit']:
-    """Every feature the WHOLE tree sees at the click, best first.
-
-    Asked of the root rather than the node navigation landed on: a derived edge
-    comes from a face on each of two different primitives, so it exists only
-    where both are in scope. A leaf can never see one, which is why edges were
-    unselectable from a click while the machinery for them worked.
-
-    With a ray, features that lie in a VOID are found too -- see
-    _non_real_features_along_ray. The point alone cannot find them: it is where
-    the ray struck a surface, and the middle of a bore is a bore's radius away
-    from every surface the bore has.
-    """
-    from kumiki.csg.cutcsg import FeatureTestTolerances
-
-    resolved = tolerances or FeatureTestTolerances(face=eps)
-    hits = root.find_all_features(_to_v3(local_pt), resolved)
-    if local_ray is None:
-        return hits
-    return _merge_ray_hits(root, hits, local_ray, resolved)
-
-
-def _merge_ray_hits(
-    root: 'CutCSG', hits: List['OwnedFeatureHit'], local_ray: LocalRay,
-    tolerances: 'FeatureTestTolerances',
-) -> List['OwnedFeatureHit']:
-    """*hits*, plus the void-dwelling features the ray passes through, re-sorted.
-
-    Kept apart from find_all_features because it is not a geometric question
-    about a point -- it is what the POINTER was aiming at, which only the picking
-    layer knows. The ordering is the library's, applied once over both lots.
-    """
-    from kumiki.csg.cutcsg import _sort_feature_hits
-
-    along_ray = _non_real_features_along_ray(root, local_ray, tolerances)
-    if not along_ray:
-        return hits
-    already = {(id(hit.feature), id(hit.owner)) for hit in hits}
-    extra = [hit for hit in along_ray if (id(hit.feature), id(hit.owner)) not in already]
-    return _sort_feature_hits(hits + extra) if extra else hits
-
-
-def _non_real_features_along_ray(
-    root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
-) -> List['OwnedFeatureHit']:
-    """Non-real features the ray passes close to, in timber-local space.
-
-    ONLY non-real ones. A real feature is on the boundary, so the ray's own hit
-    point already found it; sweeping the whole ray for those would light
-    everything behind what was clicked, which is the opposite of picking.
-
-    Bounded by the feature's own extent rather than the infinite line it locates
-    to: a bore's axis is an endless line, and without this a peg hole could be
-    selected from a metre past the end of the timber.
-
-    The tolerance is the edge one, which the viewer derives from what a pixel is
-    worth -- so this is a screen-space snap, the way any CAD package snaps to a
-    centre line.
-    """
-    from kumiki.csg.cutcsg import OwnedFeatureHit, csg_children
-    from kumiki.geometry import Line
-
-    origin, direction = local_ray
-    direction = _unit_or_none(direction)
-    if direction is None:
-        return []
-    tolerance = float(tolerances.edge)
-    found: List['OwnedFeatureHit'] = []
-
-    def consider(feature: 'CSGFeature', owner: 'CutCSG') -> None:
-        # A non-real POINT would want a point-to-ray distance; nothing declares
-        # one yet, so there is nothing here to guess at.
-        if not isinstance(feature.locate_simple_unbounded(owner), Line):
-            return
-        extent = feature.get_extent(owner)
-        if extent is None or extent.ends is None:
-            return
-        ends = (_vector3_to_floats(extent.ends[0]), _vector3_to_floats(extent.ends[1]))
-        if _ray_reaches_segment(origin, direction, ends, tolerance):
-            found.append(OwnedFeatureHit(feature=feature, owner=owner))
-
-    def walk(node: 'CutCSG') -> None:
-        for feature in node.get_declared_features():
-            if not feature.real:
-                consider(feature, node)
-        for child in csg_children(node):
-            walk(child)
-
-    walk(root)
-    return found
-
-
-def _unit_or_none(vector: List[float]) -> Optional[List[float]]:
-    """A unit copy of *vector*, or None if it has no direction."""
-    length = math.sqrt(sum(float(c) * float(c) for c in vector))
-    if length <= 0:
-        return None
-    return [float(c) / length for c in vector]
-
-
-def _ray_reaches_segment(
-    origin: List[float], direction: List[float], ends: Tuple[List[float], List[float]], tolerance: float,
-) -> bool:
-    """Whether the ray passes within *tolerance* of the segment between *ends*.
-
-    Plain floats throughout: this is a screen-space snap run on every hover, and
-    it decides whether something is close enough to click -- not where anything
-    is cut.
-
-    The closest approach of two lines, with the segment parameter clamped to the
-    segment and the ray parameter to what is in front of the origin, since
-    behind it is behind the camera. Parallel lines take the segment's midpoint,
-    which is all the answer that case needs.
-
-    `direction` is expected normalised, which is what makes D.D drop out of the
-    usual pair of equations and leaves a single division.
-    """
-    segment = [float(ends[1][i]) - float(ends[0][i]) for i in range(3)]
-    segment_length_sq = sum(c * c for c in segment)
-    if segment_length_sq <= 0:
-        return False
-
-    to_origin = [float(origin[i]) - float(ends[0][i]) for i in range(3)]
-    dot = lambda a, b: sum(a[i] * b[i] for i in range(3))
-    ray_dot_segment = dot(direction, segment)
-    ray_dot_to_origin = dot(direction, to_origin)
-    segment_dot_to_origin = dot(segment, to_origin)
-
-    denominator = segment_length_sq - ray_dot_segment * ray_dot_segment
-    if abs(denominator) < 1e-12:
-        along_segment = 0.5
-    else:
-        along_segment = (segment_dot_to_origin - ray_dot_segment * ray_dot_to_origin) / denominator
-        along_segment = min(1.0, max(0.0, along_segment))
-
-    on_segment = [float(ends[0][i]) + segment[i] * along_segment for i in range(3)]
-    along_ray = max(0.0, dot([on_segment[i] - float(origin[i]) for i in range(3)], direction))
-    on_ray = [float(origin[i]) + direction[i] * along_ray for i in range(3)]
-    gap = [on_segment[i] - on_ray[i] for i in range(3)]
-    return math.sqrt(dot(gap, gap)) <= tolerance
-
-def _resolve_derived_feature(hits: List['OwnedFeatureHit']) -> Optional['CSGFeature']:
-    """The DERIVED edge or point under the click, if one is the best answer there.
-
-    Only derived. A timber's own arris is an edge as well, and a declared
-    feature -- it has a name, an owner and a place in the tree, so it is
-    referred to the way any declared feature is. Only one that exists nowhere
-    but as the product of two parents needs the roundabout treatment of being
-    named by them.
-    """
-    from kumiki.csg.cutcsg import CSGFeatureType
-
-    if not hits:
-        return None
-    best = hits[0]
-    if best.feature.feature_type() not in (CSGFeatureType.EDGE, CSGFeatureType.POINT):
-        return None
-    if not best.feature.is_derived():
-        return None
-    return best.feature
 
 
 def _describe_pick(
@@ -5803,7 +5174,7 @@ def _describe_pick(
 ) -> NodeDescriptionWire:
     """Everything the selection display wants to say about one click.
 
-    Kept separate from _describe_leaf_csg, which runs per triangle during
+    Kept separate from describe_leaf_csg, which runs per triangle during
     highlight extraction and must stay a cheap string lookup. This runs once.
 
     The three CSG-ish arguments are all about one timber and are easy to
@@ -5843,12 +5214,13 @@ def _describe_pick(
         feature was selected; and jointName, which is None for the timber's own
         body, since no joint produced that.
     """
+    from kumiki.picking import outward_normal_and_face, to_v3, label_name
     from kumiki.csg.cutcsg import CSGFeatureType, FeatureTestTolerances
 
     described: NodeDescriptionWire = {
         "nodeKind": type(target).__name__,
         "nodeDisplayName": type(target).display_name(),
-        "nodeLabel": _label_name(target),
+        "nodeLabel": label_name(target),
         "jointName": _joint_name_for_node(local_csg, cut_timber, target),
     }
 
@@ -5861,16 +5233,16 @@ def _describe_pick(
             "outwardNormal": None,
         }
 
-    point = _to_v3(local_pt)
+    point = to_v3(local_pt)
     hit = target.find_first_feature(point, FeatureTestTolerances(face=eps))
     resolved_type = feature_type
     if resolved_type is None and hit is not None:
         resolved_type = hit.feature_type().name
-    normal, faces_toward = _outward_normal_and_face(target, local_csg, local_pt, eps)
+    normal, faces_toward = outward_normal_and_face(target, local_csg, local_pt, eps)
     return {
         **described,
         # featureLabel is only a name when the primitive declared one. Without
-        # that it is _describe_leaf_csg's geometric guess, which the display
+        # that it is describe_leaf_csg's geometric guess, which the display
         # must not present as a name -- it is a direction, and one that has not
         # been sign-corrected, unlike the normal below.
         "featureLabel": feature_label,
@@ -5878,197 +5250,6 @@ def _describe_pick(
         "facesToward": faces_toward,
         "outwardNormal": normal,
     }
-
-
-def _outward_normal_and_face(
-    target: 'CutCSG',
-    local_csg: 'CutCSG',
-    local_pt: List[float],
-    eps: float,
-) -> Tuple[Optional[List[float]], Optional[str]]:
-    """The outward normal at the pick, and which of the timber's own six faces
-    it points most nearly along.
-
-    The tree is already in the timber's local frame, so the normal is matched
-    against the six local directions directly -- going via
-    get_closest_oriented_face_from_global_direction would convert to global and
-    straight back.
-
-    The primitive supplies the direction and its parity supplies the sign. A
-    primitive's own normal points out of that primitive, which is not always
-    out of the finished timber: a mortise prism's points out of the hole and
-    into the material, so the wall you clicked faces the other way. A
-    SUBTRACTIVE node bounds a void, so its surface faces the opposite way to
-    the solid.
-
-    Parity rather than the root's own normal at the point, which is what this
-    used to ask. That is a local geometric answer and it assumes the point is
-    on the composed boundary without rechecking: Difference returns the base's
-    normal without asking whether a subtract removed that point, and SolidUnion
-    averages whichever children contain it without asking whether the result is
-    on the union's surface. Both answer confidently for points that are not on
-    the boundary at all, and averaging at an edge gives a bisector rather than
-    a normal. Parity never consults the point, so none of that applies.
-
-    Args:
-        target: the leaf primitive that was hit, for the face direction.
-        local_csg: the root of the tree it sits in, for the parity.
-        local_pt: the clicked point, in that tree's (timber-local) space.
-        eps: surface tolerance for the normal lookup.
-
-    Returns:
-        (normal, face name) in timber-local space, or (None, None) if no normal
-        is available. The normal is the exact answer and the face name is the
-        nearest of six, so the display can show both rather than rounding
-        silently.
-    """
-    from kumiki.csg.cutcsg import CSGParity, walk_csg_with_parity
-
-    point = _to_v3(local_pt)
-    normal = target.get_outward_normal(point, eps)
-    if normal is None:
-        return None, None
-    # First occurrence: parity belongs to a position, and navigation hands back
-    # the node rather than the path it took, so a subtree placed twice in one
-    # tree could not be told apart here anyway.
-    parity = next(
-        (p for node, p in walk_csg_with_parity(local_csg) if node is target),
-        None,
-    )
-    if parity is CSGParity.SUBTRACTIVE:
-        normal = -normal
-    as_floats = [float(normal[0]), float(normal[1]), float(normal[2])]
-    return as_floats, _nearest_timber_local_face_name(normal)
-
-
-def _resolve_csg_at_path(csg: 'CutCSG', path: List[str], local_pt: Optional[List[float]] = None, eps: float = 1e-4) -> 'CutCSG':
-    """Walk the CSG tree following *path* of labeled CSG nodes.
-
-    Searches through unlabeled intermediate Difference/SolidUnion nodes
-    transparently.  When *local_pt* is given and multiple children share the
-    same label, prefer the one whose boundary contains *local_pt*.
-    """
-    from kumiki.csg.cutcsg import SolidUnion, Difference
-
-    def _find_labeled(node: 'CutCSG', label_name: str) -> List[Any]:
-        """Return all descendants of *node* with the given *label*, searching
-        through unlabeled compound intermediaries."""
-        results: List[Any] = []
-        children: List[Any] = []
-        if isinstance(node, Difference):
-            children = list(node.subtract)
-            # Also check base
-            base_label = _label_name(node.base)
-            if base_label == label_name:
-                results.append(node.base)
-            elif isinstance(node.base, (SolidUnion, Difference)) and base_label is None:
-                results.extend(_find_labeled(node.base, label_name))
-        elif isinstance(node, SolidUnion):
-            children = list(node.children)
-        for ch in children:
-            ch_label = _label_name(ch)
-            if ch_label == label_name:
-                results.append(ch)
-            elif isinstance(ch, (SolidUnion, Difference)) and ch_label is None:
-                results.extend(_find_labeled(ch, label_name))
-        return results
-
-    from kumiki.identity import ResolvedJointPath
-
-    node = csg
-    for segment in path:
-        # A segment may carry the occurrence that tells same-named siblings
-        # apart. Names match bare; the number, when given, chooses.
-        wanted = ResolvedJointPath.parse(segment)
-        candidates = _find_labeled(node, wanted.path)
-        if not candidates:
-            break
-        if wanted.occurrence and wanted.occurrence < len(candidates):
-            node = candidates[wanted.occurrence]
-        elif len(candidates) == 1 or local_pt is None:
-            node = candidates[0]
-        else:
-            # Multiple with same name — pick the one on boundary
-            picked = candidates[0]
-            for c in candidates:
-                if _csg_point_on_boundary(c, local_pt, eps):
-                    picked = c
-                    break
-                if _csg_contains_point(c, local_pt, eps):
-                    picked = c
-            node = picked
-    return node
-
-
-def _navigate_csg_one_level(
-    node: 'CutCSG',
-    local_pt: List[float],
-    current_path: List[str],
-    eps: float = 1e-4,
-    segments: Optional[Dict[int, str]] = None,
-) -> Tuple[List[str], Any, Optional[str]]:
-    """Navigate one level deeper into *node* based on click point.
-
-    Returns (new_path, target_csg_to_highlight, feature_label_or_None).
-
-    Every step carries the occurrence numbering its label among the siblings it
-    shares one with, from the same _candidate_segments the resolvers index into.
-    *segments* is that scope, passed down when drilling through an unlabelled
-    compound so its children stay numbered against the labelled ancestor a path
-    actually names.
-    """
-    from kumiki.csg.cutcsg import SolidUnion, Difference
-
-    if segments is None:
-        segments = _candidate_segments(node)
-
-    def step(child: 'CutCSG') -> Tuple[List[str], Any, Optional[str]]:
-        """The move onto *child*."""
-        segment = segments.get(id(child))
-        if segment:
-            return (current_path + [segment], child, None)
-        if isinstance(child, (SolidUnion, Difference)):
-            return _navigate_csg_one_level(child, local_pt, current_path, eps, segments)
-        return (current_path, child, _describe_leaf_csg(child, local_pt, eps))
-
-    if isinstance(node, Difference):
-        for sub in node.subtract:
-            if _csg_point_on_boundary(sub, local_pt, eps):
-                return step(sub)
-        # Point is on the base surface
-        return step(node.base)
-
-    if isinstance(node, SolidUnion):
-        for ch in node.children:
-            if _csg_point_on_boundary(ch, local_pt, eps):
-                return step(ch)
-        # Couldn't match a specific child — report face of whole union
-        return (current_path, node, "face")
-
-    # Leaf primitive — report face
-    return (current_path, node, _describe_leaf_csg(node, local_pt, eps))
-
-
-def _navigate_csg_to_leaf(
-    csg: 'CutCSG',
-    local_pt: List[float],
-    eps: float = 1e-4,
-) -> Tuple[List[str], Any, Optional[str]]:
-    """A plain click: traverse from root to deepest labeled node, then report face."""
-    from kumiki.csg.cutcsg import SolidUnion, Difference
-
-    path: List[str] = []
-    node = csg
-    while True:
-        new_path, target, label = _navigate_csg_one_level(node, local_pt, path, eps)
-        if label is not None:
-            # Reached a leaf
-            return (new_path, target, label)
-        if new_path == path:
-            # No progress — shouldn't happen but guard against infinite loop
-            return (path, node, "face")
-        path = new_path
-        node = target
 
 
 def _pick_reference(
@@ -6085,6 +5266,7 @@ def _pick_reference(
     reached a feature, and None for a derived feature whose parents cannot both
     be placed in the tree -- neither is something to measure to yet.
     """
+    from kumiki.picking import node_positions
     from kumiki.identity import (DerivedFeaturePath, FeatureRef, ResolvedTimberPath,
                                  SingleFeaturePath)
 
@@ -6093,7 +5275,7 @@ def _pick_reference(
     timber = ResolvedTimberPath.parse(member_key)
 
     if edge is not None:
-        positions = _node_positions(local_csg)
+        positions = node_positions(local_csg)
         parents = []
         for hit in getattr(edge, "parents", (None, None)):
             if hit is None or id(hit.owner) not in positions:
@@ -6108,170 +5290,6 @@ def _pick_reference(
         ref=FeatureRef(tuple(node_path), feature_label),
         feature_type=feature_type,
     ))
-
-
-def _aabb_filter(csg: 'CutCSG', eps: float) -> Optional[Callable[[List[float]], bool]]:
-    """A cheap "could this point be on *csg*" test, or None if it cannot help.
-
-    None when the box says nothing useful -- a solid unbounded in every
-    direction, or one whose bounds cannot be read. An empty solid rejects
-    everything, which is a real answer rather than an unhelpful one.
-
-    The bounds are the CSG's own, so points must be in the same space it is:
-    timber-local, the same as the centroids the caller computes.
-    """
-    try:
-        with warnings.catch_warnings():
-            # Asking speculatively, and "unbounded" is a perfectly good answer:
-            # it means the box cannot help and the walk goes ahead unfiltered.
-            # The library's warning is for callers who wanted a real box.
-            warnings.simplefilter("ignore")
-            box = csg.get_aabb()
-    except Exception:
-        return None
-    if box is None:
-        return None
-    if getattr(box, "is_empty", False):
-        return lambda point: False
-
-    bounds = [
-        (box.min_x, box.max_x),
-        (box.min_y, box.max_y),
-        (box.min_z, box.max_z),
-    ]
-    limits = []
-    for low, high in bounds:
-        limits.append((
-            None if low is None else float(low) - eps,
-            None if high is None else float(high) + eps,
-        ))
-    if all(low is None and high is None for low, high in limits):
-        return None
-
-    def inside(point: List[float]) -> bool:
-        for axis, (low, high) in enumerate(limits):
-            value = point[axis]
-            if low is not None and value < low:
-                return False
-            if high is not None and value > high:
-                return False
-        return True
-
-    return inside
-
-
-def _extract_highlight_mesh(
-    mesh_vertices: List[float],
-    mesh_indices: List[int],
-    target_csg: 'CutCSG',
-    timber_rot: List[List[float]],
-    timber_pos: List[float],
-    eps: float = 1e-4,
-    root_csg: Optional['CutCSG'] = None,
-    selected_path: Optional[List[str]] = None,
-    selected_ref: Optional[Any] = None,
-    feature_label: Optional[str] = None,
-    edge_feature: Optional['CSGFeature'] = None,
-    feature_type: Optional[str] = None,
-) -> Tuple[List[float], List[int], int, int]:
-    """Extract triangles belonging to *target_csg* from the rendered mesh.
-
-    *mesh_vertices* / *mesh_indices* are in global coords (flat lists).
-    Returns (highlight_vertices, highlight_indices, matched_tris, total_tris).
-    """
-    total_tris = len(mesh_indices) // 3
-    out_verts: List[float] = []
-    out_idx: List[int] = []
-    matched = 0
-
-    # The path to hold each triangle's owner to, or None to keep every triangle.
-    owner_path = (selected_path if root_csg is not None and selected_ref is not None and selected_path
-                  else None)
-
-    # Broadphase: a triangle whose centroid is outside the target's own box
-    # cannot be on its boundary, and a box test is far cheaper than asking the
-    # CSG. It matters because the target is usually small and the mesh is the
-    # whole timber -- a mortise on a beam keeps 10 triangles out of 376, and the
-    # walk drops from 2.8ms to 0.1ms.
-    # An edge whose line has already been worked out has no triangles to light:
-    # the line IS its highlight. Without this the walk still runs, comparing
-    # every triangle against an edge's name that no face can ever answer to, and
-    # spends a fifth of a second arriving at nothing.
-    if feature_type in ("EDGE", "POINT") and edge_feature is None:
-        return [], [], 0, len(mesh_indices) // 3
-
-    inside_box = _aabb_filter(target_csg, eps)
-
-    # The feature we are matching against, looked up once instead of once per
-    # triangle. _describe_leaf_csg asks the node for EVERY feature at the point
-    # and compares names; when the name is a declared feature we can ask that
-    # one feature directly, which is the same answer without the search.
-    #
-    # test_point_unbounded is only meaningful for a point already known to be on
-    # owner's boundary -- which the loop below establishes before it gets here.
-    wanted_feature = None
-    if feature_label is not None and edge_feature is None:
-        wanted_feature = next(
-            (f for f in target_csg.get_declared_features() if f.name == feature_label), None)
-
-    for tri in range(total_tris):
-        i0 = mesh_indices[tri * 3]
-        i1 = mesh_indices[tri * 3 + 1]
-        i2 = mesh_indices[tri * 3 + 2]
-        # Centroid in global
-        cx = (mesh_vertices[i0*3] + mesh_vertices[i1*3] + mesh_vertices[i2*3]) / 3.0
-        cy = (mesh_vertices[i0*3+1] + mesh_vertices[i1*3+1] + mesh_vertices[i2*3+1]) / 3.0
-        cz = (mesh_vertices[i0*3+2] + mesh_vertices[i1*3+2] + mesh_vertices[i2*3+2]) / 3.0
-        # Convert centroid to timber-local
-        local_c = _inv_transform_point(timber_rot, timber_pos, [cx, cy, cz])
-        if inside_box is not None and not inside_box(local_c):
-            continue
-        if _csg_point_on_boundary(target_csg, local_c, eps):
-            if owner_path is not None and root_csg is not None:
-                owner = _resolve_csg_at_path(root_csg, owner_path, local_c, eps)
-                if owner is not selected_ref:
-                    continue
-            if edge_feature is not None:
-                # The last fallback, and a poor one: it asks test_point_unbounded
-                # vertex without the boundary check, so it lights the strip
-                # along the whole line rather than along the edge. Only reached
-                # when crop_line_to_segments_on_csg met a primitive it could not
-                # describe as half spaces, and it should go once that is total.
-                #
-                # An edge is a line, and no triangle's centroid sits on one --
-                # matching the way a face does would light nothing at all. The
-                # mesher puts vertices on edges, so the strip along an edge is
-                # the triangles with two vertices on it.
-                on_edge = 0
-                for corner in (i0, i1, i2):
-                    corner_local = _inv_transform_point(timber_rot, timber_pos, [
-                        mesh_vertices[corner * 3],
-                        mesh_vertices[corner * 3 + 1],
-                        mesh_vertices[corner * 3 + 2],
-                    ])
-                    if edge_feature.test_point_unbounded(
-                        target_csg, _to_v3(corner_local), _edge_tolerance()
-                    ):
-                        on_edge += 1
-                if on_edge < 2:
-                    continue
-            elif wanted_feature is not None:
-                if not wanted_feature.test_point_unbounded(target_csg, _to_v3(local_c), eps):
-                    continue
-            elif feature_label is not None:
-                # A generic name -- "left", "cylindrical_surface" -- which no
-                # declared feature answers to, so it has to be worked out.
-                tri_face_label = _describe_leaf_csg(target_csg, local_c, eps)
-                if tri_face_label != feature_label:
-                    continue
-            base = len(out_verts) // 3
-            out_verts.extend(mesh_vertices[i0*3 : i0*3+3])
-            out_verts.extend(mesh_vertices[i1*3 : i1*3+3])
-            out_verts.extend(mesh_vertices[i2*3 : i2*3+3])
-            out_idx.extend([base, base+1, base+2])
-            matched += 1
-
-    return out_verts, out_idx, matched, total_tris
 
 
 def _handle_hover_feature_at_point(
@@ -6361,6 +5379,7 @@ def _nothing_at_point(member_key: str) -> PickResultWire:
 
 def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Process a find_csg_at_point request and return the result dict."""
+    from kumiki.picking import build_inv_transform_float, csg_point_on_boundary, derived_feature_owner, edge_highlight_segments, extract_highlight_mesh, features_at_point, inv_transform_point, navigate_csg_one_level, navigate_csg_to_leaf, node_positions, resolve_csg_at_path, resolve_derived_feature
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
     point = payload.get("point")
@@ -6400,10 +5419,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         raise ValueError(f"No CSG data cached for {member_key}")
 
     timber = cut_timber.timber
-    timber_rot, timber_pos = _build_inv_transform_float(timber.transform)
+    timber_rot, timber_pos = build_inv_transform_float(timber.transform)
 
     # Convert global click point to timber-local
-    local_pt = _inv_transform_point(timber_rot, timber_pos, [float(p) for p in point])
+    local_pt = inv_transform_point(timber_rot, timber_pos, [float(p) for p in point])
 
     t0 = time.monotonic()
 
@@ -6411,18 +5430,18 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     # clicking a shoulder or an edge is after. Ctrl holds it back to one level
     # per click, for walking down through the compounds on the way.
     if not ctrl_click:
-        new_path, target_csg, feature_label = _navigate_csg_to_leaf(local_csg, local_pt, eps)
+        new_path, target_csg, feature_label = navigate_csg_to_leaf(local_csg, local_pt, eps)
     else:
         if current_path:
-            node = _resolve_csg_at_path(local_csg, current_path, local_pt, eps)
-            on_boundary = _csg_point_on_boundary(node, local_pt, eps)
+            node = resolve_csg_at_path(local_csg, current_path, local_pt, eps)
+            on_boundary = csg_point_on_boundary(node, local_pt, eps)
             if not on_boundary:
                 node = local_csg
                 current_path = []
         else:
             node = local_csg
 
-        new_path, target_csg, feature_label = _navigate_csg_one_level(
+        new_path, target_csg, feature_label = navigate_csg_one_level(
             node, local_pt, current_path, eps,
         )
 
@@ -6432,11 +5451,11 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     # jumping to an edge deep inside would skip the levels between.
     feature_type = None
     declared_edge = None
-    feature_hits = _features_at_point(
+    feature_hits = features_at_point(
         local_csg, local_pt, eps, tolerances,
         local_ray=_local_ray_from_payload(payload, timber_rot, timber_pos),
     )
-    edge = _resolve_derived_feature(feature_hits) if feature_label is not None else None
+    edge = resolve_derived_feature(feature_hits) if feature_label is not None else None
 
     # Which of the features at this point is wanted, when more than one is.
     #
@@ -6465,7 +5484,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
 
     if picked is None:
         if edge is not None:
-            owned = _derived_feature_owner(local_csg, edge)
+            owned = derived_feature_owner(local_csg, edge)
             if owned is not None:
                 target_csg, new_path = owned[0], owned[1]
                 feature_label = edge.name
@@ -6480,7 +5499,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
 
             best = feature_hits[0]
             if best.feature.feature_type() in (CSGFeatureType.EDGE, CSGFeatureType.POINT):
-                placed = _node_positions(local_csg).get(id(best.owner))
+                placed = node_positions(local_csg).get(id(best.owner))
                 if placed is not None:
                     new_path, target_csg = placed[2], best.owner
                     feature_label = best.feature.name
@@ -6489,7 +5508,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
 
     parent_csg = None
     if new_path:
-        parent_csg = _resolve_csg_at_path(local_csg, new_path, local_pt, eps)
+        parent_csg = resolve_csg_at_path(local_csg, new_path, local_pt, eps)
 
     # An edge is drawn as a line whether it was derived or declared: a timber's
     # own arris needs the line as much as a joint's does, and without this it
@@ -6499,12 +5518,12 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     edge_feature = edge if edge is not None else declared_edge
     located_pick = _picked_located(feature_hits, feature_label, edge_feature, target_csg)
     if edge_feature is not None:
-        highlight_edge, edge_absent = _edge_highlight_segments(
+        highlight_edge, edge_absent = edge_highlight_segments(
             edge_feature, target_csg, timber, local_csg,
         )
 
     # Extract highlight mesh for the selected target
-    hl_verts, hl_idx, matched, total = _extract_highlight_mesh(
+    hl_verts, hl_idx, matched, total = extract_highlight_mesh(
         mesh["vertices"],
         mesh["indices"],
         target_csg,
@@ -6523,7 +5542,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     # so the viewer can render the parent dimmer and the feature brighter.
     parent_hl: Optional[MeshWire] = None
     if feature_label is not None and parent_csg is not None:
-        p_verts, p_idx, _, _ = _extract_highlight_mesh(
+        p_verts, p_idx, _, _ = extract_highlight_mesh(
             mesh["vertices"],
             mesh["indices"],
             parent_csg,
@@ -6673,6 +5692,7 @@ def _log_pick(
 
 def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Resolve a CSG at a known path and return highlight mesh for the viewer."""
+    from kumiki.picking import build_inv_transform_float, extract_highlight_mesh, resolve_csg_at_path, label_name
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
     path = payload.get("path") or []
@@ -6693,19 +5713,19 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
         raise ValueError(f"No CSG data cached for {member_key}")
 
     timber = cut_timber.timber
-    timber_rot, timber_pos = _build_inv_transform_float(timber.transform)
+    timber_rot, timber_pos = build_inv_transform_float(timber.transform)
 
     # Resolve the CSG node at the given path (no point hint needed)
-    target_csg = _resolve_csg_at_path(local_csg, path, None, eps)
+    target_csg = resolve_csg_at_path(local_csg, path, None, eps)
 
     # If a feature name was requested, confirm the target actually declares it.
-    # The mesh target stays the CSG either way -- _extract_highlight_mesh does
+    # The mesh target stays the CSG either way -- extract_highlight_mesh does
     # the per-face narrowing itself, via feature_label.
     actual_feature_label = None
     if feature_label and feature_label in _declared_feature_names(target_csg):
         actual_feature_label = feature_label
 
-    hl_verts, hl_idx, matched, total = _extract_highlight_mesh(
+    hl_verts, hl_idx, matched, total = extract_highlight_mesh(
         mesh["vertices"],
         mesh["indices"],
         target_csg,
@@ -6720,7 +5740,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
 
     parent_hl: Optional[MeshWire] = None
     if actual_feature_label:
-        p_verts, p_idx, _, _ = _extract_highlight_mesh(
+        p_verts, p_idx, _, _ = extract_highlight_mesh(
             mesh["vertices"],
             mesh["indices"],
             target_csg,
@@ -6742,7 +5762,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
         # whether a node was picked in 3D or clicked in the tree.
         "nodeKind": type(target_csg).__name__,
         "nodeDisplayName": type(target_csg).display_name(),
-        "nodeLabel": _label_name(target_csg),
+        "nodeLabel": label_name(target_csg),
         "highlightMesh": {
             "vertices": hl_verts,
             "indices": hl_idx,

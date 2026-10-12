@@ -13,6 +13,7 @@ import math
 
 import pytest
 
+from kumiki import picking
 from kumiki.drawings.drawing import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
                             ViewAxes,
                             MeasurementOperation, MeasurementSpace, distance_anchors)
@@ -405,8 +406,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         ]
         found = {}
         for point in points:
-            for hit in runner._features_at_point(
-                    root, runner._to_v3(point), 5e-4, FeatureTestTolerances(face=5e-4)):
+            for hit in picking.features_at_point(root, point, 5e-4, FeatureTestTolerances(face=5e-4)):
                 if hit.feature.feature_type() != CSGFeatureType.EDGE:
                     continue
                 found.setdefault(hit.feature.name, runner._measure_span(
@@ -1005,7 +1005,7 @@ class TestAFeatureOnALabelledRoot:
         for cut_timber in frame.cut_timbers:
             roots, _ = roots_for_path(cut_timber, ())
             for root in roots:
-                if runner._label_name(root) is not None and root.get_declared_features():
+                if picking.label_name(root) is not None and root.get_declared_features():
                     return cut_timber, root
         return None, None
 
@@ -1016,7 +1016,7 @@ class TestAFeatureOnALabelledRoot:
         cut_timber, root = self._labelled_root(runner, frame)
 
         assert root is not None
-        assert runner._label_name(root) is not None
+        assert picking.label_name(root) is not None
 
     def test_an_empty_path_means_the_node_you_are_on(self):
         runner, frame = self._runner_and_frame()

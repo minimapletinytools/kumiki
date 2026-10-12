@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from kumiki import picking
 from kumiki.drawings.drawing import ViewAxes
 
 from tests.testing_shavings import load_module
@@ -77,7 +78,7 @@ class Viewer:
                                         (corners[2], corners[0]))]
                 for local_point in corners + halfway + [middle]:
                     world = cut_timber.timber.transform.local_to_global(
-                        runner._to_v3(local_point))
+                        picking.to_v3(local_point))
                     points.append([float(world[i, 0]) for i in range(3)])
             flat = [value for point in points for value in point]
             cache[key] = {
