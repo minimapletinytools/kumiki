@@ -816,6 +816,59 @@ class PerfectTimberWithin(ABC):
             label=self.csg_label("perfect", "extended"),
         )
 
+    @final
+    def get_extended_rough_csg_with_perfect_features_local(
+            self,
+            right: bool = False,
+            left: bool = False,
+            front: bool = False,
+            back: bool = False,
+            centerplane_left_right: bool = False,
+            centerplane_front_back: bool = False,
+            extend_bot: bool = False,
+            extend_top: bool = False,
+    ) -> CutCSG:
+        """The rough body (get_extended_actual_csg_local), carrying the perfect timber within's
+        long faces and centerplanes asked for, as non-real features named ptw.*.
+
+        So the perfect timber can be measured from on the body that is rendered. A long face
+        lying on a rough face is not added: that rough face is already rptw.*, the perfect one.
+
+        Raises NotImplementedError for a timber whose rough body is not a rectangular prism.
+        """
+        rough = self.get_extended_actual_csg_local(extend_bot, extend_top)
+        if not isinstance(rough, RectangularPrism):
+            raise NotImplementedError(
+                f"{type(self).__name__}'s rough body is a {type(rough).__name__}; perfect features are "
+                "only carried by a rectangular one")
+        # Distances are from the rough prism's axis, which sits off the perfect one's by its offset.
+        width_dir, height_dir, _ = rough._local_axes()
+        offset_x = safe_dot_product(rough.transform.position, width_dir)
+        offset_y = safe_dot_product(rough.transform.position, height_dir)
+        half_width, half_height = self.size[0] / scalar(2), self.size[1] / scalar(2)
+        faces = [
+            (right, TimberFace.RIGHT, half_width - offset_x),
+            (left, TimberFace.LEFT, half_width + offset_x),
+            (front, TimberFace.FRONT, half_height - offset_y),
+            (back, TimberFace.BACK, half_height + offset_y),
+        ]
+        perfect = FeatureProperties(group=FeatureGroup.PERFECT, real=False)
+        added: List[CSGFeature] = [
+            PrismParallelPlaneFeature(name=PTW_FACE_PREFIX + face.name.lower(), face=PrismFace(face.value),
+                                      distance=distance, properties=perfect)
+            for wanted, face, distance in faces
+            if wanted and not self.is_face_perfect(face)
+        ]
+        if centerplane_left_right:
+            added.append(PrismParallelPlaneFeature(
+                name=PTW_FACE_PREFIX + "centerplane_left_right", face=PrismFace.RIGHT, distance=-offset_x))
+        if centerplane_front_back:
+            added.append(PrismParallelPlaneFeature(
+                name=PTW_FACE_PREFIX + "centerplane_front_back", face=PrismFace.FRONT, distance=-offset_y))
+        if not added:
+            return rough
+        return dataclass_replace(rough, extra_features=tuple(rough.extra_features) + tuple(added))
+
     def rough_face_tags(self) -> Tuple[FeatureOverride, ...]:
         """This timber's names for its rough prism: rptw.* wherever it lies on the perfect timber within."""
         perfect = frozenset(PrismFace(face.value) for face in TimberFace if self.is_face_perfect(face))
