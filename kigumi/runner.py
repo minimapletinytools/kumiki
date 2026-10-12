@@ -26,12 +26,155 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Callable, Dict, Mapping, NamedTuple, Optional, List, Sequence, Tuple, Union
+from typing import (TYPE_CHECKING, Any, Callable, Dict, Final, List, Mapping, NamedTuple, Optional, Sequence,
+                    Tuple, TypedDict, Union, cast)
 
 # Stations along a line, low then high.
 Interval = Tuple[float, float]
 # A pointer's ray in timber-local space: origin, direction.
 LocalRay = Tuple[List[float], List[float]]
+
+# --- wire forms ---------------------------------------------------------------
+#
+# What crosses to the viewer and into the drawings file. Plain dicts at runtime;
+# these only tell ty which keys there are. total=False because most are built up
+# a key at a time, and a file written by an older version may lack any of them.
+
+Vec3 = List[float]
+
+
+class GeometryWire(TypedDict, total=False):
+    """A located Point, Line or Plane in world space. See _geometry_payload."""
+    kind: str  # "point" | "line" | "plane"
+    at: Vec3
+    direction: Vec3
+    normal: Vec3
+
+
+class FeatureRefWire(TypedDict):
+    csgPath: List[str]
+    feature: Optional[str]
+
+
+class AnchorWire(TypedDict, total=False):
+    """A FeaturePath (see serialize_feature_path), plus where it resolved to."""
+    timber: str
+    csgPath: List[str]
+    feature: Optional[str]
+    type: Optional[str]
+    kind: str  # a derived feature's: "edge" | "point"
+    a: FeatureRefWire
+    b: FeatureRefWire
+    at: Optional[Vec3]
+    geometry: Optional[GeometryWire]
+
+
+class PlaneWire(TypedDict):
+    at: Vec3
+    normal: Vec3
+
+
+class MeasureKindWire(TypedDict):
+    operation: str
+    space: str
+    direction: str
+
+
+class PlacementWire(TypedDict):
+    offset: float
+
+
+AngleWire = TypedDict("AngleWire", {"vertex": Vec3, "from": Vec3, "to": Vec3, "normal": Vec3})
+
+
+class SettledEndWire(TypedDict, total=False):
+    form: str  # "point" | "line" | "plane" | "area" | "none"
+    normal: Vec3
+    direction: Vec3
+
+
+class SettledValueWire(TypedDict):
+    unit: str  # "length" | "angle"
+    value: float
+
+
+class SettledWire(TypedDict):
+    """What a measurement comes to. See _settled_measurement."""
+    kind: Optional[MeasureKindWire]
+    available: List[str]
+    space: Optional[str]
+    value: Optional[SettledValueWire]
+    reason: Optional[str]
+    a: Optional[SettledEndWire]
+    b: Optional[SettledEndWire]
+
+
+class MeasureWire(TypedDict, total=False):
+    a: AnchorWire
+    b: AnchorWire
+    measureId: Optional[str]
+    # A name ("perpendicular_distance") in files from before kinds were structured.
+    kind: Union[MeasureKindWire, str, None]
+    placement: Optional[PlacementWire]
+    plane: Optional[PlaneWire]
+    origin: str  # ORIGIN_*
+    suppressed: bool  # MEASURE_SUPPRESSED
+    unresolved: List[str]
+    angle: Optional[AngleWire]
+    settled: SettledWire
+
+
+class MeasurementRequest(MeasureWire, total=False):
+    """What the viewer sends to add, change, restore or delete a measurement."""
+    drawingId: str
+    viewportId: str
+    changes: MeasureWire
+
+
+class CameraWire(TypedDict, total=False):
+    right: Vec3
+    up: Vec3
+    look: Vec3
+    target: Vec3
+    extent: float
+
+
+class OrbitWire(TypedDict, total=False):
+    mode: str  # "free" | "axis"
+    axis: Vec3
+
+
+class PageWire(TypedDict):
+    width: float
+    height: float
+
+
+class ViewportWire(TypedDict, total=False):
+    id: str
+    name: Optional[str]
+    rect: List[float]
+    locked: bool
+    projection: str  # "orthographic" | "perspective"
+    orbit: OrbitWire
+    camera: CameraWire
+    members: Optional[List[str]]
+    ghostOthers: bool
+    measurements: List[MeasureWire]
+
+
+class DrawingWire(TypedDict, total=False):
+    id: str
+    name: str
+    members: List[str]
+    page: Optional[PageWire]
+    cameraControls: List[str]
+    viewports: List[ViewportWire]
+    origin: str  # ORIGIN_*
+    overriddenBy: str
+    overridesPythonDrawing: str  # OVERRIDES_KEY
+    dangling: bool
+    dirty: bool
+    unplaceableMeasurements: Dict[str, List[MeasureWire]]
 
 if TYPE_CHECKING:
     # Annotations only. kumiki must NOT be imported at module scope for
@@ -42,7 +185,8 @@ if TYPE_CHECKING:
     # TYPE_CHECKING there is no runtime import at all, so annotations can be
     # concrete while every isinstance check still imports inside its function.
     from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
-    from kumiki.drawings.drawing import MeasureSpan, MeasurementSpace, VectorLike, Viewport, ViewAxes, ViewportId
+    from kumiki.drawings.drawing import (AngleRays, MeasureSpan, MeasurementKind, MeasurementSpace, VectorLike,
+                                         Viewport, ViewAxes, ViewportId)
     from kumiki.drawings.layout import PlacedViewport
     from kumiki.geometry import Line, Plane, Point
     from kumiki.identity import FeaturePath
@@ -161,7 +305,7 @@ class SlotState:
     # Drawings made in this session and not yet saved. They live here rather
     # than in the viewer so python stays the one place a drawing comes from,
     # and they are lost on reload, which is what "unsaved" should mean.
-    pending_drawings: List[Dict[str, Any]] = field(default_factory=list)
+    pending_drawings: List[DrawingWire] = field(default_factory=list)
 
 
 @dataclass
@@ -988,10 +1132,10 @@ _DEBUG_DRAWING_VIEWS: List[Tuple[str, List[float], List[float], List[float]]] = 
 
 # A3 landscape, in metres. Customizable per drawing in the real thing; this one
 # is scaffolding, so it just picks a common sheet.
-_DEBUG_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
+_DEBUG_DRAWING_PAGE: PageWire = {"width": 0.420, "height": 0.297}
 
 def _placed_by_role(
-    viewports: Sequence['Viewport'], ids: Mapping[str, 'ViewportId'], page: Dict[str, float],
+    viewports: Sequence['Viewport'], ids: Mapping[str, 'ViewportId'], page: PageWire,
 ) -> Dict[str, 'PlacedViewport']:
     """Resolve a drawing's viewports against a page, keyed by what each is for.
 
@@ -1009,13 +1153,20 @@ def _placed_by_role(
     return {role: placed[str(viewport_id)] for role, viewport_id in ids.items()}
 
 
-def _viewport_spec(placed: 'PlacedViewport', **rest: Any) -> Dict[str, Any]:
+def _viewport_spec(
+    placed: 'PlacedViewport', *, locked: bool, projection: str, camera: CameraWire,
+    orbit: Optional[OrbitWire] = None,
+) -> ViewportWire:
     """The wire form of one placed viewport.
 
     The id is the tree's -- a position, "0.1.2" -- and the name is a label that
     nothing looks anything up by. See kumiki/drawings/drawing.py.
     """
-    return {"id": str(placed.id), "name": placed.label, "rect": list(placed.rect), **rest}
+    spec: ViewportWire = {"id": str(placed.id), "name": placed.label, "rect": list(placed.rect),
+                          "locked": locked, "projection": projection, "camera": camera}
+    if orbit is not None:
+        spec["orbit"] = orbit
+    return spec
 
 # Leaves a margin around the model rather than framing it edge to edge.
 _DRAWING_EXTENT_PADDING = 1.15
@@ -1103,7 +1254,7 @@ def _view_extent(
     return max(0.001, needed * _DRAWING_EXTENT_PADDING)
 
 
-def _viewport_aspect(rect: List[float], page: Dict[str, float]) -> float:
+def _viewport_aspect(rect: List[float], page: PageWire) -> float:
     """A viewport's aspect: its share of the sheet, times the sheet's own."""
     height = rect[3] * page["height"]
     return (rect[2] * page["width"]) / height if height > 0 else 1.0
@@ -1121,7 +1272,7 @@ def _cross(a: List[float], b: List[float]) -> List[float]:
     ]
 
 
-def _camera_looking_at_face(normal: List[float], along: List[float]) -> Dict[str, Any]:
+def _camera_looking_at_face(normal: List[float], along: List[float]) -> CameraWire:
     """A camera frame square-on to a face, with the timber's length across screen.
 
     The camera sits outside the face along its outward normal and looks back at
@@ -1135,7 +1286,7 @@ def _camera_looking_at_face(normal: List[float], along: List[float]) -> Dict[str
     }
 
 
-def build_default_drawing_for_debugging(frame: 'Frame') -> Dict[str, Any]:
+def build_default_drawing_for_debugging(frame: 'Frame') -> DrawingWire:
     """A four-viewport scene over the whole frame: three elevations and a preview.
 
     Testing scaffolding -- see the note at the top of this section. The three
@@ -1146,10 +1297,10 @@ def build_default_drawing_for_debugging(frame: 'Frame') -> Dict[str, Any]:
     centre, half_size = _frame_world_bounds(frame)
     from kumiki.drawings.drawing import ELEVATION_IDS, elevation_viewports
     placed = _placed_by_role(elevation_viewports(), ELEVATION_IDS, _DEBUG_DRAWING_PAGE)
-    viewports: List[Dict[str, Any]] = []
+    viewports: List[ViewportWire] = []
     for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
         rect = list(placed[view_id].rect)
-        viewports.append(_viewport_spec(
+        viewport = _viewport_spec(
             placed[view_id],
             locked=True,
             projection="orthographic",
@@ -1160,12 +1311,11 @@ def build_default_drawing_for_debugging(frame: 'Frame') -> Dict[str, Any]:
                 "target": centre,
                 "extent": _view_extent(half_size, right, up, _viewport_aspect(rect, _DEBUG_DRAWING_PAGE)),
             },
-            # Every timber, which is also what a scene defaults to; spelled out
-            # because a real drawing is the interesting case and would not.
-            members=None,
-            ghostOthers=True,
-            measurements=[],
-        ))
+        )
+        # Every timber, which is also what a scene defaults to; spelled out
+        # because a real drawing is the interesting case and would not.
+        viewport.update(members=None, ghostOthers=True, measurements=[])
+        viewports.append(viewport)
 
     viewports.append(_preview_viewport(
         placed["preview"], _world_box(centre, half_size), _DEBUG_DRAWING_PAGE,
@@ -1176,7 +1326,7 @@ def build_default_drawing_for_debugging(frame: 'Frame') -> Dict[str, Any]:
         "id": "debug-default-drawing",
         # The sheet these sit on. Rects above are fractions of it, so the four
         # views tile an A3 page rather than the window.
-        "page": dict(_DEBUG_DRAWING_PAGE),
+        "page": PageWire(**_DEBUG_DRAWING_PAGE),
         # A drawing shows no camera gizmos.
         "cameraControls": [],
         "viewports": viewports,
@@ -1185,7 +1335,7 @@ def build_default_drawing_for_debugging(frame: 'Frame') -> Dict[str, Any]:
 
 # A3 landscape, in metres. Fixed for now; the page is meant to be the drawing's
 # to choose, and this is where that choice will arrive from.
-_SELECTION_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
+_SELECTION_DRAWING_PAGE: PageWire = {"width": 0.420, "height": 0.297}
 
 SELECTION_DRAWING_ID = "selection-drawing"
 
@@ -1234,7 +1384,7 @@ def _normalize(vec: List[float]) -> List[float]:
     return [component / length for component in vec] if length > 0 else [0.0, 0.0, 1.0]
 
 
-def _camera_frame_looking(look: List[float]) -> Dict[str, Any]:
+def _camera_frame_looking(look: List[float]) -> CameraWire:
     """An orthonormal frame looking along `look`, kept upright.
 
     `up` is world Z with the part along the view direction taken out, which is
@@ -1331,7 +1481,7 @@ def _timber_box(entry: Dict[str, Any]) -> OrientedBox:
     )
 
 
-def _preview_extent(box: OrientedBox, frame: Dict[str, Any], aspect: float) -> float:
+def _preview_extent(box: OrientedBox, frame: CameraWire, aspect: float) -> float:
     """How much of the world the preview has to hold, at this angle."""
     needed = max(box.reach(frame["up"]), box.reach(frame["right"]) / aspect)
     return max(0.001, needed * _PREVIEW_EXTENT_PADDING)
@@ -1362,7 +1512,7 @@ def _preview_look_candidates() -> List[List[float]]:
     return candidates
 
 
-def orient_by_search(box: OrientedBox, aspect: float, preserve_up: bool = True) -> Dict[str, Any]:
+def orient_by_search(box: OrientedBox, aspect: float, preserve_up: bool = True) -> CameraWire:
     """Try a few dozen angles and keep the one that shows the piece best.
 
     What is maximized is how long the box's longest axis appears once the view
@@ -1419,7 +1569,7 @@ def orient_by_search(box: OrientedBox, aspect: float, preserve_up: bool = True) 
 _PIECE_LOOK_IN_BOX = (0.38, 0.86, -0.55)
 
 
-def orient_from_box(box: OrientedBox, aspect: float) -> Dict[str, Any]:
+def orient_from_box(box: OrientedBox, aspect: float) -> CameraWire:
     """Look at a box from a fixed three-quarter angle in its own frame.
 
     For a single piece there is nothing to search for: the box is the timber, so
@@ -1444,7 +1594,7 @@ def orient_from_box(box: OrientedBox, aspect: float) -> Dict[str, Any]:
     return _frame_from_look_and_up(look, up_hint)
 
 
-def _frame_from_look_and_up(look: List[float], up_hint: List[float]) -> Dict[str, Any]:
+def _frame_from_look_and_up(look: List[float], up_hint: List[float]) -> CameraWire:
     """An orthonormal frame looking along `look`, as close to `up_hint` as it can.
 
     Falls back to the upright frame when the hint is along the view direction,
@@ -1462,10 +1612,10 @@ def _frame_from_look_and_up(look: List[float], up_hint: List[float]) -> Dict[str
 def _preview_viewport(
     placed: 'PlacedViewport',
     box: OrientedBox,
-    page: Dict[str, Any],
-    orbit: Dict[str, Any],
-    orient: Callable[[OrientedBox, float], Dict[str, Any]],
-) -> Dict[str, Any]:
+    page: PageWire,
+    orbit: OrbitWire,
+    orient: Callable[[OrientedBox, float], CameraWire],
+) -> ViewportWire:
     """The live 3D view beside the elevations, pointed at what is being drawn.
 
     Left to itself the viewer builds a camera at the origin looking at nothing
@@ -1490,8 +1640,8 @@ def _preview_viewport(
     )
 
 
-def _long_face_viewports(entry: Dict[str, Any], page: Dict[str, Any],
-                         placed_by_role: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _long_face_viewports(entry: Dict[str, Any], page: PageWire,
+                         placed_by_role: Dict[str, 'PlacedViewport']) -> List[ViewportWire]:
     """The four long sides of one timber, stacked, each square-on to its face."""
     timber = entry["timber"]
     along = _vector3_to_floats(timber.get_length_direction_global())
@@ -1501,7 +1651,7 @@ def _long_face_viewports(entry: Dict[str, Any], page: Dict[str, Any],
     }
     centre, half_size = _members_world_bounds([entry])
 
-    viewports: List[Dict[str, Any]] = []
+    viewports: List[ViewportWire] = []
     for view_id, axis_name, sign in _LONG_FACE_VIEWS:
         normal = [component * sign for component in axes[axis_name]]
         frame = _camera_looking_at_face(normal, along)
@@ -1523,11 +1673,11 @@ def _long_face_viewports(entry: Dict[str, Any], page: Dict[str, Any],
 
 
 def _world_elevation_viewports(
-    entries: List[Dict[str, Any]], page: Dict[str, Any], placed_by_role: Dict[str, Any],
-) -> List[Dict[str, Any]]:
+    entries: List[Dict[str, Any]], page: PageWire, placed_by_role: Dict[str, 'PlacedViewport'],
+) -> List[ViewportWire]:
     """Front, top and right elevations in world axes, for a group of members."""
     centre, half_size = _members_world_bounds(entries)
-    viewports: List[Dict[str, Any]] = []
+    viewports: List[ViewportWire] = []
     for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
         placed = placed_by_role[view_id]
         rect = list(placed.rect)
@@ -1569,7 +1719,7 @@ def _selection_drawing_name(entries: List[Dict[str, Any]], total: int) -> str:
     return f"{len(entries)} members"
 
 
-def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dict[str, Any]:
+def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> DrawingWire:
     """A drawing of the selected members, on a sheet.
 
     One timber is drawn the way a piece is drawn for the shop: its four long
@@ -1581,7 +1731,7 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dic
     The drawing names its members. The scene still holds every timber -- the
     rest are ghosted, present for context and not part of what is drawn.
     """
-    page = dict(_SELECTION_DRAWING_PAGE)
+    page = PageWire(**_SELECTION_DRAWING_PAGE)
     timber_entries, _ = _assign_member_keys(frame)
     wanted = list(member_keys or [])
     by_key = {entry["memberKey"]: entry for entry in timber_entries}
@@ -1601,7 +1751,7 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dic
         # attitude it is drawn in.
         preview_box = _timber_box(entries[0])
         orient = orient_from_box
-        orbit = {"mode": "axis", "axis": list(preview_box.axes[0])}
+        orbit = OrbitWire(mode="axis", axis=list(preview_box.axes[0]))
     else:
         # No selection is treated as the whole frame, so asking for a drawing
         # before selecting anything gives you something rather than nothing.
@@ -1614,7 +1764,7 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dic
         # what a preview of an assembly is telling you.
         preview_box = _world_box(centre, half_size)
         orient = orient_by_search
-        orbit = {"mode": "free"}
+        orbit = OrbitWire(mode="free")
 
     members = [entry["memberKey"] for entry in entries]
     for viewport in viewports:
@@ -1655,14 +1805,14 @@ ORIGIN_DELETED = "deleted"
 # the three states worth marking -- untouched code, code the file has overridden,
 # and one the file introduced.
 
-MEASURE_SUPPRESSED = "suppressed"
+MEASURE_SUPPRESSED: Final = "suppressed"
 
 # Warned about once per parse rather than per duplicate: a hand-edited file with
 # a repeated entry would otherwise fill the log with the same sentence.
 _duplicate_warning_given = False
 
 
-def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]:
+def _feature_path_identity(anchor: Optional[AnchorWire]) -> Tuple[str, Tuple[str, ...], str, str]:
     """A comparable form of a feature reference as it travels on the wire.
 
     A tuple rather than a joined string, since a ticket path may itself contain
@@ -1682,7 +1832,7 @@ def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]
     return path.identity()
 
 
-def _anchor_sort_key(anchor: Any) -> Tuple[str, ...]:
+def _anchor_sort_key(anchor: Optional[AnchorWire]) -> Tuple[str, ...]:
     """Where one anchor falls in the order a pair is written in.
 
     On the path, not on its identity: identity nests differently per shape and
@@ -1692,13 +1842,13 @@ def _anchor_sort_key(anchor: Any) -> Tuple[str, ...]:
     return ("",) if path is None else path.sort_key
 
 
-def _measure_pair_identity(measure: Dict[str, Any]) -> Tuple[Any, Any]:
+def _measure_pair_identity(measure: MeasureWire) -> Tuple[Any, Any]:
     """Just the two features of a measurement, without what is measured between."""
     first, second = sorted((measure.get("a"), measure.get("b")), key=_anchor_sort_key)
     return (_feature_path_identity(first), _feature_path_identity(second))
 
 
-def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, Any, str]:
+def _measure_identity(measure: MeasureWire) -> Tuple[Any, Any, Any, str]:
     """What makes a measurement itself, within the viewport it is drawn in.
 
     The anchors unordered, since measuring A to B is measuring B to A. Then the
@@ -1724,10 +1874,10 @@ def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, Any, str]:
     )
 
 
-def serialize_feature_path(path: 'FeaturePath') -> Dict[str, Any]:
+def serialize_feature_path(path: 'FeaturePath') -> AnchorWire:
     """A feature reference as the viewer and the file hold it. See kumiki.csg.feature_paths."""
     from kumiki.csg.feature_paths import serialize_feature_path as serialize
-    return serialize(path)
+    return cast(AnchorWire, serialize(path))
 
 
 def deserialize_feature_path(source: Any) -> Optional['FeaturePath']:
@@ -1743,7 +1893,7 @@ def deserialize_feature_path(source: Any) -> Optional['FeaturePath']:
 # orbits, and a measurement evaluated against it would read a different number
 # from one moment to the next.
 
-def _plane_constraints(one: Dict[str, Any], other: Dict[str, Any]) -> List[List[float]]:
+def _plane_constraints(one: GeometryWire, other: GeometryWire) -> List[List[float]]:
     """Directions the plane's normal has to be square to, for these two features.
 
     Each rule in the spec's priority order turns into the same kind of thing:
@@ -1815,12 +1965,12 @@ def _plane_normal(constraints: List[List[float]], look: List[float]) -> Optional
 
 
 def _measurement_plane(
-    one: Dict[str, Any],
-    other: Dict[str, Any],
+    one: GeometryWire,
+    other: GeometryWire,
     at_one: Optional[List[float]],
     at_other: Optional[List[float]],
     look: List[float],
-) -> Dict[str, Any]:
+) -> PlaneWire:
     """Where a measurement between these two features is taken and drawn.
 
     `look` is the camera's view direction at the moment it was made, which
@@ -1901,7 +2051,7 @@ def _pick_from_candidate(
 def _best_matching_candidate(
     feature_hits: List['OwnedFeatureHit'],
     timber: 'PerfectTimberWithin',
-    held_geometry: Optional[Dict[str, Any]],
+    held_geometry: Optional[GeometryWire],
     look: Optional[List[float]],
     payload: Optional[Dict[str, Any]] = None,
 ) -> Optional[int]:
@@ -2109,16 +2259,15 @@ def _pick_placement(
     # it. .claude/plans/measuring-states.md asks for exactly this and only half had it:
     # the picture came from the verdict, the number was worked out again in the
     # viewer.
-    ends = {"a": {"geometry": held_geometry}, "b": {"geometry": geometry}}
+    ends = {"a": held_geometry, "b": geometry}
     if kind.operation.value == "angle":
         rays = angle_rays(held_span, picked_span)
-        settled = _settled_measurement(
-            {**ends, "angle": rays}, None, kind, admitted, in_three_d, normal, view)
+        settled = _settled_measurement(ends, rays, None, kind, admitted, in_three_d, normal, view)
         return {"anchors": None,
                 "angle": rays.as_wire() if rays is not None else None,
                 "settled": settled}
     at_held, at_picked = distance_anchors(held_span, picked_span, kind, view)
-    settled = _settled_measurement(ends, None, kind, admitted, in_three_d, normal, view)
+    settled = _settled_measurement(ends, None, None, kind, admitted, in_three_d, normal, view)
     return {"anchors": {"a": list(at_held), "b": list(at_picked)},
             "angle": None, "settled": settled}
 
@@ -2130,7 +2279,7 @@ def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']
 
 def _plane_for_pick(
     located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+) -> Optional[PlaneWire]:
     """The plane a measurement to this pick would be taken on, or None.
 
     None unless something is held and the viewer said which way it is looking:
@@ -2148,7 +2297,7 @@ def _plane_for_pick(
         held_geometry, geometry, payload.get("heldAt"), anchor, look)
 
 
-def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[Dict[str, Any]]:
+def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWire]:
     anchors = measure.wire_anchors(frame)
     if anchors is None:
         log_stderr("Warning: a measurement's feature is not in this frame, so it is left out.")
@@ -2177,9 +2326,9 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[Dict[str, 
 
 
 def merge_measurements(
-    code_measures: List[Dict[str, Any]],
-    file_measures: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    code_measures: List[MeasureWire],
+    file_measures: List[MeasureWire],
+) -> List[MeasureWire]:
     """The measurements of one drawing, from both tiers.
 
     A file entry with the same identity as a code one replaces it and is marked
@@ -2195,7 +2344,7 @@ def merge_measurements(
     file parser already makes.
     """
     global _duplicate_warning_given
-    from_file: Dict[Tuple[Any, Any, Any, str], Dict[str, Any]] = {}
+    from_file: Dict[Tuple[Any, Any, Any, str], MeasureWire] = {}
     for measure in file_measures:
         identity = _measure_identity(measure)
         if identity in from_file and not _duplicate_warning_given:
@@ -2208,7 +2357,7 @@ def merge_measurements(
 
     from kumiki.drawings.drawing import MeasurementSource, does_override_identities
 
-    merged: List[Dict[str, Any]] = []
+    merged: List[MeasureWire] = []
     used = set()
     for measure in code_measures:
         identity = _measure_identity(measure)
@@ -2243,9 +2392,9 @@ def merge_measurements(
     return merged
 
 
-def _file_measurements_by_viewport(entry: Optional[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+def _file_measurements_by_viewport(entry: Optional[DrawingWire]) -> Dict[str, List[MeasureWire]]:
     """A file drawing's measurements, off the viewports they hang from."""
-    by_viewport: Dict[str, List[Dict[str, Any]]] = {}
+    by_viewport: Dict[str, List[MeasureWire]] = {}
     for viewport in (entry or {}).get("viewports") or []:
         if isinstance(viewport, dict) and isinstance(viewport.get("id"), str):
             by_viewport[viewport["id"]] = list(viewport.get("measurements") or [])
@@ -2254,9 +2403,9 @@ def _file_measurements_by_viewport(entry: Optional[Dict[str, Any]]) -> Dict[str,
 
 def _measurements_by_viewport(
     declared: Any,
-    override: Optional[Dict[str, Any]],
+    override: Optional[DrawingWire],
     frame: 'Frame',
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> Dict[str, List[MeasureWire]]:
     """A drawing's measurements, merged tier over tier, under each viewport.
 
     Both tiers hang them off viewports, and the merge happens within one: the
@@ -2267,7 +2416,7 @@ def _measurements_by_viewport(
     # and one keyed by id both reach the merge the same way.
     code_by_viewport = declared.measurements_by_viewport() if declared is not None else {}
     file_by_viewport = _file_measurements_by_viewport(override)
-    merged: Dict[str, List[Dict[str, Any]]] = {}
+    merged: Dict[str, List[MeasureWire]] = {}
     for viewport in list(code_by_viewport) + [v for v in file_by_viewport if v not in code_by_viewport]:
         merged[viewport] = merge_measurements(
             [wire for wire in (_serialize_code_measure(m, frame) for m in code_by_viewport.get(viewport, ()))
@@ -2291,10 +2440,10 @@ def _drawings_file_path(example_path: Path) -> Path:
 # separate from its own id so that an override is always recognisably an
 # override: delete the python drawing and what is left is plainly a dangling
 # entry, rather than something that quietly becomes a drawing in its own right.
-OVERRIDES_KEY = "overridesPythonDrawing"
+OVERRIDES_KEY: Final = "overridesPythonDrawing"
 
 
-def _read_drawings_file(path: Path) -> List[Dict[str, Any]]:
+def _read_drawings_file(path: Path) -> List[DrawingWire]:
     """The drawings file, in order, or nothing. A broken file is reported, not fatal.
 
     Losing a viewer because a hand-edited file has a comma out of place would be
@@ -2328,7 +2477,7 @@ def _member_keys_for_timbers(frame: 'Frame', timbers: List[Any]) -> List[str]:
     return keys
 
 
-def _drawing_from_code(frame: 'Frame', declared: Any) -> Dict[str, Any]:
+def _drawing_from_code(frame: 'Frame', declared: Any) -> DrawingWire:
     """Turn what the frame asked for into a scene the viewer can render."""
     member_keys = _member_keys_for_timbers(frame, list(declared.timbers))
     scene = create_drawing_from_selection(frame, member_keys)
@@ -2341,11 +2490,11 @@ def _drawing_from_code(frame: 'Frame', declared: Any) -> Dict[str, Any]:
 def add_measurement(
     frame: 'Frame',
     example_path: Optional[Path],
-    pending: List[Dict[str, Any]],
+    pending: List[DrawingWire],
     drawing_id: str,
     viewport_id: str,
-    measure: Dict[str, Any],
-) -> Dict[str, Any]:
+    measure: MeasureWire,
+) -> DrawingWire:
     """Put a measurement on a viewport, and say which entry now holds it.
 
     The file is where a measurement made in the viewer lives, even when the
@@ -2365,7 +2514,19 @@ def add_measurement(
     return holder
 
 
-def _viewer_measure_identity(measure: Dict[str, Any]) -> Tuple[Any, str]:
+def _requested_measure(payload: Dict[str, Any], *, whole: bool = False) -> MeasureWire:
+    """The measurement a viewer request names: its ends and id, and with `whole` the rest."""
+    request = cast(MeasurementRequest, payload)
+    a, b = request.get("a"), request.get("b")
+    if a is None or b is None:
+        raise ValueError("A measurement request needs both payload.a and payload.b")
+    if not whole:
+        return MeasureWire(a=a, b=b, measureId=request.get("measureId"))
+    return MeasureWire(a=a, b=b, kind=request.get("kind"), measureId=request.get("measureId"),
+                       plane=request.get("plane"), placement=request.get("placement"))
+
+
+def _viewer_measure_identity(measure: MeasureWire) -> Tuple[Any, str]:
     """Which measurement an edit from the viewer means.
 
     The two features, plus the id that lets one pair be measured twice. NOT the
@@ -2378,10 +2539,10 @@ def _viewer_measure_identity(measure: Dict[str, Any]) -> Tuple[Any, str]:
 def _measurement_slot(
     frame: 'Frame',
     example_path: Optional[Path],
-    pending: List[Dict[str, Any]],
+    pending: List[DrawingWire],
     drawing_id: str,
     viewport_id: str,
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+) -> Tuple[DrawingWire, List[MeasureWire]]:
     """The file entry that holds a viewport's measurements, and that list.
 
     The list is returned to be edited in place, and the holder is on `pending`
@@ -2397,24 +2558,24 @@ def _measurement_slot(
         # entered -- what it holds are measurements that belong to the model
         # rather than to any drawing of it, so its viewport declares no camera
         # and each measurement carries its own plane.
-        target = {
-            "id": THREE_D_MEASUREMENTS_ID,
-            "name": THREE_D_MEASUREMENTS_ID,
-            "origin": ORIGIN_FILE,
-            "page": None,
-            "cameraControls": [],
-            "viewports": [{"id": THREE_D_MEASUREMENTS_VIEWPORT, "measurements": []}],
-        }
+        target = DrawingWire(
+            id=THREE_D_MEASUREMENTS_ID,
+            name=THREE_D_MEASUREMENTS_ID,
+            origin=ORIGIN_FILE,
+            page=None,
+            cameraControls=[],
+            viewports=[ViewportWire(id=THREE_D_MEASUREMENTS_VIEWPORT, measurements=[])],
+        )
         pending.append(target)
         existing = existing + [target]
     if target is None:
         raise ValueError(f"No drawing {drawing_id!r} to measure on")
 
     holder = _measurement_holder(existing, pending, target)
-    viewport: Optional[Dict[str, Any]] = next(
+    viewport = next(
         (v for v in holder.setdefault("viewports", []) if v.get("id") == viewport_id), None)
     if viewport is None:
-        viewport = {"id": viewport_id, "measurements": []}
+        viewport = ViewportWire(id=viewport_id, measurements=[])
         holder["viewports"].append(viewport)
     if holder not in pending:
         pending.append(holder)
@@ -2424,12 +2585,12 @@ def _measurement_slot(
 def update_measurement(
     frame: 'Frame',
     example_path: Optional[Path],
-    pending: List[Dict[str, Any]],
+    pending: List[DrawingWire],
     drawing_id: str,
     viewport_id: str,
-    measure: Dict[str, Any],
-    changes: Dict[str, Any],
-) -> Dict[str, Any]:
+    measure: MeasureWire,
+    changes: MeasureWire,
+) -> DrawingWire:
     """Change a measurement without replacing it: its kind, its plane, where it sits.
 
     Not add_measurement with different fields. An add replaces whatever measured
@@ -2453,9 +2614,9 @@ def update_measurement(
 
 
 def _merged_measurement(
-    frame: 'Frame', example_path: Optional[Path], pending: List[Dict[str, Any]],
-    drawing_id: str, viewport_id: str, measure: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    frame: 'Frame', example_path: Optional[Path], pending: List[DrawingWire],
+    drawing_id: str, viewport_id: str, measure: MeasureWire,
+) -> Optional[MeasureWire]:
     """The measurement as the viewer sees it, tiers merged, or None if it is not there."""
     identity = _viewer_measure_identity(measure)
     return next((
@@ -2472,11 +2633,11 @@ def _merged_measurement(
 def delete_measurement(
     frame: 'Frame',
     example_path: Optional[Path],
-    pending: List[Dict[str, Any]],
+    pending: List[DrawingWire],
     drawing_id: str,
     viewport_id: str,
-    measure: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    measure: MeasureWire,
+) -> Optional[DrawingWire]:
     """Take a measurement off a viewport, according to where it comes from.
 
     - One the file owns is removed.
@@ -2506,11 +2667,11 @@ def delete_measurement(
 def restore_measurement(
     frame: 'Frame',
     example_path: Optional[Path],
-    pending: List[Dict[str, Any]],
+    pending: List[DrawingWire],
     drawing_id: str,
     viewport_id: str,
-    measure: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    measure: MeasureWire,
+) -> Optional[DrawingWire]:
     """Put back a code measurement the file deleted. Returns None if it was not deleted."""
     current = _merged_measurement(frame, example_path, pending, drawing_id, viewport_id, measure)
     if current is None or current.get("origin") != ORIGIN_DELETED:
@@ -2524,10 +2685,10 @@ def restore_measurement(
 
 
 def _measurement_holder(
-    existing: List[Dict[str, Any]],
-    pending: List[Dict[str, Any]],
-    target: Dict[str, Any],
-) -> Dict[str, Any]:
+    existing: List[DrawingWire],
+    pending: List[DrawingWire],
+    target: DrawingWire,
+) -> DrawingWire:
     """The file entry a measurement on *target* belongs in, made if need be.
 
     A drawing of the file's own holds its own measurements. One from the code
@@ -2559,8 +2720,8 @@ def _measurement_holder(
 def collect_drawings(
     frame: 'Frame',
     example_path: Optional[Path],
-    pending: Optional[List[Dict[str, Any]]] = None,
-) -> List[Dict[str, Any]]:
+    pending: Optional[List[DrawingWire]] = None,
+) -> List[DrawingWire]:
     """Every drawing for a frame: from the code, from the file, and unsaved.
 
     The file mirrors the code -- drawings holding viewports holding measurements
@@ -2579,7 +2740,7 @@ def collect_drawings(
     # to a drawing the code lays out, so a pending override has to go through
     # the same merge -- appended, it would replace the code drawing instead and
     # take the layout with it.
-    pending_by_id = {entry["id"]: dict(entry) for entry in (pending or []) if entry.get("id")}
+    pending_by_id = {entry["id"]: DrawingWire(**entry) for entry in (pending or []) if entry.get("id")}
     from_file = [pending_by_id.pop(entry["id"], entry) for entry in saved]
     from_file.extend(pending_by_id.values())
     unsaved = {entry["id"] for entry in (pending or []) if entry.get("id")}
@@ -2588,7 +2749,7 @@ def collect_drawings(
         entry[OVERRIDES_KEY]: entry for entry in from_file
         if isinstance(entry.get(OVERRIDES_KEY), str)
     }
-    drawings: List[Dict[str, Any]] = []
+    drawings: List[DrawingWire] = []
     overridden = set()
 
     for declared in list(getattr(frame, "drawings", None) or []):
@@ -2607,7 +2768,7 @@ def collect_drawings(
     for entry in from_file:
         if id(entry) in overridden:
             continue
-        scene = dict(entry)
+        scene = DrawingWire(**entry)
         scene.setdefault("name", scene["id"])
         target = entry.get(OVERRIDES_KEY)
         if isinstance(target, str):
@@ -2896,8 +3057,8 @@ def _measure_span(
 
 
 def _resolve_measurement(
-    frame: 'Frame', measure: Dict[str, Any], view: Optional['ViewAxes'] = None,
-) -> Dict[str, Any]:
+    frame: 'Frame', measure: MeasureWire, view: Optional['ViewAxes'] = None,
+) -> MeasureWire:
     """A measurement with its anchors found, or marked as not findable.
 
     Resolved here rather than in the viewer because finding a feature means
@@ -2918,7 +3079,7 @@ def _resolve_measurement(
                                angle_rays, distance_anchors, pair_separation,
                                projected_kinds, three_d_kinds)
 
-    resolved = dict(measure)
+    resolved: MeasureWire = {**measure}
     broken = []
     found = {}
     spans = {}
@@ -2979,21 +3140,17 @@ def _resolve_measurement(
             # two unrelated screen lines happened to cross -- often touching
             # neither of the features being measured.
             rays = angle_rays(spans["a"], spans["b"])
-            resolved["angle"] = rays.as_wire() if rays is not None else None
+            resolved["angle"] = cast(AngleWire, rays.as_wire()) if rays is not None else None
         resolved["settled"] = _settled_measurement(
-            {**resolved, "a": {"geometry": ends["a"]}, "b": {"geometry": ends["b"]},
-             # The rays themselves, not the wire form just put on `resolved`:
-             # what comes to is read off them, and the wire is for the viewer.
-             "angle": rays},
-            declared, kind, admitted, in_three_d, plane, view)
+            ends, rays, declared, kind, admitted, in_three_d, plane, view)
     else:
         resolved["settled"] = _unplaceable_measurement(measure, spans, plane)
     return resolved
 
 
 def _unplaceable_measurement(
-    measure: Dict[str, Any], spans: Dict[str, Any], plane: Any,
-) -> Dict[str, Any]:
+    measure: MeasureWire, spans: Dict[str, Any], plane: Any,
+) -> SettledWire:
     """A measurement that resolved but cannot be worked out, and why.
 
     Both ends were found -- an end that was not is `unresolved`, handled above
@@ -3030,16 +3187,17 @@ def _unplaceable_measurement(
             "reason": reason, "a": None, "b": None}
 
 
-def _measure_end_name(measure: Dict[str, Any], key: str) -> str:
+def _measure_end_name(measure: MeasureWire, key: str) -> str:
     """One end of a measurement, named the way a person would look for it."""
     end = measure.get(key) or {}
     return str(end.get("feature") or end.get("timber") or "?")
 
 
 def _settled_measurement(
-    resolved: Dict[str, Any], declared: Any, kind: Any, admitted: Any,
-    in_three_d: bool, plane: Any, view: Optional['ViewAxes'],
-) -> Dict[str, Any]:
+    ends: Dict[str, Optional['Located']], rays: Optional['AngleRays'],
+    declared: Optional['MeasurementKind'], kind: Optional['MeasurementKind'],
+    admitted: Sequence['MeasurementKind'], in_three_d: bool, plane: 'VectorLike', view: Optional['ViewAxes'],
+) -> SettledWire:
     """What this measurement comes to, decided here and sent with it.
 
     The viewer worked the same thing out for itself on every frame, from its own
@@ -3067,10 +3225,11 @@ def _settled_measurement(
 
     names = [one.name for one in admitted]
     space = "3d" if in_three_d else "projected"
-    settled = {"kind": kind.as_wire() if kind is not None else None,
-               "available": names, "space": space, "value": None, "reason": None,
-               "a": _settled_form(resolved["a"].get("geometry"), in_three_d, plane),
-               "b": _settled_form(resolved["b"].get("geometry"), in_three_d, plane)}
+    settled: SettledWire = {
+        "kind": cast(MeasureKindWire, kind.as_wire()) if kind is not None else None,
+        "available": names, "space": space, "value": None, "reason": None,
+        "a": _settled_form(ends["a"], in_three_d, plane),
+        "b": _settled_form(ends["b"], in_three_d, plane)}
     if not admitted:
         settled["reason"] = "not-measurable"
         return settled
@@ -3085,14 +3244,14 @@ def _settled_measurement(
         # Off the RAYS, which are the two ways the corner opens -- so the number
         # and the arc drawn from them are one answer. Normals alone give the
         # same absolute dot for 45 degrees and 135.
-        value = angle_between(resolved.get("angle"))
+        value = angle_between(rays)
         settled["value"] = {"unit": "angle", "value": 0.0 if value is None else value}
         return settled
 
     # Against the measurement's own plane, not the viewport's: `plane` is
     # already the one or the other, decided above.
     length = pair_separation(
-        resolved["a"].get("geometry"), resolved["b"].get("geometry"), kind,
+        ends["a"], ends["b"], kind,
         replace(ViewAxes.from_wire(view), look=create_v3(*plane)))
     if length is None:
         settled["reason"] = "not-measurable"
@@ -3103,7 +3262,7 @@ def _settled_measurement(
     return settled
 
 
-def _settled_form(geometry: Optional['Located'], in_three_d: bool, plane: Any) -> Dict[str, Any]:
+def _settled_form(geometry: Optional['Located'], in_three_d: bool, plane: Any) -> SettledEndWire:
     """What one end behaves as, in the shape the viewer's own forms took.
 
     Settled here so the rule has one implementation; what crosses is the answer.
@@ -3127,7 +3286,7 @@ def _settled_form(geometry: Optional['Located'], in_three_d: bool, plane: Any) -
     return {"form": "none"}
 
 
-def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional['ViewAxes']:
+def _viewport_axes(scene: DrawingWire, viewport_id: str) -> Optional['ViewAxes']:
     """A viewport's camera frame, as the measurement code wants it."""
     from kumiki.drawings.drawing import ViewAxes
 
@@ -3142,8 +3301,8 @@ def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional['ViewAxe
 
 
 def _attach_measurements(
-    scene: Dict[str, Any],
-    by_viewport: Dict[str, List[Dict[str, Any]]],
+    scene: DrawingWire,
+    by_viewport: Dict[str, List[MeasureWire]],
     drawing_name: str,
     frame: 'Frame',
 ) -> None:
@@ -3186,7 +3345,7 @@ def _attach_measurements(
     scene["unplaceableMeasurements"] = unplaceable
 
 
-def _savable_override(scene: Dict[str, Any]) -> Dict[str, Any]:
+def _savable_override(scene: DrawingWire) -> DrawingWire:
     """A code drawing the file overrides, as the file holds it: the override, not the drawing.
 
     The scene here is the merge -- the code's layout with the file's measurements -- so
@@ -3203,7 +3362,7 @@ def _savable_override(scene: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
+def _savable_drawing(drawing: DrawingWire) -> DrawingWire:
     """One drawing as the file should hold it.
 
     Measurements the code produced are left out. Writing them would freeze what
@@ -3211,28 +3370,34 @@ def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
     algorithm the moment the frame changed -- the same reason an untouched code
     drawing is not written out either.
     """
-    saved = {
-        key: value for key, value in drawing.items()
-        if key not in ("origin", "dirty", "unplaceableMeasurements", "overriddenBy", "dangling")
-    }
+    saved = DrawingWire(**drawing)
+    for transient in ("origin", "dirty", "unplaceableMeasurements", "overriddenBy", "dangling"):
+        saved.pop(transient, None)
 
-    def keepers(measures: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-        return [
-            {key: value for key, value in measure.items() if key != "origin"}
-            for measure in (measures or [])
-            if measure.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE, ORIGIN_DELETED)
-        ]
+    def keepers(measures: Optional[List[MeasureWire]]) -> List[MeasureWire]:
+        kept = []
+        for measure in measures or []:
+            if measure.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE, ORIGIN_DELETED):
+                copy = MeasureWire(**measure)
+                copy.pop("origin", None)
+                kept.append(copy)
+        return kept
 
     # Written back the way the file holds them: on the viewports. An override
     # keeps only the ids, since the layout is the code's; a drawing of its own
     # keeps whatever it had.
     is_override = isinstance(drawing.get(OVERRIDES_KEY), str)
-    viewports: List[Dict[str, Any]] = []
+    viewports: List[ViewportWire] = []
     for viewport in saved.get("viewports") or []:
         kept = keepers(viewport.get("measurements"))
         if is_override and not kept:
             continue
-        entry = {"id": viewport.get("id")} if is_override else dict(viewport)
+        if is_override:
+            entry = ViewportWire()
+            if "id" in viewport:
+                entry["id"] = viewport["id"]
+        else:
+            entry = ViewportWire(**viewport)
         entry["measurements"] = kept
         viewports.append(entry)
     # Ones that could not be placed keep their viewport, so they come back if it
@@ -3240,12 +3405,12 @@ def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
     for viewport, measures in (drawing.get("unplaceableMeasurements") or {}).items():
         kept = keepers(measures)
         if kept:
-            viewports.append({"id": viewport, "measurements": kept})
+            viewports.append(ViewportWire(id=viewport, measurements=kept))
     saved["viewports"] = viewports
     return saved
 
 
-def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> str:
+def write_drawings_file(example_path: Path, drawings: List[DrawingWire]) -> str:
     """Save the drawings that are the file's to keep.
 
     Only the ones the file is responsible for: a drawing that came from code and
@@ -3325,7 +3490,7 @@ def _located_geometry(located: Optional['Located'], timber: 'PerfectTimberWithin
     return None
 
 
-def _geometry_payload(geometry: Optional['Located']) -> Optional[Dict[str, Any]]:
+def _geometry_payload(geometry: Optional['Located']) -> Optional[GeometryWire]:
     """One of those, in the shape the viewer reads.
 
     The wire keeps the mapping form -- a "kind" and two lists -- because that is
@@ -3345,7 +3510,7 @@ def _geometry_payload(geometry: Optional['Located']) -> Optional[Dict[str, Any]]
     return None
 
 
-def _geometry_from_wire(value: Optional[Dict[str, Any]]) -> Optional['Located']:
+def _geometry_from_wire(value: Optional[GeometryWire]) -> Optional['Located']:
     """The other direction: what the viewer sent, as the primitive it describes.
 
     The held end of a half-made measurement comes back this way -- the viewer
@@ -3371,7 +3536,7 @@ def _geometry_from_wire(value: Optional[Dict[str, Any]]) -> Optional['Located']:
     return None
 
 
-def _located_geometry_payload(located: Optional['Located'], timber: 'PerfectTimberWithin') -> Optional[Dict[str, Any]]:
+def _located_geometry_payload(located: Optional['Located'], timber: 'PerfectTimberWithin') -> Optional[GeometryWire]:
     """A feature's unbounded geometry, in world space, as the viewer wants it."""
     return _geometry_payload(_located_geometry(located, timber))
 
@@ -3461,16 +3626,16 @@ def _find_declared_feature(cut_timber: 'CutTimber', ref: Any) -> Optional[Tuple[
     return None if hit is None else (hit.feature, hit.owner)
 
 
-def resolve_anchor(frame: 'Frame', anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def resolve_anchor(frame: 'Frame', anchor: AnchorWire) -> Optional[AnchorWire]:
     """Where one feature is, on its own. See _resolve_anchor_placed for the pair."""
     placed = _resolve_anchor_placed(frame, anchor, None)
     return None if placed is None else placed[0]
 
 
 def _resolve_anchor_placed(
-    frame: 'Frame', anchor: Optional[Dict[str, Any]], plane: Optional['VectorLike'],
+    frame: 'Frame', anchor: Optional[AnchorWire], plane: Optional['VectorLike'],
     solid_space: bool = False,
-) -> Optional[Tuple[Dict[str, Any], Optional['MeasureSpan']]]:
+) -> Optional[Tuple[AnchorWire, Optional['MeasureSpan']]]:
     """Where the feature an anchor names actually is, in world space.
 
     None when it cannot be found, so the caller shows the measurement as broken.
@@ -3494,7 +3659,7 @@ def _resolve_anchor_placed(
 def _anchor_payload(
     feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
     root_csg: 'CutCSG', plane: Optional['VectorLike'], solid_space: bool = False,
-) -> Tuple[Dict[str, Any], Optional['MeasureSpan']]:
+) -> Tuple[AnchorWire, Optional['MeasureSpan']]:
     """What one end of a measurement is: where it is, what it lies on, its extent.
 
     The span is what the pairwise rules need and the anchor is what they fall
@@ -5735,7 +5900,7 @@ def _pick_reference(
     feature_label: Optional[str],
     feature_type: Optional[str],
     edge: Optional['CSGFeature'] = None,
-) -> Optional[Dict[str, Any]]:
+) -> Optional[AnchorWire]:
     """The reference a measurement would hold for what was just picked.
 
     None while a click is still drilling down through compounds and has not
@@ -6675,14 +6840,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             ss.frame, ss.file_path, ss.pending_drawings,
             str(payload.get("drawingId") or ""),
             str(payload.get("viewportId") or ""),
-            {
-                "a": payload.get("a"),
-                "b": payload.get("b"),
-                "kind": payload.get("kind"),
-                "measureId": payload.get("measureId"),
-                "plane": payload.get("plane"),
-                "placement": payload.get("placement"),
-            },
+            _requested_measure(payload, whole=True),
         )
         return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
@@ -6694,9 +6852,8 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             ss.frame, ss.file_path, ss.pending_drawings,
             str(payload.get("drawingId") or ""),
             str(payload.get("viewportId") or ""),
-            {"a": payload.get("a"), "b": payload.get("b"),
-             "measureId": payload.get("measureId")},
-            payload.get("changes") or {},
+            _requested_measure(payload),
+            cast(MeasurementRequest, payload).get("changes") or MeasureWire(),
         )
         return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
@@ -6717,8 +6874,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             ss.frame, ss.file_path, ss.pending_drawings,
             str(payload.get("drawingId") or ""),
             str(payload.get("viewportId") or ""),
-            {"a": payload.get("a"), "b": payload.get("b"),
-             "measureId": payload.get("measureId")},
+            _requested_measure(payload),
         )
         return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
@@ -6730,8 +6886,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             ss.frame, ss.file_path, ss.pending_drawings,
             str(payload.get("drawingId") or ""),
             str(payload.get("viewportId") or ""),
-            {"a": payload.get("a"), "b": payload.get("b"),
-             "measureId": payload.get("measureId")},
+            _requested_measure(payload),
         )
         return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),

@@ -563,8 +563,7 @@ class TestWhatTheRunnerSettles:
                     else projected_kinds(one, other, look))
         kind = declared or (admitted[0] if admitted else None)
         return runner._settled_measurement(
-            {"a": {"geometry": one}, "b": {"geometry": other}, "angle": None},
-            declared, kind, admitted, solid, look, axes)
+            {"a": one, "b": other}, None, declared, kind, admitted, solid, look, axes)
 
     def test_two_points_admit_three_so_there_is_a_choice_to_offer(self):
         settled = self._settle(at([0, 0, 0]), at([1, 0, 1]))
@@ -623,8 +622,7 @@ class TestWhatTheRunnerSettles:
         rays = angle_rays(PlaneSpan(at=first.point, normal=first.normal),
                           PlaneSpan(at=second.point, normal=second.normal))
         settled = runner._settled_measurement(
-            {"a": {"geometry": first}, "b": {"geometry": second}, "angle": rays},
-            None, admitted[0], admitted, True, self.AXES.look, self.AXES)
+            {"a": first, "b": second}, rays, None, admitted[0], admitted, True, self.AXES.look, self.AXES)
 
         assert settled["value"] == {"unit": "angle", "value": pytest.approx(90.0)}
 
