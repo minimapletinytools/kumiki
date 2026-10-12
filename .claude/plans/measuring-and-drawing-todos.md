@@ -62,9 +62,12 @@ measure what is hidden, deliberately.
   against every flat face plane, cropped exactly to the surface; the outline's camera side,
   projected back onto the line, is what is hidden -- a union of intervals;
 - a face seen edge-on: visible if any of its edges is;
-- each is first nudged off its own timber into free space, sideways to the view first, so an
-  outline counts as visible;
-- a curved primitive the lines of sight could reach makes it "visible, not exact" -- no sampling.
+- each is first nudged off its own timber into free space, away from the camera first, so only
+  the frontmost of features sharing a line of the sheet is seen (a box's far arris is hidden
+  behind its near one); an edge is cropped to its own primitives first;
+- a cylinder (peg, bore) is exact too: its wall cuts the plane in an ellipse, and one line of
+  sight between each pair of critical stations decides;
+- any other curved primitive in reach makes it "visible, not exact" -- no sampling.
 
 Later: place a measurement's anchor on the visible part (the stretches are returned); draw
 hidden lines dashed; cache per view for auto drawing.

@@ -6,6 +6,7 @@ from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.drawings.visibility import feature_visibility, line_visibility
 
 import numpy as np
+from pytest import approx
 
 # The camera is at -y, looking along +y. A post's "front" faces +y, away from it.
 LOOK = create_v3(0, 1, 0)
@@ -33,10 +34,13 @@ class TestOneTimber:
         post = _post(0, 0, "post")
         assert _seen(post, "rptw.back_right", [post]).visible
 
-    def test_its_outline_is_seen_far_arrises_and_all(self):
-        # A box's far arrises lie on its outline, which a drawing draws.
+    def test_its_far_arrises_are_hidden_behind_the_near_ones(self):
+        # On its outline the far arris lies on the same line as the near one, which is in
+        # front of it: only the frontmost is seen.
         post = _post(0, 0, "post")
-        assert _seen(post, "rptw.front_right", [post]).visible
+        assert not _seen(post, "rptw.front_right", [post]).visible
+        assert not _seen(post, "rptw.front_left", [post]).visible
+        assert _seen(post, "rptw.back_left", [post]).visible
 
     def test_a_face_seen_edge_on_is_seen(self):
         post = _post(0, 0, "post")
@@ -75,9 +79,9 @@ class TestPartlyHidden:
         assert result.visible and lows_highs == [(0.0, 0.4), (0.6, 1.0)]
 
 
-class TestWhatCannotBeDecided:
+class TestThroughABore:
 
-    def test_a_curved_primitive_in_the_way_makes_it_visible_not_exact(self):
+    def test_it_is_seen_exactly_through_a_bore_in_the_way(self):
         # A bore through the front post, right where the line of sight to the one behind passes
         # (its left arrises are at x = -30mm).
         bore = lambda timber: Cutting(timber=timber, negative_csg=Cylinder(  # noqa: E731
@@ -85,8 +89,9 @@ class TestWhatCannotBeDecided:
             start_distance=mm(-100), end_distance=mm(100)))
         front, behind = _post(0, 0, "front", cuts=[bore]), _post(0.02, 0.5, "behind")
         result = _seen(behind, "rptw.back_left", [front, behind])
-        assert result.visible and not result.exact
-
+        assert result.visible and result.exact
+        [(start, end)] = result.stretches
+        assert sorted((float(start[2]), float(end[2]))) == [approx(0.49, abs=1e-4), approx(0.51, abs=1e-4)]
 
     def test_a_curved_primitive_out_of_the_way_does_not(self):
         bore = lambda timber: Cutting(timber=timber, negative_csg=Cylinder(  # noqa: E731
@@ -95,3 +100,33 @@ class TestWhatCannotBeDecided:
         front, behind = _post(0, 0, "front", cuts=[bore]), _post(0.02, 0.5, "behind")
         result = _seen(behind, "rptw.back_left", [front, behind])
         assert not result.visible and result.exact
+
+
+class TestAPeggedTenon:
+    """The starter frame's tenons have a peg hole through them, which the edge-on face meets."""
+
+    def test_two_of_its_four_long_arrises_show_from_each_side_exactly(self):
+        import runpy
+        from pathlib import Path
+
+        from kumiki.csg.cutcsg import csg_children
+
+        pattern = Path(__file__).resolve().parent.parent / "patterns" / "structures" / "my_cute_frame.py"
+        frame = runpy.run_path(str(pattern))["build_frame"]()
+        cross = next(c for c in frame.cut_timbers if c.timber.ticket.path == "Back Cross")
+
+        def tenons(node):
+            if "'tenon'" in repr(getattr(node, "label", None)):
+                yield node
+            for child in csg_children(node):
+                yield from tenons(child)
+
+        tenon = next(tenons(cross.render_timber_with_cuts_csg_local()))
+        for look in (create_v3(0, 1, 0), create_v3(0, -1, 0), create_v3(0, 0, 1), create_v3(0, 0, -1)):
+            results = []
+            for name in ("arris.0", "arris.1", "arris.2", "arris.3"):
+                feature = next(f for f in tenon.get_declared_features() if f.name == name)
+                handle = FeatureHandle(timber=cross.timber, hit=OwnedFeatureHit(feature=feature, owner=tenon))
+                results.append(feature_visibility(handle, cross, look, [cross]))
+            assert all(r.exact for r in results), look
+            assert sum(r.visible for r in results) == 2, (look, [r.visible for r in results])

@@ -12,13 +12,19 @@ so that is all this answers. Both are exact, with no sampling:
   So the hidden stretch is a union of intervals, exactly.
 
 Before either, the point or line is nudged a few micrometres off its own timber
-into free space, sideways to the view where it can be, so a line of sight grazing
-a surface -- an arris, a face seen edge-on -- is not hidden by the surface it lies
-on. That makes an outline visible, the way a drawing draws it: a box's far
-arrises lie on its outline, and count as seen.
+into free space -- away from the camera where it can be -- so it is tested from
+just behind itself. Only what is frontmost is seen: where two features lie on one
+line of the sheet, like a box's near and far arrises on its outline, the far one is
+hidden, since what is in front of it is the near one. A measurement to it would be
+to something the view does not show.
 
-What cannot be done exactly is not guessed at: a curved primitive the lines of
-sight could reach (a peg, a bore) makes the answer "visible, not exact".
+A cylinder (a peg, a bore) cuts P in an ellipse, or a pair of lines, so its outline
+is no longer straight. What is hidden then changes only at finitely many stations --
+straight pieces' ends, each wall's extremes along the line, and where walls meet
+face lines or each other -- and one line of sight between each pair decides.
+
+What cannot be done exactly is not guessed at: any other curved primitive the lines
+of sight could reach makes the answer "visible, not exact".
 """
 
 from dataclasses import dataclass
@@ -27,7 +33,7 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 from ..csg.cropcsg import crop_line_to_boundary_segments_on_csg, crop_line_to_segments_on_csg
-from ..csg.cutcsg import CSGFeatureType, FeatureSource, HasFeatures, csg_children
+from ..csg.cutcsg import CSGFeatureType, Cylinder, FeatureSource, HasFeatures, csg_children
 from ..geometry import Line, Plane, Point
 from ..rule import create_v3
 
@@ -81,7 +87,7 @@ def feature_visibility(handle, cut_timber, look, occluders: Sequence) -> Visibil
         at = _np(transform.local_to_global(located.position))
         return point_visibility(at, toward_camera, occluders, own=cut_timber)
     if isinstance(located, Line):
-        return _edge_visibility(located, root, transform, toward_camera, occluders, cut_timber)
+        return _edge_visibility(located, root, transform, toward_camera, occluders, cut_timber, _owners(handle))
     if isinstance(located, Plane):
         normal = _np(transform.local_to_global_direction(located.normal))
         if abs(float(np.dot(_unit(normal), toward_camera))) > 1e-9:
@@ -101,7 +107,7 @@ def point_visibility(at: np.ndarray, toward_camera: np.ndarray, occluders: Seque
         transform = occluder.timber.transform
         local = _np(transform.global_to_local(_v3(start)))
         direction = _unit(_np(transform.global_to_local_direction(_v3(toward_camera))))
-        if _reaches_curves(root, [local, local + direction * REACH]):
+        if _curves_in_reach(root, [local, local + direction * REACH]) is None:
             return UNKNOWN
         pieces = crop_line_to_segments_on_csg(
             Line(direction=_v3(direction), point=_v3(local)), root, seed_reach=REACH, near=_v3(local))
@@ -138,9 +144,17 @@ def line_visibility(a: np.ndarray, b: np.ndarray, toward_camera: np.ndarray, occ
     )
 
 
-def _edge_visibility(line, root, transform, toward_camera, occluders, cut_timber) -> Visibility:
+def _owners(handle) -> List:
+    """What declares a feature: its owner, or for a derived one, its two parents' owners."""
+    parents = getattr(handle.feature, "parents", None)
+    if parents:
+        return [parent.owner for parent in parents if parent is not None]
+    return [handle.owner]
+
+
+def _edge_visibility(line, root, transform, toward_camera, occluders, cut_timber, owners) -> Visibility:
     """An edge: where it exists on its own timber, each stretch tested."""
-    stretches = _on_surface(line, root)
+    stretches = _on_surface(line, root, owners)
     if not stretches:
         return UNKNOWN
     found = []
@@ -176,44 +190,64 @@ def _edge_on_face_visibility(handle, root, transform, toward_camera, occluders, 
     if not edges:
         return UNKNOWN
     for line in edges:
-        result = _edge_visibility(line, root, transform, toward_camera, occluders, cut_timber)
+        result = _edge_visibility(line, root, transform, toward_camera, occluders, cut_timber, [handle.owner])
         if not result.exact or result.visible:
             return result
     return Visibility(visible=False)
 
 
-def _on_surface(line, root) -> List[Tuple[float, float]]:
-    """Where a line (timber local) lies on the cut timber's surface, as stations along it."""
+def _on_surface(line, root, owners) -> List[Tuple[float, float]]:
+    """Where a line (timber local) is an edge: on the cut timber's surface, and within what
+    declares it -- as a highlight is cropped. Its line can lie on the surface elsewhere too,
+    where it is some other edge: a tenon's arris lines up with the tenon at the other end."""
     direction = _unit(_np(line.direction))
     unit_line = Line(direction=_v3(direction), point=line.point)
+    origin = _np(line.point)
+
+    def stations(pieces):
+        found = []
+        for piece in pieces or []:
+            one = float(np.dot(_np(piece.start) - origin, direction))
+            other = float(np.dot(_np(piece.end) - origin, direction))
+            found.append((min(one, other), max(one, other)))
+        return found
+
     for tolerance in (0.0, 1e-6):
-        pieces = crop_line_to_boundary_segments_on_csg(
-            unit_line, root, seed_reach=REACH, near=line.point, tolerance=tolerance)
-        if pieces:
-            origin = _np(line.point)
-            found = []
-            for piece in pieces:
-                one = float(np.dot(_np(piece.start) - origin, direction))
-                other = float(np.dot(_np(piece.end) - origin, direction))
-                found.append((min(one, other), max(one, other)))
-            return found
+        on_surface = stations(crop_line_to_boundary_segments_on_csg(
+            unit_line, root, seed_reach=REACH, near=line.point, tolerance=tolerance))
+        for owner in owners:
+            within = stations(crop_line_to_segments_on_csg(
+                unit_line, owner, seed_reach=REACH, near=line.point, tolerance=1e-6))
+            on_surface = _intersect(on_surface, within)
+        if on_surface:
+            return on_surface
     return []
+
+
+def _intersect(one: List[Tuple[float, float]], other: List[Tuple[float, float]]) -> List[Tuple[float, float]]:
+    found = []
+    for low, high in one:
+        for other_low, other_high in other:
+            start, end = max(low, other_low), min(high, other_high)
+            if end - start > NOISE:
+                found.append((start, end))
+    return found
 
 
 def _off_the_surface(at: np.ndarray, along: Optional[np.ndarray], own,
                      toward_camera: np.ndarray) -> Optional[np.ndarray]:
     """*at* moved NUDGE into free space beside its own timber, square to *along* if given.
 
-    Sideways to the view first, so a line of sight grazing a surface stays beside it
-    rather than being pushed behind it. None when no direction leads out: then it is
-    not on that timber's surface at all.
+    Away from the camera first, so it is tested from just behind itself: anything at
+    all in front of it -- a surface its line of sight would only graze included --
+    hides it. None when no direction leads out: then it is not on that timber's
+    surface at all.
     """
     if own is None:
         return at
     root = own.render_timber_with_cuts_csg_local()
     transform = own.timber.transform
-    directions = sorted(_directions(along), key=lambda d: (round(abs(float(np.dot(d, toward_camera))), 6),
-                                                          -float(np.dot(d, toward_camera))))
+    directions = sorted(_directions(along), key=lambda d: round(float(np.dot(d, toward_camera)), 6))
     for direction in directions:
         moved = at + direction * NUDGE
         if not root.contains_point(transform.global_to_local(_v3(moved))):
@@ -246,7 +280,8 @@ def _hidden_by(occluder, a, along, length, toward_camera) -> Optional[List[Tuple
     strip = [a_local, a_local + u * length, a_local + c * REACH, a_local + u * length + c * REACH]
     if not _boxes_meet(_box(strip), _aabb(root)):
         return []
-    if _reaches_curves(root, strip):
+    cylinders = _curves_in_reach(root, strip)
+    if cylinders is None:
         return None
     normal = _unit(np.cross(u, c))
     gram = np.array([[np.dot(u, u), np.dot(u, c)], [np.dot(u, c), np.dot(c, c)]])
@@ -257,17 +292,41 @@ def _hidden_by(occluder, a, along, length, toward_camera) -> Optional[List[Tuple
         return float(s), float(v)
 
     # The region's outline: where the plane of sight meets each face plane, on the surface.
-    for face_normal, face_point in _face_planes(root):
+    planes = _face_planes(root) + [cap for cylinder in cylinders for cap in _caps(cylinder)]
+    lines, breaks = [], [0.0, length]
+    for face_normal, face_point in planes:
         direction = np.cross(normal, face_normal)
         if np.linalg.norm(direction) <= 1e-9:
             continue
         on_both = _point_on_both(normal, a_local, face_normal, face_point, direction)
+        lines.append((np.array(stations(on_both)), np.array(stations(on_both + _unit(direction))) - stations(on_both)))
         line = Line(direction=_v3(_unit(direction)), point=_v3(on_both))
         pieces = crop_line_to_boundary_segments_on_csg(line, root, seed_reach=REACH, near=_v3(a_local))
         if pieces is None:
             return None
         for piece in pieces:
-            hidden.extend(_in_front(stations(_np(piece.start)), stations(_np(piece.end))))
+            ends = stations(_np(piece.start)), stations(_np(piece.end))
+            breaks.extend(end[0] for end in ends)
+            hidden.extend(_in_front(*ends))
+    if cylinders:
+        # A cylinder's outline in the plane is curved, so the straight pieces no longer bound
+        # the region. What is hidden changes only at the stations listed here; between them
+        # one line of sight decides.
+        conics = [_conic(cylinder, a_local, u, c) for cylinder in cylinders]
+        breaks.extend(_conic_stations(conics, lines))
+        hidden = []
+        cuts = sorted(b for b in breaks if 0.0 <= b <= length)
+        for low, high in zip(cuts, cuts[1:]):
+            if high - low <= NOISE:
+                continue
+            middle = a_local + u * (low + high) / 2
+            pieces = crop_line_to_segments_on_csg(
+                Line(direction=_v3(c), point=_v3(middle)), root, seed_reach=REACH, near=_v3(middle))
+            if pieces is None:
+                return None
+            if any(max(float(np.dot(_np(piece.start) - middle, c)), float(np.dot(_np(piece.end) - middle, c))) > NOISE
+                   for piece in pieces):
+                hidden.append((low, high))
     # And the region where it reaches the line itself.
     pieces = crop_line_to_segments_on_csg(
         Line(direction=_v3(u), point=_v3(a_local)), root, seed_reach=REACH, near=_v3(a_local))
@@ -316,18 +375,141 @@ def _face_planes(root) -> List[Tuple[np.ndarray, np.ndarray]]:
     return found
 
 
-def _reaches_curves(root, points: Sequence[np.ndarray]) -> bool:
-    """Whether a primitive with a curved face sits where the lines of sight could reach it."""
+def _curves_in_reach(root, points: Sequence[np.ndarray]) -> Optional[List[Cylinder]]:
+    """The cylinders the lines of sight could reach, or None if another curved primitive could."""
     reach = _box(points)
+    found: List[Cylinder] = []
 
-    def curved(node) -> bool:
+    def walk(node) -> bool:
+        if isinstance(node, Cylinder):
+            if _meets_cylinder(points, node):
+                found.append(node)
+            return True
         if isinstance(node, HasFeatures) and any(
                 feature.feature_type() is CSGFeatureType.CURVED_FACE
                 for feature in node.get_declared_features(FeatureSource.DEFAULTS)):
-            return _boxes_meet(reach, _aabb(node))
-        return any(curved(child) for child in csg_children(node))
+            return not _boxes_meet(reach, _aabb(node))
+        return all(walk(child) for child in csg_children(node))
 
-    return curved(root)
+    return found if walk(root) else None
+
+
+def _caps(cylinder: Cylinder) -> List[Tuple[np.ndarray, np.ndarray]]:
+    axis = _unit(_np(cylinder.axis_direction))
+    return [(axis, _np(cylinder.position) + axis * float(d))
+            for d in (cylinder.start_distance, cylinder.end_distance) if d is not None]
+
+
+def _conic(cylinder: Cylinder, a, u, c):
+    """The cylinder's wall in the plane a + u s + c v, as f(s, v) = z'Mz + 2 b'z + k."""
+    axis = _unit(_np(cylinder.axis_direction))
+    square = np.eye(3) - np.outer(axis, axis)
+    w0 = a - _np(cylinder.position)
+    basis = np.array([u, c]).T
+    return (basis.T @ square @ basis, basis.T @ square @ w0,
+            float(w0 @ square @ w0) - float(cylinder.radius) ** 2)
+
+
+def _on_conic(conic):
+    """The conic as parametrised pieces: ('ellipse', centre, L) for z = centre + L (cos t, sin t),
+    or ('line', point, direction); empty if it has no points."""
+    m, b, k = conic
+    if np.linalg.det(m) > 1e-12 * max(1.0, float(np.trace(m)) ** 2):
+        centre = -np.linalg.solve(m, b)
+        level = -(k - float(centre @ m @ centre))
+        if level <= 0:
+            return []
+        values, vectors = np.linalg.eigh(m)
+        return [("ellipse", centre, vectors @ np.diag(np.sqrt(level / values)))]
+    # Seen along its axis or parallel to it: the wall is a pair of parallel lines.
+    values, vectors = np.linalg.eigh(m)
+    across, along = vectors[:, 1], vectors[:, 0]
+    if values[1] <= 1e-12:
+        return []
+    # f along `across` (t) is values[1] t^2 + 2 (b.across) t + k, taking z = t across + r along.
+    roots = _real_roots([values[1], 2 * float(b @ across), k])
+    return [("line", across * t, along) for t in roots]
+
+
+def _real_roots(coefficients) -> List[float]:
+    coefficients = np.array(coefficients, dtype=float)
+    while len(coefficients) > 1 and abs(coefficients[0]) <= 1e-14:
+        coefficients = coefficients[1:]
+    if len(coefficients) <= 1:
+        return []
+    return [float(r.real) for r in np.roots(coefficients) if abs(r.imag) <= 1e-7 * max(1.0, abs(r))]
+
+
+def _on_line_meets(conic, point, direction) -> List[np.ndarray]:
+    m, b, k = conic
+    roots = _real_roots([direction @ m @ direction, 2 * (point @ m @ direction + b @ direction),
+                         point @ m @ point + 2 * b @ point + k])
+    return [point + direction * t for t in roots]
+
+
+def _ellipse_meets(conic, centre, shape) -> List[np.ndarray]:
+    """Where z = centre + shape (cos t, sin t) meets the conic, with tan(t/2) as the unknown."""
+    m, b, k = conic
+    # f(z) along the ellipse in terms of x = cos t, y = sin t.
+    p, q = shape[:, 0], shape[:, 1]
+    xx, yy, xy = p @ m @ p, q @ m @ q, 2 * p @ m @ q
+    x1, y1 = 2 * (centre @ m @ p + b @ p), 2 * (centre @ m @ q + b @ q)
+    k0 = centre @ m @ centre + 2 * b @ centre + k
+    # x = (1 - h^2)/(1 + h^2), y = 2h/(1 + h^2), times (1 + h^2)^2.
+    quartic = [xx - x1 + k0, 2 * xy - 2 * y1, -2 * xx + 4 * yy + 2 * k0, -2 * xy + 2 * y1, xx + x1 + k0]
+    found = [centre + p * (1 - h * h) / (1 + h * h) + q * 2 * h / (1 + h * h) for h in _real_roots(quartic)]
+    if abs(xx - x1 + k0) <= 1e-12:
+        found.append(centre - p)  # t = pi, where tan(t/2) runs off
+    return found
+
+
+def _conic_stations(conics, lines) -> List[float]:
+    """Every station where the outline might turn back or cross: each wall's extremes
+    along the edge and where it meets a face line or another wall."""
+    pieces = [piece for conic in conics for piece in _on_conic(conic)]
+    found: List[float] = []
+    for kind, origin, shape in pieces:
+        if kind == "ellipse":
+            reach = float(np.hypot(shape[0, 0], shape[0, 1]))
+            found.extend([origin[0] - reach, origin[0] + reach])
+        elif abs(shape[0]) <= 1e-9:
+            found.append(float(origin[0]))
+    for conic in conics:
+        for point, direction in lines:
+            found.extend(float(z[0]) for z in _on_line_meets(conic, point, direction))
+        for kind, origin, shape in pieces:
+            if kind == "ellipse":
+                found.extend(float(z[0]) for z in _ellipse_meets(conic, origin, shape))
+            else:
+                found.extend(float(z[0]) for z in _on_line_meets(conic, origin, shape))
+    return found
+
+
+def _meets_cylinder(points: Sequence[np.ndarray], cylinder: Cylinder) -> bool:
+    """Whether the convex hull of *points* (a segment or a flat parallelogram from
+    points[0]) meets the cylinder's bounding box, by separating axes."""
+    axis = _unit(_np(cylinder.axis_direction))
+    start = -1e9 if cylinder.start_distance is None else float(cylinder.start_distance)
+    end = 1e9 if cylinder.end_distance is None else float(cylinder.end_distance)
+    center = _np(cylinder.position) + axis * (start + end) / 2
+    across = _unit(np.cross(axis, [1.0, 0, 0] if abs(axis[0]) < 0.9 else [0, 1.0, 0]))
+    box = [(axis, (end - start) / 2), (across, float(cylinder.radius)),
+           (np.cross(axis, across), float(cylinder.radius))]
+    spans = [p - points[0] for p in points[1:3]]
+    tests = [d for d, _ in box] + [np.cross(d, span) for d, _ in box for span in spans]
+    if len(spans) == 2:
+        tests.append(np.cross(spans[0], spans[1]))
+    for test in tests:
+        size = np.linalg.norm(test)
+        if size <= 1e-12:
+            continue
+        test = test / size
+        mine = [float(np.dot(p, test)) for p in points]
+        middle = float(np.dot(center, test))
+        radius = sum(half * abs(float(np.dot(d, test))) for d, half in box)
+        if min(mine) > middle + radius + NOISE or max(mine) < middle - radius - NOISE:
+            return False
+    return True
 
 
 def _box(points: Sequence[np.ndarray]) -> Tuple[np.ndarray, np.ndarray]:
