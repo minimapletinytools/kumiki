@@ -108,14 +108,16 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 DONE-don't show assembly in measuring window
 
--disallow hidden fetaure measuring?
-  -I think either don't do it or restrict mesauring selection to viewport
+-DECISION TIME ON DRAWING FEATURES
+  -the high level issue here is that each view in 2d drawing only has some features visible and you only want to make measuremints for those features. Except you can totally mesauer other featuers and its' kind NBD so maybe ther' sjust ntonig to do here.
+  -disallow hidden fetaure measuring?
+    -I think either don't do it or restrict mesauring selection to viewport
+  -2D VIEW EQUIVALENCY GROUPS (probably not what you want to do but techincalyl the most general solution)
+    -paus eher for a moment, one thing I realized is that in 2d view, there are sorta equivalency groups for measurements when locked to an orthographic view. so for example, a pirsm has 6 faces, and a bunch of edgse/vertices. When we measure betwene 2 edges on a face that's parallel with the viewport plane, we are also measuring the distance bteew all other edges, vertices of the perpendicular face that edge is a part of. IN the measurement, we say it's just the edge being measured, but in. thesolver wesay that a DOF got removed from all the features I mentioned. Is there some way to solve for all features that had their DOfs solved in this way even though just teh edge was measured. 
+    -don't really need to do this...
 
--2D VIEW EQUIVALENCY GROUPS
-  -paus eher for a moment, one thing I realized is that in 2d view, there are sorta equivalency groups for measurements when locked to an orthographic view. so for example, a pirsm has 6 faces, and a bunch of edgse/vertices. When we measure betwene 2 edges on a face that's parallel with the viewport plane, we are also measuring the distance bteew all other edges, vertices of the perpendicular face that edge is a part of. IN the measurement, we say it's just the edge being measured, but in. thesolver wesay that a DOF got removed from all the features I mentioned. Is there some way to solve for all features that had their DOfs solved in this way even though just teh edge was measured. 
-  -don't really need to do this...
-
--PTW stuff
+-DECISION TIME PTW
+  -the remaining high level issue here is when to show rough/PTW features, when to allow them to be measured etc
   DONE-rough faces matching PTW faces should be given PTW labels?
   -rough fetaures are marked as do not measure
   -when entering drawing mode
@@ -123,14 +125,15 @@ DONE-don't show assembly in measuring window
     
 
 -auto drawing
-  -add preferences in auto drawing algoirthm, pick measurements from reference face/edge always (maybe not a bad rule for now..)
+  DONE-add preferences in auto drawing algoirthm, pick measurements from reference face/edge always (maybe not a bad rule for now..)
   -test auto drawing generation on a single timber with joints
   -test auto drawing on a rough/PTW timber
   -hidden feature detection in drawing view (featurelist, view) to see what's hidden
     -you need this so mesaurements only get created in the viwe that shows the feature on the surface <- this is the important thing.
     -ask agent what its currentyl doing though
 
-
+-BUG dragging python created measurement si my_cute_fraem_drawing_test creates 2 copies of the mesaurement in the viewer. so teh override is not working for whateve rreason
+-rework left hand view or whatever, it sholud be cllapsoable but maybe yous hould justc remaigen it for the standalone app...
 
 -diagonal brace notiching broken in learn to timber frame shed
 -add support to run @tools from the parameter section
