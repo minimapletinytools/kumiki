@@ -16,9 +16,14 @@ PATTERN = FilePath(__file__).resolve().parent.parent / "patterns" / "structures"
 
 
 @pytest.fixture(scope="module")
-def solve():
+def pattern():
     with contextlib.redirect_stdout(io.StringIO()):
-        return runpy.run_path(str(PATTERN))["solve_cute_frame"]
+        return runpy.run_path(str(PATTERN))
+
+
+@pytest.fixture(scope="module")
+def solve(pattern):
+    return pattern["solve_cute_frame"]
 
 
 def _from_a_reference(pick) -> bool:
@@ -75,3 +80,32 @@ class TestPolicy:
 
         assert result.left_after == 0
         assert result.picks and all(pick.broke_rules for pick in result.picks)
+
+
+class TestEachTimber:
+    """A shop drawing per timber, solving every required feature from its reference faces and end."""
+
+    def test_everything_but_the_bore_radii_is_dimensioned(self, pattern):
+        # A bore's radius would need a diameter dimension, which no measurement kind takes yet.
+        from kumiki.csg.cutcsg import SimpleCylinderBarrelFeature
+
+        frame = pattern["_load_cute_frame"]()()
+        for cut in frame.cut_timbers:
+            result, _ = pattern["solve_timber"](cut)
+            assert result.unsolved, cut.timber.ticket.path
+            assert all(isinstance(h.feature, SimpleCylinderBarrelFeature) for h in result.unsolved)
+            assert result.left_after == len(result.unsolved)
+
+    def test_a_peg_axis_is_dimensioned_seen_end_on(self, pattern):
+        frame = pattern["_load_cute_frame"]()()
+        result, _ = pattern["solve_timber"](frame.cut_timbers[0])
+        ends = [end.feature.name for pick in result.picks
+                for end in (pick.candidate.measure.anchor_a, pick.candidate.measure.anchor_b)]
+        assert "peg_hole_axis" in ends
+
+    def test_the_frame_has_a_drawing_per_timber_and_the_plan(self, pattern):
+        frame = pattern["build_frame_with_drawing"]()
+        names = [drawing.name for drawing in frame.drawings]
+        assert "Cute frame plan (generated)" in names
+        for cut in frame.cut_timbers:
+            assert f"{cut.timber.ticket.path} (generated)" in names

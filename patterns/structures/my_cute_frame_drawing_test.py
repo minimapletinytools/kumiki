@@ -6,7 +6,10 @@ planes -- is solved by auto dimensioning (kumiki.drawings.auto_dimensioning) in 
 elevations, top and front. Square and sheet-axis assumptions start known, so only positions are
 left to dimension.
 
-Run directly to print what it picked; load in Kigumi to see the drawing.
+Each timber also gets a shop drawing of its own, solving every required feature -- joints and
+peg holes too, not just its prism -- from its reference faces and its bottom end.
+
+Run directly to print what it picked; load in Kigumi to see the drawings.
 """
 
 import importlib.util as importlib_util
@@ -20,10 +23,12 @@ from kumiki.csg.carriers import Row
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.drawings.assumptions import sheet_axis_assumptions, square_assumptions
 from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, Policy, auto_dimension, is_reference,
-                                              plane_pair_candidates)
-from kumiki.drawings.drawing import ELEVATION_IDS, Drawing, ViewAxes, elevation_viewports
+                                              sheet_candidates)
+from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, ViewAxes, elevation_viewports,
+                                    shop_drawing_viewports)
+from kumiki.geometry import Plane
 from kumiki.drawings.feature_solving import carrier_map_of, feature_handle_dof_rows
-from kumiki.drawings.required_features import planning_features
+from kumiki.drawings.required_features import planning_features, required_features
 
 
 def _load_cute_frame():
@@ -79,7 +84,7 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
 
     # Centerplanes can't be referenced by a drawing yet, so they're solved for but never dimensioned to.
     anchors = [handle for handle in directed if not isinstance(handle.feature, PrismCenterplaneFeature)]
-    candidates = plane_pair_candidates(anchors, carriers, {view: _sheet(view)[0] for view in VIEWS})
+    candidates = sheet_candidates(anchors, carriers, {view: _sheet(view)[0] for view in VIEWS})
     result = auto_dimension(candidates, targets, known_rows, carriers, policy)
 
     report = [f"fixed: {FIXED_TIMBER} ({len(known)} faces known), {len(assumptions)} assumptions",
@@ -93,6 +98,64 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     report.append(f"unsolved: {[_name(h) for h in result.unsolved] or 'none'} "
                   f"(rank test: {result.left_after} left)  * = a reference face")
     return frame, result, report
+
+
+# A shop drawing's four long-face views (kigumi/runner.py, _LONG_FACE_VIEWS): face axis and sign.
+SHOP_VIEWS = {"front": ("height", 1), "right": ("width", 1), "back": ("height", -1), "left": ("width", -1)}
+
+
+def _shop_sheets(timber) -> Dict[str, Tuple[ViewAxes, Transform]]:
+    """Each long face square on, the length across the sheet -- the cameras the viewer builds."""
+    along = timber.get_length_direction_global()
+    axes = {"width": timber.get_width_direction_global(), "height": timber.get_height_direction_global()}
+    sheets = {}
+    for view, (axis, sign) in SHOP_VIEWS.items():
+        normal = axes[axis] * sign
+        up = normal.cross(along)
+        sheets[view] = (ViewAxes(look=-normal, right=along, up=up),
+                        Transform(position=create_v3(0, 0, 0), orientation=Orientation.from_x_and_y(along, up)))
+    return sheets
+
+
+def _end_datum(targets: Sequence[FeatureHandle], timber) -> FeatureHandle:
+    """The face nearest the bottom end square to the length: where a piece's length is measured from."""
+    along = [float(v) for v in timber.get_length_direction_global()]
+    ends = []
+    for handle in targets:
+        plane = handle.feature.locate_simple_unbounded(handle.owner)
+        if not isinstance(plane, Plane):
+            continue
+        normal = [float(v) for v in timber.transform.local_to_global_direction(plane.normal)]
+        if abs(abs(sum(a * b for a, b in zip(normal, along))) - 1) > 1e-9:
+            continue
+        point = [float(v) for v in timber.transform.local_to_global(plane.point)]
+        ends.append((sum(a * b for a, b in zip(point, along)), handle))
+    return min(ends, key=lambda end: end[0])[1]
+
+
+def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
+    """Every required feature of one timber, dimensioned from its reference faces and its bottom end."""
+    carriers = carrier_map_of(cut)
+    targets = list({(id(r.handle.owner), r.handle.feature.name): r.handle for r in required_features(cut)}.values())
+    known = [handle for handle in targets if is_reference(handle)] + [_end_datum(targets, cut.timber)]
+    sheets = _shop_sheets(cut.timber)
+    assumptions = square_assumptions(targets, carriers)
+    for _, sheet in sheets.values():
+        assumptions += sheet_axis_assumptions(targets, carriers, sheet)
+    known_rows = _rows(known, carriers) + [row for assumption in assumptions for row in assumption.rows]
+
+    anchors = [handle for handle in targets if not isinstance(handle.feature, PrismCenterplaneFeature)]
+    candidates = sheet_candidates(anchors, carriers, {view: axes for view, (axes, _) in sheets.items()})
+    result = auto_dimension(candidates, targets, known_rows, carriers, policy)
+
+    report = [f"{cut.timber.ticket.path}: {len(targets)} features, from {[_name(h) for h in known]}, "
+              f"{len(candidates)} candidates, {result.left_before} left before"]
+    for pick in result.picks:
+        measure = pick.candidate.measure
+        report.append(f"  [{pick.candidate.view:5}] {_name(measure.anchor_a)} -> {_name(measure.anchor_b)}"
+                      f"  {pick.candidate.length * 1000:.0f}mm")
+    report.append(f"  unsolved: {[_name(h) for h in result.unsolved] or 'none'} (rank test: {result.left_after} left)")
+    return result, report
 
 
 def _drawable(handle: FeatureHandle, frame: Frame) -> FeatureHandle:
@@ -121,7 +184,20 @@ def build_frame_with_drawing() -> Frame:
         measurements[ELEVATION_IDS[candidate.view]].append(measure)
     drawing = Drawing(name="Cute frame plan (generated)", timbers=[cut.timber for cut in frame.cut_timbers],
                       viewports=elevation_viewports(), measurements=measurements)
-    return replace(frame, drawings=[*frame.drawings, drawing])
+    return replace(frame, drawings=[*frame.drawings, drawing, *(_timber_drawing(cut, frame) for cut in frame.cut_timbers)])
+
+
+def _timber_drawing(cut: CutTimber, frame: Frame) -> Drawing:
+    """One timber's shop drawing, dimensioned by solve_timber."""
+    result, _ = solve_timber(cut)
+    measurements: Dict = {SHOP_DRAWING_IDS[view]: [] for view in SHOP_VIEWS}
+    for pick in result.picks:
+        candidate = pick.candidate
+        measure = replace(candidate.measure, anchor_a=_drawable(candidate.measure.anchor_a, frame),
+                          anchor_b=_drawable(candidate.measure.anchor_b, frame))
+        measurements[SHOP_DRAWING_IDS[candidate.view]].append(measure)
+    return Drawing(name=f"{cut.timber.ticket.path} (generated)", timbers=[cut.timber],
+                   viewports=shop_drawing_viewports(), measurements=measurements)
 
 
 example = build_frame_with_drawing
@@ -130,6 +206,8 @@ example = build_frame_with_drawing
 if __name__ == "__main__":
     import time
     started = time.time()
-    _, _, lines = solve_cute_frame()
+    frame, _, lines = solve_cute_frame()
     print("\n".join(lines))
+    for cut in frame.cut_timbers:
+        print("\n".join(solve_timber(cut)[1]))
     print(f"took {time.time() - started:.1f}s")

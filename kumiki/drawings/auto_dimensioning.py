@@ -14,7 +14,7 @@ import numpy as np
 
 from ..csg.carriers import CarrierMap, Row
 from ..csg.feature_paths import FeatureHandle
-from ..geometry import Plane
+from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
 from .dof_solver import remaining
 from .drawing import Measure, MeasurementKind, ViewAxes
@@ -205,34 +205,68 @@ def auto_dimension(
                             left_before=left_before, left_after=left_after)
 
 
-def _plane_in_world(handle: FeatureHandle) -> Optional[Tuple[np.ndarray, float]]:
-    """(unit normal, offset along it) of a planar feature, in world space."""
-    plane = handle.feature.locate_simple_unbounded(handle.owner)
-    if not isinstance(plane, Plane):
-        return None
+def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[Tuple]:
+    """How a feature draws, looking along `look`, in world space.
+
+    ("line", in-sheet unit normal, offset along it) for a face seen edge-on or a line lying along
+    the sheet; ("point", position) for a line seen end-on; None for anything seen at an angle.
+    """
+    located = handle.feature.locate_simple_unbounded(handle.owner)
     transform = handle.timber.transform
-    normal = np.array([float(v) for v in transform.local_to_global_direction(plane.normal)])
-    normal /= np.linalg.norm(normal)
-    point = np.array([float(v) for v in transform.local_to_global(plane.point)])
-    return normal, float(normal @ point)
+    if isinstance(located, Plane):
+        normal, point = located.normal, located.point
+    elif isinstance(located, Line):
+        normal, point = located.direction, located.point
+    else:
+        return None
+    direction = np.array([float(v) for v in transform.local_to_global_direction(normal)])
+    direction /= np.linalg.norm(direction)
+    at = np.array([float(v) for v in transform.local_to_global(point)])
+    along_look = float(direction @ look)
+    if isinstance(located, Line):
+        if abs(abs(along_look) - 1) < 1e-9:
+            return ("point", at)
+        if abs(along_look) > 1e-9:
+            return None
+        direction = np.cross(direction, look)
+        direction /= np.linalg.norm(direction)
+    elif abs(along_look) > 1e-9:
+        return None
+    return ("line", direction, float(direction @ at))
 
 
-def plane_pair_candidates(
+def _separation(one: Tuple, other: Tuple) -> Optional[float]:
+    """Perpendicular distance on the sheet between two drawn features, or None if there is none to take."""
+    if one[0] == "point" and other[0] == "point":
+        return None
+    if one[0] == "point":
+        one, other = other, one
+    if other[0] == "point":
+        return abs(float(one[1] @ other[1]) - one[2])
+    alignment = float(one[1] @ other[1])
+    if abs(abs(alignment) - 1) > 1e-9:
+        return None
+    return abs(one[2] - alignment * other[2])
+
+
+def sheet_candidates(
     anchors: Sequence[FeatureHandle], carriers: CarrierMap, views: Mapping[str, ViewAxes],
 ) -> List[Candidate]:
-    """Every perpendicular dimension between two parallel planes seen edge-on, in each view."""
+    """Every perpendicular dimension a view can draw between two of the anchors.
+
+    Between two parallel lines on the sheet (a face seen edge-on, a line lying along the sheet), or
+    from a point (a line seen end-on) to a line.
+    """
     candidates = []
-    planes = [(handle, _plane_in_world(handle)) for handle in anchors]
-    planes = [(handle, plane) for handle, plane in planes if plane is not None]
     for view, axes in views.items():
         look = np.array([float(v) for v in axes.look])
-        edge_on = [(handle, plane) for handle, plane in planes if abs(float(plane[0] @ look)) < 1e-9]
-        for i, (a, (normal_a, offset_a)) in enumerate(edge_on):
-            for b, (normal_b, offset_b) in edge_on[i + 1:]:
-                if abs(abs(float(normal_a @ normal_b)) - 1) > 1e-9:
-                    continue
-                length = abs(offset_a - float(normal_a @ normal_b) * offset_b)
-                if length < 1e-9:
+        look /= np.linalg.norm(look)
+        drawn = [(handle, _on_sheet(handle, look)) for handle in anchors]
+        drawn = [(handle, shape) for handle, shape in drawn if shape is not None]
+        for i, (a, shape_a) in enumerate(drawn):
+            for b, shape_b in drawn[i + 1:]:
+                length = _separation(shape_a, shape_b)
+                if length is None or length < 1e-9:
                     continue
                 measure = Measure(a, b, kind=PERPENDICULAR)
                 try:
