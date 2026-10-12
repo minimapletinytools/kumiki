@@ -25,7 +25,13 @@ import traceback
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional, List, Sequence, Tuple
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, Callable, Dict, Mapping, NamedTuple, Optional, List, Sequence, Tuple, Union
+
+# Stations along a line, low then high.
+Interval = Tuple[float, float]
+# A pointer's ray in timber-local space: origin, direction.
+LocalRay = Tuple[List[float], List[float]]
 
 if TYPE_CHECKING:
     # Annotations only. kumiki must NOT be imported at module scope for
@@ -35,9 +41,19 @@ if TYPE_CHECKING:
     # comparing against a stale class object after a reload. Under
     # TYPE_CHECKING there is no runtime import at all, so annotations can be
     # concrete while every isinstance check still imports inside its function.
-    from kumiki.csg.cutcsg import CSGParity, CutCSG
-    from kumiki.drawings.drawing import VectorLike
-    from kumiki.timber import CutTimber, Cutting, Joint
+    from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
+    from kumiki.drawings.drawing import MeasureSpan, MeasurementSpace, VectorLike, Viewport, ViewAxes, ViewportId
+    from kumiki.drawings.layout import PlacedViewport
+    from kumiki.geometry import Line, Plane, Point
+    from kumiki.identity import FeaturePath
+    from kumiki.kiwari import Kiwari
+    from kumiki.rule import V3, Transform
+    from kumiki.ticket import Ticket
+    from kumiki.timber import Accessory, CutTimber, Cutting, Frame, Joint, PerfectTimberWithin
+
+    Located = Union[Point, Line, Plane]
+    # A picked feature, the node that owns it, and what it lies on.
+    LocatedPick = Tuple[CSGFeature, CutCSG, Optional[Located]]
 
 
 def _find_project_root_from_argv() -> "Tuple[Path | None, bool]":
@@ -224,15 +240,14 @@ def _vector3_to_floats(vec: Any) -> list:
     return [float(vec[i, 0]) for i in range(3)]
 
 
-def get_timber_display_name(timber: Any) -> str:
+def get_timber_display_name(timber: 'PerfectTimberWithin') -> str:
     if hasattr(timber, "ticket") and hasattr(timber.ticket, "path"):
         return timber.ticket.path
-    if hasattr(timber, "name"):
-        return timber.name
-    return type(timber).__name__
+    name = getattr(timber, "name", None)
+    return str(name) if name is not None else type(timber).__name__
 
 
-def _compute_csg_depth(csg: Any) -> int:
+def _compute_csg_depth(csg: 'CutCSG') -> int:
     from kumiki.csg.cutcsg import SolidUnion, Difference
 
     if isinstance(csg, SolidUnion):
@@ -248,7 +263,7 @@ def _compute_csg_depth(csg: Any) -> int:
     return 1
 
 
-def _count_csg_nodes_and_features(csg: Any) -> Tuple[int, int]:
+def _count_csg_nodes_and_features(csg: 'CutCSG') -> Tuple[int, int]:
     """Return (node_count, named_feature_count) for the CSG tree."""
     from kumiki.csg.cutcsg import SolidUnion, Difference
 
@@ -274,7 +289,7 @@ def _count_csg_nodes_and_features(csg: Any) -> Tuple[int, int]:
     return (nodes, features)
 
 
-def serialize_cut_timber(cut_timber: Any) -> Dict[str, Any]:
+def serialize_cut_timber(cut_timber: 'CutTimber') -> Dict[str, Any]:
     timber = cut_timber.timber
     return {
         "name": get_timber_display_name(timber),
@@ -344,12 +359,12 @@ def prism_to_mesh(prism: Any) -> Dict[str, Any]:
     }
 
 
-def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
+def _build_perfect_timber_within_csg_local(cut_timber: 'CutTimber') -> 'CutCSG':
     """The perfect timber within with the same cuts applied, for previewing non-perfect timbers."""
     return cut_timber.render_perfect_timber_within_with_cuts_csg_local()
 
 
-def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:
+def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> Dict[str, Any]:
     """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
     from kumiki.csg.cutcsg import adopt_csg
     from kumiki.rule import Transform
@@ -414,7 +429,7 @@ def _base_member_payload(
     }
 
 
-def _cut_length(cut_timber: Any) -> Optional[float]:
+def _cut_length(cut_timber: 'CutTimber') -> Optional[float]:
     """How long the timber is once its end cuts are made.
 
     A timber with an end joint is not cut to length first -- the joint decides
@@ -424,6 +439,8 @@ def _cut_length(cut_timber: Any) -> Optional[float]:
     """
     try:
         prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
+        if prism.start_distance is None or prism.end_distance is None:
+            return None
         return round(float(prism.end_distance - prism.start_distance), 6)
     except Exception as exc:
         log_stderr(f"Warning: could not measure cut length: {exc}")
@@ -431,8 +448,8 @@ def _cut_length(cut_timber: Any) -> Optional[float]:
 
 
 def _cut_timber_to_triangle_mesh_payload(
-    cut_timber: Any,
-    local_csg: Any,
+    cut_timber: 'CutTimber',
+    local_csg: 'CutCSG',
     timber_key: str,
 ) -> Dict[str, Any]:
     actual = _triangulate_local_csg(cut_timber, local_csg)
@@ -443,7 +460,7 @@ def _cut_timber_to_triangle_mesh_payload(
     timber = cut_timber.timber
     timber_tags = _serialize_timber_tags(getattr(timber, "ticket", None))
     perfect_size = timber.get_perfect_size()
-    nominal_size = timber.get_nominal_size()
+    nominal_size = timber.get_rough_size()
     csg_nodes, csg_features = _count_csg_nodes_and_features(local_csg)
     timber_kumiki_id = int(timber.ticket.kumiki_id)
     timber_class = type(timber).__name__
@@ -529,8 +546,8 @@ def _cut_timber_to_triangle_mesh_payload(
 
 
 def _accessory_to_triangle_mesh_payload(
-    accessory: Any,
-    local_csg: Any,
+    accessory: 'Accessory',
+    local_csg: 'CutCSG',
     accessory_key: str,
     accessory_name: str,
 ) -> Dict[str, Any]:
@@ -540,8 +557,10 @@ def _accessory_to_triangle_mesh_payload(
     from kumiki.rule import Transform
     from kumiki.csg.triangles import triangulate_cutcsg
 
-    if hasattr(accessory, "transform"):
-        global_csg = adopt_csg(accessory.transform, Transform.identity(), local_csg)
+    # Accessory itself declares no transform; the kinds placed in the world do.
+    placed = getattr(accessory, "transform", None)
+    if placed is not None:
+        global_csg = adopt_csg(placed, Transform.identity(), local_csg)
     else:
         # Accessories that already carry global-space CSG (e.g. CSGAccessory)
         # do not need an additional transform adoption.
@@ -600,7 +619,7 @@ def _accessory_to_triangle_mesh_payload(
 
 
 def _cut_timber_to_bbox_mesh_payload(
-    cut_timber: Any,
+    cut_timber: 'CutTimber',
     timber_key: str,
 ) -> Dict[str, Any]:
     """Fallback mesh payload based on a cut timber's oriented bounding prism.
@@ -613,7 +632,7 @@ def _cut_timber_to_bbox_mesh_payload(
     timber = cut_timber.timber
     timber_tags = _serialize_timber_tags(getattr(timber, "ticket", None))
     perfect_size = timber.get_perfect_size()
-    nominal_size = timber.get_nominal_size()
+    nominal_size = timber.get_rough_size()
     prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
     mesh = prism_to_mesh(prism)
 
@@ -811,7 +830,7 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
     }
 
 
-def serialize_frame(frame: Any) -> Dict[str, Any]:
+def serialize_frame(frame: 'Frame') -> Dict[str, Any]:
     accessories = list(frame.accessories) if hasattr(frame, "accessories") and frame.accessories else []
     timbers = [serialize_cut_timber(cut_timber) for cut_timber in frame.cut_timbers]
     return {
@@ -828,7 +847,7 @@ def serialize_frame(frame: Any) -> Dict[str, Any]:
     }
 
 
-def _assign_member_keys(frame: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+def _assign_member_keys(frame: 'Frame') -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Compute the same memberKey scheme used by build_real_geometry.
 
     Returns (timber_entries, accessory_entries) with stable ordering.
@@ -875,7 +894,7 @@ def _assign_member_keys(frame: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str
     return timber_entries, accessory_entries
 
 
-def _serialize_cutting_summary(cut_timber: Any) -> List[Dict[str, Any]]:
+def _serialize_cutting_summary(cut_timber: 'CutTimber') -> List[Dict[str, Any]]:
     cuts_meta: List[Dict[str, Any]] = []
     cuts = list(getattr(cut_timber, "cuts", []) or [])
     for idx, cut in enumerate(cuts):
@@ -913,7 +932,7 @@ def _timber_tag_kinds() -> List[Tuple[type, str]]:
     return [(SliceTag, "slice"), (MemberTag, "member"), (GenericTag, "generic")]
 
 
-def _serialize_timber_tags(ticket: Any) -> List[Dict[str, str]]:
+def _serialize_timber_tags(ticket: Optional['Ticket']) -> List[Dict[str, str]]:
     """Typed tags off a timber ticket, as {"kind", "name"} sorted by both.
 
     Only TimberTicket carries tags. A tag class with no wire name is skipped
@@ -971,7 +990,9 @@ _DEBUG_DRAWING_VIEWS: List[Tuple[str, List[float], List[float], List[float]]] = 
 # is scaffolding, so it just picks a common sheet.
 _DEBUG_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
 
-def _placed_by_role(viewports, ids, page: Dict[str, float]) -> Dict[str, Any]:
+def _placed_by_role(
+    viewports: Sequence['Viewport'], ids: Mapping[str, 'ViewportId'], page: Dict[str, float],
+) -> Dict[str, 'PlacedViewport']:
     """Resolve a drawing's viewports against a page, keyed by what each is for.
 
     By role rather than by id, because the code below knows which view it is
@@ -988,7 +1009,7 @@ def _placed_by_role(viewports, ids, page: Dict[str, float]) -> Dict[str, Any]:
     return {role: placed[str(viewport_id)] for role, viewport_id in ids.items()}
 
 
-def _viewport_spec(placed, **rest: Any) -> Dict[str, Any]:
+def _viewport_spec(placed: 'PlacedViewport', **rest: Any) -> Dict[str, Any]:
     """The wire form of one placed viewport.
 
     The id is the tree's -- a position, "0.1.2" -- and the name is a label that
@@ -1000,7 +1021,7 @@ def _viewport_spec(placed, **rest: Any) -> Dict[str, Any]:
 _DRAWING_EXTENT_PADDING = 1.15
 
 
-def _cut_extent(cut_timber: Any, stock_length: float) -> Tuple[float, float]:
+def _cut_extent(cut_timber: 'CutTimber', stock_length: float) -> Tuple[float, float]:
     """Where the finished piece starts and ends along its own length.
 
     The same distinction the member list draws (see _cut_length): a timber with
@@ -1018,7 +1039,7 @@ def _cut_extent(cut_timber: Any, stock_length: float) -> Tuple[float, float]:
         return 0.0, stock_length
 
 
-def _timber_world_corners(cut_timber: Any) -> List[List[float]]:
+def _timber_world_corners(cut_timber: 'CutTimber') -> List[List[float]]:
     """The 8 corners of a timber's finished piece, in world space."""
     timber = cut_timber.timber
     origin = _vector3_to_floats(timber.get_bottom_position_global())
@@ -1043,7 +1064,7 @@ def _timber_world_corners(cut_timber: Any) -> List[List[float]]:
     return corners
 
 
-def _frame_world_bounds(frame: Any) -> Tuple[List[float], List[float]]:
+def _frame_world_bounds(frame: 'Frame') -> Tuple[List[float], List[float]]:
     """(centre, half_size) of everything in the frame; a unit box if it is empty."""
     lows = [float("inf")] * 3
     highs = [float("-inf")] * 3
@@ -1114,7 +1135,7 @@ def _camera_looking_at_face(normal: List[float], along: List[float]) -> Dict[str
     }
 
 
-def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
+def build_default_drawing_for_debugging(frame: 'Frame') -> Dict[str, Any]:
     """A four-viewport scene over the whole frame: three elevations and a preview.
 
     Testing scaffolding -- see the note at the top of this section. The three
@@ -1439,11 +1460,11 @@ def _frame_from_look_and_up(look: List[float], up_hint: List[float]) -> Dict[str
 
 
 def _preview_viewport(
-    placed,
+    placed: 'PlacedViewport',
     box: OrientedBox,
     page: Dict[str, Any],
     orbit: Dict[str, Any],
-    orient,
+    orient: Callable[[OrientedBox, float], Dict[str, Any]],
 ) -> Dict[str, Any]:
     """The live 3D view beside the elevations, pointed at what is being drawn.
 
@@ -1548,7 +1569,7 @@ def _selection_drawing_name(entries: List[Dict[str, Any]], total: int) -> str:
     return f"{len(entries)} members"
 
 
-def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[str, Any]:
+def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dict[str, Any]:
     """A drawing of the selected members, on a sheet.
 
     One timber is drawn the way a piece is drawn for the shop: its four long
@@ -1703,13 +1724,13 @@ def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, Any, str]:
     )
 
 
-def serialize_feature_path(path: Any) -> Dict[str, Any]:
+def serialize_feature_path(path: 'FeaturePath') -> Dict[str, Any]:
     """A feature reference as the viewer and the file hold it. See kumiki.csg.feature_paths."""
     from kumiki.csg.feature_paths import serialize_feature_path as serialize
     return serialize(path)
 
 
-def deserialize_feature_path(source: Any) -> Optional[Any]:
+def deserialize_feature_path(source: Any) -> Optional['FeaturePath']:
     """The reference a wire form names, or None. See kumiki.csg.feature_paths."""
     from kumiki.csg.feature_paths import deserialize_feature_path as deserialize
     return deserialize(source)
@@ -1826,8 +1847,9 @@ def _measurement_plane(
 
 
 def _picked_located(
-    feature_hits: List[Any], feature_label: Optional[str], edge: Any, owner: Any,
-):
+    feature_hits: List['OwnedFeatureHit'], feature_label: Optional[str], edge: Optional['CSGFeature'],
+    owner: 'CutCSG',
+) -> Optional['LocatedPick']:
     """The picked feature, its owner, and what it lies on, or None.
 
     One lookup for the anchor and the geometry both, so the two cannot end up
@@ -1843,7 +1865,9 @@ def _picked_located(
     return (hit.feature, hit.owner, hit.feature.locate_simple_unbounded(hit.owner))
 
 
-def _pick_from_candidate(local_csg: Any, hit: Any):
+def _pick_from_candidate(
+    local_csg: 'CutCSG', hit: 'OwnedFeatureHit',
+) -> Optional[Tuple[List[str], 'CutCSG', str, str, Optional['CSGFeature'], Optional['CSGFeature']]]:
     """Everything a pick needs, for one chosen feature at the point.
 
     Returns (path, node, label, type, edge, declared_edge), or None when the
@@ -1875,8 +1899,8 @@ def _pick_from_candidate(local_csg: Any, hit: Any):
 
 
 def _best_matching_candidate(
-    feature_hits: List[Any],
-    timber: Any,
+    feature_hits: List['OwnedFeatureHit'],
+    timber: 'PerfectTimberWithin',
     held_geometry: Optional[Dict[str, Any]],
     look: Optional[List[float]],
     payload: Optional[Dict[str, Any]] = None,
@@ -1918,8 +1942,8 @@ def _best_matching_candidate(
 
 
 def _pick_verdict(
-    state: Any, located_pick: Any, timber: Any,
-    payload: Dict[str, Any], slot_state: Any,
+    state: RunnerState, located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin',
+    payload: Dict[str, Any], slot_state: Optional[SlotState],
 ) -> Optional[Dict[str, Any]]:
     """What a measurement to this pick would be, as one object.
 
@@ -1996,7 +2020,7 @@ def _pick_verdict(
     }
 
 
-def _pick_space(payload: Dict[str, Any]) -> Any:
+def _pick_space(payload: Dict[str, Any]) -> 'MeasurementSpace':
     """Which space a pick is judged in: the sheet's, or the model's.
 
     The viewer says, because it is the one that knows which view the pointer is
@@ -2030,7 +2054,8 @@ def _kinds_for_pair(
 
 
 def _pick_placement(
-    state: Any, located_pick: Any, timber: Any, payload: Dict[str, Any], slot_state: Any,
+    state: RunnerState, located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: Dict[str, Any],
+    slot_state: Optional[SlotState],
 ) -> Dict[str, Any]:
     """Where a measurement to this pick would sit: its anchors, or its corner.
 
@@ -2098,13 +2123,13 @@ def _pick_placement(
             "angle": None, "settled": settled}
 
 
-def _root_csg_of(ss: Any, member_key: Optional[str]):
+def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']:
     cached = (getattr(ss, "mesh_cache", None) or {}).get(member_key) or {}
     return cached.get("local_csg")
 
 
 def _plane_for_pick(
-    located_pick: Any, timber: Any, payload: Dict[str, Any],
+    located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
     """The plane a measurement to this pick would be taken on, or None.
 
@@ -2123,7 +2148,7 @@ def _plane_for_pick(
         held_geometry, geometry, payload.get("heldAt"), anchor, look)
 
 
-def _serialize_code_measure(measure: Any, frame: Any) -> Optional[Dict[str, Any]]:
+def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[Dict[str, Any]]:
     anchors = measure.wire_anchors(frame)
     if anchors is None:
         log_stderr("Warning: a measurement's feature is not in this frame, so it is left out.")
@@ -2230,7 +2255,7 @@ def _file_measurements_by_viewport(entry: Optional[Dict[str, Any]]) -> Dict[str,
 def _measurements_by_viewport(
     declared: Any,
     override: Optional[Dict[str, Any]],
-    frame: Any,
+    frame: 'Frame',
 ) -> Dict[str, List[Dict[str, Any]]]:
     """A drawing's measurements, merged tier over tier, under each viewport.
 
@@ -2293,7 +2318,7 @@ def _read_drawings_file(path: Path) -> List[Dict[str, Any]]:
     ]
 
 
-def _member_keys_for_timbers(frame: Any, timbers: List[Any]) -> List[str]:
+def _member_keys_for_timbers(frame: 'Frame', timbers: List[Any]) -> List[str]:
     """The member keys of the timbers a code drawing holds. Frame has checked they are its own."""
     keys: List[str] = []
     for timber in timbers or []:
@@ -2303,7 +2328,7 @@ def _member_keys_for_timbers(frame: Any, timbers: List[Any]) -> List[str]:
     return keys
 
 
-def _drawing_from_code(frame: Any, declared: Any) -> Dict[str, Any]:
+def _drawing_from_code(frame: 'Frame', declared: Any) -> Dict[str, Any]:
     """Turn what the frame asked for into a scene the viewer can render."""
     member_keys = _member_keys_for_timbers(frame, list(declared.timbers))
     scene = create_drawing_from_selection(frame, member_keys)
@@ -2314,7 +2339,7 @@ def _drawing_from_code(frame: Any, declared: Any) -> Dict[str, Any]:
 
 
 def add_measurement(
-    frame: Any,
+    frame: 'Frame',
     example_path: Optional[Path],
     pending: List[Dict[str, Any]],
     drawing_id: str,
@@ -2351,7 +2376,7 @@ def _viewer_measure_identity(measure: Dict[str, Any]) -> Tuple[Any, str]:
 
 
 def _measurement_slot(
-    frame: Any,
+    frame: 'Frame',
     example_path: Optional[Path],
     pending: List[Dict[str, Any]],
     drawing_id: str,
@@ -2397,7 +2422,7 @@ def _measurement_slot(
 
 
 def update_measurement(
-    frame: Any,
+    frame: 'Frame',
     example_path: Optional[Path],
     pending: List[Dict[str, Any]],
     drawing_id: str,
@@ -2428,7 +2453,7 @@ def update_measurement(
 
 
 def _merged_measurement(
-    frame: Any, example_path: Optional[Path], pending: List[Dict[str, Any]],
+    frame: 'Frame', example_path: Optional[Path], pending: List[Dict[str, Any]],
     drawing_id: str, viewport_id: str, measure: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
     """The measurement as the viewer sees it, tiers merged, or None if it is not there."""
@@ -2445,7 +2470,7 @@ def _merged_measurement(
 
 
 def delete_measurement(
-    frame: Any,
+    frame: 'Frame',
     example_path: Optional[Path],
     pending: List[Dict[str, Any]],
     drawing_id: str,
@@ -2479,7 +2504,7 @@ def delete_measurement(
 
 
 def restore_measurement(
-    frame: Any,
+    frame: 'Frame',
     example_path: Optional[Path],
     pending: List[Dict[str, Any]],
     drawing_id: str,
@@ -2532,7 +2557,7 @@ def _measurement_holder(
 
 
 def collect_drawings(
-    frame: Any,
+    frame: 'Frame',
     example_path: Optional[Path],
     pending: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
@@ -2610,14 +2635,14 @@ def collect_drawings(
     return drawings
 
 
-def scalar_of(value: float):
+def scalar_of(value: float) -> float:
     """A float as the exact scalar the geometry code multiplies by."""
     from kumiki.rule import scalar
 
     return scalar(repr(float(value)))
 
 
-def _line_intervals(located: Any, csg: Any, reach: float, near: Any):
+def _line_intervals(located: 'Line', csg: 'CutCSG', reach: float, near: Any) -> Optional[List[Interval]]:
     """Where a line lies on one solid, as intervals along its own direction.
 
     None when the solid cannot say -- which is different from an empty list,
@@ -2639,7 +2664,7 @@ def _line_intervals(located: Any, csg: Any, reach: float, near: Any):
             for piece in pieces]
 
 
-def _declared_line_span(feature: Any, node: Any, located: Any):
+def _declared_line_span(feature: 'CSGFeature', node: 'CutCSG', located: 'Line') -> Optional[Interval]:
     """Where a feature says its own line ends, as an interval along it, or None.
 
     Exact, and asked of the feature rather than found by clipping, so there is
@@ -2670,8 +2695,8 @@ def _intersected_spans(one: List[Any], other: List[Any]) -> List[Any]:
 
 
 def _intersected_line_pieces(
-    located: Any, solids: List[Any], reach: float, near: Any, declared=None,
-):
+    located: 'Line', solids: List[Any], reach: float, near: Any, declared: Optional[Interval] = None,
+) -> List[Interval]:
     """Where a line lies on all of these solids, as intervals along it.
 
     Intervals rather than segments because that is what makes this exact: a line
@@ -2695,7 +2720,7 @@ def _intersected_line_pieces(
     return intervals or []
 
 
-def _projects_to_a_point(direction: Sequence[float], plane_normal: Sequence[float]) -> bool:
+def _projects_to_a_point(direction: Sequence[float], plane_normal: 'VectorLike') -> bool:
     """Whether a line seen from this plane draws as a point rather than a line.
 
     The same threshold the viewer projects by -- a line a hair off end-on still
@@ -2708,7 +2733,7 @@ def _projects_to_a_point(direction: Sequence[float], plane_normal: Sequence[floa
         > 1 - ALIGNMENT_EPSILON
 
 
-def _edge_outward_normal(feature: Any, node: Any, timber: Any) -> Optional[Tuple[float, ...]]:
+def _edge_outward_normal(feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin') -> Optional[Tuple[float, ...]]:
     """Which way is out of the material across an edge, or None.
 
     An arris bisects the two faces that form it, so the way out of it is the
@@ -2749,17 +2774,18 @@ def _edge_outward_normal(feature: Any, node: Any, timber: Any) -> Optional[Tuple
     return tuple(_normalize(total))
 
 
-def _direction_to_world(direction: Any, timber: Any) -> List[float]:
+def _direction_to_world(direction: Any, timber: 'PerfectTimberWithin') -> List[float]:
     """A direction rotated into world space."""
     rotated = timber.transform.local_to_global_direction(direction)
     return [rotated[i, 0] for i in range(3)]
 
 
 def _measure_span(
-    feature: Any, node: Any, timber: Any, located: Any, root_csg: Any,
-    plane_normal: Optional[Sequence[float]],
+    feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
+    root_csg: Optional['CutCSG'],
+    plane_normal: Optional['VectorLike'],
     in_three_d: bool = False,
-) -> Optional[Any]:
+) -> Optional['MeasureSpan']:
     """What a feature is, where the measurement is being taken.
 
     See MeasureSpan. The extent comes from what the feature occupies once
@@ -2836,7 +2862,7 @@ def _measure_span(
             return None
         middle = cropped.centroid()
         geometry = _located_geometry(located, timber)
-        if middle is None or geometry is None:
+        if middle is None or not isinstance(geometry, Plane):
             return None
         at = to_world(middle)
         normal = _normalize(_vector3_to_floats(geometry.normal))
@@ -2870,7 +2896,7 @@ def _measure_span(
 
 
 def _resolve_measurement(
-    frame: Any, measure: Dict[str, Any], view: Optional[Any] = None,
+    frame: 'Frame', measure: Dict[str, Any], view: Optional['ViewAxes'] = None,
 ) -> Dict[str, Any]:
     """A measurement with its anchors found, or marked as not findable.
 
@@ -3012,7 +3038,7 @@ def _measure_end_name(measure: Dict[str, Any], key: str) -> str:
 
 def _settled_measurement(
     resolved: Dict[str, Any], declared: Any, kind: Any, admitted: Any,
-    in_three_d: bool, plane: Any, view: Optional[Any],
+    in_three_d: bool, plane: Any, view: Optional['ViewAxes'],
 ) -> Dict[str, Any]:
     """What this measurement comes to, decided here and sent with it.
 
@@ -3077,7 +3103,7 @@ def _settled_measurement(
     return settled
 
 
-def _settled_form(geometry: Any, in_three_d: bool, plane: Any) -> Dict[str, Any]:
+def _settled_form(geometry: Optional['Located'], in_three_d: bool, plane: Any) -> Dict[str, Any]:
     """What one end behaves as, in the shape the viewer's own forms took.
 
     Settled here so the rule has one implementation; what crosses is the answer.
@@ -3101,7 +3127,7 @@ def _settled_form(geometry: Any, in_three_d: bool, plane: Any) -> Dict[str, Any]
     return {"form": "none"}
 
 
-def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional[Any]:
+def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional['ViewAxes']:
     """A viewport's camera frame, as the measurement code wants it."""
     from kumiki.drawings.drawing import ViewAxes
 
@@ -3119,7 +3145,7 @@ def _attach_measurements(
     scene: Dict[str, Any],
     by_viewport: Dict[str, List[Dict[str, Any]]],
     drawing_name: str,
-    frame: Any,
+    frame: 'Frame',
 ) -> None:
     """Put each viewport's measurements on the viewport they belong to.
 
@@ -3190,7 +3216,7 @@ def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
         if key not in ("origin", "dirty", "unplaceableMeasurements", "overriddenBy", "dangling")
     }
 
-    def keepers(measures):
+    def keepers(measures: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
         return [
             {key: value for key, value in measure.items() if key != "origin"}
             for measure in (measures or [])
@@ -3244,29 +3270,29 @@ def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> s
 # compares nothing meaningful otherwise.
 
 
-def _labelled_candidates(node: Any, label: str) -> List[Any]:
+def _labelled_candidates(node: 'CutCSG', label: str) -> List[Any]:
     from kumiki.csg.feature_paths import labelled_candidates
     return labelled_candidates(node, label)
 
 
-def _candidate_segments(node: Any) -> Dict[int, str]:
+def _candidate_segments(node: 'CutCSG') -> Dict[int, str]:
     from kumiki.csg.feature_paths import candidate_segments
     return candidate_segments(node)
 
 
-def _find_csg_by_labels(csg: Any, labels: Tuple[str, ...]) -> Optional[Any]:
+def _find_csg_by_labels(csg: 'CutCSG', labels: Tuple[str, ...]) -> Optional['CutCSG']:
     from kumiki.csg.feature_paths import find_csg_by_labels
     return find_csg_by_labels(csg, labels)
 
 
-def _csg_roots_of(cut_timber: Any) -> List[Any]:
+def _csg_roots_of(cut_timber: 'CutTimber') -> List[Any]:
     return [
         cut.negative_csg for cut in (getattr(cut_timber, "cuts", None) or [])
         if getattr(cut, "negative_csg", None) is not None
     ]
 
 
-def _located_geometry(located: Any, timber: Any) -> Optional[Any]:
+def _located_geometry(located: Optional['Located'], timber: 'PerfectTimberWithin') -> Optional['Located']:
     """A feature's unbounded geometry, in world space.
 
     The same Point, Line or Plane the CSG located, carried out of the timber's
@@ -3299,7 +3325,7 @@ def _located_geometry(located: Any, timber: Any) -> Optional[Any]:
     return None
 
 
-def _geometry_payload(geometry: Any) -> Optional[Dict[str, Any]]:
+def _geometry_payload(geometry: Optional['Located']) -> Optional[Dict[str, Any]]:
     """One of those, in the shape the viewer reads.
 
     The wire keeps the mapping form -- a "kind" and two lists -- because that is
@@ -3319,7 +3345,7 @@ def _geometry_payload(geometry: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _geometry_from_wire(value: Optional[Dict[str, Any]]) -> Optional[Any]:
+def _geometry_from_wire(value: Optional[Dict[str, Any]]) -> Optional['Located']:
     """The other direction: what the viewer sent, as the primitive it describes.
 
     The held end of a half-made measurement comes back this way -- the viewer
@@ -3345,13 +3371,14 @@ def _geometry_from_wire(value: Optional[Dict[str, Any]]) -> Optional[Any]:
     return None
 
 
-def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, Any]]:
+def _located_geometry_payload(located: Optional['Located'], timber: 'PerfectTimberWithin') -> Optional[Dict[str, Any]]:
     """A feature's unbounded geometry, in world space, as the viewer wants it."""
     return _geometry_payload(_located_geometry(located, timber))
 
 
 def _feature_anchor(
-    feature: Any, node: Any, timber: Any, located: Any, root_csg: Any = None,
+    feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
+    root_csg: Optional['CutCSG'] = None,
 ) -> Optional[List[float]]:
     """Where to attach a dimension to this feature, in world space.
 
@@ -3414,7 +3441,7 @@ def _feature_anchor(
     return _vector3_to_floats(timber.transform.local_to_global(extent.anchor))
 
 
-def _timber_body_csg(cut_timber: Any) -> Optional[Any]:
+def _timber_body_csg(cut_timber: 'CutTimber') -> Optional['CutCSG']:
     from kumiki.csg.feature_paths import timber_body_csg
     try:
         return timber_body_csg(cut_timber)
@@ -3422,28 +3449,28 @@ def _timber_body_csg(cut_timber: Any) -> Optional[Any]:
         return None
 
 
-def _roots_for_path(cut_timber: Any, labels: Tuple[str, ...]) -> Tuple[List[Any], Tuple[str, ...]]:
+def _roots_for_path(cut_timber: 'CutTimber', labels: Tuple[str, ...]) -> Tuple[List[Any], Tuple[str, ...]]:
     from kumiki.csg.feature_paths import roots_for_path
     return roots_for_path(cut_timber, labels)
 
 
-def _find_declared_feature(cut_timber: Any, ref: Any) -> Optional[Tuple[Any, Any]]:
+def _find_declared_feature(cut_timber: 'CutTimber', ref: Any) -> Optional[Tuple[Any, Any]]:
     """The feature a FeatureRef names, with the node declaring it."""
     from kumiki.csg.feature_paths import find_declared_feature
     hit = find_declared_feature(cut_timber, ref)
     return None if hit is None else (hit.feature, hit.owner)
 
 
-def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def resolve_anchor(frame: 'Frame', anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Where one feature is, on its own. See _resolve_anchor_placed for the pair."""
     placed = _resolve_anchor_placed(frame, anchor, None)
     return None if placed is None else placed[0]
 
 
 def _resolve_anchor_placed(
-    frame: Any, anchor: Optional[Dict[str, Any]], plane: Optional['VectorLike'],
+    frame: 'Frame', anchor: Optional[Dict[str, Any]], plane: Optional['VectorLike'],
     solid_space: bool = False,
-):
+) -> Optional[Tuple[Dict[str, Any], Optional['MeasureSpan']]]:
     """Where the feature an anchor names actually is, in world space.
 
     None when it cannot be found, so the caller shows the measurement as broken.
@@ -3457,12 +3484,17 @@ def _resolve_anchor_placed(
     if handle is None:
         return None
     cut_timber = frame.cut_timber_of(handle.timber)
+    if cut_timber is None:
+        return None
     root_csg = cut_timber.render_timber_with_cuts_csg_local()
     located = handle.feature.locate_simple_unbounded(handle.owner)
     return _anchor_payload(handle.feature, handle.owner, handle.timber, located, root_csg, plane, solid_space)
 
 
-def _anchor_payload(feature, node, timber, located, root_csg, plane, solid_space=False):
+def _anchor_payload(
+    feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
+    root_csg: 'CutCSG', plane: Optional['VectorLike'], solid_space: bool = False,
+) -> Tuple[Dict[str, Any], Optional['MeasureSpan']]:
     """What one end of a measurement is: where it is, what it lies on, its extent.
 
     The span is what the pairwise rules need and the anchor is what they fall
@@ -3476,7 +3508,7 @@ def _anchor_payload(feature, node, timber, located, root_csg, plane, solid_space
     }, span)
 
 
-def _reference_features_payload(timber: Any, root_csg: Any = None) -> List[Dict[str, Any]]:
+def _reference_features_payload(timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None) -> List[Dict[str, Any]]:
     """A timber's reference features, as world-space lines for the viewer to light.
 
     Of the perfect timber: a line runs the timber's length, and a face or center plane
@@ -3499,7 +3531,7 @@ def _reference_features_payload(timber: Any, root_csg: Any = None) -> List[Dict[
     axes = [vector(timber.orientation.matrix[:, column]) for column in (0, 1)]
     sizes = [float(timber.size[0]), float(timber.size[1])]
 
-    def run(point):
+    def run(point: List[float]) -> Tuple[List[float], List[float]]:
         """The line through *point* along the timber, from its bottom end to its top."""
         start = plus(point, along, dot(plus(origin, point, -1.0), along))
         return start, plus(start, along, length)
@@ -3537,7 +3569,7 @@ def _reference_features_payload(timber: Any, root_csg: Any = None) -> List[Dict[
 
 
 def _cropped_reference_segments(
-    timber: Any, root_csg: Any, segments: List[Any], through_material: bool,
+    timber: 'PerfectTimberWithin', root_csg: 'CutCSG', segments: List[Any], through_material: bool,
 ) -> List[Any]:
     """*segments* (world space) cut down to where the cut timber still has them.
 
@@ -3575,7 +3607,7 @@ def _cropped_reference_segments(
     return kept
 
 
-def feature_highlights(slot_state: Any, references: Sequence[Any]) -> List[Dict[str, Any]]:
+def feature_highlights(slot_state: SlotState, references: Sequence[Any]) -> List[Dict[str, Any]]:
     """What to light for each feature reference, in the shape a pick answer has.
 
     For features nobody is pointing at -- a measurement's ends. A reference that no
@@ -3584,7 +3616,7 @@ def feature_highlights(slot_state: Any, references: Sequence[Any]) -> List[Dict[
     return [_feature_highlight(slot_state, reference) for reference in references]
 
 
-def _feature_highlight(slot_state: Any, reference: Any) -> Dict[str, Any]:
+def _feature_highlight(slot_state: SlotState, reference: Any) -> Dict[str, Any]:
     from kumiki.csg.feature_paths import resolve_feature_path
     from kumiki.identity import SingleFeaturePath
 
@@ -3616,7 +3648,7 @@ def _feature_highlight(slot_state: Any, reference: Any) -> Dict[str, Any]:
     return result
 
 
-def serialize_layers(frame: Any, frame_parts: Sequence[Tuple[str, Any]] = ()) -> Dict[str, Any]:
+def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()) -> Dict[str, Any]:
     """Build the data payload consumed by the viewer's Layers panel.
 
     With several *frame_parts* -- a file's @frame functions shown as one -- it also says
@@ -3759,7 +3791,7 @@ def _serialize_frame_parts(
     return parts
 
 
-def _frame_has_assembly_freedoms(frame: Any) -> bool:
+def _frame_has_assembly_freedoms(frame: 'Frame') -> bool:
     """Cheap gate mirroring solve_frame_assembly's: does any joint member
     declare an assembly freedom? (No solving involved.)"""
     source_joints = list(getattr(frame, "source_joints", ()) or ())
@@ -3782,7 +3814,7 @@ def _assembly_float(value: Any) -> float:
 
 
 def _build_assembly_payload(
-    frame: Any,
+    frame: 'Frame',
     timber_entries: List[Dict[str, Any]],
     accessory_entries: List[Dict[str, Any]],
     should_cancel: Optional[Any] = None,
@@ -3877,7 +3909,7 @@ def _build_assembly_payload(
     }
 
 
-def _serialize_feature(feature: Any) -> Dict[str, Any]:
+def _serialize_feature(feature: 'CSGFeature') -> Dict[str, Any]:
     """One declared feature, with the metadata the tree view wants to show."""
     return {
         "name": feature.name,
@@ -3987,7 +4019,7 @@ def serialize_cut_csg_tree(cut_timber: 'CutTimber') -> Dict[str, Any]:
         None, _candidate_segments(local_csg))}
 
 
-def _module_file_path(module: Any) -> Optional[Path]:
+def _module_file_path(module: ModuleType) -> Optional[Path]:
     module_file = getattr(module, "__file__", None)
     if not module_file:
         return None
@@ -4043,7 +4075,7 @@ def _looks_like_frame(value: Any) -> bool:
     return hasattr(value, "cut_timbers") and hasattr(value, "accessories")
 
 
-def _module_patterns(module: Any) -> List[Any]:
+def _module_patterns(module: ModuleType) -> List[Any]:
     """The module's @pattern functions as Patterns, in source order. Empty if it marks none."""
     decorators = _frame_decorators()
     if decorators is None or not hasattr(decorators, "module_patterns"):
@@ -4082,7 +4114,7 @@ def _module_name_for_path(file_path: Path) -> str:
     return ".".join(parts)
 
 
-def load_module_from_path(file_path: Path, verbose: bool = False) -> Any:
+def load_module_from_path(file_path: Path, verbose: bool = False) -> ModuleType:
     """Load a Python module from file path with aggressive cache invalidation.
     
     This function ensures that:
@@ -4170,7 +4202,7 @@ def _accepts_an_argument(entry: Any) -> bool:
     )
 
 
-def _call_frame_entry(callable_entry: Any, kiwari: Optional[Any] = None) -> Any:
+def _call_frame_entry(callable_entry: Any, kiwari: Optional['Kiwari'] = None) -> Any:
     """Build a frame, handing it *kiwari* if it is willing to take one."""
     with contextlib.redirect_stdout(sys.stderr):
         if _accepts_an_argument(callable_entry):
@@ -4282,7 +4314,7 @@ def _write_parameters_file(slot_state: SlotState) -> str:
     return str(path)
 
 
-def _bind_kiwari_values(kiwari: Optional[Any], values: Optional[Mapping[str, Any]]) -> Optional[Any]:
+def _bind_kiwari_values(kiwari: Optional['Kiwari'], values: Optional[Mapping[str, Any]]) -> Optional[Any]:
     """*kiwari* with *values* laid over it, or None if there is no kiwari yet."""
     if kiwari is None:
         return None
@@ -4350,7 +4382,7 @@ def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
     )
 
 
-def _frame_decorators() -> Optional[Any]:
+def _frame_decorators() -> Optional[ModuleType]:
     """kumiki.frame_decorators, or None on a kumiki from before @frame (0.8.0), where no file can use it."""
     try:
         import kumiki.frame_decorators as frame_decorators
@@ -4359,14 +4391,14 @@ def _frame_decorators() -> Optional[Any]:
     return frame_decorators
 
 
-def _build_frame_entry(function: Any, name: str, kiwari: Optional[Any]) -> Any:
+def _build_frame_entry(function: Any, name: str, kiwari: Optional['Kiwari']) -> Any:
     """One @frame, built with the values for its own kiwari, or None on a first build."""
     with contextlib.redirect_stdout(sys.stderr):
         result = function(kiwari)
     return _coerce_viewable_frame(result, name)
 
 
-def _origin_of(kiwari: Any) -> Any:
+def _origin_of(kiwari: 'Kiwari') -> Any:
     # A kumiki from before Kiwari.origin shares nothing between frames.
     return getattr(kiwari, "origin", kiwari)
 
@@ -4386,7 +4418,7 @@ def _group_kiwaris(built: List["tuple[str, Any]"]) -> Tuple[KiwariGroup, ...]:
 
 
 def resolve_frame_from_module(
-    module: Any, incoming: Optional[Mapping[str, Any]] = None,
+    module: ModuleType, incoming: Optional[Mapping[str, Any]] = None,
 ) -> "tuple[Any, Optional[Any], Tuple[KiwariGroup, ...], Tuple[tuple[str, Any], ...]]":
     """Resolve a frame from a loaded module, each of its frames built with *incoming*'s kiwari.
 
@@ -4605,7 +4637,7 @@ def make_error_response(request_id: Any, command: str, exc: Exception) -> Dict[s
     }
 
 
-def get_member_result(frame: Any, member_name: str) -> Dict[str, Any]:
+def get_member_result(frame: 'Frame', member_name: str) -> Dict[str, Any]:
     for cut_timber in frame.cut_timbers:
         if get_timber_display_name(cut_timber.timber) == member_name:
             return {
@@ -4622,7 +4654,7 @@ def get_member_result(frame: Any, member_name: str) -> Dict[str, Any]:
 # CSG navigation + highlight-mesh extraction (Phase B)
 # ===========================================================================
 
-def _build_inv_transform_float(transform: Any) -> Tuple[List[List[float]], List[float]]:
+def _build_inv_transform_float(transform: 'Transform') -> Tuple[List[List[float]], List[float]]:
     """Pre-compute float data for global→local.  Returns (rot_cols, position).
     local = R^T * (global - pos) where rot_cols is the FORWARD rotation matrix."""
     M = transform.orientation.matrix
@@ -4658,7 +4690,9 @@ def _inv_transform_direction(rot: List[List[float]], global_dir: List[float]) ->
     ]
 
 
-def _local_ray_from_payload(payload, rot, pos):
+def _local_ray_from_payload(
+    payload: Dict[str, Any], rot: List[List[float]], pos: List[float],
+) -> Optional[LocalRay]:
     """The pointer's ray in timber-local space, or None if it did not send one.
 
     None is ordinary rather than a fault: a pick can be made without a ray (the
@@ -4832,7 +4866,7 @@ def _label_name(labeled: Any) -> Optional[str]:
     return getattr(getattr(labeled, "label", None), "name", None)
 
 
-def _declared_feature_names(csg: Any) -> List[str]:
+def _declared_feature_names(csg: 'CutCSG') -> List[str]:
     """Names of the features *csg* declares, in declaration order."""
     names: List[str] = []
     for declared in csg.get_declared_features():
@@ -4841,18 +4875,18 @@ def _declared_feature_names(csg: Any) -> List[str]:
     return names
 
 
-def _to_v3(pt: List[float]) -> Any:
+def _to_v3(pt: List[float]) -> 'V3':
     """Wrap a plain [x, y, z] in the V3 kumiki's CSG API expects."""
     from kumiki.rule import create_v3
     return create_v3(float(pt[0]), float(pt[1]), float(pt[2]))
 
 
-def _csg_contains_point(csg: Any, local_pt: List[float], eps: float = 1e-4) -> bool:
+def _csg_contains_point(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> bool:
     """True if *local_pt* (timber-local floats) is inside *csg*, within *eps*."""
     return csg.contains_point(_to_v3(local_pt), eps)
 
 
-def _csg_point_on_boundary(csg: Any, local_pt: List[float], eps: float = 1e-4) -> bool:
+def _csg_point_on_boundary(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> bool:
     """True if *local_pt* (timber-local floats) lies on the boundary of *csg*, within *eps*.
 
     These two are thin adapters over kumiki's own CutCSG methods. kigumi used to
@@ -4896,7 +4930,7 @@ def _nearest_timber_local_face_name(normal: Any) -> str:
     return best_name
 
 
-def _feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
+def _feature_at(csg: 'CutCSG', point: Any, eps: float) -> Optional['CSGFeature']:
     """The best feature at a point, preferring one somebody named.
 
     Two passes over the same hit list rather than find_first_feature, because the
@@ -4922,7 +4956,7 @@ def _feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
             return hit.feature
     return hits[0].feature
 
-def _describe_leaf_csg(csg: Any, local_pt: List[float], eps: float = 1e-4) -> str:
+def _describe_leaf_csg(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> str:
     """What to call the part of primitive *csg* that *local_pt* lies on.
 
     A leaf's own account of itself: one primitive, one point, one string, and
@@ -5001,7 +5035,7 @@ def _node_positions(root: 'CutCSG') -> Dict[int, Tuple[int, int, List[str]]]:
     return node_positions(root)
 
 
-def _derived_feature_owner(root: 'CutCSG', derived: Any) -> Optional[Tuple[Any, List[str]]]:
+def _derived_feature_owner(root: 'CutCSG', derived: 'CSGFeature') -> Optional[Tuple[Any, List[str]]]:
     """Which node a derived edge or point is shown under, and its path.
 
     A plane-plane edge belongs to two CSGs at once -- the shoulder half-space
@@ -5034,7 +5068,7 @@ def _derived_feature_owner(root: 'CutCSG', derived: Any) -> Optional[Tuple[Any, 
     return owner, path
 
 
-def _edge_tolerance() -> Any:
+def _edge_tolerance() -> float:
     """How close a vertex must be to an edge to count as on it.
 
     The same tolerance the edge was found with -- an edge is selected by
@@ -5050,12 +5084,12 @@ _DECLARED_EDGE_FLOAT_NOISE = 1e-6
 
 
 def _cropped_edge_segments(
-    edge_feature: Any,
-    line: Any,
-    timber: Any,
-    root_csg: Any,
-    owner: Any = None,
-):
+    edge_feature: 'CSGFeature',
+    line: 'Line',
+    timber: 'PerfectTimberWithin',
+    root_csg: 'CutCSG',
+    owner: Optional['CutCSG'] = None,
+) -> Tuple[Optional[List[Dict[str, List[float]]]], bool]:
     """The edge's line, clipped to where the edge actually exists.
 
     Returns (segments, absent). Each segment is a {"start", "end"} pair in world
@@ -5124,7 +5158,7 @@ def _cropped_edge_segments(
 
     declared = _declared_line_span(edge_feature, owner, line) if owner is not None else None
 
-    def clipped(tolerance):
+    def clipped(tolerance: float) -> Optional[List[Interval]]:
         found = spans(crop_line_to_boundary_segments_on_csg(
             line, root_csg, seed_reach=reach, near=near, tolerance=tolerance))
         if found is None:
@@ -5191,10 +5225,10 @@ def _cropped_edge_segments(
 
 
 def _edge_highlight_segments(
-    edge_feature: Any,
+    edge_feature: 'CSGFeature',
     owner: 'CutCSG',
-    timber: Any,
-    root_csg: Any,
+    timber: 'PerfectTimberWithin',
+    root_csg: 'CutCSG',
 ) -> Tuple[Optional[List[Dict[str, List[float]]]], bool]:
     """Where a selected edge runs, in world space, and whether it is there at all.
 
@@ -5227,7 +5261,9 @@ def _edge_highlight_segments(
     return _cropped_edge_segments(edge_feature, line, timber, root_csg, owner)
 
 
-def _non_real_highlight_segments(feature: Any, owner: 'CutCSG', timber: Any):
+def _non_real_highlight_segments(
+    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
+) -> Optional[List[Dict[str, List[float]]]]:
     """Where a non-real feature is drawn: its own extent, in world space.
 
     NOT cropped to the cut solid the way a real edge is. A bore's axis lies in
@@ -5249,9 +5285,9 @@ def _non_real_highlight_segments(feature: Any, owner: 'CutCSG', timber: Any):
 
 
 def _features_at_point(
-    root: 'CutCSG', local_pt: List[float], eps: float, tolerances: Any = None,
-    local_ray: Optional[Tuple[List[float], List[float]]] = None,
-) -> List[Any]:
+    root: 'CutCSG', local_pt: List[float], eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
+    local_ray: Optional[LocalRay] = None,
+) -> List['OwnedFeatureHit']:
     """Every feature the WHOLE tree sees at the click, best first.
 
     Asked of the root rather than the node navigation landed on: a derived edge
@@ -5273,7 +5309,10 @@ def _features_at_point(
     return _merge_ray_hits(root, hits, local_ray, resolved)
 
 
-def _merge_ray_hits(root, hits, local_ray, tolerances):
+def _merge_ray_hits(
+    root: 'CutCSG', hits: List['OwnedFeatureHit'], local_ray: LocalRay,
+    tolerances: 'FeatureTestTolerances',
+) -> List['OwnedFeatureHit']:
     """*hits*, plus the void-dwelling features the ray passes through, re-sorted.
 
     Kept apart from find_all_features because it is not a geometric question
@@ -5290,7 +5329,9 @@ def _merge_ray_hits(root, hits, local_ray, tolerances):
     return _sort_feature_hits(hits + extra) if extra else hits
 
 
-def _non_real_features_along_ray(root, local_ray, tolerances):
+def _non_real_features_along_ray(
+    root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
+) -> List['OwnedFeatureHit']:
     """Non-real features the ray passes close to, in timber-local space.
 
     ONLY non-real ones. A real feature is on the boundary, so the ray's own hit
@@ -5313,9 +5354,9 @@ def _non_real_features_along_ray(root, local_ray, tolerances):
     if direction is None:
         return []
     tolerance = float(tolerances.edge)
-    found: List[Any] = []
+    found: List['OwnedFeatureHit'] = []
 
-    def consider(feature, owner):
+    def consider(feature: 'CSGFeature', owner: 'CutCSG') -> None:
         # A non-real POINT would want a point-to-ray distance; nothing declares
         # one yet, so there is nothing here to guess at.
         if not isinstance(feature.locate_simple_unbounded(owner), Line):
@@ -5327,7 +5368,7 @@ def _non_real_features_along_ray(root, local_ray, tolerances):
         if _ray_reaches_segment(origin, direction, ends, tolerance):
             found.append(OwnedFeatureHit(feature=feature, owner=owner))
 
-    def walk(node):
+    def walk(node: 'CutCSG') -> None:
         for feature in node.get_declared_features():
             if not feature.real:
                 consider(feature, node)
@@ -5346,7 +5387,9 @@ def _unit_or_none(vector: List[float]) -> Optional[List[float]]:
     return [float(c) / length for c in vector]
 
 
-def _ray_reaches_segment(origin, direction, ends, tolerance) -> bool:
+def _ray_reaches_segment(
+    origin: List[float], direction: List[float], ends: Tuple[List[float], List[float]], tolerance: float,
+) -> bool:
     """Whether the ray passes within *tolerance* of the segment between *ends*.
 
     Plain floats throughout: this is a screen-space snap run on every hover, and
@@ -5385,7 +5428,7 @@ def _ray_reaches_segment(origin, direction, ends, tolerance) -> bool:
     gap = [on_segment[i] - on_ray[i] for i in range(3)]
     return math.sqrt(dot(gap, gap)) <= tolerance
 
-def _resolve_derived_feature(hits: List[Any]) -> Optional[Any]:
+def _resolve_derived_feature(hits: List['OwnedFeatureHit']) -> Optional['CSGFeature']:
     """The DERIVED edge or point under the click, if one is the best answer there.
 
     Only derived. A timber's own arris is an edge as well, and a declared
@@ -5555,7 +5598,7 @@ def _outward_normal_and_face(
     return as_floats, _nearest_timber_local_face_name(normal)
 
 
-def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[float]] = None, eps: float = 1e-4) -> Any:
+def _resolve_csg_at_path(csg: 'CutCSG', path: List[str], local_pt: Optional[List[float]] = None, eps: float = 1e-4) -> 'CutCSG':
     """Walk the CSG tree following *path* of labeled CSG nodes.
 
     Searches through unlabeled intermediate Difference/SolidUnion nodes
@@ -5564,7 +5607,7 @@ def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[floa
     """
     from kumiki.csg.cutcsg import SolidUnion, Difference
 
-    def _find_labeled(node: Any, label_name: str) -> List[Any]:
+    def _find_labeled(node: 'CutCSG', label_name: str) -> List[Any]:
         """Return all descendants of *node* with the given *label*, searching
         through unlabeled compound intermediaries."""
         results: List[Any] = []
@@ -5615,7 +5658,7 @@ def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[floa
 
 
 def _navigate_csg_one_level(
-    node: Any,
+    node: 'CutCSG',
     local_pt: List[float],
     current_path: List[str],
     eps: float = 1e-4,
@@ -5636,7 +5679,7 @@ def _navigate_csg_one_level(
     if segments is None:
         segments = _candidate_segments(node)
 
-    def step(child: Any) -> Tuple[List[str], Any, Optional[str]]:
+    def step(child: 'CutCSG') -> Tuple[List[str], Any, Optional[str]]:
         """The move onto *child*."""
         segment = segments.get(id(child))
         if segment:
@@ -5664,7 +5707,7 @@ def _navigate_csg_one_level(
 
 
 def _navigate_csg_to_leaf(
-    csg: Any,
+    csg: 'CutCSG',
     local_pt: List[float],
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
@@ -5686,12 +5729,12 @@ def _navigate_csg_to_leaf(
 
 
 def _pick_reference(
-    local_csg: Any,
+    local_csg: 'CutCSG',
     member_key: str,
     node_path: List[str],
     feature_label: Optional[str],
     feature_type: Optional[str],
-    edge: Any = None,
+    edge: Optional['CSGFeature'] = None,
 ) -> Optional[Dict[str, Any]]:
     """The reference a measurement would hold for what was just picked.
 
@@ -5724,7 +5767,7 @@ def _pick_reference(
     ))
 
 
-def _aabb_filter(csg: Any, eps: float):
+def _aabb_filter(csg: 'CutCSG', eps: float) -> Optional[Callable[[List[float]], bool]]:
     """A cheap "could this point be on *csg*" test, or None if it cannot help.
 
     None when the box says nothing useful -- a solid unbounded in every
@@ -5762,7 +5805,7 @@ def _aabb_filter(csg: Any, eps: float):
     if all(low is None and high is None for low, high in limits):
         return None
 
-    def inside(point) -> bool:
+    def inside(point: List[float]) -> bool:
         for axis, (low, high) in enumerate(limits):
             value = point[axis]
             if low is not None and value < low:
@@ -5777,15 +5820,15 @@ def _aabb_filter(csg: Any, eps: float):
 def _extract_highlight_mesh(
     mesh_vertices: List[float],
     mesh_indices: List[int],
-    target_csg: Any,
+    target_csg: 'CutCSG',
     timber_rot: List[List[float]],
     timber_pos: List[float],
     eps: float = 1e-4,
-    root_csg: Optional[Any] = None,
+    root_csg: Optional['CutCSG'] = None,
     selected_path: Optional[List[str]] = None,
     selected_ref: Optional[Any] = None,
     feature_label: Optional[str] = None,
-    edge_feature: Optional[Any] = None,
+    edge_feature: Optional['CSGFeature'] = None,
     feature_type: Optional[str] = None,
 ) -> Tuple[List[float], List[int], int, int]:
     """Extract triangles belonging to *target_csg* from the rendered mesh.
@@ -5841,7 +5884,7 @@ def _extract_highlight_mesh(
         if inside_box is not None and not inside_box(local_c):
             continue
         if _csg_point_on_boundary(target_csg, local_c, eps):
-            if owner_path is not None:
+            if owner_path is not None and root_csg is not None:
                 owner = _resolve_csg_at_path(root_csg, owner_path, local_c, eps)
                 if owner is not selected_ref:
                     continue
@@ -5909,7 +5952,7 @@ def _handle_hover_feature_at_point(
     return _handle_find_csg_at_point(state, payload, slot_state)
 
 
-def _pick_tolerances(payload: Dict[str, Any], eps: float) -> Any:
+def _pick_tolerances(payload: Dict[str, Any], eps: float) -> 'FeatureTestTolerances':
     """How close a click has to be, given what the viewer says a pixel is worth.
 
     A face is clicked directly, so its slack is the gap between the analytic
@@ -6239,7 +6282,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     return result
 
 
-def _log_pick(member_key, local_pt, tolerances, feature_hits, result) -> None:
+def _log_pick(
+    member_key: str, local_pt: List[float], tolerances: 'FeatureTestTolerances',
+    feature_hits: List['OwnedFeatureHit'], result: Dict[str, Any],
+) -> None:
     """One line per pick saying what was under the pointer, when asked for.
 
     Off unless KIGUMI_PICK_LOG is set, because hover asks this on every rest of
@@ -6730,7 +6776,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         log_stderr(f"[assembly] [{slot_name}] Starting async background assembly solve for frame '{getattr(ss.frame, 'name', '?')}' ({len(ss.frame.cut_timbers)} timbers)...")
         t0 = time.monotonic()
 
-        def _worker():
+        def _worker() -> None:
             try:
                 timber_entries, accessory_entries = _assign_member_keys(ss.frame)
                 payload_data = _build_assembly_payload(
