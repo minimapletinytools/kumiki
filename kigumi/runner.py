@@ -131,6 +131,119 @@ class MeasurementRequest(MeasureWire, total=False):
     changes: MeasureWire
 
 
+class RayWire(TypedDict):
+    origin: Vec3
+    direction: Vec3
+
+
+class TolerancesWire(TypedDict, total=False):
+    """World units, from what a pixel is worth where the pointer is."""
+    edge: float
+    point: float
+
+
+class PickRequest(TypedDict, total=False):
+    """A click or hover on a member: find_csg_at_point, hover_feature_at_point."""
+    slot: str
+    memberKey: str
+    point: Vec3
+    currentPath: List[str]
+    ctrlClick: bool
+    tolerances: Optional[TolerancesWire]
+    ray: Optional[RayWire]
+    candidateIndex: Optional[int]
+    # The end already held while measuring, and the camera to judge the pair by.
+    heldGeometry: Optional[GeometryWire]
+    heldAt: Optional[Vec3]
+    heldReference: Optional[AnchorWire]
+    look: Optional[Vec3]
+    right: Optional[Vec3]
+    up: Optional[Vec3]
+    space: Optional[str]  # "3d" | "projected"
+
+
+class PathPickRequest(TypedDict, total=False):
+    """A pick from the tree: find_csg_by_path."""
+    slot: str
+    memberKey: str
+    path: List[str]
+    featureLabel: Optional[str]
+
+class MeshWire(TypedDict):
+    vertices: List[float]
+    indices: List[int]
+
+
+class SegmentWire(TypedDict):
+    start: Vec3
+    end: Vec3
+
+
+class AnchorPointsWire(TypedDict):
+    a: Vec3
+    b: Vec3
+
+
+class PickPlacementWire(TypedDict):
+    """Where a measurement to the pick would sit. See _pick_placement."""
+    anchors: Optional[AnchorPointsWire]
+    angle: Optional[AngleWire]
+    settled: Optional[SettledWire]
+
+
+class VerdictWire(TypedDict, total=False):
+    """What a measurement to the pick would be. See _pick_verdict."""
+    kinds: List[MeasureKindWire]
+    plane: Optional[PlaneWire]
+    anchors: Optional[AnchorPointsWire]
+    angle: Optional[AngleWire]
+    settled: Optional[SettledWire]
+    reason: Optional[str]
+
+
+class CandidateWire(TypedDict):
+    label: str
+    type: str
+    real: bool
+    derived: bool
+    group: str
+    priority: int
+
+
+class PickStatsWire(TypedDict, total=False):
+    meshWalkMs: float  # not timed for a pick from the tree
+    trianglesMatched: int
+    totalTriangles: int
+
+
+class NodeDescriptionWire(TypedDict, total=False):
+    """The picked node, and the feature on it if one was. See _describe_pick."""
+    nodeKind: str
+    nodeDisplayName: Optional[str]
+    nodeLabel: Optional[str]
+    jointName: Optional[str]
+    featureLabel: Optional[str]
+    featureType: Optional[str]
+    facesToward: Optional[str]
+    outwardNormal: Optional[Vec3]
+
+
+class PickResultWire(NodeDescriptionWire, total=False):
+    """The answer to a click, a hover or a pick from the tree."""
+    memberKey: str
+    path: List[str]
+    reference: Optional[AnchorWire]
+    candidateCount: int
+    candidates: List[CandidateWire]
+    candidateIndex: Optional[int]
+    geometry: Optional[GeometryWire]
+    at: Optional[Vec3]
+    verdict: Optional[VerdictWire]
+    highlightMesh: MeshWire
+    parentHighlightMesh: MeshWire
+    highlightEdgeSegments: List[SegmentWire]
+    stats: PickStatsWire
+
 class CameraWire(TypedDict, total=False):
     right: Vec3
     up: Vec3
@@ -175,6 +288,25 @@ class DrawingWire(TypedDict, total=False):
     dangling: bool
     dirty: bool
     unplaceableMeasurements: Dict[str, List[MeasureWire]]
+
+# --- member entries -------------------------------------------------------------
+#
+# Not wire forms: what _assign_member_keys pairs each member's key with.
+
+class TimberEntry(TypedDict):
+    memberKey: str
+    kumikiEphemeralId: int
+    timber: 'PerfectTimberWithin'
+    cutTimber: 'CutTimber'
+    displayName: str
+
+
+class AccessoryEntry(TypedDict):
+    memberKey: str
+    kumikiEphemeralId: int
+    accessory: 'Accessory'
+    displayName: str
+    type: str
 
 if TYPE_CHECKING:
     # Annotations only. kumiki must NOT be imported at module scope for
@@ -991,15 +1123,15 @@ def serialize_frame(frame: 'Frame') -> Dict[str, Any]:
     }
 
 
-def _assign_member_keys(frame: 'Frame') -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+def _assign_member_keys(frame: 'Frame') -> Tuple[List[TimberEntry], List[AccessoryEntry]]:
     """Compute the same memberKey scheme used by build_real_geometry.
 
     Returns (timber_entries, accessory_entries) with stable ordering.
     Each timber entry: {memberKey, kumikiEphemeralId, timber, cutTimber, displayName}.
     Each accessory entry: {memberKey, kumikiEphemeralId, accessory, displayName, type}.
     """
-    timber_entries: List[Dict[str, Any]] = []
-    accessory_entries: List[Dict[str, Any]] = []
+    timber_entries: List[TimberEntry] = []
+    accessory_entries: List[AccessoryEntry] = []
     key_counts: Dict[str, int] = {}
 
     for cut_timber in frame.cut_timbers:
@@ -1362,7 +1494,7 @@ _LONG_FACE_VIEWS: List[Tuple[str, str, int]] = [
 
 
 
-def _members_world_bounds(entries: List[Dict[str, Any]]) -> Tuple[List[float], List[float]]:
+def _members_world_bounds(entries: List[TimberEntry]) -> Tuple[List[float], List[float]]:
     """(centre, half_size) over the given timber entries."""
     lows = [float("inf")] * 3
     highs = [float("-inf")] * 3
@@ -1456,7 +1588,7 @@ def _world_box(centre: List[float], half_size: List[float]) -> OrientedBox:
     )
 
 
-def _timber_box(entry: Dict[str, Any]) -> OrientedBox:
+def _timber_box(entry: TimberEntry) -> OrientedBox:
     """One timber's own box: its axes, its section, and its cut extent.
 
     The cut extent rather than the stock, for the same reason the elevations use
@@ -1640,7 +1772,7 @@ def _preview_viewport(
     )
 
 
-def _long_face_viewports(entry: Dict[str, Any], page: PageWire,
+def _long_face_viewports(entry: TimberEntry, page: PageWire,
                          placed_by_role: Dict[str, 'PlacedViewport']) -> List[ViewportWire]:
     """The four long sides of one timber, stacked, each square-on to its face."""
     timber = entry["timber"]
@@ -1673,7 +1805,7 @@ def _long_face_viewports(entry: Dict[str, Any], page: PageWire,
 
 
 def _world_elevation_viewports(
-    entries: List[Dict[str, Any]], page: PageWire, placed_by_role: Dict[str, 'PlacedViewport'],
+    entries: List[TimberEntry], page: PageWire, placed_by_role: Dict[str, 'PlacedViewport'],
 ) -> List[ViewportWire]:
     """Front, top and right elevations in world axes, for a group of members."""
     centre, half_size = _members_world_bounds(entries)
@@ -1706,7 +1838,7 @@ def _unique_drawing_id(base: str, taken: set) -> str:
     return candidate
 
 
-def _selection_drawing_name(entries: List[Dict[str, Any]], total: int) -> str:
+def _selection_drawing_name(entries: List[TimberEntry], total: int) -> str:
     """What to call a drawing nobody has named.
 
     One piece is called after the piece, which is what anyone would call it.
@@ -2053,7 +2185,7 @@ def _best_matching_candidate(
     timber: 'PerfectTimberWithin',
     held_geometry: Optional[GeometryWire],
     look: Optional[List[float]],
-    payload: Optional[Dict[str, Any]] = None,
+    payload: Optional[PickRequest] = None,
 ) -> Optional[int]:
     """Which feature under the pointer best finishes the measurement in hand.
 
@@ -2080,7 +2212,7 @@ def _best_matching_candidate(
     for index, hit in enumerate(feature_hits):
         located = hit.feature.locate_simple_unbounded(hit.owner)
         geometry = _located_geometry(located, timber)
-        if not geometry or not _kinds_for_pair(held, geometry, look, payload or {}):
+        if not geometry or not _kinds_for_pair(held, geometry, look, payload or PickRequest()):
             continue
         # Earlier is more specific, so among equals the first wins. Same TYPE as
         # the held end breaks the tie -- an edge matching an edge -- which is
@@ -2093,8 +2225,8 @@ def _best_matching_candidate(
 
 def _pick_verdict(
     state: RunnerState, located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin',
-    payload: Dict[str, Any], slot_state: Optional[SlotState],
-) -> Optional[Dict[str, Any]]:
+    payload: PickRequest, slot_state: Optional[SlotState],
+) -> Optional[VerdictWire]:
     """What a measurement to this pick would be, as one object.
 
     None when no measurement is being made -- an ordinary hover, which is a
@@ -2117,7 +2249,8 @@ def _pick_verdict(
     """
     from kumiki.drawings.drawing import ViewAxes, measures_nothing
 
-    if not payload.get("heldGeometry") or not payload.get("look"):
+    held_geometry, look = payload.get("heldGeometry"), payload.get("look")
+    if not held_geometry or not look:
         return None
     if located_pick is None:
         return {"kinds": [], "plane": None, "anchors": None,
@@ -2131,14 +2264,14 @@ def _pick_verdict(
     # The end already held comes back as the viewer stored it, so it is turned
     # into the shape the rules take. This is the one edge that conversion
     # happens at; everything past it works in primitives.
-    held = _geometry_from_wire(payload["heldGeometry"])
+    held = _geometry_from_wire(held_geometry)
     # The plane comes first and stands whether or not a kind does: where a pair
     # would be measured is a property of the two features and the camera, not of
     # what the pair happens to admit.
     plane = _plane_for_pick(located_pick, timber, payload)
     # Structured, not named: `angle` composes for a 3D angle and is also what
     # every measurement written before spaces called a projected one.
-    admitted = _kinds_for_pair(held, geometry, payload["look"], payload)
+    admitted = _kinds_for_pair(held, geometry, look, payload)
     if not admitted:
         return {"kinds": [], "plane": plane, "anchors": None, "reason": "no-kind"}
     # A kind that comes to nothing is not a kind this pair admits. Asked of the
@@ -2170,7 +2303,7 @@ def _pick_verdict(
     }
 
 
-def _pick_space(payload: Dict[str, Any]) -> 'MeasurementSpace':
+def _pick_space(payload: PickRequest) -> 'MeasurementSpace':
     """Which space a pick is judged in: the sheet's, or the model's.
 
     The viewer says, because it is the one that knows which view the pointer is
@@ -2187,7 +2320,7 @@ def _pick_space(payload: Dict[str, Any]) -> 'MeasurementSpace':
 
 def _kinds_for_pair(
     one: Optional[Any], other: Optional[Any],
-    look: Sequence[float], payload: Dict[str, Any],
+    look: Sequence[float], payload: PickRequest,
 ) -> Tuple[Any, ...]:
     """What a pair admits, judged in whichever space the view is.
 
@@ -2204,9 +2337,9 @@ def _kinds_for_pair(
 
 
 def _pick_placement(
-    state: RunnerState, located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: Dict[str, Any],
+    state: RunnerState, located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: PickRequest,
     slot_state: Optional[SlotState],
-) -> Dict[str, Any]:
+) -> PickPlacementWire:
     """Where a measurement to this pick would sit: its anchors, or its corner.
 
     Both from the same pair of spans and the same rules that place a written
@@ -2223,7 +2356,7 @@ def _pick_placement(
     from kumiki.drawings.drawing import (MeasurementSpace, ViewAxes, angle_rays,
                                 distance_anchors)
 
-    empty = {"anchors": None, "angle": None, "settled": None}
+    empty = PickPlacementWire(anchors=None, angle=None, settled=None)
     held = payload.get("heldReference")
     look = payload.get("look")
     if not held or not look or located_pick is None:
@@ -2278,7 +2411,7 @@ def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']
 
 
 def _plane_for_pick(
-    located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: Dict[str, Any],
+    located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: PickRequest,
 ) -> Optional[PlaneWire]:
     """The plane a measurement to this pick would be taken on, or None.
 
@@ -3980,8 +4113,8 @@ def _assembly_float(value: Any) -> float:
 
 def _build_assembly_payload(
     frame: 'Frame',
-    timber_entries: List[Dict[str, Any]],
-    accessory_entries: List[Dict[str, Any]],
+    timber_entries: List[TimberEntry],
+    accessory_entries: List[AccessoryEntry],
     should_cancel: Optional[Any] = None,
 ) -> Optional[Dict[str, Any]]:
     """Solve the frame's assembly sequence for the viewer's preview timeline.
@@ -4856,7 +4989,7 @@ def _inv_transform_direction(rot: List[List[float]], global_dir: List[float]) ->
 
 
 def _local_ray_from_payload(
-    payload: Dict[str, Any], rot: List[List[float]], pos: List[float],
+    payload: PickRequest, rot: List[List[float]], pos: List[float],
 ) -> Optional[LocalRay]:
     """The pointer's ray in timber-local space, or None if it did not send one.
 
@@ -5254,7 +5387,7 @@ def _cropped_edge_segments(
     timber: 'PerfectTimberWithin',
     root_csg: 'CutCSG',
     owner: Optional['CutCSG'] = None,
-) -> Tuple[Optional[List[Dict[str, List[float]]]], bool]:
+) -> Tuple[Optional[List[SegmentWire]], bool]:
     """The edge's line, clipped to where the edge actually exists.
 
     Returns (segments, absent). Each segment is a {"start", "end"} pair in world
@@ -5394,7 +5527,7 @@ def _edge_highlight_segments(
     owner: 'CutCSG',
     timber: 'PerfectTimberWithin',
     root_csg: 'CutCSG',
-) -> Tuple[Optional[List[Dict[str, List[float]]]], bool]:
+) -> Tuple[Optional[List[SegmentWire]], bool]:
     """Where a selected edge runs, in world space, and whether it is there at all.
 
     An edge is a line, and a highlight built out of triangles can only ever
@@ -5428,7 +5561,7 @@ def _edge_highlight_segments(
 
 def _non_real_highlight_segments(
     feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
-) -> Optional[List[Dict[str, List[float]]]]:
+) -> Optional[List[SegmentWire]]:
     """Where a non-real feature is drawn: its own extent, in world space.
 
     NOT cropped to the cut solid the way a real edge is. A bore's axis lies in
@@ -5622,7 +5755,7 @@ def _describe_pick(
     eps: float,
     feature_label: Optional[str],
     feature_type: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> NodeDescriptionWire:
     """Everything the selection display wants to say about one click.
 
     Kept separate from _describe_leaf_csg, which runs per triangle during
@@ -6097,8 +6230,8 @@ def _extract_highlight_mesh(
 
 
 def _handle_hover_feature_at_point(
-    state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None,
-) -> Dict[str, Any]:
+    state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None,
+) -> PickResultWire:
     """What the pointer is over: the answer a click would give, without clicking.
 
     Deliberately the same code, not a cheaper likeness of it. An outline drawn
@@ -6117,7 +6250,7 @@ def _handle_hover_feature_at_point(
     return _handle_find_csg_at_point(state, payload, slot_state)
 
 
-def _pick_tolerances(payload: Dict[str, Any], eps: float) -> 'FeatureTestTolerances':
+def _pick_tolerances(payload: PickRequest, eps: float) -> 'FeatureTestTolerances':
     """How close a click has to be, given what the viewer says a pixel is worth.
 
     A face is clicked directly, so its slack is the gap between the analytic
@@ -6153,7 +6286,7 @@ def _pick_tolerances(payload: Dict[str, Any], eps: float) -> 'FeatureTestToleran
 ACCESSORY_KEY_PREFIX = "accessory:"
 
 
-def _nothing_at_point(member_key: str) -> Dict[str, Any]:
+def _nothing_at_point(member_key: str) -> PickResultWire:
     """A pick that found nothing, in the shape every pick answer takes.
 
     Every key the viewer reads, so nothing it displays is left holding what the
@@ -6181,7 +6314,7 @@ def _nothing_at_point(member_key: str) -> Dict[str, Any]:
     }
 
 
-def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
+def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Process a find_csg_at_point request and return the result dict."""
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
@@ -6343,7 +6476,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
 
     # When a feature (face) is selected, also extract the parent labeled CSG mesh
     # so the viewer can render the parent dimmer and the feature brighter.
-    parent_hl = None
+    parent_hl: Optional[MeshWire] = None
     if feature_label is not None and parent_csg is not None:
         p_verts, p_idx, _, _ = _extract_highlight_mesh(
             mesh["vertices"],
@@ -6357,11 +6490,11 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
             selected_ref=parent_csg,
         )
         if p_verts:
-            parent_hl = {"vertices": p_verts, "indices": p_idx}
+            parent_hl = MeshWire(vertices=p_verts, indices=p_idx)
 
     mesh_walk_ms = (time.monotonic() - t0) * 1000.0
 
-    result: Dict[str, Any] = {
+    result: PickResultWire = {
         # Echoed back because the viewer can have several timbers selected at
         # once, so it cannot infer which one a result belongs to.
         "memberKey": member_key,
@@ -6449,7 +6582,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
 
 def _log_pick(
     member_key: str, local_pt: List[float], tolerances: 'FeatureTestTolerances',
-    feature_hits: List['OwnedFeatureHit'], result: Dict[str, Any],
+    feature_hits: List['OwnedFeatureHit'], result: PickResultWire,
 ) -> None:
     """One line per pick saying what was under the pointer, when asked for.
 
@@ -6493,7 +6626,7 @@ def _log_pick(
     )
 
 
-def _handle_find_csg_by_path(state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
+def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Resolve a CSG at a known path and return highlight mesh for the viewer."""
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
@@ -6540,7 +6673,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: Dict[str, Any], slot_s
         feature_label=actual_feature_label,
     )
 
-    parent_hl = None
+    parent_hl: Optional[MeshWire] = None
     if actual_feature_label:
         p_verts, p_idx, _, _ = _extract_highlight_mesh(
             mesh["vertices"],
@@ -6554,9 +6687,9 @@ def _handle_find_csg_by_path(state: RunnerState, payload: Dict[str, Any], slot_s
             selected_ref=target_csg,
         )
         if p_verts:
-            parent_hl = {"vertices": p_verts, "indices": p_idx}
+            parent_hl = MeshWire(vertices=p_verts, indices=p_idx)
 
-    result: Dict[str, Any] = {
+    result: PickResultWire = {
         "memberKey": member_key,
         "path": path,
         "featureLabel": actual_feature_label,
@@ -6990,17 +7123,17 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "hover_feature_at_point":
         ss = _resolve_slot(state, payload)
-        result = _handle_hover_feature_at_point(state, payload, ss)
+        result = _handle_hover_feature_at_point(state, cast(PickRequest, payload), ss)
         return state, make_success_response(request_id, command, result), False
 
     if command == "find_csg_at_point":
         ss = _resolve_slot(state, payload)
-        result = _handle_find_csg_at_point(state, payload, ss)
+        result = _handle_find_csg_at_point(state, cast(PickRequest, payload), ss)
         return state, make_success_response(request_id, command, result), False
 
     if command == "find_csg_by_path":
         ss = _resolve_slot(state, payload)
-        result = _handle_find_csg_by_path(state, payload, ss)
+        result = _handle_find_csg_by_path(state, cast(PathPickRequest, payload), ss)
         return state, make_success_response(request_id, command, result), False
 
     # --- Slot management ---
