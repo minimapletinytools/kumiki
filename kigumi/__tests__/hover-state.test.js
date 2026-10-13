@@ -291,6 +291,12 @@ describe('whether redrawing the hover would change anything', () => {
         expect(HoverState.isRefused(refused('front'))).toBe(true);
     });
 
+    test('a refused click does nothing while measuring, and is an ordinary click otherwise', () => {
+        expect(HoverState.clickDoesNothing(refused('front'), true)).toBe(true);
+        expect(HoverState.clickDoesNothing(allowed('front'), true)).toBe(false);
+        expect(HoverState.clickDoesNothing(refused('front'), false)).toBe(false);
+    });
+
     test('a kind it does admit is not', () => {
         expect(HoverState.isRefused(allowed('front'))).toBe(false);
     });

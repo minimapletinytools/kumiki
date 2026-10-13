@@ -32,7 +32,7 @@ describe('feature states', () => {
         const [state] = featureStatesFor({ selection: { key: 'a' }, hover: { key: 'a', refused: true } });
 
         expect(featureStateSummary(state)).toEqual(['a', ['selection', 'hover'], true]);
-        expect(ROLES).toEqual(['selection', 'hover', 'held']);
+        expect(ROLES).toEqual(['selection', 'hover', 'held', 'measurementEnd', 'reference']);
     });
 });
 
@@ -53,5 +53,23 @@ describe('which role a feature is drawn as', () => {
 
     test('no roles, no lead', () => {
         expect(leadingRole({ key: 'k', roles: {} })).toBeNull();
+    });
+});
+
+
+describe('roles with many features at once', () => {
+    const { featureStatesFor: statesFor, leadingRole: lead } = require('../webview/feature-states.js');
+
+    test('a list of sources is a state per feature', () => {
+        const states = statesFor({ reference: [{ key: 'a' }, { key: 'b' }] });
+        expect(states.map((state) => [state.key, Object.keys(state.roles)])).toEqual([
+            ['a', ['reference']], ['b', ['reference']]]);
+    });
+
+    test('a measurement end and a reference give way to the selection, the end before the reference', () => {
+        const [state] = statesFor({ selection: { key: 'a' }, measurementEnd: [{ key: 'a' }], reference: [{ key: 'a' }] });
+        expect(lead(state).role).toBe('selection');
+        const [behind] = statesFor({ measurementEnd: [{ key: 'b' }], reference: [{ key: 'b' }] });
+        expect(lead(behind).role).toBe('measurementEnd');
     });
 });

@@ -35,10 +35,11 @@ const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 // to it without a second implementation; reserved so nothing in python declares
 // one. See .claude/plans/measurement-spec.md.
 const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
-// Only a measurement the file owns can be deleted here. 'code' and 'overridden'
-// both mean the frame's python is still asking for it, and an override is
-// somebody's placement or kind on top of one the code owns.
-const MEASUREMENT_FILE_ORIGIN = 'file';
+// What deleting a measurement does depends on where it comes from. The file's own
+// goes; an override goes and the code's measurement comes back; a code one is
+// marked deleted in the file -- listed greyed, to be put back -- and one already
+// deleted is left alone.
+const MEASUREMENT_CODE_ORIGIN = 'code';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
 const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
@@ -772,6 +773,18 @@ class ViewerSettingsPanel {
                     </select>
                 </label>
                 <label>
+                    <input id="feature-parent-toggle" type="checkbox" .checked=${Boolean(this.app.showFeatureParent)}>
+                    ${t('viewer.options.featureParent')}
+                </label>
+                <label>
+                    ${t('viewer.options.referenceFeatures.label')}
+                    <select id="reference-features-select" .value=${this.app.referenceFeatures || 'drawings'}>
+                        <option value="drawings">${t('viewer.options.referenceFeatures.drawings')}</option>
+                        <option value="always">${t('viewer.options.referenceFeatures.always')}</option>
+                        <option value="never">${t('viewer.options.referenceFeatures.never')}</option>
+                    </select>
+                </label>
+                <label>
                     ${t('viewer.options.edges.label')}
                     <select id="edge-mode-select" .value=${this.app.edgeMode || 'noOverlay'}>
                         <option value="none">${t('viewer.options.edges.none')}</option>
@@ -999,6 +1012,16 @@ class ViewerSettingsPanel {
                         debugEl.style.display = app.debugEnabled ? 'block' : 'none';
                     }
                 },
+            },
+            {
+                id: 'feature-parent-toggle', on: 'change',
+                apply: (el) => app.setShowFeatureParent(el.checked),
+                sync: (el) => { el.checked = Boolean(app.showFeatureParent); },
+            },
+            {
+                id: 'reference-features-select', on: 'change',
+                apply: (el) => app.setReferenceFeatures(el.value),
+                sync: (el) => { el.value = app.referenceFeatures || 'drawings'; },
             },
             {
                 id: 'drawing-ghosts-toggle', on: 'change',
@@ -1481,6 +1504,10 @@ class KigumiViewerApp extends LitElement {
         // What the frame on screen may be adjusted by, or null when it takes
         // nothing. The shape is kiwari-values.js's, not this file's.
         this.kiwariSections = [];
+        // Highlights for features nobody is pointing at. See _highlightState.
+        this._referenceFeaturesByMember = new Map();
+        this._measurementEndHighlights = new Map();
+        this._measurementEndAsked = new Set();
         this.kiwariPanel = new ViewerKiwariPanel(this);
         this.memberListPanel = new MemberListPanel(this, { t });
         this.selectionPanel = new SelectionPanel(this, {
@@ -1499,6 +1526,11 @@ class KigumiViewerApp extends LitElement {
         this.onLightDialPointerMove = this.onLightDialPointerMove.bind(this);
         this.onLightDialPointerUp = this.onLightDialPointerUp.bind(this);
         this.onWindowKeyDown = this.onWindowKeyDown.bind(this);
+        this.onWindowKeyUp = this.onWindowKeyUp.bind(this);
+        this.onWindowBlur = this.onWindowBlur.bind(this);
+        // Whether shift is held: it switches the selection mode, which hover has to follow
+        // while the pointer rests. See pickMode in selection-store.js.
+        this._shiftHeld = false;
         this.onLayerStateChanged = this.onLayerStateChanged.bind(this);
         this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
         this.onCsgTreeRequested = this.onCsgTreeRequested.bind(this);
@@ -1641,6 +1673,9 @@ class KigumiViewerApp extends LitElement {
             this._layersView.addEventListener('kigumi-focus-measurement', (event) => {
                 this._focusMeasurementFrom(event.detail);
             });
+            this._layersView.addEventListener('kigumi-measurement-contextmenu', (event) => {
+                this.showMeasurementContextMenu(event.detail || {});
+            });
             this._layersView.addEventListener('kigumi-toggle-measurements', (event) => {
                 this.setMeasurementsHidden(event.detail && event.detail.hidden);
                 this._layersDrawingsChanged();
@@ -1669,6 +1704,8 @@ class KigumiViewerApp extends LitElement {
         window.removeEventListener('mousedown', this.onWindowContextMenuDismiss);
         window.removeEventListener('resize', this.onWindowResize);
         window.removeEventListener('keydown', this.onWindowKeyDown);
+        window.removeEventListener('keyup', this.onWindowKeyUp);
+        window.removeEventListener('blur', this.onWindowBlur);
         window.removeEventListener('pointermove', this.onGizmoPointerMove);
         window.removeEventListener('pointerup', this.onGizmoPointerUp);
         window.removeEventListener('pointermove', this.onLightDialPointerMove);
@@ -1880,6 +1917,8 @@ class KigumiViewerApp extends LitElement {
         window.addEventListener('pointerup', this.onLightDialPointerUp);
         window.addEventListener('resize', this.onWindowResize);
         window.addEventListener('keydown', this.onWindowKeyDown);
+        window.addEventListener('keyup', this.onWindowKeyUp);
+        window.addEventListener('blur', this.onWindowBlur);
     }
 
     setupThreeScene() {
@@ -2640,6 +2679,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'featureHighlights') {
+            this._setMeasurementEndHighlights(message);
+            return;
+        }
+
         if (message.type === 'csgSelectionResult') {
             this.handleCSGSelectionResult(message);
             return;
@@ -2663,6 +2707,13 @@ class KigumiViewerApp extends LitElement {
             // have a different CSG, so cached trees must not outlive it.
             this.csgTreesByKey.clear();
             this.csgTreeRequests.clear();
+            // A new frame: its reference features, and nothing kept from the last one.
+            this._referenceFeaturesByMember = new Map(
+                ((message.payload && message.payload.timbers) || [])
+                    .filter((timber) => Array.isArray(timber.referenceFeatures) && timber.referenceFeatures.length)
+                    .map((timber) => [timber.memberKey, timber.referenceFeatures]));
+            this._measurementEndHighlights.clear();
+            this._measurementEndAsked.clear();
             if (this._layersView && typeof this._layersView.setLayersPayload === 'function') {
                 this._layersView.setLayersPayload(message.payload || {});
             }
@@ -2994,7 +3045,34 @@ class KigumiViewerApp extends LitElement {
         this.updateCamera();
     }
 
+    /** Shift pressed or released: the selection mode may have changed, so ask the hover again. */
+    _setShiftHeld(held) {
+        if (this._shiftHeld === held) {
+            return;
+        }
+        this._shiftHeld = held;
+        // A hover that found nothing to light has forgotten where it was, so it is
+        // given the pointer again rather than asked again.
+        if (this._hover && !this._hover.askAgain() && this._lastClientX !== undefined) {
+            this._hover.pointerAt(this._lastClientX, this._lastClientY);
+        }
+    }
+
+    onWindowKeyUp(event) {
+        if (event.key === 'Shift') {
+            this._setShiftHeld(false);
+        }
+    }
+
+    /** A key released while the window is away is never heard, so let go of shift here. */
+    onWindowBlur() {
+        this._setShiftHeld(false);
+    }
+
     onWindowKeyDown(event) {
+        if (event.key === 'Shift') {
+            this._setShiftHeld(true);
+        }
         // Tab is checked BEFORE the defaultPrevented guard: it is the focus key,
         // so something else may well have claimed it, and this only acts while
         // the pointer is over a feature -- which is not a moment anyone is
@@ -3072,6 +3150,14 @@ class KigumiViewerApp extends LitElement {
                 this._dropCsgFocus();
             } else {
                 this.selectionManager.clearTimberSelection();
+            }
+            return;
+        }
+        if ((event.key === 'm' || event.key === 'M') && !accel && !event.altKey) {
+            // Measure from this: the same as the button, when it would be offered.
+            if (!this.measureDraft.isActive && this.canStartMeasurement) {
+                event.preventDefault();
+                this.startMeasurementFromFocus();
             }
             return;
         }
@@ -3227,6 +3313,8 @@ class KigumiViewerApp extends LitElement {
         // arrives long after the click that asked.
         this._lastClientX = event.clientX;
         this._lastClientY = event.clientY;
+        // The pointer says whether shift is down, which catches a press the window missed.
+        this._setShiftHeld(Boolean(event.shiftKey));
         // Both thresholds at once: forget a cycled choice on any movement, ask
         // again only once past the slop. See HoverState.pointerAt.
         this._hover.pointerAt(event.clientX, event.clientY);
@@ -3248,9 +3336,10 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         // The same decision a click makes, so hover shows what a click would do
-        // rather than something else. Clicking an unselected timber selects the
-        // whole timber; clicking one already selected drills into it. Only the
-        // second has a feature to ask the runner about.
+        // rather than something else -- shift included, since it switches the
+        // selection mode. Only a pick that reaches a feature has one to ask the
+        // runner about: in timber mode that is a timber already selected, so
+        // with shift held while measuring nothing else lights.
         //
         // The decision also says WHICH member, which is not the nearest one: a
         // click drills into the selected timber wherever it sits along the ray.
@@ -3258,7 +3347,7 @@ class KigumiViewerApp extends LitElement {
         const decision = choosePickAction({
             hits: along.hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
-            shiftKey: false,
+            shiftKey: this._shiftHeld,
             inDrawing: this.selectionManager.inDrawing,
             measuring: this.measureDraft.isActive,
         });
@@ -3351,6 +3440,19 @@ class KigumiViewerApp extends LitElement {
     // -------------------------------------------------------------------------
 
     /** Whether a measurement could be started from what is focused now. */
+    /** The picked feature's reference and world geometry, or null. */
+    get pickedFeature() {
+        const anchor = this._lastPickAnchor;
+        return anchor ? { reference: anchor.reference, geometry: anchor.geometry } : null;
+    }
+
+    /** Have the extension put a description of the selection on the clipboard, for an assistant. */
+    copySelectionForAI(selection) {
+        if (vscode) {
+            vscode.postMessage({ type: 'copySelectionForAI', selection });
+        }
+    }
+
     get canStartMeasurement() {
         return Boolean(this.drawingBetaEnabled
             && this.selectionManager.csgFocus
@@ -3383,18 +3485,24 @@ class KigumiViewerApp extends LitElement {
             feature: this._lastPickAnchor.reference.feature || null,
         });
         this._reaskHover();
+        this._measureStateChanged();
+    }
+
+    /**
+     * A measurement started, finished or was let go of. The info pane says which, and it is
+     * built from scratch rather than bound, so it has to be told.
+     */
+    _measureStateChanged() {
+        if (this.selectionPanel) {
+            this.selectionPanel.updateInfo(this.currentFrameData);
+        }
         this.requestUpdate();
     }
 
     /** A pick came back while a measurement is being made. Offers it to the draft. */
     _measurePicked(message) {
+        // A pick the hover painted red never gets here: handleCSGSelectionResult stops it.
         const anchor = this._anchorFromPick(message);
-        // The same verdict the hover painted red. Refusing here is not a second
-        // judgement: it is the one the colour already promised.
-        if (window.KigumiHover.HoverState.isRefused(message)) {
-            this.reportMeasureRefusal((message.verdict || {}).reason || 'no-kind');
-            return;
-        }
         const viewport = this._resolvePointer(this._lastClientX, this._lastClientY);
         const result = this.measureDraft.confirm(
             anchor, viewport ? viewport.viewport.id : this.activeViewportId);
@@ -3407,6 +3515,7 @@ class KigumiViewerApp extends LitElement {
         }
         this._writeMeasurement(
             result.measurement, (message.verdict && message.verdict.kinds) || null);
+        this._measureStateChanged();
     }
 
     /** What a pick offers as one end of a measurement. */
@@ -3528,7 +3637,7 @@ class KigumiViewerApp extends LitElement {
         this.renderMeasurements();
         this.emitViewerLog('measure-escape', { action: released.action });
         this._reaskHover();
-        this.requestUpdate();
+        this._measureStateChanged();
         return true;
     }
 
@@ -3538,6 +3647,7 @@ class KigumiViewerApp extends LitElement {
         this._measurePreview = null;
         this.undoStacks.suspend(false);
         this._reaskHover();
+        this._measureStateChanged();
     }
 
     _sendMeasurementCommand(payload) {
@@ -3628,12 +3738,8 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * Delete every measurement picked out, where it is the file's own.
-     *
-     * A measurement the frame's code asks for is not the viewer's to remove --
-     * the code asks again the next time it runs -- so it is passed over rather
-     * than refused with a message. The key does nothing for one, which is the
-     * whole of what "there is no delete for it" means.
+     * Delete every measurement picked out. See MEASUREMENT_CODE_ORIGIN for what that
+     * does to each; one already deleted is passed over.
      */
     deleteMarkedMeasurements() {
         if (this.measureDraft.isActive) {
@@ -3642,7 +3748,7 @@ class KigumiViewerApp extends LitElement {
         const drawingId = this.measurementDrawingId;
         const removable = this.selectionManager.getMarkedMeasurements()
             .map((mark) => this.focusedMeasurement(mark.viewportId, mark.measureKey))
-            .filter((found) => found && found.measure.origin === MEASUREMENT_FILE_ORIGIN);
+            .filter((found) => found && !KigumiMeasurements.isDeleted(found.measure));
         if (removable.length === 0) {
             return false;
         }
@@ -3661,21 +3767,67 @@ class KigumiViewerApp extends LitElement {
             this.undoStacks.push(this.frameKey, drawingId, {
                 label: 'delete measurement',
                 redo: payload,
-                undo: {
-                    type: 'addMeasurement',
-                    drawingId,
-                    viewportId: found.viewportId,
-                    a,
-                    b,
-                    measureId: measure.measureId || null,
-                    kind: measure.kind || null,
-                    plane: measure.plane || null,
-                    placement: measure.placement || null,
-                },
+                // A code one was marked deleted, so undoing puts it back. Any other
+                // was taken out of the file, so undoing writes it there again --
+                // for an override, the change it carried.
+                undo: measure.origin === MEASUREMENT_CODE_ORIGIN
+                    ? { ...payload, type: 'restoreMeasurement' }
+                    : {
+                        type: 'addMeasurement',
+                        drawingId,
+                        viewportId: found.viewportId,
+                        a,
+                        b,
+                        measureId: measure.measureId || null,
+                        kind: measure.kind || null,
+                        plane: measure.plane || null,
+                        placement: measure.placement || null,
+                    },
             });
             this._sendMeasurementCommand(payload);
         }
         this.selectionManager.clearMeasurementMarks();
+        return true;
+    }
+
+    /** Put back a code measurement the drawings file deleted. */
+    restoreMeasurement(viewportId, measureKey) {
+        const found = this.focusedMeasurement(viewportId, measureKey);
+        if (!found || !KigumiMeasurements.isDeleted(found.measure)) {
+            return false;
+        }
+        const drawingId = this.measurementDrawingId;
+        const payload = {
+            type: 'restoreMeasurement',
+            drawingId,
+            viewportId: found.viewportId,
+            a: KigumiMeasurements.anchorReference(found.measure.a),
+            b: KigumiMeasurements.anchorReference(found.measure.b),
+            measureId: found.measure.measureId || null,
+        };
+        this.undoStacks.push(this.frameKey, drawingId, {
+            label: 'put back measurement',
+            redo: payload,
+            undo: { ...payload, type: 'deleteMeasurement' },
+        });
+        this._sendMeasurementCommand(payload);
+        return true;
+    }
+
+    /** Right-click on a measurement in a list: a deleted one can be put back. */
+    showMeasurementContextMenu({ viewportId, measureKey, clientX, clientY }) {
+        const found = this.focusedMeasurement(viewportId, measureKey);
+        if (!found || !KigumiMeasurements.isDeleted(found.measure)) {
+            return false;
+        }
+        this.contextMenu.open({
+            x: clientX,
+            y: clientY,
+            title: t('viewer.contextMenu.deletedMeasurement'),
+            items: [{ id: 'restore', label: t('viewer.contextMenu.putBack') }],
+            onChoose: () => this.restoreMeasurement(viewportId, measureKey),
+        });
+        this.requestUpdate();
         return true;
     }
 
@@ -4129,13 +4281,11 @@ class KigumiViewerApp extends LitElement {
             hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
             shiftKey: !!event.shiftKey,
-            // A drawing has no timber selection to drill in from, so a click
-            // goes straight to the feature. Hover asks the same question above
-            // and must get the same answer, or it lights what a click will not
-            // take -- which in a drawing was nothing at all.
+            // The selection mode (pickMode): feature mode in a drawing and while
+            // measuring, timber mode otherwise and with shift held while measuring.
+            // Hover asks the same question above and must get the same answer, or
+            // it lights what a click will not take.
             inDrawing: this.selectionManager.inDrawing,
-            // While an end is held, a click reaches the feature directly, so
-            // the second end can be on a timber that was never selected.
             measuring: this.measureDraft.isActive,
         });
 
@@ -4184,6 +4334,11 @@ class KigumiViewerApp extends LitElement {
         this.emitViewerLog('selection-changed', {
             selectedTimbers: this.selectionManager.getSelectedTimbers(),
         });
+        // What the pointer rests on may light differently now: in timber mode a
+        // timber just selected offers its features.
+        if (this._hover) {
+            this._hover.askAgain();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -4370,6 +4525,12 @@ class KigumiViewerApp extends LitElement {
     }
 
     handleCSGSelectionResult(message) {
+        // While measuring, a click the hover showed as refused does nothing but say why.
+        // Selecting it anyway left a feature selected and no measurement.
+        if (window.KigumiHover.HoverState.clickDoesNothing(message, this.measureDraft.isActive)) {
+            this.reportMeasureRefusal((message.verdict || {}).reason || 'no-kind');
+            return;
+        }
         const path = Array.isArray(message.path) ? message.path : [];
         const featureLabel = message.featureLabel || null;
         // Kept so that "measure from this" has something to start from without
@@ -4509,6 +4670,7 @@ class KigumiViewerApp extends LitElement {
             edgeLineVisibilityPercent: this.edgeLineVisibilityPercent,
             edgeMode: this.edgeMode,
             showDrawingGhosts: this.showDrawingGhosts,
+            showFeatureParent: this.showFeatureParent,
             selected: this.selectionManager.getSelectedTimbers() || [],
             focus: this.selectionManager.csgFocus,
             lit,
@@ -4543,6 +4705,93 @@ class KigumiViewerApp extends LitElement {
      * while the state it belongs to is still the state: a selection highlight
      * from before the focus moved describes a selection nobody has.
      */
+    /**
+     * The ends of the selected measurements, lit.
+     *
+     * Their geometry comes from the runner, asked once per end and kept until the
+     * frame changes. An end not yet answered is asked for here and drawn when the
+     * answer comes back.
+     */
+    _measurementEndSources() {
+        const marks = this.selectionManager ? this.selectionManager.getMarkedMeasurements() : [];
+        const sources = [];
+        const missing = [];
+        for (const mark of marks) {
+            const found = this.focusedMeasurement(mark.viewportId, mark.measureKey);
+            if (!found || KigumiMeasurements.isDeleted(found.measure)) {
+                continue;
+            }
+            for (const anchor of [found.measure.a, found.measure.b]) {
+                const reference = KigumiMeasurements.anchorReference(anchor);
+                if (!reference) {
+                    continue;
+                }
+                const key = 'end:' + JSON.stringify(reference);
+                const lit = this._measurementEndHighlights.get(key);
+                if (lit) {
+                    sources.push(lit);
+                } else if (!this._measurementEndAsked.has(key)) {
+                    this._measurementEndAsked.add(key);
+                    missing.push({ key, reference });
+                }
+            }
+        }
+        if (missing.length && typeof vscode !== 'undefined') {
+            vscode.postMessage({
+                type: 'requestFeatureHighlights',
+                keys: missing.map((one) => one.key),
+                references: missing.map((one) => one.reference),
+            });
+        }
+        return sources;
+    }
+
+    /** The runner's answer for measurement ends: kept by key, drawn from the next frame. */
+    _setMeasurementEndHighlights(message) {
+        const keys = message.keys || [];
+        (message.highlights || []).forEach((highlight, index) => {
+            const key = keys[index];
+            if (!key) {
+                return;
+            }
+            this._measurementEndHighlights.set(key, {
+                key,
+                mesh: highlight.highlightMesh,
+                edgePositions: edgeSegmentPositions(highlight.highlightEdgeSegments),
+                pointAt: window.KigumiHighlights.pointHighlightAt(highlight),
+            });
+        });
+        this.requestUpdate();
+    }
+
+    /**
+     * The timbers' reference features, lit where the option says: in drawings, on
+     * the members the drawing is about; everywhere, on every visible member; or not.
+     */
+    _referenceSources() {
+        const mode = this.referenceFeatures;
+        const inDrawing = Boolean(this.selectionManager && this.selectionManager.inDrawing);
+        if (mode === 'never' || (mode === 'drawings' && !inDrawing)) {
+            return [];
+        }
+        const drawn = this.activeSceneMembers;
+        const { featureKeyOf } = window.KigumiFeatureStates;
+        const sources = [];
+        for (const [memberKey, features] of this._referenceFeaturesByMember) {
+            if (this.isMemberHidden(memberKey) || (drawn && !drawn.has(memberKey))) {
+                continue;
+            }
+            for (const feature of features) {
+                sources.push({
+                    key: featureKeyOf({ memberKey, path: ['reference'], featureLabel: feature.name }),
+                    edgePositions: feature.edgePositions,
+                    primary: Boolean(feature.primary),
+                });
+            }
+        }
+        return sources;
+    }
+
     _highlightState() {
         const focus = this.selectionManager && this.selectionManager.csgFocus;
         const source = this._csgHighlightSource;
@@ -4565,7 +4814,10 @@ class KigumiViewerApp extends LitElement {
                     edgePositions: edgeSegmentPositions(held.highlight.highlightEdgeSegments),
                     pointAt: window.KigumiHighlights.pointHighlightAt(held),
                 } : null,
+                measurementEnd: this._measurementEndSources(),
+                reference: this._referenceSources(),
             }),
+            showFeatureParent: Boolean(this.showFeatureParent),
             policy: this._getSelectionVisualPolicy(
                 this._getSelectionVisualContext().state,
                 1 - (this.unselectedTransparencyPercent / 100)),
@@ -4632,13 +4884,20 @@ class KigumiViewerApp extends LitElement {
             geometry.setPositions(descriptor.positions);
             const material = new THREE.LineMaterial({
                 color: descriptor.color,
-                linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
+                linewidth: descriptor.linewidth || CSG_HIGHLIGHT_EDGE_WIDTH_PX,
                 // Pixel thickness is computed against this, so it tracks the
                 // canvas the way the timbers' own edges do. Kept in step on
                 // resize for EVERY overlay now -- only the selection's line
                 // used to be, so the hover and the held one went thin.
                 resolution: this._getRendererResolution(),
-                depthTest: false,
+                // Over everything, unless the overlay is a mark ON the timber (a
+                // reference feature): then hidden by what is in front, and pulled
+                // a little toward the camera so it does not fight the surface it lies on.
+                depthTest: Boolean(descriptor.depthTest),
+                depthWrite: false,
+                polygonOffset: Boolean(descriptor.depthTest),
+                polygonOffsetFactor: -1,
+                polygonOffsetUnits: -4,
                 transparent: true,
                 opacity: descriptor.opacity,
             });
@@ -4697,6 +4956,7 @@ class KigumiViewerApp extends LitElement {
     _memberState(memberKey, visualContext) {
         return window.KigumiMemberStates.memberStateFor(memberKey, {
             hidden: this.isMemberHidden(memberKey),
+            locked: this.isMemberLocked(memberKey),
             visualContext,
             drawnMembers: this.activeSceneMembers,
         });
@@ -5372,7 +5632,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     renderAssemblyTimeline() {
-        if (!ASSEMBLY_PREVIEW_ENABLED || !this.showAssemblyTimeline) {
+        if (!ASSEMBLY_PREVIEW_ENABLED || !this.showAssemblyTimeline || this.isInDrawing) {
             return '';
         }
         if (this.assemblySolving) {
@@ -5461,6 +5721,18 @@ class KigumiViewerApp extends LitElement {
             this.orbitCenterGizmo = null;
         }
 
+        // The panel first: the cube and the light dial size themselves from it, and
+        // built while it was still hidden on the way back from a drawing they came
+        // out a pixel across.
+        const panel = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#gizmo-panel')
+            : null;
+        if (panel) {
+            const wantsAny = ['cube', 'orbitGizmo', 'projection', 'focus']
+                .some((name) => this.sceneStore.wantsCameraControl(name));
+            panel.style.display = wantsAny ? '' : 'none';
+        }
+
         // The cube's canvas stays mounted either way -- its pointer handlers
         // are bound once at startup and would not survive being unmounted and
         // brought back. Hiding the panel is what makes it go away.
@@ -5475,14 +5747,11 @@ class KigumiViewerApp extends LitElement {
             this.cameraCube = null;
         }
 
-        const panel = this.renderRoot && this.renderRoot.querySelector
-            ? this.renderRoot.querySelector('#gizmo-panel')
-            : null;
-        if (panel) {
-            const wantsAny = ['cube', 'orbitGizmo', 'projection', 'focus']
-                .some((name) => this.sceneStore.wantsCameraControl(name));
-            panel.style.display = wantsAny ? '' : 'none';
+        // Whatever changed size while the panel was hidden is put right now it shows.
+        if (this.cameraCube) {
+            this.cameraCube.resize();
         }
+        this.drawLightDial();
     }
 
     renderCameraControls() {
@@ -5915,11 +6184,12 @@ class KigumiViewerApp extends LitElement {
 
     drawLightDial() {
         const canvas = this.renderRoot.querySelector('#light-dial-c');
-        if (!canvas) {
+        // Hidden, it has no size: drawn now it would be a pixel across when it comes back.
+        if (!canvas || !canvas.clientWidth || !canvas.clientHeight) {
             return;
         }
-        const width = Math.max(1, canvas.clientWidth);
-        const height = Math.max(1, canvas.clientHeight);
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
         const ratio = window.devicePixelRatio || 1;
         canvas.width = Math.floor(width * ratio);
         canvas.height = Math.floor(height * ratio);
@@ -6804,7 +7074,9 @@ class KigumiViewerApp extends LitElement {
 
         for (const viewport of this.viewports) {
             for (const measure of (viewport.spec.measurements || [])) {
-                this._drawMeasurement(overlay, viewport, pageRect, measure);
+                if (!KigumiMeasurements.isDeleted(measure)) {
+                    this._drawMeasurement(overlay, viewport, pageRect, measure);
+                }
             }
         }
         if (!this.activePage) {
@@ -6849,7 +7121,9 @@ class KigumiViewerApp extends LitElement {
         }
         for (const pane of drawing.viewports || []) {
             for (const measure of pane.measurements || []) {
-                this._drawMeasurement(overlay, viewport, pageRect, measure);
+                if (!KigumiMeasurements.isDeleted(measure)) {
+                    this._drawMeasurement(overlay, viewport, pageRect, measure);
+                }
             }
         }
     }
@@ -7306,6 +7580,11 @@ class KigumiViewerApp extends LitElement {
             this.isInDrawing
                 ? window.SELECTION_MODES.DRAWING
                 : window.SELECTION_MODES.MODEL);
+        // A drawing is of the frame assembled. Scrubbed apart in 3D, it goes
+        // back together on the way in, and stays so when you come back out.
+        if (this.isInDrawing) {
+            this.setAssemblyScrubValue(0);
+        }
         this._lastPickAnchor = null;
         this.rebuildViewports();
         this.syncCameraControls();
@@ -7341,6 +7620,20 @@ class KigumiViewerApp extends LitElement {
      * On, they sit far back so the piece can be placed among its neighbours;
      * off, the sheet holds only what is drawn.
      */
+    /** Light a selected feature's parent node as well as the feature. */
+    setShowFeatureParent(enabled) {
+        if (this.displayOptions.set('showFeatureParent', Boolean(enabled))) {
+            this.requestUpdate();
+        }
+    }
+
+    /** Where reference features are lit: 'drawings', 'always' or 'never'. */
+    setReferenceFeatures(mode) {
+        if (this.displayOptions.set('referenceFeatures', mode)) {
+            this.requestUpdate();
+        }
+    }
+
     setDrawingGhostsVisible(enabled) {
         if (!this.displayOptions.set('showDrawingGhosts', Boolean(enabled))) {
             return;
@@ -7406,6 +7699,9 @@ class KigumiViewerApp extends LitElement {
             host.addEventListener('kigumi-save-drawings', () => this.saveDrawings());
             host.addEventListener('kigumi-focus-measurement', (event) => {
                 this._focusMeasurementFrom(event.detail);
+            });
+            host.addEventListener('kigumi-measurement-contextmenu', (event) => {
+                this.showMeasurementContextMenu(event.detail || {});
             });
             host.addEventListener('kigumi-select-drawing-member', (event) => {
                 this.selectionManager.selectTimber(

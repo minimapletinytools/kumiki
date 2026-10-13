@@ -163,6 +163,10 @@ function createVscodeHost() {
             return Promise.resolve(vscode.env.openExternal(vscode.Uri.parse(url)));
         },
 
+        copyText(text) {
+            return Promise.resolve(vscode.env.clipboard.writeText(text));
+        },
+
         updateConfig(key, value) {
             return Promise.resolve(vscode.workspace.getConfiguration('kigumi').update(key, value, vscode.ConfigurationTarget.Workspace));
         },

@@ -11,19 +11,27 @@
     //
     // Pure. highlights.js draws from these. See .claude/plans/render-states.md.
 
-    /** The roles a feature can have. */
-    const ROLES = Object.freeze(['selection', 'hover', 'held']);
+    /**
+     * The roles a feature can have. The last two are for features nobody is
+     * pointing at: an end of a selected measurement, and a timber's reference
+     * feature. Each of those can be many features at once.
+     */
+    const ROLES = Object.freeze(['selection', 'hover', 'held', 'measurementEnd', 'reference']);
 
     /**
      * Which role's look a feature takes when it has several, first match wins.
      * A refused hover leads, because the click would refuse it; then the held
-     * end being measured from; then what a click would take; then the selection.
+     * end being measured from; then what a click would take; then the selection;
+     * then a selected measurement's end; then a reference feature, which is
+     * background and gives way to anything you are doing.
      */
     const ROLE_PRIORITY = Object.freeze([
         { role: 'hover', when: (source) => Boolean(source.refused) },
         { role: 'held' },
         { role: 'hover' },
         { role: 'selection' },
+        { role: 'measurementEnd' },
+        { role: 'reference' },
     ]);
 
     /** The role a feature is drawn as, and its source: { role, source }, or null with no roles. */
@@ -50,22 +58,25 @@
     /**
      * The lit features, merged by key.
      *
-     * `sources` maps a role to null or a source with a `key` (from featureKeyOf)
-     * and the geometry to draw. Returns FeatureStates in the order their keys
-     * first appear, taking the roles in ROLES order.
+     * `sources` maps a role to null, a source, or a list of sources, each with
+     * a `key` (from featureKeyOf) and the geometry to draw. Returns
+     * FeatureStates in the order their keys first appear, taking the roles in
+     * ROLES order.
      */
     function featureStatesFor(sources) {
         const found = sources || {};
         const states = new Map();
         for (const role of ROLES) {
-            const source = found[role];
-            if (!source || !source.key) {
-                continue;
+            const given = found[role];
+            for (const source of (Array.isArray(given) ? given : [given])) {
+                if (!source || !source.key) {
+                    continue;
+                }
+                if (!states.has(source.key)) {
+                    states.set(source.key, { key: source.key, roles: {} });
+                }
+                states.get(source.key).roles[role] = source;
             }
-            if (!states.has(source.key)) {
-                states.set(source.key, { key: source.key, roles: {} });
-            }
-            states.get(source.key).roles[role] = source;
         }
         return Array.from(states.values());
     }

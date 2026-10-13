@@ -133,7 +133,7 @@ class TestRequiredFeatures:
 
         assert {"shoulder", "tenon_top", "tenon_left", "tenon_right", "tenon_front", "tenon_back"} <= names["butt_timber"]
         assert "cap.0" not in names["butt_timber"], "the tenon's back face lies on the shoulder"
-        assert "rough.top" not in names["butt_timber"], "that end runs to infinity"
+        assert "rptw.top" not in names["butt_timber"], "that end runs to infinity"
         assert {"mortise_left", "mortise_right", "mortise_front", "mortise_back"} <= names["receiving_timber"]
         assert "mortise_bottom" not in names["receiving_timber"], "a through mortise's bottom is the opening"
 

@@ -15,7 +15,9 @@
 const TO_EXTENSION = Object.freeze([
     'addMeasurement',
     'assemblyFailureLog',
+    'copySelectionForAI',
     'deleteMeasurement',
+    'restoreMeasurement',
     'findCSGAtPoint',
     'hoverFeatureAtPoint',
     'openKigumiOutput',
@@ -27,6 +29,7 @@ const TO_EXTENSION = Object.freeze([
     'requestDrawings',
     'requestExportFiles',
     'requestExportMember',
+    'requestFeatureHighlights',
     'requestInstallCadqueryOcp',
     'requestRefresh',
     'requestSaveDrawings',

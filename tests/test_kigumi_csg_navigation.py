@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from kumiki import picking
 from kumiki.csg.cutcsg import (
     ConvexPolygonExtrusion,
     EmptyCSG,
@@ -46,6 +47,7 @@ from kumiki.rule import Matrix, Transform, create_v3, inches, scalar
 from kumiki.timber import Frame, PegShape
 from kumiki.csg.triangles import triangulate_cutcsg
 
+from kumiki.csg.feature_paths import find_csg_by_labels, find_declared_feature, roots_for_path, timber_body_csg
 # Generous epsilon: mesh vertices come out of a boolean op, so surface points
 # are only approximately on the analytic primitives. Matches the runner's own
 # raycast epsilon.
@@ -56,6 +58,12 @@ PICK_EPS = 5e-4
 # A segment is numbered only when something shares its label -- the first is
 # bare, which reads as #0. Nothing is doubled here, so every segment is plain.
 TENON_PATH = ["mortise_and_tenon", "tenon_waste", "tenon"]
+
+
+def _resolve_anchor(runner, frame, anchor):
+    """Where one end of a measurement is, on its own."""
+    placed = runner._resolve_anchor_placed(frame, anchor, None)
+    return None if placed is None else placed[0]
 
 
 def _load_runner():
@@ -122,7 +130,7 @@ def _navigate_every_surface_point(csg):
         centroid = [
             (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
         ]
-        path, _target, face_label = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+        path, _target, face_label = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
         found[(tuple(path), face_label)] = found.get((tuple(path), face_label), 0) + 1
     return found
 
@@ -147,7 +155,7 @@ def test_cutcsg_label_name_is_reachable_as_name():
     renaming the field itself."""
     labeled = HalfSpace(normal=create_v3(0, 0, 1), label=CutCSGLabel("shoulder"))
     assert labeled.label.name == "shoulder"
-    assert runner._label_name(labeled) == "shoulder"
+    assert picking.label_name(labeled) == "shoulder"
 
 
 def test_an_unlabeled_csg_reports_no_name():
@@ -155,7 +163,7 @@ def test_an_unlabeled_csg_reports_no_name():
     every node labelled. kigumi must see None here."""
     unlabeled = HalfSpace(normal=create_v3(0, 0, 1))
     assert unlabeled.label == CutCSGLabel.NoLabel()
-    assert runner._label_name(unlabeled) is None
+    assert picking.label_name(unlabeled) is None
 
 
 class TestCSGTreeSerialization:
@@ -213,15 +221,16 @@ class TestCSGTreeSerialization:
         tree = self._tree(mortise_and_tenon_frame, "butt_timber")
         base = tree["children"][0]
         names = {f["name"] for f in base["features"]}
-        assert {"rough.right", "rough.left", "rough.top"} <= names
+        assert {"rptw.right", "rptw.left", "rptw.top"} <= names
         # The four long arrises are declared alongside the faces.
-        assert {"rough.front_left", "rough.back_right"} <= names
+        assert {"rptw.front_left", "rptw.back_right"} <= names
         # The arrises at each end are named too, so a timber's body has a name
         # for every face and every edge it has.
-        assert {"rough.bottom_right", "rough.top_back"} <= names
-        # ROUGH: the rough body meets a joint's shoulder plane and not itself,
+        assert {"rptw.bottom_right", "rptw.top_back"} <= names
+        # PERFECT: a timber with no rough allowance has its rough body lying on its
+        # perfect one (rptw.*). It meets a joint's shoulder plane and not itself,
         # since the arrises it used to make by meeting are named outright now.
-        assert all(f["group"] == "ROUGH" for f in base["features"])
+        assert all(f["group"] == "PERFECT" for f in base["features"])
         # Six faces, four long arrises, eight at the ends, eight corners: every
         # slot the prism offers, so none of its anonymous defaults survive the
         # override.
@@ -330,7 +339,7 @@ class TestNavigateToLeaf:
         )
 
         body_faces = {face for path, face in found if path == body_path}
-        assert body_faces >= {"rough.left", "rough.right", "rough.front", "rough.back"}
+        assert body_faces >= {"rptw.left", "rptw.right", "rptw.front", "rptw.back"}
         assert not any(f.startswith("ptw.") for f in body_faces)
 
     def test_mortise_hole_faces_resolve_to_a_labeled_path(
@@ -352,7 +361,7 @@ class TestResolveCSGAtPath:
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
         local_csg = cut_timber.render_timber_with_cuts_csg_local()
 
-        resolved = runner._resolve_csg_at_path(
+        resolved = picking.resolve_csg_at_path(
             local_csg, TENON_PATH, None, PICK_EPS
         )
         assert resolved is not local_csg
@@ -408,7 +417,7 @@ class TestNonPrismPrimitivesArePickable:
         )
         # On the extrusion's x=2 wall, inside the timber body.
         point = [2.0, 0.0, 15.0]
-        assert runner._csg_point_on_boundary(extrusion, point, PICK_EPS)
+        assert picking.csg_point_on_boundary(extrusion, point, PICK_EPS)
 
     def test_extrusion_cut_resolves_to_its_label_not_the_timber_body(self):
         csg = Difference(base=_timber_prism(), subtract=[
@@ -425,7 +434,7 @@ class TestNonPrismPrimitivesArePickable:
                 label=CutCSGLabel("dovetail_housing"),
             ),
         ])
-        path, target, _face = runner._navigate_csg_to_leaf(csg, [2.0, 0.0, 15.0], PICK_EPS)
+        path, target, _face = picking.navigate_csg_to_leaf(csg, [2.0, 0.0, 15.0], PICK_EPS)
         assert path == ["dovetail_housing"]
         assert isinstance(target, ConvexPolygonExtrusion)
 
@@ -441,7 +450,7 @@ class TestNonPrismPrimitivesArePickable:
             ),
         ])
         # On the bore wall, one radius off the axis.
-        path, target, face = runner._navigate_csg_to_leaf(csg, [1.0, 0.0, 50.0], PICK_EPS)
+        path, target, face = picking.navigate_csg_to_leaf(csg, [1.0, 0.0, 50.0], PICK_EPS)
         assert path == ["peg_hole"]
         assert isinstance(target, Cylinder)
         # The cylinder's own default for its barrel. It used to reach the
@@ -509,7 +518,7 @@ class TestDescribeLeafCsg:
             end_distance=scalar(100),
             feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_right")],
         )
-        assert runner._describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
+        assert picking.describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
 
     def test_a_face_nobody_named_answers_with_the_prisms_own_default(self):
         """No longer the timber-local direction, because nothing is unnamed now.
@@ -521,10 +530,10 @@ class TestDescribeLeafCsg:
         """
         prism = _timber_prism(named=False)
 
-        assert runner._describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "side.0"
-        assert runner._describe_leaf_csg(prism, [-2.0, 0.0, 50.0], PICK_EPS) == "side.2"
-        assert runner._describe_leaf_csg(prism, [0.0, 3.0, 50.0], PICK_EPS) == "side.1"
-        assert runner._describe_leaf_csg(prism, [0.0, 0.0, 100.0], PICK_EPS) == "cap.1"
+        assert picking.describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "side.0"
+        assert picking.describe_leaf_csg(prism, [-2.0, 0.0, 50.0], PICK_EPS) == "side.2"
+        assert picking.describe_leaf_csg(prism, [0.0, 3.0, 50.0], PICK_EPS) == "side.1"
+        assert picking.describe_leaf_csg(prism, [0.0, 0.0, 100.0], PICK_EPS) == "cap.1"
 
     def test_a_shape_that_names_nothing_still_gets_a_label_and_a_warning(self):
         """The fallbacks are kept for the gap, not for the common case.
@@ -554,7 +563,7 @@ class TestDescribeLeafCsg:
 
         with warnings_module.catch_warnings(record=True) as caught:
             warnings_module.simplefilter("always")
-            label = runner._describe_leaf_csg(extrusion, [2.0, 0.0, 50.0], PICK_EPS)
+            label = picking.describe_leaf_csg(extrusion, [2.0, 0.0, 50.0], PICK_EPS)
 
         assert label == "unknown face feature"
         assert any("does not" in str(w.message) for w in caught)
@@ -568,7 +577,7 @@ class TestDescribeLeafCsg:
         plane = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(50)
         )
-        assert runner._describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "side.0"
+        assert picking.describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "side.0"
 
     def test_half_space_named_feature_wins_over_cut_plane(self):
         from kumiki.csg.cutcsg import HalfSpace
@@ -578,7 +587,7 @@ class TestDescribeLeafCsg:
             offset=scalar(50),
             feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder")],
         )
-        assert runner._describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
+        assert picking.describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
 
 
 class TestPickingToleranceIsPerCall:
@@ -594,7 +603,7 @@ class TestPickingToleranceIsPerCall:
         near_miss = create_v3(scalar(0), scalar(0), scalar(-1e-4))
         assert csg.is_point_on_boundary(near_miss, PICK_EPS)
 
-        runner._navigate_csg_to_leaf(csg, [0.0, 0.0, 0.0], PICK_EPS)
+        picking.navigate_csg_to_leaf(csg, [0.0, 0.0, 0.0], PICK_EPS)
 
         assert not csg.is_point_on_boundary(near_miss)
 
@@ -629,7 +638,7 @@ class TestJointAttribution:
         return Frame.from_joints([joint])
 
     def _leaf_at(self, csg, point):
-        _path, target, label = runner._navigate_csg_to_leaf(csg, point, PICK_EPS)
+        _path, target, label = picking.navigate_csg_to_leaf(csg, point, PICK_EPS)
         return target, label
 
     def test_joint_geometry_reports_its_joint(self, named_joint_frame):
@@ -642,7 +651,7 @@ class TestJointAttribution:
                 (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
             ]
             _target, label = self._leaf_at(csg, centroid)
-            if label.startswith("tenon"):
+            if label is not None and label.startswith("tenon"):
                 tenon_point = centroid
                 break
         assert tenon_point is not None, "no tenon face found to click on"
@@ -657,7 +666,7 @@ class TestJointAttribution:
         half_width = float(cut_timber.timber.size[0]) / 2
 
         target, label = self._leaf_at(csg, [half_width, 0.0, 0.3])
-        assert label.startswith("rough.")
+        assert label.startswith("rptw.")
         assert runner._joint_name_for_node(csg, cut_timber, target) is None
 
     def test_a_hand_built_cut_timber_declines_rather_than_guesses(self):
@@ -718,7 +727,7 @@ class TestEdgePicking:
 
     def _to_global(self, cut_timber, local_point):
         transform = cut_timber.timber.transform
-        moved = transform.position + transform.orientation.matrix * runner._to_v3(local_point)
+        moved = transform.position + transform.orientation.matrix * picking.to_v3(local_point)
         return [float(coordinate) for coordinate in moved]
 
     def _point_where(self, local_csg, predicate):
@@ -732,7 +741,7 @@ class TestEdgePicking:
             ]
             candidates.append([sum(v[i] for v in triangle) / 3 for i in range(3)])
             for point in candidates:
-                hit = local_csg.find_first_feature(runner._to_v3(point))
+                hit = local_csg.find_first_feature(picking.to_v3(point))
                 if hit is not None and predicate(hit.feature):
                     return point
         raise AssertionError("no matching point found")
@@ -912,7 +921,7 @@ class TestPickDescription:
     def _describe(self, frame, name, point):
         cut_timber = _cut_timber_by_name(frame, name)
         csg = cut_timber.render_timber_with_cuts_csg_local()
-        _path, target, label = runner._navigate_csg_to_leaf(csg, point, PICK_EPS)
+        _path, target, label = picking.navigate_csg_to_leaf(csg, point, PICK_EPS)
         return runner._describe_pick(target, csg, cut_timber, point, PICK_EPS, label)
 
     def _point_on(self, frame, name, predicate):
@@ -923,7 +932,7 @@ class TestPickDescription:
             centroid = [
                 (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
             ]
-            _p, _t, label = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+            _p, _t, label = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
             if predicate(label):
                 return centroid
         raise AssertionError("no matching surface point found")
@@ -941,7 +950,7 @@ class TestPickDescription:
                                lambda label: label is not None and label.startswith("tenon_"))
 
         # What the first click on that point selects.
-        path, target, label = runner._navigate_csg_one_level(csg, point, [], PICK_EPS)
+        path, target, label = picking.navigate_csg_one_level(csg, point, [], PICK_EPS)
         assert path == ["mortise_and_tenon"] and label is None
         described = runner._describe_pick(target, csg, cut_timber, point, PICK_EPS, label)
 
@@ -957,16 +966,16 @@ class TestPickDescription:
         self, mortise_and_tenon_frame,
     ):
         point = self._point_on(mortise_and_tenon_frame, "butt_timber",
-                               lambda label: label == "rough.right")
+                               lambda label: label == "rptw.right")
         described = self._describe(mortise_and_tenon_frame, "butt_timber", point)
         assert described["nodeKind"] == "RectangularPrism"
         assert described["nodeLabel"] == "timber (rough, extended)"
 
     def test_a_timber_face_describes_itself(self, mortise_and_tenon_frame):
         point = self._point_on(mortise_and_tenon_frame, "butt_timber",
-                               lambda label: label == "rough.right")
+                               lambda label: label == "rptw.right")
         described = self._describe(mortise_and_tenon_frame, "butt_timber", point)
-        assert described["featureLabel"] == "rough.right"
+        assert described["featureLabel"] == "rptw.right"
         assert described["featureType"] == "FACE"
         assert described["jointName"] is None
         assert described["facesToward"] == "right"
@@ -1005,16 +1014,16 @@ class TestPickDescription:
                                lambda label: label == "mortise_back")
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
         csg = cut_timber.render_timber_with_cuts_csg_local()
-        _path, target, _label = runner._navigate_csg_to_leaf(csg, point, PICK_EPS)
+        _path, target, _label = picking.navigate_csg_to_leaf(csg, point, PICK_EPS)
 
-        prism_normal = target.get_outward_normal(runner._to_v3(point), PICK_EPS)
-        composed_normal = csg.get_outward_normal(runner._to_v3(point), PICK_EPS)
+        prism_normal = target.get_outward_normal(picking.to_v3(point), PICK_EPS)
+        composed_normal = csg.get_outward_normal(picking.to_v3(point), PICK_EPS)
         # The prism's own normal points out of the hole and into the material;
         # the wall someone clicked faces the other way.
         assert safe_dot_product(prism_normal, composed_normal) < 0
 
         described = self._describe(mortise_and_tenon_frame, "receiving_timber", point)
-        assert described["facesToward"] == runner._nearest_timber_local_face_name(composed_normal)
+        assert described["facesToward"] == picking.nearest_timber_local_face_name(composed_normal)
 
     def test_it_agrees_with_the_composed_solid_everywhere(self, mortise_and_tenon_frame):
         """The reported direction always matches the finished timber's own normal.
@@ -1038,19 +1047,19 @@ class TestPickDescription:
                     (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0
                     for i in range(3)
                 ]
-                composed = csg.get_outward_normal(runner._to_v3(centroid), PICK_EPS)
+                composed = csg.get_outward_normal(picking.to_v3(centroid), PICK_EPS)
                 if composed is None:
                     continue
-                expected = runner._nearest_timber_local_face_name(composed)
-                _p, target, _l = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
-                normal, faces_toward = runner._outward_normal_and_face(
+                expected = picking.nearest_timber_local_face_name(composed)
+                _p, target, _l = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+                normal, faces_toward = picking.outward_normal_and_face(
                     target, csg, centroid, PICK_EPS)
                 assert faces_toward == expected
                 # The exact normal is reported alongside the nearest-of-six
                 # name, so the display can show both rather than rounding
                 # silently.
                 assert normal is not None and len(normal) == 3
-                assert runner._nearest_timber_local_face_name(normal) == expected
+                assert picking.nearest_timber_local_face_name(normal) == expected
 
 
 class TestSerializedParity:
@@ -1110,8 +1119,8 @@ class TestSerializedParity:
                 centroid = [
                     (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
                 ]
-                _p, target, _l = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
-                point = runner._to_v3(centroid)
+                _p, target, _l = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+                point = picking.to_v3(centroid)
                 own = target.get_outward_normal(point, PICK_EPS)
                 composed = csg.get_outward_normal(point, PICK_EPS)
                 if own is None or composed is None:
@@ -1202,8 +1211,8 @@ class TestJointDisplayName:
             centroid = [
                 (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
             ]
-            _p, target, label = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
-            if label.startswith("tenon"):
+            _p, target, label = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+            if label is not None and label.startswith("tenon"):
                 name = runner._joint_name_for_node(csg, cut_timber, target)
                 assert name == "mortise_and_tenon"
                 return
@@ -1270,9 +1279,9 @@ class TestEdgeHighlightSpan:
         # The shoulder against the timber's own front face: the line you would
         # square across before sawing, and the one pairing the library asks for.
         edge, owner, timber, root = self._edge(
-            mortise_and_tenon_frame, "shoulder", "rough.front")
+            mortise_and_tenon_frame, "shoulder", "rptw.front")
 
-        segment, absent = runner._edge_highlight_segments(edge, owner, timber, root)
+        segment, absent = picking.edge_highlight_segments(edge, owner, timber, root)
 
         assert not absent
         # Exactly the timber's width. This edge lies IN the shoulder's cutting
@@ -1319,7 +1328,7 @@ class TestEdgeHighlightSpan:
         timber = Timber(length=scalar(1), size=create_v2(scalar(0.1), scalar(0.2)),
                         transform=Transform.identity())
 
-        segment, absent = runner._edge_highlight_segments(edge, body, timber, body)
+        segment, absent = picking.edge_highlight_segments(edge, body, timber, body)
 
         assert segment is None
         assert absent, "an edge cropped away to nothing is not merely unknown"
@@ -1341,11 +1350,11 @@ class TestEdgeHighlightSpan:
         found = 0
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
-                point = runner._to_v3([float(vertex[i]) for i in range(3)])
+                point = picking.to_v3([float(vertex[i]) for i in range(3)])
                 for hit in local.find_all_features(point):
                     if hit.feature.feature_type() != CSGFeatureType.EDGE:
                         continue
-                    segment, absent = runner._edge_highlight_segments(
+                    segment, absent = picking.edge_highlight_segments(
                         hit.feature, hit.owner, cut_timber.timber, local)
                     assert not absent, f"{hit.feature.name} vanished"
                     assert segment is not None
@@ -1357,11 +1366,11 @@ class TestEdgeHighlightSpan:
     def test_the_timbers_own_edge_still_runs_its_full_length(self, mortise_and_tenon_frame):
         # The crop must not shorten an edge that really is that long.
         edge, owner, timber, root = self._declared_edge(
-            mortise_and_tenon_frame, "rough.front_left")
+            mortise_and_tenon_frame, "rptw.front_left")
 
-        segments, absent = runner._edge_highlight_segments(edge, owner, timber, root)
+        segments, absent = picking.edge_highlight_segments(edge, owner, timber, root)
 
-        assert not absent
+        assert not absent and segments is not None
         # Nothing cuts this corner, so it survives whole and in one piece.
         assert len(segments) == 1
         assert self._span_mm(segments) == pytest.approx(float(timber.length) * 1000, rel=0.01)
@@ -1397,7 +1406,7 @@ class TestEdgeHighlightSpan:
                 )
                 if edge is None:
                     continue
-                segments, absent = runner._edge_highlight_segments(
+                segments, absent = picking.edge_highlight_segments(
                     edge, first_owner, cut_timber.timber, local)
                 assert segments is not None or absent, (
                     f"{a_name} x {b_name} could not be cropped at all")
@@ -1484,7 +1493,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
             self, oblique_shoulder_frame, name, expected_mm):
         feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
 
-        segments, absent = runner._edge_highlight_segments(feature, owner, timber, root)
+        segments, absent = picking.edge_highlight_segments(feature, owner, timber, root)
 
         assert not absent
         assert self._lengths_mm(segments) == pytest.approx([expected_mm], abs=0.01)
@@ -1502,7 +1511,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
         for name in ("arris.8", "arris.9", "arris.10", "arris.11"):
             feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
 
-            segments, absent = runner._edge_highlight_segments(
+            segments, absent = picking.edge_highlight_segments(
                 feature, owner, timber, root)
 
             assert not absent, name
@@ -1520,7 +1529,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
         for name in ("arris.4", "arris.5", "arris.6", "arris.7"):
             feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
 
-            segments, absent = runner._edge_highlight_segments(
+            segments, absent = picking.edge_highlight_segments(
                 feature, owner, timber, root)
 
             assert segments is None, name
@@ -1546,11 +1555,11 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
             for feature in node.get_declared_features():
                 if feature.feature_type() != CSGFeatureType.EDGE:
                     continue
-                segments, _ = runner._edge_highlight_segments(
+                segments, _ = picking.edge_highlight_segments(
                     feature, node, cut_timber.timber, root)
                 for segment in segments or []:
-                    start = runner._to_v3(segment["start"])
-                    end = runner._to_v3(segment["end"])
+                    start = picking.to_v3(segment["start"])
+                    end = picking.to_v3(segment["end"])
                     for fraction in (0.15, 0.5, 0.85):
                         local = cut_timber.timber.transform.global_to_local(
                             start + (end - start) * scalar(repr(fraction)))
@@ -1587,13 +1596,13 @@ class TestAHousingsInsideEdgeOnAPitchedRafter:
 
         # Where the housing's floor meets its wall, across the middle of the plate.
         local = plate.transform.global_to_local(create_v3(mm(50), 0, mm(35)))
-        best = runner._features_at_point(root, [float(v) for v in local], PICK_EPS)[0]
+        best = picking.features_at_point(root, [float(v) for v in local], PICK_EPS)[0]
         assert best.feature.feature_type() == CSGFeatureType.EDGE
 
-        segments, absent = runner._edge_highlight_segments(best.feature, best.owner, plate, root)
+        segments, absent = picking.edge_highlight_segments(best.feature, best.owner, plate, root)
 
         assert not absent and segments, "the inside edge was picked but nothing was drawn"
-        start, end = runner._to_v3(segments[0]["start"]), runner._to_v3(segments[0]["end"])
+        start, end = picking.to_v3(segments[0]["start"]), picking.to_v3(segments[0]["end"])
         assert abs(float((end - start).norm()) - 0.1 / float(12 / 13)) < 1e-3, "it runs across the plate"
 
 
@@ -1608,7 +1617,7 @@ class TestTheRayReachesASegment:
     ENDS = ([0.0, 0.0, 0.0], [0.0, 0.0, 10.0])
 
     def _reaches(self, origin, direction, tolerance):
-        return runner._ray_reaches_segment(
+        return picking.ray_reaches_segment(
             origin, runner._normalize(direction), self.ENDS, tolerance)
 
     def test_a_ray_straight_through_it_reaches_it(self):
@@ -1638,7 +1647,7 @@ class TestTheRayReachesASegment:
         assert self._reaches([0, 0, -5], [0, 0, 1], 0.01)
 
     def test_a_segment_of_no_length_is_not_reachable(self):
-        assert not runner._ray_reaches_segment(
+        assert not picking.ray_reaches_segment(
             [0, 0, 0], [0, 0, 1], ([1.0, 1.0, 1.0], [1.0, 1.0, 1.0]), 100.0)
 
 
@@ -1647,7 +1656,7 @@ class TestTheRayFromThePayload:
 
     def _identity(self):
         from kumiki.rule import Transform
-        return runner._build_inv_transform_float(Transform.identity())
+        return picking.build_inv_transform_float(Transform.identity())
 
     def test_no_ray_is_not_a_fault(self):
         """A pick can be made without one -- everything on a surface still works."""
@@ -1666,7 +1675,7 @@ class TestTheRayFromThePayload:
         from kumiki.rule import Transform, create_v3, Orientation
         transform = Transform(position=create_v3(10, 20, 30),
                               orientation=Orientation.identity())
-        rot, pos = runner._build_inv_transform_float(transform)
+        rot, pos = picking.build_inv_transform_float(transform)
         origin, direction = runner._local_ray_from_payload(
             {"ray": {"origin": [10, 20, 35], "direction": [0, 0, 1]}}, rot, pos)
 
@@ -1707,9 +1716,9 @@ class TestPickingAlongTheRay:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 local_point = [float(vertex[i]) for i in range(3)]
-                world = timber.transform.local_to_global(runner._to_v3(local_point))
+                world = timber.transform.local_to_global(picking.to_v3(local_point))
                 vertices.extend([float(world[i, 0]) for i in range(3)])
-                offset = runner._to_v3(local_point) - line.point
+                offset = picking.to_v3(local_point) - line.point
                 along = offset - line.direction * (offset.T * line.direction)[0, 0]
                 radial = math.sqrt(float((along.T * along)[0, 0]))
                 if nearest is None or radial < nearest[0]:
@@ -1772,7 +1781,7 @@ class TestPickingAlongTheRay:
         # rel, because the barrel is triangulated as a polygon: its vertices sit
         # a facet's worth inside the true radius.
         assert nearest[0] == pytest.approx(float(owner.radius), rel=1e-3)
-        assert nearest[0] > float(runner._edge_tolerance())
+        assert nearest[0] > float(picking.edge_tolerance())
 
     def test_without_a_ray_the_axis_is_not_even_a_candidate(self, pegged_mortise_and_tenon_frame):
         result, _axis, _owner = self._pick(pegged_mortise_and_tenon_frame)
@@ -1836,7 +1845,7 @@ class TestResolvingADerivedEdge:
         local = cut_timber.render_timber_with_cuts_csg_local()
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
-                point = runner._to_v3([float(vertex[i]) for i in range(3)])
+                point = picking.to_v3([float(vertex[i]) for i in range(3)])
                 for hit in local.find_all_features(point):
                     # Derived specifically: a timber's own arris is an edge as
                     # well, and a declared one, with no parents to name.
@@ -1848,7 +1857,7 @@ class TestResolvingADerivedEdge:
     def _reference(self, frame, local, derived, member_key, kind="EDGE"):
         from kumiki.identity import DerivedFeaturePath, FeatureRef, ResolvedTimberPath
 
-        positions = runner._node_positions(local)
+        positions = picking.node_positions(local)
         return DerivedFeaturePath(
             timber=ResolvedTimberPath.parse(member_key),
             a=FeatureRef(tuple(positions[id(derived.parents[0].owner)][2]), derived.parents[0].feature.name),
@@ -1864,7 +1873,7 @@ class TestResolvingADerivedEdge:
         local, edge = self._picked_edge(mortise_and_tenon_frame)
         reference = self._reference(mortise_and_tenon_frame, local, edge, entry["memberKey"])
 
-        resolved = runner.resolve_anchor(
+        resolved = _resolve_anchor(runner,
             mortise_and_tenon_frame, runner.serialize_feature_path(reference))
 
         assert resolved is not None, f"{reference.describe()} did not resolve"
@@ -1888,7 +1897,7 @@ class TestResolvingADerivedEdge:
         found = None
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
-                point = runner._to_v3([float(vertex[i]) for i in range(3)])
+                point = picking.to_v3([float(vertex[i]) for i in range(3)])
                 for hit in local.find_all_features(point):
                     if isinstance(hit.feature, DerivedPointFeature):
                         found = hit.feature
@@ -1905,7 +1914,7 @@ class TestResolvingADerivedEdge:
         assert wire["kind"] == "point" and wire["type"] == "POINT"
         assert runner.deserialize_feature_path(wire).identity() == reference.identity()
 
-        resolved = runner.resolve_anchor(mortise_and_tenon_frame, wire)
+        resolved = _resolve_anchor(runner, mortise_and_tenon_frame, wire)
         assert resolved is not None, f"{reference.describe()} did not resolve"
         assert resolved["at"] is not None
         assert resolved["geometry"]["kind"] == "point"
@@ -1934,7 +1943,7 @@ class TestResolvingADerivedEdge:
             b=FeatureRef(good.b.csg_path, "renamed_since"),
         )
 
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             mortise_and_tenon_frame, runner.serialize_feature_path(broken)) is None
 
     def test_the_timbers_own_body_is_reachable(self, mortise_and_tenon_frame):
@@ -1942,10 +1951,10 @@ class TestResolvingADerivedEdge:
         # base of the rendered Difference rather than one of the cuts.
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
 
-        body = runner._timber_body_csg(cut_timber)
+        body = timber_body_csg(cut_timber)
 
         assert body is not None
-        assert any(f.name.startswith("rough.") for f in body.get_declared_features())
+        assert any(f.name.startswith("rptw.") for f in body.get_declared_features())
 
 
 class TestSameNamedSiblings:
@@ -1992,8 +2001,8 @@ class TestSameNamedSiblings:
         cut_timber, paths = self._tree_paths(self._frame(), "key_slot")
         local = cut_timber.render_timber_with_cuts_csg_local()
 
-        first = runner._resolve_csg_at_path(local, list(paths[0]))
-        second = runner._resolve_csg_at_path(local, list(paths[1]))
+        first = picking.resolve_csg_at_path(local, list(paths[0]))
+        second = picking.resolve_csg_at_path(local, list(paths[1]))
 
         assert first is not None and second is not None
         assert first is not second
@@ -2003,8 +2012,8 @@ class TestSameNamedSiblings:
         local = cut_timber.render_timber_with_cuts_csg_local()
         beyond = list(paths[0][:-1]) + [paths[0][-1].split("#")[0] + "#7"]
 
-        roots, labels = runner._roots_for_path(cut_timber, tuple(beyond))
-        found = [runner._find_csg_by_labels(root, labels) for root in roots]
+        roots, labels = roots_for_path(cut_timber, tuple(beyond))
+        found = [find_csg_by_labels(root, labels) for root in roots]
 
         assert all(node is None for node in found)
 
@@ -2024,7 +2033,7 @@ class TestPickYieldsAMeasurementReference:
         local = cut_timber.render_timber_with_cuts_csg_local()
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
-                point = runner._to_v3([float(vertex[i]) for i in range(3)])
+                point = picking.to_v3([float(vertex[i]) for i in range(3)])
                 for hit in local.find_all_features(point):
                     if predicate(hit.feature):
                         return local, hit.feature
@@ -2072,7 +2081,7 @@ class TestPickYieldsAMeasurementReference:
         reference = runner._pick_reference(
             local, "butt_timber#0", [], edge.name, "EDGE", edge)
 
-        resolved = runner.resolve_anchor(mortise_and_tenon_frame, reference)
+        resolved = _resolve_anchor(runner, mortise_and_tenon_frame, reference)
 
         assert resolved is not None and resolved["at"] is not None
 
@@ -2100,7 +2109,7 @@ class TestHoveringOverAFeature:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 world = timber.transform.local_to_global(
-                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                    picking.to_v3([float(vertex[i]) for i in range(3)]))
                 vertices.extend([float(world[i, 0]) for i in range(3)])
         mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
 
@@ -2131,9 +2140,9 @@ class TestHoveringOverAFeature:
                        for a, b in ((corners[0], corners[1]), (corners[1], corners[2]),
                                     (corners[2], corners[0]))]
             for local_pt in [centroid] + halfway + corners:
-                found = local.find_all_features(runner._to_v3(local_pt))
+                found = local.find_all_features(picking.to_v3(local_pt))
                 if found and predicate(found[0].feature):
-                    world = timber.transform.local_to_global(runner._to_v3(local_pt))
+                    world = timber.transform.local_to_global(picking.to_v3(local_pt))
                     return [float(world[i, 0]) for i in range(3)]
         raise AssertionError("no such feature on the surface")
 
@@ -2176,7 +2185,7 @@ class TestHoveringOverAFeature:
                                     (corners[2], corners[0]))]
             for vertex in corners + halfway + [centroid]:
                 world = timber.transform.local_to_global(
-                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                    picking.to_v3([float(vertex[i]) for i in range(3)]))
                 payload = {"memberKey": member,
                            "point": [float(world[i, 0]) for i in range(3)],
                            "currentPath": [], "ctrlClick": False}
@@ -2215,7 +2224,7 @@ class TestHoveringOverAFeature:
         }, slot)
 
         assert clicked["featureType"] == "POINT"
-        assert clicked["featureLabel"].startswith("shoulder\u00d7rough.")
+        assert clicked["featureLabel"].startswith("shoulder\u00d7rptw.")
 
         reference = clicked["reference"]
         assert reference is not None
@@ -2223,7 +2232,7 @@ class TestHoveringOverAFeature:
         assert reference["a"]["feature"] and reference["b"]["feature"]
 
         # And it resolves back to somewhere, which is what makes it measurable.
-        resolved = runner.resolve_anchor(mortise_and_tenon_frame, reference)
+        resolved = _resolve_anchor(runner, mortise_and_tenon_frame, reference)
         assert resolved is not None
         assert resolved["geometry"]["kind"] == "point"
 
@@ -2311,7 +2320,7 @@ class TestHoveringOverAFeature:
 
 
         assert result["reference"] is not None
-        assert runner.resolve_anchor(mortise_and_tenon_frame, result["reference"]) is not None
+        assert _resolve_anchor(runner, mortise_and_tenon_frame, result["reference"]) is not None
 
     def test_it_drills_from_where_the_selection_already_is(self, mortise_and_tenon_frame):
         # Hover has to follow the same rules as clicking, or it shows something
@@ -2373,8 +2382,8 @@ class TestTheBroadphase:
         # to, and arrives at nothing the slow way.
         from kumiki.csg.cutcsg import EmptyCSG
 
-        verts, idx, matched, total = runner._extract_highlight_mesh(
-            [0.0] * 9, [0, 1, 2], EmptyCSG(), None, None, 5e-4,
+        verts, idx, matched, total = picking.extract_highlight_mesh(
+            [0.0] * 9, [0, 1, 2], EmptyCSG(), [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]], [0.0, 0, 0], 5e-4,
             feature_label="a\u00d7b", feature_type="EDGE")
 
         assert verts == [] and idx == [] and matched == 0
@@ -2383,18 +2392,20 @@ class TestTheBroadphase:
     def test_a_box_rejects_what_is_outside_it(self, mortise_and_tenon_frame):
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()
-        node = runner._find_csg_by_labels(
-            runner._roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+        node = find_csg_by_labels(
+            roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
 
-        inside = runner._aabb_filter(node, 5e-4)
+        assert node is not None
+        inside = picking.aabb_filter(node, 5e-4)
 
         assert inside is not None
         box = node.get_aabb()
-        middle = [(float(box.min_x) + float(box.max_x)) / 2,
-                  (float(box.min_y) + float(box.max_y)) / 2,
-                  (float(box.min_z) + float(box.max_z)) / 2]
+        low = [float(v) for v in (box.min_x, box.min_y, box.min_z) if v is not None]
+        high = [float(v) for v in (box.max_x, box.max_y, box.max_z) if v is not None]
+        assert len(low) == len(high) == 3
+        middle = [(a + b) / 2 for a, b in zip(low, high)]
         assert inside(middle)
-        assert not inside([float(box.max_x) + 1.0, middle[1], middle[2]])
+        assert not inside([high[0] + 1.0, middle[1], middle[2]])
 
     def test_an_unbounded_solid_cannot_be_filtered(self):
         # A half space has no box worth having, so the walk goes ahead
@@ -2405,17 +2416,17 @@ class TestTheBroadphase:
         unbounded = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)),
                               offset=scalar(0))
 
-        assert runner._aabb_filter(unbounded, 5e-4) is None
+        assert picking.aabb_filter(unbounded, 5e-4) is None
 
     def test_an_empty_solid_rejects_everything(self):
         from kumiki.csg.cutcsg import EmptyCSG
 
-        rejects = runner._aabb_filter(EmptyCSG(), 5e-4)
+        rejects = picking.aabb_filter(EmptyCSG(), 5e-4)
 
         assert rejects is not None
         assert not rejects([0.0, 0.0, 0.0])
 
-    def test_the_highlight_is_the_same_with_the_filter_as_without(self, mortise_and_tenon_frame):
+    def test_the_highlight_is_the_same_with_the_filter_as_without(self, mortise_and_tenon_frame, monkeypatch):
         # The point: faster, not different. A broadphase that changed the answer
         # would be a bug wearing an optimisation's clothes.
         from kumiki.csg.triangles import triangulate_cutcsg
@@ -2427,23 +2438,20 @@ class TestTheBroadphase:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 world = timber.transform.local_to_global(
-                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                    picking.to_v3([float(vertex[i]) for i in range(3)]))
                 verts.extend([float(world[i, 0]) for i in range(3)])
         indices = list(range(len(verts) // 3))
-        rot, pos = runner._build_inv_transform_float(timber.transform)
-        node = runner._find_csg_by_labels(
-            runner._roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+        rot, pos = picking.build_inv_transform_float(timber.transform)
+        node = find_csg_by_labels(
+            roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+        assert node is not None
 
-        with_filter = runner._extract_highlight_mesh(
+        with_filter = picking.extract_highlight_mesh(
             verts, indices, node, rot, pos, 5e-4, root_csg=local)
 
-        original = runner._aabb_filter
-        runner._aabb_filter = lambda csg, eps: None
-        try:
-            without = runner._extract_highlight_mesh(
-                verts, indices, node, rot, pos, 5e-4, root_csg=local)
-        finally:
-            runner._aabb_filter = original
+        monkeypatch.setattr(picking, "aabb_filter", lambda csg, eps: None)
+        without = picking.extract_highlight_mesh(
+            verts, indices, node, rot, pos, 5e-4, root_csg=local)
 
         assert with_filter[0] == without[0]
         assert with_filter[2] == without[2]
@@ -2462,9 +2470,9 @@ class TestAFeatureOnALabelledRoot:
     def _labelled_root(self, frame):
         """A cut timber whose root carries a label AND declares features."""
         for cut_timber in frame.cut_timbers:
-            roots, _ = runner._roots_for_path(cut_timber, ())
+            roots, _ = roots_for_path(cut_timber, ())
             for root in roots:
-                if runner._label_name(root) is not None and root.get_declared_features():
+                if picking.label_name(root) is not None and root.get_declared_features():
                     return cut_timber, root
         return None, None
 
@@ -2483,24 +2491,24 @@ class TestAFeatureOnALabelledRoot:
         _, root = self._labelled_root(rooted)
 
         assert root is not None
-        assert runner._label_name(root) is not None
+        assert picking.label_name(root) is not None
 
     def test_an_empty_path_means_the_node_you_are_on(self, rooted):
         _, root = self._labelled_root(rooted)
 
-        assert runner._find_csg_by_labels(root, ()) is root
+        assert find_csg_by_labels(root, ()) is root
 
     def test_so_a_feature_it_declares_can_be_found_again(self, rooted):
         cut_timber, root = self._labelled_root(rooted)
         name = root.get_declared_features()[0].name
 
-        found = runner._find_declared_feature(
+        found = find_declared_feature(
             cut_timber,
             runner.deserialize_feature_path(
                 {"timber": cut_timber.name, "csgPath": [], "feature": name}).ref)
 
         assert found is not None
-        assert found[0].name == name
+        assert found.feature.name == name
 
 
 class TestChoosingAmongTheFeaturesAtAPoint:
@@ -2523,7 +2531,7 @@ class TestChoosingAmongTheFeaturesAtAPoint:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 world = timber.transform.local_to_global(
-                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                    picking.to_v3([float(vertex[i]) for i in range(3)]))
                 vertices.extend([float(world[i, 0]) for i in range(3)])
         mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
 
@@ -2605,9 +2613,9 @@ class TestChoosingAmongTheFeaturesAtAPoint:
         cut_timber = _cut_timber_by_name(frame, member)
         timber = cut_timber.timber
         local = cut_timber.render_timber_with_cuts_csg_local()
-        rot, pos = runner._build_inv_transform_float(timber.transform)
-        local_pt = runner._inv_transform_point(rot, pos, [float(p) for p in point])
-        return runner._features_at_point(
+        rot, pos = picking.build_inv_transform_float(timber.transform)
+        local_pt = picking.inv_transform_point(rot, pos, [float(p) for p in point])
+        return picking.features_at_point(
             local, local_pt, 5e-4, FeatureTestTolerances(face=5e-4))
 
     def test_a_chosen_face_can_still_be_measured_to(self, mortise_and_tenon_frame):
@@ -2618,7 +2626,7 @@ class TestChoosingAmongTheFeaturesAtAPoint:
         second = runner._handle_find_csg_at_point(
             state, dict(payload, candidateIndex=1), slot)
 
-        assert runner.resolve_anchor(mortise_and_tenon_frame, second["reference"]) is not None
+        assert _resolve_anchor(runner, mortise_and_tenon_frame, second["reference"]) is not None
 
 
 class TestWhatAPickCarriesBack:
@@ -2634,7 +2642,7 @@ class TestWhatAPickCarriesBack:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 world = timber.transform.local_to_global(
-                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                    picking.to_v3([float(vertex[i]) for i in range(3)]))
                 vertices.extend([float(world[i, 0]) for i in range(3)])
         mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
 
@@ -2670,7 +2678,7 @@ class TestWhatAPickCarriesBack:
         # a pair accepted while hovering can be drawn reading zero.
         pick = self._first_pick(mortise_and_tenon_frame, "receiving_timber")
 
-        resolved = runner.resolve_anchor(mortise_and_tenon_frame, pick["reference"])
+        resolved = _resolve_anchor(runner, mortise_and_tenon_frame, pick["reference"])
 
         assert pick["at"] == pytest.approx(resolved["at"])
 
@@ -2732,7 +2740,7 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 world = timber.transform.local_to_global(
-                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                    picking.to_v3([float(vertex[i]) for i in range(3)]))
                 vertices.extend([float(world[i, 0]) for i in range(3)])
         mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
 

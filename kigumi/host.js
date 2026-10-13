@@ -36,6 +36,7 @@
  * @property {(options: {message: string, detail?: string, action: string}) => Promise<boolean>} confirm  modal yes/no
  * @property {(title: string, task: () => Promise<any>) => Promise<any>} withProgress
  * @property {(url: string) => Promise<void>} openExternal
+ * @property {(text: string) => Promise<void>} copyText  to the system clipboard
  * @property {(key: string, value: any) => Promise<void>} updateConfig  `kigumi.<key>`
  * @property {(callback: (affects: (key: string) => boolean) => void) => Disposable} onConfigChange
  * @property {(callback: (change: {filePath, languageId, isDirty, saved}) => void) => Disposable} onDocumentChange

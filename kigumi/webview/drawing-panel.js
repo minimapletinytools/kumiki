@@ -25,6 +25,7 @@
         code: '○',
         overridden: '◐',
         file: '●',
+        deleted: '○',
     };
 
     class DrawingPanel {
@@ -206,9 +207,11 @@
             const focused = this.selectionManager
                 && this.selectionManager.isMeasurementFocused(viewport.id, entry.key);
             const broken = globalScope.KigumiMeasurements.isBroken(entry.status);
+            const deleted = globalScope.KigumiMeasurements.isDeleted(entry);
             row.className = 'dp-row dp-measurement'
-                + (entry.status.drawable ? '' : ' dp-unavailable')
+                + (entry.status.drawable || deleted ? '' : ' dp-unavailable')
                 + (broken ? ' dp-broken' : '')
+                + (deleted ? ' dp-deleted' : '')
                 + (focused ? ' dp-focused' : '');
 
             const origin = document.createElement('span');
@@ -224,7 +227,10 @@
 
             const value = document.createElement('span');
             value.className = 'dp-value';
-            if (entry.status.drawable) {
+            if (deleted) {
+                value.textContent = t('viewer.drawing.deleted');
+                value.classList.add('dp-reason');
+            } else if (entry.status.drawable) {
                 value.textContent = entry.formatted;
             } else {
                 value.textContent = t('viewer.drawing.refused.' + entry.status.reason);
@@ -235,6 +241,15 @@
             row.addEventListener('click', () => this._emit('kigumi-focus-measurement', {
                 viewportId: viewport.id, measureKey: entry.key,
             }));
+            if (deleted) {
+                row.addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                    this._emit('kigumi-measurement-contextmenu', {
+                        viewportId: viewport.id, measureKey: entry.key,
+                        clientX: event.clientX, clientY: event.clientY,
+                    });
+                });
+            }
             return row;
         }
 

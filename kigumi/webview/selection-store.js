@@ -362,22 +362,47 @@
     }
 
     /**
-     * What a click in the 3D view should do, given every member the ray passes
-     * through (nearest first) and what is currently selected.
-     *
-     * While timbers are selected, a click drills into the CSG of the nearest
-     * *selected* timber along the ray -- even one sitting behind an unselected
-     * timber -- so a neighbour in front cannot steal the click while you are
-     * inspecting. Only when the ray misses every selected timber does a click
-     * select something new. Shift always means "change which timbers are
-     * selected", so it acts on the frontmost hit.
-     *
-     * `inDrawing` makes every hit behave as a selected one. A drawing has no
-     * timber selection to drill in from, so without this a click there could
-     * only ever select a timber, and hover -- which asks the same question
-     * before the click -- never lit anything at all.
+     * Timber mode is not offered in drawings for now. Kept working behind this so it can be
+     * turned on: with it, a drawing picks the way the 3D view does.
      */
-    function choosePickAction({ hits, selectedTimbers, shiftKey, inDrawing, measuring }) {
+    const TIMBER_MODE_IN_DRAWINGS = false;
+
+    /**
+     * Which of the two selection modes a pick is in.
+     *
+     * - 'feature': a click goes straight to the feature on the nearest timber, whatever
+     *   is selected.
+     * - 'timber': a click selects a timber; a click on one already selected picks the
+     *   feature on it, wherever it is along the ray.
+     *
+     * In a drawing: feature mode (timber mode only with `timberModeInDrawings`, and then as
+     * in 3D). In 3D: timber mode, until something is held to measure from -- then feature
+     * mode, with shift held for timber mode.
+     */
+    function pickMode({ inDrawing, measuring, shiftKey, timberModeInDrawings = TIMBER_MODE_IN_DRAWINGS }) {
+        if (inDrawing && !timberModeInDrawings) {
+            return 'feature';
+        }
+        return measuring && !shiftKey ? 'feature' : 'timber';
+    }
+
+    /**
+     * What a click should do, given every member the ray passes through (nearest
+     * first) and what is currently selected. Hover asks the same question, so it
+     * lights what a click would take.
+     *
+     * Feature mode goes straight to the nearest feature. In timber mode, a click
+     * drills into the nearest *selected* timber along the ray -- even one sitting
+     * behind an unselected timber, so a neighbour in front cannot steal the click
+     * -- and only when the ray misses every selected timber does it select one.
+     * Outside measuring, shift changes which timbers are selected, so it acts on
+     * the frontmost hit. While measuring, shift is how timber mode is reached: a
+     * click selects the timber in place of the selection, and a click on it then
+     * picks its feature.
+     */
+    function choosePickAction({
+        hits, selectedTimbers, shiftKey, inDrawing, measuring, timberModeInDrawings,
+    }) {
         const along = hits || [];
         if (along.length === 0) {
             return { action: 'clear' };
@@ -386,18 +411,10 @@
             ? selectedTimbers
             : new Set(selectedTimbers || []);
         const nearest = along[0];
-        if (inDrawing || measuring) {
-            // Straight to the feature, from the front. In a drawing there is
-            // nothing to narrow by and nothing to toggle.
-            //
-            // And while an end is HELD, the 3D view drills straight in too. Its
-            // usual two clicks -- select the timber, then pick a feature on it
-            // -- would mean a feature on any other timber could not even be
-            // hovered, let alone previewed, until it was selected first; and
-            // measuring between two timbers is the ordinary case.
+        if (pickMode({ inDrawing, measuring, shiftKey, timberModeInDrawings }) === 'feature') {
             return { action: 'csg', memberKey: nearest.memberKey, hit: nearest.hit };
         }
-        if (shiftKey) {
+        if (shiftKey && !measuring) {
             return { action: 'toggle', memberKey: nearest.memberKey, hit: nearest.hit };
         }
         const onSelected = along.find((entry) => selected.has(entry.memberKey));
@@ -426,10 +443,11 @@
     const SELECTION_MODES = Object.freeze({ MODEL, DRAWING });
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { SelectionStore, choosePickAction, SELECTION_MODES, drawButtonKey };
+        module.exports = { SelectionStore, choosePickAction, pickMode, TIMBER_MODE_IN_DRAWINGS, SELECTION_MODES, drawButtonKey };
     }
     globalScope.SelectionStore = SelectionStore;
     globalScope.choosePickAction = choosePickAction;
+    globalScope.pickMode = pickMode;
     globalScope.drawButtonKey = drawButtonKey;
     globalScope.SELECTION_MODES = SELECTION_MODES;
 })(typeof window !== 'undefined' ? window : globalThis);

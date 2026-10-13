@@ -19,13 +19,14 @@
      * A member's state.
      *
      * - hidden: hidden from the layers panel.
+     * - locked: locked from the layers panel, so it cannot be picked.
      * - selection: 'none' (nothing about it is selected), 'selected' (picked as
      *   a whole), 'drilledInto' (a node or feature inside it is picked), or
      *   'dimmed' (something else is).
      * - drawing: 'none' (no drawing open), 'subject' (the drawing names it), or
      *   'context' (a drawing is open and does not).
      */
-    function memberStateFor(memberKey, { hidden = false, visualContext, drawnMembers = null } = {}) {
+    function memberStateFor(memberKey, { hidden = false, locked = false, visualContext, drawnMembers = null } = {}) {
         let selection = 'none';
         if (visualContext && visualContext.state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
             selection = visualContext.selectedTimberSet.has(memberKey) ? 'selected' : 'dimmed';
@@ -36,8 +37,11 @@
         if (drawnMembers) {
             drawing = drawnMembers.has(memberKey) ? 'subject' : 'context';
         }
-        return { hidden: Boolean(hidden), selection, drawing };
+        return { hidden: Boolean(hidden), locked: Boolean(locked), selection, drawing };
     }
+
+    /** How much a locked member is faded, faces and edges. */
+    const LOCKED_OPACITY_FACTOR = 0.5;
 
     /** How each selection state looks, before anything else is applied. */
     const SELECTION_LOOKS = Object.freeze({
@@ -53,21 +57,29 @@
      * Precedence, in order:
      *   1. hidden wins outright;
      *   2. otherwise the selection decides the look (SELECTION_LOOKS);
-     *   3. then a drawing's context is ghosted (or hidden) and capped at
+     *   3. then a locked member is faded by `lockedOpacityFactor`, faces and
+     *      edges both: it is there but cannot be picked;
+     *   4. then a drawing's context is ghosted (or hidden) and capped at
      *      `drawingContextOpacity`, faces and edges both, whatever the
      *      selection said.
      *
      * `settings`: baseSelectedOpacity, policy (selection-visuals), profile (the
      * member's render profile, or null), edgeLineVisibilityPercent, edgeMode,
-     * showDrawingGhosts, drawingContextOpacity.
+     * showDrawingGhosts, drawingContextOpacity, lockedOpacityFactor.
      */
     function appearanceFor(state, settings) {
         let look;
         let asContext = false;
+        let edgeFactor = 1;
         if (state.hidden) {
             look = { name: 'hidden', opacity: settings.baseSelectedOpacity };
         } else {
             look = SELECTION_LOOKS[state.selection](settings);
+            if (state.locked) {
+                const factor = settings.lockedOpacityFactor ?? LOCKED_OPACITY_FACTOR;
+                look = { name: 'locked', opacity: look.opacity * factor };
+                edgeFactor = factor;
+            }
             if (state.drawing === 'context') {
                 // A drawing is about the members it names; the rest of the frame
                 // is there for context and is ghosted whatever the selection says,
@@ -87,7 +99,7 @@
         // A drawing's context is the exception -- faded faces behind crisp
         // outlines would read as another piece of the drawing.
         const edgeOpacity = (profile ? profile.edgeOpacity * edgeVisibility : edgeVisibility)
-            * (asContext ? settings.drawingContextOpacity : 1);
+            * (asContext ? settings.drawingContextOpacity : 1) * edgeFactor;
 
         return {
             name: look.name,
@@ -100,7 +112,7 @@
         };
     }
 
-    const KigumiMemberStates = { memberStateFor, appearanceFor, SELECTION_LOOKS };
+    const KigumiMemberStates = { memberStateFor, appearanceFor, SELECTION_LOOKS, LOCKED_OPACITY_FACTOR };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = KigumiMemberStates;

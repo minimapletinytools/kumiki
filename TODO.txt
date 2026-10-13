@@ -102,75 +102,39 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 
+
 :: TODO
 
 
--DRAWING NEXT TODO
-  DONE-fix face extents to not be AABB but rather corners 
-  -selecting parallel faces should not be permitted in drawing view
-  -figure out how to measure to PTW
-  -hidden feature detection in drawing view (featurelist, view) to see what's hidden
+DONE-don't show assembly in measuring window
+DONE-BUG dragging python created measurement si my_cute_fraem_drawing_test creates 2 copies of the mesaurement in the viewer. so teh override is not working for whateve rreason
+DONE-do the copy for prompt button
+DONE-BUG diagonal brace notiching broken in learn to timber frame shed
+DONE-BUG the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
 
--work out feature seleciton issues  
-  -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
-  -right now faces that are perpencdiluar to the camera can't seem to be selected (they dont show up in the right click menu), instead only the face parallel to the camera shows up, we actually don't want that one to show up cuz it's easy enough to click on it through other means. 
-      -conceivably we could disallow selection fo faces entierly in 2d view? but we need to be mindful about this when determining if all featuers of a timber are solved.
+-DECISION TIME ON DRAWING FEATURES
+  -the high level issue here is that each view in 2d drawing only has some features visible and you only want to make measuremints for those features. Except you can totally mesauer other featuers and its' kind NBD so maybe ther' sjust ntonig to do here.
+  -disallow hidden fetaure measuring?
+    -I think either don't do it or restrict mesauring selection to viewport
+  -2D VIEW EQUIVALENCY GROUPS (probably not what you want to do but techincalyl the most general solution)
+    -paus eher for a moment, one thing I realized is that in 2d view, there are sorta equivalency groups for measurements when locked to an orthographic view. so for example, a pirsm has 6 faces, and a bunch of edgse/vertices. When we measure betwene 2 edges on a face that's parallel with the viewport plane, we are also measuring the distance bteew all other edges, vertices of the perpendicular face that edge is a part of. IN the measurement, we say it's just the edge being measured, but in. thesolver wesay that a DOF got removed from all the features I mentioned. Is there some way to solve for all features that had their DOfs solved in this way even though just teh edge was measured. 
+    -don't really need to do this...
 
--visual related issues
-  -do the render stack fro kigumi
-  -the selected timber blue thing is weird when we're in measuring mode, especially in 2d where there is no concept of selection and then drilling in
-  -timber goes into x-ray view when a feature is selected in drawing mode 
-  -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
-    -or maybe allow selectino of xrayed features?
-  -figure out xray joints tagging (could be a per joint/direction property)
-
-
--MEASURING RELATED STUFF
-  DONE?-fix priority of feature selection in 2d view, it should prioritize on features closest to camera, just refine the rules in general
-  DONE-test edge face -> point derivation at some point...
-  DONE-when face is highlighted in green (for measure from) it's internal tris should not be highlighted. it should look like it was selected but in green like we do for regular selection
-  cases where the 2 features being measured are perpendicular
-  -the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
-  -angle mesaurement anchor positon derivatino needs to be improved
-    -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
-    -definitely highlight the features being measured...
-  -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
-    -either add it as a separate menu after a divider
-    -get rid of it in 2d drawing view
-    -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
-  -add hotkey for "measure from this"
-  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
-
--DRAWING NONSENSE
-  -modifying python created measurements
-    -delete an original measurement should delete it, thus you need a way to override a measurement as "delteed"
-    -delete after modifying should reset to original measurement (or not)
-  -do the drawing border and meta info stuff
-    -add background border for drawing...
-    -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
-  -and you should highlight the refreence edge as wel if there is one in drawing mode
-      -or just add an option in general to highlight the reference edge for 3d view mode as well
-  -make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
-    -welly oush ould force show lines for PTW faces (maybe light grey)
-    -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
-      for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
-  -conisder just shippingthe defalut drawing with every frame by default 
-  -solver optimization, the expensive part is face_reaches_surface
-    -cache solid_bounds
-    -add broadphase
+-DECISION TIME PTW
+  -the remaining high level issue here is when to show rough/PTW features, when to allow them to be measured etc
+  DONE-rough faces matching PTW faces should be given PTW labels?
+  -rough fetaures are marked as do not measure
+  -when entering drawing mode
+    -PTW features are added 
     
 
-DONE-BUGS
-  DONE-lap cuts from half lap joint isn't a shoulder so dosen't create derived edges :(
-  DONE-actually oddly enough the inner edge isn't selectable either even though that should be a built in feature?
-DONE-probably still include kiwari in teh output Frame... maybe just require all frames to use the same kiwari for multi frame stuff? I don't like the magical params = kiwari thing...
-DONE-kiwari units should probbaly match kigumi units, or allow it to be specified?
-DONE-update tree view for multi frame files
-DONE-frames in list view should have little house emoji icon next to them
-DONE-don't show > next to empty top level and gray them out (e.g. no drawnigs, tags measurements, then drawings tags measurements should be like greyed out or something)
-DONE-drawings are as such, if a drawing contains members from multilpe frames, it shows at the top level drawing, if it has only members from a as nigle frame it goes under that frame. OBviosuly these are the same if there is only 1 frame.
-  -if they have more than 1 frame involevd they should go at top level, otherwise at frame level
-
+-auto drawing
+  DONE-add preferences in auto drawing algoirthm, pick measurements from reference face/edge always (maybe not a bad rule for now..)
+  -test auto drawing generation on a single timber with joints
+  -test auto drawing on a rough/PTW timber
+  -hidden feature detection in drawing view (featurelist, view) to see what's hidden
+    -you need this so mesaurements only get created in the viwe that shows the feature on the surface <- this is the important thing.
+    -ask agent what its currentyl doing though
 
 
 
@@ -181,13 +145,19 @@ DONE-drawings are as such, if a drawing contains members from multilpe frames, i
 -decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
 
 -do the standalone app 
+  -rework left hand view or whatever, it sholud be cllapsoable but maybe yous hould justc remaigen it for the standalone app...
+  -side bar should be collaspsable
+  -need file explorer in addition to side bar
+  -should be able to right click file and say open in viewer or osmetihng(both vscoed and electron), or maybe have it open both in electron
+  -cilkcing on patterns borken in electron ivew..
+
 
 
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
 -maybe review runner.py ;__;
 -add types to runner.py
--improve panel functions, think bout the simplest way to do this...
--update shed example to include panels
+-improve board  functions, think bout the simplest way to do this...
+-update shed example to include board
   -make a video about this maybe after you do some more edge joints
 -add srcibe notching ot more joints...
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
@@ -259,6 +229,31 @@ IGNORE-rename/reorg all mortise and tenon joints
   -maybe add some kinda broadphase check?
 
 
+-MEASURING/DRAWING BACKLOG
+  -angle mesaurement anchor positon derivatino needs to be improved
+    -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
+    -definitely highlight the features being measured...
+  -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
+    -either add it as a separate menu after a divider
+    -get rid of it in 2d drawing view
+    -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
+  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
+  -do the drawing border and meta info stuff
+    -add background border for drawing...
+    -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
+  -XRAY feature
+    -timber goes into x-ray view when a feature is selected in drawing mode 
+    -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
+      -or maybe allow selectino of xrayed features?
+    -figure out xray joints tagging (could be a per joint/direction property)
+      -XRAY_FROM_AXIS (enum face aligned timber directions) 
+      -we can add more sophistitacted filter sin the future
+  -simple function for creating the default drawing and solving it (full frame, 3 views, only measure what's visible)
+  -solver optimization, the expensive part is face_reaches_surface
+    -cache solid_bounds
+    -add broadphase
+    
+
 -JOINTS
   DONE-finish build a butt joint to do the wedged dovetail morties and tenon
   DONE-wedged_half_dovetail_mortise_and_tenon
@@ -308,6 +303,61 @@ IGNORE-rename/reorg all mortise and tenon joints
 
 
 :: TODONE 
+
+DONE-measuring
+  DONE-when measuring, if you highlight an invalid face tom easure to, clicking should do nothing, right now it selects the feature and makes no measurement whic his weird.
+  IGNORE-faces should nto be selectable in 2d measuring view, it seems like it's already impossible to measure faces in 2d view but you can still select them, figure out what's going on here.
+    -the one weird part about this is that youc an't measure faces in the 3d view in the 2d view... but that's fine for now...
+      -if you really wanted to fixt his you'd have to restrict measuring/selecting per view, or anyways make measuring from face to anything always invalid in a 2d view is fine too. 
+
+DONE-selection highlighting
+  -CSG selection still does the light blue highlight
+  -so consider getting rid of selecting than drilling down the CSG support all together. you can maybe keep support for that featuer but then add a boolean toggle so that feature highlights do not highlight the CSG parent to the feture highlighted?  
+    -feature selection no longer does the light blue highlight on CSG (at least not in drawing view)
+
+DONE-and you should highlight the refreence edge as wel if there is one in drawing mode
+  -or just add an option in general to highlight the reference edge for 3d view mode as well
+
+DONE-add hotkey for "measure from this" (maybe m)
+DONE-modifying python created measurements
+  -delete an original measurement should delete it, thus you need a way to override a measurement as "delteed"
+  -delete after modifying should reset to original measurement (or not)
+
+DONE-2 seleciton modes in 3d view, timber and feature
+  selection mode, the rules are as follows:
+  -in 2d drawing view, feature mode is the default. timber mode is disabled, although we may want to enabel it in the future so make sure it techincally still works.
+  -in 3d view, timber mode is the default when not measuring from anything, once mesauring from something, it switches to feature mode, but you can hold shift to enter timber mode
+    -when shift is held, fetaure highlighting is disabled on timbers that aren't selected, so you can keep holding shift if you want to select a fetaure on the selected timber, when in feature mode, th eselection iignored basically
+
+DONE?-fix priority of feature selection in 2d view, it should prioritize on features closest to camera, just refine the rules in general
+DONE-test edge face -> point derivation at some point...
+DONE-when face is highlighted in green (for measure from) it's internal tris should not be highlighted. it should look like it was selected but in green like we do for regular selection
+cases where the 2 features being measured are perpendicular  
+DUPE-make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
+    -welly oush ould force show lines for PTW faces (maybe light grey)
+    -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
+      for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
+DONE-fix face extents to not be AABB but rather corners 
+IGNORE-selecting hidden faces probably should also nto be premitted in drawing view? although you could always select from a different view so maybe it don't really tter
+  -or restrict measurement selecting to single views...
+IGNORE-right now faces that are perpencdiluar to the camera can't seem to be selected (they dont show up in the right click menu), instead only the face parallel to the camera shows up, we actually don't want that one to show up cuz it's easy enough to click on it through other means. 
+    -conceivably we could disallow selection fo faces entierly in 2d view? but we need to be mindful about this when determining if all featuers of a timber are solved.
+DONE-do the render stack fro kigumi
+DONE-BUGS
+  DONE-lap cuts from half lap joint isn't a shoulder so dosen't create derived edges :(
+  DONE-actually oddly enough the inner edge isn't selectable either even though that should be a built in feature?
+DONE-probably still include kiwari in teh output Frame... maybe just require all frames to use the same kiwari for multi frame stuff? I don't like the magical params = kiwari thing...
+DONE-kiwari units should probbaly match kigumi units, or allow it to be specified?
+DONE-update tree view for multi frame files
+DONE-frames in list view should have little house emoji icon next to them
+DONE-don't show > next to empty top level and gray them out (e.g. no drawnigs, tags measurements, then drawings tags measurements should be like greyed out or something)
+DONE-drawings are as such, if a drawing contains members from multilpe frames, it shows at the top level drawing, if it has only members from a as nigle frame it goes under that frame. OBviosuly these are the same if there is only 1 frame.
+  -if they have more than 1 frame involevd they should go at top level, otherwise at frame level
+DONE-do a pass on why kigumi install takes forever and bundling warning
+  Prepared bundled instructions: /Users/giraffe/kitchen/faucet/kumiki/kigumi/.generated/bundled-usage-instructions.md
+ WARNING  This extension consists of 490 files, out of which 130 are JavaScript files. For performance reasons, you should bundle your extension: https://aka.ms/vscode-bundle-extension. You should also exclude unnecessary files by adding them to your .vscodeignore: https://aka.ms/vscode-vscodeignore.
+
+
 
 DONE-NEXT STEPS FOR auto drawing DRAWING
   -figure out the measuring to rough thing.... I think all measurements should just go to PTW faces... so you need to make it so when selecting faces only PTW faces can be mesaured from/to

@@ -12,6 +12,7 @@ import numpy as np
 
 from ..csg.cutcsg import carrier_map
 from .dof_solver import Remaining, remaining
+from .feature_span import feature_span
 from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, MeasurementKind, MeasurementOperation,
                       MeasurementSpace, PlaneSpan, PointSpan, ViewAxes, distance_anchors)
 from ..csg.feature_paths import FeatureHandle
@@ -52,25 +53,11 @@ def _recipe(handle: FeatureHandle) -> Recipe:
 
 
 def _span(handle: FeatureHandle) -> MeasureSpan:
-    """The feature as drawing's measuring rules see it, in world space."""
-    transform = handle.timber.transform
-    located = handle.feature.locate_simple_unbounded(handle.owner)
-    extent = handle.feature.get_extent(handle.owner)
-    if isinstance(located, Point):
-        return PointSpan(at=transform.local_to_global(located.position))
-    if isinstance(located, Line):
-        direction = _unit(_np(located.direction))
-        ends = extent.ends if extent is not None else None
-        interval = None
-        if ends:
-            stations = sorted(float((_np(end) - _np(located.point)) @ direction) for end in ends)
-            interval = (stations[0], stations[-1])
-        return LineSpan(at=transform.local_to_global(located.point),
-                        direction=transform.local_to_global_direction(located.direction), interval=interval)
-    if isinstance(located, Plane):
-        at = extent.anchor if extent is not None else located.point
-        return PlaneSpan(at=transform.local_to_global(at), normal=transform.local_to_global_direction(located.normal))
-    raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
+    """The feature as drawing's measuring rules see it, in world space: the viewer's span (feature_span)."""
+    span = feature_span(handle, in_three_d=True)
+    if span is None:
+        raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
+    return span
 
 
 def _projected(span: MeasureSpan, look: np.ndarray) -> MeasureSpan:

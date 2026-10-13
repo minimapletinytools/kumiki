@@ -13,12 +13,14 @@ import math
 
 import pytest
 
+from kumiki import picking
 from kumiki.drawings.drawing import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
                             ViewAxes,
                             MeasurementOperation, MeasurementSpace, distance_anchors)
 from kumiki.rule import create_v3
 from tests.testing_shavings import load_module, present
 
+from kumiki.csg.feature_paths import find_csg_by_labels, find_declared_feature, roots_for_path
 
 def v(triple):
     """A triple as the vector a span holds. Written out so the tests need not."""
@@ -331,22 +333,20 @@ class TestAFeatureSeenEndOn:
     def test_a_line_along_the_view_is_a_point_to_the_rules(self):
         from pathlib import Path
 
-        root = Path(__file__).resolve().parent.parent
-        runner = load_module("kigumi_runner_endon", root / "kigumi" / "runner.py")
+        from kumiki.drawings.feature_span import projects_to_a_point
 
-        assert runner._projects_to_a_point((0, 1, 0), (0, 1, 0)) is True
-        assert runner._projects_to_a_point((0, -1, 0), (0, 1, 0)) is True
-        assert runner._projects_to_a_point((1, 0, 0), (0, 1, 0)) is False
+        assert projects_to_a_point((0, 1, 0), (0, 1, 0)) is True
+        assert projects_to_a_point((0, -1, 0), (0, 1, 0)) is True
+        assert projects_to_a_point((1, 0, 0), (0, 1, 0)) is False
 
     def test_a_hair_off_end_on_is_still_a_line(self):
         # It draws as a very short line, and calling it a point would refuse a
         # dimension that is drawable.
         from pathlib import Path
 
-        root = Path(__file__).resolve().parent.parent
-        runner = load_module("kigumi_runner_endon2", root / "kigumi" / "runner.py")
+        from kumiki.drawings.feature_span import projects_to_a_point
 
-        assert runner._projects_to_a_point((0.05, 1, 0), (0, 1, 0)) is False
+        assert projects_to_a_point((0.05, 1, 0), (0, 1, 0)) is False
 
     def test_a_point_and_a_line_do_not_go_through_the_parallel_rule(self):
         # The point stays where it is and the line takes the foot. The parallel
@@ -406,8 +406,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         ]
         found = {}
         for point in points:
-            for hit in runner._features_at_point(
-                    root, runner._to_v3(point), 5e-4, FeatureTestTolerances(face=5e-4)):
+            for hit in picking.features_at_point(root, point, 5e-4, FeatureTestTolerances(face=5e-4)):
                 if hit.feature.feature_type() != CSGFeatureType.EDGE:
                     continue
                 found.setdefault(hit.feature.name, runner._measure_span(
@@ -433,7 +432,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         spans, length = self._spans(runner, entry, [0, 0, 1])
 
         rough = [span for name, span in spans.items()
-                 if name.startswith("rough.") and span is not None and not isinstance(span, PointSpan)]
+                 if name.startswith("rptw.") and span is not None and not isinstance(span, PointSpan)]
         assert rough, "the timber should declare some arrises"
         assert max(high - low for low, high in (span.interval for span in rough)) \
             > length / 2
@@ -540,14 +539,15 @@ class TestAFeatureKnowsItsOwnEnds:
 
         from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
-        root = Path(__file__).resolve().parent.parent
-        runner = load_module("kigumi_runner_declared", root / "kigumi" / "runner.py")
+        from kumiki.drawings.feature_span import declared_line_span
 
         box = self._box()
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
-        span = runner._declared_line_span(arris, box, arris.locate_simple_unbounded(box))
+        line = arris.locate_simple_unbounded(box)
+        assert line is not None
+        span = declared_line_span(arris, box, line)
 
         assert span is not None
         assert span[1] - span[0] == pytest.approx(0.4)
@@ -560,8 +560,7 @@ class TestAFeatureKnowsItsOwnEnds:
         from kumiki.csg.cutcsg import SimpleRectangularPrismEdgeFeature
         from kumiki.rule import create_v2, scalar
 
-        root = Path(__file__).resolve().parent.parent
-        runner = load_module("kigumi_runner_declared2", root / "kigumi" / "runner.py")
+        from kumiki.drawings.feature_span import declared_line_span
 
         endless = RectangularPrism(
             size=create_v2(scalar("0.1"), scalar("0.2")),
@@ -569,7 +568,9 @@ class TestAFeatureKnowsItsOwnEnds:
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
-        assert runner._declared_line_span(arris, endless, arris.locate_simple_unbounded(endless)) is None
+        line = arris.locate_simple_unbounded(endless)
+        assert line is not None
+        assert declared_line_span(arris, endless, line) is None
 
 
 class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
@@ -1002,9 +1003,9 @@ class TestAFeatureOnALabelledRoot:
     def _labelled_root(self, runner, frame):
         """A cut timber whose root carries a label AND declares features."""
         for cut_timber in frame.cut_timbers:
-            roots, _ = runner._roots_for_path(cut_timber, ())
+            roots, _ = roots_for_path(cut_timber, ())
             for root in roots:
-                if runner._label_name(root) is not None and root.get_declared_features():
+                if picking.label_name(root) is not None and root.get_declared_features():
                     return cut_timber, root
         return None, None
 
@@ -1015,25 +1016,25 @@ class TestAFeatureOnALabelledRoot:
         cut_timber, root = self._labelled_root(runner, frame)
 
         assert root is not None
-        assert runner._label_name(root) is not None
+        assert picking.label_name(root) is not None
 
     def test_an_empty_path_means_the_node_you_are_on(self):
         runner, frame = self._runner_and_frame()
         _, root = self._labelled_root(runner, frame)
 
-        assert runner._find_csg_by_labels(root, ()) is root
+        assert find_csg_by_labels(root, ()) is root
 
     def test_so_a_feature_it_declares_can_be_found(self):
         runner, frame = self._runner_and_frame()
         cut_timber, root = self._labelled_root(runner, frame)
         name = root.get_declared_features()[0].name
 
-        found = runner._find_declared_feature(
+        found = find_declared_feature(
             cut_timber, runner.deserialize_feature_path(
                 {"timber": cut_timber.name, "csgPath": [], "feature": name}).ref)
 
         assert found is not None
-        assert found[0].name == name
+        assert found.feature.name == name
 
     def test_and_a_measurement_to_it_resolves(self):
         # The whole point: picked, written, and still findable afterwards.

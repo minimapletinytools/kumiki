@@ -2368,8 +2368,8 @@ class TestTimberCSGLabels:
         plain = timber.get_extended_actual_csg_local(
             extend_bot=False, extend_top=False, with_feature_labels=False)
 
-        assert any(feature.name.startswith("rough.") for feature in labelled.get_declared_features())
-        assert not any(feature.name.startswith("rough.") for feature in plain.get_declared_features())
+        assert any(feature.name.startswith("rptw.") for feature in labelled.get_declared_features())
+        assert not any(feature.name.startswith("rptw.") for feature in plain.get_declared_features())
         # Same shape, same place: the labels are all that was dropped.
         assert plain.size == labelled.size
         assert plain.end_distance == labelled.end_distance
@@ -2463,3 +2463,33 @@ class TestDuplicatePlanes:
         labels = [c.label.name for c in
                   self._rendered(self._plane("somewhere_else", offset=50)).children]
         assert set(labels) == {"somewhere_else", "top_end_cut"}
+
+
+class TestRoughFacesLyingOnThePerfectTimber:
+    """A rough face that lies on the perfect timber within is named rptw.* and treated as perfect."""
+
+    def _names(self, timber):
+        root = CutTimber(timber, cuts=[]).render_timber_with_cuts_csg_local()
+        return {f.name: f.properties.group for f in root.get_declared_features()}
+
+    def test_a_timber_with_no_rough_allowance_is_rptw_throughout(self):
+        timber = Timber(length=scalar(100), size=create_v2(scalar(4), scalar(6)), transform=Transform.identity())
+
+        names = self._names(timber)
+
+        assert names and all(name.startswith("rptw.") for name in names)
+        assert set(names.values()) == {FeatureGroup.PERFECT}
+
+    def test_only_what_lies_on_the_perfect_timber_is_rptw(self):
+        # Rough on the right only: 3 against a perfect half width of 2.
+        timber = Timber(
+            length=scalar(100), size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
+            rough_half_sizes=(create_v2(scalar(3), scalar(2)), create_v2(scalar(3), scalar(3))))
+
+        names = self._names(timber)
+
+        assert names["rough.right"] is FeatureGroup.ROUGH
+        assert names["rptw.left"] is FeatureGroup.PERFECT and names["rptw.front"] is FeatureGroup.PERFECT
+        # An arris or corner is perfect only if every face meeting there is.
+        assert "rough.front_right" in names and "rough.bottom_right" in names and "rough.top_right_front" in names
+        assert "rptw.front_left" in names and "rptw.bottom_left" in names and "rptw.top_front_left" in names

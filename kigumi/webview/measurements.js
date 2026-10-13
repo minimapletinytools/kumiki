@@ -499,6 +499,13 @@
      * sorted, because measuring A to B and measuring B to A are one
      * measurement, and the anchors are already canonically ordered.
      */
+    /** Where a code measurement the drawings file deleted comes from: listed greyed, never drawn. */
+    const DELETED_ORIGIN = 'deleted';
+
+    function isDeleted(measure) {
+        return Boolean(measure) && measure.origin === DELETED_ORIGIN;
+    }
+
     function measurementKey(measure) {
         const name = (anchor) => {
             if (!anchor) {
@@ -573,6 +580,8 @@
     const KigumiMeasurements = {
         BROKEN_REASONS,
         isBroken,
+        DELETED_ORIGIN,
+        isDeleted,
         measurementKey,
         offsetForPointer,
         anchorReference,

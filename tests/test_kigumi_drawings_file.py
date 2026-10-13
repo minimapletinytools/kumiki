@@ -25,6 +25,12 @@ from kumiki.csg.feature_paths import find_feature
 from tests.testing_shavings import load_module, mortise_and_tenon_handles, present
 
 
+def _resolve_anchor(runner, frame, anchor):
+    """Where one end of a measurement is, on its own."""
+    placed = runner._resolve_anchor_placed(frame, anchor, None)
+    return None if placed is None else placed[0]
+
+
 def _load_runner():
     """Import kigumi/runner.py by path -- kigumi is not an installed package."""
     runner_path = Path(__file__).resolve().parent.parent / "kigumi" / "runner.py"
@@ -237,8 +243,8 @@ class TestCollectDrawings:
 
         def drawings(timber):
             other_tree = CutTimber(timber("posts/fl"))
-            front = present(find_feature(other_tree, BODY, "rough.front"), "rough.front")
-            back = present(find_feature(other_tree, BODY, "rough.back"), "rough.back")
+            front = present(find_feature(other_tree, BODY, "rptw.front"), "rptw.front")
+            back = present(find_feature(other_tree, BODY, "rptw.back"), "rptw.back")
             return [Drawing(name="d", timbers=[timber("posts/fl")],
                             measurements={FRONT: [Measure(front, back)]})]
 
@@ -281,7 +287,9 @@ class TestSaveDrawings:
         ])
 
         saved = json.loads(Path(written).read_text())
-        assert [d["id"] for d in saved["drawings"]] == ["overridden", "from file"]
+        # An overridden code drawing is saved as its override, naming the drawing it overrides.
+        assert [(d["id"], d.get(runner.OVERRIDES_KEY)) for d in saved["drawings"]] == [
+            ("overridden-measurements", "overridden"), ("from file", None)]
 
     def test_an_untouched_code_drawing_is_not_frozen_into_the_file(self, example):
         # Writing it out would stop it following the code that asked for it.
@@ -368,14 +376,14 @@ class TestMergeMeasurements:
 
         assert [m["origin"] for m in merged] == [runner.ORIGIN_FILE]
 
-    def test_the_file_may_suppress_one_the_algorithm_produced(self):
-        # Without this, the only way to be rid of a generated measurement is to
-        # change the algorithm.
+    def test_the_file_may_delete_one_the_code_asks_for(self):
+        # Without this, the only way to be rid of a code measurement is to change the code.
+        # It is kept, marked deleted, so the viewer can list it greyed and put it back.
         merged = runner.merge_measurements(
             [self._code("x", "y")], [{"a": _ref("x"), "b": _ref("y"), "suppressed": True}],
         )
 
-        assert merged == []
+        assert [(m["origin"], m["suppressed"]) for m in merged] == [(runner.ORIGIN_DELETED, True)]
 
     def test_suppressing_something_that_is_not_there_adds_nothing(self):
         merged = runner.merge_measurements([], [{"a": _ref("x"), "b": _ref("y"), "suppressed": True}])
@@ -414,7 +422,7 @@ class TestMeasurementsThroughADrawing:
     def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
         frame = _posts_with(lambda face, timber: [Drawing(
             name="post", timbers=[timber("posts/fl")],
-            measurements={FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))]},
+            measurements={FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))]},
         )])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -430,8 +438,8 @@ class TestMeasurementsThroughADrawing:
         frame = _posts_with(lambda face, timber: [Drawing(
             name="post", timbers=[timber("posts/fl")],
             measurements={
-                FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
-                RIGHT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
+                FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))],
+                RIGHT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))],
             },
         )])
 
@@ -445,14 +453,14 @@ class TestMeasurementsThroughADrawing:
         frame = _posts_with(lambda face, timber: [Drawing(
             name="post", timbers=[timber("posts/fl")],
             measurements={
-                FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
-                RIGHT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))],
+                FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))],
+                RIGHT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))],
             },
         )])
         _write_file(example, [_override("sheet", "post", [
             {"id": str(FRONT), "measurements": [
-                {"a": _ref("rough.front", timber="posts/fl#0", csg_path=UNCUT),
-                 "b": _ref("rough.back", timber="posts/fl#0", csg_path=UNCUT)}]},
+                {"a": _ref("rptw.front", timber="posts/fl#0", csg_path=UNCUT),
+                 "b": _ref("rptw.back", timber="posts/fl#0", csg_path=UNCUT)}]},
         ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -466,7 +474,7 @@ class TestMeasurementsThroughADrawing:
         # override of the whole drawing would take its layout with it.
         frame = _posts_with(lambda face, timber: [Drawing(
             name="post", timbers=[timber("posts/fl")],
-            measurements={FRONT: [Measure(anchor_a=face("rough.front"), anchor_b=face("rough.back"))]},
+            measurements={FRONT: [Measure(anchor_a=face("rptw.front"), anchor_b=face("rptw.back"))]},
         )])
         _write_file(example, [_override("sheet", "post", [
             {"id": str(FRONT), "measurements": [{"a": _ref("p"), "b": _ref("q")}]},
@@ -626,7 +634,7 @@ class TestSingleFeaturePath:
 
     def test_a_measurement_is_the_same_measured_either_way_round(self):
         found = {}
-        frame = _posts_with(lambda face, timber: found.update(x=face("rough.front"), y=face("rough.back")) or [])
+        frame = _posts_with(lambda face, timber: found.update(x=face("rptw.front"), y=face("rptw.back")) or [])
         there = Measure(anchor_a=found["x"], anchor_b=found["y"])
         back = Measure(anchor_a=found["y"], anchor_b=found["x"])
 
@@ -634,7 +642,7 @@ class TestSingleFeaturePath:
 
     def test_an_id_still_separates_two_of_the_same_pair(self):
         found = {}
-        frame = _posts_with(lambda face, timber: found.update(x=face("rough.front"), y=face("rough.back")) or [])
+        frame = _posts_with(lambda face, timber: found.update(x=face("rptw.front"), y=face("rptw.back")) or [])
 
         assert (Measure(anchor_a=found["x"], anchor_b=found["y"]).identity(frame)
                 != Measure(anchor_a=found["x"], anchor_b=found["y"],
@@ -798,7 +806,7 @@ class TestResolvingAnchors:
         return {"timber": timber, "csgPath": list(csg_path), "feature": feature, "type": "FACE"}
 
     def test_it_finds_a_declared_face(self, measured):
-        found = runner.resolve_anchor(
+        found = _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "tenon_top"),
         )
 
@@ -831,7 +839,7 @@ class TestResolvingAnchors:
                     walk(one.negative_csg)
             return found[0]
 
-        world = runner.resolve_anchor(
+        world = _resolve_anchor(runner,
             measured, self._anchor("receiving_timber#0", ("mortise_hole",), "mortise_bottom"),
         )["at"]
 
@@ -840,24 +848,24 @@ class TestResolvingAnchors:
     def test_a_path_steps_through_unlabelled_nodes(self, measured):
         # A path names the labelled nodes only; the intermediates are what it
         # skips, and they are the ones most likely to move.
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "tenon_left"),
         ) is not None
 
     def test_a_feature_that_is_not_there_does_not_resolve(self, measured):
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "no_such_face"),
         ) is None
 
     def test_a_wrong_path_does_not_find_the_feature_elsewhere(self, measured):
         # A labelled node that does not match means the wrong branch, so the
         # walk stops rather than hunting the whole tree for the name.
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("mortise_hole",), "tenon_top"),
         ) is None
 
     def test_a_timber_that_is_gone_does_not_resolve(self, measured):
-        assert runner.resolve_anchor(
+        assert _resolve_anchor(runner,
             measured, self._anchor("no_such_timber#0", ("tenon_waste",), "tenon_top"),
         ) is None
 
@@ -865,7 +873,7 @@ class TestResolvingAnchors:
         # The shoulder is a half space: a plane to measure against, and no
         # bounded extent to hang a label on. Where to draw it has to come from
         # the geometry and the other anchor instead.
-        found = runner.resolve_anchor(
+        found = _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "shoulder"), "shoulder"),
         )
 
@@ -892,7 +900,7 @@ class TestResolvingAnchors:
         # The mortise cutter is extended past the timber so the cut comes out
         # clean, which puts its declared face anchor hundreds of metres away.
         # The anchor has to come from the region cropped to the timber instead.
-        found = runner.resolve_anchor(
+        found = _resolve_anchor(runner,
             measured, self._anchor("receiving_timber#0", ("mortise_hole",), "mortise_front"),
         )
 
@@ -901,7 +909,7 @@ class TestResolvingAnchors:
     def test_an_unbounded_feature_still_gets_an_anchor(self, measured):
         # A half space has no extent of its own; cropping to the timber gives
         # it one.
-        found = runner.resolve_anchor(
+        found = _resolve_anchor(runner,
             measured, self._anchor("butt_timber#0", ("tenon_waste", "shoulder"), "shoulder"),
         )
 
@@ -927,7 +935,7 @@ class TestTellingIdenticalJointsApart:
 
     def _anchor(self, runner, frame, first):
         path = (first,) + self.INNER if first else self.INNER
-        return runner.resolve_anchor(frame, {
+        return _resolve_anchor(runner, frame, {
             "timber": "brace_timber#0",
             "csgPath": list(path),
             "feature": "tenon_front",
@@ -1006,7 +1014,7 @@ class TestDerivedFeaturePath:
         return DerivedFeaturePath(
             timber=timber,
             a=self._ref(("mortise_and_tenon#0", "mortise_hole"), "mortise_right"),
-            b=self._ref(("timber (rough, extended)",), "rough.left"),
+            b=self._ref(("timber (rough, extended)",), "rptw.left"),
         )
 
     def test_either_way_round_is_the_same_edge(self):
@@ -1015,7 +1023,7 @@ class TestDerivedFeaturePath:
         forwards = self._edge()
         backwards = DerivedFeaturePath(
             timber=ResolvedTimberPath("posts/fl"),
-            a=self._ref(("timber (rough, extended)",), "rough.left"),
+            a=self._ref(("timber (rough, extended)",), "rptw.left"),
             b=self._ref(("mortise_and_tenon#0", "mortise_hole"), "mortise_right"),
         )
 
@@ -1153,21 +1161,85 @@ class TestChangingAndRemovingAMeasurement:
         assert [m["b"]["feature"] for m in held] == ["top"]
 
 
+class TestMovingAMeasurementTheCodeNamesTheKindOf:
+    """A move overrides it rather than drawing a second one beside it.
+
+    An override matches on kind too, so the entry a move makes has to carry the code's kind.
+    It once carried only the anchors, and a measurement whose code named its kind was drawn twice.
+    """
+
+    def _frame(self):
+        from kumiki.drawings.drawing import MeasurementKind
+
+        kind = MeasurementKind.parse("projected_perpendicular_distance")
+        return _posts_with(lambda face, timber: [Drawing(
+            name="plan",
+            timbers=(timber("post"),),
+            measurements={ViewportId(VIEWPORT): [
+                Measure(anchor_a=face("rptw.left", "post"), anchor_b=face("rptw.right", "post"), kind=kind)]},
+        )], paths=("post",))
+
+    def _wire(self):
+        # What the viewer sends with a move: the ends and the id, not the kind.
+        return {
+            "a": _ref("rptw.left", timber="post#0", csg_path=UNCUT),
+            "b": _ref("rptw.right", timber="post#0", csg_path=UNCUT),
+            "measureId": None,
+        }
+
+    def _measurements(self, frame, pending, source=None):
+        drawings = runner.collect_drawings(frame, source, pending)
+        plan = next(d for d in drawings if d["id"] == "plan")
+        return next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]
+
+    def _move(self, frame, pending, offset):
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._wire(), {"placement": {"offset": offset}})
+
+    def test_moving_it_overrides_it(self):
+        frame, pending = self._frame(), []
+
+        self._move(frame, pending, 9.0)
+
+        (moved,) = self._measurements(frame, pending)
+        assert moved["origin"] == runner.ORIGIN_OVERRIDDEN
+        assert moved["placement"] == {"offset": 9.0}
+
+    def test_moving_it_again_moves_the_same_one(self):
+        frame, pending = self._frame(), []
+
+        self._move(frame, pending, 9.0)
+        self._move(frame, pending, 12.0)
+
+        (moved,) = self._measurements(frame, pending)
+        assert moved["placement"] == {"offset": 12.0}
+
+    def test_the_move_is_saved_and_comes_back_as_one(self, tmp_path):
+        frame, pending = self._frame(), []
+        self._move(frame, pending, 9.0)
+        source = tmp_path / "frame.py"
+
+        runner.write_drawings_file(source, runner.collect_drawings(frame, None, pending))
+
+        (moved,) = self._measurements(frame, [], source)
+        assert moved["origin"] == runner.ORIGIN_OVERRIDDEN and moved["placement"] == {"offset": 9.0}
+
+
 class TestDeletingAMeasurementTheCodeAsksFor:
-    """It cannot be done. The code asks again the next time it runs."""
+    """Marked deleted in the file: listed greyed, and can be put back."""
 
     def _frame(self):
         return _posts_with(lambda face, timber: [Drawing(
             name="plan",
             timbers=(timber("post"),),
             measurements={ViewportId(VIEWPORT): [
-                Measure(anchor_a=face("rough.left", "post"), anchor_b=face("rough.right", "post"))]},
+                Measure(anchor_a=face("rptw.left", "post"), anchor_b=face("rptw.right", "post"))]},
         )], paths=("post",))
 
     def _wire(self):
         return {
-            "a": _ref("rough.left", timber="post#0", csg_path=UNCUT),
-            "b": _ref("rough.right", timber="post#0", csg_path=UNCUT),
+            "a": _ref("rptw.left", timber="post#0", csg_path=UNCUT),
+            "b": _ref("rptw.right", timber="post#0", csg_path=UNCUT),
             "measureId": None,
         }
 
@@ -1176,41 +1248,94 @@ class TestDeletingAMeasurementTheCodeAsksFor:
         plan = next(d for d in drawings if d["id"] == "plan")
         return next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]
 
+    def _origins(self, frame, pending):
+        return [m["origin"] for m in self._measurements(frame, pending)]
+
     def test_the_code_measurement_is_there_to_begin_with(self):
-        assert len(self._measurements(self._frame(), [])) == 1
+        assert self._origins(self._frame(), []) == [runner.ORIGIN_CODE]
 
-    def test_deleting_it_is_refused(self):
+    def test_deleting_it_marks_it_deleted(self):
         frame, pending = self._frame(), []
 
-        with pytest.raises(ValueError, match="declared in the frame's code"):
-            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
 
-    def test_and_it_is_still_there_afterwards(self):
+        assert self._origins(frame, pending) == [runner.ORIGIN_DELETED]
+
+    def test_deleting_one_already_deleted_does_nothing(self):
+        frame, pending = self._frame(), []
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        before = [dict(d) for d in pending]
+
+        assert runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire()) is None
+        assert self._origins(frame, pending) == [runner.ORIGIN_DELETED]
+        assert [dict(d) for d in pending] == before
+
+    def test_putting_it_back_brings_the_code_s_own(self):
+        frame, pending = self._frame(), []
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        runner.restore_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        assert self._origins(frame, pending) == [runner.ORIGIN_CODE]
+
+    def test_putting_back_one_that_is_not_deleted_does_nothing(self):
         frame, pending = self._frame(), []
 
-        with pytest.raises(ValueError):
-            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        assert runner.restore_measurement(frame, None, pending, "plan", VIEWPORT, self._wire()) is None
+        assert pending == []
 
-        assert len(self._measurements(frame, pending)) == 1
-
-    def test_a_refused_delete_does_not_quietly_drop_an_override(self):
-        # The file may hold this measurement's placement or kind. Losing that to
-        # a delete that did not happen would be an edit nobody asked for.
+    def test_deleting_a_changed_one_puts_the_code_s_back(self):
         frame, pending = self._frame(), []
         runner.update_measurement(
             frame, None, pending, "plan", VIEWPORT, self._wire(),
             {"placement": {"offset": 9.0}})
+        assert self._origins(frame, pending) == [runner.ORIGIN_OVERRIDDEN]
 
-        with pytest.raises(ValueError):
-            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
 
-        assert self._measurements(frame, pending)[0]["placement"] == {"offset": 9.0}
+        (back,) = self._measurements(frame, pending)
+        assert back["origin"] == runner.ORIGIN_CODE and back.get("placement") != {"offset": 9.0}
 
-    def test_the_file_still_says_which_it_is(self):
-        # What the viewer reads to decide whether to offer a delete at all.
-        frame = self._frame()
+    def test_and_deleting_it_again_deletes_it(self):
+        frame, pending = self._frame(), []
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._wire(),
+            {"placement": {"offset": 9.0}})
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
 
-        assert self._measurements(frame, [])[0]["origin"] == runner.ORIGIN_CODE
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        assert self._origins(frame, pending) == [runner.ORIGIN_DELETED]
+
+    def test_a_deletion_is_saved_and_comes_back(self, tmp_path):
+        frame, pending = self._frame(), []
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+        source = tmp_path / "frame.py"
+
+        runner.write_drawings_file(source, runner.collect_drawings(frame, None, pending))
+
+        assert self._origins_from_file(frame, source) == [runner.ORIGIN_DELETED]
+
+    def test_a_change_is_saved_and_comes_back(self, tmp_path):
+        # Saving used to write the merged drawing whole, without saying what it
+        # overrides: read back it was a second drawing, and the change was gone.
+        frame, pending = self._frame(), []
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._wire(),
+            {"placement": {"offset": 9.0}})
+        source = tmp_path / "frame.py"
+
+        runner.write_drawings_file(source, runner.collect_drawings(frame, None, pending))
+
+        drawings = runner.collect_drawings(frame, source, [])
+        assert [(d["id"], d["origin"]) for d in drawings] == [("plan", runner.ORIGIN_OVERRIDDEN)]
+        (measure,) = next(v for v in drawings[0]["viewports"] if v["id"] == VIEWPORT)["measurements"]
+        assert measure["placement"] == {"offset": 9.0}
+
+    def _origins_from_file(self, frame, source):
+        drawings = runner.collect_drawings(frame, source, [])
+        plan = next(d for d in drawings if d["id"] == "plan")
+        return [m["origin"] for m in next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]]
 
 
 class TestAddingAMeasurement:

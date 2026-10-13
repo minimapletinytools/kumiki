@@ -8,6 +8,7 @@ const { createFrameViewer, initializeFrameViewer, renderFrameViewer, requestView
 const { requestWebviewRoundTrip } = require('./webview-request');
 const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 const { createTranslator } = require('./i18n');
+const { describeSelection } = require('./webview/selection-copy');
 
 // Resolved once from VS Code's own display language (no user override yet).
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
@@ -312,6 +313,15 @@ class FrameViewSession {
                 this.channel.show(true);
                 return;
             }
+            if (message.type === 'copySelectionForAI') {
+                // Formatted here, where the source file is known: relative to the project, as
+                // an assistant working in it would name it.
+                const sourceFile = path.relative(this.projectRoot, this.filePath) || path.basename(this.filePath);
+                getHost().copyText(describeSelection({ ...(message.selection || {}), sourceFile })).catch((err) => {
+                    this.log(`[selection] copy for AI failed: ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'findCSGAtPoint') {
                 this._handleFindCSGAtPoint(message).catch((err) => {
                     this.log(`[csg-nav] findCSGAtPoint error: ${err.message || err}`);
@@ -344,7 +354,7 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'addMeasurement' || message.type === 'updateMeasurement'
-                || message.type === 'deleteMeasurement') {
+                || message.type === 'deleteMeasurement' || message.type === 'restoreMeasurement') {
                 // Through the same path every other drawings command takes, so
                 // the whole set comes back as one 'scenes' message and the
                 // panels redraw from one answer. Posting a shape of its own is
@@ -357,6 +367,7 @@ class FrameViewSession {
                     addMeasurement: 'add_measurement',
                     updateMeasurement: 'update_measurement',
                     deleteMeasurement: 'delete_measurement',
+                    restoreMeasurement: 'restore_measurement',
                 }[message.type];
                 this._handleDrawingsCommand(command, {
                     drawingId: message.drawingId,
@@ -392,6 +403,12 @@ class FrameViewSession {
             if (message.type === 'requestCSGTree') {
                 this._handleRequestCSGTree(message).catch((err) => {
                     this.log(`[layers] requestCSGTree error: ${err.message || err}`);
+                });
+                return;
+            }
+            if (message.type === 'requestFeatureHighlights') {
+                this._handleRequestFeatureHighlights(message).catch((err) => {
+                    this.log(`[highlight] requestFeatureHighlights error: ${err.message || err}`);
                 });
                 return;
             }
@@ -1064,6 +1081,21 @@ class FrameViewSession {
         const payload = { memberKey: message.memberKey };
         const result = await this.runnerSession.slotRequest('get_csg_tree', this.slotName, payload);
         this._postToWebview({ type: 'csgTree', payload: result });
+    }
+
+    /** What to light for features nobody is pointing at -- a selected measurement's ends. */
+    async _handleRequestFeatureHighlights(message) {
+        if (!this.runnerSession) {
+            return;
+        }
+        const references = Array.isArray(message.references) ? message.references : [];
+        const result = await this.runnerSession.slotRequest(
+            'feature_highlights', this.slotName, { references });
+        this._postToWebview({
+            type: 'featureHighlights',
+            keys: Array.isArray(message.keys) ? message.keys : [],
+            highlights: (result && result.highlights) || [],
+        });
     }
 
     async _handleRequestCSGByPath(message) {

@@ -157,8 +157,13 @@
         }
 
         resize() {
-            const width = Math.max(1, this.canvas.clientWidth);
-            const height = Math.max(1, this.canvas.clientHeight);
+            // Hidden (a drawing hides the panel), the canvas has no size to take. Sized to
+            // nothing it would stay a pixel across until the next window resize.
+            if (!this.canvas.clientWidth || !this.canvas.clientHeight) {
+                return;
+            }
+            const width = this.canvas.clientWidth;
+            const height = this.canvas.clientHeight;
             this.renderer.setPixelRatio(globalScope.devicePixelRatio || 1);
             this.renderer.setSize(width, height, false);
             this.camera.aspect = width / height;

@@ -34,6 +34,7 @@ const WEBVIEW_ASSETS = [
     ['__CONTEXT_MENU_JS_URI__', 'context-menu.js'],
     ['__HOVER_STATE_JS_URI__', 'hover-state.js'],
     ['__PICK_TOLERANCES_JS_URI__', 'pick-tolerances.js'],
+    ['__SELECTION_COPY_JS_URI__', 'selection-copy.js'],
     ['__RENDER_MODE_JS_URI__', 'render-mode.js'],
     ['__DRAWING_PANEL_JS_URI__', 'drawing-panel.js'],
     ['__GEOMETRY_MODE_JS_URI__', 'geometry-mode.js'],

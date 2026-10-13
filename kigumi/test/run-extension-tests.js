@@ -84,6 +84,9 @@ async function main() {
 
   try {
     await runTests({
+      // Outside kigumi/: vsce walks the whole extension folder when packaging,
+      // and a few downloaded VS Codes in it made every install seconds slower.
+      cachePath: path.resolve(extensionDevelopmentPath, '..', '.vscode-test'),
       extensionDevelopmentPath,
       extensionTestsPath,
       extensionTestsEnv,

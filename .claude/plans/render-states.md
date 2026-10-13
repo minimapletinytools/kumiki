@@ -70,4 +70,4 @@ are scene-wide settings or transforms, not per-thing styling.
 - [x] 1. `MemberState` + `appearanceFor`
 - [x] 2. `FeatureState`, drawn one overlay per role
 - [x] 3. One overlay per feature
-- [ ] 4. Locked/fixed, measurement-end roles
+- [x] 4. Locked/fixed, measurement-end roles (and reference features)

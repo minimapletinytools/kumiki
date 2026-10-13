@@ -139,7 +139,7 @@ def default_feature_name(key: FeatureKey) -> str:
     Deterministic, so a default is referenceable -- from a drawing, a
     measurement, an override -- without anyone having authored a name for it.
     Lower case and dotted to sit alongside the authored names already in use,
-    which look like "ptw.front" and "rough.back_right".
+    which look like "ptw.front", "rptw.front" and "rough.back_right".
     """
     category, index = key
     return f"{category.name.lower()}.{index}"
@@ -349,7 +349,10 @@ class FeatureGroup(Enum):
     naming and pointing at without every face of it turning into an arris.
 
     What carries what today: a timber's perfect-timber-within faces, arrises,
-    corners and centerplanes are PERFECT, and its rough body's are ROUGH. A
+    corners and centerplanes are PERFECT, and its rough body's are ROUGH --
+    except where the rough body lies on the perfect timber within (rptw.*, see
+    timber.RPTW_FACE_PREFIX), which is PERFECT too, as is every face of a
+    timber with no rough allowance. A
     joint's shoulder plane is SHOULDER_PLANE, so a joint outlines itself against
     both bodies. TENON is a joint's tenon faces, and the one thing they meet is
     that shoulder plane -- where a tenon cheek leaves the timber at the shoulder
@@ -1416,6 +1419,63 @@ class PrismCenterplaneFeature(FaceFeature):
         x, y, _ = owner._local_coords(point)
         return safe_equality_test(x if PrismFace.RIGHT in self.faces else y, 0, eps=test_tolerance)
 
+
+
+@dataclass(frozen=True)
+class PrismParallelPlaneFeature(FaceFeature):
+    """A plane inside a RectangularPrism, parallel to one of its long faces. Not real by default.
+
+    `distance` is how far it sits from the prism's axis toward `face`, so `face` at half the
+    prism's size is that face's own plane and 0 is the centerplane. Placed by the owner's own
+    transform, so it moves with the prism wherever the prism is adopted.
+
+    For geometry that belongs inside a body without being on it: a timber's perfect faces and
+    centerplanes, carried by its rough prism.
+    """
+    face: PrismFace = PrismFace.RIGHT
+    distance: Numeric = scalar(0)
+    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(real=False))
+
+    def __post_init__(self):
+        if self.face in (PrismFace.TOP, PrismFace.BOTTOM):
+            raise ValueError(f"{self.name!r}: parallel to a long face, not {self.face.name}")
+
+    def _frame(self, owner: 'RectangularPrism') -> Tuple[Direction3D, Direction3D, V3]:
+        """(normal, the other cross-section axis, a point on the plane at mid-length), in the owner's space."""
+        width_dir, height_dir, length_dir = owner._local_axes()
+        normal, across = {
+            PrismFace.RIGHT: (width_dir, height_dir), PrismFace.LEFT: (-width_dir, height_dir),
+            PrismFace.FRONT: (height_dir, width_dir), PrismFace.BACK: (-height_dir, width_dir),
+        }[self.face]
+        middle = owner.transform.position + length_dir * _finite_midpoint(owner.start_distance, owner.end_distance)
+        return normal, across, middle + normal * self.distance
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
+        if not isinstance(owner, RectangularPrism):
+            return None
+        normal, _, point = self._frame(owner)
+        return Plane(normal=normal, point=point)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        """Where the plane crosses the prism, when the prism has both ends."""
+        if not isinstance(owner, RectangularPrism):
+            return None
+        normal, across, centre = self._frame(owner)
+        if owner.start_distance is None or owner.end_distance is None:
+            return CSGFeatureExtent(anchor=centre)
+        half_across = owner.size[1 if self.face in (PrismFace.RIGHT, PrismFace.LEFT) else 0] / 2
+        half_length = (owner.end_distance - owner.start_distance) / 2
+        _, _, length_dir = owner._local_axes()
+        corners = tuple(centre + across * (half_across * scalar(a)) + length_dir * (half_length * scalar(b))
+                        for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1)))
+        return CSGFeatureExtent(anchor=centre, region=_face_region(normal, corners))
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, RectangularPrism):
+            return False
+        x, y, _ = owner._local_coords(point)
+        along = {PrismFace.RIGHT: x, PrismFace.LEFT: -x, PrismFace.FRONT: y, PrismFace.BACK: -y}[self.face]
+        return safe_equality_test(along, self.distance, eps=test_tolerance)
 
 def _canonical_ordering_arris_faces(
     first: 'PrismFace', second: 'PrismFace',

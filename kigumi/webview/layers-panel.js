@@ -568,9 +568,11 @@
             // resolves, so no camera is needed to tell. The view-dependent
             // refusals cannot arise: these belong to no viewport.
             const broken = Boolean(measure.unresolved);
+            const deleted = globalScope.KigumiMeasurements.isDeleted(measure);
             const row = document.createElement('div');
             row.className = 'lp-row lp-row-measurement lp-depth-0 lp-selectable'
-                + (broken ? ' lp-broken' : '');
+                + (broken ? ' lp-broken' : '')
+                + (deleted ? ' lp-deleted' : '');
             row.dataset.nodeId = 'measurement:' + index;
 
             const chev = document.createElement('span');
@@ -598,6 +600,19 @@
                     measureKey: globalScope.KigumiMeasurements.measurementKey(measure),
                     add: Boolean(event.shiftKey),
                 }));
+            if (deleted) {
+                // Greyed, and put back from a right-click: it is the code's, deleted in the file.
+                name.title = t('viewer.drawing.deleted');
+                row.addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    this._emit('kigumi-measurement-contextmenu', {
+                        viewportId: measure.viewportId || null,
+                        measureKey: globalScope.KigumiMeasurements.measurementKey(measure),
+                        clientX: event.clientX, clientY: event.clientY,
+                    });
+                });
+            }
             return row;
         }
 

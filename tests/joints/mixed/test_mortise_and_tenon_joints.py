@@ -492,7 +492,7 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
 
         assert counts.get("shoulder") == 1
         assert [name for name, count in counts.items()
-                if name.startswith("rough.") and count > 1] == []
+                if name.startswith("rptw.") and count > 1] == []
 
     def test_forwards_through_face_aligned_to_plane_aligned_wrapper(self, simple_T_configuration):
         """cut_mortise_and_tenon_joint_on_face_aligned_timbers and
@@ -1262,13 +1262,13 @@ class TestMortiseAndTenonFeatures:
 
     def test_the_timbers_own_arrises_are_still_reachable(self, simple_T_configuration):
         # They used to come from two rough faces meeting. They are declared now
-        # -- rough.front_left rather than rough.front x rough.left -- and the
+        # -- rptw.front_left rather than rptw.front x rptw.left -- and the
         # point of the test is unchanged: joint geometry must not crowd them out.
         from kumiki.csg.cutcsg import CSGFeatureType
 
         edges = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
                              CSGFeatureType.EDGE)
-        assert {edge for edge in edges if edge.startswith("rough.") and "\u00d7" not in edge}
+        assert {edge for edge in edges if edge.startswith("rptw.") and "\u00d7" not in edge}
 
 
 class TestThePegHoleCentreline:
@@ -1682,3 +1682,65 @@ class TestInsetShoulderReliefOnRoughStock:
                 relief=ButtJointNotchReliefConfig(),
                 inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief,
             )
+
+
+class TestAnAngledBraceIntoARoughPost:
+    """A 45-degree brace tenoned into a post whose rough stock stands proud of its perfect face.
+
+    The joint's end cut carries the brace on past its own end, to the shoulder at the post's
+    perfect face, through the post's rough fringe. The scribe relief has to hollow the post for
+    that part too; it once stopped at the brace's own end and left the brace standing in the post.
+    """
+
+    def test_the_brace_does_not_stand_in_the_post(self):
+        import trimesh
+        from kumiki.construction import Stickout, StickoutReference, attach_plane_aligned_timber
+        from kumiki.csg.cutcsg import adopt_csg
+        from kumiki.csg.triangles import triangulate_cutcsg
+        from kumiki.timber import Frame
+
+        perfect_post = create_timber(
+            bottom_position=create_v3(0, 0, 0), length=inches(96), size=create_v2(inches(7), inches(7)),
+            length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="post")
+        # Half an inch of rough stock proud of the face the brace comes out of.
+        post = Timber.from_perfect_timber_within(
+            perfect_post,
+            rough_half_sizes=(create_v2(inches(4), inches(7, 2)), create_v2(inches(7, 2), inches(7, 2))))
+        # Placed as learn_to_timber_frame_shed places its knee braces.
+        brace = attach_plane_aligned_timber(
+            original_timber=post,
+            size=create_v2(inches(5), inches(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_angle=pi / 4,
+            attached_timber_length_or_target=inches(18) * sqrt(2),
+            attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
+            original_timber_end_to_measure_from_for_length_position=TimberEnd.TOP,
+            attached_timber_long_face_to_measure_to_for_length_position=TimberCenterline.CENTERLINE,
+            length_position_measurement=inches(26),
+            original_timber_face_to_measure_from_for_lateral_position=TimberFace.BACK,
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.FRONT,
+            lateral_position_measurement=scalar(0),
+            ticket="brace",
+        )
+        joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=post, butt_timber=brace, butt_timber_end=TimberEnd.BOTTOM,
+                front_face_on_butt_timber=TimberLongFace.BACK),
+            tenon_width_relative_to_joint=inches(7, 2),
+            tenon_height_relative_to_joint=inches(3, 2),
+            tenon_length=inches(4),
+            mortise_depth=inches(7, 2),
+            tenon_position=create_v2(scalar(0), -inches(3, 4)),
+            bore_mortise_perpendicular_to_face=True,
+        )
+        frame = Frame.from_joints(joints=[joint])
+
+        def mesh(name):
+            cut = next(c for c in frame.cut_timbers if c.timber.ticket.path == name)
+            local = cut.render_timber_with_cuts_csg_local()
+            triangles = triangulate_cutcsg(adopt_csg(cut.timber.transform, Transform.identity(), local)).mesh
+            return trimesh.Trimesh(vertices=triangles.vertices, faces=triangles.faces, process=False)
+
+        overlap = trimesh.boolean.intersection([mesh("post"), mesh("brace")], engine="manifold")
+
+        assert overlap.volume < 1e-8  # under a hundredth of a cubic centimetre

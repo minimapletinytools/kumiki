@@ -1,4 +1,4 @@
-const { SelectionStore, choosePickAction } = require('../webview/selection-store');
+const { SelectionStore, choosePickAction, pickMode, TIMBER_MODE_IN_DRAWINGS } = require('../webview/selection-store');
 
 describe('timber selection', () => {
     test('single selection replaces the previous one', () => {
@@ -393,6 +393,70 @@ describe('choosePickAction', () => {
     test('with nothing selected every click selects', () => {
         expect(choosePickAction({ hits: [hit('A')], selectedTimbers: [] }).action)
             .toBe('select');
+    });
+});
+
+describe('the selection mode', () => {
+    test.each([
+        // [where, measuring, shift, mode]
+        ['3D', false, false, 'timber'],
+        ['3D', false, true, 'timber'],
+        ['3D', true, false, 'feature'],
+        ['3D', true, true, 'timber'],
+        ['drawing', false, false, 'feature'],
+        ['drawing', false, true, 'feature'],
+        ['drawing', true, false, 'feature'],
+        ['drawing', true, true, 'feature'],
+    ])('in %s, measuring %s, shift %s: %s mode', (where, measuring, shiftKey, mode) => {
+        expect(pickMode({ inDrawing: where === 'drawing', measuring, shiftKey })).toBe(mode);
+    });
+
+    test('timber mode is off in drawings, but still works when turned on', () => {
+        expect(TIMBER_MODE_IN_DRAWINGS).toBe(false);
+        expect(pickMode({ inDrawing: true, measuring: false, timberModeInDrawings: true })).toBe('timber');
+        expect(pickMode({ inDrawing: true, measuring: true, timberModeInDrawings: true })).toBe('feature');
+    });
+});
+
+describe('choosePickAction while measuring', () => {
+    const hit = (memberKey) => ({ memberKey, hit: { memberKey } });
+
+    test('feature mode: straight to the nearest feature, the selection ignored', () => {
+        const decision = choosePickAction({
+            hits: [hit('B'), hit('A')], selectedTimbers: ['A'], measuring: true,
+        });
+        expect(decision).toMatchObject({ action: 'csg', memberKey: 'B' });
+    });
+
+    test('with shift, an unselected timber is selected in place of the selection', () => {
+        const decision = choosePickAction({
+            hits: [hit('B')], selectedTimbers: ['A'], measuring: true, shiftKey: true,
+        });
+        expect(decision).toMatchObject({ action: 'select', memberKey: 'B' });
+    });
+
+    test('with shift, a selected timber gives its feature, even behind another', () => {
+        const decision = choosePickAction({
+            hits: [hit('B'), hit('A')], selectedTimbers: ['A'], measuring: true, shiftKey: true,
+        });
+        expect(decision).toMatchObject({ action: 'csg', memberKey: 'A' });
+    });
+});
+
+describe('choosePickAction in a drawing', () => {
+    const hit = (memberKey) => ({ memberKey, hit: { memberKey } });
+
+    test('feature mode, shift or not', () => {
+        for (const shiftKey of [false, true]) {
+            expect(choosePickAction({ hits: [hit('B')], selectedTimbers: ['A'], inDrawing: true, shiftKey }))
+                .toMatchObject({ action: 'csg', memberKey: 'B' });
+        }
+    });
+
+    test('with timber mode turned on, it picks the way the 3D view does', () => {
+        expect(choosePickAction({
+            hits: [hit('B')], selectedTimbers: [], inDrawing: true, timberModeInDrawings: true,
+        })).toMatchObject({ action: 'select', memberKey: 'B' });
     });
 });
 

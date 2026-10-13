@@ -3,6 +3,7 @@ import { html } from 'lit';
 const KigumiUnits = window.KigumiUnits;
 const KigumiMeasurements = window.KigumiMeasurements;
 const TagIndex = window.TagIndex;
+const KigumiSelectionCopy = window.KigumiSelectionCopy;
 
 /**
  * The selection pane: what is selected, as stock and as a path into the CSG.
@@ -65,26 +66,39 @@ export class SelectionPanel {
         const action = document.createElement('button');
         action.type = 'button';
         action.className = 'ip-action ip-measure';
-        const making = this.app.measureDraft.isActive;
-        // There is nothing to confirm: the second feature is confirmed by being
-        // clicked, and what the click takes is already drawn under the pointer.
-        // So while an end is held this is the way OUT, which is otherwise only
-        // on the Escape key.
-        action.textContent = making
-            ? this.t('viewer.selection.measureCancel')
-            : this.t('viewer.selection.measureFrom');
-        action.title = making
-            ? this.t('viewer.selection.measureCancel.title')
-            : this.t('viewer.selection.measureFrom.title');
+        action.textContent = this.t('viewer.selection.measureFrom');
+        action.title = this.t('viewer.selection.measureFrom.title');
         action.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (making) {
-                this.app.escapeMeasurement();
-            } else {
-                this.app.startMeasurementFromFocus();
-            }
+            this.app.startMeasurementFromFocus();
         });
         return action;
+    }
+
+    /**
+     * While an end is held: how to pick the second feature, one line each, and the
+     * way out below it -- a button, or Escape. There is nothing to confirm: the
+     * second feature is confirmed by being clicked.
+     */
+    _measuringHint() {
+        const box = document.createElement('div');
+        box.className = 'ip-measure-hint';
+        for (const key of ['pick', 'byTimber']) {
+            const line = document.createElement('div');
+            line.textContent = this.t(`viewer.selection.measuring.${key}`);
+            box.appendChild(line);
+        }
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'ip-action ip-measure';
+        cancel.textContent = this.t('viewer.selection.measuring.cancel');
+        cancel.title = this.t('viewer.selection.measuring.cancel.title');
+        cancel.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.app.escapeMeasurement();
+        });
+        box.appendChild(cancel);
+        return box;
     }
 
     /**
@@ -171,11 +185,7 @@ export class SelectionPanel {
 
     updateInfo(frameData) {
         this.app.currentFrameData = frameData || {};
-        const timberCount = frameData && frameData.timber_count ? frameData.timber_count : 0;
-        const accessoriesCount = frameData && frameData.accessories_count ? frameData.accessories_count : 0;
         const selectedMembers = this.app.selectionManager.getSelectedTimbers();
-        let selectedTimberCount = 0;
-        let selectedAccessoryCount = 0;
         let selectedSingleName = '';
         let selectedKnownCount = 0;
 
@@ -185,11 +195,6 @@ export class SelectionPanel {
                 continue;
             }
             selectedKnownCount += 1;
-            if (metadata.type === 'accessory') {
-                selectedAccessoryCount += 1;
-            } else {
-                selectedTimberCount += 1;
-            }
             if (selectedKnownCount === 1) {
                 selectedSingleName = metadata.name || '';
             }
@@ -225,15 +230,81 @@ export class SelectionPanel {
             ).join(' \u203a ');
         }
 
+        // What is selected, in one line: the path to a focus, the member's name,
+        // or how many there are.
+        let selected = null;
+        if (focus) {
+            selected = breadcrumb;
+        } else if (selectedKnownCount === 1) {
+            selected = selectedSingleName;
+        } else if (selectedKnownCount > 1) {
+            selected = `(${selectedKnownCount})`;
+        }
+
         this._renderInfoPanel({
-            timberCount,
-            accessoriesCount,
-            selectedTimberCount,
-            selectedAccessoryCount,
-            breadcrumb,
+            selected,
+            canCopy: KigumiSelectionCopy.canCopy(selectedKnownCount, Boolean(focus && focus.featureLabel)),
             tags: selectedTags,
             size: selectedSize,
         });
+    }
+
+    /** What "copy for AI" describes: the focused feature, or the selected members. */
+    _selectionForCopy() {
+        const frame = this.app.currentFrameData || {};
+        const placements = new Map((frame.timbers || []).map((timber) => [timber.name, timber]));
+        const focus = this.app.selectionManager.csgFocus;
+        let feature = null;
+        if (focus && focus.featureLabel) {
+            const metadata = this.app.memberMetadataByKey.get(focus.timberKey) || {};
+            const detail = this.app.lastPickDetail || {};
+            const picked = this.app.pickedFeature || {};
+            feature = {
+                timberName: metadata.name || focus.timberKey,
+                memberKey: focus.timberKey,
+                path: (focus.path || []).join(' \u203a '),
+                featureLabel: focus.featureLabel,
+                featureType: detail.featureType || null,
+                jointName: detail.jointName || null,
+                geometry: picked.geometry || null,
+                reference: picked.reference || null,
+            };
+        }
+        const members = this.app.selectionManager.getSelectedTimbers()
+            .slice(0, KigumiSelectionCopy.MAX_MEMBERS)
+            .map((key) => {
+                const metadata = this.app.memberMetadataByKey.get(key) || {};
+                const mesh = metadata.mesh || {};
+                const size = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
+                return {
+                    key,
+                    name: metadata.name || key,
+                    type: metadata.type || 'timber',
+                    width: size(mesh.perfect_width),
+                    height: size(mesh.perfect_height),
+                    length: KigumiUnits.memberLengthMeters(mesh),
+                    placement: metadata.type === 'accessory' ? null : placements.get(metadata.name) || null,
+                    tags: metadata.tags || [],
+                };
+            });
+        return { frameName: frame.name || null, members, feature };
+    }
+
+    _copyButton() {
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'ip-action ip-copy';
+        action.textContent = this.t('viewer.selection.copyForAI');
+        action.title = this.t('viewer.selection.copyForAI.title');
+        action.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.app.copySelectionForAI(this._selectionForCopy());
+            action.textContent = this.t('viewer.selection.copied');
+            setTimeout(() => {
+                action.textContent = this.t('viewer.selection.copyForAI');
+            }, 1500);
+        });
+        return action;
     }
 
     _describeMemberSize(metadata) {
@@ -306,24 +377,38 @@ export class SelectionPanel {
         const body = document.createElement('div');
         body.className = 'ip-body';
 
-        const counts = document.createElement('div');
-        counts.className = 'ip-counts';
-        counts.textContent = this.t('viewer.selection.counts', {
-            selectedTimbers: summary.selectedTimberCount,
-            timbers: summary.timberCount,
-            selectedAccessories: summary.selectedAccessoryCount,
-            accessories: summary.accessoriesCount,
-        });
-        body.appendChild(counts);
+        const selected = document.createElement('div');
+        selected.className = 'ip-breadcrumb';
+        selected.textContent = summary.selected
+            ? this.t('viewer.selection.selected', { what: summary.selected })
+            : this.t('viewer.selection.none');
+        selected.title = selected.textContent;
+        body.appendChild(selected);
+
+        if (summary.canCopy) {
+            const line = document.createElement('div');
+            line.className = 'ip-detail ip-copy-line';
+            line.appendChild(this._copyButton());
+            body.appendChild(line);
+        }
 
         if (summary.size) {
-            // No member name here: the breadcrumb underneath already carries it,
-            // and the room is better spent on the dimensions.
+            // No member name here: the line above already carries it, and the
+            // room is better spent on the dimensions.
             const size = document.createElement('div');
             size.className = 'ip-size';
             size.textContent = summary.size;
             size.title = summary.size;
             body.appendChild(size);
+        }
+
+        // Measuring from what is focused. Present while a measurement is being
+        // made too, since that is when it becomes the way to finish one.
+        if (this.app.canStartMeasurement || this.app.measureDraft.isActive) {
+            const line = document.createElement('div');
+            line.className = 'ip-detail ip-measure-line';
+            line.appendChild(this.app.measureDraft.isActive ? this._measuringHint() : this._measureButton());
+            body.appendChild(line);
         }
 
         // Not behind the expander: it appears when a measurement is focused,
@@ -335,23 +420,6 @@ export class SelectionPanel {
             if (kindRow) {
                 body.appendChild(kindRow);
             }
-        }
-
-        // Measuring from what is focused. Present while a measurement is being
-        // made too, since that is when it becomes the way to finish one.
-        if (this.app.canStartMeasurement || this.app.measureDraft.isActive) {
-            const line = document.createElement('div');
-            line.className = 'ip-detail';
-            line.appendChild(this._measureButton());
-            body.appendChild(line);
-        }
-
-        if (summary.breadcrumb) {
-            const crumb = document.createElement('div');
-            crumb.className = 'ip-breadcrumb';
-            crumb.textContent = summary.breadcrumb;
-            crumb.title = summary.breadcrumb;
-            body.appendChild(crumb);
         }
 
         // The pills the member rows no longer carry: they live here, where

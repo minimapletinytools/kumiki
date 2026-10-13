@@ -27,7 +27,7 @@ def _cut(frame, path):
 def _shoulder_edge(frame):
     butt = _cut(frame, "butt_timber")
     shoulder = present(find_feature(butt, ("mortise_and_tenon", "tenon_waste", "shoulder"), "shoulder"), "shoulder")
-    front = present(find_feature(butt, BODY, "rough.front"), "rough.front")
+    front = present(find_feature(butt, BODY, "rptw.front"), "rptw.front")
     edge = present(DerivedEdgeFeature.derive(shoulder.hit, front.hit), "an edge")
     return FeatureHandle(timber=butt.timber, hit=OwnedFeatureHit(feature=edge, owner=shoulder.owner))
 
@@ -56,7 +56,7 @@ class TestRoundTrips:
     @pytest.mark.parametrize("timber, csg_path, name", [
         ("butt_timber", ("mortise_and_tenon", "tenon_waste", "tenon"), "tenon_top"),
         ("butt_timber", ("mortise_and_tenon", "tenon_waste", "shoulder"), "shoulder"),
-        ("butt_timber", BODY, "rough.front"),
+        ("butt_timber", BODY, "rptw.front"),
         ("receiving_timber", ("mortise_and_tenon", "mortise_hole"), "mortise_bottom"),
     ])
     def test_a_declared_feature(self, frame, timber, csg_path, name):
@@ -81,7 +81,7 @@ class TestRoundTrips:
 
     def test_a_timber_not_in_the_frame_has_no_path(self, frame):
         other = Frame.from_joints(joints=[example_basic_mortise_and_tenon_joint()])
-        handle = present(find_feature(_cut(other, "butt_timber"), BODY, "rough.front"), "rough.front")
+        handle = present(find_feature(_cut(other, "butt_timber"), BODY, "rptw.front"), "rptw.front")
         assert to_feature_path(handle, frame) is None
 
 

@@ -1360,10 +1360,17 @@ def chop_scribe_relief(
     timber_to_be_scribed = timber_to_be_scribed_cutting.timber
     timber_to_be_cut = timber_to_be_cut_cutting.timber
 
+    # Extended where its own cutting has an end cut, as the cut timber is rendered: a joint's
+    # end cut carries the body on past the timber's own end -- to a shoulder on an angled brace
+    # -- and that part needs its hollow too. Stopping at the timber's end left a brace at 45
+    # degrees running into a rough post's fringe.
     timber_to_be_scribed_actual_csg_global = adopt_csg(
         timber_to_be_scribed.transform,
         None,
-        timber_to_be_scribed.get_extended_actual_csg_local(extend_bot=False, extend_top=False),
+        timber_to_be_scribed.get_extended_actual_csg_local(
+            extend_bot=timber_to_be_scribed_cutting.get_maybe_bottom_end_cut() is not None,
+            extend_top=timber_to_be_scribed_cutting.get_maybe_top_end_cut() is not None,
+        ),
     )
 
     timber_to_be_scribed_imperfect_fringe_csg_global = adopt_csg(
