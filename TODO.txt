@@ -107,6 +107,10 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 DONE-don't show assembly in measuring window
+DONE-BUG dragging python created measurement si my_cute_fraem_drawing_test creates 2 copies of the mesaurement in the viewer. so teh override is not working for whateve rreason
+DONE-do the copy for prompt button
+DONE-BUG diagonal brace notiching broken in learn to timber frame shed
+DONE-BUG the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
 
 -DECISION TIME ON DRAWING FEATURES
   -the high level issue here is that each view in 2d drawing only has some features visible and you only want to make measuremints for those features. Except you can totally mesauer other featuers and its' kind NBD so maybe ther' sjust ntonig to do here.
@@ -132,10 +136,8 @@ DONE-don't show assembly in measuring window
     -you need this so mesaurements only get created in the viwe that shows the feature on the surface <- this is the important thing.
     -ask agent what its currentyl doing though
 
--BUG dragging python created measurement si my_cute_fraem_drawing_test creates 2 copies of the mesaurement in the viewer. so teh override is not working for whateve rreason
--rework left hand view or whatever, it sholud be cllapsoable but maybe yous hould justc remaigen it for the standalone app...
 
--diagonal brace notiching broken in learn to timber frame shed
+
 -add support to run @tools from the parameter section
 -add export drawing button (how to do this?)
 -then you can see if all features are visible through the views and warn if not
@@ -143,6 +145,7 @@ DONE-don't show assembly in measuring window
 -decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
 
 -do the standalone app 
+  -rework left hand view or whatever, it sholud be cllapsoable but maybe yous hould justc remaigen it for the standalone app...
   -side bar should be collaspsable
   -need file explorer in addition to side bar
   -should be able to right click file and say open in viewer or osmetihng(both vscoed and electron), or maybe have it open both in electron
@@ -153,8 +156,8 @@ DONE-don't show assembly in measuring window
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
 -maybe review runner.py ;__;
 -add types to runner.py
--improve panel functions, think bout the simplest way to do this...
--update shed example to include panels
+-improve board  functions, think bout the simplest way to do this...
+-update shed example to include board
   -make a video about this maybe after you do some more edge joints
 -add srcibe notching ot more joints...
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
@@ -227,7 +230,6 @@ IGNORE-rename/reorg all mortise and tenon joints
 
 
 -MEASURING/DRAWING BACKLOG
-  -the camera and the light widget sometimes get messed up after I create measurements or osmething (going from 3d to drawing view and back seems to trigger it sometimes)
   -angle mesaurement anchor positon derivatino needs to be improved
     -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
     -definitely highlight the features being measured...
