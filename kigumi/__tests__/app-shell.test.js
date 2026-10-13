@@ -149,6 +149,22 @@ describe('shell connection', () => {
     expect(state.panels.find((p) => p.id === editor.id).title).toBe('● frame.py');
   });
 
+  test('closing a tab asks first, and a no keeps it open', async () => {
+    const answers = [false, true];
+    const asked = [];
+    const { connection, transport } = connect({ closeRequest: (id) => { asked.push(id); return answers.shift(); } });
+    const editor = connection.createPanel('editor', { title: 'frame.py', filePath: '/path/frame.py' });
+
+    transport.fromShell({ type: 'tab:close', id: editor.id });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(connection.tabs.tabs.map((tab) => tab.id)).toEqual([editor.id]);
+
+    transport.fromShell({ type: 'tab:close', id: editor.id });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(connection.tabs.tabs).toEqual([]);
+    expect(asked).toEqual([editor.id, editor.id]);
+  });
+
   test('visible and active follow the active tab and window focus', () => {
     let focused = true;
     const { connection } = connect({ isFocused: () => focused });

@@ -210,6 +210,9 @@ function openLogTab() {
     surface.loadUrl(`${ORIGIN}/webview/shell/log.html`);
 }
 
+// Editor tabs by panel id: whether each has unsaved edits, and how to ask it for them.
+const editorTabs = new Map();
+
 function openEditorTab(filePath, line = 1) {
     const existing = connection.findPanel((panel) => panel.type === 'editor' && panel.filePath === filePath);
     if (existing) {
@@ -231,32 +234,111 @@ function openEditorTab(filePath, line = 1) {
 
     const baseName = path.basename(filePath);
     const surface = connection.createPanel('editor', { title: baseName, filePath });
-    let isDirty = false;
-    let pendingContent = fileContent;
+    const pendingContent = new Map();
+    let nextRequest = 1;
+    const tab = {
+        name: baseName,
+        isDirty: false,
+        // What the editor holds now, unsaved edits included.
+        content() {
+            const requestId = nextRequest++;
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    pendingContent.delete(requestId);
+                    reject(new Error(`${baseName} did not answer`));
+                }, 3000);
+                pendingContent.set(requestId, (content) => {
+                    clearTimeout(timer);
+                    resolve(content);
+                });
+                void surface.postMessage({ type: 'getContent', requestId });
+            });
+        },
+        save(content) {
+            fs.writeFileSync(filePath, content, 'utf8');
+            fileContent = content;
+            tab.isDirty = false;
+            surface.title = baseName;
+            void surface.postMessage({ type: 'saved' });
+        },
+    };
+    editorTabs.set(surface.id, tab);
 
     surface.onMessage(async (message) => {
         if (!message) return;
         if (message.type === 'editorReady') {
             void surface.postMessage({ type: 'init', filePath, content: fileContent, line });
         } else if (message.type === 'editorDirty') {
-            isDirty = !!message.isDirty;
-            surface.title = isDirty ? `● ${baseName}` : baseName;
+            tab.isDirty = !!message.isDirty;
+            surface.title = tab.isDirty ? `● ${baseName}` : baseName;
+        } else if (message.type === 'editorContent') {
+            const resolve = pendingContent.get(message.requestId);
+            pendingContent.delete(message.requestId);
+            if (resolve) resolve(message.content);
         } else if (message.type === 'editorSave') {
             try {
-                fs.writeFileSync(filePath, message.content, 'utf8');
-                fileContent = message.content;
-                pendingContent = message.content;
-                isDirty = false;
-                surface.title = baseName;
-                void surface.postMessage({ type: 'saved' });
+                tab.save(message.content);
             } catch (error) {
                 setStatus('error', `Failed to save ${baseName}: ${error.message}`);
             }
         }
     });
 
+    // Changes made elsewhere -- another editor, an agent -- come into the tab. Polled: an editor
+    // that saves by renaming the file would leave an fs.watch watching nothing.
+    const onDiskChange = () => {
+        let content;
+        try {
+            content = fs.readFileSync(filePath, 'utf8');
+        } catch {
+            return;
+        }
+        if (content === fileContent) {
+            return; // our own save, or nothing that matters
+        }
+        fileContent = content;
+        if (tab.isDirty) {
+            setStatus('warning', `${baseName} changed on disk; the tab keeps your unsaved edits.`);
+            return;
+        }
+        void surface.postMessage({ type: 'externalUpdate', content });
+    };
+    fs.watchFile(filePath, { interval: 1000 }, onDiskChange);
+    surface.onDispose(() => {
+        fs.unwatchFile(filePath, onDiskChange);
+        editorTabs.delete(surface.id);
+    });
+
     surface.loadUrl(`${ORIGIN}/webview/editor/editor.html`);
     return surface;
+}
+
+// Before an editor tab with unsaved edits closes: save, discard, or keep it open.
+async function confirmCloseEditor(panelId) {
+    const tab = editorTabs.get(panelId);
+    if (!tab || !tab.isDirty) {
+        return true;
+    }
+    const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        buttons: ['Save', "Don't Save", 'Cancel'],
+        defaultId: 0,
+        cancelId: 2,
+        message: `Do you want to save the changes you made to ${tab.name}?`,
+        detail: "Your changes will be lost if you don't save them.",
+    });
+    if (response === 2) {
+        return false;
+    }
+    if (response === 0) {
+        try {
+            tab.save(await tab.content());
+        } catch (error) {
+            setStatus('error', `Failed to save ${tab.name}: ${error.message}`);
+            return false;
+        }
+    }
+    return true;
 }
 
 // Opens settings.json, listing every setting with its current value.
@@ -376,8 +458,29 @@ async function start() {
         onCommand: onShellCommand,
         isFocused: () => !mainWindow.isDestroyed() && mainWindow.isFocused(),
         log,
+        closeRequest: confirmCloseEditor,
     });
     mainWindow.on('focus', () => pushShellState());
+    // Quitting asks about each editor tab with unsaved edits, as closing one does.
+    let closeConfirmed = false;
+    mainWindow.on('close', (event) => {
+        const dirty = [...editorTabs].filter(([, tab]) => tab.isDirty).map(([id]) => id);
+        if (closeConfirmed || dirty.length === 0) {
+            return;
+        }
+        event.preventDefault();
+        void (async () => {
+            for (const id of dirty) {
+                const panel = connection.panels.get(id);
+                if (panel) panel.reveal();
+                if (!(await confirmCloseEditor(id))) {
+                    return;
+                }
+            }
+            closeConfirmed = true;
+            mainWindow.close();
+        })();
+    });
 
     setHost(createElectronHost({
         window: mainWindow,

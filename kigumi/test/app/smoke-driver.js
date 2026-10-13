@@ -129,6 +129,34 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         connection().activePanel.dispose();
         check('closing editor tab succeeds', connection().tabs.tabs.length === 2);
 
+        // A change made on disk while the tab is open, with nothing unsaved, comes into the tab.
+        // Inside the workspace (a file outside it opens as a read-only copy), where git ignores it.
+        const scratch = path.join(REPO, '.kigumi', `editor-smoke-${process.pid}.py`);
+        fs.mkdirSync(path.dirname(scratch), { recursive: true });
+        fs.writeFileSync(scratch, 'first = 1\n');
+        try {
+            await runAppCommand('kigumi.viewPatternSource', { data: { sourceFile: scratch } });
+            const editorText = () => inShell(`(() => {
+                const frame = document.querySelector('#slot-center iframe:not([hidden])');
+                const win = frame && frame.contentWindow;
+                const models = win && win.monaco ? win.monaco.editor.getModels() : [];
+                return models.length ? models[0].getValue() : null;
+            })()`);
+            const opened = await waitFor(async () => (await editorText()) === 'first = 1\n', { timeoutMs: 15000 })
+                .then(() => true, () => false);
+            if (!opened) {
+                const active = connection().activePanel;
+                throw new Error(`scratch file did not open: active ${active && active.type} ${active && active.filePath}, text ${JSON.stringify(await editorText())}`);
+            }
+            fs.writeFileSync(scratch, 'second = 2\n');
+            const updated = await waitFor(async () => (await editorText()) === 'second = 2\n', { timeoutMs: 15000 })
+                .then(() => true, () => false);
+            check('a change on disk comes into an open editor tab', updated);
+            connection().activePanel.dispose();
+        } finally {
+            fs.rmSync(scratch, { force: true });
+        }
+
         const errors = logLines().filter((line) => /traceback|uncaught|\[error\]/i.test(line));
         check('no errors in the log', errors.length === 0, errors.slice(0, 3).join(' / '));
     } catch (error) {

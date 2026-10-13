@@ -12,8 +12,8 @@
     let isDirty = false;
     let originalContent = '';
 
-    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = isDarkMode ? 'vs-dark' : 'vs';
+    const darkQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    const themeNow = () => (darkQuery && darkQuery.matches ? 'vs-dark' : 'vs');
 
     // Configure Monaco AMD loader to load scripts relative to ../vendor/monaco/vs
     require.config({
@@ -22,14 +22,13 @@
         },
     });
 
+    // What a Kigumi project holds. The TypeScript, CSS and HTML language services are not
+    // shipped (they were most of Monaco's size), so those files open as plain text.
     function getLanguage(filePath) {
         if (!filePath) return 'plaintext';
         const lower = filePath.toLowerCase();
         if (lower.endsWith('.py')) return 'python';
         if (lower.endsWith('.json')) return 'json';
-        if (lower.endsWith('.js') || lower.endsWith('.mjs')) return 'javascript';
-        if (lower.endsWith('.html')) return 'html';
-        if (lower.endsWith('.css')) return 'css';
         if (lower.endsWith('.md')) return 'markdown';
         return 'plaintext';
     }
@@ -45,7 +44,7 @@
 
             editor = monaco.editor.create(container, {
                 model,
-                theme,
+                theme: themeNow(),
                 automaticLayout: true,
                 fontSize: 13,
                 fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
@@ -55,6 +54,10 @@
                 tabSize: 4,
                 insertSpaces: true,
             });
+
+            if (darkQuery) {
+                darkQuery.addEventListener('change', () => monaco.editor.setTheme(themeNow()));
+            }
 
             if (line > 1) {
                 editor.revealLineInCenter(line);
@@ -94,6 +97,14 @@
                     editor.setPosition({ lineNumber: message.line, column: 1 });
                     editor.focus();
                 }
+                break;
+
+            case 'getContent':
+                vscode.postMessage({
+                    type: 'editorContent',
+                    requestId: message.requestId,
+                    content: editor ? editor.getValue() : originalContent,
+                });
                 break;
 
             case 'saved':
