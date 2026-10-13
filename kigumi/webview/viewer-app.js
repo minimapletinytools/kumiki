@@ -5721,6 +5721,18 @@ class KigumiViewerApp extends LitElement {
             this.orbitCenterGizmo = null;
         }
 
+        // The panel first: the cube and the light dial size themselves from it, and
+        // built while it was still hidden on the way back from a drawing they came
+        // out a pixel across.
+        const panel = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#gizmo-panel')
+            : null;
+        if (panel) {
+            const wantsAny = ['cube', 'orbitGizmo', 'projection', 'focus']
+                .some((name) => this.sceneStore.wantsCameraControl(name));
+            panel.style.display = wantsAny ? '' : 'none';
+        }
+
         // The cube's canvas stays mounted either way -- its pointer handlers
         // are bound once at startup and would not survive being unmounted and
         // brought back. Hiding the panel is what makes it go away.
@@ -5735,14 +5747,11 @@ class KigumiViewerApp extends LitElement {
             this.cameraCube = null;
         }
 
-        const panel = this.renderRoot && this.renderRoot.querySelector
-            ? this.renderRoot.querySelector('#gizmo-panel')
-            : null;
-        if (panel) {
-            const wantsAny = ['cube', 'orbitGizmo', 'projection', 'focus']
-                .some((name) => this.sceneStore.wantsCameraControl(name));
-            panel.style.display = wantsAny ? '' : 'none';
+        // Whatever changed size while the panel was hidden is put right now it shows.
+        if (this.cameraCube) {
+            this.cameraCube.resize();
         }
+        this.drawLightDial();
     }
 
     renderCameraControls() {
@@ -6175,11 +6184,12 @@ class KigumiViewerApp extends LitElement {
 
     drawLightDial() {
         const canvas = this.renderRoot.querySelector('#light-dial-c');
-        if (!canvas) {
+        // Hidden, it has no size: drawn now it would be a pixel across when it comes back.
+        if (!canvas || !canvas.clientWidth || !canvas.clientHeight) {
             return;
         }
-        const width = Math.max(1, canvas.clientWidth);
-        const height = Math.max(1, canvas.clientHeight);
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
         const ratio = window.devicePixelRatio || 1;
         canvas.width = Math.floor(width * ratio);
         canvas.height = Math.floor(height * ratio);

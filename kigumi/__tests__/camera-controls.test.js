@@ -79,3 +79,35 @@ describe('picking a cube face', () => {
         expect(faceNormalToAxis({ x: 0.98, y: 0.14, z: 0.02 })).toEqual({ x: 1, y: 0, z: 0 });
     });
 });
+
+describe('the cube while its panel is hidden', () => {
+    // A drawing hides the gizmo panel, and the cube came back from one a pixel across:
+    // it had been sized from a canvas with no size.
+    const { CameraCubeGizmo } = require('../webview/camera-controls.js');
+
+    function cube(width, height) {
+        const calls = [];
+        const gizmo = Object.create(CameraCubeGizmo.prototype);
+        gizmo.canvas = { clientWidth: width, clientHeight: height };
+        gizmo.renderer = { setPixelRatio: () => {}, setSize: (w, h) => calls.push([w, h]) };
+        gizmo.camera = { aspect: 0, updateProjectionMatrix: () => {} };
+        return { gizmo, calls };
+    }
+
+    test('keeps the size it has rather than shrinking to nothing', () => {
+        const { gizmo, calls } = cube(0, 0);
+
+        gizmo.resize();
+
+        expect(calls).toEqual([]);
+    });
+
+    test('takes its canvas size once it shows', () => {
+        const { gizmo, calls } = cube(120, 90);
+
+        gizmo.resize();
+
+        expect(calls).toEqual([[120, 90]]);
+        expect(gizmo.camera.aspect).toBeCloseTo(120 / 90);
+    });
+});
