@@ -8,6 +8,7 @@ const { createFrameViewer, initializeFrameViewer, renderFrameViewer, requestView
 const { requestWebviewRoundTrip } = require('./webview-request');
 const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 const { createTranslator } = require('./i18n');
+const { describeSelection } = require('./webview/selection-copy');
 
 // Resolved once from VS Code's own display language (no user override yet).
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
@@ -310,6 +311,15 @@ class FrameViewSession {
             }
             if (message.type === 'openOutputChannel' || message.type === 'openKigumiOutput') {
                 this.channel.show(true);
+                return;
+            }
+            if (message.type === 'copySelectionForAI') {
+                // Formatted here, where the source file is known: relative to the project, as
+                // an assistant working in it would name it.
+                const sourceFile = path.relative(this.projectRoot, this.filePath) || path.basename(this.filePath);
+                getHost().copyText(describeSelection({ ...(message.selection || {}), sourceFile })).catch((err) => {
+                    this.log(`[selection] copy for AI failed: ${err.message || err}`);
+                });
                 return;
             }
             if (message.type === 'findCSGAtPoint') {

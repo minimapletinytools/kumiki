@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const { dialog, shell: electronShell } = require('electron');
+const { clipboard, dialog, shell: electronShell } = require('electron');
 const { createMatcher } = require('./glob-match');
 
 const CODE_CLI_CANDIDATES = [
@@ -141,6 +141,8 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
         },
 
         openExternal: (url) => electronShell.openExternal(url),
+
+        copyText: async (text) => clipboard.writeText(text),
 
         async openFileAt(filePath, line = 1) {
             openInEditor(filePath, line);

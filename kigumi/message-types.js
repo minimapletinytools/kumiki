@@ -15,6 +15,7 @@
 const TO_EXTENSION = Object.freeze([
     'addMeasurement',
     'assemblyFailureLog',
+    'copySelectionForAI',
     'deleteMeasurement',
     'restoreMeasurement',
     'findCSGAtPoint',

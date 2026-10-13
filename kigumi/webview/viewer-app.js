@@ -3440,6 +3440,19 @@ class KigumiViewerApp extends LitElement {
     // -------------------------------------------------------------------------
 
     /** Whether a measurement could be started from what is focused now. */
+    /** The picked feature's reference and world geometry, or null. */
+    get pickedFeature() {
+        const anchor = this._lastPickAnchor;
+        return anchor ? { reference: anchor.reference, geometry: anchor.geometry } : null;
+    }
+
+    /** Have the extension put a description of the selection on the clipboard, for an assistant. */
+    copySelectionForAI(selection) {
+        if (vscode) {
+            vscode.postMessage({ type: 'copySelectionForAI', selection });
+        }
+    }
+
     get canStartMeasurement() {
         return Boolean(this.drawingBetaEnabled
             && this.selectionManager.csgFocus
