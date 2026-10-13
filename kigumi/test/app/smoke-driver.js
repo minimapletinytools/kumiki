@@ -23,7 +23,7 @@ async function waitFor(check, { timeoutMs = 60000, intervalMs = 250 } = {}) {
     }
 }
 
-module.exports = async function smoke({ runAppCommand, connection, window, logLines, onShellCommand, settings }) {
+module.exports = async function smoke({ runAppCommand, connection, window, logLines, onShellCommand, settings, panels }) {
     const results = [];
     const check = (name, ok, detail) => {
         results.push({ name, ok: !!ok, detail });
@@ -66,6 +66,15 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         const shot = await runAppCommand('kigumi.captureScreenshot', { filePath: FRAME, outputPath: shotPath, timeoutMs: 15000 });
         check('the viewer answers a screenshot round trip', shot && shot.ok && shot.screenshot.byteLength > 1000,
             shot && shot.screenshot && `${shot.screenshot.width}x${shot.screenshot.height}`);
+
+        // What an agent is told about the view: the frame, 3D, and what is selected (nothing yet).
+        const listed = panels().list();
+        const described = await panels().describe(`viewer:${FRAME}`);
+        check('an agent can list the view and ask what it shows',
+            listed.some((panel) => panel.kind === 'viewer' && panel.filePath === FRAME)
+                && described && described.kind === 'viewer' && described.view === '3d' && described.frameName === 'My Cute Frame'
+                && described.selection && Array.isArray(described.selection.members),
+            described && JSON.stringify({ view: described.view, frame: described.frameName }));
 
         const picking = runAppCommand('kigumi.browsePatterns');
         await waitFor(() => inShell('!document.getElementById("quickpick").hidden && document.querySelectorAll("#quickpick .item").length'), { timeoutMs: 30000 });
@@ -126,6 +135,11 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         })()`), { timeoutMs: 15000 });
         check('Monaco editor initializes and renders inside iframe', editorReady);
 
+        const editorDescribed = await panels().describe(`tab:${connection().activePanel.id}`);
+        check('an agent can ask an editor tab what it shows',
+            editorDescribed && editorDescribed.kind === 'editor' && editorDescribed.filePath === FRAME && editorDescribed.lineCount > 10,
+            editorDescribed && `${editorDescribed.lineCount} lines`);
+
         connection().activePanel.dispose();
         check('closing editor tab succeeds', connection().tabs.tabs.length === 2);
 
@@ -180,11 +194,12 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         check('clicking toggle-right opens the agent sidebar', agentOpened && connection().findPanel((p) => p.type === 'agent') !== undefined);
 
         await inShell(`(() => { document.querySelector('#toggle-right').click(); })()`);
-        const agentClosed = await waitFor(() => inShell(`(() => {
+        const agentHidden = await waitFor(() => inShell(`(() => {
             const slot = document.querySelector('#slot-right');
             return !slot || slot.hidden;
         })()`));
-        check('clicking toggle-right again closes the agent sidebar', agentClosed && !connection().findPanel((p) => p.type === 'agent'));
+        // Hidden, not closed: the conversation is kept.
+        check('clicking toggle-right again hides the agent and keeps it', agentHidden && connection().findPanel((p) => p.type === 'agent') !== undefined);
 
         const errors = logLines().filter((line) => /traceback|uncaught|\[error\]/i.test(line));
         check('no errors in the log', errors.length === 0, errors.slice(0, 3).join(' / '));

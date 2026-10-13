@@ -12,27 +12,26 @@
 <body>
     <div class="agent-panel">
         <header class="agent-header">
-            <span class="agent-title"><span class="codicon codicon-sparkle"></span> Claude Agent</span>
+            <span class="agent-title"><span class="codicon codicon-sparkle"></span> Agent</span>
             <div class="agent-actions">
                 <button id="btn-clear" class="icon-btn" title="Clear chat"><span class="codicon codicon-clear-all"></span></button>
             </div>
         </header>
 
         <div id="messages" class="agent-messages">
-            <div class="agent-welcome">
-                <h3>Kumiki Assistant</h3>
-                <p>Ask questions about your timber structures, request joint or frame edits, or diagnose runner errors.</p>
+            <div class="agent-welcome" id="welcome">
+                <h3>Kigumi Agent</h3>
+                <p>Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
                 <div class="suggestions">
-                    <button class="suggestion-chip">Explain active frame parameters</button>
-                    <button class="suggestion-chip">Check for joint errors</button>
-                    <button class="suggestion-chip">List available joint patterns</button>
+                    <button class="suggestion-chip">What do I have selected?</button>
+                    <button class="suggestion-chip">Why didn't this frame build?</button>
+                    <button class="suggestion-chip">Take a screenshot and describe the frame</button>
                 </div>
             </div>
         </div>
-
         <footer class="agent-footer">
             <div class="input-box">
-                <textarea id="prompt-input" placeholder="Ask Claude about your model…" rows="1"></textarea>
+                <textarea id="prompt-input" placeholder="Ask about your frame…" rows="1"></textarea>
                 <button id="send-btn" class="send-btn" title="Send message"><span class="codicon codicon-send"></span></button>
             </div>
         </footer>

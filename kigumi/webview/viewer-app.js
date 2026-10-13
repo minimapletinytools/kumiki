@@ -2658,6 +2658,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'describePanelRequest') {
+            this.respondToRequest(message, 'describePanelResult', () => this.describePanel(), 'Failed to describe the view');
+            return;
+        }
+
         if (message.type === 'setCameraStateRequest') {
             this.handleSetCameraStateRequest(message);
             return;
@@ -2945,6 +2950,20 @@ class KigumiViewerApp extends LitElement {
                 error: error && error.message ? error.message : fallbackError,
             });
         }
+    }
+
+    /** What this view shows and what is selected in it, for an agent asking. See agent/panel-directory.js. */
+    describePanel() {
+        const scene = this.sceneStore.activeScene();
+        const counts = (this.currentFrameData || {});
+        return {
+            kind: 'viewer',
+            frameName: counts.name || null,
+            view: this.isInDrawing ? 'drawing' : '3d',
+            drawing: this.isInDrawing ? { id: scene.id, name: scene.name || scene.id } : null,
+            timberCount: Number.isFinite(counts.timber_count) ? counts.timber_count : null,
+            selection: this.selectionPanel.selectionForCopy(),
+        };
     }
 
     handleGetCameraStateRequest(message) {

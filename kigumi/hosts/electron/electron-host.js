@@ -7,6 +7,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { clipboard, dialog, shell: electronShell } = require('electron');
 const { createMatcher } = require('./glob-match');
+const { requestWebviewRoundTrip } = require('../../webview-request');
 
 const CODE_CLI_CANDIDATES = [
     '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
@@ -67,6 +68,39 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
         openExternalEditor(filePath, line);
     }
 
+    // The app's own panels besides its views, for agents (see agent/panel-directory.js). The views
+    // come from the app's sessions; the agent panel is the one asking.
+    function listPanels() {
+        return [...connection.panels.values()]
+            .filter((panel) => panel.type !== 'viewer' && panel.type !== 'agent')
+            .map((panel) => ({
+                id: `tab:${panel.id}`,
+                kind: panel.type,
+                title: panel.title,
+                filePath: panel.filePath || null,
+                active: Boolean(panel.active),
+                visible: Boolean(panel.visible),
+                central: panel.slot === 'center',
+            }));
+    }
+
+    async function describePanel(id) {
+        const panel = connection.panels.get(String(id).replace(/^tab:/, ''));
+        if (!panel) {
+            return null;
+        }
+        if (panel.type === 'editor') {
+            return requestWebviewRoundTrip(panel, {
+                requestType: 'describePanelRequest',
+                resultType: 'describePanelResult',
+                requestId: `describe-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+                timeoutMs: 4000,
+                label: 'describePanel',
+            });
+        }
+        return { kind: panel.type, title: panel.title };
+    }
+
     function watchFiles(baseDir, glob, { onCreate, onChange, onDelete } = {}) {
         if (!baseDir || !fs.existsSync(baseDir)) {
             return { dispose() {} };
@@ -97,6 +131,9 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
 
     return {
         locale,
+
+        listPanels,
+        describePanel,
 
         getConfig: (key, fallback) => settings.get(key, fallback),
 

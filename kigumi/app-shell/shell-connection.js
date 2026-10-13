@@ -133,6 +133,9 @@ class ShellConnection {
         this.panels = new Map();
         this.tabs = new TabList();
         this.sides = { left: null, right: null };
+        // The layout, as data: whether each side slot is shown. A hidden side keeps its panel,
+        // and what that panel holds (the agent's conversation, the explorer's state).
+        this.layout = { left: true, right: true };
         this.nextPanel = 1;
         this.pendingPicks = new Map();
         this.nextPick = 1;
@@ -170,7 +173,16 @@ class ShellConnection {
     }
 
     isShowing(panel) {
-        return panel.slot !== 'center' || this.tabs.activeId === panel.id;
+        return panel.slot === 'center' ? this.tabs.activeId === panel.id : this.layout[panel.slot];
+    }
+
+    /** Show or hide a side slot, keeping its panel. */
+    setSideShown(side, shown) {
+        if (!(side in this.layout) || this.layout[side] === Boolean(shown)) {
+            return;
+        }
+        this.layout[side] = Boolean(shown);
+        this.pushState();
     }
 
     activate(id) {
@@ -199,6 +211,7 @@ class ShellConnection {
         this.send({
             type: 'shell:state',
             activeId: this.tabs.activeId,
+            layout: { ...this.layout },
             panels: ordered.map((panel) => ({
                 id: panel.id,
                 type: panel.type,
@@ -240,6 +253,9 @@ class ShellConnection {
                 break;
             case 'tab:activate':
                 this.activate(message.id);
+                break;
+            case 'layout:toggle':
+                this.setSideShown(message.side, !this.layout[message.side]);
                 break;
             case 'tab:close':
                 if (this.closeRequest) {

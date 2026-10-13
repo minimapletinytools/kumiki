@@ -573,6 +573,12 @@ class FrameViewSession {
         return this._requestWebviewAction('getCameraState', 'get-camera-state');
     }
 
+    /** What the view shows and what is selected in it. See agent/panel-directory.js. */
+    async describePanel() {
+        const view = await this._requestWebviewAction('describePanel', 'describe-panel');
+        return { ...view, filePath: this.filePath, slotName: this.slotName };
+    }
+
     setCameraState(cameraState, options = {}) {
         return this._requestWebviewAction('setCameraState', 'set-camera-state', {
             cameraState,

@@ -29,6 +29,7 @@ files:
   - webview/**
   - hosts/**
   - app-shell/**
+  - agent/**
   - skills/**
   - .kigumi/docs/**
   - templogo.png

@@ -160,3 +160,107 @@ textarea {
 .send-btn:hover {
     opacity: 0.9;
 }
+
+.message-bubble {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.tool-chip {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    align-self: flex-start;
+    max-width: 100%;
+    padding: 3px 8px;
+    border: 1px solid var(--ka-border);
+    border-radius: 10px;
+    background: var(--ka-chrome-bg);
+    color: var(--ka-muted);
+    font-size: 12px;
+}
+
+.tool-chip .tool-name {
+    font-family: var(--ka-mono);
+    color: var(--ka-fg);
+}
+
+.tool-chip .tool-detail {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool-chip.is-done .tool-name::before {
+    content: "✓ ";
+    color: var(--ka-accent);
+}
+
+.tool-chip.is-error {
+    border-color: var(--ka-error);
+}
+
+.tool-chip.is-error .tool-name::before {
+    content: "✕ ";
+    color: var(--ka-error);
+}
+
+.permission-card {
+    border: 1px solid var(--ka-warning);
+    border-radius: 6px;
+    padding: 8px;
+    background: var(--ka-chrome-bg);
+}
+
+.permission-card pre {
+    margin: 6px 0;
+    max-height: 160px;
+    overflow: auto;
+    font-family: var(--ka-mono);
+    font-size: 11px;
+    white-space: pre-wrap;
+}
+
+.permission-card.is-allowed {
+    border-color: var(--ka-border);
+}
+
+.permission-card.is-denied {
+    border-color: var(--ka-border);
+    opacity: 0.6;
+}
+
+.permission-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.permission-buttons button {
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    padding: 3px 10px;
+    cursor: pointer;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+}
+
+.permission-buttons button.allow {
+    background: var(--ka-accent);
+    border-color: var(--ka-accent);
+    color: var(--ka-accent-fg);
+}
+
+.agent-error {
+    color: var(--ka-error);
+    white-space: pre-wrap;
+}
+
+.agent-note {
+    color: var(--ka-muted);
+    font-style: italic;
+}
+
+.agent-messages.is-busy::after {
+    content: "…";
+    color: var(--ka-muted);
+}

@@ -149,6 +149,20 @@ describe('shell connection', () => {
     expect(state.panels.find((p) => p.id === editor.id).title).toBe('● frame.py');
   });
 
+  test('a side is hidden and shown as data, keeping its panel', () => {
+    const { connection, transport } = connect();
+    const agent = connection.createPanel('agent', { title: 'Agent' });
+    expect(agent.visible).toBe(true);
+
+    transport.fromShell({ type: 'layout:toggle', side: 'right' });
+    expect(transport.last('shell:state').layout).toEqual({ left: true, right: false });
+    expect(agent.visible).toBe(false);
+    expect(connection.findPanel((panel) => panel.type === 'agent')).toBe(agent);
+
+    transport.fromShell({ type: 'layout:toggle', side: 'right' });
+    expect(agent.visible).toBe(true);
+  });
+
   test('closing a tab asks first, and a no keeps it open', async () => {
     const answers = [false, true];
     const asked = [];

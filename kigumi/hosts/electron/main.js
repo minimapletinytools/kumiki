@@ -16,6 +16,9 @@ const { createAppWindow } = require('./app-window');
 const { createElectronHost } = require('./electron-host');
 const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
+const { AgentSession } = require('../../agent/agent-session');
+const { createKigumiTools } = require('../../agent/tools');
+const { startMcpHttpServer, claudeCodeAddCommand, newToken } = require('../../agent/mcp-http');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
 const ORIGIN = 'kigumi://app';
@@ -27,6 +30,13 @@ const STATUS_CLEAR_MS = 10000;
 const APP_DEFAULTS = {
     'viewer.autoRefreshOnFileChange': true,
     'app.editorCommand': '',
+    // The agent panel. With no key it uses the Claude login on this machine, if there is one.
+    'agent.apiKey': '',
+    'agent.model': '',
+    // Kigumi's tools for any agent, over MCP on this machine only. See agent/mcp-http.js.
+    'mcp.enabled': false,
+    'mcp.port': 7345,
+    'mcp.token': '',
 };
 
 const CONTENT_TYPES = {
@@ -350,14 +360,84 @@ async function openSettingsFile() {
     }
 }
 
+// An app command for an agent's tool: unlike runAppCommand, a failure reaches the agent.
+function runToolCommand(id, args) {
+    const handler = kigumiApp && kigumiApp.commands[id];
+    if (!handler) {
+        throw new Error(`Kigumi has no command ${id}`);
+    }
+    return handler(args);
+}
+
+let agentSession = null;
+
+// Shows or hides the agent. Hidden, it keeps its conversation.
 function toggleAgentPanel() {
-    const existing = connection.findPanel((panel) => panel.type === 'agent');
-    if (existing) {
-        existing.dispose();
+    if (connection.findPanel((panel) => panel.type === 'agent')) {
+        connection.setSideShown('right', !connection.layout.right);
         return;
     }
     const surface = connection.createPanel('agent', { title: 'Agent' });
+    agentSession = new AgentSession({
+        panels: kigumiApp.panels,
+        run: runToolCommand,
+        post: (message) => void surface.postMessage(message),
+        cwd: () => workspaceFolder,
+        setting: (key, fallback) => settings.get(key, fallback),
+        version: packageJson.version,
+        log: (line) => logChannel.appendLine(line),
+    });
+    surface.onMessage((message) => agentSession && agentSession.handle(message));
+    surface.onDispose(() => {
+        if (agentSession) agentSession.stop();
+        agentSession = null;
+    });
     surface.loadUrl(`${ORIGIN}/webview/agent/agent.html`);
+    connection.setSideShown('right', true);
+}
+
+let mcpServer = null;
+
+// Serves Kigumi's tools over MCP while `mcp.enabled` is on, on the port and token in settings.
+async function syncMcpServer() {
+    const wanted = settings.get('mcp.enabled', false) === true;
+    const port = Number(settings.get('mcp.port', 7345)) || 0;
+    if (mcpServer && (!wanted || mcpServer.port !== port)) {
+        await mcpServer.close();
+        logChannel.appendLine('[mcp] Stopped');
+        mcpServer = null;
+    }
+    if (!wanted || mcpServer || !kigumiApp) {
+        return;
+    }
+    let token = settings.get('mcp.token', '');
+    if (!token) {
+        token = newToken();
+        settings.set('mcp.token', token);
+    }
+    try {
+        mcpServer = await startMcpHttpServer({
+            tools: createKigumiTools({ panels: kigumiApp.panels, run: runToolCommand }),
+            token,
+            port,
+            version: packageJson.version,
+            log: (line) => logChannel.appendLine(line),
+        });
+        logChannel.appendLine(`[mcp] Serving Kigumi's tools at ${mcpServer.url}`);
+    } catch (error) {
+        logChannel.appendLine(`[mcp] Could not start on port ${port}: ${error.message || error}`);
+        setStatus('error', `Kigumi's MCP server could not start on port ${port}: ${error.message || error}`);
+    }
+}
+
+// Puts the line that adds Kigumi to Claude Code on the clipboard.
+function copyMcpSetup() {
+    if (!mcpServer) {
+        setStatus('warning', 'Turn on "mcp.enabled" in Kigumi settings first.');
+        return;
+    }
+    require('electron').clipboard.writeText(claudeCodeAddCommand(mcpServer.url, settings.get('mcp.token', '')));
+    setStatus('info', 'Copied the command that adds Kigumi to Claude Code.');
 }
 
 function onShellCommand(id, ...args) {
@@ -366,6 +446,7 @@ function onShellCommand(id, ...args) {
     if (id === 'openLog') return openLogTab();
     if (id === 'openSettings') return openSettingsFile();
     if (id === 'toggleAgent') return toggleAgentPanel();
+    if (id === 'copyMcpSetup') return copyMcpSetup();
     if (id === 'run' && typeof args[0] === 'string') return runAppCommand(args[0], ...args.slice(1));
     return undefined;
 }
@@ -384,9 +465,9 @@ function buildMenu() {
                 {
                     label: 'Close Tab',
                     accelerator: 'CmdOrCtrl+W',
-                    click: () => {
+                    click: async () => {
                         const active = connection.activePanel;
-                        if (active) active.dispose();
+                        if (active && await confirmCloseEditor(active.id)) active.dispose();
                     },
                 },
                 ...(isMac ? [] : [{ type: 'separator' }, { role: 'quit' }]),
@@ -409,6 +490,9 @@ function buildMenu() {
                     checked: settings.get('viewer.autoRefreshOnFileChange', false),
                     click: () => runAppCommand('kigumi.toggleAutoRefreshOnFileChange'),
                 },
+                { type: 'separator' },
+                { label: 'Toggle Agent', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() },
+                { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcpServer), click: () => copyMcpSetup() },
                 { type: 'separator' },
                 { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
                 { label: 'Show Log', accelerator: 'CmdOrCtrl+Shift+U', click: () => openLogTab() },
@@ -518,10 +602,14 @@ async function start() {
     settings.onChange(() => {
         buildMenu();
         pushShellState();
+        void syncMcpServer();
     });
     buildMenu();
+    void syncMcpServer();
 
     mainWindow.on('closed', async () => {
+        if (agentSession) agentSession.stop();
+        if (mcpServer) await mcpServer.close();
         const current = kigumiApp;
         kigumiApp = null;
         connection.dispose();
@@ -540,6 +628,7 @@ async function start() {
             logLines: () => logChannel.lines,
             onShellCommand,
             settings,
+            panels: () => kigumiApp && kigumiApp.panels,
         };
         // A test driver run against the live app; its result sets the exit code.
         if (process.env.KIGUMI_TEST_SCRIPT) {

@@ -99,6 +99,29 @@
                 }
                 break;
 
+            case 'describePanelRequest': {
+                // What an agent asking about this tab is told: the file, and what is selected.
+                const model = editor && editor.getModel();
+                const range = editor && editor.getSelection();
+                const selected = model && range && !range.isEmpty() ? model.getValueInRange(range) : '';
+                vscode.postMessage({
+                    type: 'describePanelResult',
+                    requestId: message.requestId,
+                    ok: true,
+                    payload: {
+                        kind: 'editor',
+                        filePath: currentFilePath,
+                        dirty: isDirty,
+                        lineCount: model ? model.getLineCount() : null,
+                        cursorLine: editor && editor.getPosition() ? editor.getPosition().lineNumber : null,
+                        selection: selected
+                            ? { text: selected, startLine: range.startLineNumber, endLine: range.endLineNumber }
+                            : null,
+                    },
+                });
+                break;
+            }
+
             case 'getContent':
                 vscode.postMessage({
                     type: 'editorContent',

@@ -41,6 +41,20 @@ status bar) opens it listing every key; edits apply without a restart. Auto
 refresh on save defaults to on in the app. Logs are in
 `<userData>/logs/kigumi.log`, rotated to `kigumi.1.log` past 5 MB.
 
+## Agent and MCP
+
+- **Agent panel** (the sparkle button, or Kigumi > Toggle Agent): the Claude Agent SDK, run in the
+  app's main process (`../../agent/agent-session.js`). It uses `agent.apiKey` from settings if set,
+  else the Claude login on this machine; `agent.model` picks a model. Tools that only look run without
+  asking; anything else (editing files, running commands, moving the camera) asks in the panel.
+  Hiding the panel keeps the conversation; the clear button starts a new one.
+- **MCP server** (`../../agent/mcp-http.js`): with `mcp.enabled` on, Kigumi's tools are served at
+  `http://127.0.0.1:<mcp.port>/mcp` (default port 7345) to any agent holding `mcp.token`, which is
+  generated the first time. Kigumi > Copy MCP Setup for Claude Code copies the `claude mcp add` line.
+- **The tools** (`../../agent/tools.js`): `list_panels`, `describe_panel` (what a panel shows and
+  what is selected in it), `open_in_viewer`, `refresh_view`, `read_view_log`, `get_camera`,
+  `set_camera`, `screenshot`. Panels answer through `../../agent/panel-directory.js`.
+
 ## Signing
 
 `electron-builder.yml` signs and notarizes when `CSC_LINK`, `CSC_KEY_PASSWORD`,

@@ -31,3 +31,7 @@ jest.config.js
 check-extension.md
 tag-search-plan.txt
 tempsidebaricon.png
+# The agent and the MCP server run in the standalone app; the extension uses only the panel directory.
+agent/agent-session.js
+agent/tools.js
+agent/mcp-http.js

@@ -5,6 +5,7 @@
  */
 
 const path = require('path');
+const { createPanelDirectory } = require('./agent/panel-directory');
 const fs = require('fs');
 const { FrameViewSession } = require('./frame-view-session');
 const { PythonRunnerSession } = require('./runner-session');
@@ -954,8 +955,18 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         }
     }
 
+    // What an agent can ask about: the open views, and the host's own panels.
+    const panels = createPanelDirectory({
+        views: () => [
+            ...[...frameSessions.values()].map((session) => ({ id: `viewer:${session.filePath}`, session })),
+            ...[...patternSessions.entries()].map(([slotName, session]) => ({ id: `pattern:${slotName}`, session })),
+        ],
+        host,
+    });
+
     return {
         commands,
+        panels,
         sidebarModel,
         sidebarController,
         get openInSplitView() { return openInSplitView; },

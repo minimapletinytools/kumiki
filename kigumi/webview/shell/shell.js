@@ -81,8 +81,6 @@
         }
     });
 
-    let leftVisible = true;
-
     function renderPanels() {
         const live = new Set(state.panels.map((panel) => panel.id));
         for (const [id, frame] of frames) {
@@ -96,16 +94,17 @@
             frame.iframe.hidden = panel.slot === 'center' && panel.id !== state.activeId;
         }
         const hasLeft = state.panels.some((panel) => panel.slot === 'left');
-        const showLeft = hasLeft && leftVisible;
+        const layout = state.layout || { left: true, right: true };
+        const showLeft = hasLeft && layout.left;
         $('slot-left').hidden = !showLeft;
         $('splitter-left').hidden = !showLeft;
         $('shell').classList.toggle('is-left-hidden', !showLeft);
         $('toggle-left').classList.toggle('is-active', showLeft);
 
-        const hasRight = state.panels.some((panel) => panel.slot === 'right');
-        $('slot-right').hidden = !hasRight;
-        $('splitter-right').hidden = !hasRight;
-        $('toggle-right').classList.toggle('is-active', hasRight);
+        const showRight = state.panels.some((panel) => panel.slot === 'right') && layout.right;
+        $('slot-right').hidden = !showRight;
+        $('splitter-right').hidden = !showRight;
+        $('toggle-right').classList.toggle('is-active', showRight);
     }
 
     // ---------------------------------------------------------------------
@@ -364,10 +363,9 @@
         $('status-log').addEventListener('click', () => command('openLog'));
         $('status-settings').addEventListener('click', () => command('openSettings'));
         $('status-autorefresh').addEventListener('click', () => command('run', 'kigumi.toggleAutoRefreshOnFileChange'));
-        $('toggle-left').addEventListener('click', () => {
-            leftVisible = !leftVisible;
-            renderPanels();
-        });
+        // The window is frameless only on macOS (hiddenInset); elsewhere the native title bar stays.
+        document.body.classList.toggle('is-mac', /Mac/i.test(navigator.platform || navigator.userAgent));
+        $('toggle-left').addEventListener('click', () => core.send({ type: 'layout:toggle', side: 'left' }));
         $('toggle-right').addEventListener('click', () => command('toggleAgent'));
         setupSplitter('left');
         setupSplitter('right');

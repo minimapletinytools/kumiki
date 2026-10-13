@@ -249,8 +249,9 @@ export class SelectionPanel {
         });
     }
 
-    /** What "copy for AI" describes: the focused feature, or the selected members. */
-    _selectionForCopy() {
+    /** What "copy for AI" describes, and what an agent asking about this view is told:
+     *  the focused feature, or the selected members. */
+    selectionForCopy() {
         const frame = this.app.currentFrameData || {};
         const placements = new Map((frame.timbers || []).map((timber) => [timber.name, timber]));
         const focus = this.app.selectionManager.csgFocus;
@@ -298,7 +299,7 @@ export class SelectionPanel {
         action.title = this.t('viewer.selection.copyForAI.title');
         action.addEventListener('click', (event) => {
             event.stopPropagation();
-            this.app.copySelectionForAI(this._selectionForCopy());
+            this.app.copySelectionForAI(this.selectionForCopy());
             action.textContent = this.t('viewer.selection.copied');
             setTimeout(() => {
                 action.textContent = this.t('viewer.selection.copyForAI');

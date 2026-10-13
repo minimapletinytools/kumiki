@@ -24,6 +24,21 @@
     z-index: 10;
 }
 
+/* Off macOS the native frame stays and carries the title; the bar keeps only its buttons. */
+body:not(.is-mac) .titlebar {
+    height: 30px;
+    padding-left: 8px;
+    -webkit-app-region: no-drag;
+}
+
+body:not(.is-mac) .titlebar-center {
+    visibility: hidden;
+}
+
+body:not(.is-mac) .titlebar-drag-region {
+    display: none;
+}
+
 .titlebar-drag-region {
     position: absolute;
     inset: 0;
