@@ -121,6 +121,7 @@ export class MemberListPanel {
     }
 
     rebuild(meshes) {
+        this.app.publishViewState();
         const tbody = this.app.renderRoot && this.app.renderRoot.querySelector
             ? this.app.renderRoot.querySelector('#timber-rows')
             : null;
@@ -149,17 +150,35 @@ export class MemberListPanel {
         this.applyOptionVisibility();
     }
 
-    formatCrossSection(mesh, axis) {
+    /** The table as data, every option's column included, for a member list drawn elsewhere. */
+    rows(meshes) {
+        return meshes.map((mesh, index) => ({
+            key: mesh.memberKey || mesh.timberKey || `index-${index}`,
+            type: mesh.memberType === 'accessory' ? 'accessory' : 'timber',
+            name: mesh.memberName || mesh.name || '?',
+            tags: KigumiTags.coerceTags(mesh.tags).map((tag) => tag.name),
+            length: this.formatLength(mesh, { rough: false }),
+            roughLength: this.formatLength(mesh, { rough: true }),
+            width: this.formatCrossSection(mesh, 'width', { nominal: false }),
+            height: this.formatCrossSection(mesh, 'height', { nominal: false }),
+            nominalWidth: this.formatCrossSection(mesh, 'width', { nominal: true }),
+            nominalHeight: this.formatCrossSection(mesh, 'height', { nominal: true }),
+            csgNodes: mesh.csg_nodes !== undefined ? mesh.csg_nodes : null,
+            csgFeatures: mesh.csg_features !== undefined ? mesh.csg_features : null,
+        }));
+    }
+
+    formatCrossSection(mesh, axis, { nominal = this.options.showNominalSizes } = {}) {
         const nominalKey = axis === 'width' ? 'nominal_width' : 'nominal_height';
         const perfectKey = axis === 'width' ? 'perfect_width' : 'perfect_height';
         const legacyKey = axis === 'width' ? 'prism_width' : 'prism_height';
 
-        const selected = this.options.showNominalSizes ? mesh[nominalKey] : mesh[perfectKey];
+        const selected = nominal ? mesh[nominalKey] : mesh[perfectKey];
         const value = selected !== undefined ? selected : mesh[legacyKey];
         return value === undefined ? '—' : this.app.fmt(value);
     }
 
-    formatLength(mesh) {
+    formatLength(mesh, { rough = this.options.showRoughLength } = {}) {
         // The finished piece rather than the stock it was cut from: a timber
         // with an end joint is never cut to length first, so its declared
         // length is not a dimension anyone meant (see docs/concepts.md).
@@ -167,7 +186,7 @@ export class MemberListPanel {
         if (exactLengthM === null) {
             return '—';
         }
-        if (this.options.showRoughLength) {
+        if (rough) {
             return this.app.fmt(exactLengthM + (this.roughLengthAllowanceMm / 1000));
         }
         return this.app.fmt(exactLengthM);

@@ -1086,6 +1086,10 @@ canvas { display: block; width: 100%; height: 100%; }
     user-select: none;
     white-space: nowrap;
 }
+/* The host shows these in a panel of its own (the app's inspector). */
+kigumi-app.panels-outside #panels {
+    display: none;
+}
 #panels {
     width: 100%;
     max-width: none;

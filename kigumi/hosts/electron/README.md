@@ -41,6 +41,16 @@ status bar) opens it listing every key; edits apply without a restart. Auto
 refresh on save defaults to on in the app. Logs are in
 `<userData>/logs/kigumi.log`, rotated to `kigumi.1.log` past 5 MB.
 
+## Layout
+
+The window's layout is data in `../../app-shell/shell-connection.js`:
+- the explorer on the left;
+- two tab groups in the centre, sources (`code`) and views (`view`), linked by file, so bringing either tab forward brings its partner forward;
+- the inspector underneath (`../../view-inspector.js`), showing the member list and the log of the view on display;
+- the agent on the right.
+
+The title bar buttons and Cmd/Ctrl+J show and hide the sides.
+
 ## Agent and MCP
 
 - **Agent panel** (the sparkle button, or Kigumi > Toggle Agent): the Claude Agent SDK, run in the

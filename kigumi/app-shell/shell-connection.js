@@ -1,15 +1,18 @@
 /**
- * The core's side of the app shell (webview/shell/): panels, center tabs and
- * the quick pick, kept in step with the shell page over a transport. Each panel
- * is a surface (see ../host.js). Host-neutral: a host supplies the transport.
+ * The core's side of the app shell (webview/shell/): panels, the two center tab
+ * groups and the quick pick, kept in step with the shell page over a transport.
+ * Each panel is a surface (see ../host.js). Host-neutral: a host supplies the transport.
+ *
+ * The groups are linked by file: bringing a tab forward brings forward the tab
+ * for the same file in the other group, so a frame's source and its view show together.
  *
  * Core → shell: shell:state, panel:message, quickpick:show
- * Shell → core: shell:ready, shell:command, tab:activate, tab:close,
+ * Shell → core: shell:ready, shell:command, tab:activate, tab:close, layout:toggle,
  *               panel:message, panel:state, panel:loaded, quickpick:result
  */
 
 const { TabList } = require('./tab-list');
-const { panelType } = require('./panel-registry');
+const { GROUPS, panelType } = require('./panel-registry');
 
 class PanelSurface {
     constructor(connection, { id, type, title, filePath }) {
@@ -17,6 +20,7 @@ class PanelSurface {
         this.id = id;
         this.type = type;
         this.slot = panelType(type).slot;
+        this.group = panelType(type).group || null;
         this.filePath = filePath || null;
         this.url = null;
         this.state = undefined;
@@ -34,8 +38,8 @@ class PanelSurface {
 
     set title(value) {
         this._title = value;
-        if (this.slot === 'center') {
-            this.connection.tabs.update(this.id, { title: value });
+        if (this.group) {
+            this.connection.groups[this.group].update(this.id, { title: value });
         }
         this.connection.pushState();
     }
@@ -131,11 +135,14 @@ class ShellConnection {
         this.log = log;
         this.closeRequest = closeRequest;
         this.panels = new Map();
-        this.tabs = new TabList();
-        this.sides = { left: null, right: null };
+        this.groups = Object.fromEntries(GROUPS.map((group) => [group, new TabList()]));
+        // The group last used: where the active panel is, and what closing a tab acts on.
+        this.focusedGroup = 'view';
+        this.sides = { left: null, bottom: null, right: null };
         // The layout, as data: whether each side slot is shown. A hidden side keeps its panel,
         // and what that panel holds (the agent's conversation, the explorer's state).
-        this.layout = { left: true, right: true };
+        this.layout = { left: true, bottom: true, right: true };
+        this._changeListeners = new Set();
         this.nextPanel = 1;
         this.pendingPicks = new Map();
         this.nextPick = 1;
@@ -150,8 +157,10 @@ class ShellConnection {
         const id = `${type}-${this.nextPanel++}`;
         const panel = new PanelSurface(this, { id, type, title, filePath });
         this.panels.set(id, panel);
-        if (panel.slot === 'center') {
-            this.tabs.add(id, { title: panel.title, kind: type });
+        if (panel.group) {
+            this.groups[panel.group].add(id, { title: panel.title, kind: type });
+            this.focusedGroup = panel.group;
+            this._bringPartnerForward(panel);
         } else {
             const previous = this.sides[panel.slot];
             this.sides[panel.slot] = id;
@@ -168,12 +177,45 @@ class ShellConnection {
         return null;
     }
 
+    /** Every center tab, code group first. */
+    get tabs() {
+        return GROUPS.flatMap((group) => this.groups[group].tabs);
+    }
+
+    /** The active tab of the focused group, else of the other one. */
     get activePanel() {
-        return this.tabs.activeId ? this.panels.get(this.tabs.activeId) : null;
+        const order = [this.focusedGroup, ...GROUPS.filter((group) => group !== this.focusedGroup)];
+        const id = order.map((group) => this.groups[group].activeId).find(Boolean);
+        return id ? this.panels.get(id) : null;
+    }
+
+    /** The tab showing in a group. */
+    shownIn(group) {
+        const id = this.groups[group] && this.groups[group].activeId;
+        return id ? this.panels.get(id) : null;
     }
 
     isShowing(panel) {
-        return panel.slot === 'center' ? this.tabs.activeId === panel.id : this.layout[panel.slot];
+        return panel.group ? this.groups[panel.group].activeId === panel.id : this.layout[panel.slot];
+    }
+
+    /** Called after any change to what is open or showing. */
+    onDidChange(callback) {
+        this._changeListeners.add(callback);
+        return { dispose: () => this._changeListeners.delete(callback) };
+    }
+
+    // The tab for the same file in the other group comes forward too, without taking focus.
+    _bringPartnerForward(panel) {
+        if (!panel.filePath) {
+            return;
+        }
+        for (const group of GROUPS.filter((other) => other !== panel.group)) {
+            const partner = this.groups[group].tabs
+                .map((tab) => this.panels.get(tab.id))
+                .find((other) => other && other.filePath === panel.filePath);
+            if (partner) this.groups[group].activate(partner.id);
+        }
     }
 
     /** Show or hide a side slot, keeping its panel. */
@@ -186,7 +228,17 @@ class ShellConnection {
     }
 
     activate(id) {
-        this.tabs.activate(id);
+        const panel = this.panels.get(id);
+        if (!panel) {
+            return;
+        }
+        if (panel.group) {
+            this.groups[panel.group].activate(id);
+            this.focusedGroup = panel.group;
+            this._bringPartnerForward(panel);
+        } else {
+            this.layout[panel.slot] = true;
+        }
         this.pushState();
     }
 
@@ -196,7 +248,12 @@ class ShellConnection {
             return;
         }
         this.panels.delete(id);
-        this.tabs.remove(id);
+        if (panel.group) {
+            this.groups[panel.group].remove(id);
+            if (this.groups[panel.group].tabs.length === 0) {
+                this.focusedGroup = GROUPS.find((group) => this.groups[group].tabs.length > 0) || this.focusedGroup;
+            }
+        }
         if (this.sides[panel.slot] === id) this.sides[panel.slot] = null;
         panel._destroyed();
         this.pushState();
@@ -205,17 +262,22 @@ class ShellConnection {
     pushState() {
         const ordered = [
             this.sides.left,
-            ...this.tabs.tabs.map((tab) => tab.id),
+            ...this.tabs.map((tab) => tab.id),
+            this.sides.bottom,
             this.sides.right,
         ].filter(Boolean).map((id) => this.panels.get(id)).filter(Boolean);
+        const active = this.activePanel;
         this.send({
             type: 'shell:state',
-            activeId: this.tabs.activeId,
+            activeId: active ? active.id : null,
+            shown: Object.fromEntries(GROUPS.map((group) => [group, this.groups[group].activeId])),
+            focusedGroup: this.focusedGroup,
             layout: { ...this.layout },
             panels: ordered.map((panel) => ({
                 id: panel.id,
                 type: panel.type,
                 slot: panel.slot,
+                group: panel.group,
                 icon: panelType(panel.type).icon,
                 title: panel.title,
                 url: panel.url,
@@ -223,6 +285,9 @@ class ShellConnection {
             })),
             ...this.status(),
         });
+        for (const listener of [...this._changeListeners]) {
+            listener();
+        }
     }
 
     // Shows the quick pick; resolves with the chosen item, or undefined.
@@ -293,6 +358,7 @@ class ShellConnection {
             panel._destroyed();
         }
         this.panels.clear();
+        this._changeListeners.clear();
         for (const pending of this.pendingPicks.values()) {
             pending.resolve(undefined);
         }

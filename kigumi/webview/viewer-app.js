@@ -1655,7 +1655,9 @@ class KigumiViewerApp extends LitElement {
                 this._csgHighlightSource = null;
             }
             this.selectionPanel.updateInfo(this.currentFrameData);
+            this.publishViewState();
         });
+        this.classList.toggle('panels-outside', INITIAL_PAYLOAD.panelsOutside === true);
 
         // Attach Layers panel to selection store + extension messaging.
         const layersView = this.renderRoot.querySelector('#layers-view');
@@ -2668,6 +2670,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'selectMembers') {
+            this.selectMembers(message.memberKeys, message.additive === true);
+            return;
+        }
+
         if (message.type === 'logEntry') {
             const text = typeof message.text === 'string' ? message.text : String(message.text);
             this.appendLogLine(text);
@@ -2953,6 +2960,42 @@ class KigumiViewerApp extends LitElement {
     }
 
     /** What this view shows and what is selected in it, for an agent asking. See agent/panel-directory.js. */
+    /**
+     * What this view shows, for panels outside it (the app's inspector): the member list as
+     * data, and which members are selected. Sent when either changes, at most once a frame.
+     */
+    publishViewState() {
+        if (!INITIAL_PAYLOAD.panelsOutside || !vscode || this._viewStateQueued) {
+            return;
+        }
+        this._viewStateQueued = true;
+        requestAnimationFrame(() => {
+            this._viewStateQueued = false;
+            const geometry = this._lastGeometryData;
+            vscode.postMessage({
+                type: 'viewState',
+                state: {
+                    frameName: (this.currentFrameData && this.currentFrameData.name) || null,
+                    members: this.memberListPanel.rows(geometry && geometry.meshes ? geometry.meshes : []),
+                    selection: this.selectionManager.getSelectedTimbers(),
+                },
+            });
+        });
+    }
+
+    /** Selection asked for from outside the view, as a click on each member would make it. */
+    selectMembers(memberKeys, additive) {
+        const keys = (Array.isArray(memberKeys) ? memberKeys : []).filter((key) => this.sceneManager.has(key));
+        this._dropCsgFocus();
+        if (!additive) {
+            this.selectionManager.clearTimberSelection();
+        }
+        for (const key of keys) {
+            if (additive) this.selectionManager.toggleTimber(key);
+            else this.selectionManager.selectTimber(key, true);
+        }
+    }
+
     describePanel() {
         const scene = this.sceneStore.activeScene();
         const counts = (this.currentFrameData || {});

@@ -77,7 +77,13 @@ function createPanelDirectory({ views, host }) {
         return null;
     }
 
-    return { list, active, describe, viewSession };
+    /** The view session drawing into a surface, if any. */
+    function sessionForSurface(surface) {
+        const found = surface ? liveViews().find(({ session }) => session.panel === surface) : null;
+        return found ? found.session : null;
+    }
+
+    return { list, active, describe, viewSession, sessionForSurface };
 }
 
 module.exports = { createPanelDirectory };

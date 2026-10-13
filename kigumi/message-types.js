@@ -38,6 +38,7 @@ const TO_EXTENSION = Object.freeze([
     'setRefreshOptions',
     'updateMeasurement',
     'viewerLog',
+    'viewState',
 ]);
 
 /**

@@ -72,7 +72,7 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
     // come from the app's sessions; the agent panel is the one asking.
     function listPanels() {
         return [...connection.panels.values()]
-            .filter((panel) => panel.type !== 'viewer' && panel.type !== 'agent')
+            .filter((panel) => !['viewer', 'agent', 'inspector'].includes(panel.type))
             .map((panel) => ({
                 id: `tab:${panel.id}`,
                 kind: panel.type,
@@ -80,7 +80,7 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
                 filePath: panel.filePath || null,
                 active: Boolean(panel.active),
                 visible: Boolean(panel.visible),
-                central: panel.slot === 'center',
+                central: Boolean(panel.group),
             }));
     }
 
@@ -134,6 +134,9 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
 
         listPanels,
         describePanel,
+
+        // The inspector shows each view's member list and log (view-inspector.js).
+        viewerPanelsOutside: true,
 
         getConfig: (key, fallback) => settings.get(key, fallback),
 

@@ -80,6 +80,8 @@ body:not(.is-mac) .titlebar-drag-region {
 
 .slot-left[hidden],
 .slot-right[hidden],
+.slot-bottom[hidden],
+.group[hidden],
 .splitter[hidden] {
     display: none;
 }
@@ -243,7 +245,65 @@ body:not(.is-mac) .titlebar-drag-region {
     flex: 1;
 }
 
+/* The two center groups: sources on the left, views on the right. One alone takes the width. */
+.groups {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 0;
+}
+
+.groups.is-split #group-code {
+    flex: 0 0 var(--code-width, 45%);
+}
+
+.group-actions {
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    flex: none;
+}
+
+.group-actions [hidden] {
+    display: none;
+}
+
+/* The group the active panel is in. */
+.group.is-focused .tab.is-active {
+    box-shadow: inset 0 1px 0 var(--ka-accent);
+}
+
+.group:not(.is-focused) .tab.is-active {
+    box-shadow: none;
+}
+
+.splitter-group {
+    width: 4px;
+    flex: none;
+    border-left: 1px solid var(--ka-border);
+}
+
+.splitter-bottom {
+    height: 4px;
+    flex: none;
+    cursor: row-resize;
+    border-top: 1px solid var(--ka-border);
+}
+
+.slot-bottom {
+    flex: none;
+    height: var(--bottom-height, 240px);
+    background: var(--ka-chrome-bg);
+}
+
 .welcome {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -325,7 +385,7 @@ kbd {
 /* Status bar */
 
 .status {
-    grid-row: 2;
+    grid-row: 3;
     grid-column: 1 / -1;
     display: flex;
     align-items: center;

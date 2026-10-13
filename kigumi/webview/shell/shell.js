@@ -1,5 +1,5 @@
-// The app shell: a fixed layout (left panel, center tabs, right panel, status
-// bar) whose panels are iframes. Everything it shows comes from the core as
+// The app shell: a fixed layout (left panel, two center tab groups -- sources and
+// views -- a bottom panel, a right panel, status bar) whose panels are iframes. Everything it shows comes from the core as
 // `shell:state`; it talks to the core only through window.kigumiShell
 // ({ send, onMessage }), which the host provides. See app-shell/.
 
@@ -9,9 +9,9 @@
     const core = window.kigumiShell;
     const $ = (id) => document.getElementById(id);
     const isMac = navigator.platform.toUpperCase().includes('MAC');
-    const SIDE_LIMITS = { left: [180, 600], right: [240, 800] };
+    const SIDE_LIMITS = { left: [180, 600], right: [240, 800], bottom: [80, 800] };
 
-    let state = { panels: [], activeId: null };
+    let state = { panels: [], activeId: null, shown: {} };
     const frames = new Map(); // panel id -> { iframe, url, loaded, queue }
 
     // ---------------------------------------------------------------------
@@ -40,7 +40,7 @@
                 core.send({ type: 'panel:loaded', id: panel.id });
             });
             frames.set(panel.id, frame);
-            $(`slot-${panel.slot}`).append(iframe);
+            $(`slot-${panel.group || panel.slot}`).append(iframe);
         }
         if (panel.url && panel.url !== frame.url) {
             frame.url = panel.url;
@@ -91,10 +91,19 @@
         }
         for (const panel of state.panels) {
             const frame = ensureFrame(panel);
-            frame.iframe.hidden = panel.slot === 'center' && panel.id !== state.activeId;
+            frame.iframe.hidden = Boolean(panel.group) && panel.id !== state.shown[panel.group];
         }
+        const groupHas = (group) => state.panels.some((panel) => panel.group === group);
+        const split = groupHas('code') && groupHas('view');
+        for (const group of ['code', 'view']) {
+            $(`group-${group}`).hidden = !groupHas(group);
+            $(`group-${group}`).classList.toggle('is-focused', split && state.focusedGroup === group);
+        }
+        $('groups').classList.toggle('is-split', split);
+        $('splitter-group').hidden = !split;
+
         const hasLeft = state.panels.some((panel) => panel.slot === 'left');
-        const layout = state.layout || { left: true, right: true };
+        const layout = state.layout || { left: true, bottom: true, right: true };
         const showLeft = hasLeft && layout.left;
         $('slot-left').hidden = !showLeft;
         $('splitter-left').hidden = !showLeft;
@@ -105,6 +114,13 @@
         $('slot-right').hidden = !showRight;
         $('splitter-right').hidden = !showRight;
         $('toggle-right').classList.toggle('is-active', showRight);
+
+        const hasBottom = state.panels.some((panel) => panel.slot === 'bottom');
+        const showBottom = hasBottom && layout.bottom;
+        $('slot-bottom').hidden = !showBottom;
+        $('splitter-bottom').hidden = !showBottom;
+        $('toggle-bottom').hidden = !hasBottom;
+        $('toggle-bottom').classList.toggle('is-active', showBottom);
     }
 
     // ---------------------------------------------------------------------
@@ -126,41 +142,53 @@
         core.send({ type: 'shell:command', command: name, args });
     }
 
+    function renderTab(tab) {
+        const active = tab.id === state.shown[tab.group];
+        const element = el('div', `tab${active ? ' is-active' : ''}`);
+        element.setAttribute('role', 'tab');
+        element.setAttribute('tabindex', '0');
+        element.setAttribute('aria-selected', active ? 'true' : 'false');
+        element.title = tab.title;
+        element.append(icon(tab.icon || 'file'), el('span', 'tab-title', tab.title || 'Kigumi'));
+        const close = el('span', 'tab-close');
+        close.setAttribute('role', 'button');
+        close.setAttribute('aria-label', `Close ${tab.title}`);
+        close.append(icon('close'));
+        close.addEventListener('click', (event) => {
+            event.stopPropagation();
+            core.send({ type: 'tab:close', id: tab.id });
+        });
+        element.append(close);
+        element.addEventListener('click', () => core.send({ type: 'tab:activate', id: tab.id }));
+        element.addEventListener('auxclick', (event) => {
+            if (event.button === 1) core.send({ type: 'tab:close', id: tab.id });
+        });
+        element.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                core.send({ type: 'tab:activate', id: tab.id });
+            }
+        });
+        return element;
+    }
+
+    function shownPanel(group) {
+        return state.panels.find((panel) => panel.id === state.shown[group]) || null;
+    }
+
     function renderTabs() {
-        const tabs = state.panels.filter((panel) => panel.slot === 'center');
-        $('tabs').replaceChildren(...tabs.map((tab) => {
-            const active = tab.id === state.activeId;
-            const element = el('div', `tab${active ? ' is-active' : ''}`);
-            element.setAttribute('role', 'tab');
-            element.setAttribute('tabindex', '0');
-            element.setAttribute('aria-selected', active ? 'true' : 'false');
-            element.title = tab.title;
-            element.append(icon(tab.icon || 'file'), el('span', 'tab-title', tab.title || 'Kigumi'));
-            const close = el('span', 'tab-close');
-            close.setAttribute('role', 'button');
-            close.setAttribute('aria-label', `Close ${tab.title}`);
-            close.append(icon('close'));
-            close.addEventListener('click', (event) => {
-                event.stopPropagation();
-                core.send({ type: 'tab:close', id: tab.id });
-            });
-            element.append(close);
-            element.addEventListener('click', () => core.send({ type: 'tab:activate', id: tab.id }));
-            element.addEventListener('auxclick', (event) => {
-                if (event.button === 1) core.send({ type: 'tab:close', id: tab.id });
-            });
-            element.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    core.send({ type: 'tab:activate', id: tab.id });
-                }
-            });
-            return element;
-        }));
+        for (const group of ['code', 'view']) {
+            $(`tabs-${group}`).replaceChildren(...state.panels.filter((panel) => panel.group === group).map(renderTab));
+        }
+        // Each group offers the other half of what it shows: a view its source, a source its view.
+        const view = shownPanel('view');
+        $('open-source').hidden = !(view && view.filePath);
+        const code = shownPanel('code');
+        $('open-view').hidden = !(code && code.type === 'editor' && /\.py$/.test(code.filePath || ''));
     }
 
     function renderWelcome() {
-        const hasTabs = state.panels.some((panel) => panel.slot === 'center');
+        const hasTabs = state.panels.some((panel) => panel.group);
         $('welcome').hidden = hasTabs;
         const button = (label, onClick, secondary) => {
             const element = el('button', secondary ? 'secondary' : '', label);
@@ -203,7 +231,7 @@
     }
 
     function renderTitlebar() {
-        const active = state.panels.find((panel) => panel.slot === 'center' && panel.id === state.activeId);
+        const active = state.panels.find((panel) => panel.group && panel.id === state.activeId);
         const parts = [];
         if (active && active.title) parts.push(active.title);
         if (state.workspace && state.workspace.name) parts.push(state.workspace.name);
@@ -223,40 +251,80 @@
     // Splitters
     // ---------------------------------------------------------------------
 
-    function setSideWidth(side, width) {
-        const [min, max] = SIDE_LIMITS[side];
-        const clamped = Math.max(min, Math.min(max, Math.round(width)));
-        document.documentElement.style.setProperty(`--${side}-width`, `${clamped}px`);
+    function remember(key, value) {
         try {
-            localStorage.setItem(`kigumi.${side}Width`, String(clamped));
+            localStorage.setItem(key, String(value));
         } catch (_error) {
-            // Width just isn't remembered.
+            // Not remembered, then.
         }
     }
 
-    function setupSplitter(side) {
-        const splitter = $(`splitter-${side}`);
+    function recall(key) {
+        try {
+            return Number(localStorage.getItem(key)) || null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function setSideSize(side, size) {
+        const [min, max] = SIDE_LIMITS[side];
+        const clamped = Math.max(min, Math.min(max, Math.round(size)));
+        const dimension = side === 'bottom' ? 'height' : 'width';
+        document.documentElement.style.setProperty(`--${side}-${dimension}`, `${clamped}px`);
+        remember(`kigumi.${side}${dimension === 'height' ? 'Height' : 'Width'}`, clamped);
+    }
+
+    // The sources group's share of the center, as a percentage.
+    function setCodeShare(percent) {
+        const clamped = Math.max(15, Math.min(85, percent));
+        document.documentElement.style.setProperty('--code-width', `${clamped}%`);
+        remember('kigumi.codeShare', clamped);
+    }
+
+    function dragSplitter(splitter, onMove) {
         splitter.addEventListener('pointerdown', (event) => {
             splitter.setPointerCapture(event.pointerId);
             splitter.classList.add('is-dragging');
             $('shell').classList.add('is-resizing');
-            const move = (moveEvent) => setSideWidth(side, side === 'left' ? moveEvent.clientX : window.innerWidth - moveEvent.clientX);
             const up = () => {
                 splitter.classList.remove('is-dragging');
                 $('shell').classList.remove('is-resizing');
-                splitter.removeEventListener('pointermove', move);
+                splitter.removeEventListener('pointermove', onMove);
                 splitter.removeEventListener('pointerup', up);
             };
-            splitter.addEventListener('pointermove', move);
+            splitter.addEventListener('pointermove', onMove);
             splitter.addEventListener('pointerup', up);
         });
-        let saved = null;
-        try {
-            saved = Number(localStorage.getItem(`kigumi.${side}Width`));
-        } catch (_error) {
-            saved = null;
+    }
+
+    function setupSplitters() {
+        dragSplitter($('splitter-left'), (event) => setSideSize('left', event.clientX));
+        dragSplitter($('splitter-right'), (event) => setSideSize('right', window.innerWidth - event.clientX));
+        dragSplitter($('splitter-bottom'), (event) => setSideSize('bottom', $('main').getBoundingClientRect().bottom - event.clientY));
+        dragSplitter($('splitter-group'), (event) => {
+            const rect = $('groups').getBoundingClientRect();
+            setCodeShare(((event.clientX - rect.left) / rect.width) * 100);
+        });
+        for (const side of ['left', 'right', 'bottom']) {
+            const saved = recall(`kigumi.${side}${side === 'bottom' ? 'Height' : 'Width'}`);
+            if (saved) setSideSize(side, saved);
         }
-        if (saved) setSideWidth(side, saved);
+        const share = recall('kigumi.codeShare');
+        if (share) setCodeShare(share);
+    }
+
+    // A click inside a panel's page goes to the iframe, never to the shell: notice the focus
+    // moving into one, so the group it is in becomes the focused one.
+    function followFrameFocus() {
+        window.addEventListener('blur', () => setTimeout(() => {
+            const focused = document.activeElement;
+            if (!focused || focused.tagName !== 'IFRAME') return;
+            const panel = state.panels.find((candidate) => candidate.id === focused.name);
+            if (panel && panel.group && panel.group !== state.focusedGroup) {
+                core.send({ type: 'tab:activate', id: panel.id });
+            }
+        }, 0));
     }
 
     // ---------------------------------------------------------------------
@@ -367,8 +435,11 @@
         document.body.classList.toggle('is-mac', /Mac/i.test(navigator.platform || navigator.userAgent));
         $('toggle-left').addEventListener('click', () => core.send({ type: 'layout:toggle', side: 'left' }));
         $('toggle-right').addEventListener('click', () => command('toggleAgent'));
-        setupSplitter('left');
-        setupSplitter('right');
+        $('toggle-bottom').addEventListener('click', () => core.send({ type: 'layout:toggle', side: 'bottom' }));
+        $('open-source').addEventListener('click', () => command('openSource', state.shown.view));
+        $('open-view').addEventListener('click', () => command('openView', state.shown.code));
+        setupSplitters();
+        followFrameFocus();
         setupQuickPick();
 
         core.onMessage((message) => {
