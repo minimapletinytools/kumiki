@@ -80,7 +80,7 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
                 filePath: panel.filePath || null,
                 active: Boolean(panel.active),
                 visible: Boolean(panel.visible),
-                central: Boolean(panel.group),
+                central: panel.slot === 'center',
             }));
     }
 

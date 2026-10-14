@@ -431,32 +431,25 @@ async function syncMcpServer() {
     }
 }
 
-// The source of a view, in the sources group.
-function openSourceOf(panelId) {
-    const panel = connection.panels.get(panelId);
-    if (panel && panel.filePath) openEditorTab(panel.filePath);
-}
-
-// The view of a source, in the views group: brought forward if open, else opened.
-async function openViewOf(panelId) {
-    const panel = connection.panels.get(panelId);
-    if (!panel || !panel.filePath) return;
-    const view = connection.findPanel((other) => other.type === 'viewer' && other.filePath === panel.filePath);
-    if (view) {
-        view.reveal();
-        return;
-    }
-    await runAppCommand('kigumi.openFrameFromSidebar', panel.filePath);
-}
-
 let inspector = null;
 
-// The inspector under the tabs, following the view showing in the views group.
+// The inspector under the tabs, showing the view in front -- or, while a source file is, the
+// last view that was.
 function createInspector() {
     const surface = connection.createPanel('inspector', { title: 'Inspector' });
+    let lastView = null;
+    const inspectedView = () => {
+        const active = connection.activePanel;
+        if (active && active.type === 'viewer') {
+            lastView = active;
+        } else if (lastView && !connection.panels.has(lastView.id)) {
+            lastView = connection.findPanel((panel) => panel.type === 'viewer');
+        }
+        return lastView;
+    };
     inspector = new ViewInspector({
         surface,
-        currentSession: () => kigumiApp && kigumiApp.panels.sessionForSurface(connection.shownIn('view')),
+        currentSession: () => kigumiApp && kigumiApp.panels.sessionForSurface(inspectedView()),
     });
     surface.onDispose(() => {
         inspector.dispose();
@@ -483,8 +476,6 @@ function onShellCommand(id, ...args) {
     if (id === 'openSettings') return openSettingsFile();
     if (id === 'toggleAgent') return toggleAgentPanel();
     if (id === 'copyMcpSetup') return copyMcpSetup();
-    if (id === 'openSource') return openSourceOf(args[0]);
-    if (id === 'openView') return openViewOf(args[0]);
     if (id === 'run' && typeof args[0] === 'string') return runAppCommand(args[0], ...args.slice(1));
     return undefined;
 }

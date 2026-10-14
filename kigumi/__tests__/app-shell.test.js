@@ -68,7 +68,7 @@ describe('shell connection', () => {
 
     expect(state.panels.map((panel) => [panel.type, panel.slot])).toEqual([['explorer', 'left'], ['viewer', 'center']]);
     expect(state.activeId).toBe(viewer.id);
-    expect(connection.tabs.map((tab) => tab.id)).toEqual([viewer.id]);
+    expect(connection.tabs.tabs.map((tab) => tab.id)).toEqual([viewer.id]);
   });
 
   test('setHtml serves the page and publishes its URL', () => {
@@ -141,10 +141,10 @@ describe('shell connection', () => {
     const { connection, transport } = connect();
     const editor = connection.createPanel('editor', { title: 'frame.py', filePath: '/path/frame.py' });
     expect(editor.slot).toBe('center');
-    expect(connection.tabs[0].title).toBe('frame.py');
+    expect(connection.tabs.tabs[0].title).toBe('frame.py');
 
     editor.title = '● frame.py';
-    expect(connection.tabs[0].title).toBe('● frame.py');
+    expect(connection.tabs.tabs[0].title).toBe('● frame.py');
     const state = transport.last('shell:state');
     expect(state.panels.find((p) => p.id === editor.id).title).toBe('● frame.py');
   });
@@ -161,45 +161,6 @@ describe('shell connection', () => {
 
     transport.fromShell({ type: 'layout:toggle', side: 'right' });
     expect(agent.visible).toBe(true);
-  });
-
-  test('sources and views have a group each, and both show', () => {
-    const { connection, transport } = connect();
-    const editor = connection.createPanel('editor', { title: 'a.py', filePath: '/a.py' });
-    const viewer = connection.createPanel('viewer', { title: 'a', filePath: '/a.py' });
-
-    expect([editor.group, viewer.group]).toEqual(['code', 'view']);
-    expect([editor.visible, viewer.visible]).toEqual([true, true]);
-    expect(connection.activePanel).toBe(viewer);
-    expect(transport.last('shell:state').shown).toEqual({ code: editor.id, view: viewer.id });
-  });
-
-  test('bringing a tab forward brings forward the tab for its file in the other group', () => {
-    const { connection } = connect();
-    const sourceA = connection.createPanel('editor', { filePath: '/a.py' });
-    const viewA = connection.createPanel('viewer', { filePath: '/a.py' });
-    const sourceB = connection.createPanel('editor', { filePath: '/b.py' });
-    const viewB = connection.createPanel('viewer', { filePath: '/b.py' });
-    expect([sourceB.visible, viewB.visible]).toEqual([true, true]);
-
-    viewA.reveal();
-    expect([sourceA.visible, viewA.visible]).toEqual([true, true]);
-    expect(connection.activePanel).toBe(viewA);
-
-    sourceB.reveal();
-    expect([sourceB.visible, viewB.visible]).toEqual([true, true]);
-    expect(connection.activePanel).toBe(sourceB);
-  });
-
-  test('closing the last tab of a group moves focus to the other', () => {
-    const { connection } = connect();
-    const viewer = connection.createPanel('viewer', { filePath: '/a.py' });
-    const editor = connection.createPanel('editor', { filePath: '/b.py' });
-    expect(connection.activePanel).toBe(editor);
-
-    editor.dispose();
-    expect(connection.activePanel).toBe(viewer);
-    expect(connection.focusedGroup).toBe('view');
   });
 
   test('revealing a side panel shows its side', () => {
@@ -220,11 +181,11 @@ describe('shell connection', () => {
 
     transport.fromShell({ type: 'tab:close', id: editor.id });
     await new Promise((resolve) => setImmediate(resolve));
-    expect(connection.tabs.map((tab) => tab.id)).toEqual([editor.id]);
+    expect(connection.tabs.tabs.map((tab) => tab.id)).toEqual([editor.id]);
 
     transport.fromShell({ type: 'tab:close', id: editor.id });
     await new Promise((resolve) => setImmediate(resolve));
-    expect(connection.tabs).toEqual([]);
+    expect(connection.tabs.tabs).toEqual([]);
     expect(asked).toEqual([editor.id, editor.id]);
   });
 

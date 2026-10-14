@@ -53,9 +53,9 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
 
         await runAppCommand('kigumi.openFrameFromSidebar', FRAME);
         const session = await runAppCommand('kigumi.testGetSessionSnapshot', { filePath: FRAME });
-        check('a frame opens in a viewer tab', session && session.exists && connection().tabs.length === 1, session && session.panelTitle);
+        check('a frame opens in a viewer tab', session && session.exists && connection().tabs.tabs.length === 1, session && session.panelTitle);
         const canvas = await waitFor(() => inShell(`(() => {
-            const frame = document.querySelector('#slot-view iframe:not([hidden])');
+            const frame = document.querySelector('#slot-center iframe:not([hidden])');
             return !!(frame && frame.contentDocument && frame.contentDocument.querySelector('canvas'));
         })()`), { timeoutMs: 15000 });
         check('the viewer panel draws into a canvas', canvas);
@@ -83,7 +83,7 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             .catch(() => 0);
         check('the inspector lists the members of the view', memberRows > 0, `${memberRows} members`);
         check('the view leaves its member list to the inspector', await inShell(`(() => {
-            const frame = document.querySelector('#slot-view iframe:not([hidden])');
+            const frame = document.querySelector('#slot-center iframe:not([hidden])');
             const panels = frame && frame.contentDocument.getElementById('panels');
             return !!panels && frame.contentWindow.getComputedStyle(panels).display === 'none';
         })()`));
@@ -110,7 +110,7 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         check('the quick pick filters by name', filtered.length > 0 && filtered.every((label) => label.includes(wanted)), `${wanted}: ${filtered.join(', ')}`);
         await inShell(`document.getElementById('quickpick-filter').dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(filtered.length > 0 ? 'Enter' : 'Escape')} }))`);
         await picking;
-        const tabs = connection().tabs.map((tab) => connection().panels.get(tab.id).title);
+        const tabs = connection().tabs.tabs.map((tab) => connection().panels.get(tab.id).title);
         check('the picked pattern opens in a second tab', tabs.length === 2 && tabs[1].includes(wanted), tabs.join(' | '));
         await sleep(1000);
         await capture('05-pattern');
@@ -133,14 +133,14 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
 
         onShellCommand('openLog');
         const logLinesShown = await waitFor(() => inShell(`(() => {
-            const frame = document.querySelector('#slot-code iframe:not([hidden])');
+            const frame = document.querySelector('#slot-center iframe:not([hidden])');
             return frame && frame.contentDocument ? frame.contentDocument.querySelectorAll('#lines div').length : 0;
         })()`));
         check('the Log tab opens and shows the log', connection().activePanel && connection().activePanel.type === 'log' && logLinesShown > 0, `${logLinesShown} lines`);
         await capture('06-log');
 
         connection().activePanel.dispose();
-        check('closing a tab activates a neighbour', connection().tabs.length === 2 && connection().activePanel !== null);
+        check('closing a tab activates a neighbour', connection().tabs.tabs.length === 2 && connection().activePanel !== null);
 
         // Test Monaco editor panel opening
         await runAppCommand('kigumi.viewPatternSource', { data: { sourceFile: FRAME } });
@@ -149,13 +149,10 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             return active && active.type === 'editor' ? active : null;
         });
         check('viewPatternSource opens a file in the Monaco editor panel', !!editorPanel && editorPanel.filePath === FRAME);
-        check('the view of a source comes forward beside it',
-            connection().shownIn('view') && connection().shownIn('view').filePath === FRAME && connection().shownIn('code') === editorPanel,
-            connection().shownIn('view') && connection().shownIn('view').title);
-        await sleep(500);
-        await capture('06b-linked');
+        const inspectedTitle = await inShell('document.querySelector("#slot-bottom iframe")?.contentDocument?.getElementById("view-title").textContent');
+        check('with a source file in front, the inspector keeps showing the last view', inspectedTitle === tabs[1], inspectedTitle);
         const editorReady = await waitFor(() => inShell(`(() => {
-            const frame = document.querySelector('#slot-code iframe:not([hidden])');
+            const frame = document.querySelector('#slot-center iframe:not([hidden])');
             return !!(frame && frame.contentDocument && frame.contentDocument.querySelector('.monaco-editor'));
         })()`), { timeoutMs: 15000 });
         check('Monaco editor initializes and renders inside iframe', editorReady);
@@ -166,7 +163,7 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             editorDescribed && `${editorDescribed.lineCount} lines`);
 
         connection().activePanel.dispose();
-        check('closing editor tab succeeds', connection().tabs.length === 2);
+        check('closing editor tab succeeds', connection().tabs.tabs.length === 2);
 
         // A change made on disk while the tab is open, with nothing unsaved, comes into the tab.
         // Inside the workspace (a file outside it opens as a read-only copy), where git ignores it.
@@ -176,7 +173,7 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         try {
             await runAppCommand('kigumi.viewPatternSource', { data: { sourceFile: scratch } });
             const editorText = () => inShell(`(() => {
-                const frame = document.querySelector('#slot-code iframe:not([hidden])');
+                const frame = document.querySelector('#slot-center iframe:not([hidden])');
                 const win = frame && frame.contentWindow;
                 const models = win && win.monaco ? win.monaco.editor.getModels() : [];
                 return models.length ? models[0].getValue() : null;

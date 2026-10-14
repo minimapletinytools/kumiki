@@ -1,18 +1,16 @@
 /**
- * The kinds of panel the app shell can show, and where each lives.
- *
- * The layout is fixed: `left` (one panel), `center` (two tab groups side by side: `code` for
- * sources, `view` for what they build), `bottom` (one panel, under the groups), `right` (one panel).
+ * The kinds of panel the app shell can show, and the layout slot each lives in.
+ * The layout is fixed: `left` (one panel), `center` (tabs), `bottom` (one panel, under the
+ * tabs), `right` (one panel).
  */
 
 const SLOTS = Object.freeze(['left', 'center', 'bottom', 'right']);
-const GROUPS = Object.freeze(['code', 'view']);
 
 const PANEL_TYPES = Object.freeze({
     explorer: { slot: 'left', icon: 'files' },
-    viewer: { slot: 'center', group: 'view', icon: 'fish2-very-sad', redrawAfterReload: true },
-    log: { slot: 'center', group: 'code', icon: 'output' },
-    editor: { slot: 'center', group: 'code', icon: 'file-code' },
+    viewer: { slot: 'center', icon: 'fish2-very-sad', redrawAfterReload: true },
+    log: { slot: 'center', icon: 'output' },
+    editor: { slot: 'center', icon: 'file-code' },
     inspector: { slot: 'bottom', icon: 'layout-panel' },
     agent: { slot: 'right', icon: 'sparkle' },
 });
@@ -25,4 +23,4 @@ function panelType(type) {
     return spec;
 }
 
-module.exports = { SLOTS, GROUPS, PANEL_TYPES, panelType };
+module.exports = { SLOTS, PANEL_TYPES, panelType };

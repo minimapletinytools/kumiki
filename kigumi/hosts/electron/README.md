@@ -45,8 +45,8 @@ refresh on save defaults to on in the app. Logs are in
 
 The window's layout is data in `../../app-shell/shell-connection.js`:
 - the explorer on the left;
-- two tab groups in the centre, sources (`code`) and views (`view`), linked by file, so bringing either tab forward brings its partner forward;
-- the inspector underneath (`../../view-inspector.js`), showing the member list and the log of the view on display;
+- tabs in the centre, for views and source files alike;
+- the inspector underneath (`../../view-inspector.js`), showing the member list and the log of the view in front, or of the last one that was;
 - the agent on the right.
 
 The title bar buttons and Cmd/Ctrl+J show and hide the sides.

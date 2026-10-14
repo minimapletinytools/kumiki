@@ -22,27 +22,11 @@
         </header>
         <aside class="slot slot-left" id="slot-left" aria-label="Explorer"></aside>
         <div class="splitter" id="splitter-left" role="separator" aria-orientation="vertical" aria-label="Resize explorer"></div>
-        <main class="main" id="main">
-            <div class="groups" id="groups">
-                <section class="group" id="group-code" data-group="code" hidden>
-                    <header class="tabs-bar">
-                        <nav class="tabs" id="tabs-code" role="tablist" aria-label="Sources"></nav>
-                        <div class="group-actions">
-                            <button class="layout-toggle" id="open-view" title="Show the frame in this file" hidden><span class="codicon codicon-eye"></span></button>
-                        </div>
-                    </header>
-                    <div class="slot slot-center" id="slot-code"></div>
-                </section>
-                <div class="splitter splitter-group" id="splitter-group" role="separator" aria-orientation="vertical" aria-label="Resize sources" hidden></div>
-                <section class="group" id="group-view" data-group="view" hidden>
-                    <header class="tabs-bar">
-                        <nav class="tabs" id="tabs-view" role="tablist" aria-label="Views"></nav>
-                        <div class="group-actions">
-                            <button class="layout-toggle" id="open-source" title="Open the source of this view" hidden><span class="codicon codicon-go-to-file"></span></button>
-                        </div>
-                    </header>
-                    <div class="slot slot-center" id="slot-view"></div>
-                </section>
+        <main class="main">
+            <header class="tabs-bar">
+                <nav class="tabs" id="tabs" role="tablist" aria-label="Open panels"></nav>
+            </header>
+            <section class="slot slot-center" id="slot-center">
                 <div class="welcome" id="welcome">
                     <h1>Kigumi</h1>
                     <p class="welcome-lead" id="welcome-lead"></p>
@@ -53,7 +37,7 @@
                         <dt><kbd id="key-browse">⌘P</kbd></dt><dd>Browse patterns</dd>
                     </dl>
                 </div>
-            </div>
+            </section>
             <div class="splitter splitter-bottom" id="splitter-bottom" role="separator" aria-orientation="horizontal" aria-label="Resize inspector" hidden></div>
             <section class="slot slot-bottom" id="slot-bottom" aria-label="Inspector" hidden></section>
         </main>
