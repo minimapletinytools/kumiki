@@ -21,6 +21,9 @@
     // Where a drawing came from, as one mark. The same scheme the drawings
     // section uses, and for the same reason: the fill reads as how much of it
     // comes from the file.
+    const { overlayHeader } = globalScope.KigumiOverlay
+        || (typeof require === 'function' ? require('./overlay-header') : {});
+
     const ORIGIN_MARKS = {
         code: '○',
         overridden: '◐',
@@ -36,6 +39,7 @@
             this.viewports = [];
             this.members = [];
             this.expanded = new Set(['section:viewports', 'section:members']);
+            this.collapsed = false;
         }
 
         mount(container) {
@@ -95,6 +99,9 @@
                 return;
             }
             this.el.appendChild(this._header());
+            if (this.collapsed) {
+                return;
+            }
             this.el.appendChild(this._section(
                 'viewports', t('viewer.drawing.viewports'), () => this._viewportRows(),
             ));
@@ -114,18 +121,20 @@
         }
 
         _header() {
-            const header = document.createElement('div');
-            header.className = 'dp-header';
+            const header = overlayHeader(this.drawing.name || this.drawing.id, {
+                collapsed: this.collapsed,
+                onToggle: () => {
+                    this.collapsed = !this.collapsed;
+                    this._render();
+                },
+                doc: document,
+            });
+            header.classList.add('dp-header');
 
             const origin = document.createElement('span');
             origin.className = 'dp-origin';
             origin.textContent = ORIGIN_MARKS[this.drawing.origin] || ORIGIN_MARKS.file;
-            header.appendChild(origin);
-
-            const name = document.createElement('span');
-            name.className = 'dp-name';
-            name.textContent = this.drawing.name || this.drawing.id;
-            header.appendChild(name);
+            header.insertBefore(origin, header.lastChild);
 
             if (this.drawing.dirty) {
                 const unsaved = document.createElement('span');
@@ -140,7 +149,10 @@
             save.className = 'dp-action';
             save.textContent = t('viewer.layers.drawing.save');
             save.title = t('viewer.layers.drawing.save.title');
-            save.addEventListener('click', () => this._emit('kigumi-save-drawings', {}));
+            save.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this._emit('kigumi-save-drawings', {});
+            });
             header.appendChild(save);
 
             const close = document.createElement('button');
@@ -148,7 +160,10 @@
             close.className = 'dp-action';
             close.textContent = t('viewer.selection.leaveDrawing');
             close.title = t('viewer.selection.leaveDrawing.title');
-            close.addEventListener('click', () => this._emit('kigumi-close-drawing', {}));
+            close.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this._emit('kigumi-close-drawing', {});
+            });
             header.appendChild(close);
 
             return header;

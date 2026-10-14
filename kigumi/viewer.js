@@ -15,6 +15,7 @@ const VIEWER_APP_VERSION = '2026.03.17.4';
 const WEBVIEW_ASSETS = [
     ['__BOOT_DIAGNOSTICS_JS_URI__', 'boot-diagnostics.js'],
     ['__I18N_JS_URI__', 'i18n.js'],
+    ['__OVERLAY_HEADER_JS_URI__', 'overlay-header.js'],
     ['__SELECTION_STORE_JS_URI__', 'selection-store.js'],
     ['__FEATURE_STATES_JS_URI__', 'feature-states.js'],
     ['__SELECTION_VISUALS_JS_URI__', 'selection-visuals.js'],

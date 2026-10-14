@@ -449,29 +449,51 @@ canvas { display: block; width: 100%; height: 100%; }
     margin-top: 4px;
 }
 
-.ip-header {
+/* The header of every panel over the view (overlay-header.js): its name and the
+   arrow that collapses it, on one line. */
+.ov-header {
     display: flex;
     align-items: center;
     gap: 4px;
     cursor: pointer;
     color: var(--hv-title);
+    font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: lowercase;
     padding: 4px 8px;
-    border-bottom: 1px solid var(--hv-panel-border);
     background: var(--hv-layers-header-bg);
+    user-select: none;
 }
 
-.ip-chev {
+.ov-header:hover .ov-chev {
+    color: var(--hv-title);
+}
+
+.ov-chev {
+    flex: none;
     display: inline-block;
     width: 12px;
     text-align: center;
+    font-size: 10px;
     color: var(--hv-dim);
 }
 
-.ip-title {
+.ov-title {
     flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ov-header-right .ov-title {
+    text-align: right;
+}
+
+/* A rule under the header only when something is under it. */
+.ov-header:not(:last-child) {
+    border-bottom: 1px solid var(--hv-panel-border);
 }
 
 .ip-body {
@@ -540,34 +562,47 @@ canvas { display: block; width: 100%; height: 100%; }
     backdrop-filter: blur(4px);
 }
 #debug strong { color: var(--hv-strong); font-size: 13px; }
+/* The camera controls: one column under one header, which collapses it. */
 #gizmo-panel {
     position: absolute;
     top: 12px;
     right: 12px;
+    width: 122px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
-    z-index: 3;
-}
-.gizmo-block {
-    width: 108px;
     background: var(--hv-panel-bg);
     border: 1px solid var(--hv-panel-border);
     border-radius: 6px;
-    padding: 6px;
+    overflow: hidden;
     backdrop-filter: blur(4px);
+    z-index: 3;
+}
+#gizmo-panel.is-collapsed {
+    width: auto;
+}
+#gizmo-panel.is-collapsed .gizmo-body {
+    display: none;
+}
+#gizmo-panel.is-collapsed .ov-header {
+    border-bottom: none;
+}
+.gizmo-body {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 6px;
 }
 .gizmo-title {
     color: var(--hv-title);
     font: 11px 'Segoe UI', sans-serif;
-    margin-bottom: 4px;
+    margin-top: 2px;
     text-transform: lowercase;
 }
 #gizmo-cube-c,
 #light-dial-c {
-    width: 96px;
-    height: 96px;
+    width: 108px;
+    height: 108px;
     display: block;
     border-radius: 4px;
     border: 1px solid var(--hv-control-border-strong);
@@ -579,44 +614,20 @@ canvas { display: block; width: 100%; height: 100%; }
 #light-dial-c:active {
     cursor: grabbing;
 }
-#focus-btn {
-    width: 108px;
-    border: 1px solid var(--hv-panel-border);
-    border-radius: 6px;
-    background: var(--hv-control-bg-strong);
-    color: var(--hv-title);
-    font: 12px 'Segoe UI', sans-serif;
-    padding: 6px 10px;
-    cursor: pointer;
-}
-#focus-btn:hover {
-    background: var(--hv-control-bg-solid-hover);
-}
-#camera-mode-btn {
-    width: 108px;
-    border: 1px solid var(--hv-panel-border);
-    border-radius: 6px;
-    background: var(--hv-control-bg-strong);
-    color: var(--hv-title);
-    font: 12px 'Segoe UI', sans-serif;
-    padding: 6px 10px;
-    cursor: pointer;
-    text-transform: lowercase;
-}
-#camera-mode-btn:hover {
-    background: var(--hv-control-bg-solid-hover);
-}
+#focus-btn,
+#camera-mode-btn,
 #projection-mode-btn {
-    width: 108px;
     border: 1px solid var(--hv-panel-border);
     border-radius: 6px;
     background: var(--hv-control-bg-strong);
     color: var(--hv-title);
     font: 12px 'Segoe UI', sans-serif;
-    padding: 6px 10px;
+    padding: 5px 8px;
     cursor: pointer;
     text-transform: lowercase;
 }
+#focus-btn:hover,
+#camera-mode-btn:hover,
 #projection-mode-btn:hover {
     background: var(--hv-control-bg-solid-hover);
 }
@@ -1448,9 +1459,7 @@ kigumi-layers-view:has(.layers-panel.is-collapsed) {
 
 /* ---- Layers panel (lp-* class compatibility for current implementation) ---- */
 kigumi-layers-view:has(.lp-collapsed) {
-    width: auto;
-    bottom: auto;
-    max-height: 28px;
+    flex: 0 0 auto;
 }
 
 .lp-panel {
@@ -1469,55 +1478,7 @@ kigumi-layers-view:has(.lp-collapsed) {
 }
 
 .lp-panel.lp-collapsed {
-    width: auto;
-    height: 28px;
-    background: var(--hv-layers-collapsed-bg);
-}
-
-.lp-toggle-btn {
-    align-self: flex-start;
-    margin: 2px;
-    background: transparent;
-    border: 1px solid var(--hv-panel-border);
-    border-radius: 4px;
-    color: var(--hv-title);
-    cursor: pointer;
-    font-size: 12px;
-    line-height: 1;
-    padding: 2px 6px;
-}
-
-.lp-toggle-btn.lp-toggle-collapsed {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 8px;
-}
-
-.lp-toggle-chev {
-    font-size: 10px;
-    color: var(--hv-dim);
-}
-
-.lp-toggle-label {
-    font-size: 12px;
-    color: var(--hv-title);
-    letter-spacing: 0.04em;
-}
-
-.lp-toggle-btn:hover {
-    background: var(--hv-control-bg-solid-hover);
-}
-
-.lp-header {
-    color: var(--hv-title);
-    font-weight: 600;
-    font-size: 12px;
-    letter-spacing: 0.06em;
-    text-transform: lowercase;
-    padding: 4px 8px;
-    border-bottom: 1px solid var(--hv-panel-border);
-    background: var(--hv-layers-header-bg);
+    height: auto;
 }
 
 .lp-filter-bar {

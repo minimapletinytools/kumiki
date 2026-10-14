@@ -769,6 +769,7 @@ class KigumiViewerApp extends LitElement {
         this.showCenterGizmo = true;
         this.footprintObjects = [];
         this.debugEnabled = false;
+        this.cameraPanelCollapsed = false;
         this.leftClickDragRotatesCamera = true;
         // What a right-click is offering. One menu for every kind of menu --
         // dismissing, choosing and where it sits are solved once.
@@ -943,23 +944,29 @@ class KigumiViewerApp extends LitElement {
                     <div id="rail-resize" title=${t('viewer.layers.resize.title')}
                          @pointerdown=${this.onRailResizeStart}></div>
                 </div>
-                <div id="gizmo-panel" aria-label=${t('viewer.chrome.gizmoPanel.ariaLabel')}>
-                    <div class="gizmo-block">
-                        <div class="gizmo-title">${t('viewer.chrome.gizmo.camera')}</div>
-                        <canvas id="gizmo-cube-c"></canvas>
+                <div id="gizmo-panel" class=${this.cameraPanelCollapsed ? 'is-collapsed' : ''}
+                     aria-label=${t('viewer.chrome.gizmoPanel.ariaLabel')}>
+                    <!-- The same header as the panels on the left (overlay-header.js), the
+                         arrow after the name on this side. -->
+                    <div class="ov-header ov-header-right" role="button"
+                         aria-expanded=${this.cameraPanelCollapsed ? 'false' : 'true'}
+                         @click=${() => this.toggleCameraPanel()}>
+                        <span class="ov-title">${t('viewer.chrome.gizmo.camera')}</span>
+                        <span class="ov-chev">${window.KigumiOverlay.ARROWS.right[this.cameraPanelCollapsed ? 'collapsed' : 'open']}</span>
                     </div>
-                    <button id="focus-btn" type="button" title=${t('viewer.chrome.gizmo.focus.title')}>${t('viewer.chrome.gizmo.focus')}</button>
-                    <button
-                        id="camera-mode-btn"
-                        type="button"
-                        title=${t('viewer.chrome.gizmo.cameraMode.title')}
-                    >📷 ${cameraMode === 'standard' ? t('viewer.chrome.gizmo.cameraMode.standard') : t('viewer.chrome.gizmo.cameraMode.free')}</button>
-                    <button
-                        id="projection-mode-btn"
-                        type="button"
-                        title=${t('viewer.chrome.gizmo.projectionMode.title')}
-                    >${this.isOrthographic ? '⬛' : '📐'} ${this.isOrthographic ? t('viewer.chrome.gizmo.projectionMode.orthographic') : t('viewer.chrome.gizmo.projectionMode.perspective')}</button>
-                    <div class="gizmo-block">
+                    <div class="gizmo-body">
+                        <canvas id="gizmo-cube-c"></canvas>
+                        <button id="focus-btn" type="button" title=${t('viewer.chrome.gizmo.focus.title')}>${t('viewer.chrome.gizmo.focus')}</button>
+                        <button
+                            id="camera-mode-btn"
+                            type="button"
+                            title=${t('viewer.chrome.gizmo.cameraMode.title')}
+                        >📷 ${cameraMode === 'standard' ? t('viewer.chrome.gizmo.cameraMode.standard') : t('viewer.chrome.gizmo.cameraMode.free')}</button>
+                        <button
+                            id="projection-mode-btn"
+                            type="button"
+                            title=${t('viewer.chrome.gizmo.projectionMode.title')}
+                        >${this.isOrthographic ? '⬛' : '📐'} ${this.isOrthographic ? t('viewer.chrome.gizmo.projectionMode.orthographic') : t('viewer.chrome.gizmo.projectionMode.perspective')}</button>
                         <div class="gizmo-title">${t('viewer.chrome.gizmo.light')}</div>
                         <canvas id="light-dial-c"></canvas>
                     </div>
@@ -5240,6 +5247,16 @@ class KigumiViewerApp extends LitElement {
             this.cameraCube.resize();
         }
         this.drawLightDial();
+    }
+
+    /** Collapse the camera controls to their header, or bring them back. */
+    toggleCameraPanel() {
+        this.cameraPanelCollapsed = !this.cameraPanelCollapsed;
+        this.requestUpdate();
+        if (!this.cameraPanelCollapsed) {
+            // Hidden, the cube and the dial had no size to draw at.
+            this.updateComplete.then(() => this.syncCameraControls());
+        }
     }
 
     renderCameraControls() {

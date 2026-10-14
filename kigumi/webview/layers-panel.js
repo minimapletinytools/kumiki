@@ -19,6 +19,8 @@
     // Tags arrive as {kind, name}; viewer.html loads these ahead of us.
     const KigumiTags = globalScope.KigumiTags;
     const TagIndex = globalScope.TagIndex;
+    const { overlayHeader } = globalScope.KigumiOverlay
+        || (typeof require === 'function' ? require('./overlay-header') : {});
 
     // CSG rows indent from where the member rows leave off (.lp-depth-0 is
     // 18px), one step per level. The old 10px step started shallower than the
@@ -170,19 +172,16 @@
                 this.viewport.classList.toggle('lp-open', !this.collapsed);
             }
 
-            const toggleBtn = document.createElement('button');
-            toggleBtn.className = 'lp-toggle-btn' + (this.collapsed ? ' lp-toggle-collapsed' : '');
-            toggleBtn.title = this.collapsed ? t('viewer.layers.expand.title') : t('viewer.layers.collapse.title');
-            if (this.collapsed) {
-                toggleBtn.innerHTML = `<span class="lp-toggle-chev">▸</span><span class="lp-toggle-label">${t('viewer.layers.toggleLabel')}</span>`;
-            } else {
-                toggleBtn.textContent = '◁';
-            }
-            toggleBtn.addEventListener('click', () => {
-                this.collapsed = !this.collapsed;
-                this._render();
+            const header = overlayHeader(t('viewer.layers.header'), {
+                collapsed: this.collapsed,
+                onToggle: () => {
+                    this.collapsed = !this.collapsed;
+                    this._render();
+                },
+                doc: document,
             });
-            this.el.appendChild(toggleBtn);
+            header.title = this.collapsed ? t('viewer.layers.expand.title') : t('viewer.layers.collapse.title');
+            this.el.appendChild(header);
 
             if (this.collapsed) {
                 // The tree went with the wipe. Left set, it would be a detached
@@ -190,11 +189,6 @@
                 this._treeEl = null;
                 return;
             }
-
-            const header = document.createElement('div');
-            header.className = 'lp-header';
-            header.textContent = t('viewer.layers.header');
-            this.el.appendChild(header);
 
             // Search input
             const filterBar = document.createElement('div');

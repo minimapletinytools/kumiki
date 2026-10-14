@@ -77,6 +77,37 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
                 && described.selection && Array.isArray(described.selection.members),
             described && JSON.stringify({ view: described.view, frame: described.frameName }));
 
+        // Every panel over the view collapses from its header, and comes back.
+        const viewDoc = 'document.querySelector("#slot-center iframe:not([hidden])").contentDocument';
+        const overlayState = () => inShell(`(() => {
+            const doc = ${viewDoc};
+            return {
+                selection: !doc.querySelector('#info-panel .ip-body'),
+                layers: doc.querySelector('#layers-view .lp-panel').classList.contains('lp-collapsed'),
+                camera: doc.getElementById('gizmo-panel').classList.contains('is-collapsed'),
+            };
+        })()`);
+        const clickHeaders = () => inShell(`(() => {
+            const doc = ${viewDoc};
+            for (const selector of ['#info-panel .ov-header', '#layers-view .ov-header', '#gizmo-panel .ov-header']) {
+                doc.querySelector(selector).click();
+            }
+        })()`);
+        const before = await overlayState();
+        await clickHeaders();
+        await sleep(200);
+        const toggled = await overlayState();
+        await capture('02b-collapsed');
+        await clickHeaders();
+        await sleep(200);
+        const restored = await overlayState();
+        await capture('02c-expanded');
+        const cubeWidth = await waitFor(() => inShell(`${viewDoc}.getElementById('gizmo-cube-c').width`), { timeoutMs: 5000 });
+        check('the selection, layers and camera panels collapse from their headers and come back',
+            ['selection', 'layers', 'camera'].every((name) => toggled[name] !== before[name] && restored[name] === before[name])
+                && cubeWidth > 50,
+            `${JSON.stringify(before)} -> ${JSON.stringify(toggled)}, cube ${cubeWidth}px`);
+
         // The inspector under the tabs shows the view's members; a click there selects in the view,
         // and the selection comes back to the inspector.
         const inspectorDoc = 'document.querySelector("#slot-bottom iframe")?.contentDocument';

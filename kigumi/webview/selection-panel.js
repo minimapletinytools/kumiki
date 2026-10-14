@@ -4,12 +4,13 @@ const KigumiUnits = window.KigumiUnits;
 const KigumiMeasurements = window.KigumiMeasurements;
 const TagIndex = window.TagIndex;
 const KigumiSelectionCopy = window.KigumiSelectionCopy;
+const { overlayHeader } = window.KigumiOverlay;
 
 /**
  * The selection pane: what is selected, as stock and as a path into the CSG.
  *
  * Follows the panel shape already in the viewer. It owns whether it is
- * expanded, since nothing outside it cares, and asks the app for anything about
+ * collapsed, since nothing outside it cares, and asks the app for anything about
  * the frame or the selection.
  */
 export class SelectionPanel {
@@ -18,9 +19,8 @@ export class SelectionPanel {
         this.t = t;
         this.CsgTreeView = csgTreeView;
         this.featureTypeNouns = featureTypeNouns;
-        // It never expands itself -- expanding is the user's choice, and the
-        // CSG trees live in the layers panel rather than here.
-        this.expanded = false;
+        // Open until the user collapses it to its header.
+        this.collapsed = false;
     }
 
     render() {
@@ -351,25 +351,18 @@ export class SelectionPanel {
         panel.className = 'ip-panel';
         panel.innerHTML = '';
 
-        const header = document.createElement('div');
-        header.className = 'ip-header';
-        const chev = document.createElement('span');
-        chev.className = 'ip-chev';
-        chev.textContent = this.expanded ? '\u25be' : '\u25b8';
-        header.appendChild(chev);
-        const headerTitle = document.createElement('span');
-        headerTitle.className = 'ip-title';
-        headerTitle.textContent = this.t('viewer.selection.header');
-        header.appendChild(headerTitle);
-        header.addEventListener('click', () => {
-            this.expanded = !this.expanded;
-            this.updateInfo(this.app.currentFrameData);
+        const header = overlayHeader(this.t('viewer.selection.header'), {
+            collapsed: this.collapsed,
+            onToggle: () => {
+                this.collapsed = !this.collapsed;
+                this.updateInfo(this.app.currentFrameData);
+            },
         });
 
         // Getting into and out of a drawing lives in the header rather than the
-        // body: the body is collapsed by default, and a way out of a drawing
-        // that can be collapsed is a trap. Absent entirely while drawing mode
-        // is off, which is what keeps the viewer in the 3D scene.
+        // body: a way out of a drawing that can be collapsed is a trap. Absent
+        // entirely while drawing mode is off, which is what keeps the viewer in
+        // the 3D scene.
         if (this.app.drawingBetaEnabled) {
             header.appendChild(this._drawingButton());
         }
@@ -377,6 +370,19 @@ export class SelectionPanel {
 
         const body = document.createElement('div');
         body.className = 'ip-body';
+
+        // Collapsed, the panel keeps only how a focused measurement is measured: it
+        // appears right after making one, and a control you have to go looking for is
+        // one nobody finds.
+        if (this.collapsed) {
+            const measurement = this.app.focusedMeasurement();
+            const kindRow = measurement && this._measureKindRow(measurement);
+            if (kindRow) {
+                body.appendChild(kindRow);
+                panel.appendChild(body);
+            }
+            return;
+        }
 
         const selected = document.createElement('div');
         selected.className = 'ip-breadcrumb';
@@ -412,9 +418,6 @@ export class SelectionPanel {
             body.appendChild(line);
         }
 
-        // Not behind the expander: it appears when a measurement is focused,
-        // which is immediately after making one, and a control you have to go
-        // looking for is one nobody finds.
         const measurement = this.app.focusedMeasurement();
         if (measurement) {
             const kindRow = this._measureKindRow(measurement);
@@ -425,7 +428,7 @@ export class SelectionPanel {
 
         // The pills the member rows no longer carry: they live here, where
         // there is room for them, and only for what is selected.
-        if (this.expanded && summary.tags && summary.tags.length > 0) {
+        if (summary.tags && summary.tags.length > 0) {
             const line = document.createElement('div');
             line.className = 'ip-detail ip-tags';
             const label = document.createElement('span');
@@ -445,9 +448,8 @@ export class SelectionPanel {
             body.appendChild(line);
         }
 
-        // Detail lines are the reward for expanding, so they stay behind it.
         const detail = this.app.lastPickDetail;
-        if (this.expanded && detail && this.app.selectionManager.csgFocus) {
+        if (detail && this.app.selectionManager.csgFocus) {
             const normalText = this.CsgTreeView.describeOutwardNormal(
                 detail.outwardNormal,
                 detail.facesToward,
