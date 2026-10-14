@@ -12,6 +12,13 @@
  *                  inspector:log {line}, inspector:state {state}
  *   page -> here:  inspector:ready, inspector:select {memberKeys, additive}, inspector:clearLog,
  *                  inspector:call {method, args, seq}
+ *
+ * Two paths, on purpose for now: under VS Code the view still draws its own options, parameters,
+ * member list and log; only the app moves them here. The options and parameters are one code
+ * path (viewer-panels.js); the member table and the log list are drawn twice (here and in the
+ * view). What can break quietly is viewer-panels.js's SNAPSHOT_PROPS and PANEL_ACTIONS: a viewer
+ * property or method the panels use but those lists omit works in VS Code and is dead here.
+ * Showing this page in VS Code too (a webview panel) would make it one path.
  */
 
 const path = require('path');
