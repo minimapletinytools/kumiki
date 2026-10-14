@@ -9,13 +9,13 @@ import {
 } from '../viewer-panels.js';
 
 {
-    const TABS = ['members', 'parameters', 'options', 'log'];
+    const TABS = ['options', 'parameters', 'members', 'log'];
     const api = acquireVsCodeApi();
     const $ = (id) => document.getElementById(id);
     const saved = api.getState() || {};
 
     const ui = {
-        tab: TABS.includes(saved.tab) ? saved.tab : 'members',
+        tab: TABS.includes(saved.tab) ? saved.tab : 'options',
         options: { roughLength: false, nominal: false, csg: false, tags: false, ...(saved.options || {}) },
     };
     let state = null;
