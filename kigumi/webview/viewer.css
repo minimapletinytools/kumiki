@@ -473,9 +473,9 @@ canvas { display: block; width: 100%; height: 100%; }
 .ov-chev {
     flex: none;
     display: inline-block;
-    width: 12px;
+    width: 14px;
     text-align: center;
-    font-size: 10px;
+    font-size: 13px;
     color: var(--hv-dim);
 }
 
