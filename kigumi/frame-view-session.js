@@ -116,6 +116,11 @@ class FrameViewSession {
         this.logLines = [];
     }
 
+    /** A call from the view's options or parameters panel, drawn outside it (viewer-panels.js). */
+    callViewPanel(method, args, seq) {
+        this._postToWebview({ type: 'panelCall', method, args, seq });
+    }
+
     /** Select members in the view, as a click in it would. */
     selectMembers(memberKeys, { additive = false } = {}) {
         this._postToWebview({ type: 'selectMembers', memberKeys, additive });

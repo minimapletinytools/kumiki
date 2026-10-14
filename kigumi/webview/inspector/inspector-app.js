@@ -1,15 +1,21 @@
-// The inspector's page: the current view's member list and log, drawn from what the app relays
-// (view-inspector.js). Clicking a member selects it in the view; shift or cmd adds to the selection.
+// The inspector's page: the current view's member list, parameters, options and log, drawn from
+// what the app relays (view-inspector.js). Clicking a member selects it in the view; shift or cmd
+// adds to the selection. The parameters and options are the view's own panels
+// (viewer-panels.js), drawn against a stand-in that sends each change back to the view.
 
-(function () {
-    'use strict';
+import { html, render } from '../vendor/lit.min.js';
+import {
+    ViewerSettingsPanel, ViewerKiwariPanel, usePanelRuntime, panelStandIn,
+} from '../viewer-panels.js';
 
+{
+    const TABS = ['members', 'parameters', 'options', 'log'];
     const api = acquireVsCodeApi();
     const $ = (id) => document.getElementById(id);
     const saved = api.getState() || {};
 
     const ui = {
-        tab: saved.tab === 'log' ? 'log' : 'members',
+        tab: TABS.includes(saved.tab) ? saved.tab : 'members',
         options: { roughLength: false, nominal: false, csg: false, tags: false, ...(saved.options || {}) },
     };
     let state = null;
@@ -106,6 +112,59 @@
     }
 
     // ---------------------------------------------------------------------
+    // Parameters and options
+
+    let t = window.KigumiI18n.createTranslator({});
+    let panelsSnapshot = null;
+    let settingsPanel = null;
+    // The last call sent to the view on show. An answer older than that is to an earlier
+    // keystroke, and drawing it would undo what was typed since.
+    let nextCallSeq = 0;
+    let awaitedSeq = 0;
+
+    function useStrings(strings) {
+        t = window.KigumiI18n.createTranslator(strings || {});
+        usePanelRuntime({ html, t, KigumiUnits: window.KigumiUnits, KigumiKiwariValues: window.KigumiKiwariValues });
+    }
+
+    function callView(method, args) {
+        nextCallSeq = Math.max(nextCallSeq + 1, Date.now());
+        awaitedSeq = nextCallSeq;
+        api.postMessage({ type: 'inspector:call', method, args, seq: nextCallSeq });
+    }
+
+    function renderViewPanels() {
+        if (!panelsSnapshot) {
+            settingsPanel = null;
+            render(html`<p class="empty">Open a frame to see its parameters.</p>`, $('parameters-panel'));
+            render(html`<p class="empty">Open a frame to see its options.</p>`, $('options-panel'));
+            return;
+        }
+        const app = panelStandIn(panelsSnapshot, callView);
+        settingsPanel = new ViewerSettingsPanel(app);
+        render(settingsPanel.render(), $('options-panel'));
+        settingsPanel.syncControls($('options-panel'));
+        const parameters = new ViewerKiwariPanel(app).render();
+        render(parameters || html`<p class="empty">This frame takes no parameters.</p>`, $('parameters-panel'));
+    }
+
+    for (const type of ['change', 'input', 'click']) {
+        $('options-panel').addEventListener(type, (event) => {
+            if (settingsPanel) settingsPanel.handleEvent(event);
+        });
+    }
+
+    function takeState(nextState, { fresh = false } = {}) {
+        state = nextState || null;
+        const panels = state && state.panels;
+        if (fresh || !panels || (state.panelCallSeq || 0) >= awaitedSeq) {
+            panelsSnapshot = panels || null;
+            renderViewPanels();
+        }
+        renderMembers();
+    }
+
+    // ---------------------------------------------------------------------
     // Log
 
     function classFor(line) {
@@ -155,13 +214,13 @@
             $('members-empty').textContent = message.view
                 ? 'Waiting for the view to build…'
                 : 'Open a frame to see its members.';
-            state = message.state || null;
+            useStrings(message.strings);
+            awaitedSeq = 0;
+            takeState(message.state, { fresh: true });
             logLines = [...(message.log || [])];
-            renderMembers();
             renderLog();
         } else if (message.type === 'inspector:state') {
-            state = message.state || null;
-            renderMembers();
+            takeState(message.state);
         } else if (message.type === 'inspector:log') {
             logLines.push(message.line);
             if (logLines.length > 5000) logLines.splice(0, logLines.length - 5000);
@@ -175,7 +234,9 @@
     for (const button of document.querySelectorAll('.inspector-tab')) {
         button.addEventListener('click', () => showTab(button.dataset.tab));
     }
+    useStrings({});
     showTab(ui.tab);
     renderMembers();
+    renderViewPanels();
     api.postMessage({ type: 'inspector:ready' });
-})();
+}

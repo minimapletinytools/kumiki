@@ -1087,8 +1087,15 @@ canvas { display: block; width: 100%; height: 100%; }
     white-space: nowrap;
 }
 /* The host shows these in a panel of its own (the app's inspector). */
-kigumi-app.panels-outside #panels {
+kigumi-app.panels-outside #panels,
+kigumi-app.panels-outside #top-controls {
     display: none;
+}
+/* With nothing left under it, the 3D view is the whole page. */
+kigumi-app.panels-outside #viewport {
+    height: 100vh;
+    min-height: 0;
+    border-bottom: none;
 }
 #panels {
     width: 100%;

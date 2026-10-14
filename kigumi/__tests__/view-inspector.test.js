@@ -23,6 +23,8 @@ function fakeSession(filePath) {
     onLogLine: (callback) => { logListeners.add(callback); return { dispose: () => logListeners.delete(callback) }; },
     onViewState: (callback) => { stateListeners.add(callback); return { dispose: () => stateListeners.delete(callback) }; },
     selectMembers(keys, options) { this.selected.push([keys, options]); },
+    calls: [],
+    callViewPanel(method, args, seq) { this.calls.push([method, args, seq]); },
     clearLogLines() { this.logLines = []; },
     log: (line) => logListeners.forEach((listener) => listener(line)),
     publish: (state) => stateListeners.forEach((listener) => listener(state)),
@@ -42,6 +44,7 @@ describe('the view inspector', () => {
       view: { title: 'a.py', filePath: '/a.py' },
       log: ['built'],
       state: { members: [{ key: 'post' }], selection: [] },
+      strings: expect.objectContaining({ 'common.enabled': 'enabled' }),
     });
 
     session.log('rebuilt');
@@ -76,5 +79,15 @@ describe('the view inspector', () => {
 
     surface.fromPage({ type: 'inspector:select', memberKeys: ['post'], additive: true });
     expect(session.selected).toEqual([[['post'], { additive: true }]]);
+  });
+
+  test('a change to an option or a parameter goes to the view', () => {
+    const surface = fakeSurface();
+    const session = fakeSession('/a.py');
+    const inspector = new ViewInspector({ surface, currentSession: () => session });
+    inspector.sync();
+
+    surface.fromPage({ type: 'inspector:call', method: 'setKiwariDraft', args: [0, 'span', '2m'], seq: 7 });
+    expect(session.calls).toEqual([['setKiwariDraft', [0, 'span', '2m'], 7]]);
   });
 });

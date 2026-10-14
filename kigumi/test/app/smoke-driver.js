@@ -9,6 +9,7 @@ const path = require('path');
 
 const REPO = path.resolve(__dirname, '..', '..', '..');
 const FRAME = path.join(REPO, 'patterns', 'structures', 'my_cute_frame.py');
+const PARAMETER_FRAME = path.join(REPO, 'patterns', 'structures', 'dovetailed_sawhorse.py');
 const ARTIFACTS = process.env.KIGUMI_TEST_ARTIFACTS || null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -95,6 +96,54 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             selectedRows === 1 && viewSelection && viewSelection.members.length === 1,
             `${selectedRows} row, ${viewSelection && viewSelection.members.length} selected in the view`);
         await capture('03b-inspector');
+
+        // The options are drawn in the inspector against a stand-in for the view: a change there
+        // reaches the view, and its answer comes back.
+        const lengthOfFirstRow = () => inShell(`${inspectorDoc}.querySelector("#member-rows tr").children[4].textContent`);
+        const metricLength = await lengthOfFirstRow();
+        await inShell(`(() => {
+            ${inspectorDoc}.querySelector('.inspector-tab[data-tab="options"]').click();
+            const units = ${inspectorDoc}.getElementById('units-select');
+            units.value = 'imperial';
+            units.dispatchEvent(new Event('change', { bubbles: true }));
+        })()`);
+        const imperialLength = await waitFor(async () => {
+            const length = await lengthOfFirstRow();
+            return length !== metricLength ? length : null;
+        }, { timeoutMs: 5000 }).catch(() => null);
+        check('an option changed in the inspector changes the view',
+            imperialLength !== null && await inShell(`${inspectorDoc}.getElementById('units-select').value`) === 'imperial',
+            `${metricLength} -> ${imperialLength}`);
+        await capture('03c-options');
+        await inShell(`(() => {
+            const units = ${inspectorDoc}.getElementById('units-select');
+            units.value = 'metric';
+            units.dispatchEvent(new Event('change', { bubbles: true }));
+        })()`);
+        await waitFor(async () => (await lengthOfFirstRow()) === metricLength, { timeoutMs: 5000 }).catch(() => null);
+        check('the view leaves its options to the inspector', await inShell(`(() => {
+            const frame = document.querySelector('#slot-center iframe:not([hidden])');
+            const controls = frame && frame.contentDocument.getElementById('top-controls');
+            return !!controls && frame.contentWindow.getComputedStyle(controls).display === 'none';
+        })()`));
+
+        // A frame's parameters: typed in the inspector, held by the view, shown back.
+        await runAppCommand('kigumi.openFrameFromSidebar', PARAMETER_FRAME);
+        await inShell(`${inspectorDoc}.querySelector('.inspector-tab[data-tab="parameters"]').click()`);
+        const parameterRows = await waitFor(() => inShell(`${inspectorDoc}?.querySelectorAll(".kiwari-row").length || 0`), { timeoutMs: 60000 })
+            .catch(() => 0);
+        await inShell(`(() => {
+            const box = ${inspectorDoc}.querySelector('input.kiwari-box[type="text"]');
+            box.value = '7';
+            box.dispatchEvent(new Event('input', { bubbles: true }));
+        })()`);
+        const parameterEdits = await waitFor(() => inShell(`${inspectorDoc}.querySelectorAll(".kiwari-row-changed, .kiwari-problem").length`), { timeoutMs: 5000 })
+            .catch(() => 0);
+        check('the inspector shows a frame\'s parameters, and an edit there reaches the view',
+            parameterRows > 0 && parameterEdits > 0, `${parameterRows} parameters`);
+        await capture('03d-parameters');
+        connection().activePanel.dispose();
+        await inShell(`${inspectorDoc}.querySelector('.inspector-tab[data-tab="members"]').click()`);
 
         const picking = runAppCommand('kigumi.browsePatterns');
         await waitFor(() => inShell('!document.getElementById("quickpick").hidden && document.querySelectorAll("#quickpick .item").length'), { timeoutMs: 30000 });

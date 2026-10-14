@@ -5,24 +5,29 @@
  *
  * The view's page publishes what it shows as `viewState` (viewer-app.js, publishViewState); its
  * session keeps that and the recent log (frame-view-session.js). This relays both to the
- * inspector's page, and what the user does there back to the view.
+ * inspector's page, and what the user does there back to the view. The view's options and
+ * parameters panels are drawn there too, against a stand-in for the view (webview/viewer-panels.js).
  *
- *   here -> page:  inspector:view {view: {title, filePath}|null, log, state}, inspector:log {line},
- *                  inspector:state {state}
- *   page -> here:  inspector:ready, inspector:select {memberKeys, additive}, inspector:clearLog
+ *   here -> page:  inspector:view {view: {title, filePath}|null, log, state, strings},
+ *                  inspector:log {line}, inspector:state {state}
+ *   page -> here:  inspector:ready, inspector:select {memberKeys, additive}, inspector:clearLog,
+ *                  inspector:call {method, args, seq}
  */
 
 const path = require('path');
+const { loadCatalog } = require('./i18n');
 
 class ViewInspector {
     /**
      * @param {object} options
      * @param {{postMessage: (message: object) => any, onMessage: (callback: (message: object) => void) => any}} options.surface
      * @param {() => object|null} options.currentSession  the view session showing, if any
+     * @param {string} [options.locale]  for the panels' strings
      */
-    constructor({ surface, currentSession }) {
+    constructor({ surface, currentSession, locale = 'en' }) {
         this.surface = surface;
         this.currentSession = currentSession;
+        this.strings = loadCatalog(locale);
         this.session = null;
         this.subscriptions = [];
         surface.onMessage((message) => this.handle(message));
@@ -48,7 +53,7 @@ class ViewInspector {
         this.subscriptions = [];
         this.session = session;
         if (!session) {
-            this.post({ type: 'inspector:view', view: null, log: [], state: null });
+            this.post({ type: 'inspector:view', view: null, log: [], state: null, strings: this.strings });
             return;
         }
         this.post({
@@ -59,6 +64,7 @@ class ViewInspector {
             },
             log: session.logLines,
             state: session.viewState,
+            strings: this.strings,
         });
         this.subscriptions.push(
             session.onLogLine((line) => this.post({ type: 'inspector:log', line })),
@@ -73,6 +79,8 @@ class ViewInspector {
             this._bind(this.currentSession() || null);
         } else if (message.type === 'inspector:select' && this.session) {
             this.session.selectMembers(message.memberKeys || [], { additive: message.additive === true });
+        } else if (message.type === 'inspector:call' && this.session && typeof message.method === 'string') {
+            this.session.callViewPanel(message.method, message.args || [], message.seq);
         } else if (message.type === 'inspector:clearLog' && this.session) {
             this.session.clearLogLines();
         }

@@ -20,6 +20,7 @@ const { AgentSession } = require('../../agent/agent-session');
 const { createKigumiTools } = require('../../agent/tools');
 const { startMcpHttpServer, claudeCodeAddCommand, newToken } = require('../../agent/mcp-http');
 const { ViewInspector } = require('../../view-inspector');
+const { resolveLocale } = require('../../i18n');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
 const ORIGIN = 'kigumi://app';
@@ -450,6 +451,7 @@ function createInspector() {
     inspector = new ViewInspector({
         surface,
         currentSession: () => kigumiApp && kigumiApp.panels.sessionForSurface(inspectedView()),
+        locale: resolveLocale(app.getLocale()),
     });
     surface.onDispose(() => {
         inspector.dispose();

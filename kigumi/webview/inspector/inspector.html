@@ -13,6 +13,8 @@
     <header class="inspector-header">
         <nav class="inspector-tabs" role="tablist">
             <button class="inspector-tab is-active" role="tab" data-tab="members">Members <span class="count" id="members-count"></span></button>
+            <button class="inspector-tab" role="tab" data-tab="parameters">Parameters</button>
+            <button class="inspector-tab" role="tab" data-tab="options">Options</button>
             <button class="inspector-tab" role="tab" data-tab="log">Log</button>
         </nav>
         <span class="inspector-view" id="view-title"></span>
@@ -42,9 +44,19 @@
             <tbody id="member-rows"></tbody>
         </table>
     </section>
+    <section class="inspector-body" data-tab="parameters" hidden>
+        <div class="view-panel" id="parameters-panel"></div>
+    </section>
+    <section class="inspector-body" data-tab="options" hidden>
+        <div class="view-panel" id="options-panel"></div>
+    </section>
     <section class="inspector-body" data-tab="log" hidden>
         <pre class="log-lines" id="log-lines" tabindex="0"></pre>
     </section>
-    <script src="inspector-app.js"></script>
+    <script src="../dimension-text.js"></script>
+    <script src="../units.js"></script>
+    <script src="../kiwari-values.js"></script>
+    <script src="../i18n.js"></script>
+    <script type="module" src="inspector-app.js"></script>
 </body>
 </html>
