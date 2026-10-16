@@ -203,6 +203,7 @@
   "viewer.selection.header": "Selection",
   "viewer.selection.selected": "Selected: {what}",
   "viewer.selection.none": "Nothing selected",
+  "viewer.selection.derivedFrom": "derived from:",
   "viewer.selection.copyForAI": "Copy for AI",
   "viewer.selection.copyForAI.title": "Copy what is selected, with sizes, positions and feature references, to paste into a conversation with an AI assistant",
   "viewer.selection.copied": "Copied",

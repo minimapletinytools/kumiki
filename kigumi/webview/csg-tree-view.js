@@ -331,18 +331,24 @@
     }
 
     /**
-     * A derived feature's breadcrumb: the path to the node that owns it, then the feature, named by
-     * the full path to each of the two features that form it.
+     * A derived feature's breadcrumb: the path to the node that owns it, then what it is. The
+     * features it is derived from are listed apart -- see derivedFromPaths.
      */
     function derivedBreadcrumb(timberName, derivation, pick, nouns) {
         const segments = timberName ? [timberName] : [];
         segments.push(...(derivation.ownerPath || []));
-        const parents = derivation.parents.map((parent) => [
+        segments.push((nouns && nouns[pick.featureType]) || 'feature');
+        return segments;
+    }
+
+    /** The full path to each feature a derived feature is formed from, or null when it is not derived. */
+    function derivedFromPaths(timberName, derivation) {
+        if (!derivation || !Array.isArray(derivation.parents) || !derivation.parents.length) {
+            return null;
+        }
+        return derivation.parents.map((parent) => [
             ...(timberName ? [timberName] : []), ...(parent.path || []), parent.name,
         ].join(' \u203a '));
-        const noun = (nouns && nouns[pick.featureType]) || 'feature';
-        segments.push(noun + ' (' + parents.join(' \u2716\ufe0f ') + ')');
-        return segments;
     }
 
     /**
@@ -391,6 +397,7 @@
         describeNode,
         describePickTail,
         breadcrumbSegments,
+        derivedFromPaths,
         describeOutwardNormal,
     };
 

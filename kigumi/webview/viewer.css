@@ -514,6 +514,25 @@ canvas { display: block; width: 100%; height: 100%; }
     overflow-wrap: anywhere;
 }
 
+/* The features a derived edge or point is formed from, one per line. */
+.ip-derived-from {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 2px;
+}
+
+.ip-derived-path {
+    padding-left: 10px;
+    color: var(--hv-text);
+    overflow-wrap: anywhere;
+}
+
+.ip-derived-cross {
+    padding-left: 10px;
+    font-size: 0.85em;
+}
+
 .ip-detail {
     display: flex;
     gap: 6px;

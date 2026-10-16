@@ -231,6 +231,13 @@ export class SelectionPanel {
             ).join(' \u203a ');
         }
 
+        // A derived edge or point, named by the features it is formed from.
+        const derivedFrom = focus && detail
+            ? this.CsgTreeView.derivedFromPaths(
+                (this.app.memberMetadataByKey.get(focus.timberKey) || {}).name || focus.timberKey,
+                detail.derivation)
+            : null;
+
         // What is selected, in one line: the path to a focus, the member's name,
         // or how many there are.
         let selected = null;
@@ -244,6 +251,7 @@ export class SelectionPanel {
 
         this._renderInfoPanel({
             selected,
+            derivedFrom,
             canCopy: KigumiSelectionCopy.canCopy(selectedKnownCount, Boolean(focus && focus.featureLabel)),
             tags: selectedTags,
             size: selectedSize,
@@ -392,6 +400,28 @@ export class SelectionPanel {
             : this.t('viewer.selection.none');
         selected.title = selected.textContent;
         body.appendChild(selected);
+
+        if (summary.derivedFrom) {
+            const from = document.createElement('div');
+            from.className = 'ip-derived-from';
+            const label = document.createElement('div');
+            label.className = 'ip-detail-label';
+            label.textContent = this.t('viewer.selection.derivedFrom');
+            from.appendChild(label);
+            summary.derivedFrom.forEach((path, index) => {
+                if (index > 0) {
+                    const cross = document.createElement('div');
+                    cross.className = 'ip-derived-cross';
+                    cross.textContent = '\u2716\ufe0f';
+                    from.appendChild(cross);
+                }
+                const line = document.createElement('div');
+                line.className = 'ip-derived-path';
+                line.textContent = path;
+                from.appendChild(line);
+            });
+            body.appendChild(from);
+        }
 
         if (summary.canCopy) {
             const line = document.createElement('div');
