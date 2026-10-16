@@ -1300,6 +1300,22 @@ class TestAnOperandIsNotGivenTwice:
 class TestConvexPolygonExtrusion:
     """Test ConvexPolygonExtrusion class."""
 
+    def test_eps_is_a_distance_from_the_profile(self):
+        """5mm off a 100mm edge is outside at a 2mm eps.
+
+        The test compared a cross product -- distance times edge length -- with eps, so on
+        a 0.1m edge a 2mm eps reached 20mm out, and a dovetail socket held points across
+        the beam from it, removing every feature there.
+        """
+        side = scalar(1, 10)
+        square = ConvexPolygonExtrusion(
+            points=[Matrix([0, 0]), Matrix([side, 0]), Matrix([side, side]), Matrix([0, side])],
+            start_distance=scalar(0), end_distance=side)
+        eps = scalar(2, 1000)
+
+        assert not square.contains_point(create_v3(side / 2, scalar(-5, 1000), side / 2), eps=eps)
+        assert square.contains_point(create_v3(side / 2, scalar(-1, 1000), side / 2), eps=eps)
+
     def test_winding_does_not_change_what_is_inside(self):
         """A profile written clockwise reads the same as one written counter-clockwise.
 

@@ -3773,9 +3773,16 @@ def point_in_convex_profile(points: Sequence[V2], point_2d: V2, eps: Optional[Nu
         p2 = points[(index + 1) % len(points)]
         edge = p2 - p1
         to_point = point_2d - p1
-        cross = edge[0] * to_point[1] - edge[1] * to_point[0]
+        # Over the edge's length, so it is the point's distance from the edge and `eps` a length.
+        # The bare cross product is that distance times the edge's length: compared with eps, it
+        # made the tolerance eps / length -- 20mm for 2mm on a 100mm edge -- and a socket "held"
+        # points well outside it, wiping out every feature near where it met another cut.
+        edge_length = safe_norm(Matrix([edge[0], edge[1]]))
+        if safe_zero_test(edge_length):
+            continue
+        distance = (edge[0] * to_point[1] - edge[1] * to_point[0]) / edge_length
         wrong_side = Comparison.GT if not inside_is_positive else Comparison.LT
-        if safe_compare(cross, 0, wrong_side, eps=eps):
+        if safe_compare(distance, 0, wrong_side, eps=eps):
             return False
     return True
 
