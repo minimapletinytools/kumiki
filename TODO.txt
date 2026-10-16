@@ -1,4 +1,27 @@
 
+::10/12/2026 agent panel mega refactor
+
+
+-no general docking system YET
+  -panels only go in hardocde locations for now, but we may want to add general docking system later
+
+-must have tabs
+  -multiple views
+  -multiple source code files open
+  -maybe organize it so source code and view tabs go together somehow?
+
+-2 types of panels
+  -generic panels (the kigumi "sidebar", filebrowser, and agent panel)
+  -view specific panels. these contents change depending on which view is "active"
+    -I am somewhat undecided on this one i'm considering moving the tree view and all the kigumi panels that are below the 3d view into their own panels... what do you think?
+
+-agent panel
+  -does this need any work? should be fine as is?
+  -should be able to query current open panel, any open panel, and contents selected in an open panel
+  -how to setup backend and user account system for web??
+  -can it hook up to other AIs?
+
+
 :: 10/10/2026 selecting second feature via drilling notes
 
 
@@ -126,19 +149,40 @@ DONE-BUG the camera and the light widget sometimes get messed up after I create 
   -rough fetaures are marked as do not measure
   -when entering drawing mode
     -PTW features are added 
-    
+
+-DECISION TIME STANDALONE APP
+  -decide how to do file browser, maybe combine with kigumi explorer probably
+  -make sure using external agent works, don't allow self api key
+  -decide if you want to setup backend, auth, billing, subscription or pay per token or both? or just get rid of the agent panel entirely
+  -can we bring vscoed kigumi more in parity with standalone app
+    -need to decide how to deal with the  stuff below the main view
 
 -auto drawing
   DONE-add preferences in auto drawing algoirthm, pick measurements from reference face/edge always (maybe not a bad rule for now..)
-  -test auto drawing generation on a single timber with joints
+  DONE-test auto drawing generation on a single timber with joints
   -test auto drawing on a rough/PTW timber
   -hidden feature detection in drawing view (featurelist, view) to see what's hidden
     -you need this so mesaurements only get created in the viwe that shows the feature on the surface <- this is the important thing.
     -ask agent what its currentyl doing though
 
 
+DONE-BUG th dovetail sawhores has vertexes that cant' be selected, also the inside edges of the dovetail are showing up as derived faces when they should be faces of the trapezoid shape
+DONE-it should be more clear the 2 crossing features forming a derived feature. there should be an X emoji or osmetihng
+DONE-for 2 crossing featuers in the kigumi viewer it should be much more clear in selection (use new lines and stuff)
 
+-right now hen I right click in the tree view it shows copy/cut/paste???
+  -instead you should be able to right click on stuff in layer view and choose "copy for ai", and it will copy the fully qualified name of whatever you have selected. Perhaps give 2 options "copy for ai" and "copy with details for ai" where copy with details gives a lot more info.
+  
+-2d featuer seleciton ifxes
+  -remove csg-hover logging
+  -add logging for creating new measurements
+  -stuff like [dovetailed_sawhorse.py] [webview:viewer:info] csg-selection v2026.03.17.4 {"path":["free_dovetail#1","dovetail"],"featureLabel":"rptw.front_left×dovetail_left_flank","meshWalkMs":13.08,"trianglesMatched":2,"totalTriangles":108,"candidates":["> POINT derived real NONE p0 rptw.front_left×dovetail_left_flank","  EDGE declared real PERFECT p0 rptw.front_left","  EDGE derived real NONE p0 rptw.front×dovetail_left_flank","  EDGE derived real NONE p0 rptw.left×dovetail_left_flank","  FACE declared real PERFECT p0 rptw.front"]}. is hard to select, I think points should always be first priority
+  -also tab/right click selection in 2d view for choosing other featuers seems a little broken.
+
+-add beta features section to option
 -add support to run @tools from the parameter section
+  -do this for generating saw horse router jig lol
+  -router jig template function? takes a timber and a flat profile (extrusion or prism), adds a "template blcok over both, cuts out the timber, and then cuts out the profile extruding upwards to make the template based on bit + collar paraemetrs. shouldn't be too hard? would be cool if it makes mid supports too for extra wide profiles...
 -add export drawing button (how to do this?)
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
