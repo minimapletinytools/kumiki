@@ -64,4 +64,39 @@ describe('what is copied', () => {
         expect(text).toContain('Accessory "Peg 1"');
         expect(text).not.toContain('position');
     });
+
+    describe('a row of the layers tree', () => {
+        const node = {
+            path: ['free_dovetail#3', 'dovetail'], kind: 'ConvexPolygonSimpleLoft', displayName: 'loft',
+            label: 'dovetail', role: 'cut', jointName: 'free_dovetail',
+            features: [{ name: 'dovetail_neck', type: 'FACE' }, { name: 'dovetail_neck×dovetail_right_flank', type: 'EDGE' }],
+        };
+        const csg = { kind: 'csg', timberName: 'beam', memberKey: 'beam#0', path: node.path, node };
+
+        test('is copied as its fully qualified name', () => {
+            expect(describeSelection({ sourceFile: 'patterns/sawhorse.py', item: csg }))
+                .toBe('patterns/sawhorse.py \u203a beam \u203a free_dovetail#3 \u203a dovetail\n');
+            expect(describeSelection({ item: { kind: 'joint', name: 'free_dovetail#3', timbers: ['beam'] } }))
+                .toBe('joint free_dovetail#3\n');
+        });
+
+        test('or with details: what the node is, what made it, and the features it names', () => {
+            const text = describeSelection({ sourceFile: 'patterns/sawhorse.py', frameName: 'Sawhorse', item: csg, detailed: true });
+
+            expect(text).toContain('frame "Sawhorse" in patterns/sawhorse.py');
+            expect(text).toContain('- "dovetail" (loft) on timber "beam" (member key beam#0)');
+            expect(text).toContain('path: beam \u203a free_dovetail#3 \u203a dovetail');
+            expect(text).toContain('joint: free_dovetail');
+            expect(text).toContain('feature: dovetail_neck×dovetail_right_flank (edge)');
+        });
+
+        test('a tag lists who wears it', () => {
+            const text = describeSelection({
+                item: { kind: 'tag', tagKind: 'generic', name: 'wonky', members: ['beam', 'leg'] }, detailed: true,
+            });
+
+            expect(text).toContain('- Tag generic:wonky');
+            expect(text).toContain('members: beam, leg');
+        });
+    });
 });

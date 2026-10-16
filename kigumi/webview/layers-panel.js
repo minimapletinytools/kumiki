@@ -78,6 +78,8 @@
             this.el = document.createElement('div');
             this.el.id = 'layers-panel';
             this.el.addEventListener('wheel', this._onPanelWheel, { passive: false });
+            // No browser menu (cut, copy, paste) over the tree: a row with a menu opens its own.
+            this.el.addEventListener('contextmenu', (event) => event.preventDefault());
             viewport.insertBefore(this.el, viewport.firstChild);
             this._render();
 
@@ -400,7 +402,7 @@
             row.dataset.nodeId = nodeId;
             if (memberKey) row.dataset.memberKey = memberKey;
 
-            if (memberKey && rowType === 'timber') {
+            if (memberKey && (rowType === 'timber' || rowType === 'jointMember')) {
                 row.addEventListener('contextmenu', (event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -409,6 +411,10 @@
                         bubbles: true,
                         composed: true,
                     }));
+                });
+            } else if (selectNode && selectNode.type === 'joint') {
+                this._offerCopy(row, {
+                    kind: 'joint', name: label, jointId: selectNode.jointId, timberKeys: selectNode.timberKeys,
                 });
             }
 
@@ -701,8 +707,18 @@
             row.addEventListener('click', (event) => {
                 this._applySelection({ type: 'tag', memberKeys: entry.memberKeys }, !!event.shiftKey);
             });
+            this._offerCopy(row, { kind: 'tag', tagKind: entry.kind, name: entry.name, memberKeys: entry.memberKeys });
 
             return row;
+        }
+
+        /** A right click on `row` offers to copy `item` for an assistant; see viewer-app's showLayerContextMenu. */
+        _offerCopy(row, item) {
+            row.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                this._emit('kigumi-layer-contextmenu', { item, clientX: event.clientX, clientY: event.clientY });
+            });
         }
 
         _buildTimberRows(onlyKeys = null) {
@@ -840,6 +856,7 @@
             row.addEventListener('click', () => {
                 this._focusCsgNode(node, timberKey, context);
             });
+            this._offerCopy(row, { kind: 'csg', memberKey: timberKey, node });
             return row;
         }
 

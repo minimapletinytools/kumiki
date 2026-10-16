@@ -282,22 +282,27 @@ export class SelectionPanel {
         }
         const members = this.app.selectionManager.getSelectedTimbers()
             .slice(0, KigumiSelectionCopy.MAX_MEMBERS)
-            .map((key) => {
-                const metadata = this.app.memberMetadataByKey.get(key) || {};
-                const mesh = metadata.mesh || {};
-                const size = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
-                return {
-                    key,
-                    name: metadata.name || key,
-                    type: metadata.type || 'timber',
-                    width: size(mesh.perfect_width),
-                    height: size(mesh.perfect_height),
-                    length: KigumiUnits.memberLengthMeters(mesh),
-                    placement: metadata.type === 'accessory' ? null : placements.get(metadata.name) || null,
-                    tags: metadata.tags || [],
-                };
-            });
+            .map((key) => this.memberForCopy(key, placements));
         return { frameName: frame.name || null, members, feature };
+    }
+
+    /** One member, as selection-copy.js's memberLines takes it. */
+    memberForCopy(key, placements = null) {
+        const frame = this.app.currentFrameData || {};
+        const placed = placements || new Map((frame.timbers || []).map((timber) => [timber.name, timber]));
+        const metadata = this.app.memberMetadataByKey.get(key) || {};
+        const mesh = metadata.mesh || {};
+        const size = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
+        return {
+            key,
+            name: metadata.name || key,
+            type: metadata.type || 'timber',
+            width: size(mesh.perfect_width),
+            height: size(mesh.perfect_height),
+            length: KigumiUnits.memberLengthMeters(mesh),
+            placement: metadata.type === 'accessory' ? null : placed.get(metadata.name) || null,
+            tags: metadata.tags || [],
+        };
     }
 
     _copyButton() {

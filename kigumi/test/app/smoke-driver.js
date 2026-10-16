@@ -108,6 +108,33 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
                 && cubeWidth > 50,
             `${JSON.stringify(before)} -> ${JSON.stringify(toggled)}, cube ${cubeWidth}px`);
 
+        // A right click on a row of the layers tree offers to copy it for an assistant, not the
+        // browser's cut/copy/paste.
+        const { clipboard } = require('electron');
+        clipboard.writeText('');
+        const menuItems = await inShell(`(async () => {
+            const doc = ${viewDoc};
+            doc.querySelector('#layers-view .ov-header').click();
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            const row = doc.querySelector('#layers-view .lp-row-timber');
+            const box = row.getBoundingClientRect();
+            row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: box.left + 5, clientY: box.top + 5 }));
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            return Array.from(doc.querySelectorAll('#member-context-menu .context-menu-item')).map((item) => item.textContent.trim());
+        })()`);
+        await inShell(`(() => {
+            const doc = ${viewDoc};
+            const copy = Array.from(doc.querySelectorAll('#member-context-menu .context-menu-item'))
+                .find((item) => item.textContent.trim() === 'copy for ai');
+            if (copy) copy.click();
+            doc.querySelector('#layers-view .ov-header').click();
+        })()`);
+        const copied = await waitFor(() => clipboard.readText() || null, { timeoutMs: 5000 }).catch(() => '');
+        check('a right click on a timber in the layers tree copies its name for an assistant',
+            menuItems.includes('copy for ai') && menuItems.includes('copy with details for ai')
+                && copied.startsWith('patterns/structures/my_cute_frame.py \u203a '),
+            `${menuItems.join(' | ')} -> ${JSON.stringify(copied)}`);
+
         // The inspector under the tabs shows the view's members; a click there selects in the view,
         // and the selection comes back to the inspector.
         const inspectorDoc = 'document.querySelector("#slot-bottom iframe")?.contentDocument';

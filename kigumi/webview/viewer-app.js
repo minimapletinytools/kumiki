@@ -894,6 +894,7 @@ class KigumiViewerApp extends LitElement {
         this._shiftHeld = false;
         this.onLayerStateChanged = this.onLayerStateChanged.bind(this);
         this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
+        this.onLayerContextMenuRequest = this.onLayerContextMenuRequest.bind(this);
         this.onCsgTreeRequested = this.onCsgTreeRequested.bind(this);
         this.onCsgByPathRequested = this.onCsgByPathRequested.bind(this);
         this.onEnterDrawingRequested = this.onEnterDrawingRequested.bind(this);
@@ -1035,6 +1036,7 @@ class KigumiViewerApp extends LitElement {
         if (this._layersView) {
             this._layersView.addEventListener('layer-state-changed', this.onLayerStateChanged);
             this._layersView.addEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
+            this._layersView.addEventListener('kigumi-layer-contextmenu', this.onLayerContextMenuRequest);
             this._layersView.addEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
             this._layersView.addEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
             this._layersView.addEventListener('kigumi-enter-drawing', this.onEnterDrawingRequested);
@@ -1090,6 +1092,7 @@ class KigumiViewerApp extends LitElement {
         if (this._layersView) {
             this._layersView.removeEventListener('layer-state-changed', this.onLayerStateChanged);
             this._layersView.removeEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
+            this._layersView.removeEventListener('kigumi-layer-contextmenu', this.onLayerContextMenuRequest);
             this._layersView.removeEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
             this._layersView.removeEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
             this._layersView.removeEventListener('kigumi-enter-drawing', this.onEnterDrawingRequested);
@@ -3852,17 +3855,71 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const meta = this.memberMetadataByKey.get(memberKey);
+        const item = { kind: 'member', member: this.selectionPanel.memberForCopy(memberKey) };
         this.contextMenu.open({
             x: clientX,
             y: clientY,
             title: (meta && meta.name) || memberKey,
             items: [
+                ...this._copyMenuItems(),
                 { id: 'stl', label: t('viewer.contextMenu.exportStl') },
                 { id: 'step', label: t('viewer.contextMenu.exportStep') },
             ],
-            onChoose: (id) => this.exportMember(memberKey, id),
+            onChoose: (id) => (this._copyFromMenu(id, item) || this.exportMember(memberKey, id)),
         });
         this.requestUpdate();
+    }
+
+    onLayerContextMenuRequest(event) {
+        const detail = event && event.detail;
+        if (detail && detail.item) {
+            this.showLayerContextMenu(detail.item, detail.clientX, detail.clientY);
+        }
+    }
+
+    /** A right click on a row of the layers tree: a CSG node, a joint or a tag. */
+    showLayerContextMenu(row, clientX, clientY) {
+        const name = (key) => (this.memberMetadataByKey.get(key) || {}).name || key;
+        let item = null;
+        if (row.kind === 'csg') {
+            item = { kind: 'csg', timberName: name(row.memberKey), memberKey: row.memberKey,
+                path: (row.node && row.node.path) || [], node: row.node };
+        } else if (row.kind === 'joint') {
+            item = { kind: 'joint', name: row.name, timbers: (row.timberKeys || []).map(name) };
+        } else if (row.kind === 'tag') {
+            item = { kind: 'tag', tagKind: row.tagKind, name: row.name, members: (row.memberKeys || []).map(name) };
+        }
+        if (!item) {
+            return;
+        }
+        this.contextMenu.open({
+            x: clientX,
+            y: clientY,
+            title: item.kind === 'csg' ? (row.node && (row.node.label || row.node.displayName)) || item.timberName : item.name,
+            items: this._copyMenuItems(),
+            onChoose: (id) => this._copyFromMenu(id, item),
+        });
+        this.requestUpdate();
+    }
+
+    _copyMenuItems() {
+        return [
+            { id: 'copyForAI', label: t('viewer.contextMenu.copyForAI') },
+            { id: 'copyForAIDetailed', label: t('viewer.contextMenu.copyForAIDetailed') },
+        ];
+    }
+
+    /** Copies `item` (see selection-copy.js) if `id` is a copy row; false otherwise. */
+    _copyFromMenu(id, item) {
+        if (id !== 'copyForAI' && id !== 'copyForAIDetailed') {
+            return false;
+        }
+        this.copySelectionForAI({
+            frameName: (this.currentFrameData && this.currentFrameData.name) || null,
+            item,
+            detailed: id === 'copyForAIDetailed',
+        });
+        return true;
     }
 
     /**

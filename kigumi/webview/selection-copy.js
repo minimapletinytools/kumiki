@@ -69,16 +69,67 @@
         return lines;
     }
 
+    const ARROW = ' \u203a ';
+
+    /** A tree row's fully qualified name, from its timber down. See itemLines for `item`. */
+    function qualifiedName(item) {
+        if (item.kind === 'member') {
+            return item.member.name;
+        }
+        if (item.kind === 'csg') {
+            return [item.timberName, ...(item.path || [])].join(ARROW) || item.timberName;
+        }
+        if (item.kind === 'joint') {
+            return `joint ${item.name}`;
+        }
+        return `tag ${item.tagKind}:${item.name}`;
+    }
+
     /**
-     * The text to copy. `selection` is {sourceFile?, frameName?, members: [...], feature?}:
-     * members as {key, name, type, width, height, length, placement, tags} (metres), a feature
+     * A row of the layers tree, in full. `item` is one of {kind: 'member', member} (as
+     * memberLines takes), {kind: 'csg', timberName, memberKey, path, node} (the tree's node),
+     * {kind: 'joint', name, timbers}, {kind: 'tag', tagKind, name, members}.
+     */
+    function itemLines(item) {
+        if (item.kind === 'member') {
+            return memberLines(item.member);
+        }
+        if (item.kind === 'csg') {
+            const node = item.node || {};
+            const kind = node.displayName || node.kind;
+            const lines = [`- ${node.label ? `"${node.label}" ` : ''}(${kind || 'node'}) on timber "${item.timberName}"`
+                + ` (member key ${item.memberKey})`, `  path: ${qualifiedName(item)}`];
+            if (node.role) lines.push(`  role: ${node.role === 'cut' ? 'cut away' : node.role}`);
+            if (node.jointName) lines.push(`  joint: ${node.jointName}`);
+            for (const feature of node.features || []) {
+                lines.push(`  feature: ${feature.name} (${String(feature.type || '').toLowerCase()})`);
+            }
+            return lines;
+        }
+        if (item.kind === 'joint') {
+            return [`- Joint "${item.name}"`, `  timbers: ${(item.timbers || []).join(', ') || 'none'}`];
+        }
+        return [`- Tag ${item.tagKind}:${item.name}`, `  members: ${(item.members || []).join(', ') || 'none'}`];
+    }
+
+    /**
+     * The text to copy. `selection` is {sourceFile?, frameName?, members: [...], feature?}, or
+     * {sourceFile?, frameName?, item, detailed} for a row of the layers tree: its fully qualified
+     * name alone, or with `detailed`, everything itemLines says about it.
+     *
+     * Members are {key, name, type, width, height, length, placement, tags} (metres), a feature
      * as {timberName, memberKey, path, featureLabel, featureType, jointName, geometry, reference}.
      */
     function describeSelection(selection) {
+        if (selection.item && !selection.detailed) {
+            return [selection.sourceFile, qualifiedName(selection.item)].filter(Boolean).join(ARROW) + '\n';
+        }
         const where = [selection.frameName ? `frame "${selection.frameName}"` : null,
             selection.sourceFile ? `in ${selection.sourceFile}` : null].filter(Boolean).join(' ');
         const lines = [`Selected in Kigumi${where ? ` (${where})` : ''}, in metres, world space:`];
-        if (selection.feature) {
+        if (selection.item) {
+            lines.push(...itemLines(selection.item));
+        } else if (selection.feature) {
             lines.push(...featureLines(selection.feature));
         } else {
             for (const member of selection.members || []) {
