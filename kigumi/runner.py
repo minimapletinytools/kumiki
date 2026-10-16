@@ -762,6 +762,9 @@ class SlotState:
     # than in the viewer so python stays the one place a drawing comes from,
     # and they are lost on reload, which is what "unsaved" should mean.
     pending_drawings: List[DrawingWire] = field(default_factory=list)
+    # Which import of the project's modules (kumiki, in a dev checkout) this was built
+    # with. See _project_generation.
+    generation: int = 0
 
 
 @dataclass
@@ -4423,6 +4426,41 @@ def _is_venv_path(path: Path) -> bool:
     return ".venv" in path_parts or "venv" in path_parts
 
 
+# When each project module was imported, by name, so a load purges them only when one has
+# changed since; and when the last load was, for a module imported after it.
+_project_module_loaded_at: Dict[str, float] = {}
+_last_project_load_at = 0.0
+# Bumped by every purge. A slot built before one holds objects of classes the purge replaced,
+# and new code fails on them (a new Matrix does not know an old one), so it is rebuilt before
+# its next use: see _resolve_slot.
+_project_generation = 0
+
+
+def _project_modules(project_root: Path, keep_paths: set[Path]) -> List[Tuple[str, Path]]:
+    """The modules a purge would drop: under the project root, outside a venv, not kept."""
+    found = []
+    for module_name, module in list(sys.modules.items()):
+        module_path = _module_file_path(module)
+        if module_path is None or module_path in keep_paths or _is_venv_path(module_path):
+            continue
+        if project_root not in module_path.parents and module_path != project_root:
+            continue
+        found.append((module_name, module_path))
+    return found
+
+
+def _project_modules_changed(project_root: Path, keep_paths: set[Path]) -> bool:
+    """Whether any project module's file was written after it was imported."""
+    for module_name, module_path in _project_modules(project_root, keep_paths):
+        try:
+            written = module_path.stat().st_mtime
+        except OSError:
+            return True
+        if written > _project_module_loaded_at.get(module_name, _last_project_load_at):
+            return True
+    return False
+
+
 def _purge_project_modules(project_root: Path, keep_paths: set[Path], verbose: bool = False) -> None:
     """Aggressively purge all project modules from sys.modules to force clean reloads.
     
@@ -4451,6 +4489,7 @@ def _purge_project_modules(project_root: Path, keep_paths: set[Path], verbose: b
     # Remove all project modules
     for module_name in removable:
         sys.modules.pop(module_name, None)
+        _project_module_loaded_at.pop(module_name, None)
         removed_count += 1
 
     if verbose:
@@ -4511,13 +4550,22 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> ModuleType:
     2. All project modules are purged from sys.modules
     3. The target module and its dependencies are loaded fresh
     """
+    global _last_project_load_at, _project_generation
+    started = time.time()
+
     # Step 1: Invalidate Python's built-in import caches
     importlib.invalidate_caches()
     
-    # Step 2: Aggressively purge project modules
+    # Step 2: Aggressively purge project modules -- when one has changed. Purging when none has
+    # gains nothing, and replaces the classes every other slot's frame was built from.
+    keep_paths: set[Path] = set()
     if _project_root is not None:
         keep_paths = {Path(__file__).resolve(), file_path.resolve()}
-        _purge_project_modules(_project_root, keep_paths, verbose=verbose)
+        if _project_modules_changed(_project_root, keep_paths):
+            _purge_project_modules(_project_root, keep_paths, verbose=verbose)
+            _project_generation += 1
+        elif verbose:
+            log_stderr("[reload] No project module changed since it was imported; keeping them")
     else:
         if verbose:
             log_stderr("[reload] WARNING: _project_root is None — project module purge skipped!")
@@ -4543,6 +4591,10 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> ModuleType:
 
     with contextlib.redirect_stdout(sys.stderr):
         spec.loader.exec_module(module)
+    if _project_root is not None:
+        for name, _path in _project_modules(_project_root, keep_paths):
+            _project_module_loaded_at.setdefault(name, started)
+    _last_project_load_at = started
     
     if verbose:
         log_stderr(f"[reload] Loaded module: {module_name} from {file_path}")
@@ -4950,6 +5002,7 @@ def load_slot_state(
         frame_parts=parts,
         tools=entries.tools if entries is not None else (),
         rejected_entries=entries.rejected if entries is not None else (),
+        generation=_project_generation,
     )
 
 
@@ -5813,9 +5866,36 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
 
 
 def _resolve_slot(state: RunnerState, payload: Dict[str, Any]) -> SlotState:
-    """Return the SlotState targeted by the request payload (defaults to active_slot)."""
+    """Return the SlotState targeted by the request payload (defaults to active_slot),
+    rebuilt first if the project's modules were re-imported since it was built."""
     slot_name = payload.get("slot", state.active_slot)
-    return state.get_slot(slot_name)
+    slot = state.get_slot(slot_name)
+    if slot.generation != _project_generation:
+        slot = _rebuild_stale_slot(slot)
+        state.slots[slot_name] = slot
+        # Picks read the mesh cache, which the rebuild emptied.
+        build_real_geometry(state, slot)
+    return slot
+
+
+def _rebuild_stale_slot(slot: SlotState) -> SlotState:
+    """*slot* built again with the current modules, keeping its parameter values.
+
+    The values go over as plain data: the old Kiwari, and any vector in it, are instances of
+    the replaced classes. The mesh cache is not kept either, for the same reason.
+    """
+    log_stderr(f"[reload] Rebuilding {slot.file_path.name}: the project's modules were re-imported since it was built")
+    values = {
+        group.id: {key: group.kiwari.value_payload(key) for key in group.kiwari.declarations}
+        for group in slot.kiwari_groups if group.kiwari is not None
+    }
+    if slot.single_pattern_name:
+        rebuilt, _ = _raise_specific_pattern(str(slot.file_path), slot.single_pattern_name, kiwari_values=values)
+        return rebuilt
+    rebuilt = load_slot_state(str(slot.file_path))
+    if values and rebuilt.kiwari_groups:
+        rebuilt = load_slot_state(str(slot.file_path), kiwari_values=values, previous_groups=rebuilt.kiwari_groups)
+    return rebuilt
 
 
 def _resolve_slot_name(state: RunnerState, payload: Dict[str, Any]) -> str:
@@ -5948,6 +6028,7 @@ def _raise_specific_pattern(
             patternbook=pattern_list,
             single_pattern_name=pattern.path,
             kiwari_groups=(KiwariGroup((pattern.path,), bound),) if bound is not None else (),
+            generation=_project_generation,
         )
         result: SlotLoadedWire = {
             "examplePath": str(resolved),
