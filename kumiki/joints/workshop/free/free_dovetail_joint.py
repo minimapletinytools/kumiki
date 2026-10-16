@@ -9,7 +9,26 @@ from typing import Optional
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
+from kumiki.csg.cutcsg import (
+    END_CAP, START_CAP, FeatureGroup, FeatureOverride, FeatureProperties, side_key,
+)
 from ..shavings import *
+
+
+#: The dovetail's faces, by profile edge (see profile_at) and end. CROSSING, like a cross lap's: they
+#: meet both timbers' bodies, so the socket's and the tongue's outlines are edges to measure to.
+_DOVETAIL_FACE = FeatureProperties(group=FeatureGroup.CROSSING)
+_DOVETAIL_FACES = [
+    FeatureOverride(key, name, _DOVETAIL_FACE)
+    for key, name in (
+        (side_key(0), "dovetail_neck"),
+        (side_key(1), "dovetail_right_flank"),
+        (side_key(2), "dovetail_wide_face"),
+        (side_key(3), "dovetail_left_flank"),
+        (START_CAP, "dovetail_backward_end"),
+        (END_CAP, "dovetail_forward_end"),
+    )
+]
 
 
 #.    _______
@@ -62,12 +81,13 @@ class FreeDovetailShape:
         start = None if self.backward_length is None else -self.backward_length
         if safe_zero_test(self.taper_angle):
             return ConvexPolygonExtrusion(points=self.profile_at(scalar(0)), start_distance=start,
-                                          end_distance=self.forward_length, label=CutCSGLabel("dovetail"))
+                                          end_distance=self.forward_length, feature_overrides=_DOVETAIL_FACES,
+                                          label=CutCSGLabel("dovetail"))
         assert start is not None and self.forward_length is not None
         return ConvexPolygonSimpleLoft(bottom_points=self.profile_at(start),
                                        top_points=self.profile_at(self.forward_length),
                                        bottom_points_z_pos=start, top_points_z_pos=self.forward_length,
-                                       label=CutCSGLabel("dovetail"))
+                                       feature_overrides=_DOVETAIL_FACES, label=CutCSGLabel("dovetail"))
 
 
 def cut_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: TimberLike,

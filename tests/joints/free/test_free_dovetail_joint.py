@@ -87,6 +87,40 @@ class TestFreeDovetailJoint:
 
         assert shoulders == ["shoulder"]
 
+    def test_the_dovetail_s_faces_are_CROSSING(self):
+        from kumiki.csg.cutcsg import FeatureGroup, csg_children
+        for taper in (0, 5):
+            _, beam = _cut(taper)
+            found = {}
+
+            def walk(node):
+                for feature in getattr(node, "get_declared_features", lambda: [])():
+                    found[feature.name] = feature.properties.group
+                for child in csg_children(node):
+                    walk(child)
+            walk(beam.render_timber_with_cuts_csg_local())
+
+            for name in ("dovetail_neck", "dovetail_right_flank", "dovetail_wide_face", "dovetail_left_flank",
+                         "dovetail_backward_end", "dovetail_forward_end"):
+                assert found.get(name) is FeatureGroup.CROSSING, (taper, name)
+
+    def test_the_flanks_meet_both_timbers_faces_in_edges(self):
+        # The socket's flank leaves the beam's top face at the neck, 20 out; the tongue's flank
+        # leaves the post's side face (x=50), 24 out halfway down the tongue. The dovetail runs
+        # past the post, so its ends are not the post's faces too.
+        beam_timber, post_timber = _beam(), _post()
+        joint = cut_free_dovetail_joint(post_timber, beam_timber, _dovetail(forward=mm(80), backward=mm(80)))
+        post = CutTimber(post_timber, cuts=[joint.cuttings["dovetail_timber"]])
+        beam = CutTimber(beam_timber, cuts=[joint.cuttings["receiving_timber"]])
+
+        def derived_at(cut_timber, x, y, z):
+            local = cut_timber.timber.transform.global_to_local(create_v3(mm(x), mm(y), mm(z)))
+            return [hit.feature.name for hit in cut_timber.render_timber_with_cuts_csg_local().find_all_features(local)
+                    if hit.feature.is_derived()]
+
+        assert any("dovetail_" in name for name in derived_at(beam, 0, 20, 50))
+        assert any("dovetail_" in name for name in derived_at(post, 50, 20 + 15 * 0.2679491924, 35))
+
     def test_a_taper_needs_both_ends(self):
         with pytest.raises(AssertionError, match="finite"):
             _dovetail(taper=5, forward=None)
