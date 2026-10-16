@@ -2430,6 +2430,7 @@ def _measurement_plane(
     at_one: Optional[List[float]],
     at_other: Optional[List[float]],
     look: List[float],
+    in_view_plane: bool = False,
 ) -> PlaneWire:
     """Where a measurement between these two features is taken and drawn.
 
@@ -2440,8 +2441,12 @@ def _measurement_plane(
     Position: through a measured point if there is one, since the plane has to
     contain it; otherwise midway between the two anchors, which puts the
     dimension among what it measures rather than off beside it.
+
+    `in_view_plane` for a drawing's view, where the features are projected onto the sheet: the
+    plane is the view's own, whatever they are. Held to the features instead, an edge running
+    into the sheet tilted it, and the measurement refused the very view it was made in.
     """
-    normal = _plane_normal(_plane_constraints(one, other), look)
+    normal = None if in_view_plane else _plane_normal(_plane_constraints(one, other), look)
     if normal is None:
         normal = _normalize(look)
 
@@ -2777,8 +2782,10 @@ def _plane_for_pick(
     if geometry is None:
         return None
     anchor = _feature_anchor(located_pick[0], located_pick[1], timber, located_pick[2])
+    from kumiki.drawings.drawing import MeasurementSpace
     return _measurement_plane(
-        held_geometry, geometry, payload.get("heldAt"), anchor, look)
+        held_geometry, geometry, payload.get("heldAt"), anchor, look,
+        in_view_plane=_pick_space(payload) is MeasurementSpace.PROJECTED)
 
 
 def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWire]:

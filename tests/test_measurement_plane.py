@@ -93,6 +93,15 @@ class TestWhichWayThePlaneFaces:
 
         assert square(plane["normal"], [1, 0, 1])
 
+    def test_in_a_drawing_s_view_the_plane_is_the_view_s_whatever_is_measured(self):
+        # The features are projected onto the sheet: an edge running into it must not tilt the
+        # plane, or the measurement refuses the very view it was made in.
+        tilted = [0, 0.17, 0.98]
+        plane = runner._measurement_plane(
+            edge(tilted), edge([1, 0, 0.2]), [0, 0, 0], [1, 0, 1], LOOK, in_view_plane=True)
+
+        assert plane["normal"] == pytest.approx(LOOK, abs=1e-9)
+
     def test_nothing_to_be_square_to_means_face_the_camera(self):
         plane = runner._measurement_plane(
             {"kind": None}, {"kind": None}, [0, 0, 0], [2, 0, 0], LOOK)

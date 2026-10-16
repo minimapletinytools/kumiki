@@ -97,9 +97,25 @@ usePanelRuntime({ html, t, KigumiUnits: window.KigumiUnits, KigumiKiwariValues: 
  * come apart.
  */
 /** A feature reference, for a person to read. */
+/** An anchor's short name: its feature, or a derived one's two parents, or its timber. */
+function anchorName(anchor) {
+    if (!anchor) {
+        return '?';
+    }
+    if ((anchor.kind === 'edge' || anchor.kind === 'point') && anchor.a && anchor.b) {
+        return `${anchor.a.feature || '?'}\u00d7${anchor.b.feature || '?'}`;
+    }
+    return anchor.feature || anchor.timber || '?';
+}
+
 function describeAnchor(anchor) {
     if (!anchor) {
         return '?';
+    }
+    if ((anchor.kind === 'edge' || anchor.kind === 'point') && anchor.a && anchor.b) {
+        // Derived: named by the two features it is formed from.
+        const parent = (one) => [...(one.csgPath || []), one.feature].filter(Boolean).join(' > ');
+        return `${anchor.timber} > ${anchor.kind} (${parent(anchor.a)} \u2716\ufe0f ${parent(anchor.b)})`;
     }
     const trail = [anchor.timber].concat(anchor.csgPath || []);
     return anchor.feature ? trail.concat(anchor.feature).join(' > ') : trail.join(' > ');
@@ -3330,7 +3346,7 @@ class KigumiViewerApp extends LitElement {
     /** A measurement, as selection-copy.js's itemLines takes it. */
     _measurementForCopy(viewportId, found) {
         const { measure, status } = found;
-        const named = (anchor) => (anchor && anchor.feature) || (anchor && anchor.timber) || '?';
+        const named = anchorName;
         const scene = this.sceneStore.activeScene();
         const value = status && status.drawable && status.value
             ? (status.value.unit === 'angle'
@@ -7329,8 +7345,7 @@ class KigumiViewerApp extends LitElement {
             measurements: (viewport.spec.measurements || []).map((measure) => {
                 const status = KigumiMeasurements.measurementStatus(
                     measure, axes, projection);
-                const named = (anchor) => (anchor && anchor.feature)
-                    || (anchor && anchor.timber) || '?';
+                const named = anchorName;
                 return {
                     key: measurementKey(measure),
                     origin: measure.origin,

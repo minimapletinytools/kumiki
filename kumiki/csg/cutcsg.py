@@ -620,6 +620,10 @@ def _drop_duplicate_derived(
         winner, loser = sorted((twin, hit), key=order)
         if winner is hit:
             kept[twin_index] = hit
+        if winner.feature.name != loser.feature.name:
+            # Two different pairs meeting at one place -- an arris and a face crossing where an
+            # edge leaves that face -- which is geometry, not one surface declared twice.
+            continue
         warnings.warn(
             f"{loser.feature.name} at "
             f"{' > '.join(trails.get(id(loser.owner), ())) or '<unnamed>'} is the same "
