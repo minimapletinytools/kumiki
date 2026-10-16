@@ -747,6 +747,8 @@ class KigumiViewerApp extends LitElement {
         // view is the scene the viewer starts in: one full-canvas viewport
         // with a free camera, so it runs the same path a drawing will.
         this.sceneStore = new SceneStore();
+        // Before the viewports: the selection is kept in one of them.
+        this.selectionManager = new SelectionStore();
         this.viewports = [];
         this.activeViewportId = null;
         // Built here rather than in setupScene: a viewport is cameras and data,
@@ -830,7 +832,6 @@ class KigumiViewerApp extends LitElement {
         this.shadowCatcher = null;
         this.orbitCenterGizmo = null;
 
-        this.selectionManager = new SelectionStore();
         this.memberMetadataByKey = new Map(); // member key -> { name, type }
         /** The last state the frame was drawn for. See visualSignature. */
         this._visualSignature = null;
@@ -1037,6 +1038,10 @@ class KigumiViewerApp extends LitElement {
             // or clearing the focus outright, left a stale mesh behind.
             if (!this.selectionManager.csgFocus) {
                 this._csgHighlightSource = null;
+            }
+            // A measurement is made in one view: selecting in another lets go of it.
+            if (event.type === 'scope' && this.measureDraft.isActive) {
+                this.escapeMeasurement();
             }
             this.selectionPanel.updateInfo(this.currentFrameData);
             this.publishViewState();
@@ -1517,6 +1522,7 @@ class KigumiViewerApp extends LitElement {
         if (!this.viewports.some((viewport) => viewport.id === this.activeViewportId)) {
             this.activeViewportId = this.viewports.length > 0 ? this.viewports[0].id : null;
         }
+        this.selectionManager.keepScopeWithin(this.viewports.map((viewport) => viewport.id));
         // Cameras are built with a placeholder aspect, since a viewport can be
         // rebuilt before there is a canvas to measure. Give them the real one
         // now if there is; without this they keep 1 until the first resize and
@@ -1532,6 +1538,20 @@ class KigumiViewerApp extends LitElement {
      * it contributing only its geometry. Off a sheet -- the 3D scene -- it is
      * the single full-canvas render it always was.
      */
+    /**
+     * Which highlights a viewport draws. The selection, and a measurement's ends, belong to the
+     * view they were made in; a hover to the view under the pointer; a reference to every view.
+     * With one viewport there is nothing to choose.
+     */
+    _showHighlightsFor(viewportId) {
+        const single = this.viewports.length < 2;
+        for (const object of this._highlightObjects.values()) {
+            const role = object.userData.role;
+            object.visible = single || role === 'reference'
+                || viewportId === (role === 'hover' ? this._hoverViewportId : this.selectionManager.scope);
+        }
+    }
+
     renderViewports() {
         if (!this.renderer || !this.scene) {
             return;
@@ -1553,6 +1573,7 @@ class KigumiViewerApp extends LitElement {
         const scissored = onPaper || this.viewports.length > 1;
         this.renderer.setScissorTest(scissored);
         for (const viewport of this.viewports) {
+            this._showHighlightsFor(viewport.id);
             const rect = viewport.pixelRect(pageRect, size.y);
             this.renderer.setViewport(rect.x, rect.y, rect.width, rect.height);
             if (scissored) {
@@ -2826,6 +2847,8 @@ class KigumiViewerApp extends LitElement {
         // arrives long after the click that asked.
         this._lastClientX = event.clientX;
         this._lastClientY = event.clientY;
+        const under = this._resolvePointer(event.clientX, event.clientY);
+        this._hoverViewportId = under ? under.viewport.id : null;
         // The pointer says whether shift is down, which catches a press the window missed.
         this._setShiftHeld(Boolean(event.shiftKey));
         // Both thresholds at once: forget a cycled choice on any movement, ask
@@ -3005,9 +3028,8 @@ class KigumiViewerApp extends LitElement {
     _measurePicked(message) {
         // A pick the hover painted red never gets here: handleCSGSelectionResult stops it.
         const anchor = this._anchorFromPick(message);
-        const viewport = this._resolvePointer(this._lastClientX, this._lastClientY);
-        const result = this.measureDraft.confirm(
-            anchor, viewport ? viewport.viewport.id : this.activeViewportId);
+        // Into the view it was made in, which is the selection's: picking in another drops it.
+        const result = this.measureDraft.confirm(anchor, this.selectionManager.scope);
         this.emitViewerLog('measure-pick', {
             feature: message.featureLabel, action: result.action, reason: result.reason,
         });
@@ -3756,11 +3778,12 @@ class KigumiViewerApp extends LitElement {
         // the 3D view and drew the preview from each end's own position, only
         // coming right on confirm.
         const held = this.measureDraft.heldEnd;
-        if (!held) {
+        // Only in the view it is being made in: elsewhere a click starts again, so a hover there
+        // is an ordinary one, judged against nothing.
+        if (!held || this._hoverViewportId !== this.selectionManager.scope) {
             return {};
         }
-        const viewport = this.viewports.find((one) => one.id === this.activeViewportId)
-            || this.viewports[0];
+        const viewport = this.viewports.find((one) => one.id === this.selectionManager.scope);
         const axes = viewport ? this.viewportAxes(viewport) : null;
         return {
             heldGeometry: held.geometry,
@@ -3813,6 +3836,11 @@ class KigumiViewerApp extends LitElement {
     handleCanvasClick(event) {
         if (!event) {
             return;
+        }
+        // A pick belongs to the view it is made in; one in another view starts there afresh.
+        const under = this._resolvePointer(event.clientX, event.clientY);
+        if (under) {
+            this.selectionManager.enterScope(under.viewport.id);
         }
         const { hits, camera: pickCamera, ray: pickRay } = this._findMembersAlongRay(event.clientX, event.clientY);
         const decision = choosePickAction({
@@ -4430,6 +4458,7 @@ class KigumiViewerApp extends LitElement {
             build: (descriptor) => {
                 const object = this._buildHighlightObject(descriptor);
                 if (object) {
+                    object.userData.role = descriptor.role;
                     this.scene.add(object);
                 }
                 return object;
@@ -4438,6 +4467,7 @@ class KigumiViewerApp extends LitElement {
             // the selection, which the old code froze at the moment the
             // message arrived.
             update: (object, descriptor) => {
+                object.userData.role = descriptor.role;
                 object.material.color.setHex(descriptor.color);
                 object.material.opacity = descriptor.opacity;
                 object.renderOrder = descriptor.renderOrder;
@@ -6691,12 +6721,8 @@ class KigumiViewerApp extends LitElement {
         // looking at.
         const pending = this._previewMeasurementForDisplay();
         if (pending) {
-            // Whichever viewport the pointer is over -- the draft no longer
-            // holds one, there being nothing pending to hold it for.
-            const at = this._resolvePointer(this._lastClientX, this._lastClientY);
-            const viewport = (at && at.viewport)
-                || this.viewports.find((one) => one.id === this.activeViewportId)
-                || this.viewports[0];
+            // In the view the measurement is being made in, which is the selection's.
+            const viewport = this.viewports.find((one) => one.id === this.selectionManager.scope);
             if (viewport) {
                 this._drawMeasurement(
                     overlay, viewport, pageRect, pending,

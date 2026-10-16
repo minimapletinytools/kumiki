@@ -145,6 +145,7 @@
             if (!leading) {
                 continue;
             }
+            const from = out.length;
             if (leading.role === 'selection') {
                 selectionOverlays(leading.source, policy, out);
             } else if (leading.role === 'hover') {
@@ -165,6 +166,11 @@
                     linewidth: REFERENCE_EDGE_WIDTH_PX,
                 }, out);
             }
+            // Which role drew it, so a drawing can show each in the right views: see viewer-app's
+            // renderViewports.
+            for (let index = from; index < out.length; index += 1) {
+                out[index].role = leading.role;
+            }
         }
         return out;
     }
@@ -179,6 +185,7 @@
                 color: CSG_COLORS.tagged,
                 opacity: policy.parentHighlightOpacity,
                 renderOrder: ORDER.csgMesh,
+                role: 'selection',
             });
         }
     }

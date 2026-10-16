@@ -170,3 +170,20 @@ class TestTheDerivedPlaneIsOneTheModelAccepts:
             length = math.sqrt(sum(part * part for part in plane["normal"]))
 
             assert length == pytest.approx(1, abs=1e-9)
+
+
+class TestAMeasurementLiesOnItsViewsPlane:
+    SCENES = [{"id": "beam", "viewports": [
+        {"id": "front", "projection": "orthographic", "camera": {"look": [0.0, -1.0, 0.0]}},
+        {"id": "preview", "projection": "perspective", "camera": {"look": [0.0, -1.0, 0.0]}},
+    ]}]
+
+    def test_one_on_the_view_s_plane_is_written(self):
+        runner._check_plane_matches_view(self.SCENES, "beam", "front", {"normal": [0.0, 1.0, 0.0]})
+
+    def test_one_tilted_off_it_is_refused(self):
+        with pytest.raises(ValueError, match="view's plane"):
+            runner._check_plane_matches_view(self.SCENES, "beam", "front", {"normal": [0.0, -0.986, -0.167]})
+
+    def test_a_perspective_view_checks_nothing(self):
+        runner._check_plane_matches_view(self.SCENES, "beam", "preview", {"normal": [0.0, -0.986, -0.167]})

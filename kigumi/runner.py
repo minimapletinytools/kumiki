@@ -3005,6 +3005,32 @@ def add_measurement(
     return holder
 
 
+def _check_plane_matches_view(
+    scenes: Sequence[DrawingWire], drawing_id: str, viewport_id: str, plane: Any,
+) -> None:
+    """Refuse to write a measurement whose plane an orthographic viewport cannot show.
+
+    Ours to get right, not the reader's: a measurement is made in one view, on that view's plane
+    (see _measurement_plane), so a mismatch here is a bug -- and written, it would only come back
+    refused as "plane does not match this view". A file saying so is another matter; the viewer
+    refuses that when it reads it.
+    """
+    normal = (plane or {}).get("normal") if isinstance(plane, Mapping) else None
+    if not normal or len(normal) != 3:
+        return
+    drawing = next((one for one in scenes if one.get("id") == drawing_id), None)
+    viewport = next((one for one in (drawing or {}).get("viewports", []) if one.get("id") == viewport_id), None)
+    camera = (viewport or {}).get("camera") or {}
+    look = camera.get("look")
+    if (viewport or {}).get("projection") != "orthographic" or not look or len(look) != 3:
+        return
+    unit_normal, unit_look = _normalize([float(v) for v in normal]), _normalize([float(v) for v in look])
+    if abs(abs(_dot(unit_normal, unit_look)) - 1.0) > 1e-6:
+        raise ValueError(
+            f"A measurement in viewport {viewport_id!r} of {drawing_id!r} has to lie on that view's plane "
+            f"(normal {unit_look}), not on one with normal {unit_normal}")
+
+
 def _requested_measure(payload: Dict[str, Any], *, whole: bool = False) -> MeasureWire:
     """The measurement a viewer request names: its ends and id, and with `whole` the rest."""
     request = cast(MeasurementRequest, payload)
@@ -6157,6 +6183,9 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
 
     if command == "add_measurement":
         ss = _resolve_slot(state, payload)
+        _check_plane_matches_view(
+            collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            str(payload.get("drawingId") or ""), str(payload.get("viewportId") or ""), payload.get("plane"))
         add_measurement(
             ss.frame, ss.file_path, ss.pending_drawings,
             str(payload.get("drawingId") or ""),

@@ -47,7 +47,37 @@
             // something that cannot happen rather than a rule every place has
             // to remember.
             this.focus = null;
+            // The viewport the selection belongs to, and the last one anything was selected in.
+            // A feature or measurement selected in one view is not one in another, so selecting
+            // in a different view starts again there -- see enterScope.
+            this.scope = null;
             this.listeners = new Set();
+        }
+
+        // --- which view the selection is in --------------------------------
+
+        /**
+         * Selecting in `viewportId`. If that is another view, what was selected in the old one
+         * (the focus, marked measurements) is dropped first. Timbers are kept: they are a
+         * property of the model, the same in every view.
+         */
+        enterScope(viewportId) {
+            if (!viewportId || viewportId === this.scope) {
+                return false;
+            }
+            this.scope = viewportId;
+            this.focus = null;
+            this.markedMeasures.clear();
+            this.emit({ type: 'scope', scope: viewportId });
+            return true;
+        }
+
+        /** Keep the scope on one of these viewports: the first, when it is on none of them. */
+        keepScopeWithin(viewportIds) {
+            const ids = viewportIds || [];
+            if (!ids.includes(this.scope)) {
+                this.enterScope(ids[0] || null);
+            }
         }
 
         /**
@@ -85,6 +115,7 @@
             this.selectedTimbers.clear();
             this.markedMeasures.clear();
             this.focus = null;
+            this.scope = null;
             this.emit({ type: 'mode', mode: next });
             return true;
         }
@@ -254,6 +285,7 @@
          * a dimension must not change what a command would act on.
          */
         setMeasurementFocus({ viewportId, measureKey }) {
+            this.enterScope(viewportId);
             this.focus = { kind: 'measurement', viewportId, measureKey };
             // Looking at one replaces whatever several were picked out before.
             this.markedMeasures = new Set([measurementMark(viewportId, measureKey)]);
@@ -268,6 +300,7 @@
          * leaves the focus on whatever remains, and nothing when none do.
          */
         toggleMeasurementMark({ viewportId, measureKey }) {
+            this.enterScope(viewportId);
             const mark = measurementMark(viewportId, measureKey);
             if (this.markedMeasures.delete(mark)) {
                 if (this.measurementFocus

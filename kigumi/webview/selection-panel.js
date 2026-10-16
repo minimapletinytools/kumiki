@@ -406,6 +406,14 @@ export class SelectionPanel {
         selected.title = selected.textContent;
         body.appendChild(selected);
 
+        // Which view it is in, when there are several: the others show nothing selected.
+        if (summary.selected && this.app.isInDrawing && this.app.viewports.length > 1) {
+            const view = document.createElement('div');
+            view.className = 'ip-detail ip-in-view';
+            view.textContent = this.t('viewer.selection.inView', { view: this.app.selectionManager.scope });
+            body.appendChild(view);
+        }
+
         if (summary.derivedFrom) {
             const from = document.createElement('div');
             from.className = 'ip-derived-from';

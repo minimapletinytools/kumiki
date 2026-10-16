@@ -669,14 +669,15 @@ describe('measurements picked out to delete together', () => {
         expect(store.measurementFocus.measureKey).toBe('c|d');
     });
 
-    test('the same key in another viewport is another measurement', () => {
+    test('the same key in another viewport is another measurement, and marking it starts there', () => {
         const store = new SelectionStore();
         store.setMeasurementFocus(one);
 
         store.toggleMeasurementMark(elsewhere);
 
-        expect(store.getMarkedMeasurements()).toHaveLength(2);
+        expect(store.getMarkedMeasurements()).toEqual([elsewhere]);
         expect(store.isMeasurementMarked('top', 'a|b')).toBe(true);
+        expect(store.scope).toBe('top');
     });
 
     test('taking the focused one back out leaves nothing focused', () => {
@@ -780,5 +781,54 @@ describe('reaching a feature while a measurement is being made', () => {
             hits: [], selectedTimbers: new Set(), shiftKey: false,
             inDrawing: false, measuring: true,
         }).action).toBe('clear');
+    });
+});
+
+describe('the view the selection is in', () => {
+    test('selecting in another view drops what was selected in the old one, timbers kept', () => {
+        const store = new SelectionStore();
+        store.enterScope('front');
+        store.selectTimber('post');
+        store.setCsgFocus({ timberKey: 'post', path: ['tenon'], featureLabel: 'cheek' });
+        const events = [];
+        store.onSelectionChanged((event) => events.push(event.type));
+
+        expect(store.enterScope('top')).toBe(true);
+
+        expect(store.scope).toBe('top');
+        expect(store.csgFocus).toBeNull();
+        expect(store.isTimberSelected('post')).toBe(true);
+        expect(events).toEqual(['scope']);
+    });
+
+    test('selecting again in the same view keeps it', () => {
+        const store = new SelectionStore();
+        store.enterScope('front');
+        store.setCsgFocus({ timberKey: 'post', path: ['tenon'], featureLabel: 'cheek' });
+
+        expect(store.enterScope('front')).toBe(false);
+        expect(store.csgFocus).not.toBeNull();
+    });
+
+    test('a measurement brings its own view', () => {
+        const store = new SelectionStore();
+        store.enterScope('front');
+        store.setCsgFocus({ timberKey: 'post', path: ['tenon'], featureLabel: 'cheek' });
+
+        store.setMeasurementFocus({ viewportId: 'top', measureKey: 'a|b' });
+
+        expect(store.scope).toBe('top');
+        expect(store.measurementFocus.measureKey).toBe('a|b');
+    });
+
+    test('kept on a viewport that exists: the first, when it is gone', () => {
+        const store = new SelectionStore();
+        store.enterScope('front');
+
+        store.keepScopeWithin(['front', 'top']);
+        expect(store.scope).toBe('front');
+
+        store.keepScopeWithin(['side', 'top']);
+        expect(store.scope).toBe('side');
     });
 });

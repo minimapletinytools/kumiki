@@ -206,6 +206,7 @@
   "viewer.selection.selected": "選択: {what}",
   "viewer.selection.none": "選択なし",
   "viewer.selection.derivedFrom": "派生元:",
+  "viewer.selection.inView": "ビュー {view}",
   "viewer.selection.copyForAI": "AI用にコピー",
   "viewer.selection.copyForAI.title": "選択中のもの（寸法・位置・特徴の参照）をコピーして、AIアシスタントとの会話に貼り付けられるようにします",
   "viewer.selection.copied": "コピーしました",
