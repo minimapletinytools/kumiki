@@ -10,25 +10,34 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from kumiki.csg.cutcsg import (
-    END_CAP, START_CAP, FeatureGroup, FeatureOverride, FeatureProperties, side_key,
+    END_CAP, START_CAP, FeatureCategory, FeatureGroup, FeatureOverride, FeatureProperties, arris_against_cap,
+    side_key,
 )
 from ..shavings import *
 
 
 #: The dovetail's faces, by profile edge (see profile_at) and end. CROSSING, like a cross lap's: they
 #: meet both timbers' bodies, so the socket's and the tongue's outlines are edges to measure to.
-_DOVETAIL_FACE = FeatureProperties(group=FeatureGroup.CROSSING)
+_DOVETAIL_FEATURE = FeatureProperties(group=FeatureGroup.CROSSING)
+_SIDE_NAMES = ("dovetail_neck", "dovetail_right_flank", "dovetail_wide_face", "dovetail_left_flank")
+_END_NAMES = ("dovetail_backward_end", "dovetail_forward_end")
 _DOVETAIL_FACES = [
-    FeatureOverride(key, name, _DOVETAIL_FACE)
-    for key, name in (
-        (side_key(0), "dovetail_neck"),
-        (side_key(1), "dovetail_right_flank"),
-        (side_key(2), "dovetail_wide_face"),
-        (side_key(3), "dovetail_left_flank"),
-        (START_CAP, "dovetail_backward_end"),
-        (END_CAP, "dovetail_forward_end"),
+    *(FeatureOverride(side_key(side), name, _DOVETAIL_FEATURE) for side, name in enumerate(_SIDE_NAMES)),
+    FeatureOverride(START_CAP, _END_NAMES[0], _DOVETAIL_FEATURE),
+    FeatureOverride(END_CAP, _END_NAMES[1], _DOVETAIL_FEATURE),
+]
+#: Its edges, named by the two faces they join: along its length between neighbouring sides,
+#: and round each end. CROSSING too, so where one leaves a timber's face is a point to measure to.
+_DOVETAIL_EDGES = [
+    override
+    for side, name in enumerate(_SIDE_NAMES)
+    for override in (
+        FeatureOverride((FeatureCategory.ARRIS, side), f"{name}×{_SIDE_NAMES[(side + 1) % 4]}", _DOVETAIL_FEATURE),
+        FeatureOverride(arris_against_cap(side, 4, end=False), f"{name}×{_END_NAMES[0]}", _DOVETAIL_FEATURE),
+        FeatureOverride(arris_against_cap(side, 4, end=True), f"{name}×{_END_NAMES[1]}", _DOVETAIL_FEATURE),
     )
 ]
+_DOVETAIL_FEATURES = [*_DOVETAIL_FACES, *_DOVETAIL_EDGES]
 
 
 #.    _______
@@ -81,13 +90,13 @@ class FreeDovetailShape:
         start = None if self.backward_length is None else -self.backward_length
         if safe_zero_test(self.taper_angle):
             return ConvexPolygonExtrusion(points=self.profile_at(scalar(0)), start_distance=start,
-                                          end_distance=self.forward_length, feature_overrides=_DOVETAIL_FACES,
+                                          end_distance=self.forward_length, feature_overrides=_DOVETAIL_FEATURES,
                                           label=CutCSGLabel("dovetail"))
         assert start is not None and self.forward_length is not None
         return ConvexPolygonSimpleLoft(bottom_points=self.profile_at(start),
                                        top_points=self.profile_at(self.forward_length),
                                        bottom_points_z_pos=start, top_points_z_pos=self.forward_length,
-                                       feature_overrides=_DOVETAIL_FACES, label=CutCSGLabel("dovetail"))
+                                       feature_overrides=_DOVETAIL_FEATURES, label=CutCSGLabel("dovetail"))
 
 
 def cut_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: TimberLike,

@@ -40,6 +40,14 @@ def _has(cut_timber, x, y, z):
     return cut_timber.render_timber_with_cuts_csg_local().contains_point(local)
 
 
+def _edges_at(cut_timber, x, y, z):
+    """The names of the edges at a world point given in mm."""
+    from kumiki.csg.cutcsg import CSGFeatureType
+    local = cut_timber.timber.transform.global_to_local(create_v3(mm(x), mm(y), mm(z)))
+    return [hit.feature.name for hit in cut_timber.render_timber_with_cuts_csg_local().find_all_features(local)
+            if hit.feature.feature_type() is CSGFeatureType.EDGE]
+
+
 class TestFreeDovetailJoint:
 
     def test_the_tongue_is_the_post_s_and_the_socket_is_cut_from_the_beam(self):
@@ -87,7 +95,7 @@ class TestFreeDovetailJoint:
 
         assert shoulders == ["shoulder"]
 
-    def test_the_dovetail_s_faces_are_CROSSING(self):
+    def test_the_dovetail_s_faces_and_edges_are_CROSSING(self):
         from kumiki.csg.cutcsg import FeatureGroup, csg_children
         for taper in (0, 5):
             _, beam = _cut(taper)
@@ -101,22 +109,26 @@ class TestFreeDovetailJoint:
             walk(beam.render_timber_with_cuts_csg_local())
 
             for name in ("dovetail_neck", "dovetail_right_flank", "dovetail_wide_face", "dovetail_left_flank",
-                         "dovetail_backward_end", "dovetail_forward_end"):
+                         "dovetail_backward_end", "dovetail_forward_end",
+                         "dovetail_right_flank×dovetail_wide_face", "dovetail_neck×dovetail_forward_end"):
                 assert found.get(name) is FeatureGroup.CROSSING, (taper, name)
 
     def test_the_flanks_meet_both_timbers_faces_in_edges(self):
         # The socket's flank leaves the beam's top face at the neck, 20 out; the tongue's flank
-        # leaves the post's side face (x=50), 24 out halfway down the tongue. The dovetail's ends
-        # are flush with the post's faces, which is where the tongue's edge used to go missing.
+        # leaves the post's side face (x=50), 24 out halfway down the tongue. Here the neck is
+        # flush with the beam's top and the dovetail's end with the post's side, so each edge is
+        # one of the dovetail's own, and the derived edge naming the same line gives way to it.
         post, beam = _cut()
 
-        def derived_at(cut_timber, x, y, z):
-            local = cut_timber.timber.transform.global_to_local(create_v3(mm(x), mm(y), mm(z)))
-            return [hit.feature.name for hit in cut_timber.render_timber_with_cuts_csg_local().find_all_features(local)
-                    if hit.feature.is_derived()]
+        assert "dovetail_neck×dovetail_right_flank" in _edges_at(beam, 0, 20, 50)
+        assert "dovetail_right_flank×dovetail_backward_end" in _edges_at(post, 50, 20 + 15 * 0.2679491924, 35)
 
-        assert any("dovetail_" in name for name in derived_at(beam, 0, 20, 50))
-        assert any("dovetail_" in name for name in derived_at(post, 50, 20 + 15 * 0.2679491924, 35))
+    def test_the_socket_s_inside_edges_are_the_dovetail_s_own(self):
+        # Where the socket's floor (z=20) meets its flank, 28 out; midway along, a taper leaves it there.
+        for taper in (0, 5):
+            _, beam = _cut(taper)
+
+            assert "dovetail_right_flank×dovetail_wide_face" in _edges_at(beam, 0, 20 + 30 * 0.2679491924, 20), taper
 
     def test_a_taper_needs_both_ends(self):
         with pytest.raises(AssertionError, match="finite"):

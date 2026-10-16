@@ -98,8 +98,6 @@ def dovetailed_sawhorse(k: Optional[Kiwari] = None) -> Frame:
             leg, joint = _leg(k, beam, end, side)
             legs.append(leg)
             joints.append(joint)
-    # Each leg is let in by its thickness: the beam is housed to the leg's finished shape.
-    joints.append(cut_free_house_joint(beam, legs))
     # Built by hand rather than from the joints, for the legs' level trims; the joints ride along
     # so Kigumi can list them.
     beam_cuts = [cutting for joint in joints for cutting in joint.cuttings.values() if cutting.timber is beam]

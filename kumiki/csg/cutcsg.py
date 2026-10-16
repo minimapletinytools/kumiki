@@ -2041,6 +2041,109 @@ class SimpleLoftFeature(FaceFeature):
         return owner._point_on_side(self.key, x, y, z, eps=test_tolerance)
 
 
+def _profile_corner(owner: 'CutCSG', index: int, end: bool) -> Optional[V3]:
+    """Vertex `index` of a convex extrusion's or loft's profile at its start or end, in the
+    owner's space, or None where that end is infinite."""
+    if isinstance(owner, ConvexPolygonExtrusion):
+        z = owner.end_distance if end else owner.start_distance
+        if z is None:
+            return None
+        vertex = owner.points[index]
+    elif isinstance(owner, ConvexPolygonSimpleLoft):
+        z = owner.top_points_z_pos if end else owner.bottom_points_z_pos
+        vertex = (owner.top_points if end else owner.bottom_points)[index]
+    else:
+        return None
+    local = Matrix([vertex[0], vertex[1], z])
+    return owner.transform.position + safe_transform_vector(owner.transform.orientation.matrix, local)
+
+
+@dataclass(frozen=True)
+class ConvexProfileEdgeFeature(EdgeFeature):
+    """An edge of a ConvexPolygonExtrusion or ConvexPolygonSimpleLoft, where two of its faces meet.
+
+    `faces` is a side and the side after it -- the long edge through the vertex they share -- or
+    a side and a cap -- that side's edge of the profile at that end. `key` is its slot in the
+    ARRIS run; see FeatureCategory and convex_profile_edge_features.
+    """
+    key: FeatureKey = (FeatureCategory.ARRIS, 0)
+    faces: Tuple[ExtrusionFeatureKey, ExtrusionFeatureKey] = (0, 1)
+
+    def feature_key(self) -> Optional[FeatureKey]:
+        return self.key
+
+    def _face_features(self, owner: 'CutCSG') -> Tuple[CSGFeature, ...]:
+        face_type = (SimpleConvexPolygonExtrusionFeature if isinstance(owner, ConvexPolygonExtrusion)
+                     else SimpleLoftFeature)
+        return tuple(face_type(name=self.name, key=face) for face in self.faces)
+
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        carriers = owner.carriers()
+        keys = [face.feature_key() for face in self._face_features(owner)]
+        if not all(key in carriers for key in keys):
+            return None
+        return tuple(CarrierRef(owner, key) for key in keys if key is not None)
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)):
+            return False
+        return all(face.test_point_unbounded(owner, point, test_tolerance)
+                   for face in self._face_features(owner))
+
+    def _ends(self, owner: 'CutCSG') -> Tuple[Optional[V3], Optional[V3]]:
+        """The edge's two endpoints, either None where it runs to an infinite end."""
+        side, other = self.faces
+        if isinstance(other, ExtrusionCap):
+            end = other is ExtrusionCap.TOP
+            count = len(owner.points) if isinstance(owner, ConvexPolygonExtrusion) else len(owner.bottom_points)  # type: ignore[attr-defined]
+            return _profile_corner(owner, side, end), _profile_corner(owner, (side + 1) % count, end)
+        return _profile_corner(owner, other, False), _profile_corner(owner, other, True)
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Line]:
+        if not isinstance(owner, (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)):
+            return None
+        start, end = self._ends(owner)
+        if start is not None and end is not None:
+            if safe_zero_test(giraffe_norm(end - start)):
+                return None
+            return Line(direction=safe_normalize_vector(end - start), point=start)
+        side, other = self.faces
+        if isinstance(other, ExtrusionCap) or not isinstance(owner, ConvexPolygonExtrusion):
+            return None  # a profile edge at an infinite end: there is none
+        # A long edge of an extrusion open at an end: through its vertex, along the extrusion.
+        orientation = owner.transform.orientation.matrix
+        vertex = owner.points[other]
+        return Line(
+            direction=safe_transform_vector(orientation, Matrix([scalar(0), scalar(0), scalar(1)])),
+            point=owner.transform.position + safe_transform_vector(
+                orientation, Matrix([vertex[0], vertex[1], scalar(0)])))
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        line = self.locate_simple_unbounded(owner)
+        if line is None:
+            return None
+        start, end = self._ends(owner)
+        if start is not None and end is not None:
+            return CSGFeatureExtent(anchor=(start + end) / scalar(2), ends=(start, end))
+        return CSGFeatureExtent(anchor=line.point)
+
+
+def convex_profile_edge_features(sides: int) -> Dict[FeatureKey, CSGFeature]:
+    """The default edges of a convex extrusion or loft with `sides` sides, in the ARRIS run:
+    side n against side n+1, then each side against the start cap, then against the end cap."""
+    features: Dict[FeatureKey, CSGFeature] = {}
+    for side in range(sides):
+        for key, faces in (
+            ((FeatureCategory.ARRIS, side), (side, (side + 1) % sides)),
+            (arris_against_cap(side, sides, end=False), (side, ExtrusionCap.BOTTOM)),
+            (arris_against_cap(side, sides, end=True), (side, ExtrusionCap.TOP)),
+        ):
+            features[key] = ConvexProfileEdgeFeature(
+                name=default_feature_name(key), key=key, faces=faces,
+                properties=_DEFAULT_FEATURE_PROPERTIES)
+    return features
+
+
 class FeatureSource(Flag):
     """Which features a query is asking for.
 
@@ -3805,11 +3908,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
     """
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Two caps and a side per edge of the profile.
-
-        No arrises yet: SimpleRectangularPrismEdgeFeature is a prism's, and an
-        extrusion needs its own before ARRIS n can be filled in here.
-        """
+        """Two caps, a side per edge of the profile, and the edges where they meet."""
         features: Dict[FeatureKey, CSGFeature] = {}
         for key, cap in ((START_CAP, ExtrusionCap.BOTTOM), (END_CAP, ExtrusionCap.TOP)):
             features[key] = SimpleConvexPolygonExtrusionFeature(
@@ -3820,6 +3919,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
             features[key] = SimpleConvexPolygonExtrusionFeature(
                 name=default_feature_name(key), key=index,
                 properties=_DEFAULT_FEATURE_PROPERTIES)
+        features.update(convex_profile_edge_features(len(self.points)))
         return features
 
     @classmethod
@@ -4186,7 +4286,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     """
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Two caps and a side per edge of the profile, as an extrusion has."""
+        """Two caps, a side per edge of the profile, and the edges where they meet, as an extrusion has."""
         features: Dict[FeatureKey, CSGFeature] = {}
         for key, cap in ((START_CAP, ExtrusionCap.BOTTOM), (END_CAP, ExtrusionCap.TOP)):
             features[key] = SimpleLoftFeature(
@@ -4197,6 +4297,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
             features[key] = SimpleLoftFeature(
                 name=default_feature_name(key), key=index,
                 properties=_DEFAULT_FEATURE_PROPERTIES)
+        features.update(convex_profile_edge_features(len(self.bottom_points)))
         return features
 
     @classmethod

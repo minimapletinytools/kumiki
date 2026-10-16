@@ -1645,6 +1645,58 @@ class TestConvexPolygonExtrusion:
         assert "5" in repr_str
 
 
+class TestConvexProfileEdges:
+    """A convex extrusion's and a loft's edges: between neighbouring sides, and round each end."""
+
+    SQUARE = [Matrix([0, 0]), Matrix([4, 0]), Matrix([4, 4]), Matrix([0, 4])]
+
+    def _edges(self, shape):
+        from kumiki.csg.cutcsg import CSGFeatureType
+        return {feature.feature_key(): feature for feature in shape.get_declared_features()
+                if feature.feature_type() is CSGFeatureType.EDGE}
+
+    def test_an_extrusion_has_an_edge_per_side_along_it_and_one_round_each_end(self):
+        from kumiki.csg.cutcsg import FeatureCategory, arris_against_cap
+        box = ConvexPolygonExtrusion(points=self.SQUARE, start_distance=scalar(0), end_distance=scalar(10))
+        edges = self._edges(box)
+
+        assert len(edges) == 12
+        # Side 0 runs (0,0)->(4,0) and side 1 (4,0)->(4,4): they meet along x=4, y=0.
+        long = edges[(FeatureCategory.ARRIS, 0)].locate_simple_unbounded(box)
+        assert all(safe_zero_test(v) for v in (long.point[0] - 4, long.point[1], long.direction[0], long.direction[1]))
+        assert edges[(FeatureCategory.ARRIS, 0)].test_point_unbounded(box, create_v3(4, 0, 5))
+        assert not edges[(FeatureCategory.ARRIS, 0)].test_point_unbounded(box, create_v3(2, 0, 5))
+        # Side 0 against the end cap: from (0,0,10) to (4,0,10).
+        ends = edges[arris_against_cap(0, 4, end=True)].get_extent(box).ends
+        assert [[float(v) for v in end] for end in ends] == [[0, 0, 10], [4, 0, 10]]
+
+    def test_an_open_extrusion_keeps_its_long_edges_and_has_none_at_the_open_end(self):
+        from kumiki.csg.cutcsg import FeatureCategory, arris_against_cap
+        open_box = ConvexPolygonExtrusion(points=self.SQUARE, start_distance=scalar(0), end_distance=None)
+        edges = self._edges(open_box)
+
+        assert edges[(FeatureCategory.ARRIS, 1)].locate_simple_unbounded(open_box) is not None
+        assert edges[arris_against_cap(0, 4, end=True)].locate_simple_unbounded(open_box) is None
+        assert not edges[arris_against_cap(0, 4, end=True)].test_point_unbounded(open_box, create_v3(2, 0, 100))
+
+    def test_a_loft_s_long_edge_runs_from_a_bottom_vertex_to_the_top_one(self):
+        from kumiki.csg.cutcsg import FeatureCategory
+        top = [Matrix([1, 1]), Matrix([3, 1]), Matrix([3, 3]), Matrix([1, 3])]
+        loft = ConvexPolygonSimpleLoft(bottom_points=self.SQUARE, top_points=top,
+                                       bottom_points_z_pos=scalar(0), top_points_z_pos=scalar(10))
+        edge = self._edges(loft)[(FeatureCategory.ARRIS, 0)]
+
+        assert [[float(v) for v in end] for end in edge.get_extent(loft).ends] == [[4, 0, 0], [3, 1, 10]]
+        assert edge.test_point_unbounded(loft, create_v3(3.5, 0.5, 5))
+
+    def test_an_edge_is_named_like_a_face(self):
+        from kumiki.csg.cutcsg import FeatureCategory, FeatureOverride
+        box = ConvexPolygonExtrusion(points=self.SQUARE, start_distance=scalar(0), end_distance=scalar(10),
+                                     feature_overrides=[FeatureOverride((FeatureCategory.ARRIS, 0), "corner_post")])
+
+        assert self._edges(box)[(FeatureCategory.ARRIS, 0)].name == "corner_post"
+
+
 class TestConvexPolygonSimpleLoft:
     """Test ConvexPolygonSimpleLoft class."""
 
