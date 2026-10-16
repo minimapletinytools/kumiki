@@ -139,6 +139,8 @@ DONE-BUG the camera and the light widget sometimes get messed up after I create 
   -the high level issue here is that each view in 2d drawing only has some features visible and you only want to make measuremints for those features. Except you can totally mesauer other featuers and its' kind NBD so maybe ther' sjust ntonig to do here.
   -disallow hidden fetaure measuring?
     -I think either don't do it or restrict mesauring selection to viewport
+  -hidden feature weirdnesse xample
+    it's weird that I could even select the inside edge of the dovetail, and in fact it was picking that over the outside edge of the dovetail, so we should mayb edo some z sorting (although this may be part of a bigger project of disallowing selecing hidden features so ignore this for now)
   -2D VIEW EQUIVALENCY GROUPS (probably not what you want to do but techincalyl the most general solution)
     -paus eher for a moment, one thing I realized is that in 2d view, there are sorta equivalency groups for measurements when locked to an orthographic view. so for example, a pirsm has 6 faces, and a bunch of edgse/vertices. When we measure betwene 2 edges on a face that's parallel with the viewport plane, we are also measuring the distance bteew all other edges, vertices of the perpendicular face that edge is a part of. IN the measurement, we say it's just the edge being measured, but in. thesolver wesay that a DOF got removed from all the features I mentioned. Is there some way to solve for all features that had their DOfs solved in this way even though just teh edge was measured. 
     -don't really need to do this...
@@ -169,13 +171,19 @@ DONE-BUG the camera and the light widget sometimes get messed up after I create 
 DONE-BUG th dovetail sawhores has vertexes that cant' be selected, also the inside edges of the dovetail are showing up as derived faces when they should be faces of the trapezoid shape
 DONE-it should be more clear the 2 crossing features forming a derived feature. there should be an X emoji or osmetihng
 DONE-for 2 crossing featuers in the kigumi viewer it should be much more clear in selection (use new lines and stuff)
-
--right now hen I right click in the tree view it shows copy/cut/paste???
+DONE-right now hen I right click in the tree view it shows copy/cut/paste???
   -instead you should be able to right click on stuff in layer view and choose "copy for ai", and it will copy the fully qualified name of whatever you have selected. Perhaps give 2 options "copy for ai" and "copy with details for ai" where copy with details gives a lot more info.
+
+
   
 -2d featuer seleciton ifxes
-  -remove csg-hover logging
-  -add logging for creating new measurements
+  DONE-remove csg-hover logging
+  DONE-add logging for creating new measurements
+  DONE-BUG from side view I can select the behind dovetail edge and then try to measuer it to the one of the horizontal edges and it will say the measureemnt is not permitted in the view
+    -1. it's weird that I could even select the inside edge of the dovetail, and in fact it was picking that over the outside edge of the dovetail, so we should mayb edo some z sorting (although this may be part of a bigger project of disallowing selecing hidden features so ignore this for now)
+    -2. it should be permitted, as that edge gets projected into the viewport and taht's what wed' be measuring, so I
+    -3. yo ushouldnt' be able to create unpermitted measurements (it should hover as red, but I guessi it's beacues the hover logic understands 2 but something goes wrong when the measueremnt actually gets created)
+    
   -stuff like [dovetailed_sawhorse.py] [webview:viewer:info] csg-selection v2026.03.17.4 {"path":["free_dovetail#1","dovetail"],"featureLabel":"rptw.front_left×dovetail_left_flank","meshWalkMs":13.08,"trianglesMatched":2,"totalTriangles":108,"candidates":["> POINT derived real NONE p0 rptw.front_left×dovetail_left_flank","  EDGE declared real PERFECT p0 rptw.front_left","  EDGE derived real NONE p0 rptw.front×dovetail_left_flank","  EDGE derived real NONE p0 rptw.left×dovetail_left_flank","  FACE declared real PERFECT p0 rptw.front"]}. is hard to select, I think points should always be first priority
   -also tab/right click selection in 2d view for choosing other featuers seems a little broken.
 

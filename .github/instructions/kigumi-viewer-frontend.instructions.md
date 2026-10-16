@@ -4,14 +4,15 @@ applyTo: "kigumi/**"
 
 # Kigumi Frontend Agent Rules
 
-## Goal
-Keep frontend implementation migration-safe so Lit can be swapped to React later with minimal churn.
+## General Coding Philosophy
+
+Kigumi code is entirely agent coded, as such extra discipline is needed. Agents LOVE introducing ad-hoc fixes for issues the user reports. These should be avoided as much as possible. Instead always consider systemic changes that cover the edge cases by design and weigh their introduced complexity over tech debt of layered ad-hoc fixes. When modifying code, also look for existing ad-hoc changes that might have new opportunities to be expressed through better architectural decisions. It's an iteraive process as we better understand the system requirements.
 
 ## Architecture Boundaries
 
 - Keep framework-specific UI code isolated to webview UI adapter files.
 - Keep viewer domain logic framework-agnostic wherever possible (state transforms, geometry update decisions, session protocol payload shaping).
-- Do not mix VS Code extension lifecycle logic with UI framework logic.
+- Core logic should be platform agnostic, as we deploy to web, electron, and VSCode extension
 
 ## Framework Isolation Rules
 
@@ -21,23 +22,18 @@ Keep frontend implementation migration-safe so Lit can be swapped to React later
 
 ## Migration-Safe Conventions
 
-- Treat the UI as an adapter layer over a stable data contract (`frame`, `geometry`, refresh messages).
+- Treat the UI as an adapter layer over a stable data contract (`frame`, `geometry`, refresh messages), but don't be afraid to break this rule either, in which case a minor version bump is needed.
 - Keep message protocol explicit and versionable (message type + payload shape).
 - Avoid coupling business logic to Lit lifecycle semantics; keep lifecycle methods thin and delegate to plain methods.
-- Prefer pure utility functions for calculations and formatting where practical.
 
 ## Scope Discipline
 
 - Implement only requested UX changes.
 - Avoid introducing broad frontend dependencies unless explicitly requested.
-- Keep the current Three.js scene behavior intact unless task requirements ask for a rendering behavior change.
 
 ## Theme System Policy
 
 - Use a single theme registry for viewer appearance: background, UI chrome tokens, and default timber/accessory render profiles should be selected together.
-- Do not add separate background-only presets alongside the unified theme selector.
-- Do not reintroduce the `blueprint` viewer theme.
-- Prefer semantic CSS variables (`--hv-*`) for UI colors; avoid adding new hard-coded color literals in component rules.
 
 ## Running Tests
 
