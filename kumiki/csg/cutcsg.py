@@ -527,14 +527,19 @@ def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']
     features were gathered in, which sorted() preserves without a key of its
     own.
     """
-    return sorted(hits, key=lambda hit: (
+    return sorted(hits, key=feature_hit_sort_key)
+
+
+def feature_hit_sort_key(hit: 'OwnedFeatureHit') -> Tuple:
+    """Where a hit sorts: see _sort_feature_hits."""
+    return (
         hit.feature.real,
         _FEATURE_TYPE_SPECIFICITY[hit.feature.feature_type()],
         hit.feature.is_derived(),
         hit.feature.group_rank(),
         hit.feature.priority,
         hit.feature.name,
-    ))
+    )
 
 
 def _names_same_geometry(one: 'OwnedFeatureHit', other: 'OwnedFeatureHit') -> bool:

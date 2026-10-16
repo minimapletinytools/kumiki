@@ -55,7 +55,7 @@ def picked():
     segment = edge_highlight_segments(front, root, beam.timber, root)[0][0]
     on_line = [(a + b) / 2 for a, b in zip(segment["start"], segment["end"])]
 
-    def pick(offset, space):
+    def pick(offset, space, **extra):
         # Shifted across the line, then onto the first surface the ray meets there.
         across = [on_line[0] + offset, on_line[1], on_line[2]]
         from kumiki.rule import create_v3
@@ -67,9 +67,9 @@ def picked():
             result = runner._handle_find_csg_at_point(None, {
                 "memberKey": "m#0", "point": point, "currentPath": [], "ctrlClick": False, "space": space,
                 "ray": {"origin": [point[0], point[1] + 1.0, point[2]], "direction": LOOK},
-                "tolerances": {"face": 0.0005, "edge": 0.002, "point": 0.004},
+                "tolerances": {"face": 0.0005, "edge": 0.002, "point": 0.004}, **extra,
             }, slot)
-        return [candidate["label"] for candidate in result["candidates"]]
+        return result if extra else [candidate["label"] for candidate in result["candidates"]]
 
     return pick
 
@@ -84,3 +84,29 @@ def test_both_edges_of_a_flank_seen_edge_on_are_candidates_whichever_side_the_cl
 def test_the_3d_view_still_picks_the_surface_the_pointer_is_on(picked):
     # Into the socket, past the beam's face: only what is there.
     assert FRONT not in picked(0.0004, "3d")
+
+
+@pytest.mark.parametrize("offset", [-0.0004, 0.0004])
+def test_nearest_the_viewer_comes_first(picked, offset):
+    # The front edge leads, ahead of the face it lies on (no depth between them), and the back
+    # edge comes after both, however the declared-before-derived order would have had it.
+    labels = picked(offset, "projected")
+
+    assert labels[0] == FRONT
+    assert labels.index("rptw.right") < labels.index(BACK)
+    assert labels[-1] == "rptw.left"
+
+
+def test_two_features_named_alike_are_each_their_own(picked):
+    # The dovetails either side of the beam line up from here, and each has a dovetail_wide_face.
+    # Choosing one used to answer with the first by name, whichever was asked for.
+    candidates = picked(0.0004, "projected", candidateIndex=0)["candidates"]
+    alike = [index for index, candidate in enumerate(candidates) if candidate["label"] == "dovetail_wide_face"]
+    assert len(alike) == 2
+    assert candidates[alike[0]]["path"] != candidates[alike[1]]["path"]
+
+    chosen = [picked(0.0004, "projected", candidateIndex=index) for index in alike]
+
+    assert [result["candidateIndex"] for result in chosen] == alike
+    assert [result["path"] for result in chosen] == [candidates[index]["path"] for index in alike]
+    assert chosen[0]["geometry"] != chosen[1]["geometry"]

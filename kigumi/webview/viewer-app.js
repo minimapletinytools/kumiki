@@ -139,7 +139,8 @@ class ViewerViewport {
         // Frustum bounds are placeholders; updateOrthographicFrustum() sizes
         // them from the current orbitDist before every use, so the two
         // projections keep the same apparent framing when toggled.
-        this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
+        // Near behind the camera: see where the camera plan is applied, in getSceneBounds.
+        this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -10000, 10000);
         this.orthographicCamera.up.set(0, 0, 1);
     }
 
@@ -4026,7 +4027,10 @@ class KigumiViewerApp extends LitElement {
             items: candidates.map((candidate, index) => ({
                 id: String(index),
                 label: candidate.label,
-                note: (candidate.type || '').toLowerCase(),
+                // Where it is declared, so two named alike (a dovetail_wide_face on each of two
+                // dovetails) can be told apart.
+                note: [(candidate.type || '').toLowerCase(), ...(candidate.path || []).slice(-2)]
+                    .filter(Boolean).join(' \u00b7 '),
             })),
             // A row is the feature it names: choosing one is the click that
             // would have taken it in the view.
@@ -6599,7 +6603,11 @@ class KigumiViewerApp extends LitElement {
                 return;
             }
             for (const camera of [viewport.perspectiveCamera, viewport.orthographicCamera]) {
-                camera.near = entry.near;
+                // An orthographic view sees all along each line wherever the camera sits, and
+                // zooming in moves the camera closer -- into the frame, in the end. A near plane
+                // ahead of it then cut away what it had passed, and rays started inside it, so
+                // only what lay behind could be picked. Behind it instead, as far as far is ahead.
+                camera.near = camera.isOrthographicCamera ? -entry.far : entry.near;
                 camera.far = entry.far;
                 camera.updateProjectionMatrix();
             }

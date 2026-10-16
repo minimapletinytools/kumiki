@@ -207,6 +207,7 @@ class CandidateWire(TypedDict):
     derived: bool
     group: str
     priority: int
+    path: List[str]
 
 
 class PickStatsWire(TypedDict, total=False):
@@ -2459,25 +2460,6 @@ def _measurement_plane(
         at = [(float(at_one[i]) + float(at_other[i])) / 2 for i in range(3)]
 
     return {"at": at or [0.0, 0.0, 0.0], "normal": normal}
-
-
-def _picked_located(
-    feature_hits: List['OwnedFeatureHit'], feature_label: Optional[str], edge: Optional['CSGFeature'],
-    owner: 'CutCSG',
-) -> Optional['LocatedPick']:
-    """The picked feature, its owner, and what it lies on, or None.
-
-    One lookup for the anchor and the geometry both, so the two cannot end up
-    describing different features.
-    """
-    if feature_label is None:
-        return None
-    if edge is not None:
-        return (edge, owner, edge.locate_simple_unbounded(owner))
-    hit = next((h for h in feature_hits if h.feature.name == feature_label), None)
-    if hit is None:
-        return None
-    return (hit.feature, hit.owner, hit.feature.locate_simple_unbounded(hit.owner))
 
 
 def _derivation_wire(
@@ -5595,6 +5577,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         candidate_index = _best_matching_candidate(
             feature_hits, timber, held_geometry, look, payload)
     picked = None
+    # The candidate this answer is, settled once by whichever branch chooses it, and then read
+    # for the geometry and the menu's active row alike. Looked up again by name afterwards, two
+    # features named alike (a dovetail_wide_face on each of two dovetails) answered as one.
+    chosen_hit: Optional['OwnedFeatureHit'] = None
     # `is not None`, because ZERO IS A CHOICE. Stepping round to the first
     # feature, or picking the first row of the menu, is the caller naming one --
     # and treating it as "nothing named" dropped it back to the most specific
@@ -5604,6 +5590,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         picked = _pick_from_candidate(local_csg, chosen)
         if picked is not None:
             new_path, target_csg, feature_label, feature_type, edge, declared_edge = picked
+            chosen_hit = chosen
 
     if picked is None:
         if edge is not None:
@@ -5612,6 +5599,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
                 target_csg, new_path = owned[0], owned[1]
                 feature_label = edge.name
                 feature_type = edge.feature_type().name
+                chosen_hit = feature_hits[0]  # resolve_derived_feature's answer is the best one
         elif feature_label is not None and feature_hits:
             # A declared edge or point -- a timber's own arris or corner --
             # beats the face a click lands on, the same way a derived one does
@@ -5628,6 +5616,12 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
                     feature_label = best.feature.name
                     feature_type = best.feature.feature_type().name
                     declared_edge = best.feature
+                    chosen_hit = best
+        if chosen_hit is None and feature_label is not None:
+            # Navigation landed on a face: it names a node and a label, so the candidate is the
+            # one that node declares under that name.
+            named = [hit for hit in feature_hits if hit.feature.name == feature_label]
+            chosen_hit = next((hit for hit in named if hit.owner is target_csg), named[0] if named else None)
 
     parent_csg = None
     if new_path:
@@ -5639,7 +5633,12 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     highlight_edge = None
     edge_absent = False
     edge_feature = edge if edge is not None else declared_edge
-    located_pick = _picked_located(feature_hits, feature_label, edge_feature, target_csg)
+    located_pick: Optional['LocatedPick'] = None
+    if chosen_hit is not None:
+        # An edge or point is shown under the node navigation placed it at; anything else is
+        # its own owner's.
+        owner = target_csg if edge_feature is not None else chosen_hit.owner
+        located_pick = (chosen_hit.feature, owner, chosen_hit.feature.locate_simple_unbounded(owner))
     if edge_feature is not None:
         highlight_edge, edge_absent = edge_highlight_segments(
             edge_feature, target_csg, timber, local_csg,
@@ -5680,6 +5679,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
             parent_hl = MeshWire(vertices=p_verts, indices=p_idx)
 
     mesh_walk_ms = (time.monotonic() - t0) * 1000.0
+    candidate_positions = node_positions(local_csg)
 
     result: PickResultWire = {
         # Echoed back because the viewer can have several timbers selected at
@@ -5709,6 +5709,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
                 "derived": bool(hit.feature.is_derived()),
                 "group": hit.feature.group.name,
                 "priority": int(hit.feature.priority),
+                # Where it is declared, which tells apart two features named alike.
+                "path": candidate_positions.get(id(hit.owner), (0, 0, []))[2],
             }
             for hit in feature_hits
         ],
@@ -5721,10 +5723,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         # or from one of the fallbacks, and all of them have to be reported the
         # same way.
         "candidateIndex": next(
-            (index for index, hit in enumerate(feature_hits)
-             if hit.feature.name == feature_label),
-            None,
-        ),
+            (index for index, hit in enumerate(feature_hits) if hit is chosen_hit), None),
         # Where the feature is, unbounded, in world space. What decides whether
         # a pair can be dimensioned is what each PROJECTS to, and the viewer
         # projects on every pointer move -- so it gets the plane or the line and
