@@ -2908,17 +2908,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this._hover.markDrawn(message);
-        // What the pointer is over, once per thing it comes to rest on rather
-        // than once per move -- wouldRedraw above has already dropped the
-        // repeats. Hover said nothing at all before, which made "why can I not
-        // hover that" a question with no evidence behind it.
-        this.emitViewerLog('csg-hover', {
-            memberKey: message.memberKey,
-            path: message.path,
-            featureLabel: message.featureLabel,
-            featureType: message.featureType,
-            ...describeCandidates(message),
-        });
         if (this.contextMenu.isOpen) {
             // The feature menu marks the row THIS answer came from, so a new
             // answer has to reach it. Tab changes the answer without the pointer
