@@ -227,6 +227,17 @@ class NodeDescriptionWire(TypedDict, total=False):
     outwardNormal: Optional[Vec3]
 
 
+class DerivationParentWire(TypedDict):
+    path: List[str]
+    name: str
+
+
+class DerivationWire(TypedDict):
+    """How a derived feature was formed: the node that owns it, and its two parents."""
+    ownerPath: Optional[List[str]]
+    parents: List[DerivationParentWire]
+
+
 class PickResultWire(NodeDescriptionWire, total=False):
     """The answer to a click, a hover or a pick from the tree."""
     memberKey: str
@@ -2459,6 +2470,28 @@ def _picked_located(
     if hit is None:
         return None
     return (hit.feature, hit.owner, hit.feature.locate_simple_unbounded(hit.owner))
+
+
+def _derivation_wire(
+    local_csg: 'CutCSG', feature_hits: List['OwnedFeatureHit'], feature: Optional['CSGFeature'],
+) -> Optional[DerivationWire]:
+    """For a derived feature: the path to the node owning it, and each parent's path and name."""
+    from kumiki.picking import node_positions
+
+    if feature is None or not feature.is_derived():
+        return None
+    positions = node_positions(local_csg)
+
+    def path_of(owner) -> Optional[List[str]]:
+        placed = positions.get(id(owner))
+        return placed[2] if placed is not None else None
+
+    owner = next((hit.owner for hit in feature_hits if hit.feature is feature), None)
+    return {
+        "ownerPath": path_of(owner) if owner is not None else None,
+        "parents": [{"path": path_of(parent.owner) or [], "name": parent.feature.name}
+                    for parent in getattr(feature, "parents", ()) if parent is not None],
+    }
 
 
 def _pick_from_candidate(
@@ -5625,6 +5658,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         # through compounds, and the display has to say so rather than name a
         # face belonging to something further in.
         **_describe_pick(target_csg, local_csg, cut_timber, local_pt, eps, feature_label, feature_type),
+        "derivation": _derivation_wire(
+            local_csg, feature_hits, edge if edge is not None and edge.name == feature_label else None),
         "highlightMesh": {
             "vertices": hl_verts,
             "indices": hl_idx,

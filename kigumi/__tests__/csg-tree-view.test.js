@@ -488,6 +488,22 @@ describe('breadcrumbSegments', () => {
         }, NOUNS)).toEqual(['post', 'lap_cut', 'other', 'prism (lap_cut)']);
     });
 
+    test('a derived edge shows its owner, then the full path to each feature forming it', () => {
+        expect(CsgTreeView.breadcrumbSegments('beam', ['free_dovetail#3', 'dovetail'], {
+            featureLabel: 'rptw.front×dovetail_wide_face', featureType: 'EDGE',
+            derivation: {
+                ownerPath: [],
+                parents: [
+                    { path: [], name: 'rptw.front' },
+                    { path: ['free_dovetail#3', 'dovetail'], name: 'dovetail_wide_face' },
+                ],
+            },
+        }, NOUNS)).toEqual([
+            'beam',
+            'edge (beam \u203a rptw.front \u2716\ufe0f beam \u203a free_dovetail#3 \u203a dovetail \u203a dovetail_wide_face)',
+        ]);
+    });
+
     test('just the timber when nothing is picked', () => {
         expect(CsgTreeView.breadcrumbSegments('post', [], null, NOUNS)).toEqual(['post']);
     });

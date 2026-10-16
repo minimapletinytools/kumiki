@@ -225,6 +225,7 @@ export class SelectionPanel {
                     nodeKind: detail && detail.nodeKind,
                     nodeDisplayName: detail && detail.nodeDisplayName,
                     nodeLabel: detail && detail.nodeLabel,
+                    derivation: detail && detail.derivation,
                 },
                 this.featureTypeNouns(),
             ).join(' \u203a ');

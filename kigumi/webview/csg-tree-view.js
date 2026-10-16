@@ -312,6 +312,10 @@
      * of the thing picked, and popping it would lose it from the trail.
      */
     function breadcrumbSegments(timberName, path, pick, nouns) {
+        const derivation = pick && pick.derivation;
+        if (derivation && Array.isArray(derivation.parents) && derivation.parents.length) {
+            return derivedBreadcrumb(timberName, derivation, pick, nouns);
+        }
         const trail = (path || []).slice();
         const selectedTheNodeItself = Boolean(pick) && !pick.featureLabel && Boolean(pick.nodeLabel);
         if (selectedTheNodeItself && trail.length && trail[trail.length - 1] === pick.nodeLabel) {
@@ -323,6 +327,21 @@
         if (tail) {
             segments.push(tail);
         }
+        return segments;
+    }
+
+    /**
+     * A derived feature's breadcrumb: the path to the node that owns it, then the feature, named by
+     * the full path to each of the two features that form it.
+     */
+    function derivedBreadcrumb(timberName, derivation, pick, nouns) {
+        const segments = timberName ? [timberName] : [];
+        segments.push(...(derivation.ownerPath || []));
+        const parents = derivation.parents.map((parent) => [
+            ...(timberName ? [timberName] : []), ...(parent.path || []), parent.name,
+        ].join(' \u203a '));
+        const noun = (nouns && nouns[pick.featureType]) || 'feature';
+        segments.push(noun + ' (' + parents.join(' \u2716\ufe0f ') + ')');
         return segments;
     }
 

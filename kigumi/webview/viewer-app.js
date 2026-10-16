@@ -4038,6 +4038,7 @@ class KigumiViewerApp extends LitElement {
             nodeDisplayName: message.nodeDisplayName || null,
             nodeLabel: message.nodeLabel || null,
             outwardNormal: Array.isArray(message.outwardNormal) ? message.outwardNormal : null,
+            derivation: message.derivation || null,
         };
         const hlMesh = message.highlightMesh;
         const parentHlMesh = message.parentHighlightMesh || null;
