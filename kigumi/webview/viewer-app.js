@@ -3076,8 +3076,13 @@ class KigumiViewerApp extends LitElement {
             plane: measurement.plane,
             kind,
         };
-        this.emitViewerLog('measure-written', {
-            label: 'measure', frame: this.frameKey, drawing: drawingId });
+        this.emitViewerLog('measurement-created', {
+            drawing: drawingId,
+            viewport: measurement.viewportId || null,
+            from: describeAnchor(measurement.a),
+            to: describeAnchor(measurement.b),
+            kind,
+        });
         this.undoStacks.push(this.frameKey, drawingId, {
             label: 'measure',
             redo: payload,
