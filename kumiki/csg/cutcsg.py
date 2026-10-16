@@ -3703,9 +3703,27 @@ class Difference(CutCSG):
         return SolidsAtPoint(self.subtract, point, eps=eps).average_outward_normal(negated=True)
 
     def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
-        if self.base.is_point_on_boundary(point, eps=eps):
-            return self.base.get_outward_normals(point, eps=eps)
-        return super().get_outward_normals(point, eps=eps)
+        """On the base's surface: the base's normals, and the walls of any hole meeting it there.
+
+        A hole's face lying along one of the base's adds nothing (a cut's end flush with the
+        base's face); any other is a wall. Without the walls, the edge where a hole leaves the
+        base's face read as that face alone, and a Difference over this one took the edge for
+        a cut flush with its own face and removed it -- a dovetail tongue whose ends are flush
+        with its timber lost its outline there.
+        """
+        if not self.base.is_point_on_boundary(point, eps=eps):
+            return super().get_outward_normals(point, eps=eps)
+        base_normals = list(self.base.get_outward_normals(point, eps=eps))
+        normals = list(base_normals)
+        for solid in SolidsAtPoint(self.subtract, point, eps=eps).on_surface:
+            for normal in solid.get_outward_normals(point, eps=eps):
+                along_base = any(
+                    safe_equality_test(safe_dot_product(base_normal, normal), 1, eps=eps)
+                    or safe_equality_test(safe_dot_product(base_normal, normal), -1, eps=eps)
+                    for base_normal in base_normals)
+                if not along_base:
+                    normals.append(-normal)
+        return normals
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         bbox = self.base.get_aabb()

@@ -106,12 +106,9 @@ class TestFreeDovetailJoint:
 
     def test_the_flanks_meet_both_timbers_faces_in_edges(self):
         # The socket's flank leaves the beam's top face at the neck, 20 out; the tongue's flank
-        # leaves the post's side face (x=50), 24 out halfway down the tongue. The dovetail runs
-        # past the post, so its ends are not the post's faces too.
-        beam_timber, post_timber = _beam(), _post()
-        joint = cut_free_dovetail_joint(post_timber, beam_timber, _dovetail(forward=mm(80), backward=mm(80)))
-        post = CutTimber(post_timber, cuts=[joint.cuttings["dovetail_timber"]])
-        beam = CutTimber(beam_timber, cuts=[joint.cuttings["receiving_timber"]])
+        # leaves the post's side face (x=50), 24 out halfway down the tongue. The dovetail's ends
+        # are flush with the post's faces, which is where the tongue's edge used to go missing.
+        post, beam = _cut()
 
         def derived_at(cut_timber, x, y, z):
             local = cut_timber.timber.transform.global_to_local(create_v3(mm(x), mm(y), mm(z)))
