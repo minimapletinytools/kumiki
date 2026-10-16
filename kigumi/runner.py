@@ -5570,9 +5570,13 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     # jumping to an edge deep inside would skip the levels between.
     feature_type = None
     declared_edge = None
+    from kumiki.drawings.drawing import MeasurementSpace
     feature_hits = features_at_point(
         local_csg, local_pt, eps, tolerances,
         local_ray=_local_ray_from_payload(payload, timber_rot, timber_pos),
+        # In a drawing's view everything under the pointer is drawn at one place, at whatever
+        # depth; the 3D view picks the surface the pointer is on.
+        whole_ray=_pick_space(payload) is MeasurementSpace.PROJECTED,
     )
     edge = resolve_derived_feature(feature_hits) if feature_label is not None else None
 

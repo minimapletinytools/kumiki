@@ -511,7 +511,7 @@ def non_real_highlight_segments(
 
 def features_at_point(
     root: 'CutCSG', local_pt: List[float], eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
-    local_ray: Optional[LocalRay] = None,
+    local_ray: Optional[LocalRay] = None, whole_ray: bool = False,
 ) -> List['OwnedFeatureHit']:
     """Every feature the WHOLE tree sees at the click, best first.
 
@@ -531,7 +531,93 @@ def features_at_point(
     hits = root.find_all_features(to_v3(local_pt), resolved)
     if local_ray is None:
         return hits
+    if whole_ray:
+        hits = _merge_hits(hits, real_features_along_ray(root, local_ray, resolved))
     return merge_ray_hits(root, hits, local_ray, resolved)
+
+
+def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
+    """*hits* and *more*, each feature once, in the library's order. A derived feature found at
+    two places is two objects, so features are matched by name and owner."""
+    from kumiki.csg.cutcsg import _sort_feature_hits
+
+    seen = {(hit.feature.name, id(hit.owner)) for hit in hits}
+    extra = []
+    for hit in more:
+        key = (hit.feature.name, id(hit.owner))
+        if key not in seen:
+            seen.add(key)
+            extra.append(hit)
+    return _sort_feature_hits(hits + extra) if extra else hits
+
+
+def real_features_along_ray(
+    root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
+) -> List['OwnedFeatureHit']:
+    """Every feature on the boundary anywhere under the pointer, at any depth.
+
+    For an orthographic view, where everything along the ray is drawn at one place on the
+    sheet: there, a flank seen edge-on has its front edge and its back edge on one line, and
+    which of them the ray's first hit lands nearer to is chance -- so whichever it was, the
+    other was no candidate at all.
+
+    Found where the ray meets each declared face's plane, and where it passes within the edge
+    tolerance of each declared edge or corner -- kept where that is on the boundary -- and then
+    everything at those places, derived features included. At the edge tolerance throughout,
+    since this is a screen-space question: what is within a few pixels of the pointer.
+    """
+    from kumiki.csg.cutcsg import FeatureTestTolerances, csg_children
+    from kumiki.geometry import Line, Plane, Point
+
+    origin, direction = local_ray
+    direction = unit_or_none(direction)
+    if direction is None:
+        return []
+    near = float(tolerances.edge)
+    places: List[List[float]] = []
+
+    def consider(feature: 'CSGFeature', owner: 'CutCSG') -> None:
+        located = feature.locate_simple_unbounded(owner)
+        if isinstance(located, Plane):
+            at = _ray_meets_plane(origin, direction, located)
+        elif isinstance(located, Line):
+            extent = feature.get_extent(owner)
+            at = (ray_nears_segment(origin, direction, (_floats3(extent.ends[0]), _floats3(extent.ends[1])), near)
+                  if extent is not None and extent.ends is not None else None)
+        elif isinstance(located, Point):
+            position = _floats3(located.position)
+            along = sum((position[i] - origin[i]) * direction[i] for i in range(3))
+            closest = [origin[i] + direction[i] * along for i in range(3)]
+            at = position if math.dist(position, closest) <= near else None
+        else:
+            at = None
+        if at is not None:
+            places.append(at)
+
+    def walk(node: 'CutCSG') -> None:
+        for feature in node.get_declared_features():
+            if feature.real:
+                consider(feature, node)
+        for child in csg_children(node):
+            walk(child)
+
+    walk(root)
+    snap = FeatureTestTolerances(face=near, edge=near, point=max(near, float(tolerances.point)))
+    found: List['OwnedFeatureHit'] = []
+    for place in places:
+        if root.is_point_on_boundary(to_v3(place), eps=near):
+            found = _merge_hits(found, root.find_all_features(to_v3(place), snap))
+    return found
+
+
+def _ray_meets_plane(origin: List[float], direction: List[float], plane: Any) -> Optional[List[float]]:
+    """Where the ray crosses *plane*, or None if it runs along it or the plane is behind it."""
+    normal, at = _floats3(plane.normal), _floats3(plane.point)
+    facing = sum(direction[i] * normal[i] for i in range(3))
+    if abs(facing) < 1e-9:
+        return None
+    along = sum((at[i] - origin[i]) * normal[i] for i in range(3)) / facing
+    return None if along < 0 else [origin[i] + direction[i] * along for i in range(3)]
 
 
 def merge_ray_hits(
@@ -559,9 +645,11 @@ def non_real_features_along_ray(
 ) -> List['OwnedFeatureHit']:
     """Non-real features the ray passes close to, in timber-local space.
 
-    ONLY non-real ones. A real feature is on the boundary, so the ray's own hit
-    point already found it; sweeping the whole ray for those would light
-    everything behind what was clicked, which is the opposite of picking.
+    ONLY non-real ones. A real feature is on the boundary, so in the 3D view the
+    ray's own hit point already found it, and sweeping the whole ray would light
+    everything behind what was clicked. A drawing's view does sweep for them --
+    see real_features_along_ray -- since there everything under the pointer is
+    drawn in one place.
 
     Bounded by the feature's own extent rather than the infinite line it locates
     to: a bore's axis is an endless line, and without this a peg hole could be
@@ -615,7 +703,14 @@ def unit_or_none(vector: List[float]) -> Optional[List[float]]:
 def ray_reaches_segment(
     origin: List[float], direction: List[float], ends: Tuple[List[float], List[float]], tolerance: float,
 ) -> bool:
-    """Whether the ray passes within *tolerance* of the segment between *ends*.
+    """Whether the ray passes within *tolerance* of the segment between *ends*."""
+    return ray_nears_segment(origin, direction, ends, tolerance) is not None
+
+
+def ray_nears_segment(
+    origin: List[float], direction: List[float], ends: Tuple[List[float], List[float]], tolerance: float,
+) -> Optional[List[float]]:
+    """The point of the segment between *ends* nearest the ray, if within *tolerance* of it.
 
     Plain floats throughout: this is a screen-space snap run on every hover, and
     it decides whether something is close enough to click -- not where anything
@@ -632,7 +727,7 @@ def ray_reaches_segment(
     segment = [float(ends[1][i]) - float(ends[0][i]) for i in range(3)]
     segment_length_sq = sum(c * c for c in segment)
     if segment_length_sq <= 0:
-        return False
+        return None
 
     to_origin = [float(origin[i]) - float(ends[0][i]) for i in range(3)]
     dot = lambda a, b: sum(a[i] * b[i] for i in range(3))
@@ -651,7 +746,7 @@ def ray_reaches_segment(
     along_ray = max(0.0, dot([on_segment[i] - float(origin[i]) for i in range(3)], direction))
     on_ray = [float(origin[i]) + direction[i] * along_ray for i in range(3)]
     gap = [on_segment[i] - on_ray[i] for i in range(3)]
-    return math.sqrt(dot(gap, gap)) <= tolerance
+    return on_segment if math.sqrt(dot(gap, gap)) <= tolerance else None
 
 
 def resolve_derived_feature(hits: List['OwnedFeatureHit']) -> Optional['CSGFeature']:
