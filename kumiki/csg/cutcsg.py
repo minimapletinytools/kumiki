@@ -3255,11 +3255,15 @@ class Cylinder(HasFeatures, CutCSG):
         )
 
 
+# TODO rename to PointOnCSGInfo
 class SolidsAtPoint:
-    """Where a point stands against a list of solids, worked out once.
+    """cached info about a point against a sequence of CSGs, the point asks of each CSG
 
-    Each solid is asked twice -- does it hold the point, and is the point on
-    its surface -- and every question below reads off that:
+
+    - contains_point
+    - is_point_on_boundary
+
+    thus we can answer the questions:
 
     - `any_holds`: does any of them hold the point at all?
     - `any_encloses`: does any hold it strictly inside, off its surface?
@@ -3267,9 +3271,6 @@ class SolidsAtPoint:
     - `outward_normals`: which way does each of those surfaces face?
     - `average_outward_normal`: which way do they face together?
     - `close_around_it`: do they leave the point no way out?
-
-    Every boolean node asked some of these of its children, each spelling out
-    its own loop over contains_point and is_point_on_boundary.
     """
 
     def __init__(
@@ -3703,14 +3704,8 @@ class Difference(CutCSG):
         return SolidsAtPoint(self.subtract, point, eps=eps).average_outward_normal(negated=True)
 
     def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
-        """On the base's surface: the base's normals, and the walls of any hole meeting it there.
-
-        A hole's face lying along one of the base's adds nothing (a cut's end flush with the
-        base's face); any other is a wall. Without the walls, the edge where a hole leaves the
-        base's face read as that face alone, and a Difference over this one took the edge for
-        a cut flush with its own face and removed it -- a dovetail tongue whose ends are flush
-        with its timber lost its outline there.
-        """
+        """On the base's boundary: the base's normals, plus the negated normals of the subtracts
+        whose surface passes through the point, except those parallel to a base normal."""
         if not self.base.is_point_on_boundary(point, eps=eps):
             return super().get_outward_normals(point, eps=eps)
         base_normals = list(self.base.get_outward_normals(point, eps=eps))
