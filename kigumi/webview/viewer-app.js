@@ -3314,18 +3314,49 @@ class KigumiViewerApp extends LitElement {
     /** Right-click on a measurement in a list: a deleted one can be put back. */
     showMeasurementContextMenu({ viewportId, measureKey, clientX, clientY }) {
         const found = this.focusedMeasurement(viewportId, measureKey);
-        if (!found || !KigumiMeasurements.isDeleted(found.measure)) {
+        if (!found) {
             return false;
         }
+        const deleted = KigumiMeasurements.isDeleted(found.measure);
+        const item = this._measurementForCopy(viewportId, found);
         this.contextMenu.open({
             x: clientX,
             y: clientY,
-            title: t('viewer.contextMenu.deletedMeasurement'),
-            items: [{ id: 'restore', label: t('viewer.contextMenu.putBack') }],
-            onChoose: () => this.restoreMeasurement(viewportId, measureKey),
+            title: deleted ? t('viewer.contextMenu.deletedMeasurement') : item.between,
+            items: [
+                ...this._copyMenuItems(),
+                ...(deleted ? [{ id: 'restore', label: t('viewer.contextMenu.putBack') }] : []),
+            ],
+            onChoose: (id) => this._copyFromMenu(id, item) || this.restoreMeasurement(viewportId, measureKey),
         });
         this.requestUpdate();
         return true;
+    }
+
+    /** A measurement, as selection-copy.js's itemLines takes it. */
+    _measurementForCopy(viewportId, found) {
+        const { measure, status } = found;
+        const named = (anchor) => (anchor && anchor.feature) || (anchor && anchor.timber) || '?';
+        const scene = this.sceneStore.activeScene();
+        const value = status && status.drawable && status.value
+            ? (status.value.unit === 'angle'
+                ? `${Number(status.value.value).toFixed(3)} degrees`
+                : `${Number(status.value.value)} m`)
+            : null;
+        return {
+            kind: 'measurement',
+            drawing: viewportId ? ((scene && (scene.name || scene.id)) || null) : '3D',
+            viewport: viewportId || null,
+            between: `${named(measure.a)} / ${named(measure.b)}`,
+            anchors: [measure.a, measure.b].map((anchor) => ({
+                describes: describeAnchor(anchor),
+                reference: KigumiMeasurements.anchorReference(anchor),
+            })),
+            measureKind: measure.kind || null,
+            value,
+            origin: measure.origin || null,
+            refused: status && !status.drawable ? status.reason || null : null,
+        };
     }
 
     /**
@@ -7266,6 +7297,9 @@ class KigumiViewerApp extends LitElement {
             host.addEventListener('kigumi-measurement-contextmenu', (event) => {
                 this.showMeasurementContextMenu(event.detail || {});
             });
+            host.addEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
+            // No browser menu (cut, copy, paste) over the panel: its rows open their own.
+            host.addEventListener('contextmenu', (event) => event.preventDefault());
             host.addEventListener('kigumi-select-drawing-member', (event) => {
                 this.selectionManager.selectTimber(
                     event.detail.memberKey, event.detail.addToSelection,

@@ -603,16 +603,17 @@
             if (deleted) {
                 // Greyed, and put back from a right-click: it is the code's, deleted in the file.
                 name.title = t('viewer.drawing.deleted');
-                row.addEventListener('contextmenu', (event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    this._emit('kigumi-measurement-contextmenu', {
-                        viewportId: measure.viewportId || null,
-                        measureKey: globalScope.KigumiMeasurements.measurementKey(measure),
-                        clientX: event.clientX, clientY: event.clientY,
-                    });
-                });
             }
+            // Copied for an assistant from a right-click, and put back from one if deleted.
+            row.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                this._emit('kigumi-measurement-contextmenu', {
+                    viewportId: measure.viewportId || null,
+                    measureKey: globalScope.KigumiMeasurements.measurementKey(measure),
+                    clientX: event.clientX, clientY: event.clientY,
+                });
+            });
             return row;
         }
 

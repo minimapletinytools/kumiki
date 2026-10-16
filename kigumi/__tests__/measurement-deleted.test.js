@@ -54,10 +54,10 @@ describe('a deleted measurement', () => {
         }]);
     });
 
-    test('one that is not deleted has its value and no menu', () => {
+    test('one that is not deleted has its value, and a menu only to copy it', () => {
         const { row } = rowFor('code');
         expect(row.className).not.toContain('dp-deleted');
         expect(row.children[2].textContent).toBe('12mm');
-        expect(row.handles('contextmenu')).toBe(false);
+        expect(row.handles('contextmenu')).toBe(true);
     });
 });

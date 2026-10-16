@@ -256,15 +256,13 @@
             row.addEventListener('click', () => this._emit('kigumi-focus-measurement', {
                 viewportId: viewport.id, measureKey: entry.key,
             }));
-            if (deleted) {
-                row.addEventListener('contextmenu', (event) => {
-                    event.preventDefault();
-                    this._emit('kigumi-measurement-contextmenu', {
-                        viewportId: viewport.id, measureKey: entry.key,
-                        clientX: event.clientX, clientY: event.clientY,
-                    });
+            row.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                this._emit('kigumi-measurement-contextmenu', {
+                    viewportId: viewport.id, measureKey: entry.key,
+                    clientX: event.clientX, clientY: event.clientY,
                 });
-            }
+            });
             return row;
         }
 
@@ -278,6 +276,12 @@
                 row.addEventListener('click', (event) => this._emit('kigumi-select-drawing-member', {
                     memberKey: member.key, addToSelection: Boolean(event.shiftKey),
                 }));
+                row.addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                    this._emit('kigumi-member-contextmenu', {
+                        memberKey: member.key, clientX: event.clientX, clientY: event.clientY,
+                    });
+                });
                 return row;
             });
         }

@@ -80,14 +80,33 @@ describe('what is copied', () => {
                 .toBe('joint free_dovetail#3\n');
         });
 
-        test('or with details: what the node is, what made it, and the features it names', () => {
+        test('or with details: what the node is and what made it, but not every feature it names', () => {
             const text = describeSelection({ sourceFile: 'patterns/sawhorse.py', frameName: 'Sawhorse', item: csg, detailed: true });
 
             expect(text).toContain('frame "Sawhorse" in patterns/sawhorse.py');
             expect(text).toContain('- "dovetail" (loft) on timber "beam" (member key beam#0)');
             expect(text).toContain('path: beam \u203a free_dovetail#3 \u203a dovetail');
             expect(text).toContain('joint: free_dovetail');
-            expect(text).toContain('feature: dovetail_neck×dovetail_right_flank (edge)');
+            expect(text).not.toContain('dovetail_neck×dovetail_right_flank');
+        });
+
+        test('a measurement names its drawing and ends, and in detail what each end refers to', () => {
+            const measurement = {
+                kind: 'measurement', drawing: '3D', viewport: null, between: 'rptw.front / dovetail_neck',
+                anchors: [
+                    { describes: 'beam > rptw.front', reference: { timber: 'beam', csgPath: [], feature: 'rptw.front' } },
+                    { describes: 'beam > free_dovetail#3 > dovetail > dovetail_neck', reference: null },
+                ],
+                measureKind: 'distance', value: '0.0254 m', origin: 'file', refused: null,
+            };
+
+            expect(describeSelection({ sourceFile: 'sawhorse.py', item: measurement }))
+                .toBe('sawhorse.py \u203a drawing 3D \u203a measurement rptw.front / dovetail_neck\n');
+            const text = describeSelection({ item: measurement, detailed: true });
+            expect(text).toContain('value: 0.0254 m');
+            expect(text).toContain('from: beam > rptw.front');
+            expect(text).toContain('reference: {"timber":"beam","csgPath":[],"feature":"rptw.front"}');
+            expect(text).toContain('to: beam > free_dovetail#3 > dovetail > dovetail_neck');
         });
 
         test('a tag lists who wears it', () => {

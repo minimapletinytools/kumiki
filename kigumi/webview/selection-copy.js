@@ -82,13 +82,19 @@
         if (item.kind === 'joint') {
             return `joint ${item.name}`;
         }
+        if (item.kind === 'measurement') {
+            return [item.drawing ? `drawing ${item.drawing}` : null, item.viewport,
+                `measurement ${item.between}`].filter(Boolean).join(ARROW);
+        }
         return `tag ${item.tagKind}:${item.name}`;
     }
 
     /**
-     * A row of the layers tree, in full. `item` is one of {kind: 'member', member} (as
+     * A row of the layers tree, in full -- though not a node's features, which run to dozens. `item` is one of {kind: 'member', member} (as
      * memberLines takes), {kind: 'csg', timberName, memberKey, path, node} (the tree's node),
-     * {kind: 'joint', name, timbers}, {kind: 'tag', tagKind, name, members}.
+     * {kind: 'joint', name, timbers}, {kind: 'tag', tagKind, name, members}, or {kind:
+     * 'measurement', drawing, viewport, between, anchors: [{describes, reference}], measureKind,
+     * value, origin, refused}.
      */
     function itemLines(item) {
         if (item.kind === 'member') {
@@ -101,13 +107,21 @@
                 + ` (member key ${item.memberKey})`, `  path: ${qualifiedName(item)}`];
             if (node.role) lines.push(`  role: ${node.role === 'cut' ? 'cut away' : node.role}`);
             if (node.jointName) lines.push(`  joint: ${node.jointName}`);
-            for (const feature of node.features || []) {
-                lines.push(`  feature: ${feature.name} (${String(feature.type || '').toLowerCase()})`);
-            }
             return lines;
         }
         if (item.kind === 'joint') {
             return [`- Joint "${item.name}"`, `  timbers: ${(item.timbers || []).join(', ') || 'none'}`];
+        }
+        if (item.kind === 'measurement') {
+            const lines = [`- Measurement ${qualifiedName(item)}`];
+            if (item.measureKind) lines.push(`  kind: ${typeof item.measureKind === 'string' ? item.measureKind : JSON.stringify(item.measureKind)}`);
+            lines.push(`  value: ${item.value || (item.refused ? `not drawn (${item.refused})` : 'not drawn')}`);
+            if (item.origin) lines.push(`  origin: ${item.origin}`);
+            (item.anchors || []).forEach((anchor, index) => {
+                lines.push(`  ${index ? 'to' : 'from'}: ${anchor.describes}`);
+                if (anchor.reference) lines.push(`    reference: ${JSON.stringify(anchor.reference)}`);
+            });
+            return lines;
         }
         return [`- Tag ${item.tagKind}:${item.name}`, `  members: ${(item.members || []).join(', ') || 'none'}`];
     }
