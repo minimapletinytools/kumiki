@@ -93,20 +93,50 @@ def test_nearest_the_viewer_comes_first(picked, offset):
     labels = picked(offset, "projected")
 
     assert labels[0] == FRONT
-    assert labels.index("rptw.right") < labels.index(BACK)
-    assert labels[-1] == "rptw.left"
+    assert labels.index(FRONT) < labels.index(BACK)
 
 
-def test_two_features_named_alike_are_each_their_own(picked):
-    # The dovetails either side of the beam line up from here, and each has a dovetail_wide_face.
-    # Choosing one used to answer with the first by name, whichever was asked for.
+def test_whichever_candidate_is_chosen_is_the_one_answered(picked):
+    # Settled once and read for everything: of two named alike (a dovetail_wide_face on each of
+    # two dovetails) the first used to answer for both.
     candidates = picked(0.0004, "projected", candidateIndex=0)["candidates"]
-    alike = [index for index, candidate in enumerate(candidates) if candidate["label"] == "dovetail_wide_face"]
-    assert len(alike) == 2
-    assert candidates[alike[0]]["path"] != candidates[alike[1]]["path"]
 
-    chosen = [picked(0.0004, "projected", candidateIndex=index) for index in alike]
+    for index, candidate in enumerate(candidates):
+        chosen = picked(0.0004, "projected", candidateIndex=index)
+        assert (chosen["candidateIndex"], chosen["featureLabel"]) == (index, candidate["label"])
 
-    assert [result["candidateIndex"] for result in chosen] == alike
-    assert [result["path"] for result in chosen] == [candidates[index]["path"] for index in alike]
-    assert chosen[0]["geometry"] != chosen[1]["geometry"]
+
+def test_a_drawing_offers_no_face_it_cannot_measure(picked):
+    # The beam's faces and the socket floors are areas from here; the flank is edge-on, but its
+    # edges lie on the same line and measure the same.
+    labels = picked(0.0004, "projected")
+
+    assert labels and all("×" in label for label in labels)
+
+
+def test_the_3d_view_keeps_its_faces(picked):
+    assert "dovetail_wide_face" in picked(0.0004, "3d")
+
+
+def test_a_cylinder_cap_seen_edge_on_is_kept_and_a_face_beside_its_edge_is_not():
+    from kumiki import picking
+    from kumiki.csg.cutcsg import (CSGFeatureType, Cylinder, OwnedFeatureHit, RectangularPrism, END_CAP,
+                                   PrismFace, prism_arris_key, prism_face_key)
+    from kumiki.rule import create_v2, create_v3, scalar
+
+    peg = Cylinder(axis_direction=create_v3(1, 0, 0), radius=scalar(1), start_distance=scalar(0), end_distance=scalar(5))
+    cap = next(f for f in peg.get_declared_features() if f.feature_key() == END_CAP)
+    box = RectangularPrism(size=create_v2(2, 2), start_distance=scalar(0), end_distance=scalar(4))
+    right = next(f for f in box.get_declared_features() if f.feature_key() == prism_face_key(PrismFace.RIGHT))
+    arris = next(f for f in box.get_declared_features() if f.feature_key() == prism_arris_key(PrismFace.RIGHT, PrismFace.FRONT))
+    front = next(f for f in box.get_declared_features() if f.feature_key() == prism_face_key(PrismFace.FRONT))
+    hits = [OwnedFeatureHit(feature=feature, owner=owner)
+            for feature, owner in ((cap, peg), (right, box), (arris, box), (front, box))]
+    assert cap.feature_type() is CSGFeatureType.FACE
+
+    # Looking along y: the peg's cap (normal x) and the box's right face are edge-on, its front is not.
+    kept = [hit.feature for hit in picking.measurable_in_view(hits, [0.0, 1.0, 0.0], 1e-3)]
+
+    assert cap in kept and arris in kept
+    assert right not in kept  # the arris in its plane measures the same
+    assert front not in kept  # an area from here

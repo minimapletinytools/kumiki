@@ -5553,12 +5553,13 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     feature_type = None
     declared_edge = None
     from kumiki.drawings.drawing import MeasurementSpace
+    in_drawing = _pick_space(payload) is MeasurementSpace.PROJECTED
     feature_hits = features_at_point(
         local_csg, local_pt, eps, tolerances,
         local_ray=_local_ray_from_payload(payload, timber_rot, timber_pos),
         # In a drawing's view everything under the pointer is drawn at one place, at whatever
         # depth; the 3D view picks the surface the pointer is on.
-        whole_ray=_pick_space(payload) is MeasurementSpace.PROJECTED,
+        whole_ray=in_drawing,
     )
     edge = resolve_derived_feature(feature_hits) if feature_label is not None else None
 
@@ -5576,6 +5577,11 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     if candidate_index is None:
         candidate_index = _best_matching_candidate(
             feature_hits, timber, held_geometry, look, payload)
+    if candidate_index is None and in_drawing and not ctrl_click and feature_hits:
+        # In a drawing the candidates are already in the order a click should take them --
+        # nearest first, and only what the view can measure -- so the first is the answer,
+        # rather than whatever face the walk down the tree happened to stop at.
+        candidate_index = 0
     picked = None
     # The candidate this answer is, settled once by whichever branch chooses it, and then read
     # for the geometry and the menu's active row alike. Looked up again by name afterwards, two
