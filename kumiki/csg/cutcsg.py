@@ -87,6 +87,7 @@ class FeatureCategory(Enum):
     ARRIS = 2   # every arris, in one run -- see below
     CORNER = 3  # every corner, in one run -- see below
     AXIS = 4    # a cylinder's axis
+    EXTRA = 5   # n = the nth of a primitive's extra_features, for one that is its own carrier (PlaneFeature)
 
     # ARRIS and CORNER each number all of their kind together rather than
     # splitting by which end they belong to. For a shape with s sides:
@@ -1436,61 +1437,102 @@ class PrismCenterplaneFeature(FaceFeature):
 
 
 
+def _plane_extent(owner: 'CutCSG', plane: Optional[Plane]) -> Optional[CSGFeatureExtent]:
+    """Where *plane* crosses a RectangularPrism *owner*, for one that runs along its length."""
+    if plane is None or not isinstance(owner, RectangularPrism):
+        return None
+    width_dir, height_dir, length_dir = owner._local_axes()
+    middle = owner.transform.position + length_dir * _finite_midpoint(owner.start_distance, owner.end_distance)
+    centre = middle - plane.normal * safe_dot_product(middle - plane.point, plane.normal)
+    if owner.start_distance is None or owner.end_distance is None:
+        return CSGFeatureExtent(anchor=centre)
+    across = safe_normalize_vector(cross_product(plane.normal, length_dir))
+    half_across = (Abs(safe_dot_product(across, width_dir)) * owner.size[0]
+                   + Abs(safe_dot_product(across, height_dir)) * owner.size[1]) / 2
+    half_length = (owner.end_distance - owner.start_distance) / 2
+    corners = tuple(centre + across * (half_across * scalar(a)) + length_dir * (half_length * scalar(b))
+                    for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1)))
+    return CSGFeatureExtent(anchor=centre, region=_face_region(plane.normal, corners))
+
+
 @dataclass(frozen=True)
-class PrismParallelPlaneFeature(FaceFeature):
-    """A plane inside a RectangularPrism, parallel to one of its long faces. Not real by default.
+class PlaneFeature(FaceFeature):
+    """A plane of its own on a primitive, and its own carrier: an unknown the solver measures to.
 
-    `distance` is how far it sits from the prism's axis toward `face`, so `face` at half the
-    prism's size is that face's own plane and 0 is the centerplane. Placed by the owner's own
-    transform, so it moves with the prism wherever the prism is adopted.
-
-    For geometry that belongs inside a body without being on it: a timber's perfect faces and
-    centerplanes, carried by its rough prism.
+    `normal` . x = `offset`, in the owner's own frame (before its transform), so it moves with the
+    owner wherever the owner is adopted. An extra feature only: its carrier is keyed by its place in
+    the owner's extra_features (FeatureCategory.EXTRA). Not real by default.
     """
-    face: PrismFace = PrismFace.RIGHT
-    distance: Numeric = scalar(0)
+    normal: Tuple[Numeric, Numeric, Numeric] = (scalar(1), scalar(0), scalar(0))
+    offset: Numeric = scalar(0)
     properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(real=False))
 
-    def __post_init__(self):
-        if self.face in (PrismFace.TOP, PrismFace.BOTTOM):
-            raise ValueError(f"{self.name!r}: parallel to a long face, not {self.face.name}")
-
-    def _frame(self, owner: 'RectangularPrism') -> Tuple[Direction3D, Direction3D, V3]:
-        """(normal, the other cross-section axis, a point on the plane at mid-length), in the owner's space."""
-        width_dir, height_dir, length_dir = owner._local_axes()
-        normal, across = {
-            PrismFace.RIGHT: (width_dir, height_dir), PrismFace.LEFT: (-width_dir, height_dir),
-            PrismFace.FRONT: (height_dir, width_dir), PrismFace.BACK: (-height_dir, width_dir),
-        }[self.face]
-        middle = owner.transform.position + length_dir * _finite_midpoint(owner.start_distance, owner.end_distance)
-        return normal, across, middle + normal * self.distance
-
     def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
-        if not isinstance(owner, RectangularPrism):
-            return None
-        normal, _, point = self._frame(owner)
-        return Plane(normal=normal, point=point)
+        transform = getattr(owner, "transform", None)
+        normal = create_v3(*self.normal)
+        point = normal * self.offset
+        if transform is None:
+            return Plane(normal=normal, point=point)
+        return Plane(normal=safe_transform_vector(transform.orientation.matrix, normal),
+                     point=transform.local_to_global(point))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Where the plane crosses the prism, when the prism has both ends."""
-        if not isinstance(owner, RectangularPrism):
-            return None
-        normal, across, centre = self._frame(owner)
-        if owner.start_distance is None or owner.end_distance is None:
-            return CSGFeatureExtent(anchor=centre)
-        half_across = owner.size[1 if self.face in (PrismFace.RIGHT, PrismFace.LEFT) else 0] / 2
-        half_length = (owner.end_distance - owner.start_distance) / 2
-        _, _, length_dir = owner._local_axes()
-        corners = tuple(centre + across * (half_across * scalar(a)) + length_dir * (half_length * scalar(b))
-                        for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1)))
-        return CSGFeatureExtent(anchor=centre, region=_face_region(normal, corners))
+        return _plane_extent(owner, self.locate_simple_unbounded(owner))
+
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        extras = getattr(owner, "extra_features", ())
+        index = next((i for i, extra in enumerate(extras) if extra.name == self.name), None)
+        return None if index is None else (CarrierRef(owner, (FeatureCategory.EXTRA, index)),)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        if not isinstance(owner, RectangularPrism):
-            return False
-        x, y, _ = owner._local_coords(point)
-        along = {PrismFace.RIGHT: x, PrismFace.LEFT: -x, PrismFace.FRONT: y, PrismFace.BACK: -y}[self.face]
-        return safe_equality_test(along, self.distance, eps=test_tolerance)
+        plane = self.locate_simple_unbounded(owner)
+        return plane is not None and safe_equality_test(
+            safe_dot_product(point - plane.point, plane.normal), 0, eps=test_tolerance)
+
+
+@dataclass(frozen=True)
+class MidplaneFeature(FaceFeature):
+    """The plane midway between two of its owner's planes, named in `between`. Not real by default.
+
+    Solved as the midplane of theirs, so knowing both solves it: it is no unknown of its own.
+    """
+    between: Tuple[str, str] = ("", "")
+    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(real=False))
+
+    def _sides(self, owner: 'CutCSG') -> Optional[Tuple['CSGFeature', 'CSGFeature']]:
+        named = {feature.name: feature for feature in owner.get_declared_features()}
+        first, second = (named.get(name) for name in self.between)
+        return None if first is None or second is None else (first, second)
+
+    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
+        sides = self._sides(owner)
+        if sides is None:
+            return None
+        first, second = (side.locate_simple_unbounded(owner) for side in sides)
+        if not isinstance(first, Plane) or not isinstance(second, Plane):
+            return None
+        return Plane(normal=first.normal, point=(first.point + second.point) / 2)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        return _plane_extent(owner, self.locate_simple_unbounded(owner))
+
+    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
+        sides = self._sides(owner)
+        if sides is None:
+            return None
+        first, second = (side.solve_recipe(owner) for side in sides)
+        if first is None or second is None or len(first) != 1 or len(second) != 1:
+            return None
+        front, back = first[0], second[0]
+        if not isinstance(front, CarrierRef) or not isinstance(back, CarrierRef):
+            return None
+        return (Midplane(front=front, back=back),)
+
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        plane = self.locate_simple_unbounded(owner)
+        return plane is not None and safe_equality_test(
+            safe_dot_product(point - plane.point, plane.normal), 0, eps=test_tolerance)
+
 
 def _canonical_ordering_arris_faces(
     first: 'PrismFace', second: 'PrismFace',
@@ -2302,7 +2344,8 @@ class HasFeatures:
 
 
 def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
-    """A plane for each default face of `csg` that has one, keyed like the face."""
+    """A plane for each default face of `csg` that has one, keyed like the face; and one for each
+    extra PlaneFeature, keyed by its place among the extras (FeatureCategory.EXTRA)."""
     carriers: Dict[FeatureKey, Carrier] = {}
     for key, feature in csg.default_features().items():
         if not isinstance(feature, FaceFeature):
@@ -2310,6 +2353,11 @@ def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
         plane = feature.locate_simple_unbounded(cast(CutCSG, csg))
         if plane is not None:
             carriers[key] = CarrierPlane(plane)
+    for index, extra in enumerate(csg.extra_features):
+        if isinstance(extra, PlaneFeature):
+            plane = extra.locate_simple_unbounded(cast(CutCSG, csg))
+            if plane is not None:
+                carriers[(FeatureCategory.EXTRA, index)] = CarrierPlane(plane)
     return carriers
 
 

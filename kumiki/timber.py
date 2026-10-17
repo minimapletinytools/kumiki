@@ -818,21 +818,13 @@ class PerfectTimberWithin(ABC):
 
     @final
     def get_extended_rough_csg_with_perfect_features_local(
-            self,
-            right: bool = False,
-            left: bool = False,
-            front: bool = False,
-            back: bool = False,
-            centerplane_left_right: bool = False,
-            centerplane_front_back: bool = False,
-            extend_bot: bool = False,
-            extend_top: bool = False,
-    ) -> CutCSG:
-        """The rough body (get_extended_actual_csg_local), carrying the perfect timber within's
-        long faces and centerplanes asked for, as non-real features named ptw.*.
+            self, extend_bot: bool = False, extend_top: bool = False) -> CutCSG:
+        """The rough body (get_extended_actual_csg_local), carrying every perfect plane it lacks:
+        the drawn timber, and the one its features are solved on.
 
-        So the perfect timber can be measured from on the body that is rendered. A long face
-        lying on a rough face is not added: that rough face is already rptw.*, the perfect one.
+        A long face lying on a rough face is already that face, named rptw.*. Every other one is
+        added as a PlaneFeature named ptw.* -- its own carrier, so the solver measures to it -- and
+        both centerplanes as MidplaneFeatures between whichever planes are the perfect ones.
 
         Raises NotImplementedError for a timber whose rough body is not a rectangular prism.
         """
@@ -841,32 +833,31 @@ class PerfectTimberWithin(ABC):
             raise NotImplementedError(
                 f"{type(self).__name__}'s rough body is a {type(rough).__name__}; perfect features are "
                 "only carried by a rectangular one")
-        # Distances are from the rough prism's axis, which sits off the perfect one's by its offset.
+        # In the rough prism's own frame, whose axis sits off the perfect one's by its offset.
         width_dir, height_dir, _ = rough._local_axes()
         offset_x = safe_dot_product(rough.transform.position, width_dir)
         offset_y = safe_dot_product(rough.transform.position, height_dir)
         half_width, half_height = self.size[0] / scalar(2), self.size[1] / scalar(2)
-        faces = [
-            (right, TimberFace.RIGHT, half_width - offset_x),
-            (left, TimberFace.LEFT, half_width + offset_x),
-            (front, TimberFace.FRONT, half_height - offset_y),
-            (back, TimberFace.BACK, half_height + offset_y),
+        one, zero = scalar(1), scalar(0)
+        planes = [
+            (TimberFace.RIGHT, (one, zero, zero), half_width - offset_x),
+            (TimberFace.LEFT, (-one, zero, zero), half_width + offset_x),
+            (TimberFace.FRONT, (zero, one, zero), half_height - offset_y),
+            (TimberFace.BACK, (zero, -one, zero), half_height + offset_y),
         ]
         perfect = FeatureProperties(group=FeatureGroup.PERFECT, real=False)
-        added: List[CSGFeature] = [
-            PrismParallelPlaneFeature(name=PTW_FACE_PREFIX + face.name.lower(), face=PrismFace(face.value),
-                                      distance=distance, properties=perfect)
-            for wanted, face, distance in faces
-            if wanted and not self.is_face_perfect(face)
-        ]
-        if centerplane_left_right:
-            added.append(PrismParallelPlaneFeature(
-                name=PTW_FACE_PREFIX + "centerplane_left_right", face=PrismFace.RIGHT, distance=-offset_x))
-        if centerplane_front_back:
-            added.append(PrismParallelPlaneFeature(
-                name=PTW_FACE_PREFIX + "centerplane_front_back", face=PrismFace.FRONT, distance=-offset_y))
-        if not added:
-            return rough
+        added: List[CSGFeature] = []
+        named: Dict[TimberFace, str] = {}
+        for face, normal, offset in planes:
+            if self.is_face_perfect(face):
+                named[face] = RPTW_FACE_PREFIX + face.name.lower()
+            else:
+                named[face] = PTW_FACE_PREFIX + face.name.lower()
+                added.append(PlaneFeature(name=named[face], normal=normal, offset=offset, properties=perfect))
+        added.append(MidplaneFeature(name=PTW_FACE_PREFIX + "centerplane_left_right",
+                                     between=(named[TimberFace.RIGHT], named[TimberFace.LEFT])))
+        added.append(MidplaneFeature(name=PTW_FACE_PREFIX + "centerplane_front_back",
+                                     between=(named[TimberFace.FRONT], named[TimberFace.BACK])))
         return dataclass_replace(rough, extra_features=tuple(rough.extra_features) + tuple(added))
 
     def rough_face_tags(self) -> Tuple[FeatureOverride, ...]:
