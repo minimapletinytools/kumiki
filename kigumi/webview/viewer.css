@@ -239,6 +239,14 @@ canvas { display: block; width: 100%; height: 100%; }
     opacity: 0.85;
 }
 
+.dp-chev {
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+    user-select: none;
+    flex-shrink: 0;
+}
+
 .dp-row {
     display: flex;
     align-items: center;
@@ -247,10 +255,28 @@ canvas { display: block; width: 100%; height: 100%; }
     cursor: pointer;
 }
 
+.dp-section-header:hover,
+.dp-row:hover {
+    background: var(--hv-layers-hover-bg);
+}
+
 .dp-viewport {
     padding-left: 14px;
     opacity: 0.8;
+    cursor: pointer;
+    user-select: none;
+}
+
+.dp-viewport.dp-viewport-empty {
     cursor: default;
+}
+
+.dp-viewport.dp-viewport-empty:hover {
+    background: transparent;
+}
+
+.dp-measurement {
+    padding-left: 28px;
 }
 
 .dp-between {

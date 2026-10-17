@@ -39,6 +39,7 @@
             this.viewports = [];
             this.members = [];
             this.expanded = new Set(['section:viewports', 'section:members']);
+            this.collapsedViewports = new Set();
             this.collapsed = false;
         }
 
@@ -65,6 +66,11 @@
          * to that viewport's camera, which only the viewer knows.
          */
         setDrawing({ drawing, viewports, members, slice }) {
+            const nextDrawingId = (drawing && (drawing.id || drawing.name)) || null;
+            const currentDrawingId = (this.drawing && (this.drawing.id || this.drawing.name)) || null;
+            if (nextDrawingId !== currentDrawingId) {
+                this.collapsedViewports.clear();
+            }
             this.drawing = drawing || null;
             this.viewports = viewports || [];
             this.members = members || [];
@@ -81,13 +87,43 @@
             }
         }
 
+        _isViewportExpanded(viewportId) {
+            if (this.collapsedViewports.has(viewportId)) {
+                // If a measurement in this viewport is currently focused, reveal it.
+                if (this.selectionManager) {
+                    const viewport = this.viewports.find((v) => v.id === viewportId);
+                    const hasFocused = (viewport && viewport.measurements || []).some((m) =>
+                        this.selectionManager.isMeasurementFocused(viewportId, m.key));
+                    if (hasFocused) {
+                        this.collapsedViewports.delete(viewportId);
+                        return true;
+                    }
+                }
+                return false;
+            }
+            return true;
+        }
+
         _toggle(nodeId) {
-            if (this.expanded.has(nodeId)) {
-                this.expanded.delete(nodeId);
+            if (nodeId.startsWith('viewport:')) {
+                const viewportId = nodeId.slice('viewport:'.length);
+                if (this.collapsedViewports.has(viewportId)) {
+                    this.collapsedViewports.delete(viewportId);
+                } else {
+                    this.collapsedViewports.add(viewportId);
+                }
             } else {
-                this.expanded.add(nodeId);
+                if (this.expanded.has(nodeId)) {
+                    this.expanded.delete(nodeId);
+                } else {
+                    this.expanded.add(nodeId);
+                }
             }
             this._render();
+        }
+
+        toggleViewport(viewportId) {
+            this._toggle('viewport:' + viewportId);
         }
 
         _render() {
@@ -199,12 +235,35 @@
         _viewportRows() {
             const rows = [];
             for (const viewport of this.viewports) {
+                const nodeId = 'viewport:' + viewport.id;
+                const measurements = viewport.measurements || [];
+                const hasChildren = measurements.length > 0;
+                const open = this._isViewportExpanded(viewport.id);
+
                 const head = document.createElement('div');
-                head.className = 'dp-row dp-viewport';
-                head.textContent = viewport.id;
+                head.className = 'dp-row dp-viewport' + (hasChildren ? '' : ' dp-viewport-empty');
+
+                const chevron = document.createElement('span');
+                chevron.className = 'dp-chev' + (hasChildren ? '' : ' dp-leaf');
+                chevron.textContent = hasChildren ? (open ? '▾' : '▸') : '';
+                head.appendChild(chevron);
+
+                const label = document.createElement('span');
+                label.className = 'dp-viewport-label';
+                label.textContent = viewport.id;
+                head.appendChild(label);
+
+                if (hasChildren) {
+                    head.role = 'button';
+                    head.ariaExpanded = open ? 'true' : 'false';
+                    head.addEventListener('click', () => this._toggle(nodeId));
+                }
                 rows.push(head);
-                for (const entry of viewport.measurements || []) {
-                    rows.push(this._measurementRow(viewport, entry));
+
+                if (open) {
+                    for (const entry of measurements) {
+                        rows.push(this._measurementRow(viewport, entry));
+                    }
                 }
             }
             return rows;
