@@ -121,6 +121,16 @@ function describeAnchor(anchor) {
     return anchor.feature ? trail.concat(anchor.feature).join(' > ') : trail.join(' > ');
 }
 
+// A drawing's dotted lines: the perfect timber within inside rough stock, and centerplanes.
+const DRAWING_LINE_WIDTH_PX = 2;
+// In world units (metres), as LineMaterial dashes are: a dot is a dash shorter than the line is wide.
+const DRAWING_DOT = 0.0008;
+const DRAWING_DOT_GAP = 0.004;
+const PERFECT_TIMBER_LINE_COLOR = 0x2f6fd0;
+const CENTERPLANE_LINE_COLOR = 0xd0582f;
+// How square to the view a centerplane must be to be drawn: seen edge-on, it is a line.
+const EDGE_ON_DOT = 1e-3;
+
 // How strongly a selection shows in a drawing's views other than its own.
 const SELECTION_ECHO_OPACITY = 0.3;
 
@@ -1561,6 +1571,79 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    /**
+     * Lines only a drawing's views draw: the perfect timber within, dotted, where the rough stock
+     * is not it, and each centerplane, dotted in its own colour. See _showDrawingLinesFor.
+     *
+     * Hovering or selecting one of those planes lights it through the usual highlight, from the
+     * outline the runner sends for it (highlightEdgeSegments).
+     */
+    _drawingLinesFor(mesh) {
+        const materials = this._drawingLineMaterials();
+        const lines = [];
+        const add = (positions, material, normal) => {
+            const geometry = new THREE.LineSegmentsGeometry();
+            geometry.setPositions(positions);
+            const object = new THREE.LineSegments2(geometry, material);
+            object.computeLineDistances();
+            object.renderOrder = 11;
+            object.visible = false;
+            lines.push({ object, normal, option: normal ? 'showDrawingCenterplanes' : 'showDrawingPerfectFaces' });
+        };
+        if (mesh.perfectTimberWithinVertices && mesh.perfectTimberWithinIndices) {
+            const indexed = new THREE.BufferGeometry();
+            indexed.setAttribute('position', new THREE.Float32BufferAttribute(mesh.perfectTimberWithinVertices, 3));
+            indexed.setIndex(mesh.perfectTimberWithinIndices);
+            const flat = indexed.toNonIndexed();
+            const edges = new THREE.EdgesGeometry(flat, 25);
+            add(edges.attributes.position.array, materials.perfect, null);
+            edges.dispose();
+            flat.dispose();
+            indexed.dispose();
+        }
+        for (const centerplane of mesh.centerplanes || []) {
+            add(centerplane.positions, materials.centerplane, new THREE.Vector3(...centerplane.normal));
+        }
+        return lines;
+    }
+
+    /** The two dotted materials every member's drawing lines share, made once. */
+    _drawingLineMaterials() {
+        if (!this._drawingMaterials) {
+            const dotted = (color, dashSize, gapSize) => {
+                const material = new THREE.LineMaterial({
+                    color,
+                    linewidth: DRAWING_LINE_WIDTH_PX,
+                    resolution: this._getRendererResolution(),
+                    dashed: true,
+                    dashSize,
+                    gapSize,
+                    // Inside the rough stock, so drawn through it.
+                    depthTest: false,
+                });
+                // This LineMaterial dashes only with the define set; `dashed` alone does nothing.
+                material.defines.USE_DASH = '';
+                return material;
+            };
+            this._drawingMaterials = {
+                perfect: dotted(PERFECT_TIMBER_LINE_COLOR, DRAWING_DOT, DRAWING_DOT_GAP),
+                centerplane: dotted(CENTERPLANE_LINE_COLOR, DRAWING_DOT, DRAWING_DOT_GAP),
+            };
+        }
+        return this._drawingMaterials;
+    }
+
+    /** Drawing lines in a drawing's views only, as its options say, and a centerplane only where it is seen edge-on. */
+    _showDrawingLinesFor(viewport) {
+        const look = viewport.camera.getWorldDirection(this._drawingLook || (this._drawingLook = new THREE.Vector3()));
+        for (const bundle of this.sceneManager.bundles()) {
+            for (const line of bundle.drawingLines || []) {
+                line.object.visible = this.isInDrawing && Boolean(this[line.option])
+                    && (!line.normal || Math.abs(line.normal.dot(look)) < EDGE_ON_DOT);
+            }
+        }
+    }
+
     renderViewports() {
         if (!this.renderer || !this.scene) {
             return;
@@ -1583,6 +1666,7 @@ class KigumiViewerApp extends LitElement {
         this.renderer.setScissorTest(scissored);
         for (const viewport of this.viewports) {
             this._showHighlightsFor(viewport.id);
+            this._showDrawingLinesFor(viewport);
             const rect = viewport.pixelRect(pageRect, size.y);
             this.renderer.setViewport(rect.x, rect.y, rect.width, rect.height);
             if (scissored) {
@@ -2733,6 +2817,9 @@ class KigumiViewerApp extends LitElement {
             if (bundle.edges && bundle.edges.material) {
                 bundle.edges.material.resolution = resolution;
             }
+        }
+        for (const material of Object.values(this._drawingMaterials || {})) {
+            material.resolution = resolution;
         }
         // Every overlay, not only the selection's: the hover and held lines
         // had their own fields and were missed here, so they went thin on a
@@ -4473,7 +4560,7 @@ class KigumiViewerApp extends LitElement {
     _referenceSources() {
         const mode = this.referenceFeatures;
         const inDrawing = Boolean(this.selectionManager && this.selectionManager.inDrawing);
-        if (mode === 'never' || (mode === 'drawings' && !inDrawing)) {
+        if (mode === 'never' || (mode === 'drawings' && !inDrawing) || (inDrawing && !this.showDrawingReferenceFeatures)) {
             return [];
         }
         const drawn = this.activeSceneMembers;
@@ -6428,6 +6515,12 @@ class KigumiViewerApp extends LitElement {
                 cylinderSilhouette = { axisStart, axisEnd, radius, line: silhouetteLine };
             }
 
+            // Parented like the silhouette, so they follow the member's visibility and offset.
+            const drawingLines = this._drawingLinesFor(mesh);
+            for (const line of drawingLines) {
+                edgeMesh.add(line.object);
+            }
+
             this.scene.add(solidMesh);
             this.scene.add(edgeMesh);
             this.scene.add(reflectionMesh);
@@ -6444,6 +6537,7 @@ class KigumiViewerApp extends LitElement {
                 edges: edgeMesh,
                 reflection: reflectionMesh,
                 cylinderSilhouette,
+                drawingLines,
             });
             meshBuildMs += performance.now() - meshT0;
             processed += 1;
@@ -7365,6 +7459,13 @@ class KigumiViewerApp extends LitElement {
     /** Where reference features are lit: 'drawings', 'always' or 'never'. */
     setReferenceFeatures(mode) {
         if (this.displayOptions.set('referenceFeatures', mode)) {
+            this.requestUpdate();
+        }
+    }
+
+    /** One of a drawing's on/off options: showDrawingPerfectFaces, -Centerplanes, -ReferenceFeatures. */
+    setDrawingOption(option, enabled) {
+        if (this.displayOptions.set(option, Boolean(enabled))) {
             this.requestUpdate();
         }
     }

@@ -345,6 +345,12 @@ class CylinderAxisWire(TypedDict):
     radius: float
 
 
+class CenterplaneWire(TypedDict):
+    """A centerplane's outline across the perfect timber, in world space, for drawing it edge-on."""
+    normal: Vec3
+    positions: List[float]  # segment pairs, flat
+
+
 class MemberMeshWire(TypedDict, total=False):
     """One member's mesh and what the viewer shows about it. See _base_member_payload."""
     name: str
@@ -372,6 +378,7 @@ class MemberMeshWire(TypedDict, total=False):
     hasActualGeometryDifferentFromPerfect: bool
     perfectTimberWithinVertices: List[float]
     perfectTimberWithinIndices: List[int]
+    centerplanes: List[CenterplaneWire]
     perfectBoxNoJointsVertices: List[float]
     perfectBoxNoJointsIndices: List[int]
     roughBoxNoJointsVertices: List[float]
@@ -995,6 +1002,24 @@ def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> Tria
     }
 
 
+def _centerplane_outlines(timber: 'PerfectTimberWithin') -> List[CenterplaneWire]:
+    """Each centerplane as the rectangle it cuts across the perfect timber, in world space.
+
+    Seen edge-on, which is the only way a drawing shows one, the rectangle is the centerline.
+    """
+    from kumiki.geometry import Plane
+    from kumiki.rule import create_v3
+    from kumiki.viewer.picking import plane_outline_segments
+
+    outlines: List[CenterplaneWire] = []
+    for normal in (create_v3(1, 0, 0), create_v3(0, 1, 0)):
+        segments = plane_outline_segments(Plane(normal=normal, point=create_v3(0, 0, 0)), timber) or []
+        positions = [float(v) for segment in segments for v in (*segment["start"], *segment["end"])]
+        direction = timber.transform.local_to_global_direction(normal)
+        outlines.append({"normal": [float(v) for v in direction], "positions": positions})
+    return outlines
+
+
 def _base_member_payload(
     *,
     name: str,
@@ -1124,6 +1149,17 @@ def _cut_timber_to_triangle_mesh_payload(
             payload["hasActualGeometryDifferentFromPerfect"] = False
     else:
         payload["hasActualGeometryDifferentFromPerfect"] = False
+        if not is_perfect:
+            # Rough stock: a drawing draws the perfect timber within inside it, dashed. Not a
+            # geometry mode, so the flag stays off.
+            try:
+                perfect = _triangulate_local_csg(cut_timber, _build_perfect_timber_within_csg_local(cut_timber))
+                payload["perfectTimberWithinVertices"] = perfect["vertices"]
+                payload["perfectTimberWithinIndices"] = perfect["indices"]
+            except Exception as exc:  # noqa: BLE001 — best-effort optional payload
+                log_stderr(f"Warning: failed to build the perfect timber within for "
+                           f"{get_timber_display_name(timber)}: {exc}")
+    payload["centerplanes"] = _centerplane_outlines(timber)
 
     # No-joints box geometry: plain rectangular boxes with no CSG cuts applied at
     # all (no joint cuts, no mortise holes), cropped in length only by this
@@ -5729,6 +5765,12 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         highlight_edge, edge_absent = edge_highlight_segments(
             edge_feature, target_csg, timber, local_csg,
         )
+    elif located_pick is not None and not located_pick[0].real and located_pick[2] is not None \
+            and located_pick[0].feature_type().name == "FACE":
+        # A non-real plane (a perfect face in rough stock, a centerplane) has no surface to light:
+        # its outline is drawn instead, which a drawing shows edge-on, as the line it draws dotted.
+        from kumiki.viewer.picking import plane_outline_segments
+        highlight_edge = plane_outline_segments(located_pick[2], timber)
 
     # Extract highlight mesh for the selected target
     hl_verts, hl_idx, matched, total = extract_highlight_mesh(

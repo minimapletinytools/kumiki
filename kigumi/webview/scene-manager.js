@@ -196,6 +196,10 @@
             if (bundle.cylinderSilhouette) {
                 bundle.cylinderSilhouette.line.geometry.dispose();
             }
+            // Children of bundle.edges too; their materials are the viewer's, shared by every member.
+            for (const line of bundle.drawingLines || []) {
+                line.object.geometry.dispose();
+            }
         }
 
         disposeAll() {
