@@ -48,6 +48,7 @@ from kumiki.timber import Frame, PegShape
 from kumiki.csg.triangles import triangulate_cutcsg
 
 from kumiki.csg.feature_paths import find_csg_by_labels, find_declared_feature, roots_for_path, timber_body_csg
+from kumiki.viewer.rule_at_home import Float3
 # Generous epsilon: mesh vertices come out of a boolean op, so surface points
 # are only approximately on the analytic primitives. Matches the runner's own
 # raycast epsilon.
@@ -130,7 +131,7 @@ def _navigate_every_surface_point(csg):
         centroid = [
             (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
         ]
-        path, _target, face_label = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+        path, _target, face_label = picking.navigate_csg_to_leaf(csg, Float3.of(centroid), PICK_EPS)
         found[(tuple(path), face_label)] = found.get((tuple(path), face_label), 0) + 1
     return found
 
@@ -417,7 +418,7 @@ class TestNonPrismPrimitivesArePickable:
         )
         # On the extrusion's x=2 wall, inside the timber body.
         point = [2.0, 0.0, 15.0]
-        assert picking.csg_point_on_boundary(extrusion, point, PICK_EPS)
+        assert picking.csg_point_on_boundary(extrusion, Float3.of(point), PICK_EPS)
 
     def test_extrusion_cut_resolves_to_its_label_not_the_timber_body(self):
         csg = Difference(base=_timber_prism(), subtract=[
@@ -434,7 +435,7 @@ class TestNonPrismPrimitivesArePickable:
                 label=CutCSGLabel("dovetail_housing"),
             ),
         ])
-        path, target, _face = picking.navigate_csg_to_leaf(csg, [2.0, 0.0, 15.0], PICK_EPS)
+        path, target, _face = picking.navigate_csg_to_leaf(csg, Float3(2.0, 0.0, 15.0), PICK_EPS)
         assert path == ["dovetail_housing"]
         assert isinstance(target, ConvexPolygonExtrusion)
 
@@ -450,7 +451,7 @@ class TestNonPrismPrimitivesArePickable:
             ),
         ])
         # On the bore wall, one radius off the axis.
-        path, target, face = picking.navigate_csg_to_leaf(csg, [1.0, 0.0, 50.0], PICK_EPS)
+        path, target, face = picking.navigate_csg_to_leaf(csg, Float3(1.0, 0.0, 50.0), PICK_EPS)
         assert path == ["peg_hole"]
         assert isinstance(target, Cylinder)
         # The cylinder's own default for its barrel. It used to reach the
@@ -518,7 +519,7 @@ class TestDescribeLeafCsg:
             end_distance=scalar(100),
             feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_right")],
         )
-        assert picking.describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
+        assert picking.describe_leaf_csg(prism, Float3(2.0, 0.0, 50.0), PICK_EPS) == "tenon_right"
 
     def test_a_face_nobody_named_answers_with_the_prisms_own_default(self):
         """No longer the timber-local direction, because nothing is unnamed now.
@@ -530,10 +531,10 @@ class TestDescribeLeafCsg:
         """
         prism = _timber_prism(named=False)
 
-        assert picking.describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "side.0"
-        assert picking.describe_leaf_csg(prism, [-2.0, 0.0, 50.0], PICK_EPS) == "side.2"
-        assert picking.describe_leaf_csg(prism, [0.0, 3.0, 50.0], PICK_EPS) == "side.1"
-        assert picking.describe_leaf_csg(prism, [0.0, 0.0, 100.0], PICK_EPS) == "cap.1"
+        assert picking.describe_leaf_csg(prism, Float3(2.0, 0.0, 50.0), PICK_EPS) == "side.0"
+        assert picking.describe_leaf_csg(prism, Float3(-2.0, 0.0, 50.0), PICK_EPS) == "side.2"
+        assert picking.describe_leaf_csg(prism, Float3(0.0, 3.0, 50.0), PICK_EPS) == "side.1"
+        assert picking.describe_leaf_csg(prism, Float3(0.0, 0.0, 100.0), PICK_EPS) == "cap.1"
 
     def test_a_shape_that_names_nothing_still_gets_a_label_and_a_warning(self):
         """The fallbacks are kept for the gap, not for the common case.
@@ -563,7 +564,7 @@ class TestDescribeLeafCsg:
 
         with warnings_module.catch_warnings(record=True) as caught:
             warnings_module.simplefilter("always")
-            label = picking.describe_leaf_csg(extrusion, [2.0, 0.0, 50.0], PICK_EPS)
+            label = picking.describe_leaf_csg(extrusion, Float3(2.0, 0.0, 50.0), PICK_EPS)
 
         assert label == "unknown face feature"
         assert any("does not" in str(w.message) for w in caught)
@@ -577,7 +578,7 @@ class TestDescribeLeafCsg:
         plane = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(50)
         )
-        assert picking.describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "side.0"
+        assert picking.describe_leaf_csg(plane, Float3(0.0, 0.0, 50.0), PICK_EPS) == "side.0"
 
     def test_half_space_named_feature_wins_over_cut_plane(self):
         from kumiki.csg.cutcsg import HalfSpace
@@ -587,7 +588,7 @@ class TestDescribeLeafCsg:
             offset=scalar(50),
             feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, "shoulder")],
         )
-        assert picking.describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
+        assert picking.describe_leaf_csg(plane, Float3(0.0, 0.0, 50.0), PICK_EPS) == "shoulder"
 
 
 class TestPickingToleranceIsPerCall:
@@ -603,7 +604,7 @@ class TestPickingToleranceIsPerCall:
         near_miss = create_v3(scalar(0), scalar(0), scalar(-1e-4))
         assert csg.is_point_on_boundary(near_miss, PICK_EPS)
 
-        picking.navigate_csg_to_leaf(csg, [0.0, 0.0, 0.0], PICK_EPS)
+        picking.navigate_csg_to_leaf(csg, Float3(0.0, 0.0, 0.0), PICK_EPS)
 
         assert not csg.is_point_on_boundary(near_miss)
 
@@ -932,7 +933,7 @@ class TestPickDescription:
             centroid = [
                 (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
             ]
-            _p, _t, label = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+            _p, _t, label = picking.navigate_csg_to_leaf(csg, Float3.of(centroid), PICK_EPS)
             if predicate(label):
                 return centroid
         raise AssertionError("no matching surface point found")
@@ -1051,9 +1052,9 @@ class TestPickDescription:
                 if composed is None:
                     continue
                 expected = picking.nearest_timber_local_face_name(composed)
-                _p, target, _l = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+                _p, target, _l = picking.navigate_csg_to_leaf(csg, Float3.of(centroid), PICK_EPS)
                 normal, faces_toward = picking.outward_normal_and_face(
-                    target, csg, centroid, PICK_EPS)
+                    target, csg, Float3.of(centroid), PICK_EPS)
                 assert faces_toward == expected
                 # The exact normal is reported alongside the nearest-of-six
                 # name, so the display can show both rather than rounding
@@ -1119,7 +1120,7 @@ class TestSerializedParity:
                 centroid = [
                     (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
                 ]
-                _p, target, _l = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+                _p, target, _l = picking.navigate_csg_to_leaf(csg, Float3.of(centroid), PICK_EPS)
                 point = picking.to_v3(centroid)
                 own = target.get_outward_normal(point, PICK_EPS)
                 composed = csg.get_outward_normal(point, PICK_EPS)
@@ -1211,7 +1212,7 @@ class TestJointDisplayName:
             centroid = [
                 (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
             ]
-            _p, target, label = picking.navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+            _p, target, label = picking.navigate_csg_to_leaf(csg, Float3.of(centroid), PICK_EPS)
             if label is not None and label.startswith("tenon"):
                 name = runner._joint_name_for_node(csg, cut_timber, target)
                 assert name == "mortise_and_tenon"
@@ -1596,7 +1597,7 @@ class TestAHousingsInsideEdgeOnAPitchedRafter:
 
         # Where the housing's floor meets its wall, across the middle of the plate.
         local = plate.transform.global_to_local(create_v3(mm(50), 0, mm(35)))
-        best = picking.features_at_point(root, [float(v) for v in local], PICK_EPS)[0]
+        best = picking.features_at_point(root, Float3.of(local), PICK_EPS)[0]
         assert best.feature.feature_type() == CSGFeatureType.EDGE
 
         segments, absent = picking.edge_highlight_segments(best.feature, best.owner, plate, root)
@@ -2383,7 +2384,7 @@ class TestTheBroadphase:
         from kumiki.csg.cutcsg import EmptyCSG
 
         verts, idx, matched, total = picking.extract_highlight_mesh(
-            [0.0] * 9, [0, 1, 2], EmptyCSG(), [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]], [0.0, 0, 0], 5e-4,
+            [0.0] * 9, [0, 1, 2], EmptyCSG(), (Float3(1.0, 0, 0), Float3(0, 1.0, 0), Float3(0, 0, 1.0)), Float3(0.0, 0, 0), 5e-4,
             feature_label="a\u00d7b", feature_type="EDGE")
 
         assert verts == [] and idx == [] and matched == 0
@@ -2404,8 +2405,8 @@ class TestTheBroadphase:
         high = [float(v) for v in (box.max_x, box.max_y, box.max_z) if v is not None]
         assert len(low) == len(high) == 3
         middle = [(a + b) / 2 for a, b in zip(low, high)]
-        assert inside(middle)
-        assert not inside([high[0] + 1.0, middle[1], middle[2]])
+        assert inside(Float3.of(middle))
+        assert not inside(Float3.of([high[0] + 1.0, middle[1], middle[2]]))
 
     def test_an_unbounded_solid_cannot_be_filtered(self):
         # A half space has no box worth having, so the walk goes ahead
@@ -2424,7 +2425,7 @@ class TestTheBroadphase:
         rejects = picking.aabb_filter(EmptyCSG(), 5e-4)
 
         assert rejects is not None
-        assert not rejects([0.0, 0.0, 0.0])
+        assert not rejects(Float3(0.0, 0.0, 0.0))
 
     def test_the_highlight_is_the_same_with_the_filter_as_without(self, mortise_and_tenon_frame, monkeypatch):
         # The point: faster, not different. A broadphase that changed the answer

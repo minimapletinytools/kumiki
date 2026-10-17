@@ -13,6 +13,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+from kumiki.viewer.rule_at_home import Float3
 
 REPO = Path(__file__).resolve().parent.parent
 FRONT = "rptw.right×dovetail_right_flank"
@@ -23,6 +24,7 @@ LOOK = [0.0, -1.0, 0.0]
 @pytest.fixture(scope="module")
 def picked():
     spec = importlib.util.spec_from_file_location("kigumi_runner_whole_ray", REPO / "kigumi" / "runner.py")
+    assert spec is not None and spec.loader is not None
     runner = importlib.util.module_from_spec(spec)
     sys.modules["kigumi_runner_whole_ray"] = runner
     spec.loader.exec_module(runner)
@@ -32,6 +34,7 @@ def picked():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         module_spec = importlib.util.spec_from_file_location("sawhorse", REPO / "patterns" / "structures" / "dovetailed_sawhorse.py")
+        assert module_spec is not None and module_spec.loader is not None
         module = importlib.util.module_from_spec(module_spec)
         module_spec.loader.exec_module(module)
         beam = module.dovetailed_sawhorse().cut_timbers[0]
@@ -52,7 +55,10 @@ def picked():
         return found[0]
 
     front = DerivedEdgeFeature.derive(owned("rptw.right", None), owned("dovetail_right_flank", "free_dovetail"))
-    segment = edge_highlight_segments(front, root, beam.timber, root)[0][0]
+    assert front is not None
+    segments = edge_highlight_segments(front, root, beam.timber, root)[0]
+    assert segments is not None
+    segment = segments[0]
     on_line = [(a + b) / 2 for a, b in zip(segment["start"], segment["end"])]
 
     def pick(offset, space, **extra):
@@ -71,7 +77,7 @@ def picked():
             }, slot)
         return result if extra else [candidate["label"] for candidate in result["candidates"]]
 
-    pick.ask = lambda payload: runner._handle_find_csg_at_point(None, payload, slot)
+    setattr(pick, "ask", lambda payload: runner._handle_find_csg_at_point(None, payload, slot))
     return pick
 
 
@@ -139,7 +145,7 @@ def test_a_cylinder_cap_seen_edge_on_is_kept_and_a_face_beside_its_edge_is_not()
     assert cap.feature_type() is CSGFeatureType.FACE
 
     # Looking along y: the peg's cap (normal x) and the box's right face are edge-on, its front is not.
-    kept = [hit.feature for hit in picking.measurable_in_view(hits, [0.0, 1.0, 0.0], 1e-3)]
+    kept = [hit.feature for hit in picking.measurable_in_view(hits, Float3(0.0, 1.0, 0.0), 1e-3)]
 
     assert cap in kept and arris in kept
     assert right not in kept  # the arris in its plane measures the same

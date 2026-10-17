@@ -255,6 +255,7 @@ class PickResultWire(NodeDescriptionWire, total=False):
     highlightMesh: MeshWire
     parentHighlightMesh: MeshWire
     highlightEdgeSegments: List[SegmentWire]
+    derivation: Optional[DerivationWire]
     stats: PickStatsWire
 
 class CameraWire(TypedDict, total=False):

@@ -21,6 +21,7 @@ from kumiki.rule import create_v3
 from tests.testing_shavings import load_module, present
 
 from kumiki.csg.feature_paths import find_csg_by_labels, find_declared_feature, roots_for_path
+from kumiki.viewer.rule_at_home import Float3
 
 def v(triple):
     """A triple as the vector a span holds. Written out so the tests need not."""
@@ -406,7 +407,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
         ]
         found = {}
         for point in points:
-            for hit in picking.features_at_point(root, point, 5e-4, FeatureTestTolerances(face=5e-4)):
+            for hit in picking.features_at_point(root, Float3.of(point), 5e-4, FeatureTestTolerances(face=5e-4)):
                 if hit.feature.feature_type() != CSGFeatureType.EDGE:
                     continue
                 found.setdefault(hit.feature.name, runner._measure_span(

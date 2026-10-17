@@ -2053,16 +2053,16 @@ class SimpleLoftFeature(FaceFeature):
 def _profile_corner(owner: 'CutCSG', index: int, end: bool) -> Optional[V3]:
     """Vertex `index` of a convex extrusion's or loft's profile at its start or end, in the
     owner's space, or None where that end is infinite."""
+    if not isinstance(owner, (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)):
+        return None
     if isinstance(owner, ConvexPolygonExtrusion):
         z = owner.end_distance if end else owner.start_distance
         if z is None:
             return None
         vertex = owner.points[index]
-    elif isinstance(owner, ConvexPolygonSimpleLoft):
+    else:
         z = owner.top_points_z_pos if end else owner.bottom_points_z_pos
         vertex = (owner.top_points if end else owner.bottom_points)[index]
-    else:
-        return None
     local = Matrix([vertex[0], vertex[1], z])
     return owner.transform.position + safe_transform_vector(owner.transform.orientation.matrix, local)
 
@@ -2076,7 +2076,7 @@ class ConvexProfileEdgeFeature(EdgeFeature):
     ARRIS run; see FeatureCategory and convex_profile_edge_features.
     """
     key: FeatureKey = (FeatureCategory.ARRIS, 0)
-    faces: Tuple[ExtrusionFeatureKey, ExtrusionFeatureKey] = (0, 1)
+    faces: Tuple[int, ExtrusionFeatureKey] = (0, 1)
 
     def feature_key(self) -> Optional[FeatureKey]:
         return self.key
