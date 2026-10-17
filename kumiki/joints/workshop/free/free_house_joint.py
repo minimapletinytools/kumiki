@@ -10,6 +10,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from ..shavings import *
+from kumiki.csg.cutcsg import strip_features
 
 
 def cut_free_house_joint(
@@ -121,7 +122,9 @@ def cut_free_house_joint(
             housed_timber.get_actual_csg_local(),
         )
 
-    housed_negative_csgs = [_compute_housed_body_in_housing_local(housed_timber) for housed_timber in housed_timbers]
+    # Each housed timber's body and cuts, which its own tree already names.
+    housed_negative_csgs = [strip_features(_compute_housed_body_in_housing_local(housed_timber))
+                            for housed_timber in housed_timbers]
     housing_negative_csg = (
         housed_negative_csgs[0] if len(housed_negative_csgs) == 1
         else SolidUnion(children=housed_negative_csgs, label=CutCSGLabel("housed_timbers"))

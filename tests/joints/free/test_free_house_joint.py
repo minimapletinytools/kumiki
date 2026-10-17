@@ -241,3 +241,24 @@ class TestFreeHouseJoint:
         away_global = create_v3(scalar(0), scalar(0), scalar(5))
         away_housing_local = housing_timber.transform.global_to_local(away_global)
         assert housing_rendered.contains_point(away_housing_local)
+
+    @pytest.mark.parametrize("as_cut_timber", [False, True])
+    def test_the_housing_names_nothing_its_housed_timber_already_names(self, as_cut_timber):
+        # The housed timber's body is its own tree's, rptw.* and all: in the housing, only defaults.
+        from kumiki.csg.cutcsg import FeatureSource, csg_children
+
+        housing_timber = create_standard_vertical_timber(height=20, size=(3, 3), position=(0, 0, 0), ticket="housing")
+        housed = create_timber(
+            length=scalar(20), size=Matrix([scalar(2), scalar(2)]),
+            bottom_position=create_v3(scalar(-10), scalar(0), scalar(10)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0)), ticket="housed")
+        joint = cut_free_house_joint(housing_timber, [CutTimber(housed) if as_cut_timber else housed])
+
+        housing = joint.cuttings["housing_timber"].negative_csg
+        assert housing is not None
+        nodes = [housing]
+        while nodes:
+            node = nodes.pop()
+            nodes.extend(csg_children(node))
+            assert node.get_declared_features(FeatureSource.OVERRIDES) == []
