@@ -5,6 +5,37 @@ How a hover or click becomes a picked feature. The CSG feature system it picks f
 
 Feature picking differes if we are in the 3d view or if we are in a 2d orthographic drawing view. 
 
+## Feature priority
+
+Several features can be under the pointer at once. `_sort_feature_hits` in `cutcsg.py` orders
+them, and a click takes the first. Each rule decides only where the ones before it tie:
+
+1. **Non-real lines and points, then real features, then non-real planes.** A bore's axis is a
+   deliberate snap, so the surface it lies on does not steal the click. A non-real plane (a
+   centerplane, or a perfect face inside rough stock) runs through the whole body, so it would
+   take every click on its line; it comes last.
+2. **The more specific kind.** Point, then edge, then face (flat or curved). An edge beats the two
+   faces that formed it, and a corner beats its edges.
+3. **Declared before derived.** A feature something declared beats one derived from a pair of
+   faces.
+4. **Group rank** (`FeatureGroup`, lower is better): `SHOULDER_PLANE`, `PERFECT`, `ROUGH`, `TENON`,
+   `CROSSING`, then `NONE`. A derived feature takes the better rank of its two parents.
+5. **Author-set priority** (`FeatureProperties.priority`, lower wins). Default features carry a high
+   value, so anything a joint names beats the prism's anonymous defaults.
+6. **Name**, alphabetically.
+7. **The order they were found in**, as the last tie-break.
+
+In a drawing's view the candidates come nearest the viewer first, and this order breaks ties at
+one depth (`order_along_ray`; see 2D below).
+
+In Kigumi, while the pointer is over a feature:
+
+- **Tab** steps to the next feature under the pointer, wrapping round. The highlight shows what a
+  click would now take. Moving the pointer forgets the choice.
+- **Right-click** (without dragging) lists every feature under the pointer, best first, with its
+  kind; choosing a row selects that feature. With only one feature there, right-click opens the
+  member menu instead.
+
 ## 3D:
 
 TODO

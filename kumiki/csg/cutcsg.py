@@ -516,26 +516,16 @@ def _within_tolerance(
 
 
 def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
-    """Best answer first.
+    """Best answer first, ordered by each of these in turn (see docs/internal/picking.md):
 
-    A non-real line or point beats anything real: selecting a centre axis is a
-    deliberate snap, and a surface it happens to lie on should not steal the
-    click. A non-real plane (a centerplane, a perfect face inside rough stock)
-    is the other way round, last: it runs through the body, so it would
-    otherwise take every click that lands on its line. Then the more
-    specific kind -- a point sits on an edge sits on a face, and the narrowest
-    claimant is the better answer, so an edge beats the two faces that formed
-    it.
-
-    Specificity stays ahead of everything below it on purpose. Declaredness
-    ranks above priority, but ABOVE specificity it would hand a click on an
-    arris to one of the declared faces meeting there, which is the answer
-    deriving edges exists to stop giving.
-
-    Then, in order: a declared feature before a derived one; the pairing group,
-    best rank first; author-set priority; the name; and, last, the order the
-    features were gathered in, which sorted() preserves without a key of its
-    own.
+    1. Non-real lines and points (a bore's axis), then real features, then non-real planes
+       (a centerplane, a perfect face inside rough stock).
+    2. Kind: point, then edge, then face.
+    3. Declared before derived.
+    4. Group rank, best first.
+    5. Author-set priority, lowest first.
+    6. Name.
+    7. The order they were found in.
     """
     return sorted(hits, key=feature_hit_sort_key)
 
