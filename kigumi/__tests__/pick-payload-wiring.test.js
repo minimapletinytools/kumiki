@@ -16,15 +16,16 @@ const app = fs.readFileSync(
 const session = fs.readFileSync(
     path.join(__dirname, '..', 'frame-view-session.js'), 'utf8');
 
-/** The keys _heldForRequest puts on a pick request. */
-function heldFields() {
-    const at = app.indexOf('_heldForRequest() {');
+/** The keys a method of the viewer returns, read from its last `return {`. */
+function returnedKeys(method) {
+    const at = app.indexOf(`${method}() {`);
     const body = app.slice(at, app.indexOf('\n    }', at));
     const returned = body.slice(body.lastIndexOf('return {'));
     return [...returned.matchAll(/^\s{12}([A-Za-z][A-Za-z0-9_]*):/gm)].map((m) => m[1]);
 }
 
-const fields = heldFields();
+// What every pick carries (_pickContext), and what one carries while measuring (_heldForRequest).
+const fields = [...returnedKeys('_pickContext'), ...returnedKeys('_heldForRequest')];
 
 describe('everything the pick request carries survives the trip to the runner', () => {
     test('there is something to check', () => {
@@ -32,6 +33,7 @@ describe('everything the pick request carries survives the trip to the runner', 
         // test below would pass by matching nothing.
         expect(fields.length).toBeGreaterThan(4);
         expect(fields).toContain('heldReference');
+        expect(fields).toContain('space');
     });
 
     test.each(fields)('frame-view-session forwards %s', (field) => {

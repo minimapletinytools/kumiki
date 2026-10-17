@@ -140,3 +140,30 @@ def test_a_cylinder_cap_seen_edge_on_is_kept_and_a_face_beside_its_edge_is_not()
     assert cap in kept and arris in kept
     assert right not in kept  # the arris in its plane measures the same
     assert front not in kept  # an area from here
+
+
+@pytest.mark.parametrize("offset", [-0.0004, 0.0004])
+def test_what_is_not_seen_under_the_pointer_is_offered_but_not_taken(picked, offset):
+    # The back edge is stacked exactly behind the front one along the view; the far dovetail's
+    # edges are behind the beam itself. Both are listed, last and marked, and none is chosen.
+    result = picked(offset, "projected", drawnMembers=["m#0"])
+    hidden = {candidate["label"]: candidate["hidden"] for candidate in result["candidates"]}
+
+    assert result["featureLabel"] == FRONT and not hidden[FRONT]
+    assert hidden[BACK]
+    assert hidden["rptw.left×dovetail_left_flank"]
+    assert result["candidateCount"] == sum(1 for is_hidden in hidden.values() if not is_hidden)
+    assert [candidate["hidden"] for candidate in result["candidates"]] == sorted(hidden.values())
+
+
+def test_a_line_of_sight_along_a_surface_is_not_blocked_by_it():
+    # A box seen edge-on along its top face: a place on the top's far edge looks back along the
+    # face, which is surface, not material -- the stacked rule, not this one, says it is hidden.
+    from kumiki.csg.cutcsg import RectangularPrism
+    from kumiki.drawings.visibility import sight_is_blocked
+    from kumiki.rule import create_v2, scalar
+
+    box = RectangularPrism(size=create_v2(2, 2), start_distance=scalar(0), end_distance=scalar(4))
+
+    assert not sight_is_blocked(box, [1.0, 1.0, 4.0], [0.0, -1.0, 0.0])
+    assert sight_is_blocked(box, [0.0, 1.0, 2.0], [0.0, -1.0, 0.0])
