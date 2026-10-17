@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from kumiki import picking
+from kumiki.viewer import picking
 from kumiki.drawings.drawing import ViewAxes
 
 from tests.testing_shavings import load_module

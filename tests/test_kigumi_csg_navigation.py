@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from kumiki import picking
+from kumiki.viewer import picking
 from kumiki.csg.cutcsg import (
     ConvexPolygonExtrusion,
     EmptyCSG,

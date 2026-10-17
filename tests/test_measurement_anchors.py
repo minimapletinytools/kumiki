@@ -13,7 +13,7 @@ import math
 
 import pytest
 
-from kumiki import picking
+from kumiki.viewer import picking
 from kumiki.drawings.drawing import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
                             ViewAxes,
                             MeasurementOperation, MeasurementSpace, distance_anchors)

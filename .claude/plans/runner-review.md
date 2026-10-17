@@ -47,7 +47,7 @@ Largest functions: `handle_request` 446 lines (one `if command == ...` chain ove
 - Most of the file isn't protocol: measuring, picking and drawing layout are geometry questions with
   a wire form at the end. Two ways to shrink it:
   1. **Move the geometry into kumiki** (`kumiki/drawings/` for spans, verdicts, measurement planes;
-     a `kumiki/picking.py` for CSG navigation and highlight extraction). Tested and typed there,
+     a `kumiki/viewer/picking.py` for CSG navigation and highlight extraction). Tested and typed there,
      usable from the auto dimensioning, and the runner keeps only serialization and dispatch. Costs a
      kumiki minor bump each time the runner needs something new, which the version coupling already
      asks for.

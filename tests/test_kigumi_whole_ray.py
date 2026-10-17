@@ -27,7 +27,7 @@ def picked():
     sys.modules["kigumi_runner_whole_ray"] = runner
     spec.loader.exec_module(runner)
     from kumiki.csg.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
-    from kumiki.picking import edge_highlight_segments, node_positions
+    from kumiki.viewer.picking import edge_highlight_segments, node_positions
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -119,7 +119,7 @@ def test_the_3d_view_keeps_its_faces(picked):
 
 
 def test_a_cylinder_cap_seen_edge_on_is_kept_and_a_face_beside_its_edge_is_not():
-    from kumiki import picking
+    from kumiki.viewer import picking
     from kumiki.csg.cutcsg import (CSGFeatureType, Cylinder, OwnedFeatureHit, RectangularPrism, END_CAP,
                                    PrismFace, prism_arris_key, prism_face_key)
     from kumiki.rule import create_v2, create_v3, scalar
@@ -160,7 +160,7 @@ def test_a_line_of_sight_along_a_surface_is_not_blocked_by_it():
     # A box seen edge-on along its top face: a place on the top's far edge looks back along the
     # face, which is surface, not material -- the stacked rule, not this one, says it is hidden.
     from kumiki.csg.cutcsg import RectangularPrism
-    from kumiki.drawings.visibility import sight_is_blocked
+    from kumiki.viewer.visibility import sight_is_blocked
     from kumiki.rule import create_v2, scalar
 
     box = RectangularPrism(size=create_v2(2, 2), start_distance=scalar(0), end_distance=scalar(4))
