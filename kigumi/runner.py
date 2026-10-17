@@ -5591,7 +5591,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     member_key = payload.get("memberKey")
     point = payload.get("point")
     current_path = payload.get("currentPath") or []
-    ctrl_click = payload.get("ctrlClick", False)
+    # A drawing's view picks features directly, every timber alike: there is no drilling down the
+    # tree there, so Ctrl is a plain click.
+    from kumiki.drawings.drawing import MeasurementSpace
+    ctrl_click = bool(payload.get("ctrlClick", False)) and payload.get("space") != MeasurementSpace.PROJECTED.value
     eps = 5e-4  # generous epsilon for raycast-based click points
     # Edge and vertex slack scaled to what a pixel is worth where the click
     # landed, which the viewer works out and sends. See _pick_tolerances.
@@ -5765,12 +5768,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         highlight_edge, edge_absent = edge_highlight_segments(
             edge_feature, target_csg, timber, local_csg,
         )
-    elif located_pick is not None and not located_pick[0].real and located_pick[2] is not None \
-            and located_pick[0].feature_type().name == "FACE":
-        # A non-real plane (a perfect face in rough stock, a centerplane) has no surface to light:
-        # its outline is drawn instead, which a drawing shows edge-on, as the line it draws dotted.
-        from kumiki.viewer.picking import plane_outline_segments
-        highlight_edge = plane_outline_segments(located_pick[2], timber)
+    elif located_pick is not None:
+        highlight_edge = _non_real_plane_outline(located_pick[0], located_pick[1], timber)
 
     # Extract highlight mesh for the selected target
     hl_verts, hl_idx, matched, total = extract_highlight_mesh(
@@ -5926,6 +5925,20 @@ def _log_pick(
     )
 
 
+def _non_real_plane_outline(
+    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
+) -> Optional[List[SegmentWire]]:
+    """A non-real plane's outline (a perfect face in rough stock, a centerplane), which has no
+    surface to light: a drawing shows it edge-on, as the line it draws dotted. None for anything else."""
+    from kumiki.geometry import Plane
+    from kumiki.viewer.picking import plane_outline_segments
+
+    plane = feature.locate_simple_unbounded(owner)
+    if feature.real or not isinstance(plane, Plane):
+        return None
+    return plane_outline_segments(plane, timber)
+
+
 def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Resolve a CSG at a known path and return highlight mesh for the viewer."""
     from kumiki.viewer.picking import build_inv_transform_float, extract_highlight_mesh, resolve_csg_at_path, label_name
@@ -6010,6 +6023,11 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
     }
     if parent_hl is not None:
         result["parentHighlightMesh"] = parent_hl
+    if actual_feature_label:
+        named = next((f for f in target_csg.get_declared_features() if f.name == actual_feature_label), None)
+        outline = None if named is None else _non_real_plane_outline(named, target_csg, cut_timber.timber)
+        if outline:
+            result["highlightEdgeSegments"] = outline
     return result
 
 
