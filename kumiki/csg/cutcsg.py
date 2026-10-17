@@ -2600,6 +2600,24 @@ def csg_children(csg: CutCSG) -> List[CutCSG]:
     return []
 
 
+def strip_features(csg: CutCSG) -> CutCSG:
+    """*csg* with every feature anyone added taken off, all the way down: each primitive's
+    overrides (names, groups, properties) and extra features. Only its own defaults remain.
+
+    For a copy of geometry that is already in a tree elsewhere -- a relief built from another
+    timber's body and cuts -- which would otherwise declare those features a second time.
+    """
+    if isinstance(csg, SolidUnion):
+        return replace(csg, children=[strip_features(child) for child in csg.children])
+    if isinstance(csg, Intersection):
+        return replace(csg, left=strip_features(csg.left), right=strip_features(csg.right))
+    if isinstance(csg, Difference):
+        return replace(csg, base=strip_features(csg.base), subtract=[strip_features(c) for c in csg.subtract])
+    if isinstance(csg, HasFeatures) and (csg.feature_overrides or csg.extra_features):
+        return replace(csg, feature_overrides=(), extra_features=())
+    return csg
+
+
 class CSGParity(Enum):
     """Whether a node adds material to the finished solid or takes it away.
 

@@ -12,6 +12,8 @@ from kumiki.csg.cutcsg import (
     Intersection,
     RectangularPrism,
     SolidUnion,
+    FeatureSource,
+    csg_children,
 )
 from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
@@ -708,38 +710,53 @@ class TestChopShoulderNotchAlignedWithTimber:
         assert float(self._base_prism(notch).size[0]) == pytest.approx(0.187470, rel=1e-4)
 
 
+def _scribe_relief_of_a_rough_timber():
+    timber_to_be_cut = create_standard_vertical_timber(
+        height=scalar(20),
+        size=(scalar(4), scalar(6)),
+        position=(scalar(0), scalar(0), scalar(0)),
+        ticket="timber_to_be_cut",
+    )
+    timber_to_be_scribed = replace(
+        create_timber(
+            length=scalar(20),
+            size=create_v2(scalar(4), scalar(4)),
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            ticket="timber_to_be_scribed",
+        ),
+        rough_half_sizes=(
+            create_v2(scalar(3), scalar(3)),
+            create_v2(scalar(4), scalar(4)),
+        ),
+    )
+
+    return chop_scribe_relief(
+        timber_to_be_scribed_cutting=Cutting(timber=timber_to_be_scribed, negative_csg=EmptyCSG()),
+        timber_to_be_cut_cutting=Cutting(timber=timber_to_be_cut, negative_csg=EmptyCSG()),
+    )
+
+
 class TestChopScribeRelief:
     def test_returns_pair_in_cut_timber_local_space(self):
-        timber_to_be_cut = create_standard_vertical_timber(
-            height=scalar(20),
-            size=(scalar(4), scalar(6)),
-            position=(scalar(0), scalar(0), scalar(0)),
-            ticket="timber_to_be_cut",
-        )
-        timber_to_be_scribed = replace(
-            create_timber(
-                length=scalar(20),
-                size=create_v2(scalar(4), scalar(4)),
-                bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
-                length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
-                width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
-                ticket="timber_to_be_scribed",
-            ),
-            rough_half_sizes=(
-                create_v2(scalar(3), scalar(3)),
-                create_v2(scalar(4), scalar(4)),
-            ),
-        )
-
-        scribed_overlap_csg_local, scribe_relief_csg_local = chop_scribe_relief(
-            timber_to_be_scribed_cutting=Cutting(timber=timber_to_be_scribed, negative_csg=EmptyCSG()),
-            timber_to_be_cut_cutting=Cutting(timber=timber_to_be_cut, negative_csg=EmptyCSG()),
-        )
+        scribed_overlap_csg_local, scribe_relief_csg_local = _scribe_relief_of_a_rough_timber()
 
         assert isinstance(scribed_overlap_csg_local, Intersection)
         assert isinstance(scribe_relief_csg_local, Difference)
         assert scribed_overlap_csg_local.contains_point(create_v3(scalar(1), scalar(5, 2), scalar(10)))
         assert scribe_relief_csg_local.contains_point(create_v3(scalar(5, 2), scalar(0), scalar(10)))
+
+    def test_names_nothing_its_timbers_already_name(self):
+        # Built from both timbers' bodies, which their own trees already name: only defaults stay.
+        for relief in _scribe_relief_of_a_rough_timber():
+            nodes = [relief]
+            while nodes:
+                node = nodes.pop()
+                nodes.extend(csg_children(node))
+                assert node.get_declared_features(FeatureSource.OVERRIDES) == []
+                if isinstance(node, RectangularPrism):
+                    assert node.get_declared_features(FeatureSource.DEFAULTS)
 
 
 class TestReliefCSGNaming:
