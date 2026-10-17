@@ -71,6 +71,7 @@ def picked():
             }, slot)
         return result if extra else [candidate["label"] for candidate in result["candidates"]]
 
+    pick.ask = lambda payload: runner._handle_find_csg_at_point(None, payload, slot)
     return pick
 
 
@@ -103,7 +104,10 @@ def test_whichever_candidate_is_chosen_is_the_one_answered(picked):
 
     for index, candidate in enumerate(candidates):
         chosen = picked(0.0004, "projected", candidateIndex=index)
-        assert (chosen["candidateIndex"], chosen["featureLabel"]) == (index, candidate["label"])
+        if candidate["hidden"]:  # never taken, even when named
+            assert chosen["candidates"][chosen["candidateIndex"]]["hidden"] is False
+        else:
+            assert (chosen["candidateIndex"], chosen["featureLabel"]) == (index, candidate["label"])
 
 
 def test_a_drawing_offers_no_face_it_cannot_measure(picked):
@@ -169,3 +173,18 @@ def test_a_line_of_sight_along_a_surface_is_not_blocked_by_it():
 
     assert not sight_is_blocked(box, create_v3(1, 1, 4), create_v3(0, -1, 0))
     assert sight_is_blocked(box, create_v3(0, 1, 2), create_v3(0, -1, 0))
+
+
+def test_where_everything_under_the_pointer_is_hidden_nothing_is_taken(picked):
+    # The beam's side, face-on, just over the dovetail socket: only the socket's edges behind it.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        result = picked.ask({
+            "memberKey": "m#0", "point": [-0.3912, 0.0254, 0.7353], "currentPath": [], "ctrlClick": False,
+            "space": "projected", "ray": {"origin": [-0.3912, 1.0254, 0.7353], "direction": LOOK},
+            "tolerances": {"face": 0.0005, "edge": 0.002, "point": 0.004},
+        })
+
+    assert result["candidates"] and all(candidate["hidden"] for candidate in result["candidates"])
+    assert result["candidateCount"] == 0
+    assert result["featureLabel"] is None and result["candidateIndex"] is None and result["path"] == []
