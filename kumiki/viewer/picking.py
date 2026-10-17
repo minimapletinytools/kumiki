@@ -839,9 +839,16 @@ def real_features_along_ray(
             walk(child)
 
     walk(root)
+    # Many planes meet the ray at one place -- rough stock's reliefs lie on its faces -- and each
+    # place costs a walk of the whole tree, so each is asked about once. Only the same place: two
+    # a pixel apart can differ in whether they are on the boundary at all.
+    distinct: List[Float3] = []
+    for place in places:
+        if all(place.dist(kept) > 1e-9 for kept in distinct):
+            distinct.append(place)
     snap = FeatureTestTolerances(face=near, edge=near, point=max(near, float(tolerances.point)))
     return [(root.find_all_features(place.v3(), snap), place)
-            for place in places if root.is_point_on_boundary(place.v3(), eps=near)]
+            for place in distinct if root.is_point_on_boundary(place.v3(), eps=near)]
 
 
 def _ray_meets_plane(origin: Float3, direction: Float3, plane: Any) -> Optional[Float3]:
