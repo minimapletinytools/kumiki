@@ -1501,7 +1501,7 @@ def _assign_member_keys(frame: 'Frame') -> Tuple[List[TimberEntry], List[Accesso
 
 
 def _serialize_cutting_summary(cut_timber: 'CutTimber') -> List[CuttingSummaryWire]:
-    from kumiki.picking import label_name
+    from kumiki.viewer.picking import label_name
     cuts_meta: List[CuttingSummaryWire] = []
     cuts = list(getattr(cut_timber, "cuts", []) or [])
     for idx, cut in enumerate(cuts):
@@ -2468,7 +2468,7 @@ def _derivation_wire(
     local_csg: 'CutCSG', feature_hits: List['OwnedFeatureHit'], feature: Optional['CSGFeature'],
 ) -> Optional[DerivationWire]:
     """For a derived feature: the path to the node owning it, and each parent's path and name."""
-    from kumiki.picking import node_positions
+    from kumiki.viewer.picking import node_positions
 
     if feature is None or not feature.is_derived():
         return None
@@ -2495,7 +2495,7 @@ def _pick_from_candidate(
     feature's owner cannot be placed in the tree, which leaves the caller with
     what it had.
     """
-    from kumiki.picking import derived_feature_owner, node_positions
+    from kumiki.viewer.picking import derived_feature_owner, node_positions
     from kumiki.csg.cutcsg import CSGFeatureType
 
     feature = hit.feature
@@ -2528,7 +2528,7 @@ def _sight_blocker(
     Anything the drawing draws can be in the way -- the viewer sends which members those are, and
     with none sent every member is -- but not its faded context, which is there to place the piece.
     """
-    from kumiki.drawings.visibility import sight_is_blocked
+    from kumiki.viewer.visibility import sight_is_blocked
     from kumiki.rule import create_v3
 
     toward_camera = [-float(c) for c in direction]
@@ -4015,7 +4015,7 @@ def _cropped_reference_segments(
     On its surface, or -- *through_material* -- inside it. Exact first, then at float
     noise, as a declared edge is (see cropped_edge_segments).
     """
-    from kumiki.picking import DECLARED_EDGE_FLOAT_NOISE
+    from kumiki.viewer.picking import DECLARED_EDGE_FLOAT_NOISE
     from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
                                     crop_line_to_segments_on_csg)
     from kumiki.geometry import Line, unit_vector
@@ -4057,7 +4057,7 @@ def feature_highlights(slot_state: SlotState, references: Sequence[AnchorWire]) 
 
 
 def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> HighlightWire:
-    from kumiki.picking import build_inv_transform_float, edge_highlight_segments, extract_highlight_mesh
+    from kumiki.viewer.picking import build_inv_transform_float, edge_highlight_segments, extract_highlight_mesh
     from kumiki.csg.feature_paths import resolve_feature_path
     from kumiki.identity import SingleFeaturePath
 
@@ -4378,7 +4378,7 @@ def _serialize_csg_node(
     gone wrong. `path` still carries labels only, since that is what
     find_csg_by_path navigates by.
     """
-    from kumiki.picking import label_name
+    from kumiki.viewer.picking import label_name
     from kumiki.csg.cutcsg import (
         Difference, Intersection, SolidUnion, csg_children, csg_children_with_parity,
     )
@@ -5133,7 +5133,7 @@ def make_error_response(request_id: Any, command: str, exc: Exception) -> Respon
 
 # ===========================================================================
 # Picking: the requests. What a point or ray lands on, and what to light for it,
-# is kumiki.picking; this turns its answers into wire forms.
+# is kumiki.viewer.picking; this turns its answers into wire forms.
 # ===========================================================================
 
 def _local_ray_from_payload(
@@ -5145,7 +5145,7 @@ def _local_ray_from_payload(
     tests do, and so does any caller that has only a point), and everything on
     a surface is found from the point alone.
     """
-    from kumiki.picking import inv_transform_direction, inv_transform_point
+    from kumiki.viewer.picking import inv_transform_direction, inv_transform_point
     ray = payload.get("ray")
     if not isinstance(ray, dict):
         return None
@@ -5191,7 +5191,7 @@ def _cutting_for_node(
     single function, so this reads it in a single function; everything else
     here is identity-based.
     """
-    from kumiki.picking import subtree_contains
+    from kumiki.viewer.picking import subtree_contains
     from kumiki.csg.cutcsg import Difference
 
     if not isinstance(local_csg, Difference):
@@ -5350,7 +5350,7 @@ def _describe_pick(
         feature was selected; and jointName, which is None for the timber's own
         body, since no joint produced that.
     """
-    from kumiki.picking import outward_normal_and_face, to_v3, label_name
+    from kumiki.viewer.picking import outward_normal_and_face, to_v3, label_name
     from kumiki.csg.cutcsg import CSGFeatureType, FeatureTestTolerances
 
     described: NodeDescriptionWire = {
@@ -5402,7 +5402,7 @@ def _pick_reference(
     reached a feature, and None for a derived feature whose parents cannot both
     be placed in the tree -- neither is something to measure to yet.
     """
-    from kumiki.picking import node_positions
+    from kumiki.viewer.picking import node_positions
     from kumiki.identity import (DerivedFeaturePath, FeatureRef, ResolvedTimberPath,
                                  SingleFeaturePath)
 
@@ -5515,7 +5515,7 @@ def _nothing_at_point(member_key: str) -> PickResultWire:
 
 def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Process a find_csg_at_point request and return the result dict."""
-    from kumiki.picking import build_inv_transform_float, csg_point_on_boundary, derived_feature_owner, edge_highlight_segments, extract_highlight_mesh, features_at_point, inv_transform_point, navigate_csg_one_level, navigate_csg_to_leaf, node_positions, resolve_csg_at_path, resolve_derived_feature
+    from kumiki.viewer.picking import build_inv_transform_float, csg_point_on_boundary, derived_feature_owner, edge_highlight_segments, extract_highlight_mesh, features_at_point, inv_transform_point, navigate_csg_one_level, navigate_csg_to_leaf, node_positions, resolve_csg_at_path, resolve_derived_feature
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
     point = payload.get("point")
@@ -5588,7 +5588,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     feature_type = None
     declared_edge = None
     from kumiki.drawings.drawing import MeasurementSpace
-    from kumiki.picking import candidates_under_pointer, split_hidden
+    from kumiki.viewer.picking import candidates_under_pointer, split_hidden
     in_drawing = _pick_space(payload) is MeasurementSpace.PROJECTED
     local_ray = _local_ray_from_payload(payload, timber_rot, timber_pos)
     if in_drawing and local_ray is not None:
@@ -5867,7 +5867,7 @@ def _log_pick(
 
 def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Resolve a CSG at a known path and return highlight mesh for the viewer."""
-    from kumiki.picking import build_inv_transform_float, extract_highlight_mesh, resolve_csg_at_path, label_name
+    from kumiki.viewer.picking import build_inv_transform_float, extract_highlight_mesh, resolve_csg_at_path, label_name
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
     path = payload.get("path") or []

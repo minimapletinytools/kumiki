@@ -14,7 +14,7 @@ What a pointer in a drawing's orthographic view can select and measure. This fol
 - the back edges of a flank seen edge-on, stacked behind its front edge.
 
 **Earlier work.** PR #82 (branch `visibility`, commits a47f93e8 and 62ffbded, 2026-10-11) built
-an exact orthographic visibility test in `kumiki/drawings/visibility.py`:
+an exact orthographic visibility test in `kumiki/viewer/visibility.py`:
 - **Point:** hidden if its line of sight to the camera passes through material.
 - **Line:** the plane of sight is cut by each solid in the way; that region's camera side,
   projected onto the line, is the hidden part. The result is exact stretches.

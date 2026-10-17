@@ -181,7 +181,7 @@ in metres), and the drawn members.
 When `space` is `'projected'` and there is a ray, steps 1–3 run. Otherwise it is the 3D view's
 single-point lookup, `features_at_point`.
 
-### 1. Collect the candidates: `candidates_under_pointer` (`kumiki/picking.py`)
+### 1. Collect the candidates: `candidates_under_pointer` (`kumiki/viewer/picking.py`)
 
 Returns `Candidate(hit, place, depth, group)`: each feature, where along the ray it is, how deep
 that is, and its depth group.
@@ -251,7 +251,7 @@ cache: those in `drawnMembers`, or every member when none are sent. The place an
 to the camera are converted into each timber's own space first. A drawing's faded context is not
 in `drawnMembers`, so it hides nothing.
 
-**`sight_is_blocked(root, place, toward_camera)`** (`kumiki/drawings/visibility.py`):
+**`sight_is_blocked(root, place, toward_camera)`** (`kumiki/viewer/visibility.py`):
 1. Crop the line through `place`, in the camera's direction, to the solid
    (`crop_line_to_segments_on_csg`, exact): the stretches of it that lie on the solid.
 2. Of each stretch, keep the part toward the camera beyond `NUDGE` (10 µm), so the surface the
