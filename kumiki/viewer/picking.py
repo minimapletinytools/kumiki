@@ -4,8 +4,8 @@ Navigating a timber's CSG tree to the node under a click, the features there, th
 features a ray passes near, and the triangles of the rendered mesh that belong to a picked
 node or feature. Geometry only: kigumi's runner turns the answers into wire forms.
 
-Moved out of kigumi/runner.py, where it was written; plain floats on the hot paths, since these
-run on every hover.
+Moved out of kigumi/runner.py, where it was written. Points and directions are Float3
+(rule_at_home.py) rather than rule.py's V3 on the hot paths, since these run on every hover.
 """
 
 import math
@@ -18,14 +18,15 @@ from ..drawings.feature_span import Interval
 from ..geometry import Line
 from ..rule import Transform, V3, scalar
 from ..timber import PerfectTimberWithin
+from .rule_at_home import Float3, Rows3
 
 #: A pointer's ray in timber-local space: origin, direction.
-LocalRay = Tuple[List[float], List[float]]
+LocalRay = Tuple[Float3, Float3]
 
 
 class Segment(TypedDict):
-    start: List[float]
-    end: List[float]
+    start: Float3
+    end: Float3
 
 
 def label_name(labeled: Any) -> Optional[str]:
@@ -40,9 +41,7 @@ def label_name(labeled: Any) -> Optional[str]:
     return getattr(getattr(labeled, "label", None), "name", None)
 
 
-def _floats3(vector) -> List[float]:
-    """Exact float triple from a 3x1 Matrix."""
-    return [float(vector[i, 0]) for i in range(3)]
+
 
 
 def _exact(value: float):
@@ -50,40 +49,29 @@ def _exact(value: float):
     return scalar(repr(float(value)))
 
 
-def build_inv_transform_float(transform: 'Transform') -> Tuple[List[List[float]], List[float]]:
-    """Pre-compute float data for global→local.  Returns (rot_cols, position).
-    local = R^T * (global - pos) where rot_cols is the FORWARD rotation matrix."""
+def build_inv_transform_float(transform: 'Transform') -> Tuple[Rows3, Float3]:
+    """Pre-compute float data for global→local.  Returns (rot_rows, position).
+    local = R^T * (global - pos) where rot_rows is the FORWARD rotation matrix."""
     M = transform.orientation.matrix
-    P = transform.position
-    rot = [[float(M[r, c]) for c in range(3)] for r in range(3)]
-    pos = [float(P[i]) for i in range(3)]
-    return rot, pos
+    rot = tuple(Float3(float(M[r, 0]), float(M[r, 1]), float(M[r, 2])) for r in range(3))
+    return rot, Float3.of(transform.position)  # type: ignore[return-value]
 
 
-def inv_transform_point(rot: List[List[float]], pos: List[float], global_pt: List[float]) -> List[float]:
+def inv_transform_point(rot: Rows3, pos: Float3, global_pt) -> Float3:
     """Apply inverse transform: local = R^T * (global_pt - pos)."""
-    dx = global_pt[0] - pos[0]
-    dy = global_pt[1] - pos[1]
-    dz = global_pt[2] - pos[2]
-    return [
-        rot[0][0]*dx + rot[1][0]*dy + rot[2][0]*dz,
-        rot[0][1]*dx + rot[1][1]*dy + rot[2][1]*dz,
-        rot[0][2]*dx + rot[1][2]*dy + rot[2][2]*dz,
-    ]
+    return inv_transform_direction(rot, Float3.of(global_pt) - pos)
 
 
-def inv_transform_direction(rot: List[List[float]], global_dir: List[float]) -> List[float]:
+def inv_transform_direction(rot: Rows3, global_dir) -> Float3:
     """Apply inverse transform to a DIRECTION: local = R^T * d, no translation.
 
     A direction has no position, so the offset that inv_transform_point applies
     would tilt it. Kept beside that one so the pair is read together.
     """
-    dx, dy, dz = (float(component) for component in global_dir)
-    return [
-        rot[0][0]*dx + rot[1][0]*dy + rot[2][0]*dz,
-        rot[0][1]*dx + rot[1][1]*dy + rot[2][1]*dz,
-        rot[0][2]*dx + rot[1][2]*dy + rot[2][2]*dz,
-    ]
+    d = Float3.of(global_dir)
+    return Float3(rot[0][0]*d.x + rot[1][0]*d.y + rot[2][0]*d.z,
+                  rot[0][1]*d.x + rot[1][1]*d.y + rot[2][1]*d.z,
+                  rot[0][2]*d.x + rot[1][2]*d.y + rot[2][2]*d.z)
 
 
 def subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
@@ -98,18 +86,17 @@ def subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
     return any(subtree_contains(child, target) for child in csg_children(root))
 
 
-def to_v3(pt: List[float]) -> 'V3':
+def to_v3(pt) -> 'V3':
     """Wrap a plain [x, y, z] in the V3 kumiki's CSG API expects."""
-    from kumiki.rule import create_v3
-    return create_v3(float(pt[0]), float(pt[1]), float(pt[2]))
+    return Float3.of(pt).v3()
 
 
-def csg_contains_point(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> bool:
+def csg_contains_point(csg: 'CutCSG', local_pt: Float3, eps: float = 1e-4) -> bool:
     """True if *local_pt* (timber-local floats) is inside *csg*, within *eps*."""
     return csg.contains_point(to_v3(local_pt), eps)
 
 
-def csg_point_on_boundary(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> bool:
+def csg_point_on_boundary(csg: 'CutCSG', local_pt: Float3, eps: float = 1e-4) -> bool:
     """True if *local_pt* (timber-local floats) lies on the boundary of *csg*, within *eps*.
 
     These two are thin adapters over kumiki's own CutCSG methods. kigumi used to
@@ -180,7 +167,7 @@ def feature_at(csg: 'CutCSG', point: Any, eps: float) -> Optional['CSGFeature']:
     return hits[0].feature
 
 
-def describe_leaf_csg(csg: 'CutCSG', local_pt: List[float], eps: float = 1e-4) -> str:
+def describe_leaf_csg(csg: 'CutCSG', local_pt: Float3, eps: float = 1e-4) -> str:
     """What to call the part of primitive *csg* that *local_pt* lies on.
 
     A leaf's own account of itself: one primitive, one point, one string, and
@@ -442,8 +429,8 @@ def cropped_edge_segments(
         line.point + line.direction * _exact(reached))
     return ([
         {
-            "start": _floats3(at(low)),
-            "end": _floats3(at(high)),
+            "start": Float3.of(at(low)),
+            "end": Float3.of(at(high)),
         }
         for low, high in cropped
     ], False)
@@ -505,12 +492,12 @@ def non_real_highlight_segments(
     extent = feature.get_extent(owner)
     if extent is None or extent.ends is None:
         return None
-    to_world = lambda point: _floats3(timber.transform.local_to_global(point))
+    to_world = lambda point: Float3.of(timber.transform.local_to_global(point))
     return [{"start": to_world(extent.ends[0]), "end": to_world(extent.ends[1])}]
 
 
 def features_at_point(
-    root: 'CutCSG', local_pt: List[float], eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
+    root: 'CutCSG', local_pt: Float3, eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
     local_ray: Optional[LocalRay] = None, whole_ray: bool = False,
 ) -> List['OwnedFeatureHit']:
     """Every feature the WHOLE tree sees at the click, best first.
@@ -544,30 +531,31 @@ class Candidate(NamedTuple):
     """A feature under the pointer in a drawing's view: where along the ray it was found, and
     the depth group it is in (see order_along_ray), named by the depth the group starts at."""
     hit: 'OwnedFeatureHit'
-    place: Optional[List[float]]
+    place: Optional[Float3]
     depth: float
     group: float
 
 
 def candidates_under_pointer(
-    root: 'CutCSG', local_pt: List[float], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
+    root: 'CutCSG', local_pt: Float3, tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
 ) -> List[Candidate]:
     """Everything under the pointer at any depth, for a drawing's view: only what the view can
     measure (measurable_in_view), nearest first (order_along_ray)."""
-    hits = root.find_all_features(to_v3(local_pt), tolerances)
-    origin, direction = local_ray[0], unit_or_none(local_ray[1])
+    local_pt = Float3.of(local_pt)
+    hits = root.find_all_features(local_pt.v3(), tolerances)
+    origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
     if direction is None:
-        return [Candidate(hit, list(local_pt), 0.0, 0.0) for hit in hits]
-    found: Dict[Tuple[str, int], Tuple[float, List[float]]] = {}
+        return [Candidate(hit, local_pt, 0.0, 0.0) for hit in hits]
+    found: Dict[Tuple[str, int], Tuple[float, Float3]] = {}
 
-    def found_at(at_place: List['OwnedFeatureHit'], place: List[float]) -> None:
+    def found_at(at_place: List['OwnedFeatureHit'], place: Float3) -> None:
         along = _along_ray(origin, direction, place)
         for hit in at_place:
             key = _hit_key(hit)
             if key not in found or along < found[key][0]:
                 found[key] = (along, place)
 
-    found_at(hits, list(local_pt))
+    found_at(hits, local_pt)
     for at_place, place in real_features_along_ray(root, local_ray, tolerances):
         found_at(at_place, place)
         hits = _merge_hits(hits, at_place)
@@ -578,7 +566,7 @@ def candidates_under_pointer(
             extent = hit.feature.get_extent(hit.owner)
             if extent is not None and extent.ends is not None:
                 nearest = ray_nears_segment(
-                    origin, direction, (_floats3(extent.ends[0]), _floats3(extent.ends[1])), math.inf)
+                    origin, direction, (Float3.of(extent.ends[0]), Float3.of(extent.ends[1])), math.inf)
                 if nearest is not None:
                     found_at([hit], nearest)
     # An edge or corner is placed on itself, where it comes nearest the pointer: it was found
@@ -597,30 +585,29 @@ def candidates_under_pointer(
             for hit in ordered]
 
 
-def _nearest_on(hit: 'OwnedFeatureHit', origin: List[float], direction: List[float]) -> Optional[List[float]]:
+def _nearest_on(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3) -> Optional[Float3]:
     """The point of an edge (its line) or corner nearest the ray; None for anything else."""
     from kumiki.geometry import Line, Point
 
     located = hit.feature.locate_simple_unbounded(hit.owner)
     if isinstance(located, Point):
-        return _floats3(located.position)
+        return Float3.of(located.position)
     if not isinstance(located, Line):
         return None
-    point, run = _floats3(located.point), unit_or_none(_floats3(located.direction))
+    point, run = Float3.of(located.point), Float3.of(located.direction).unit()
     if run is None:
         return None
-    across = sum(run[i] * direction[i] for i in range(3))
+    across = run.dot(direction)
     if abs(across) > 1 - 1e-12:
         return None  # along the ray: any point of it is as near as any other
-    to_origin = [origin[i] - point[i] for i in range(3)]
-    along_line = (sum(to_origin[i] * run[i] for i in range(3))
-                  - across * sum(to_origin[i] * direction[i] for i in range(3))) / (1 - across * across)
-    return [point[i] + run[i] * along_line for i in range(3)]
+    to_origin = origin - point
+    along_line = (to_origin.dot(run) - across * to_origin.dot(direction)) / (1 - across * across)
+    return point + run * along_line
 
 
 def split_hidden(
-    candidates: List[Candidate], direction: List[float], tolerance: float,
-    blocked: Optional[Callable[[List[float]], bool]] = None,
+    candidates: List[Candidate], direction: Float3, tolerance: float,
+    blocked: Optional[Callable[[Float3], bool]] = None,
 ) -> Tuple[List[Candidate], List[Candidate]]:
     """*candidates* as (visible, hidden), each in order.
 
@@ -634,7 +621,7 @@ def split_hidden(
 
     Non-real features (a bore's axis) are snap targets in a void, and never hidden.
     """
-    unit = unit_or_none(direction) or direction
+    unit = Float3.of(direction).unit() or Float3.of(direction)
     visible: List[Candidate] = []
     hidden: List[Candidate] = []
     for candidate in candidates:
@@ -650,44 +637,36 @@ def split_hidden(
     return visible, hidden
 
 
-def _sheet_shape(hit: 'OwnedFeatureHit', direction: List[float]):
-    """What a feature is on the sheet: ('line', point, run) or ('point', point), projected along
+def _sheet_shape(hit: 'OwnedFeatureHit', direction: Float3):
+    """What a feature is on the sheet: ('line', point, run) or ('point', point), flattened along
     *direction*; None for anything else (a face seen at an angle, a curved surface)."""
     from kumiki.geometry import Line, Plane, Point
 
     located = hit.feature.locate_simple_unbounded(hit.owner)
-    flatten = lambda v: [v[i] - direction[i] * sum(v[j] * direction[j] for j in range(3)) for i in range(3)]
     if isinstance(located, Point):
-        return ("point", flatten(_floats3(located.position)))
+        return ("point", Float3.of(located.position).across(direction))
     if isinstance(located, Line):
-        run = unit_or_none(flatten(_floats3(located.direction)))
-        point = flatten(_floats3(located.point))
+        run = Float3.of(located.direction).across(direction).unit()
+        point = Float3.of(located.point).across(direction)
         return ("point", point) if run is None else ("line", point, run)
     if isinstance(located, Plane):
-        normal = _floats3(located.normal)
-        run = unit_or_none([normal[1] * direction[2] - normal[2] * direction[1],
-                            normal[2] * direction[0] - normal[0] * direction[2],
-                            normal[0] * direction[1] - normal[1] * direction[0]])
-        return None if run is None else ("line", flatten(_floats3(located.point)), run)
+        run = Float3.of(located.normal).cross(direction).unit()
+        return None if run is None else ("line", Float3.of(located.point).across(direction), run)
     return None
 
 
-def _covers(front: Candidate, behind: Candidate, direction: List[float], tolerance: float) -> bool:
+def _covers(front: Candidate, behind: Candidate, direction: Float3, tolerance: float) -> bool:
     """Whether *front* lands where *behind* does on the sheet, under the pointer."""
     near, far = _sheet_shape(front.hit, direction), _sheet_shape(behind.hit, direction)
     if near is None or far is None:
         return False
     if near[0] == "line" and far[0] == "line":
-        cross = [near[2][1] * far[2][2] - near[2][2] * far[2][1],
-                 near[2][2] * far[2][0] - near[2][0] * far[2][2],
-                 near[2][0] * far[2][1] - near[2][1] * far[2][0]]
-        return math.sqrt(sum(c * c for c in cross)) <= EDGE_ON
+        return near[2].cross(far[2]).length() <= EDGE_ON
     if far[0] == "point" and near[0] == "point":
-        return math.dist(near[1], far[1]) <= tolerance
+        return near[1].dist(far[1]) <= tolerance
     if far[0] == "point" and near[0] == "line":
-        offset = [far[1][i] - near[1][i] for i in range(3)]
-        along = sum(offset[i] * near[2][i] for i in range(3))
-        return math.sqrt(max(0.0, sum(c * c for c in offset) - along * along)) <= tolerance
+        offset = far[1] - near[1]
+        return offset.across(near[2]).length() <= tolerance
     return False  # a line behind a point is seen either side of it
 
 
@@ -696,7 +675,7 @@ EDGE_ON = 1e-6
 
 
 def measurable_in_view(
-    hits: List['OwnedFeatureHit'], direction: List[float], tolerance: float,
+    hits: List['OwnedFeatureHit'], direction: Float3, tolerance: float,
 ) -> List['OwnedFeatureHit']:
     """*hits* without the faces a drawing's view has no use for.
 
@@ -710,22 +689,20 @@ def measurable_in_view(
     from kumiki.geometry import Line, Plane
 
     located = [(hit, hit.feature.locate_simple_unbounded(hit.owner)) for hit in hits]
-    lines = [(_floats3(line.point), _floats3(line.direction))
+    lines = [(Float3.of(line.point), Float3.of(line.direction).unit())
              for _hit, line in located if isinstance(line, Line)]
-    dot = lambda a, b: sum(a[i] * b[i] for i in range(3))
 
     def keep(hit: 'OwnedFeatureHit', where: Any) -> bool:
         if hit.feature.feature_type() is not CSGFeatureType.FACE or not isinstance(where, Plane):
             return True
-        normal = unit_or_none(_floats3(where.normal))
+        normal = Float3.of(where.normal).unit()
         if normal is None:
             return True
-        if abs(dot(normal, direction)) > EDGE_ON:
+        if abs(normal.dot(direction)) > EDGE_ON:
             return False
-        on_plane = _floats3(where.point)
+        on_plane = Float3.of(where.point)
         return not any(
-            abs(dot(normal, unit_or_none(run) or run)) <= EDGE_ON
-            and abs(dot(normal, [point[i] - on_plane[i] for i in range(3)])) <= tolerance
+            run is not None and abs(normal.dot(run)) <= EDGE_ON and abs(normal.dot(point - on_plane)) <= tolerance
             for point, run in lines)
 
     return [hit for hit, where in located if keep(hit, where)]
@@ -737,8 +714,8 @@ def _hit_key(hit: 'OwnedFeatureHit') -> Tuple[str, int]:
     return (hit.feature.name, id(hit.owner))
 
 
-def _along_ray(origin: List[float], direction: List[float], point: List[float]) -> float:
-    return sum((float(point[i]) - origin[i]) * direction[i] for i in range(3))
+def _along_ray(origin: Float3, direction: Float3, point) -> float:
+    return (Float3.of(point) - origin).dot(direction)
 
 
 def order_along_ray(
@@ -787,7 +764,7 @@ def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) ->
 
 def real_features_along_ray(
     root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
-) -> List[Tuple[List['OwnedFeatureHit'], List[float]]]:
+) -> List[Tuple[List['OwnedFeatureHit'], Float3]]:
     """Every feature on the boundary anywhere under the pointer, at any depth: the features at
     each place found, and the place.
 
@@ -804,12 +781,11 @@ def real_features_along_ray(
     from kumiki.csg.cutcsg import FeatureTestTolerances, csg_children
     from kumiki.geometry import Line, Plane, Point
 
-    origin, direction = local_ray
-    direction = unit_or_none(direction)
+    origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
     if direction is None:
         return []
     near = float(tolerances.edge)
-    places: List[List[float]] = []
+    places: List[Float3] = []
 
     def consider(feature: 'CSGFeature', owner: 'CutCSG') -> None:
         located = feature.locate_simple_unbounded(owner)
@@ -817,13 +793,11 @@ def real_features_along_ray(
             at = _ray_meets_plane(origin, direction, located)
         elif isinstance(located, Line):
             extent = feature.get_extent(owner)
-            at = (ray_nears_segment(origin, direction, (_floats3(extent.ends[0]), _floats3(extent.ends[1])), near)
+            at = (ray_nears_segment(origin, direction, (Float3.of(extent.ends[0]), Float3.of(extent.ends[1])), near)
                   if extent is not None and extent.ends is not None else None)
         elif isinstance(located, Point):
-            position = _floats3(located.position)
-            along = sum((position[i] - origin[i]) * direction[i] for i in range(3))
-            closest = [origin[i] + direction[i] * along for i in range(3)]
-            at = position if math.dist(position, closest) <= near else None
+            position = Float3.of(located.position)
+            at = position if (position - origin).across(direction).length() <= near else None
         else:
             at = None
         if at is not None:
@@ -838,18 +812,18 @@ def real_features_along_ray(
 
     walk(root)
     snap = FeatureTestTolerances(face=near, edge=near, point=max(near, float(tolerances.point)))
-    return [(root.find_all_features(to_v3(place), snap), place)
-            for place in places if root.is_point_on_boundary(to_v3(place), eps=near)]
+    return [(root.find_all_features(place.v3(), snap), place)
+            for place in places if root.is_point_on_boundary(place.v3(), eps=near)]
 
 
-def _ray_meets_plane(origin: List[float], direction: List[float], plane: Any) -> Optional[List[float]]:
+def _ray_meets_plane(origin: Float3, direction: Float3, plane: Any) -> Optional[Float3]:
     """Where the ray crosses *plane*, or None if it runs along it or the plane is behind it."""
-    normal, at = _floats3(plane.normal), _floats3(plane.point)
-    facing = sum(direction[i] * normal[i] for i in range(3))
+    normal, at = Float3.of(plane.normal), Float3.of(plane.point)
+    facing = direction.dot(normal)
     if abs(facing) < 1e-9:
         return None
-    along = sum((at[i] - origin[i]) * normal[i] for i in range(3)) / facing
-    return None if along < 0 else [origin[i] + direction[i] * along for i in range(3)]
+    along = (at - origin).dot(normal) / facing
+    return None if along < 0 else origin + direction * along
 
 
 def merge_ray_hits(
@@ -894,8 +868,7 @@ def non_real_features_along_ray(
     from kumiki.csg.cutcsg import OwnedFeatureHit, csg_children
     from kumiki.geometry import Line
 
-    origin, direction = local_ray
-    direction = unit_or_none(direction)
+    origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
     if direction is None:
         return []
     tolerance = float(tolerances.edge)
@@ -909,7 +882,7 @@ def non_real_features_along_ray(
         extent = feature.get_extent(owner)
         if extent is None or extent.ends is None:
             return
-        ends = (_floats3(extent.ends[0]), _floats3(extent.ends[1]))
+        ends = (Float3.of(extent.ends[0]), Float3.of(extent.ends[1]))
         if ray_reaches_segment(origin, direction, ends, tolerance):
             found.append(OwnedFeatureHit(feature=feature, owner=owner))
 
@@ -924,29 +897,19 @@ def non_real_features_along_ray(
     return found
 
 
-def unit_or_none(vector: List[float]) -> Optional[List[float]]:
-    """A unit copy of *vector*, or None if it has no direction."""
-    length = math.sqrt(sum(float(c) * float(c) for c in vector))
-    if length <= 0:
-        return None
-    return [float(c) / length for c in vector]
 
 
-def ray_reaches_segment(
-    origin: List[float], direction: List[float], ends: Tuple[List[float], List[float]], tolerance: float,
-) -> bool:
+
+def ray_reaches_segment(origin, direction, ends, tolerance: float) -> bool:
     """Whether the ray passes within *tolerance* of the segment between *ends*."""
     return ray_nears_segment(origin, direction, ends, tolerance) is not None
 
 
-def ray_nears_segment(
-    origin: List[float], direction: List[float], ends: Tuple[List[float], List[float]], tolerance: float,
-) -> Optional[List[float]]:
+def ray_nears_segment(origin, direction, ends, tolerance: float) -> Optional[Float3]:
     """The point of the segment between *ends* nearest the ray, if within *tolerance* of it.
 
-    Plain floats throughout: this is a screen-space snap run on every hover, and
-    it decides whether something is close enough to click -- not where anything
-    is cut.
+    A screen-space snap run on every hover: it decides whether something is close enough to
+    click, not where anything is cut.
 
     The closest approach of two lines, with the segment parameter clamped to the
     segment and the ray parameter to what is in front of the origin, since
@@ -956,29 +919,25 @@ def ray_nears_segment(
     `direction` is expected normalised, which is what makes D.D drop out of the
     usual pair of equations and leaves a single division.
     """
-    segment = [float(ends[1][i]) - float(ends[0][i]) for i in range(3)]
-    segment_length_sq = sum(c * c for c in segment)
+    origin, direction = Float3.of(origin), Float3.of(direction)
+    start, end = Float3.of(ends[0]), Float3.of(ends[1])
+    segment = end - start
+    segment_length_sq = segment.dot(segment)
     if segment_length_sq <= 0:
         return None
 
-    to_origin = [float(origin[i]) - float(ends[0][i]) for i in range(3)]
-    dot = lambda a, b: sum(a[i] * b[i] for i in range(3))
-    ray_dot_segment = dot(direction, segment)
-    ray_dot_to_origin = dot(direction, to_origin)
-    segment_dot_to_origin = dot(segment, to_origin)
-
+    to_origin = origin - start
+    ray_dot_segment = direction.dot(segment)
     denominator = segment_length_sq - ray_dot_segment * ray_dot_segment
     if abs(denominator) < 1e-12:
         along_segment = 0.5
     else:
-        along_segment = (segment_dot_to_origin - ray_dot_segment * ray_dot_to_origin) / denominator
+        along_segment = (segment.dot(to_origin) - ray_dot_segment * direction.dot(to_origin)) / denominator
         along_segment = min(1.0, max(0.0, along_segment))
 
-    on_segment = [float(ends[0][i]) + segment[i] * along_segment for i in range(3)]
-    along_ray = max(0.0, dot([on_segment[i] - float(origin[i]) for i in range(3)], direction))
-    on_ray = [float(origin[i]) + direction[i] * along_ray for i in range(3)]
-    gap = [on_segment[i] - on_ray[i] for i in range(3)]
-    return on_segment if math.sqrt(dot(gap, gap)) <= tolerance else None
+    on_segment = start + segment * along_segment
+    on_ray = origin + direction * max(0.0, (on_segment - origin).dot(direction))
+    return on_segment if on_segment.dist(on_ray) <= tolerance else None
 
 
 def resolve_derived_feature(hits: List['OwnedFeatureHit']) -> Optional['CSGFeature']:
@@ -1005,9 +964,9 @@ def resolve_derived_feature(hits: List['OwnedFeatureHit']) -> Optional['CSGFeatu
 def outward_normal_and_face(
     target: 'CutCSG',
     local_csg: 'CutCSG',
-    local_pt: List[float],
+    local_pt: Float3,
     eps: float,
-) -> Tuple[Optional[List[float]], Optional[str]]:
+) -> Tuple[Optional[Float3], Optional[str]]:
     """The outward normal at the pick, and which of the timber's own six faces
     it points most nearly along.
 
@@ -1059,11 +1018,10 @@ def outward_normal_and_face(
     )
     if parity is CSGParity.SUBTRACTIVE:
         normal = -normal
-    as_floats = [float(normal[0]), float(normal[1]), float(normal[2])]
-    return as_floats, nearest_timber_local_face_name(normal)
+    return Float3.of(normal), nearest_timber_local_face_name(normal)
 
 
-def resolve_csg_at_path(csg: 'CutCSG', path: List[str], local_pt: Optional[List[float]] = None, eps: float = 1e-4) -> 'CutCSG':
+def resolve_csg_at_path(csg: 'CutCSG', path: List[str], local_pt: Optional[Float3] = None, eps: float = 1e-4) -> 'CutCSG':
     """Walk the CSG tree following *path* of labeled CSG nodes.
 
     Searches through unlabeled intermediate Difference/SolidUnion nodes
@@ -1124,7 +1082,7 @@ def resolve_csg_at_path(csg: 'CutCSG', path: List[str], local_pt: Optional[List[
 
 def navigate_csg_one_level(
     node: 'CutCSG',
-    local_pt: List[float],
+    local_pt: Float3,
     current_path: List[str],
     eps: float = 1e-4,
     segments: Optional[Dict[int, str]] = None,
@@ -1173,7 +1131,7 @@ def navigate_csg_one_level(
 
 def navigate_csg_to_leaf(
     csg: 'CutCSG',
-    local_pt: List[float],
+    local_pt: Float3,
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
     """A plain click: traverse from root to deepest labeled node, then report face."""
@@ -1192,7 +1150,7 @@ def navigate_csg_to_leaf(
         node = target
 
 
-def aabb_filter(csg: 'CutCSG', eps: float) -> Optional[Callable[[List[float]], bool]]:
+def aabb_filter(csg: 'CutCSG', eps: float) -> Optional[Callable[[Float3], bool]]:
     """A cheap "could this point be on *csg*" test, or None if it cannot help.
 
     None when the box says nothing useful -- a solid unbounded in every
@@ -1230,7 +1188,7 @@ def aabb_filter(csg: 'CutCSG', eps: float) -> Optional[Callable[[List[float]], b
     if all(low is None and high is None for low, high in limits):
         return None
 
-    def inside(point: List[float]) -> bool:
+    def inside(point: Float3) -> bool:
         for axis, (low, high) in enumerate(limits):
             value = point[axis]
             if low is not None and value < low:
@@ -1246,8 +1204,8 @@ def extract_highlight_mesh(
     mesh_vertices: List[float],
     mesh_indices: List[int],
     target_csg: 'CutCSG',
-    timber_rot: List[List[float]],
-    timber_pos: List[float],
+    timber_rot: Rows3,
+    timber_pos: Float3,
     eps: float = 1e-4,
     root_csg: Optional['CutCSG'] = None,
     selected_path: Optional[List[str]] = None,

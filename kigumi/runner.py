@@ -31,7 +31,7 @@ from typing import (TYPE_CHECKING, Any, Callable, Dict, Final, List, Mapping, Na
 # Stations along a line, low then high.
 Interval = Tuple[float, float]
 # A pointer's ray in timber-local space: origin, direction.
-LocalRay = Tuple[List[float], List[float]]
+LocalRay = Tuple['Float3', 'Float3']
 
 # --- wire forms ---------------------------------------------------------------
 #
@@ -175,8 +175,8 @@ class MeshWire(TypedDict):
 
 
 class SegmentWire(TypedDict):
-    start: Vec3
-    end: Vec3
+    start: 'Float3'
+    end: 'Float3'
 
 
 class AnchorPointsWire(TypedDict):
@@ -227,7 +227,7 @@ class NodeDescriptionWire(TypedDict, total=False):
     featureLabel: Optional[str]
     featureType: Optional[str]
     facesToward: Optional[str]
-    outwardNormal: Optional[Vec3]
+    outwardNormal: Optional['Float3']
 
 
 class DerivationParentWire(TypedDict):
@@ -653,6 +653,7 @@ if TYPE_CHECKING:
     from kumiki.kiwari import Kiwari
     from kumiki.ticket import Ticket
     from kumiki.timber import Accessory, CutTimber, Cutting, Frame, Joint, PerfectTimberWithin
+    from kumiki.viewer.rule_at_home import Float3, Rows3
 
     Located = Union[Point, Line, Plane]
     # A picked feature, the node that owns it, and what it lies on.
@@ -2521,31 +2522,30 @@ def _pick_from_candidate(
 
 
 def _sight_blocker(
-    ss: 'SlotState', own: 'CutTimber', own_root: 'CutCSG', payload: PickRequest, direction: List[float],
-) -> Callable[[List[float]], bool]:
+    ss: 'SlotState', own: 'CutTimber', own_root: 'CutCSG', payload: PickRequest, direction: 'Float3',
+) -> Callable[['Float3'], bool]:
     """Whether a place on *own* (in its local space) is behind material in a drawing's view.
 
     Anything the drawing draws can be in the way -- the viewer sends which members those are, and
     with none sent every member is -- but not its faded context, which is there to place the piece.
     """
     from kumiki.viewer.visibility import sight_is_blocked
-    from kumiki.rule import create_v3
 
-    toward_camera = [-float(c) for c in direction]
+    toward = (-direction).v3()
     drawn = payload.get("drawnMembers")
     others = [entry for key, entry in ss.mesh_cache.items()
               if entry.get("cut_timber") is not None and entry.get("cut_timber") is not own
               and entry.get("local_csg") is not None and (drawn is None or key in drawn)]
 
-    def blocked(place: List[float]) -> bool:
-        at, toward = create_v3(*place), create_v3(*toward_camera)
+    def blocked(place: 'Float3') -> bool:
+        at = place.v3()
         if sight_is_blocked(own_root, at, toward):
             return True
         world = own.timber.transform.local_to_global(at)
         world_toward = own.timber.transform.local_to_global_direction(toward)
         for entry in others:
             transform = entry["cut_timber"].timber.transform
-            if sight_is_blocked(entry["local_csg"], transform.global_to_local(world),
+            if sight_is_blocked(cast('CutCSG', entry["local_csg"]), transform.global_to_local(world),
                                 transform.global_to_local_direction(world_toward)):
                 return True
         return False
@@ -5137,7 +5137,7 @@ def make_error_response(request_id: Any, command: str, exc: Exception) -> Respon
 # ===========================================================================
 
 def _local_ray_from_payload(
-    payload: PickRequest, rot: List[List[float]], pos: List[float],
+    payload: PickRequest, rot: 'Rows3', pos: 'Float3',
 ) -> Optional[LocalRay]:
     """The pointer's ray in timber-local space, or None if it did not send one.
 
@@ -5155,8 +5155,8 @@ def _local_ray_from_payload(
     if len(origin) != 3 or len(direction) != 3:
         return None
     return (
-        inv_transform_point(rot, pos, [float(c) for c in origin]),
-        inv_transform_direction(rot, [float(c) for c in direction]),
+        inv_transform_point(rot, pos, origin),
+        inv_transform_direction(rot, direction),
     )
 
 
@@ -5303,7 +5303,7 @@ def _describe_pick(
     target: 'CutCSG',
     local_csg: 'CutCSG',
     cut_timber: 'CutTimber',
-    local_pt: List[float],
+    local_pt: 'Float3',
     eps: float,
     feature_label: Optional[str],
     feature_type: Optional[str] = None,
@@ -5558,7 +5558,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     timber_rot, timber_pos = build_inv_transform_float(timber.transform)
 
     # Convert global click point to timber-local
-    local_pt = inv_transform_point(timber_rot, timber_pos, [float(p) for p in point])
+    local_pt = inv_transform_point(timber_rot, timber_pos, point)
 
     t0 = time.monotonic()
 
@@ -5820,7 +5820,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
 
 
 def _log_pick(
-    member_key: str, local_pt: List[float], tolerances: 'FeatureTestTolerances',
+    member_key: str, local_pt: 'Float3', tolerances: 'FeatureTestTolerances',
     feature_hits: List['OwnedFeatureHit'], result: PickResultWire,
 ) -> None:
     """One line per pick saying what was under the pointer, when asked for.
