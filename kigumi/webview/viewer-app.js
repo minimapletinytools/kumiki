@@ -121,6 +121,9 @@ function describeAnchor(anchor) {
     return anchor.feature ? trail.concat(anchor.feature).join(' > ') : trail.join(' > ');
 }
 
+// How strongly a selection shows in a drawing's views other than its own.
+const SELECTION_ECHO_OPACITY = 0.3;
+
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
  *
@@ -128,6 +131,7 @@ function describeAnchor(anchor) {
  * holds several viewports at once and each frames the model its own way -- an
  * elevation and the preview beside it cannot take turns with one camera.
  */
+
 class ViewerViewport {
     constructor(spec, cameraController) {
         this.spec = spec;
@@ -1548,8 +1552,12 @@ class KigumiViewerApp extends LitElement {
         const single = this.viewports.length < 2;
         for (const object of this._highlightObjects.values()) {
             const role = object.userData.role;
-            object.visible = single || role === 'reference'
+            const own = single || role === 'reference'
                 || viewportId === (role === 'hover' ? this._hoverViewportId : this.selectionManager.scope);
+            // The selection echoes softly in the other views, so it can be found there too.
+            const echo = !own && role === 'selection';
+            object.visible = own || echo;
+            object.material.opacity = object.userData.opacity * (echo ? SELECTION_ECHO_OPACITY : 1);
         }
     }
 
@@ -3886,7 +3894,7 @@ class KigumiViewerApp extends LitElement {
             const focus = this.selectionManager.csgFocus;
             const currentPath = (focus && focus.timberKey === memberKey) ? focus.path : [];
             if (typeof vscode !== 'undefined') {
-                vscode.postMessage({
+                const request = {
                     type: 'findCSGAtPoint',
                     memberKey,
                     point,
@@ -3903,7 +3911,16 @@ class KigumiViewerApp extends LitElement {
                     // to the feature the hover lit rather than to a different
                     // one -- and so the pick comes back with the plane.
                     ...this._heldForRequest(),
+                };
+                // The whole question, so a pick can be replayed against the runner.
+                this.emitViewerLog('pick-request', {
+                    ...request,
+                    camera: pickCamera ? {
+                        position: pickCamera.position.toArray(),
+                        quaternion: pickCamera.quaternion.toArray(),
+                    } : null,
                 });
+                vscode.postMessage(request);
             }
         } else {
             this._dropCsgFocus();
@@ -4478,6 +4495,7 @@ class KigumiViewerApp extends LitElement {
                 const object = this._buildHighlightObject(descriptor);
                 if (object) {
                     object.userData.role = descriptor.role;
+                    object.userData.opacity = descriptor.opacity;
                     this.scene.add(object);
                 }
                 return object;
@@ -4487,6 +4505,7 @@ class KigumiViewerApp extends LitElement {
             // message arrived.
             update: (object, descriptor) => {
                 object.userData.role = descriptor.role;
+                object.userData.opacity = descriptor.opacity;
                 object.material.color.setHex(descriptor.color);
                 object.material.opacity = descriptor.opacity;
                 object.renderOrder = descriptor.renderOrder;
@@ -5258,7 +5277,12 @@ class KigumiViewerApp extends LitElement {
                             item.checked || item.id === activeId
                                 ? ' context-menu-checked' : ''}"
                         ?disabled=${Boolean(item.disabled)}
-                        @mouseenter=${() => this._showFeatureFromMenu(item.id)}
+                        @mouseenter=${() => {
+                            // A disabled button still gets mouseenter; a hidden feature is not shown.
+                            if (!item.disabled) {
+                                this._showFeatureFromMenu(item.id);
+                            }
+                        }}
                         @click=${(event) => {
                             this.contextMenu.choose(item.id, event);
                             this.requestUpdate();

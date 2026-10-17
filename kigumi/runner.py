@@ -5485,6 +5485,35 @@ def _pick_tolerances(payload: PickRequest, eps: float) -> 'FeatureTestTolerances
 ACCESSORY_KEY_PREFIX = "accessory:"
 
 
+def _candidates_wire(
+    local_csg: 'CutCSG', feature_hits: List['OwnedFeatureHit'], visible_count: int,
+) -> List[CandidateWire]:
+    """The candidates under the pointer, for the viewer; those from *visible_count* on are hidden.
+
+    Enough per candidate to answer "why that one" and "why not mine" from the viewer's own log,
+    without turning the runner's pick log on: the ordering is (real, kind, declared, group,
+    priority), and all of it is here.
+    """
+    from kumiki.viewer.picking import node_positions
+
+    positions = node_positions(local_csg)
+    return [
+        {
+            "label": hit.feature.name,
+            "type": hit.feature.feature_type().name,
+            "real": bool(hit.feature.real),
+            "derived": bool(hit.feature.is_derived()),
+            "group": hit.feature.group.name,
+            "priority": int(hit.feature.priority),
+            # Where it is declared, which tells apart two features named alike.
+            "path": positions.get(id(hit.owner), (0, 0, []))[2],
+            # Under the pointer but not seen there: offered greyed, never taken.
+            "hidden": index >= visible_count,
+        }
+        for index, hit in enumerate(feature_hits)
+    ]
+
+
 def _nothing_at_point(member_key: str) -> PickResultWire:
     """A pick that found nothing, in the shape every pick answer takes.
 
@@ -5600,6 +5629,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
             local_ray[1], float(tolerances.edge), _sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1]))
         feature_hits = [candidate.hit for candidate in visible + hidden]
         visible_count = len(visible)
+        if not visible and not ctrl_click:
+            # Only hidden features here: nothing to take, but the menu still lists them, greyed.
+            return {**_nothing_at_point(member_key),
+                    "candidates": _candidates_wire(local_csg, feature_hits, visible_count)}
     else:
         feature_hits = features_at_point(local_csg, local_pt, eps, tolerances, local_ray=local_ray)
         visible_count = len(feature_hits)
@@ -5633,8 +5666,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     # feature, or picking the first row of the menu, is the caller naming one --
     # and treating it as "nothing named" dropped it back to the most specific
     # answer, which is the very thing cycling exists to get away from.
-    if candidate_index is not None and feature_hits:
-        chosen = feature_hits[int(candidate_index) % len(feature_hits)]
+    if candidate_index is not None and visible_count:
+        chosen = feature_hits[int(candidate_index) % visible_count]  # never a hidden one
         picked = _pick_from_candidate(local_csg, chosen)
         if picked is not None:
             new_path, target_csg, feature_label, feature_type, edge, declared_edge = picked
@@ -5727,7 +5760,6 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
             parent_hl = MeshWire(vertices=p_verts, indices=p_idx)
 
     mesh_walk_ms = (time.monotonic() - t0) * 1000.0
-    candidate_positions = node_positions(local_csg)
 
     result: PickResultWire = {
         # Echoed back because the viewer can have several timbers selected at
@@ -5746,25 +5778,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         # them by name rather than as "the next one".
         # Only those that can be taken: Tab steps through these.
         "candidateCount": visible_count,
-        # Enough per candidate to answer "why that one" and "why not mine" from
-        # the viewer's own log, without turning the runner's pick log on: the
-        # ordering is (real, kind, declared, group, priority), and all of it is
-        # here.
-        "candidates": [
-            {
-                "label": hit.feature.name,
-                "type": hit.feature.feature_type().name,
-                "real": bool(hit.feature.real),
-                "derived": bool(hit.feature.is_derived()),
-                "group": hit.feature.group.name,
-                "priority": int(hit.feature.priority),
-                # Where it is declared, which tells apart two features named alike.
-                "path": candidate_positions.get(id(hit.owner), (0, 0, []))[2],
-                # Under the pointer but not seen there: offered greyed, never taken.
-                "hidden": index >= visible_count,
-            }
-            for index, hit in enumerate(feature_hits)
-        ],
+        "candidates": _candidates_wire(local_csg, feature_hits, visible_count),
         # And WHICH of them this answer is, so the viewer can mark the one it is
         # showing -- the right-click menu lights the row the view is lighting,
         # rather than keeping a second opinion about which that is.
