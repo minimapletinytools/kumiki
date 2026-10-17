@@ -10,6 +10,8 @@ import io
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -23,6 +25,16 @@ def _load_runner():
 
 
 runner = _load_runner()
+
+
+@pytest.fixture(autouse=True)
+def _keep_modules():
+    # Loading a file purges kumiki where it is installed from this checkout (as on CI); the rest
+    # of the session keeps the modules it imported. See test_kigumi_slot_reload.
+    saved_modules = dict(sys.modules)
+    yield
+    sys.modules.clear()
+    sys.modules.update(saved_modules)
 
 
 def test_every_generated_measurement_resolves_and_settles():
