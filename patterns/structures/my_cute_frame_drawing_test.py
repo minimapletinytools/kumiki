@@ -18,7 +18,7 @@ from pathlib import Path as FilePath
 from typing import Dict, List, Sequence, Tuple
 
 from kumiki import *
-from kumiki.csg.cutcsg import OwnedFeatureHit, PrismCenterplaneFeature
+from kumiki.csg.cutcsg import MidplaneFeature, OwnedFeatureHit, measured_by_default
 from kumiki.csg.carriers import Row
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.drawings.assumptions import sheet_axis_assumptions, square_assumptions
@@ -69,10 +69,11 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     carriers = carrier_map_of(*cut_timbers)
 
     fixed = next(cut for cut in cut_timbers if cut.timber.ticket.path == FIXED_TIMBER)
-    body = fixed.get_extended_perfect_csg_local()
+    body = fixed.get_extended_rough_csg_with_perfect_features_local()
     known = [FeatureHandle(timber=fixed.timber, hit=OwnedFeatureHit(feature=feature, owner=body))
              for feature in body.get_declared_features()
-             if feature.feature_type().name == "FACE" and not isinstance(feature, PrismCenterplaneFeature)]
+             if feature.feature_type().name == "FACE" and not isinstance(feature, MidplaneFeature)
+             and measured_by_default(feature.properties.purpose)]
 
     targets = [required.handle for cut in cut_timbers for required in planning_features(cut)]
     # The fixed timber's faces are targets too; each feature once.
@@ -83,7 +84,7 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     known_rows = _rows(known, carriers) + [row for assumption in assumptions for row in assumption.rows]
 
     # Centerplanes can't be referenced by a drawing yet, so they're solved for but never dimensioned to.
-    anchors = [handle for handle in directed if not isinstance(handle.feature, PrismCenterplaneFeature)]
+    anchors = [handle for handle in directed if not isinstance(handle.feature, MidplaneFeature)]
     candidates = sheet_candidates(anchors, carriers, {view: _sheet(view)[0] for view in VIEWS})
     result = auto_dimension(candidates, targets, known_rows, carriers, policy)
 
@@ -144,7 +145,7 @@ def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
         assumptions += sheet_axis_assumptions(targets, carriers, sheet)
     known_rows = _rows(known, carriers) + [row for assumption in assumptions for row in assumption.rows]
 
-    anchors = [handle for handle in targets if not isinstance(handle.feature, PrismCenterplaneFeature)]
+    anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
     candidates = sheet_candidates(anchors, carriers, {view: axes for view, (axes, _) in sheets.items()})
     result = auto_dimension(candidates, targets, known_rows, carriers, policy)
 
@@ -158,30 +159,12 @@ def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
     return result, report
 
 
-def _drawable(handle: FeatureHandle, frame: Frame) -> FeatureHandle:
-    """The same face on the rough body, which is what a drawing can reference today.
-
-    The cute frame's timbers have no rough allowance, so the rough body's face is rptw.X, on ptw.X's plane.
-    """
-    if not handle.feature.name.startswith("ptw."):
-        return handle
-    cut = frame.cut_timber_of(handle.timber)
-    assert cut is not None
-    rendered = cut.render_timber_with_cuts_csg_local()
-    rough_body = rendered.base if isinstance(rendered, Difference) else rendered
-    wanted = "rptw." + handle.feature.name.removeprefix("ptw.")
-    feature = next(f for f in rough_body.get_declared_features() if f.name == wanted)
-    return FeatureHandle(timber=handle.timber, hit=OwnedFeatureHit(feature=feature, owner=rough_body))
-
-
 def build_frame_with_drawing() -> Frame:
     frame, result, _ = solve_cute_frame()
     measurements: Dict = {ELEVATION_IDS["top"]: [], ELEVATION_IDS["front"]: []}
     for pick in result.picks:
         candidate = pick.candidate
-        measure = replace(candidate.measure, anchor_a=_drawable(candidate.measure.anchor_a, frame),
-                          anchor_b=_drawable(candidate.measure.anchor_b, frame))
-        measurements[ELEVATION_IDS[candidate.view]].append(measure)
+        measurements[ELEVATION_IDS[candidate.view]].append(candidate.measure)
     drawing = Drawing(name="Cute frame plan (generated)", timbers=[cut.timber for cut in frame.cut_timbers],
                       viewports=elevation_viewports(), measurements=measurements)
     return replace(frame, drawings=[*frame.drawings, drawing, *(_timber_drawing(cut, frame) for cut in frame.cut_timbers)])
@@ -193,9 +176,7 @@ def _timber_drawing(cut: CutTimber, frame: Frame) -> Drawing:
     measurements: Dict = {SHOP_DRAWING_IDS[view]: [] for view in SHOP_VIEWS}
     for pick in result.picks:
         candidate = pick.candidate
-        measure = replace(candidate.measure, anchor_a=_drawable(candidate.measure.anchor_a, frame),
-                          anchor_b=_drawable(candidate.measure.anchor_b, frame))
-        measurements[SHOP_DRAWING_IDS[candidate.view]].append(measure)
+        measurements[SHOP_DRAWING_IDS[candidate.view]].append(candidate.measure)
     return Drawing(name=f"{cut.timber.ticket.path} (generated)", timbers=[cut.timber],
                    viewports=shop_drawing_viewports(), measurements=measurements)
 

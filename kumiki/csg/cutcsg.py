@@ -518,8 +518,11 @@ def _within_tolerance(
 def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
     """Best answer first.
 
-    Non-real beats real: selecting a centre axis is a deliberate snap, and a
-    surface it happens to lie on should not steal the click. Then the more
+    A non-real line or point beats anything real: selecting a centre axis is a
+    deliberate snap, and a surface it happens to lie on should not steal the
+    click. A non-real plane (a centerplane, a perfect face inside rough stock)
+    is the other way round, last: it runs through the body, so it would
+    otherwise take every click that lands on its line. Then the more
     specific kind -- a point sits on an edge sits on a face, and the narrowest
     claimant is the better answer, so an edge beats the two faces that formed
     it.
@@ -539,8 +542,9 @@ def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']
 
 def feature_hit_sort_key(hit: 'OwnedFeatureHit') -> Tuple:
     """Where a hit sorts: see _sort_feature_hits."""
+    face = hit.feature.feature_type() is CSGFeatureType.FACE
     return (
-        hit.feature.real,
+        1 if hit.feature.real else (2 if face else 0),
         _FEATURE_TYPE_SPECIFICITY[hit.feature.feature_type()],
         hit.feature.is_derived(),
         hit.feature.group_rank(),

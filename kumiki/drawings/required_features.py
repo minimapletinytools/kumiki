@@ -47,9 +47,10 @@ def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_
     - curved faces: always.
     - edges and points: only extras, since a primitive's own are solved through its faces.
 
-    Over the perfect-timber-within tree, which is what the solver works on.
+    Over the drawn tree -- the rough body carrying every perfect plane, with the cuts -- which is
+    what the solver works on.
     """
-    root = cut_timber.render_perfect_timber_within_with_cuts_csg_local()
+    root = cut_timber.render_timber_with_cuts_csg_local()
     timber = cut_timber.timber
     near = create_v3(0, 0, float(timber.length) / 2)
     reach = 4 * float(timber.length) + float(max(timber.size[0], timber.size[1]))
@@ -83,6 +84,6 @@ def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_
 def planning_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_surface) -> List[RequiredFeature]:
     """The required features a planning drawing solves for: the perfect timber within and its joints' shoulder planes."""
     # TODO figure out what do here, we probably want to return centerplanes as well?
-    body = cut_timber.get_extended_perfect_csg_local()
+    body = cut_timber.get_extended_rough_csg_with_perfect_features_local()
     return [required for required in required_features(cut_timber, face_test)
             if required.handle.owner is body or required.handle.feature.properties.purpose is FeaturePurpose.SHOULDER]

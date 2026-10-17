@@ -1350,7 +1350,8 @@ class TestThePegHoleCentreline:
         midpoint = axis.get_extent(bore).anchor
 
         assert not rendered.is_point_on_boundary(midpoint, scalar("5e-4"))
-        assert [hit.name for hit in rendered.find_all_features(midpoint)] == ["peg_hole_axis"]
+        # The timber's centerplane runs through it too; the axis, a line, comes first.
+        assert [hit.name for hit in rendered.find_all_features(midpoint)][0] == "peg_hole_axis"
 
     def test_it_derives_no_point_where_it_leaves_the_timber(self, simple_T_configuration):
         """Two reasons, either of which is enough.

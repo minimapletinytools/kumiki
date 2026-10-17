@@ -19,8 +19,8 @@ def timber():
     made = create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(150)),
                          length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="t")
     cut_timber = CutTimber(made, cuts=[])
-    body = cut_timber.get_extended_perfect_csg_local()
-    handles = {feature.name.removeprefix("ptw."): FeatureHandle(
+    body = cut_timber.get_extended_rough_csg_with_perfect_features_local()
+    handles = {feature.name.split(".", 1)[1]: FeatureHandle(
         timber=made, hit=OwnedFeatureHit(feature=feature, owner=body)) for feature in body.get_declared_features()}
     return cut_timber, handles
 

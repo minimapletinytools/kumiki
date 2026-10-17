@@ -118,10 +118,10 @@ def test_whichever_candidate_is_chosen_is_the_one_answered(picked):
 
 def test_a_drawing_offers_no_face_it_cannot_measure(picked):
     # The beam's faces and the socket floors are areas from here; the flank is edge-on, but its
-    # edges lie on the same line and measure the same.
+    # edges lie on the same line and measure the same. A centerplane edge-on is a line of its own.
     labels = picked(0.0004, "projected")
 
-    assert labels and all("×" in label for label in labels)
+    assert labels and all("×" in label or label.startswith("ptw.centerplane") for label in labels)
 
 
 def test_the_3d_view_keeps_its_faces(picked):

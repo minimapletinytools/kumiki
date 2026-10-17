@@ -29,11 +29,11 @@ THREE_D_DISTANCE = MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpa
 
 
 def carrier_map_of(cut_timber: CutTimber, *more: CutTimber) -> CarrierMap:
-    """The solving carriers of cut timbers' perfect-timber-within trees, the trees their handles point into.
+    """The solving carriers of cut timbers' drawn trees, the trees their handles point into.
 
     Coincident planes are merged within a timber, never across timbers.
     """
-    return CarrierMap.union([carrier_map(timber.render_perfect_timber_within_with_cuts_csg_local())
+    return CarrierMap.union([carrier_map(timber.render_timber_with_cuts_csg_local())
                              for timber in (cut_timber, *more)])
 
 

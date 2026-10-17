@@ -231,11 +231,14 @@ class TestCSGTreeSerialization:
         # PERFECT: a timber with no rough allowance has its rough body lying on its
         # perfect one (rptw.*). It meets a joint's shoulder plane and not itself,
         # since the arrises it used to make by meeting are named outright now.
-        assert all(f["group"] == "PERFECT" for f in base["features"])
+        # And its two centerplanes, which pair with nothing.
+        centerplanes = {"ptw.centerplane_left_right", "ptw.centerplane_front_back"}
+        assert centerplanes <= names
+        assert all(f["group"] == ("NONE" if f["name"] in centerplanes else "PERFECT") for f in base["features"])
         # Six faces, four long arrises, eight at the ends, eight corners: every
         # slot the prism offers, so none of its anonymous defaults survive the
         # override.
-        assert len(base["features"]) == 26
+        assert len(base["features"]) == 26 + len(centerplanes)
         assert not [f for f in base["features"] if f["name"].startswith(
             ("cap.", "side.", "arris.", "corner."))]
 

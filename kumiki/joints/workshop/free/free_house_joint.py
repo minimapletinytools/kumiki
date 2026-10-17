@@ -46,7 +46,7 @@ def cut_free_house_joint(
             housed_prism_in_housing = adopt_csg(
                 housed_timber.timber.transform,
                 housing_timber.transform,
-                housed_timber._extended_timber_without_cuts_csg_local(),
+                housed_timber.get_extended_rough_csg_with_perfect_features_local(),
             )
 
             with warnings.catch_warnings():

@@ -758,9 +758,9 @@ class TestCutTimber:
     def test_prisms_are_built_once_and_reused(self):
         timber = self._timber()
         cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))])
-        rough = cut_timber._extended_timber_without_cuts_csg_local()
+        rough = cut_timber.get_extended_rough_csg_with_perfect_features_local()
         perfect = cut_timber.get_extended_perfect_csg_local()
-        assert cut_timber._extended_timber_without_cuts_csg_local() is rough
+        assert cut_timber.get_extended_rough_csg_with_perfect_features_local() is rough
         assert cut_timber.get_extended_perfect_csg_local() is perfect
         rendered = cut_timber.render_timber_with_cuts_csg_local()
         assert isinstance(rendered, Difference) and rendered.base is rough
@@ -801,13 +801,13 @@ class TestCutTimber:
 
     def test_an_uncut_timber_renders_as_its_prisms(self):
         cut_timber = CutTimber(self._timber())
-        assert cut_timber.render_timber_with_cuts_csg_local() is cut_timber._extended_timber_without_cuts_csg_local()
+        assert cut_timber.render_timber_with_cuts_csg_local() is cut_timber.get_extended_rough_csg_with_perfect_features_local()
         assert cut_timber.render_perfect_timber_within_with_cuts_csg_local() is cut_timber.get_extended_perfect_csg_local()
 
     def test_both_prisms_extend_the_ends_with_end_cuts(self):
         timber = self._timber()
         cut_timber = CutTimber(timber, cuts=[Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))])
-        for prism in (cut_timber._extended_timber_without_cuts_csg_local(), cut_timber.get_extended_perfect_csg_local()):
+        for prism in (cut_timber.get_extended_rough_csg_with_perfect_features_local(), cut_timber.get_extended_perfect_csg_local()):
             assert isinstance(prism, RectangularPrism)
             assert prism.start_distance == 0
             assert prism.end_distance is None
@@ -825,7 +825,7 @@ class TestCutTimber:
         cut_timber = CutTimber(timber)
         
         # Get the CSG
-        csg = cut_timber._extended_timber_without_cuts_csg_local()
+        csg = cut_timber.get_extended_rough_csg_with_perfect_features_local()
         
         # Should be a finite prism
         from kumiki.csg.cutcsg import RectangularPrism
@@ -857,7 +857,7 @@ class TestCutTimber:
         timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         cut_timber = CutTimber(timber)
         
-        csg = cut_timber._extended_timber_without_cuts_csg_local()
+        csg = cut_timber.get_extended_rough_csg_with_perfect_features_local()
         assert isinstance(csg, RectangularPrism), "Expected csg to be a RectangularPrism"
         
         # In LOCAL coordinates (relative to bottom_position):
@@ -878,7 +878,7 @@ class TestCutTimber:
         timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         cut_timber = CutTimber(timber)
         
-        csg = cut_timber._extended_timber_without_cuts_csg_local()
+        csg = cut_timber.get_extended_rough_csg_with_perfect_features_local()
         assert isinstance(csg, RectangularPrism), "Expected csg to be a RectangularPrism"
         
         # In LOCAL coordinates (relative to bottom_position):
@@ -2476,6 +2476,7 @@ class TestRoughFacesLyingOnThePerfectTimber:
         timber = Timber(length=scalar(100), size=create_v2(scalar(4), scalar(6)), transform=Transform.identity())
 
         names = self._names(timber)
+        names.pop("ptw.centerplane_left_right"), names.pop("ptw.centerplane_front_back")
 
         assert names and all(name.startswith("rptw.") for name in names)
         assert set(names.values()) == {FeatureGroup.PERFECT}
