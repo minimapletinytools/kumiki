@@ -562,7 +562,47 @@ def features_at_point(
                     origin, direction, (_floats3(extent.ends[0]), _floats3(extent.ends[1])), math.inf)
                 if nearest is not None:
                     found_at([hit], _along_ray(origin, direction, nearest))
-    return order_along_ray(hits, depth_of, float(resolved.edge))
+    return order_along_ray(measurable_in_view(hits, direction, float(resolved.edge)), depth_of, float(resolved.edge))
+
+
+#: How far off square to the view a face's normal may be and the face still count as edge-on.
+EDGE_ON = 1e-6
+
+
+def measurable_in_view(
+    hits: List['OwnedFeatureHit'], direction: List[float], tolerance: float,
+) -> List['OwnedFeatureHit']:
+    """*hits* without the faces a drawing's view has no use for.
+
+    A 2D view measures lines and points, so a face is only of use where it is a line -- seen
+    edge-on -- and even then nearly always lies on the same line as one of its straight edges,
+    declared or derived, which measures the same. So a face stays only when it is edge-on and no
+    straight edge among *hits* lies in its plane: a cylinder's cap, rimmed by a circle, is the one
+    thing naming its line, and stays. Seen at any other angle a face is an area, and goes.
+    """
+    from kumiki.csg.cutcsg import CSGFeatureType
+    from kumiki.geometry import Line, Plane
+
+    located = [(hit, hit.feature.locate_simple_unbounded(hit.owner)) for hit in hits]
+    lines = [(_floats3(line.point), _floats3(line.direction))
+             for _hit, line in located if isinstance(line, Line)]
+    dot = lambda a, b: sum(a[i] * b[i] for i in range(3))
+
+    def keep(hit: 'OwnedFeatureHit', where: Any) -> bool:
+        if hit.feature.feature_type() is not CSGFeatureType.FACE or not isinstance(where, Plane):
+            return True
+        normal = unit_or_none(_floats3(where.normal))
+        if normal is None:
+            return True
+        if abs(dot(normal, direction)) > EDGE_ON:
+            return False
+        on_plane = _floats3(where.point)
+        return not any(
+            abs(dot(normal, unit_or_none(run) or run)) <= EDGE_ON
+            and abs(dot(normal, [point[i] - on_plane[i] for i in range(3)])) <= tolerance
+            for point, run in lines)
+
+    return [hit for hit, where in located if keep(hit, where)]
 
 
 def _hit_key(hit: 'OwnedFeatureHit') -> Tuple[str, int]:
