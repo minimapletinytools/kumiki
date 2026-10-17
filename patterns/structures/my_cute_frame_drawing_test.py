@@ -32,12 +32,31 @@ from kumiki.drawings.visibility import visible_by_view
 from kumiki.drawings.required_features import planning_features, required_features
 
 
+ROUGH_ALLOWANCE = inches(1)
+
+
+def _rough(timber: Timber) -> Timber:
+    """*timber*, its rough stock ROUGH_ALLOWANCE larger on each long face that is not a reference face."""
+    referenced = {face for feature in timber.ticket.reference_features for face in feature.long_faces_it_rests_on()}
+    (right, left), (front, back) = ((half[0], half[1]) for half in timber.get_rough_half_sizes())
+    grow = lambda face, half: half if face in referenced else half + ROUGH_ALLOWANCE
+    return Timber.from_perfect_timber_within(timber, rough_half_sizes=(
+        create_v2(grow(TimberLongFace.RIGHT, right), grow(TimberLongFace.LEFT, left)),
+        create_v2(grow(TimberLongFace.FRONT, front), grow(TimberLongFace.BACK, back))))
+
+
 def _load_cute_frame():
+    """my_cute_frame's build_frame, every timber of it rough on its two non-reference faces.
+
+    my_cute_frame.py is the starter project's frame and stays as it is, so the rough stock goes in
+    here, where its timbers are made.
+    """
     path = FilePath(__file__).resolve().parent / "my_cute_frame.py"
     spec = importlib_util.spec_from_file_location("my_cute_frame_for_drawing_test", path)
     assert spec is not None and spec.loader is not None
     module = importlib_util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    module.create_axis_aligned_timber = lambda *args, **kwargs: _rough(create_axis_aligned_timber(*args, **kwargs))
     return module.build_frame
 
 
