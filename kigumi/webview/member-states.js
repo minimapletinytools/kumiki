@@ -22,20 +22,31 @@
      * - locked: locked from the layers panel, so it cannot be picked.
      * - selection: 'none' (nothing about it is selected), 'selected' (picked as
      *   a whole), 'drilledInto' (a node or feature inside it is picked), or
-     *   'dimmed' (something else is).
-     * - drawing: 'none' (no drawing open), 'subject' (the drawing names it), or
-     *   'context' (a drawing is open and does not).
+     *   'dimmed' (something else is). A drawing has no timber selection, so it
+     *   is always 'none' there: picking a feature narrows the focus to its
+     *   timber, but the drawing decides how that timber looks, not the
+     *   selection.
+     * - drawing: 'none' (no drawing open), 'subject' (the drawing is of it, or
+     *   of everything), or 'context' (a drawing is open and is not about it).
+     *
+     * `inDrawing` is needed as well as `drawnMembers` because a drawing that
+     * names no members is a drawing of the whole frame, which the member set
+     * alone cannot tell apart from the 3D scene.
      */
-    function memberStateFor(memberKey, { hidden = false, locked = false, visualContext, drawnMembers = null } = {}) {
+    function memberStateFor(memberKey, { hidden = false, locked = false, visualContext, drawnMembers = null, inDrawing = false } = {}) {
         let selection = 'none';
-        if (visualContext && visualContext.state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
-            selection = visualContext.selectedTimberSet.has(memberKey) ? 'selected' : 'dimmed';
-        } else if (visualContext && visualContext.hasSubselection) {
-            selection = visualContext.subselectionTimberKey === memberKey ? 'drilledInto' : 'dimmed';
+        if (!inDrawing) {
+            if (visualContext && visualContext.state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
+                selection = visualContext.selectedTimberSet.has(memberKey) ? 'selected' : 'dimmed';
+            } else if (visualContext && visualContext.hasSubselection) {
+                selection = visualContext.subselectionTimberKey === memberKey ? 'drilledInto' : 'dimmed';
+            }
         }
         let drawing = 'none';
         if (drawnMembers) {
             drawing = drawnMembers.has(memberKey) ? 'subject' : 'context';
+        } else if (inDrawing) {
+            drawing = 'subject';
         }
         return { hidden: Boolean(hidden), locked: Boolean(locked), selection, drawing };
     }

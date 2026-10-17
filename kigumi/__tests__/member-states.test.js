@@ -96,15 +96,70 @@ describe('member states', () => {
         const drawnMembers = new Set(['post']);
         const visualContext = context([], null);
 
-        expect(memberStateFor('post', { visualContext, drawnMembers }).drawing).toBe('subject');
-        expect(memberStateFor('girt', { visualContext, drawnMembers }).drawing).toBe('context');
-        expect(memberStateFor('girt', { visualContext }).drawing).toBe('none');
+        expect(memberStateFor('post', { visualContext, drawnMembers, inDrawing: true }).drawing).toBe('subject');
+        expect(memberStateFor('girt', { visualContext, drawnMembers, inDrawing: true }).drawing).toBe('context');
+        expect(memberStateFor('girt', { visualContext, inDrawing: false }).drawing).toBe('none');
     });
 
     test('a state is plain data, so it can be compared and folded', () => {
         const state = memberStateFor('post', { hidden: true, visualContext: context(['post'], null) });
 
         expect(JSON.parse(JSON.stringify(state))).toEqual(state);
+    });
+});
+
+describe('a drawing has no timber selection', () => {
+    const visualContext = computeSelectionVisualContext(
+        ['post'], { timberKey: 'post', path: ['cut'], featureLabel: 'cheek' });
+    const settings = {
+        baseSelectedOpacity: 1,
+        policy: selectionVisualPolicy(visualContext.state, 0.3),
+        profile: PROFILE,
+        edgeLineVisibilityPercent: 100,
+        edgeMode: 'noOverlay',
+        showDrawingGhosts: true,
+        drawingContextOpacity: DRAWING_CONTEXT_OPACITY,
+    };
+
+    test('a picked feature leaves its timber opaque', () => {
+        const state = memberStateFor('post',
+            { visualContext, drawnMembers: new Set(['post']), inDrawing: true });
+        const appearance = appearanceFor(state, settings);
+
+        expect(state.selection).toBe('none');
+        expect(appearance.name).toBe('normal');
+        expect(appearance.opacity).toBe(1);
+    });
+
+    test('and leaves the drawing’s other subjects opaque too', () => {
+        const state = memberStateFor('girt',
+            { visualContext, drawnMembers: new Set(['post', 'girt']), inDrawing: true });
+
+        expect(state.selection).toBe('none');
+        expect(appearanceFor(state, settings).opacity).toBe(1);
+    });
+
+    test('the drawing still ghosts what it is not about', () => {
+        const state = memberStateFor('girt',
+            { visualContext, drawnMembers: new Set(['post']), inDrawing: true });
+
+        expect(appearanceFor(state, settings).opacity).toBe(DRAWING_CONTEXT_OPACITY);
+    });
+
+    test('a drawing about everything makes every member a subject', () => {
+        const state = memberStateFor('girt',
+            { visualContext, drawnMembers: null, inDrawing: true });
+
+        expect(state.drawing).toBe('subject');
+        expect(appearanceFor(state, settings).opacity).toBe(1);
+    });
+
+    test('the model still fades the timber a feature is picked on', () => {
+        const state = memberStateFor('post', { visualContext, inDrawing: false });
+
+        expect(state.selection).toBe('drilledInto');
+        expect(appearanceFor(state, settings).opacity).toBe(
+            selectionVisualPolicy(SELECTION_VISUAL_STATES.FEATURE_SELECTED, 0.3).selectedTimberOpacity);
     });
 });
 
@@ -141,7 +196,7 @@ describe('a locked member', () => {
     });
 
     test('in a drawing’s context it is context, capped like any other', () => {
-        const state = memberStateFor('girt', { locked: true, visualContext, drawnMembers: new Set(['post']) });
+        const state = memberStateFor('girt', { locked: true, visualContext, drawnMembers: new Set(['post']), inDrawing: true });
         expect(appearanceFor(state, settings).opacity).toBeLessThanOrEqual(DRAWING_CONTEXT_OPACITY);
     });
 });

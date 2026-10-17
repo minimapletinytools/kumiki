@@ -4328,6 +4328,7 @@ class KigumiViewerApp extends LitElement {
             edgeMode: this.edgeMode,
             showDrawingGhosts: this.showDrawingGhosts,
             showFeatureParent: this.showFeatureParent,
+            inDrawing: this.isInDrawing,
             selected: this.selectionManager.getSelectedTimbers() || [],
             focus: this.selectionManager.csgFocus,
             lit,
@@ -4620,6 +4621,7 @@ class KigumiViewerApp extends LitElement {
             locked: this.isMemberLocked(memberKey),
             visualContext,
             drawnMembers: this.activeSceneMembers,
+            inDrawing: this.isInDrawing,
         });
     }
 
