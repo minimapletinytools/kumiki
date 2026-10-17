@@ -2535,7 +2535,7 @@ def _sight_blocker(
             (every member when it is None).
         direction: the view direction, from the camera, in *own*'s local space.
     """
-    from kumiki.viewer.visibility import sight_is_blocked
+    from kumiki.drawings.visibility import sight_is_blocked
 
     toward = (-direction).v3()
     drawn = payload.get("drawnMembers")

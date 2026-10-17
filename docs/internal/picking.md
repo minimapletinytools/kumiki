@@ -130,16 +130,20 @@ cache: those in `drawnMembers`, or every member when none are sent. The place an
 to the camera are converted into each timber's own space first. A drawing's faded context is not
 in `drawnMembers`, so it hides nothing.
 
-**`sight_is_blocked(root, place, toward_camera)`** (`kumiki/viewer/visibility.py`):
-1. Crop the line through `place`, in the camera's direction, to the solid
-   (`crop_line_to_segments_on_csg`, exact): the stretches of it that lie on the solid.
-2. Of each stretch, keep the part toward the camera beyond `NUDGE` (10 µm), so the surface the
-   place sits on does not count.
-3. Blocked only if the middle of that part is *inside* the solid (`contains_point` and not
-   `is_point_on_boundary`). A line of sight along an edge-on face only grazes the surface, so a
-   peg's cap seen edge-on, or the front edge of a flank, stays visible.
-4. A tree that cannot be cropped (`None`: curved primitives other than cylinders) is "not
+**`sight_is_blocked(root, place, toward_camera)`** (`kumiki/drawings/visibility.py`):
+1. Crop the line through `place`, in the camera's direction, to the solid's *inside*
+   (`crop_line_to_interior_segments_on_csg`, exact): the stretches of it strictly within the solid,
+   not on its surface.
+2. Blocked if any of them reaches more than `NUDGE` (10 µm) toward the camera. A line of sight along
+   an edge-on face only runs along the surface, so a peg's cap seen edge-on, or the front edge of a
+   flank, stays visible -- and one that runs along a surface and then into material is blocked.
+   (It judged each stretch by its middle before, which missed the second.)
+3. A tree that cannot be cropped (`None`: curved primitives other than cylinders) is "not
    blocked". Unsure means visible.
+
+A drawing's generator asks the same of a whole feature rather than a place: see
+`nearest_visible_depth` in the same module, which decides a face seen edge-on, or a line lying
+along the sheet, in the one plane holding all its lines of sight, cut exactly by each solid.
 
 ### 3. The runner uses the result (`_handle_find_csg_at_point`)
 

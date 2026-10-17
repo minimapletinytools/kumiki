@@ -909,6 +909,18 @@ def crop_line_to_segments_on_csg(
     return _segments(line, spans)
 
 
+def crop_line_to_interior_segments_on_csg(
+    line: Line,
+    csg,
+    seed_reach: Numeric,
+    near: Optional[V3] = None,
+) -> Optional[List[LineSegment]]:
+    """The parts of a line strictly INSIDE a solid, not on its surface: what a line of sight
+    cannot pass. The same three return values as crop_line_to_segments_on_csg."""
+    interior = _interior_spans(line, csg, _seed_span(line, seed_reach, near), 0.0)
+    return None if interior is None else _segments(line, interior)
+
+
 def crop_line_to_boundary_segments_on_csg(
     line: Line,
     csg,
