@@ -250,18 +250,19 @@ def _separation(one: Tuple, other: Tuple) -> Optional[float]:
 
 
 def sheet_candidates(
-    anchors: Sequence[FeatureHandle], carriers: CarrierMap, views: Mapping[str, ViewAxes],
+    anchors: Mapping[str, Sequence[FeatureHandle]], carriers: CarrierMap, views: Mapping[str, ViewAxes],
 ) -> List[Candidate]:
-    """Every perpendicular dimension a view can draw between two of the anchors.
+    """Every perpendicular dimension a view can draw between two of the anchors it can see.
 
     Between two parallel lines on the sheet (a face seen edge-on, a line lying along the sheet), or
-    from a point (a line seen end-on) to a line.
+    from a point (a line seen end-on) to a line. `anchors` are each view's own: what it can see of
+    them (visibility.visible_by_view), so nothing is measured in a view that hides it.
     """
     candidates = []
     for view, axes in views.items():
         look = np.array([float(v) for v in axes.look])
         look /= np.linalg.norm(look)
-        drawn = [(handle, _on_sheet(handle, look)) for handle in anchors]
+        drawn = [(handle, _on_sheet(handle, look)) for handle in anchors.get(view, ())]
         drawn = [(handle, shape) for handle, shape in drawn if shape is not None]
         for i, (a, shape_a) in enumerate(drawn):
             for b, shape_b in drawn[i + 1:]:

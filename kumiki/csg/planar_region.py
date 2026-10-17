@@ -2,7 +2,8 @@
 
 A region is a list of disjoint convex polygons in a plane's own 2D frame. For a plane, every CSG
 node gives two regions: where it has material just in front of the plane, and just behind. The finished
-surface in the plane is where those differ. `face_reaches_surface` is the only public entry point.
+surface in the plane is where those differ. `face_reaches_surface` asks that of a face; the
+`SightFrame` functions below ask, in a plane holding a line of sight, what material is in the way.
 """
 
 import math
@@ -51,6 +52,13 @@ class _Frame:
         offset = point - self.origin
         return float(offset @ self.u), float(offset @ self.v)
 
+    @classmethod
+    def with_axes(cls, origin: np.ndarray, u: np.ndarray, v: np.ndarray, normal: np.ndarray) -> '_Frame':
+        """A frame whose 2D axes are given rather than chosen, so frames in several spaces agree."""
+        frame = cls.__new__(cls)
+        frame.origin, frame.u, frame.v, frame.normal = origin, u, v, normal
+        return frame
+
 
 def _area(polygon: Polygon) -> float:
     total = 0.0
@@ -74,7 +82,10 @@ def _clip(polygon: Polygon, a: float, b: float, c: float) -> Polygon:
         if current_in != previous_in:
             denominator = a * (current[0] - previous[0]) + b * (current[1] - previous[1])
             if denominator != 0:
-                t = (c - a * previous[0] - b * previous[1]) / denominator
+                # In [0, 1] whenever the ends are on opposite sides; an edge lying all but along the
+                # line can be put either side of it by rounding, and the ratio of two near-zeros
+                # then lands anywhere -- a spike to the far end of the plane.
+                t = min(1.0, max(0.0, (c - a * previous[0] - b * previous[1]) / denominator))
                 kept.append((previous[0] + t * (current[0] - previous[0]),
                              previous[1] + t * (current[1] - previous[1])))
         if current_in:
@@ -261,3 +272,105 @@ def face_reaches_surface(face: FeatureHandle[FaceFeature], root: CutCSG, near: V
         return True
     surface = _xor(front, back)
     return sum(_area(polygon) for polygon in _intersect(own, surface)) > SLIVER_AREA
+
+
+# --- lines of sight ---------------------------------------------------------------------------
+
+CannotSection = _CannotSection
+# A plane's 2D frame, given as (origin, u, v, normal) in a CSG's own space.
+SightFrame = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+
+
+def material_crossing(root: CutCSG, frame: SightFrame, reach: float) -> Region:
+    """Where `root` has material on both sides of the frame's plane: what a line of sight lying in
+    the plane cannot pass. Material on one side only is surface, which a sight line runs along.
+
+    Raises CannotSection for a tree this module can't cut by a plane.
+    """
+    front, back = _sides(root, _Frame.with_axes(*frame), [_square(reach)])
+    return _intersect(front, back)
+
+
+def face_on_surface(face: FeatureHandle[FaceFeature], root: CutCSG, frame: SightFrame, reach: float) -> Region:
+    """The part of `face`, which lies in the frame's plane, that is on the finished surface of `root`
+    (see face_reaches_surface). Raises CannotSection as material_crossing does."""
+    plane_frame = _Frame.with_axes(*frame)
+    own_front, own_back = _sides(face.owner, plane_frame, [_square(reach)])
+    own = own_front or own_back
+    if not own:
+        return []
+    front, back = _sides(root, plane_frame, own)
+    return _intersect(own, _xor(front, back))
+
+
+def shadow(region: Region, reach: float) -> Region:
+    """What `region` hides from a viewer looking along +v: each piece swept that way, `reach` far."""
+    swept: Region = []
+    for polygon in region:
+        far = [(x, y + reach) for x, y in polygon]
+        swept.append(_convex_hull(polygon + far))
+    return _clean(swept)
+
+
+def subtract(one: Region, other: Region) -> Region:
+    return _subtract(one, other)
+
+
+def area(region: Region) -> float:
+    return sum(_area(polygon) for polygon in region)
+
+
+Segment2D = Tuple[Tuple[float, float], Tuple[float, float]]
+
+
+def segments_outside(segments: Sequence[Segment2D], region: Region) -> List[Segment2D]:
+    """The parts of `segments` outside every polygon of `region`."""
+    pieces = list(segments)
+    for polygon in region:
+        lines = _inside_lines(polygon)
+        kept: List[Segment2D] = []
+        for start, end in pieces:
+            # Where the segment is inside this convex polygon, as a parameter span (Cyrus-Beck).
+            low, high = 0.0, 1.0
+            dx, dy = end[0] - start[0], end[1] - start[1]
+            for a, b, c in lines:
+                along = a * dx + b * dy
+                gap = c - (a * start[0] + b * start[1])
+                if abs(along) < 1e-15:
+                    if gap < 0:
+                        low, high = 1.0, 0.0
+                        break
+                    continue
+                t = gap / along
+                if along > 0:
+                    high = min(high, t)
+                else:
+                    low = max(low, t)
+            point = lambda t: (start[0] + dx * t, start[1] + dy * t)
+            if low >= high:
+                kept.append((start, end))
+                continue
+            if low > 0:
+                kept.append((start, point(low)))
+            if high < 1:
+                kept.append((point(high), end))
+        pieces = [(a, b) for a, b in kept if math.hypot(b[0] - a[0], b[1] - a[1]) > math.sqrt(SLIVER_AREA)]
+    return pieces
+
+
+def _convex_hull(points: Polygon) -> Polygon:
+    ordered = sorted(set(points))
+    if len(ordered) < 3:
+        return ordered
+
+    def half(sequence: Sequence[Tuple[float, float]]) -> Polygon:
+        out: Polygon = []
+        for point in sequence:
+            while len(out) >= 2 and ((out[-1][0] - out[-2][0]) * (point[1] - out[-2][1])
+                                     - (out[-1][1] - out[-2][1]) * (point[0] - out[-2][0])) <= 0:
+                out.pop()
+            out.append(point)
+        return out
+
+    lower, upper = half(ordered), half(list(reversed(ordered)))
+    return lower[:-1] + upper[:-1]

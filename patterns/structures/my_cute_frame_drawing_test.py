@@ -28,6 +28,7 @@ from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, V
                                     shop_drawing_viewports)
 from kumiki.geometry import Plane
 from kumiki.drawings.feature_solving import carrier_map_of, feature_handle_dof_rows
+from kumiki.drawings.visibility import visible_by_view
 from kumiki.drawings.required_features import planning_features, required_features
 
 
@@ -85,7 +86,8 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
 
     # Centerplanes can't be referenced by a drawing yet, so they're solved for but never dimensioned to.
     anchors = [handle for handle in directed if not isinstance(handle.feature, MidplaneFeature)]
-    candidates = sheet_candidates(anchors, carriers, {view: _sheet(view)[0] for view in VIEWS})
+    views = {view: _sheet(view)[0] for view in VIEWS}
+    candidates = sheet_candidates(visible_by_view(anchors, views, cut_timbers), carriers, views)
     result = auto_dimension(candidates, targets, known_rows, carriers, policy)
 
     report = [f"fixed: {FIXED_TIMBER} ({len(known)} faces known), {len(assumptions)} assumptions",
@@ -146,7 +148,8 @@ def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
     known_rows = _rows(known, carriers) + [row for assumption in assumptions for row in assumption.rows]
 
     anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
-    candidates = sheet_candidates(anchors, carriers, {view: axes for view, (axes, _) in sheets.items()})
+    views = {view: axes for view, (axes, _) in sheets.items()}
+    candidates = sheet_candidates(visible_by_view(anchors, views, [cut]), carriers, views)
     result = auto_dimension(candidates, targets, known_rows, carriers, policy)
 
     report = [f"{cut.timber.ticket.path}: {len(targets)} features, from {[_name(h) for h in known]}, "

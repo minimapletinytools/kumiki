@@ -170,7 +170,7 @@ def test_a_line_of_sight_along_a_surface_is_not_blocked_by_it():
     # A box seen edge-on along its top face: a place on the top's far edge looks back along the
     # face, which is surface, not material -- the stacked rule, not this one, says it is hidden.
     from kumiki.csg.cutcsg import RectangularPrism
-    from kumiki.viewer.visibility import sight_is_blocked
+    from kumiki.drawings.visibility import sight_is_blocked
     from kumiki.rule import create_v2, scalar
 
     box = RectangularPrism(size=create_v2(2, 2), start_distance=scalar(0), end_distance=scalar(4))
