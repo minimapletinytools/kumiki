@@ -3,10 +3,8 @@
 import pytest
 
 from kumiki import *
-from kumiki.csg.cutcsg import FeatureGroup, PrismParallelPlaneFeature, RectangularPrism
-
-ALL = dict(right=True, left=True, front=True, back=True,
-           centerplane_left_right=True, centerplane_front_back=True)
+from kumiki.csg.carriers import CarrierRef, Midplane
+from kumiki.csg.cutcsg import FeatureCategory, FeatureGroup, RectangularPrism, prism_face_key
 
 
 def _timber(rough_half_sizes=None):
@@ -36,35 +34,23 @@ def _same_plane(one, other):
 class TestWhichAreAdded:
 
     def test_only_the_faces_off_the_rough_body_and_the_centerplanes(self):
-        added = {name for name in _features(_oversawn().get_extended_rough_csg_with_perfect_features_local(**ALL))
+        added = {name for name in _features(_oversawn().get_extended_rough_csg_with_perfect_features_local())
                  if name.startswith("ptw.")}
 
         # LEFT and FRONT lie on rough faces, which are rptw.left and rptw.front already.
         assert added == {"ptw.right", "ptw.back", "ptw.centerplane_left_right", "ptw.centerplane_front_back"}
 
     def test_a_timber_with_no_rough_allowance_gets_only_its_centerplanes(self):
-        names = _features(_timber().get_extended_rough_csg_with_perfect_features_local(**ALL))
+        names = _features(_timber().get_extended_rough_csg_with_perfect_features_local())
 
         assert {name for name in names if name.startswith("ptw.")} == {
             "ptw.centerplane_left_right", "ptw.centerplane_front_back"}
         assert "rptw.right" in names
 
-    def test_only_what_is_asked_for(self):
-        names = _features(_oversawn().get_extended_rough_csg_with_perfect_features_local(
-            right=True, centerplane_front_back=True))
-
-        assert {name for name in names if name.startswith("ptw.")} == {"ptw.right", "ptw.centerplane_front_back"}
-
-    def test_asking_for_nothing_is_the_rough_body(self):
-        timber = _oversawn()
-
-        assert timber.get_extended_rough_csg_with_perfect_features_local() == timber.get_extended_actual_csg_local(
-            False, False)
-
     def test_the_rough_body_is_unchanged(self):
         timber = _oversawn()
         rough = timber.get_extended_actual_csg_local(True, False)
-        carrying = timber.get_extended_rough_csg_with_perfect_features_local(**ALL, extend_bot=True)
+        carrying = timber.get_extended_rough_csg_with_perfect_features_local(extend_bot=True)
 
         assert isinstance(carrying, RectangularPrism)
         assert (carrying.size, carrying.transform, carrying.start_distance, carrying.end_distance) == (
@@ -77,7 +63,7 @@ class TestWhereTheyAre:
                                       "ptw.centerplane_front_back"])
     def test_on_the_perfect_timber_within_not_the_rough_body(self, name):
         timber = _oversawn()
-        carrying = timber.get_extended_rough_csg_with_perfect_features_local(**ALL)
+        carrying = timber.get_extended_rough_csg_with_perfect_features_local()
         perfect = timber.get_perfect_timber_within_csg_local()
 
         located = _features(carrying)[name].locate_simple_unbounded(carrying)
@@ -86,7 +72,7 @@ class TestWhereTheyAre:
         assert _same_plane(located, expected)
 
     def test_a_point_on_one_is_on_it(self):
-        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local(**ALL)
+        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local()
         feature = _features(carrying)["ptw.right"]
 
         # The perfect RIGHT face is x = 2, wherever the rough prism sits.
@@ -94,7 +80,7 @@ class TestWhereTheyAre:
         assert not feature.test_point_unbounded(carrying, create_v3(scalar(3), scalar(1), scalar(50)))
 
     def test_its_extent_spans_the_rough_body(self):
-        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local(**ALL)
+        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local()
         region = _features(carrying)["ptw.centerplane_front_back"].get_extent(carrying).region
 
         # y = 0, across the rough width (-2..3) and the length.
@@ -107,20 +93,45 @@ class TestWhereTheyAre:
 class TestWhatTheyAre:
 
     def test_non_real(self):
-        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local(**ALL)
+        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local()
 
         assert all(not feature.real for name, feature in _features(carrying).items() if name.startswith("ptw."))
 
     def test_faces_are_perfect_and_centerplanes_pair_with_nothing(self):
         # As on the perfect timber within itself.
-        features = _features(_oversawn().get_extended_rough_csg_with_perfect_features_local(**ALL))
+        features = _features(_oversawn().get_extended_rough_csg_with_perfect_features_local())
 
         assert features["ptw.right"].group is FeatureGroup.PERFECT
         assert features["ptw.centerplane_left_right"].group is FeatureGroup.NONE
 
-    def test_an_end_is_not_a_long_face(self):
-        with pytest.raises(ValueError):
-            PrismParallelPlaneFeature(name="nope", face=PrismFace.TOP)
+
+class TestHowTheyAreSolved:
+    """A perfect face off the rough body is an unknown of its own; one on it is the rough face's."""
+
+    def test_a_face_off_the_rough_body_is_its_own_carrier_at_the_perfect_plane(self):
+        timber = _oversawn()
+        carrying = timber.get_extended_rough_csg_with_perfect_features_local()
+        right = _features(carrying)["ptw.right"]
+        perfect = timber.get_perfect_timber_within_csg_local()
+
+        (ref,) = right.solve_recipe(carrying)
+        assert isinstance(ref, CarrierRef) and ref.local[0] is FeatureCategory.EXTRA
+        assert _same_plane(carrying.carriers()[ref.local].plane,
+                           _features(perfect)["ptw.right"].locate_simple_unbounded(perfect))
+
+    def test_a_face_on_the_rough_body_is_the_rough_face(self):
+        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local()
+
+        assert _features(carrying)["rptw.left"].solve_recipe(carrying) == (
+            CarrierRef(carrying, prism_face_key(PrismFace.LEFT)),)
+
+    def test_a_centerplane_is_the_midplane_of_the_two_perfect_planes(self):
+        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local()
+        features = _features(carrying)
+
+        (midplane,) = features["ptw.centerplane_left_right"].solve_recipe(carrying)
+        assert midplane == Midplane(front=features["ptw.right"].solve_recipe(carrying)[0],
+                                    back=features["rptw.left"].solve_recipe(carrying)[0])
 
 
 class TestRoughFacesAreNotMeasured:
