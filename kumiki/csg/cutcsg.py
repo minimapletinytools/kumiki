@@ -3023,12 +3023,17 @@ class RectangularPrism(HasFeatures, CutCSG):
         return True
     
     def _local_axes(self) -> Tuple[Direction3D, Direction3D, Direction3D]:
-        """Return (width_dir, height_dir, length_dir) unit vectors in global coordinates."""
-        m = self.transform.orientation.matrix
-        width_dir = Matrix([m[0, 0], m[1, 0], m[2, 0]])
-        height_dir = Matrix([m[0, 1], m[1, 1], m[2, 1]])
-        length_dir = Matrix([m[0, 2], m[1, 2], m[2, 2]])
-        return width_dir, height_dir, length_dir
+        """Return (width_dir, height_dir, length_dir) unit vectors in global coordinates.
+
+        Worked out once: every point test asks, and a prism never changes (replace makes a new one).
+        """
+        cached = self.__dict__.get("_axes")
+        if cached is None:
+            m = self.transform.orientation.matrix
+            cached = (Matrix([m[0, 0], m[1, 0], m[2, 0]]), Matrix([m[0, 1], m[1, 1], m[2, 1]]),
+                      Matrix([m[0, 2], m[1, 2], m[2, 2]]))
+            object.__setattr__(self, "_axes", cached)
+        return cached
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
         """Project a global point onto this prism's local (width, height, length) axes."""
