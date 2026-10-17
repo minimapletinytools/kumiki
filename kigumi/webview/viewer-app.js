@@ -3277,16 +3277,18 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * Delete every measurement picked out. See MEASUREMENT_CODE_ORIGIN for what that
-     * does to each; one already deleted is passed over.
+     * Delete each measurement in `foundList` (focusedMeasurement results).
+     *
+     * See MEASUREMENT_CODE_ORIGIN for what that does to each; one already
+     * deleted is passed over. Each gets its own undo entry, so undoing a batch
+     * puts them back one at a time.
      */
-    deleteMarkedMeasurements() {
+    _deleteMeasurements(foundList) {
         if (this.measureDraft.isActive) {
             return false;
         }
         const drawingId = this.measurementDrawingId;
-        const removable = this.selectionManager.getMarkedMeasurements()
-            .map((mark) => this.focusedMeasurement(mark.viewportId, mark.measureKey))
+        const removable = (foundList || [])
             .filter((found) => found && !KigumiMeasurements.isDeleted(found.measure));
         if (removable.length === 0) {
             return false;
@@ -3325,7 +3327,30 @@ class KigumiViewerApp extends LitElement {
             });
             this._sendMeasurementCommand(payload);
         }
+        return true;
+    }
+
+    /** Delete every measurement picked out. */
+    deleteMarkedMeasurements() {
+        const removed = this._deleteMeasurements(
+            this.selectionManager.getMarkedMeasurements()
+                .map((mark) => this.focusedMeasurement(mark.viewportId, mark.measureKey)));
+        if (!removed) {
+            return false;
+        }
         this.selectionManager.clearMeasurementMarks();
+        return true;
+    }
+
+    /** Delete one measurement, named by its viewport and key. */
+    deleteMeasurement(viewportId, measureKey) {
+        const removed = this._deleteMeasurements([
+            this.focusedMeasurement(viewportId, measureKey),
+        ]);
+        if (!removed) {
+            return false;
+        }
+        this.selectionManager.forgetMeasurement({ viewportId, measureKey });
         return true;
     }
 
@@ -3353,7 +3378,13 @@ class KigumiViewerApp extends LitElement {
         return true;
     }
 
-    /** Right-click on a measurement in a list: a deleted one can be put back. */
+    /**
+     * Right-click on a measurement, in a list or on the sheet.
+     *
+     * The same menu either way: copy it for an assistant, or delete it. A
+     * deleted one is not drawn, but its list row can still offer to put it
+     * back.
+     */
     showMeasurementContextMenu({ viewportId, measureKey, clientX, clientY }) {
         const found = this.focusedMeasurement(viewportId, measureKey);
         if (!found) {
@@ -3367,9 +3398,22 @@ class KigumiViewerApp extends LitElement {
             title: deleted ? t('viewer.contextMenu.deletedMeasurement') : item.between,
             items: [
                 ...this._copyMenuItems(),
-                ...(deleted ? [{ id: 'restore', label: t('viewer.contextMenu.putBack') }] : []),
+                deleted
+                    ? { id: 'restore', label: t('viewer.contextMenu.putBack') }
+                    : { id: 'delete', label: t('viewer.contextMenu.deleteMeasurement') },
             ],
-            onChoose: (id) => this._copyFromMenu(id, item) || this.restoreMeasurement(viewportId, measureKey),
+            onChoose: (id) => {
+                if (this._copyFromMenu(id, item)) {
+                    return true;
+                }
+                if (id === 'restore') {
+                    return this.restoreMeasurement(viewportId, measureKey);
+                }
+                if (id === 'delete') {
+                    return this.deleteMeasurement(viewportId, measureKey);
+                }
+                return false;
+            },
         });
         this.requestUpdate();
         return true;
@@ -6914,6 +6958,18 @@ class KigumiViewerApp extends LitElement {
                 return;
             }
             this._beginMeasurementDrag(event, group, viewport.id, key, measure);
+        });
+        // The overlay is not the canvas, so its right-click never reaches the
+        // canvas's handler that keeps the browser menu away.
+        group.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this.showMeasurementContextMenu({
+                viewportId: viewport.id,
+                measureKey: key,
+                clientX: event.clientX,
+                clientY: event.clientY,
+            });
         });
         return group;
     }

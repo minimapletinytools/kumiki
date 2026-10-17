@@ -690,6 +690,37 @@ describe('measurements picked out to delete together', () => {
         expect(store.measurementFocus).toBeNull();
     });
 
+    test('forgetting a deleted one leaves the other marks alone', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus(one);
+        store.toggleMeasurementMark(other);
+
+        store.forgetMeasurement(one);
+
+        expect(store.getMarkedMeasurements()).toEqual([other]);
+        expect(store.measurementFocus.measureKey).toBe('c|d');
+    });
+
+    test('and drops the focus when the deleted one was the focused one', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus(one);
+
+        store.forgetMeasurement(one);
+
+        expect(store.getMarkedMeasurements()).toEqual([]);
+        expect(store.measurementFocus).toBeNull();
+    });
+
+    test('the same key in another viewport is a different measurement to forget', () => {
+        const store = new SelectionStore();
+        store.setMeasurementFocus(elsewhere);
+
+        expect(store.forgetMeasurement(one)).toBe(false);
+
+        expect(store.getMarkedMeasurements()).toEqual([elsewhere]);
+        expect(store.measurementFocus).toMatchObject(elsewhere);
+    });
+
     test('looking at a feature instead puts the measurements down', () => {
         const store = new SelectionStore();
         store.setMeasurementFocus(one);
