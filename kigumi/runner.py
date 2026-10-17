@@ -159,6 +159,7 @@ class PickRequest(TypedDict, total=False):
     right: Optional[Vec3]
     up: Optional[Vec3]
     space: Optional[str]  # "3d" | "projected"
+    drawnMembers: Optional[List[str]]  # in a drawing, the members it draws: what can hide something
 
 
 class PathPickRequest(TypedDict, total=False):
@@ -208,6 +209,7 @@ class CandidateWire(TypedDict):
     group: str
     priority: int
     path: List[str]
+    hidden: bool
 
 
 class PickStatsWire(TypedDict, total=False):
@@ -2516,6 +2518,40 @@ def _pick_from_candidate(
     if placed is None:
         return None
     return (placed[2], hit.owner, feature.name, feature.feature_type().name, None, None)
+
+
+def _sight_blocker(
+    ss: 'SlotState', own: 'CutTimber', own_root: 'CutCSG', payload: PickRequest, direction: List[float],
+) -> Callable[[List[float]], bool]:
+    """Whether a place on *own* (in its local space) is behind material in a drawing's view.
+
+    Anything the drawing draws can be in the way -- the viewer sends which members those are, and
+    with none sent every member is -- but not its faded context, which is there to place the piece.
+    """
+    from kumiki.drawings.visibility import sight_is_blocked
+    from kumiki.rule import create_v3
+
+    toward_camera = [-float(c) for c in direction]
+    drawn = payload.get("drawnMembers")
+    others = [entry for key, entry in ss.mesh_cache.items()
+              if entry.get("cut_timber") is not None and entry.get("cut_timber") is not own
+              and entry.get("local_csg") is not None and (drawn is None or key in drawn)]
+
+    def blocked(place: List[float]) -> bool:
+        if sight_is_blocked(own_root, place, toward_camera):
+            return True
+        world = own.timber.transform.local_to_global(create_v3(*place))
+        world_toward = own.timber.transform.local_to_global_direction(create_v3(*toward_camera))
+        for entry in others:
+            transform = entry["cut_timber"].timber.transform
+            local = transform.global_to_local(world)
+            local_toward = transform.global_to_local_direction(world_toward)
+            if sight_is_blocked(entry["local_csg"], [float(local[i]) for i in range(3)],
+                                [float(local_toward[i]) for i in range(3)]):
+                return True
+        return False
+
+    return blocked
 
 
 def _best_matching_candidate(
@@ -5553,14 +5589,21 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     feature_type = None
     declared_edge = None
     from kumiki.drawings.drawing import MeasurementSpace
+    from kumiki.picking import candidates_under_pointer, split_hidden
     in_drawing = _pick_space(payload) is MeasurementSpace.PROJECTED
-    feature_hits = features_at_point(
-        local_csg, local_pt, eps, tolerances,
-        local_ray=_local_ray_from_payload(payload, timber_rot, timber_pos),
+    local_ray = _local_ray_from_payload(payload, timber_rot, timber_pos)
+    if in_drawing and local_ray is not None:
         # In a drawing's view everything under the pointer is drawn at one place, at whatever
-        # depth; the 3D view picks the surface the pointer is on.
-        whole_ray=in_drawing,
-    )
+        # depth -- so all of it is a candidate, and what is hidden goes last, offered but not
+        # taken. The 3D view picks the surface the pointer is on.
+        visible, hidden = split_hidden(
+            candidates_under_pointer(local_csg, local_pt, tolerances, local_ray),
+            local_ray[1], float(tolerances.edge), _sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1]))
+        feature_hits = [candidate.hit for candidate in visible + hidden]
+        visible_count = len(visible)
+    else:
+        feature_hits = features_at_point(local_csg, local_pt, eps, tolerances, local_ray=local_ray)
+        visible_count = len(feature_hits)
     edge = resolve_derived_feature(feature_hits) if feature_label is not None else None
 
     # Which of the features at this point is wanted, when more than one is.
@@ -5576,8 +5619,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     candidate_index = payload.get("candidateIndex")
     if candidate_index is None:
         candidate_index = _best_matching_candidate(
-            feature_hits, timber, held_geometry, look, payload)
-    if candidate_index is None and in_drawing and not ctrl_click and feature_hits:
+            feature_hits[:visible_count], timber, held_geometry, look, payload)
+    if candidate_index is None and in_drawing and not ctrl_click and visible_count:
         # In a drawing the candidates are already in the order a click should take them --
         # nearest first, and only what the view can measure -- so the first is the answer,
         # rather than whatever face the walk down the tree happened to stop at.
@@ -5702,7 +5745,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         # How many features are at this point, so the viewer knows how many
         # there are to step through, and what they are called, so it can offer
         # them by name rather than as "the next one".
-        "candidateCount": len(feature_hits),
+        # Only those that can be taken: Tab steps through these.
+        "candidateCount": visible_count,
         # Enough per candidate to answer "why that one" and "why not mine" from
         # the viewer's own log, without turning the runner's pick log on: the
         # ordering is (real, kind, declared, group, priority), and all of it is
@@ -5717,8 +5761,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
                 "priority": int(hit.feature.priority),
                 # Where it is declared, which tells apart two features named alike.
                 "path": candidate_positions.get(id(hit.owner), (0, 0, []))[2],
+                # Under the pointer but not seen there: offered greyed, never taken.
+                "hidden": index >= visible_count,
             }
-            for hit in feature_hits
+            for index, hit in enumerate(feature_hits)
         ],
         # And WHICH of them this answer is, so the viewer can mark the one it is
         # showing -- the right-click menu lights the row the view is lighting,

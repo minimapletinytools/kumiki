@@ -119,6 +119,7 @@
   "viewer.chrome.gizmo.projectionMode.perspective": "perspective",
   "viewer.chrome.gizmo.projectionMode.orthographic": "orthographic",
   "viewer.chrome.gizmo.light": "light",
+  "viewer.contextMenu.hidden": "hidden",
   "viewer.contextMenu.copyForAI": "copy for ai",
   "viewer.contextMenu.copyForAIDetailed": "copy with details for ai",
   "viewer.contextMenu.exportStl": "export as stl",

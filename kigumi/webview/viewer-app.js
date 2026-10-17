@@ -2925,6 +2925,7 @@ class KigumiViewerApp extends LitElement {
             // The line the pointer went along, so features that lie in a void
             // rather than on a surface can be found at all. See _findMembersAlongRay.
             ray: along.ray,
+            ...this._pickContext(),
             // The end already held, and which way we are looking. With these
             // the runner offers the feature that can finish the measurement
             // rather than the most specific one, and says whether it can.
@@ -3797,10 +3798,20 @@ class KigumiViewerApp extends LitElement {
             look: axes ? axes.look : null,
             right: axes ? axes.right : null,
             up: axes ? axes.up : null,
-            // Which space to judge the pair in. A drawing projects onto its
-            // sheet; the 3D view projects nothing, so a face there is a plane
-            // rather than whatever it looks like from where the reader stands.
+        };
+    }
+
+    /**
+     * What every pick is judged in, measuring or not. The space: a drawing projects onto its
+     * sheet -- everything under the pointer is a candidate, and a face is a plane only seen
+     * edge-on -- while the 3D view takes the surface the pointer is on. And in a drawing, the
+     * members it draws, which are what can hide something; its faded context cannot.
+     */
+    _pickContext() {
+        const drawn = this.isInDrawing ? this.activeSceneMembers : null;
+        return {
             space: this.isInDrawing ? 'projected' : '3d',
+            drawnMembers: drawn ? Array.from(drawn) : null,
         };
     }
 
@@ -3887,6 +3898,7 @@ class KigumiViewerApp extends LitElement {
                     ray: pickRay,
                     // Whatever the hover is showing is what the click takes.
                     candidateIndex: this._hover ? this._hover.asking : null,
+                    ...this._pickContext(),
                     // The same question the hover asked, so the click resolves
                     // to the feature the hover lit rather than to a different
                     // one -- and so the pick comes back with the plane.
@@ -4027,9 +4039,12 @@ class KigumiViewerApp extends LitElement {
             items: candidates.map((candidate, index) => ({
                 id: String(index),
                 label: candidate.label,
+                // Under the pointer but not seen there: listed, so you know it is there, not taken.
+                disabled: Boolean(candidate.hidden),
                 // Where it is declared, so two named alike (a dovetail_wide_face on each of two
                 // dovetails) can be told apart.
-                note: [(candidate.type || '').toLowerCase(), ...(candidate.path || []).slice(-2)]
+                note: [(candidate.type || '').toLowerCase(), ...(candidate.path || []).slice(-2),
+                    candidate.hidden ? t('viewer.contextMenu.hidden') : null]
                     .filter(Boolean).join(' \u00b7 '),
             })),
             // A row is the feature it names: choosing one is the click that

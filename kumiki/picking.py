@@ -10,7 +10,7 @@ run on every hover.
 
 import math
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, TypedDict
 
 from .csg.cutcsg import CSGFeature, CutCSG, FeatureTestTolerances, OwnedFeatureHit
 from .csg.feature_paths import candidate_segments
@@ -532,37 +532,163 @@ def features_at_point(
     from kumiki.csg.cutcsg import FeatureTestTolerances
 
     resolved = tolerances or FeatureTestTolerances(face=eps)
+    if local_ray is not None and whole_ray:
+        return [candidate.hit for candidate in candidates_under_pointer(root, local_pt, resolved, local_ray)]
     hits = root.find_all_features(to_v3(local_pt), resolved)
     if local_ray is None:
         return hits
-    if not whole_ray:
-        return merge_ray_hits(root, hits, local_ray, resolved)
+    return merge_ray_hits(root, hits, local_ray, resolved)
 
+
+class Candidate(NamedTuple):
+    """A feature under the pointer in a drawing's view: where along the ray it was found, and
+    the depth group it is in (see order_along_ray), named by the depth the group starts at."""
+    hit: 'OwnedFeatureHit'
+    place: Optional[List[float]]
+    depth: float
+    group: float
+
+
+def candidates_under_pointer(
+    root: 'CutCSG', local_pt: List[float], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
+) -> List[Candidate]:
+    """Everything under the pointer at any depth, for a drawing's view: only what the view can
+    measure (measurable_in_view), nearest first (order_along_ray)."""
+    hits = root.find_all_features(to_v3(local_pt), tolerances)
     origin, direction = local_ray[0], unit_or_none(local_ray[1])
     if direction is None:
-        return hits
-    depth_of: Dict[Tuple[str, int], float] = {}
+        return [Candidate(hit, list(local_pt), 0.0, 0.0) for hit in hits]
+    found: Dict[Tuple[str, int], Tuple[float, List[float]]] = {}
 
-    def found_at(found: List['OwnedFeatureHit'], along: float) -> None:
-        for hit in found:
+    def found_at(at_place: List['OwnedFeatureHit'], place: List[float]) -> None:
+        along = _along_ray(origin, direction, place)
+        for hit in at_place:
             key = _hit_key(hit)
-            depth_of[key] = min(depth_of.get(key, math.inf), along)
+            if key not in found or along < found[key][0]:
+                found[key] = (along, place)
 
-    found_at(hits, _along_ray(origin, direction, local_pt))
-    for found, along in real_features_along_ray(root, local_ray, resolved):
-        found_at(found, along)
-        hits = _merge_hits(hits, found)
-    hits = merge_ray_hits(root, hits, local_ray, resolved)
+    found_at(hits, list(local_pt))
+    for at_place, place in real_features_along_ray(root, local_ray, tolerances):
+        found_at(at_place, place)
+        hits = _merge_hits(hits, at_place)
+    hits = merge_ray_hits(root, hits, local_ray, tolerances)
     for hit in hits:
-        if _hit_key(hit) not in depth_of:
+        if _hit_key(hit) not in found:
             # Non-real, in a void: as deep as its nearest approach to the ray.
             extent = hit.feature.get_extent(hit.owner)
             if extent is not None and extent.ends is not None:
                 nearest = ray_nears_segment(
                     origin, direction, (_floats3(extent.ends[0]), _floats3(extent.ends[1])), math.inf)
                 if nearest is not None:
-                    found_at([hit], _along_ray(origin, direction, nearest))
-    return order_along_ray(measurable_in_view(hits, direction, float(resolved.edge)), depth_of, float(resolved.edge))
+                    found_at([hit], nearest)
+    # An edge or corner is placed on itself, where it comes nearest the pointer: it was found
+    # where the ray crossed some face, which can be a pixel off it.
+    for hit in hits:
+        key = _hit_key(hit)
+        exact = _nearest_on(hit, origin, direction)
+        if exact is not None:
+            found[key] = (_along_ray(origin, direction, exact), exact)
+    separation = float(tolerances.edge)
+    ordered = order_along_ray(measurable_in_view(hits, direction, separation),
+                              {key: along for key, (along, _place) in found.items()}, separation)
+    groups = _depth_groups(ordered, {key: along for key, (along, _place) in found.items()}, separation)
+    return [Candidate(hit, found.get(_hit_key(hit), (math.inf, None))[1],
+                      found.get(_hit_key(hit), (math.inf, None))[0], groups[_hit_key(hit)])
+            for hit in ordered]
+
+
+def _nearest_on(hit: 'OwnedFeatureHit', origin: List[float], direction: List[float]) -> Optional[List[float]]:
+    """The point of an edge (its line) or corner nearest the ray; None for anything else."""
+    from kumiki.geometry import Line, Point
+
+    located = hit.feature.locate_simple_unbounded(hit.owner)
+    if isinstance(located, Point):
+        return _floats3(located.position)
+    if not isinstance(located, Line):
+        return None
+    point, run = _floats3(located.point), unit_or_none(_floats3(located.direction))
+    if run is None:
+        return None
+    across = sum(run[i] * direction[i] for i in range(3))
+    if abs(across) > 1 - 1e-12:
+        return None  # along the ray: any point of it is as near as any other
+    to_origin = [origin[i] - point[i] for i in range(3)]
+    along_line = (sum(to_origin[i] * run[i] for i in range(3))
+                  - across * sum(to_origin[i] * direction[i] for i in range(3))) / (1 - across * across)
+    return [point[i] + run[i] * along_line for i in range(3)]
+
+
+def split_hidden(
+    candidates: List[Candidate], direction: List[float], tolerance: float,
+    blocked: Optional[Callable[[List[float]], bool]] = None,
+) -> Tuple[List[Candidate], List[Candidate]]:
+    """*candidates* as (visible, hidden), each in order.
+
+    Hidden under the pointer is one of two things:
+
+    - Stacked: a nearer visible candidate lands on the same line of the sheet -- an edge behind a
+      parallel one on the same line, a point behind a point or on a nearer line. Where edges stack
+      exactly along the view only the front one is seen. Decided from the candidates alone.
+    - Behind material: `blocked(place)` says the line of sight from where it was found passes
+      through a solid on its way to the camera. See drawings/visibility.py.
+
+    Non-real features (a bore's axis) are snap targets in a void, and never hidden.
+    """
+    unit = unit_or_none(direction) or direction
+    visible: List[Candidate] = []
+    hidden: List[Candidate] = []
+    for candidate in candidates:
+        hit = candidate.hit
+        if not hit.feature.real:
+            visible.append(candidate)
+            continue
+        if (any(other.group < candidate.group and _covers(other, candidate, unit, tolerance) for other in visible)
+                or (blocked is not None and candidate.place is not None and blocked(candidate.place))):
+            hidden.append(candidate)
+        else:
+            visible.append(candidate)
+    return visible, hidden
+
+
+def _sheet_shape(hit: 'OwnedFeatureHit', direction: List[float]):
+    """What a feature is on the sheet: ('line', point, run) or ('point', point), projected along
+    *direction*; None for anything else (a face seen at an angle, a curved surface)."""
+    from kumiki.geometry import Line, Plane, Point
+
+    located = hit.feature.locate_simple_unbounded(hit.owner)
+    flatten = lambda v: [v[i] - direction[i] * sum(v[j] * direction[j] for j in range(3)) for i in range(3)]
+    if isinstance(located, Point):
+        return ("point", flatten(_floats3(located.position)))
+    if isinstance(located, Line):
+        run = unit_or_none(flatten(_floats3(located.direction)))
+        point = flatten(_floats3(located.point))
+        return ("point", point) if run is None else ("line", point, run)
+    if isinstance(located, Plane):
+        normal = _floats3(located.normal)
+        run = unit_or_none([normal[1] * direction[2] - normal[2] * direction[1],
+                            normal[2] * direction[0] - normal[0] * direction[2],
+                            normal[0] * direction[1] - normal[1] * direction[0]])
+        return None if run is None else ("line", flatten(_floats3(located.point)), run)
+    return None
+
+
+def _covers(front: Candidate, behind: Candidate, direction: List[float], tolerance: float) -> bool:
+    """Whether *front* lands where *behind* does on the sheet, under the pointer."""
+    near, far = _sheet_shape(front.hit, direction), _sheet_shape(behind.hit, direction)
+    if near is None or far is None:
+        return False
+    if near[0] == "line" and far[0] == "line":
+        cross = [near[2][1] * far[2][2] - near[2][2] * far[2][1],
+                 near[2][2] * far[2][0] - near[2][0] * far[2][2],
+                 near[2][0] * far[2][1] - near[2][1] * far[2][0]]
+        return math.sqrt(sum(c * c for c in cross)) <= EDGE_ON
+    if far[0] == "point" and near[0] == "point":
+        return math.dist(near[1], far[1]) <= tolerance
+    if far[0] == "point" and near[0] == "line":
+        offset = [far[1][i] - near[1][i] for i in range(3)]
+        along = sum(offset[i] * near[2][i] for i in range(3))
+        return math.sqrt(max(0.0, sum(c * c for c in offset) - along * along)) <= tolerance
+    return False  # a line behind a point is seen either side of it
 
 
 #: How far off square to the view a face's normal may be and the face still count as edge-on.
@@ -627,15 +753,22 @@ def order_along_ray(
     """
     from kumiki.csg.cutcsg import feature_hit_sort_key
 
+    starts = _depth_groups(hits, depth_of, separation)
+    return sorted(hits, key=lambda hit: (starts[_hit_key(hit)], feature_hit_sort_key(hit)))
+
+
+def _depth_groups(
+    hits: List['OwnedFeatureHit'], depth_of: Dict[Tuple[str, int], float], separation: float,
+) -> Dict[Tuple[str, int], float]:
+    """Each hit's depth group (see order_along_ray), named by the depth the group starts at."""
     depth = lambda hit: depth_of.get(_hit_key(hit), math.inf)
-    # Each hit's group, named by the depth it starts at.
     starts: Dict[Tuple[str, int], float] = {}
     start: Optional[float] = None
     for hit in sorted(hits, key=depth):
         if start is None or depth(hit) - start > separation:
             start = depth(hit)
         starts[_hit_key(hit)] = start
-    return sorted(hits, key=lambda hit: (starts[_hit_key(hit)], feature_hit_sort_key(hit)))
+    return starts
 
 
 def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
@@ -654,9 +787,9 @@ def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) ->
 
 def real_features_along_ray(
     root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
-) -> List[Tuple[List['OwnedFeatureHit'], float]]:
+) -> List[Tuple[List['OwnedFeatureHit'], List[float]]]:
     """Every feature on the boundary anywhere under the pointer, at any depth: the features at
-    each place found, and how far along the ray that place is.
+    each place found, and the place.
 
     For an orthographic view, where everything along the ray is drawn at one place on the
     sheet: there, a flank seen edge-on has its front edge and its back edge on one line, and
@@ -705,7 +838,7 @@ def real_features_along_ray(
 
     walk(root)
     snap = FeatureTestTolerances(face=near, edge=near, point=max(near, float(tolerances.point)))
-    return [(root.find_all_features(to_v3(place), snap), _along_ray(origin, direction, place))
+    return [(root.find_all_features(to_v3(place), snap), place)
             for place in places if root.is_point_on_boundary(to_v3(place), eps=near)]
 
 

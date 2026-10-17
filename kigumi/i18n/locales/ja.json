@@ -119,6 +119,7 @@
   "viewer.chrome.gizmo.projectionMode.perspective": "透視投影",
   "viewer.chrome.gizmo.projectionMode.orthographic": "平行投影",
   "viewer.chrome.gizmo.light": "ライト",
+  "viewer.contextMenu.hidden": "隠れている",
   "viewer.contextMenu.copyForAI": "AI用にコピー",
   "viewer.contextMenu.copyForAIDetailed": "詳細付きでAI用にコピー",
   "viewer.contextMenu.exportStl": "STLとしてエクスポート",

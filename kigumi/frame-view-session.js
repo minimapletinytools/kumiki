@@ -1065,6 +1065,8 @@ class FrameViewSession {
             // and in the 3D view -- where the camera is oblique and no face is
             // ever seen exactly edge-on -- that makes every face unmeasurable.
             space: message.space || null,
+            // In a drawing, the members it draws: what can hide something under the pointer.
+            drawnMembers: message.drawnMembers || null,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
@@ -1110,6 +1112,8 @@ class FrameViewSession {
             // and in the 3D view -- where the camera is oblique and no face is
             // ever seen exactly edge-on -- that makes every face unmeasurable.
             space: message.space || null,
+            // In a drawing, the members it draws: what can hide something under the pointer.
+            drawnMembers: message.drawnMembers || null,
         });
         // The request number goes out and comes back untouched, so the viewer
         // can tell an answer about where the pointer is now from one about
