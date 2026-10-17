@@ -235,6 +235,7 @@
   "viewer.drawing.deleted": "deleted",
   "viewer.contextMenu.putBack": "put back",
   "viewer.contextMenu.deletedMeasurement": "deleted measurement",
+  "viewer.contextMenu.deleteMeasurement": "delete measurement",
   "viewer.selection.measureFrom.title": "Start a measurement from this feature (M)",
   "viewer.selection.kind.face": "face",
   "viewer.selection.kind.curved_face": "curved face",

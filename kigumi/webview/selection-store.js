@@ -315,6 +315,29 @@
             this.emit({ type: 'measurement-marks' });
         }
 
+        /**
+         * Drop a measurement that has been deleted.
+         *
+         * Only the named one: deleting a row must leave the marks on the
+         * others. Its focus goes too, because what is focused has to be
+         * something that is there.
+         */
+        forgetMeasurement({ viewportId, measureKey }) {
+            const mark = measurementMark(viewportId, measureKey);
+            const unmarked = this.markedMeasures.delete(mark);
+            let unfocused = false;
+            if (this.measurementFocus
+                && measurementMark(this.focus.viewportId, this.focus.measureKey) === mark) {
+                this.focus = null;
+                unfocused = true;
+            }
+            if (!unmarked && !unfocused) {
+                return false;
+            }
+            this.emit({ type: 'measurement-marks' });
+            return true;
+        }
+
         isMeasurementMarked(viewportId, measureKey) {
             return this.markedMeasures.has(measurementMark(viewportId, measureKey));
         }

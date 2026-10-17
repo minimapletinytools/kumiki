@@ -578,3 +578,29 @@ describe('the feature menu holds the hover still', () => {
         expect(at).toBeGreaterThan(-1);
     });
 });
+
+// A dimension is drawn on an SVG overlay beside the canvas, not on the canvas,
+// so its right click never reached the canvas's handler that keeps the browser
+// menu away. It showed cut/copy/paste over the dimension instead. viewer-app.js
+// cannot be loaded here, so the wiring is read.
+describe('a measurement offers its menu where it is drawn', () => {
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+    test('a dimension opens the same menu as its list row', () => {
+        const body = methodBody(app, '_measurementGroup');
+
+        expect(body).toContain("addEventListener('contextmenu'");
+        expect(body).toContain('event.preventDefault()');
+        expect(body).toContain('this.showMeasurementContextMenu(');
+        expect(body).toMatch(/viewportId: viewport\.id/);
+        expect(body).toMatch(/measureKey: key/);
+    });
+
+    test('and the menu offers to delete it, or to put a deleted one back', () => {
+        const body = methodBody(app, 'showMeasurementContextMenu');
+
+        expect(body).toContain("id: 'delete'");
+        expect(body).toContain("id: 'restore'");
+        expect(body).toContain('this.deleteMeasurement(');
+    });
+});

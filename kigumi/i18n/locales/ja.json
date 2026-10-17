@@ -235,6 +235,7 @@
   "viewer.drawing.deleted": "削除済み",
   "viewer.contextMenu.putBack": "元に戻す",
   "viewer.contextMenu.deletedMeasurement": "削除された寸法",
+  "viewer.contextMenu.deleteMeasurement": "寸法を削除",
   "viewer.selection.measureFrom.title": "この特徴から寸法を開始する (M)",
   "viewer.selection.kind.face": "面",
   "viewer.selection.kind.curved_face": "曲面",
