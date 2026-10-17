@@ -23,6 +23,7 @@ from kumiki.csg.cutcsg import (
     RectangularPrism,
     SolidUnion,
     adopt_csg,
+    strip_features,
     EmptyCSG,
 )
 from kumiki.measuring import Plane, get_center_point_on_face_global, locate_centerline, locate_plane_from_edge_in_direction
@@ -1431,7 +1432,8 @@ def chop_scribe_relief(
         None, timber_to_be_cut.transform, cut_relief_global
     )
 
-    return scribed_relief_in_scribed_local, cut_relief_in_cut_local
+    # Both are built from the timbers' bodies and cuts, which their own trees already name.
+    return strip_features(scribed_relief_in_scribed_local), strip_features(cut_relief_in_cut_local)
 
 
 def chop_scribe_relief_and_apply(
