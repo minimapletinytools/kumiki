@@ -1684,9 +1684,9 @@ def _rough_face_tags(perfect: frozenset = frozenset()) -> Tuple[FeatureOverride,
     """
     def named(name: str, faces: Tuple[PrismFace, ...]) -> Tuple[str, FeatureProperties]:
         on_perfect = all(face in perfect for face in faces)
-        prefix = RPTW_FACE_PREFIX if on_perfect else ROUGH_FACE_PREFIX
-        group = FeatureGroup.PERFECT if on_perfect else FeatureGroup.ROUGH
-        return prefix + name, FeatureProperties(group=group)
+        if on_perfect:
+            return RPTW_FACE_PREFIX + name, FeatureProperties(group=FeatureGroup.PERFECT)
+        return ROUGH_FACE_PREFIX + name, FeatureProperties(group=FeatureGroup.ROUGH, purpose=FeaturePurpose.ROUGH_FACE)
 
     def override(key: FeatureKey, name: str, faces: Tuple[PrismFace, ...]) -> FeatureOverride:
         full_name, properties = named(name, faces)

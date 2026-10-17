@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Callable, Iterator, List
 
 from ..csg.cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
-                     OwnedFeatureHit, csg_children)
+                     OwnedFeatureHit, csg_children, measured_by_default)
 from ..csg.feature_paths import FeatureHandle
 from ..csg.planar_region import face_reaches_surface
 from ..rule import V3, create_v3
@@ -36,10 +36,10 @@ def _nodes(root: CutCSG) -> Iterator[CutCSG]:
 
 
 def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_surface,
-                      include_relief: bool = False) -> List[RequiredFeature]:
+                      include_unmeasured: bool = False) -> List[RequiredFeature]:
     """The features of `cut_timber` that need solving, each with why.
 
-    - relief (FeaturePurpose.ROUGH_RELIEF): never, unless `include_relief`.
+    - rough stock's own faces and relief (measured_by_default): never, unless `include_unmeasured`.
     - marked NEVER_MARK: never; marked ALWAYS_MARK: always.
     - non-real (an axis, a reference plane): always.
     - flat faces: when `face_test` finds them on the finished surface. A default face with no
@@ -63,7 +63,7 @@ def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_
             status = marking.mark if marking is not None else FeatureMarkingStatus.OPTIONAL
             if status is FeatureMarkingStatus.NEVER_MARK:
                 continue
-            if feature.properties.purpose is FeaturePurpose.ROUGH_RELIEF and not include_relief:
+            if not measured_by_default(feature.properties.purpose) and not include_unmeasured:
                 continue
             if status is FeatureMarkingStatus.ALWAYS_MARK:
                 required.append(RequiredFeature(handle, Reason.MARKED))

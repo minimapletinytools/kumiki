@@ -121,3 +121,23 @@ class TestWhatTheyAre:
     def test_an_end_is_not_a_long_face(self):
         with pytest.raises(ValueError):
             PrismParallelPlaneFeature(name="nope", face=PrismFace.TOP)
+
+
+class TestRoughFacesAreNotMeasured:
+    def test_a_rough_face_serves_rough_face_and_a_perfect_one_does_not(self):
+        from kumiki.csg.cutcsg import FeaturePurpose
+
+        features = _features(_oversawn().get_extended_actual_csg_local(extend_bot=False, extend_top=False))
+        rough = [f for name, f in features.items() if name.startswith("rough.")]
+        perfect = [f for name, f in features.items() if name.startswith("rptw.")]
+
+        assert rough and perfect
+        assert all(f.properties.purpose is FeaturePurpose.ROUGH_FACE for f in rough)
+        assert all(f.properties.purpose is not FeaturePurpose.ROUGH_FACE for f in perfect)
+
+    def test_only_rough_stock_is_left_unmeasured_by_default(self):
+        from kumiki.csg.cutcsg import FeaturePurpose, measured_by_default
+
+        unmeasured = {purpose for purpose in FeaturePurpose if not measured_by_default(purpose)}
+
+        assert unmeasured == {FeaturePurpose.ROUGH_FACE, FeaturePurpose.ROUGH_RELIEF}

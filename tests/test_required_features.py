@@ -177,7 +177,7 @@ class TestRequiredFeatures:
         cut_timber = CutTimber(TIMBER, cuts=[Cutting(timber=TIMBER, negative_csg=relief)])
 
         assert {"axis", "side.0"}.isdisjoint(self._reasons(cut_timber))
-        asked = {r.handle.feature.name for r in required_features(cut_timber, include_relief=True)}
+        asked = {r.handle.feature.name for r in required_features(cut_timber, include_unmeasured=True)}
         assert {"axis", "side.0"} <= asked
 
 
