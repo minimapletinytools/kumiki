@@ -168,6 +168,18 @@ class TestRequiredFeatures:
         assert "bore" not in reasons
         assert reasons["hidden end"] is Reason.MARKED
 
+    def test_relief_is_not_solved_unless_asked(self):
+        from kumiki.csg.cutcsg import CylinderAxisFeature, with_purpose
+        from kumiki.timber import CutTimber, Cutting
+
+        bore = self._cut_timber_with(extra_features=(CylinderAxisFeature(name="axis"),))
+        relief = with_purpose(bore.cuts[0].negative_csg, FeaturePurpose.ROUGH_RELIEF)
+        cut_timber = CutTimber(TIMBER, cuts=[Cutting(timber=TIMBER, negative_csg=relief)])
+
+        assert {"axis", "side.0"}.isdisjoint(self._reasons(cut_timber))
+        asked = {r.handle.feature.name for r in required_features(cut_timber, include_relief=True)}
+        assert {"axis", "side.0"} <= asked
+
 
 def test_a_face_test_can_be_swapped():
     frame, _ = mortise_and_tenon_handles()

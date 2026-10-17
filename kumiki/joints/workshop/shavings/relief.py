@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, replace
-from typing import List, Optional, Union
+from typing import List, Optional, TypeVar, Union, cast
 
 
 from kumiki.construction import ButtJointTimberArrangement, ArrangementNames
@@ -24,6 +24,8 @@ from kumiki.csg.cutcsg import (
     SolidUnion,
     adopt_csg,
     strip_features,
+    with_purpose,
+    FeaturePurpose,
     EmptyCSG,
 )
 from kumiki.measuring import Plane, get_center_point_on_face_global, locate_centerline, locate_plane_from_edge_in_direction
@@ -38,6 +40,14 @@ from kumiki.timber_shavings import (
 IMPERFECT_TIMBER_WARNING = (
     "timber is imperfect (does not match perfect timber within), this joint currently does not supporting maknig relief cuts beyond the perfect timber within so the joint may not actually fit"
 )
+
+
+_Relief = TypeVar("_Relief", bound=CutCSG)
+
+
+def _as_relief(csg: _Relief) -> _Relief:
+    """*csg* with every feature it names marked ROUGH_RELIEF: relief, which nothing solves for by default."""
+    return cast(_Relief, with_purpose(csg, FeaturePurpose.ROUGH_RELIEF))
 
 
 def warn_if_arrangement_timbers_imperfect(arrangement) -> None:
@@ -592,7 +602,7 @@ def chop_shoulder_notch_aligned_with_timber(
     wall_relief_angle_radians = Max(notch_wall_relief_cut_angle_radians, butt_rake_from_shoulder_normal_radians)
 
     if safe_zero_test(wall_relief_angle_radians):
-        return notch_prism
+        return _as_relief(notch_prism)
 
     angle_rad = wall_relief_angle_radians
     span_direction_local = cross_product(approach_direction_local, notch_width_axis_local)
@@ -622,7 +632,7 @@ def chop_shoulder_notch_aligned_with_timber(
         label=CutCSGLabel("notch_wall_relief"),
     )
 
-    return SolidUnion([notch_prism, left_wall_prism, right_wall_prism], label=label)
+    return _as_relief(SolidUnion([notch_prism, left_wall_prism, right_wall_prism], label=label))
 
 
 # TODO DEPRECATE ME mostly replaced by chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided
@@ -745,7 +755,7 @@ def chop_shoulder_notch_on_timber_face(
     )
 
     if notch_wall_relief_cut_angle == 0:
-        return notch_prism
+        return _as_relief(notch_prism)
 
     angle_rad = degrees(notch_wall_relief_cut_angle)
 
@@ -774,7 +784,7 @@ def chop_shoulder_notch_on_timber_face(
         label=CutCSGLabel("notch_wall_relief"),
     )
 
-    return SolidUnion([notch_prism, left_wall_prism, right_wall_prism], label=label)
+    return _as_relief(SolidUnion([notch_prism, left_wall_prism, right_wall_prism], label=label))
 
 
 def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
@@ -1070,8 +1080,8 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     )
 
     return ShoulderReliefCSGGeometry(
-        receiving_timber_notch_negative_CSG=receiving_timber_notch_negative_csg_local,
-        butting_timber_relief_negative_CSG=butting_timber_relief_negative_csg_local,
+        receiving_timber_notch_negative_CSG=_as_relief(receiving_timber_notch_negative_csg_local),
+        butting_timber_relief_negative_CSG=_as_relief(butting_timber_relief_negative_csg_local),
     )
 
 # TODO rewrite comments for this function better xplaining what it does and come up with a better name fro it...
@@ -1317,8 +1327,8 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
     )
     
     return ShoulderReliefCSGGeometry(
-        receiving_timber_notch_negative_CSG=receiving_timber_notch_negative_csg_local,
-        butting_timber_relief_negative_CSG=butting_timber_relief_negative_csg_local,
+        receiving_timber_notch_negative_CSG=_as_relief(receiving_timber_notch_negative_csg_local),
+        butting_timber_relief_negative_CSG=_as_relief(butting_timber_relief_negative_csg_local),
     )
 
 
@@ -1433,7 +1443,8 @@ def chop_scribe_relief(
     )
 
     # Both are built from the timbers' bodies and cuts, which their own trees already name.
-    return strip_features(scribed_relief_in_scribed_local), strip_features(cut_relief_in_cut_local)
+    return (_as_relief(strip_features(scribed_relief_in_scribed_local)),
+            _as_relief(strip_features(cut_relief_in_cut_local)))
 
 
 def chop_scribe_relief_and_apply(
