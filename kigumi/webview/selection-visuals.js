@@ -139,6 +139,7 @@
             found.edgeMode,
             Boolean(found.showDrawingGhosts),
             Boolean(found.showFeatureParent),
+            Boolean(found.inDrawing),
             // Which timbers are selected, and what is picked inside one. Order
             // is not normalised: a different order costs one extra pass, and
             // missing a change costs a frame that lies about the state.

@@ -168,6 +168,7 @@ describe('folding the state into something comparable', () => {
         edgeLineVisibilityPercent: 100,
         edgeMode: 'overlay',
         showDrawingGhosts: true,
+        inDrawing: false,
         selected: ['post#0'],
         focus: { timberKey: 'post#0', path: ['cut'], featureLabel: 'front' },
         lit: { features: [{ key: 'post#0|cut|front', roles: { selection: { key: 'post#0|cut|front' } } }] },
@@ -189,6 +190,7 @@ describe('folding the state into something comparable', () => {
         ['edgeLineVisibilityPercent', 50],
         ['edgeMode', 'none'],
         ['showDrawingGhosts', false],
+        ['inDrawing', true],
     ])('changing %s changes it', (field, value) => {
         const changed = { ...base(), [field]: value };
 
