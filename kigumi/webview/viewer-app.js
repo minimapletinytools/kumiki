@@ -4030,7 +4030,8 @@ class KigumiViewerApp extends LitElement {
                     memberKey,
                     point,
                     currentPath,
-                    ctrlClick: !!event.ctrlKey || !!event.metaKey,
+                    // No drilling in a drawing: its views pick features directly, every timber alike.
+                    ctrlClick: !this.isInDrawing && (!!event.ctrlKey || !!event.metaKey),
                     tolerances: this._pickTolerances(point, pickCamera),
                     // See _findMembersAlongRay: a hit point is on a surface, and
                     // a feature in a void is not near any surface.

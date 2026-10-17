@@ -78,6 +78,7 @@ def picked():
         return result if extra else [candidate["label"] for candidate in result["candidates"]]
 
     setattr(pick, "ask", lambda payload: runner._handle_find_csg_at_point(None, payload, slot))
+    setattr(pick, "by_path", lambda payload: runner._handle_find_csg_by_path(None, payload, slot))
     return pick
 
 
@@ -194,3 +195,24 @@ def test_where_everything_under_the_pointer_is_hidden_nothing_is_taken(picked):
     assert result["candidates"] and all(candidate["hidden"] for candidate in result["candidates"])
     assert result["candidateCount"] == 0
     assert result["featureLabel"] is None and result["candidateIndex"] is None and result["path"] == []
+
+
+def test_a_drawing_has_no_drilling_so_ctrl_is_a_plain_click(picked):
+    # A drawing's view picks features directly, every timber alike.
+    plain = picked(0.0004, "projected", ctrlClick=False)
+    with_ctrl = picked(0.0004, "projected", ctrlClick=True)
+
+    assert (with_ctrl["featureLabel"], with_ctrl["path"]) == (plain["featureLabel"], plain["path"])
+    assert plain["featureLabel"] is not None
+
+
+@pytest.mark.parametrize("name", ["ptw.centerplane_left_right", "ptw.centerplane_front_back"])
+def test_a_centerplane_lights_its_outline_and_no_triangles(picked, name):
+    # It is no surface: tested triangle by triangle it lit whichever it happened to pass through.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        result = picked.by_path({"memberKey": "m#0", "path": ["timber (rough, extended)"], "featureLabel": name})
+
+    assert result["featureLabel"] == name
+    assert result["highlightMesh"]["indices"] == []
+    assert len(result["highlightEdgeSegments"]) == 4

@@ -149,10 +149,13 @@ def feature_at(csg: 'CutCSG', point: Any, eps: float) -> Optional['CSGFeature']:
     specificity as the authored feature covering the same surface. Asking for
     the authored layer first says which of those two a person would rather
     read.
+
+    Only real features: this names the surface at a point, and a non-real one (a centerplane
+    passing through) is no surface. Named instead, it lit whatever triangles it crossed.
     """
     from kumiki.csg.cutcsg import FeatureSource, FeatureTestTolerances
 
-    hits = csg.find_all_features(point, FeatureTestTolerances(face=eps))
+    hits = [hit for hit in csg.find_all_features(point, FeatureTestTolerances(face=eps)) if hit.feature.real]
     if not hits:
         return None
     # By name: authored features are rebuilt on each call, and names are unique
@@ -1278,6 +1281,10 @@ def extract_highlight_mesh(
     if feature_label is not None and edge_feature is None:
         wanted_feature = next(
             (f for f in target_csg.get_declared_features() if f.name == feature_label), None)
+    if wanted_feature is not None and not wanted_feature.real:
+        # No surface to shade (a centerplane, a perfect face in rough stock): its outline is drawn
+        # instead. Tested triangle by triangle, it lit whichever ones it happened to pass through.
+        return [], [], 0, total_tris
 
     for tri in range(total_tris):
         i0 = mesh_indices[tri * 3]
