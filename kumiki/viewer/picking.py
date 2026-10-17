@@ -609,17 +609,18 @@ def split_hidden(
     candidates: List[Candidate], direction: Float3, tolerance: float,
     blocked: Optional[Callable[[Float3], bool]] = None,
 ) -> Tuple[List[Candidate], List[Candidate]]:
-    """*candidates* as (visible, hidden), each in order.
+    """Splits *candidates* into those the camera can see and those it cannot.
 
-    Hidden under the pointer is one of two things:
+    Args:
+        candidates: everything under the pointer, nearest first (candidates_under_pointer).
+        direction: the view direction, from the camera.
+        tolerance: how close two features on the sheet must be to count as one on top of the other.
+        blocked: whether material hides a place from the camera; None checks no material.
 
-    - Stacked: a nearer visible candidate lands on the same line of the sheet -- an edge behind a
-      parallel one on the same line, a point behind a point or on a nearer line. Where edges stack
-      exactly along the view only the front one is seen. Decided from the candidates alone.
-    - Behind material: `blocked(place)` says the line of sight from where it was found passes
-      through a solid on its way to the camera. See drawings/visibility.py.
-
-    Non-real features (a bore's axis) are snap targets in a void, and never hidden.
+    Returns:
+        (visible, hidden), each in the order given. A candidate is hidden when a nearer visible
+        one covers it on the sheet, or when *blocked* says so of its place. Non-real features (a
+        bore's axis) are never hidden.
     """
     unit = Float3.of(direction).unit() or Float3.of(direction)
     visible: List[Candidate] = []

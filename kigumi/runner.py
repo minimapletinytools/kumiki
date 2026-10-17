@@ -2524,10 +2524,15 @@ def _pick_from_candidate(
 def _sight_blocker(
     ss: 'SlotState', own: 'CutTimber', own_root: 'CutCSG', payload: PickRequest, direction: 'Float3',
 ) -> Callable[['Float3'], bool]:
-    """Whether a place on *own* (in its local space) is behind material in a drawing's view.
+    """Returns a function `blocked(place) -> bool`: whether material hides *place* from the camera.
 
-    Anything the drawing draws can be in the way -- the viewer sends which members those are, and
-    with none sent every member is -- but not its faded context, which is there to place the piece.
+    Args:
+        ss: the loaded frame; its other members can be in the way.
+        own: the member being picked on. *place* is in its local space.
+        own_root: *own*'s CSG, in that same local space.
+        payload: the pick request; its `drawnMembers` are the members that can be in the way
+            (every member when it is None).
+        direction: the view direction, from the camera, in *own*'s local space.
     """
     from kumiki.viewer.visibility import sight_is_blocked
 
@@ -5622,8 +5627,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     local_ray = _local_ray_from_payload(payload, timber_rot, timber_pos)
     if in_drawing and local_ray is not None:
         # In a drawing's view everything under the pointer is drawn at one place, at whatever
-        # depth -- so all of it is a candidate, and what is hidden goes last, offered but not
-        # taken. The 3D view picks the surface the pointer is on.
+        # depth -- so all of it is a candidate, and what is hidden goes last.
         visible, hidden = split_hidden(
             candidates_under_pointer(local_csg, local_pt, tolerances, local_ray),
             local_ray[1], float(tolerances.edge), _sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1]))
