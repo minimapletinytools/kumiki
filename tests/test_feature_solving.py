@@ -22,9 +22,10 @@ def _cut_timber(frame, handle):
 
 
 def _ptw(cut_timber, face):
-    """A face of the timber's perfect timber within, the body the solver works on."""
-    body = cut_timber.get_extended_perfect_csg_local()
-    feature = next(f for f in body.get_declared_features() if f.name == f"ptw.{face}")
+    """A face of the timber's perfect timber within, on the body the solver works on: rptw.* where
+    the rough face is the perfect one, ptw.* where it is not."""
+    body = cut_timber.get_extended_rough_csg_with_perfect_features_local()
+    feature = next(f for f in body.get_declared_features() if f.name in (f"rptw.{face}", f"ptw.{face}"))
     return FeatureHandle(timber=cut_timber.timber, hit=OwnedFeatureHit(feature=feature, owner=body))
 
 
@@ -250,7 +251,7 @@ class TestSolveReport:
         counts = {r.handle.feature.name: present(r.remaining).count for r in report.features}
 
         assert report.total.count == 6 * 3
-        assert all(counts[f"ptw.{face}"] == 0 for face in ("front", "back", "left", "right", "bottom"))
+        assert all(counts[f"rptw.{face}"] == 0 for face in ("front", "back", "left", "right", "bottom"))
         assert all(counts[name] == 3 for name in ("shoulder", "tenon_top", "tenon_left", "tenon_right"))
 
     def test_measurements_take_off_what_they_fix(self, handles):

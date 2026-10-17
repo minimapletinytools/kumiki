@@ -203,13 +203,13 @@ class TestPlanningFeatures:
 
         assert "shoulder" in names
         assert not any(name.startswith("tenon") for name in names)
-        assert all(name == "shoulder" or name.startswith("ptw.") for name in names)
+        assert all(name == "shoulder" or name.startswith(("rptw.", "ptw.")) for name in names)
 
     def test_the_mortised_timber_keeps_only_its_body(self):
         frame, found = mortise_and_tenon_handles()
         receiving = frame.cut_timber_of(found["mortise_front"].timber)
 
-        assert all(name.startswith("ptw.") for name in self._names(receiving))
+        assert all(name.startswith(("rptw.", "ptw.")) for name in self._names(receiving))
 
     def test_each_is_solvable(self):
         frame, found = mortise_and_tenon_handles()

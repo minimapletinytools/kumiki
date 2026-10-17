@@ -3905,15 +3905,17 @@ class TestNonRealFeatures:
             end_distance=scalar(10),
             feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "the_face",
                                                FeatureProperties(priority=0))],
-            extra_features=[ProgrammableFaceFeature("the_axis",
+            extra_features=[ProgrammableEdgeFeature("the_axis",
                                                    properties=FeatureProperties(real=False, priority=99),
-                                                   predicate=lambda owner, point, eps: True)],
+                                                   predicate=lambda owner, point, eps: True),
+                            ProgrammableFaceFeature("the_plane", properties=FeatureProperties(real=False),
+                                                    predicate=lambda owner, point, eps: True)],
         )
         on_face = create_v3(scalar(2), scalar(0), scalar(5))
-        assert {h.name for h in prism.find_all_features(on_face)} == {"the_face", "the_axis"}
-        # ... and the non-real one wins despite the far worse priority
-        best = prism.find_first_feature(on_face)
-        assert best is not None and best.name == "the_axis"
+        assert {h.name for h in prism.find_all_features(on_face)} == {"the_face", "the_axis", "the_plane"}
+        # ... and the non-real line wins despite the far worse priority, and a non-real plane,
+        # which runs through the body, comes last.
+        assert [h.name for h in prism.find_all_features(on_face)] == ["the_axis", "the_face", "the_plane"]
 
     def test_the_edge_tolerance_is_what_widens_an_axis(self):
         """A centre line is an EDGE, so the edge tolerance governs it."""

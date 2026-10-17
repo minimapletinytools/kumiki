@@ -826,30 +826,32 @@ class PerfectTimberWithin(ABC):
         added as a PlaneFeature named ptw.* -- its own carrier, so the solver measures to it -- and
         both centerplanes as MidplaneFeatures between whichever planes are the perfect ones.
 
-        Raises NotImplementedError for a timber whose rough body is not a rectangular prism.
+        Raises NotImplementedError for a rough body that cannot carry features.
         """
         rough = self.get_extended_actual_csg_local(extend_bot, extend_top)
-        if not isinstance(rough, RectangularPrism):
+        if not isinstance(rough, HasFeatures):
             raise NotImplementedError(
-                f"{type(self).__name__}'s rough body is a {type(rough).__name__}; perfect features are "
-                "only carried by a rectangular one")
-        # In the rough prism's own frame, whose axis sits off the perfect one's by its offset.
-        width_dir, height_dir, _ = rough._local_axes()
-        offset_x = safe_dot_product(rough.transform.position, width_dir)
-        offset_y = safe_dot_product(rough.transform.position, height_dir)
+                f"{type(self).__name__}'s rough body is a {type(rough).__name__}, which carries no features")
+        # Each perfect face in the timber's local space, then in the rough body's own frame.
+        transform = getattr(rough, "transform", None)
         half_width, half_height = self.size[0] / scalar(2), self.size[1] / scalar(2)
         one, zero = scalar(1), scalar(0)
-        planes = [
-            (TimberFace.RIGHT, (one, zero, zero), half_width - offset_x),
-            (TimberFace.LEFT, (-one, zero, zero), half_width + offset_x),
-            (TimberFace.FRONT, (zero, one, zero), half_height - offset_y),
-            (TimberFace.BACK, (zero, -one, zero), half_height + offset_y),
-        ]
+        planes = []
+        for face, normal, half in ((TimberFace.RIGHT, create_v3(one, zero, zero), half_width),
+                                   (TimberFace.LEFT, create_v3(-one, zero, zero), half_width),
+                                   (TimberFace.FRONT, create_v3(zero, one, zero), half_height),
+                                   (TimberFace.BACK, create_v3(zero, -one, zero), half_height)):
+            offset = half
+            if transform is not None:
+                offset = half - safe_dot_product(normal, transform.position)
+                normal = safe_transform_vector(transform.orientation.matrix.T, normal)
+            planes.append((face, (normal[0], normal[1], normal[2]), offset))
+        on_rough = {feature.name for feature in rough.get_declared_features()}
         perfect = FeatureProperties(group=FeatureGroup.PERFECT, real=False)
         added: List[CSGFeature] = []
         named: Dict[TimberFace, str] = {}
         for face, normal, offset in planes:
-            if self.is_face_perfect(face):
+            if RPTW_FACE_PREFIX + face.name.lower() in on_rough:
                 named[face] = RPTW_FACE_PREFIX + face.name.lower()
             else:
                 named[face] = PTW_FACE_PREFIX + face.name.lower()
@@ -858,7 +860,7 @@ class PerfectTimberWithin(ABC):
                                      between=(named[TimberFace.RIGHT], named[TimberFace.LEFT])))
         added.append(MidplaneFeature(name=PTW_FACE_PREFIX + "centerplane_front_back",
                                      between=(named[TimberFace.FRONT], named[TimberFace.BACK])))
-        return dataclass_replace(rough, extra_features=tuple(rough.extra_features) + tuple(added))
+        return cast(CutCSG, dataclass_replace(rough, extra_features=tuple(rough.extra_features) + tuple(added)))
 
     def rough_face_tags(self) -> Tuple[FeatureOverride, ...]:
         """This timber's names for its rough prism: rptw.* wherever it lies on the perfect timber within."""
@@ -1814,7 +1816,7 @@ class CutTimber:
     timber: PerfectTimberWithin
     cuts: List['Cutting']
     joints: List['Joint']
-    _extended_rough_csg_local: CutCSG
+    _extended_rough_csg_local: CutCSG  # with every perfect feature: see get_extended_rough_csg_with_perfect_features_local
     _extended_perfect_csg_local: CutCSG
     _rendered_csg_local: CutCSG
     _rendered_perfect_csg_local: CutCSG
@@ -1843,7 +1845,7 @@ class CutTimber:
 
         # Built once here, so every caller gets the same node objects.
         extend_bot, extend_top = _ends_extended_by_cuts(timber, self.cuts)
-        self._extended_rough_csg_local = timber.get_extended_actual_csg_local(
+        self._extended_rough_csg_local = timber.get_extended_rough_csg_with_perfect_features_local(
             extend_bot=extend_bot, extend_top=extend_top)
         self._extended_perfect_csg_local = timber.get_extended_perfect_csg_local(
             extend_bot=extend_bot, extend_top=extend_top)
@@ -1925,19 +1927,9 @@ class CutTimber:
         return cls(timber, cuts=cuts, joints=contributing)
 
     # this one returns the timber without cuts where ends with joints are infinite in length
-    def _extended_timber_without_cuts_csg_local(self) -> CutCSG:
-        """
-        Returns a CSG representation of the timber without any cuts applied.
-        
-        If an end has cuts on it (indicated by maybeEndCut), that end is extended to infinity.
-        This allows joints to extend the timber as needed during the CSG cutting operations.
-        
-        Uses LOCAL coordinates (relative to timber.bottom_position).
-        All cuts on this timber are also in LOCAL coordinates.
-        
-        Returns:
-            RectangularPrism CSG representing the timber (possibly semi-infinite or infinite) in LOCAL coordinates
-        """
+    def get_extended_rough_csg_with_perfect_features_local(self) -> CutCSG:
+        """The rough timber, carrying every perfect feature, with each end that has an end cut extended
+        to infinity: what is drawn and solved, before the cuts. Built once, at construction."""
         return self._extended_rough_csg_local
 
     def get_extended_perfect_csg_local(self) -> CutCSG:

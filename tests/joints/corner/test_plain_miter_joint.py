@@ -80,7 +80,7 @@ class TestMiterJoint:
 
     @staticmethod
     def get_timber_bottom_position_after_cutting_local(timber: CutTimber) -> V3:
-        prism = timber._extended_timber_without_cuts_csg_local()
+        prism = timber.get_extended_rough_csg_with_perfect_features_local()
         assert isinstance(prism, RectangularPrism)
         return prism.get_bottom_position()
 
