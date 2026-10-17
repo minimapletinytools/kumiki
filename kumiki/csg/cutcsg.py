@@ -444,11 +444,21 @@ class FeaturePurpose(Enum):
     """What purpose the feature serves."""
 
     NOT_SPECIFIED = 0
-    # Relief cut into rough stock (shavings/relief.py marks every feature of it). Not solved for
-    # unless asked (required_features); picking and measuring do not tell it apart yet.
+    # Relief cut into rough stock (shavings/relief.py marks every feature of it).
     ROUGH_RELIEF = 1
     # The plane a joint's shoulder sits in. Planning drawings solve for these and the timber prisms only.
     SHOULDER = 2
+    # A rough timber's own face, arris or corner where it is not the perfect timber within's
+    # (rough.*; see timber.ROUGH_FACE_PREFIX): as sawn, so nothing is measured from it.
+    ROUGH_FACE = 3
+
+
+def measured_by_default(purpose: FeaturePurpose) -> bool:
+    """Whether a feature serving *purpose* is measured (solved for) unless someone asks otherwise.
+
+    Not rough stock: neither its own faces nor the relief cut into it. Picking does not ask yet.
+    """
+    return purpose not in (FeaturePurpose.ROUGH_FACE, FeaturePurpose.ROUGH_RELIEF)
 
 
 @dataclass(frozen=True)
