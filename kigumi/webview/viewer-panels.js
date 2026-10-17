@@ -43,7 +43,7 @@ export const PANEL_ACTIONS = Object.freeze([
     'setShowAssemblyTimeline', 'setExportCombinedEnabled', 'setExportIndividualsEnabled',
     'setExportAccessoriesEnabled', 'setExportFormatEnabled', 'setEdgeLineVisibilityPercent',
     'setEdgeLineThicknessPx', 'setUnselectedTransparencyPercent', 'setSelectedTransparencyPercent',
-    'setDisassemblyMultiplier', 'setTheme', 'setGeometryMode', 'openDebugDrawing',
+    'setDisassemblyMultiplier', 'setDrawingOption', 'setTheme', 'setGeometryMode', 'openDebugDrawing',
     'saveViewerSettings', 'exportFiles', 'installCadqueryOcp',
     'setKiwariDraft', 'setKiwariEnabled', 'setKiwariAxisDraft', 'resetKiwariToDefaults',
     'saveKiwariToFile', 'requestRefresh',
@@ -54,7 +54,8 @@ const SNAPSHOT_PROPS = Object.freeze([
     'edgeLineThicknessPx', 'unselectedTransparencyPercent', 'selectedTransparencyPercent',
     'leftClickDragRotatesCamera', 'activeTheme', 'debugEnabled', 'showCenterGizmo', 'shadowsEnabled',
     'reflectionsEnabled', 'footprintColor', 'showAssemblyTimeline', 'disassemblyMultiplier',
-    'showDrawingGhosts', ...Object.values(EXPORT_FORMAT_PROP), 'exportCombinedEnabled',
+    'showDrawingGhosts', 'showDrawingPerfectFaces', 'showDrawingCenterplanes', 'showDrawingReferenceFeatures',
+    ...Object.values(EXPORT_FORMAT_PROP), 'exportCombinedEnabled',
     'exportIndividualsEnabled', 'exportAccessoriesEnabled', 'cadqueryOcpInstalled',
     'installingCadqueryOcp', 'themeChoices', 'footprintColorIds', 'panelFlags',
 ]);
@@ -264,6 +265,18 @@ export class ViewerSettingsPanel {
                     <input id="drawing-ghosts-toggle" type="checkbox" .checked=${this.app.showDrawingGhosts}>
                     ${t('viewer.options.drawingGhosts')}
                 </label>
+                <label>
+                    <input id="drawing-perfect-faces-toggle" type="checkbox" .checked=${this.app.showDrawingPerfectFaces}>
+                    ${t('viewer.options.drawingPerfectFaces')}
+                </label>
+                <label>
+                    <input id="drawing-centerplanes-toggle" type="checkbox" .checked=${this.app.showDrawingCenterplanes}>
+                    ${t('viewer.options.drawingCenterplanes')}
+                </label>
+                <label>
+                    <input id="drawing-reference-features-toggle" type="checkbox" .checked=${this.app.showDrawingReferenceFeatures}>
+                    ${t('viewer.options.drawingReferenceFeatures')}
+                </label>
                 <button
                     id="debug-drawing-btn"
                     type="button"
@@ -370,6 +383,15 @@ export class ViewerSettingsPanel {
                 apply: (el) => app.setDrawingGhostsVisible(el.checked),
                 sync: (el) => { el.checked = app.showDrawingGhosts; },
             },
+            ...[
+                ['drawing-perfect-faces-toggle', 'showDrawingPerfectFaces'],
+                ['drawing-centerplanes-toggle', 'showDrawingCenterplanes'],
+                ['drawing-reference-features-toggle', 'showDrawingReferenceFeatures'],
+            ].map(([id, option]) => ({
+                id, on: 'change',
+                apply: (el) => app.setDrawingOption(option, el.checked),
+                sync: (el) => { el.checked = Boolean(app[option]); },
+            })),
             {
                 id: 'left-click-rotate-toggle', on: 'change',
                 apply: (el) => app.setLeftClickDragRotatesCameraEnabled(el.checked),

@@ -55,6 +55,11 @@
             // Whether a drawing shows the timbers it is not about, faintly, to
             // place the piece among its neighbours.
             showDrawingGhosts: { value: true, normalize: (value) => (typeof value === 'boolean' ? value : undefined) },
+            // What a drawing's views draw over the timbers: the perfect timber within's faces and
+            // its centerplanes, dotted, and the reference features, lit.
+            showDrawingPerfectFaces: { value: true, normalize: bool },
+            showDrawingCenterplanes: { value: true, normalize: bool },
+            showDrawingReferenceFeatures: { value: true, normalize: bool },
             // Light a selected feature's parent (the CSG node it is on) as well as the feature.
             showFeatureParent: { value: false, normalize: bool },
             // Where timbers' reference features are lit: in drawings only, everywhere, or nowhere.

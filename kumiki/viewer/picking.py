@@ -496,6 +496,30 @@ def non_real_highlight_segments(
     return [{"start": to_world(extent.ends[0]), "end": to_world(extent.ends[1])}]
 
 
+def plane_outline_segments(
+    plane: Any, timber: 'PerfectTimberWithin',
+) -> Optional[List[Segment]]:
+    """The rectangle *plane* (timber-local) cuts across the perfect timber, in world space.
+
+    For a plane along the timber's length -- a perfect face, a centerplane -- which is where a
+    drawing shows one: seen edge-on, the rectangle is its line. None for any other plane.
+    """
+    normal, point = Float3.of(plane.normal).unit(), Float3.of(plane.point)
+    along = Float3(0.0, 0.0, 1.0)
+    if normal is None or abs(normal.dot(along)) > 1e-9:
+        return None
+    across = normal.cross(along)
+    half_width, half_height, length = float(timber.size[0]) / 2, float(timber.size[1]) / 2, float(timber.length)
+    half_across = abs(across.x) * half_width + abs(across.y) * half_height
+    # The timber's axis at mid-length, moved onto the plane.
+    centre = along * (length / 2) + normal * point.dot(normal)
+    corners = [centre + across * (half_across * a) + along * (length / 2 * b)
+               for a, b in ((1, -1), (1, 1), (-1, 1), (-1, -1))]
+    to_world = lambda corner: Float3.of(timber.transform.local_to_global(corner.v3()))
+    return [{"start": to_world(start), "end": to_world(end)}
+            for start, end in zip(corners, corners[1:] + corners[:1])]
+
+
 def features_at_point(
     root: 'CutCSG', local_pt: Float3, eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
     local_ray: Optional[LocalRay] = None, whole_ray: bool = False,
