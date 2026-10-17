@@ -35,9 +35,11 @@ def _nodes(root: CutCSG) -> Iterator[CutCSG]:
         yield from _nodes(child)
 
 
-def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_surface) -> List[RequiredFeature]:
+def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_surface,
+                      include_relief: bool = False) -> List[RequiredFeature]:
     """The features of `cut_timber` that need solving, each with why.
 
+    - relief (FeaturePurpose.ROUGH_RELIEF): never, unless `include_relief`.
     - marked NEVER_MARK: never; marked ALWAYS_MARK: always.
     - non-real (an axis, a reference plane): always.
     - flat faces: when `face_test` finds them on the finished surface. A default face with no
@@ -60,6 +62,8 @@ def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_
             marking = feature.properties.marking_override
             status = marking.mark if marking is not None else FeatureMarkingStatus.OPTIONAL
             if status is FeatureMarkingStatus.NEVER_MARK:
+                continue
+            if feature.properties.purpose is FeaturePurpose.ROUGH_RELIEF and not include_relief:
                 continue
             if status is FeatureMarkingStatus.ALWAYS_MARK:
                 required.append(RequiredFeature(handle, Reason.MARKED))

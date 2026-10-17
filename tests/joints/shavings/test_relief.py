@@ -12,6 +12,7 @@ from kumiki.csg.cutcsg import (
     Intersection,
     RectangularPrism,
     SolidUnion,
+    FeaturePurpose,
     FeatureSource,
     csg_children,
 )
@@ -747,16 +748,22 @@ class TestChopScribeRelief:
         assert scribed_overlap_csg_local.contains_point(create_v3(scalar(1), scalar(5, 2), scalar(10)))
         assert scribe_relief_csg_local.contains_point(create_v3(scalar(5, 2), scalar(0), scalar(10)))
 
-    def test_names_nothing_its_timbers_already_name(self):
-        # Built from both timbers' bodies, which their own trees already name: only defaults stay.
+    def test_names_nothing_its_timbers_already_name_and_all_of_it_is_relief(self):
+        # Built from both timbers' bodies, which their own trees already name: only defaults stay,
+        # each marked relief.
         for relief in _scribe_relief_of_a_rough_timber():
-            nodes = [relief]
-            while nodes:
-                node = nodes.pop()
-                nodes.extend(csg_children(node))
-                assert node.get_declared_features(FeatureSource.OVERRIDES) == []
-                if isinstance(node, RectangularPrism):
-                    assert node.get_declared_features(FeatureSource.DEFAULTS)
+            for node in _all_nodes(relief):
+                if not isinstance(node, RectangularPrism):
+                    continue
+                declared = node.get_declared_features()
+                assert {f.name for f in declared} == {f.name for f in node.get_declared_features(FeatureSource.DEFAULTS)}
+                assert all(f.properties.purpose is FeaturePurpose.ROUGH_RELIEF for f in declared)
+
+
+def _all_nodes(csg):
+    yield csg
+    for child in csg_children(csg):
+        yield from _all_nodes(child)
 
 
 class TestReliefCSGNaming:

@@ -441,15 +441,11 @@ class FeatureMarkingSpec:
 
 
 class FeaturePurpose(Enum):
-    """What purpose the feature serves.
-
-    DECLARED INTENT, NOT YET HONOURED for ROUGH_RELIEF: it is never set and
-    never tested against, so relief geometry is still indistinguishable from a
-    joint's real surfaces everywhere it matters -- picking, measuring and
-    drawing alike. That is the one of these with a visible cost.
-    """
+    """What purpose the feature serves."""
 
     NOT_SPECIFIED = 0
+    # Relief cut into rough stock (shavings/relief.py marks every feature of it). Not solved for
+    # unless asked (required_features); picking and measuring do not tell it apart yet.
     ROUGH_RELIEF = 1
     # The plane a joint's shoulder sits in. Planning drawings solve for these and the timber prisms only.
     SHOULDER = 2
@@ -2600,6 +2596,20 @@ def csg_children(csg: CutCSG) -> List[CutCSG]:
     return []
 
 
+def map_primitives(csg: CutCSG, change: Callable[['HasFeatures'], CutCSG]) -> CutCSG:
+    """*csg* with *change* applied to every primitive that names features, all the way down."""
+    if isinstance(csg, SolidUnion):
+        return replace(csg, children=[map_primitives(child, change) for child in csg.children])
+    if isinstance(csg, Intersection):
+        return replace(csg, left=map_primitives(csg.left, change), right=map_primitives(csg.right, change))
+    if isinstance(csg, Difference):
+        return replace(csg, base=map_primitives(csg.base, change),
+                       subtract=[map_primitives(child, change) for child in csg.subtract])
+    if isinstance(csg, HasFeatures):
+        return change(csg)
+    return csg
+
+
 def strip_features(csg: CutCSG) -> CutCSG:
     """*csg* with every feature anyone added taken off, all the way down: each primitive's
     overrides (names, groups, properties) and extra features. Only its own defaults remain.
@@ -2607,15 +2617,24 @@ def strip_features(csg: CutCSG) -> CutCSG:
     For a copy of geometry that is already in a tree elsewhere -- a relief built from another
     timber's body and cuts -- which would otherwise declare those features a second time.
     """
-    if isinstance(csg, SolidUnion):
-        return replace(csg, children=[strip_features(child) for child in csg.children])
-    if isinstance(csg, Intersection):
-        return replace(csg, left=strip_features(csg.left), right=strip_features(csg.right))
-    if isinstance(csg, Difference):
-        return replace(csg, base=strip_features(csg.base), subtract=[strip_features(c) for c in csg.subtract])
-    if isinstance(csg, HasFeatures) and (csg.feature_overrides or csg.extra_features):
-        return replace(csg, feature_overrides=(), extra_features=())
-    return csg
+    return map_primitives(csg, lambda primitive: replace(primitive, feature_overrides=(), extra_features=())
+                          if primitive.feature_overrides or primitive.extra_features else cast(CutCSG, primitive))
+
+
+def with_purpose(csg: CutCSG, purpose: 'FeaturePurpose') -> CutCSG:
+    """*csg* with every feature it names, all the way down, serving *purpose*; nothing else changes."""
+    def change(primitive: 'HasFeatures') -> CutCSG:
+        authored = {override.key: override for override in primitive.feature_overrides}
+        overrides = []
+        for key, default in primitive.default_features().items():
+            override = authored.get(key, FeatureOverride(key))
+            properties = override.properties if override.properties is not None else default.properties
+            overrides.append(replace(override, properties=replace(properties, purpose=purpose)))
+        extras = [replace(extra, properties=replace(extra.properties, purpose=purpose))
+                  for extra in primitive.extra_features]
+        return cast(CutCSG, replace(primitive, feature_overrides=overrides, extra_features=extras))
+
+    return map_primitives(csg, change)
 
 
 class CSGParity(Enum):
