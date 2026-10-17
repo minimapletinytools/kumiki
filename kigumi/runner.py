@@ -2538,16 +2538,15 @@ def _sight_blocker(
               and entry.get("local_csg") is not None and (drawn is None or key in drawn)]
 
     def blocked(place: List[float]) -> bool:
-        if sight_is_blocked(own_root, place, toward_camera):
+        at, toward = create_v3(*place), create_v3(*toward_camera)
+        if sight_is_blocked(own_root, at, toward):
             return True
-        world = own.timber.transform.local_to_global(create_v3(*place))
-        world_toward = own.timber.transform.local_to_global_direction(create_v3(*toward_camera))
+        world = own.timber.transform.local_to_global(at)
+        world_toward = own.timber.transform.local_to_global_direction(toward)
         for entry in others:
             transform = entry["cut_timber"].timber.transform
-            local = transform.global_to_local(world)
-            local_toward = transform.global_to_local_direction(world_toward)
-            if sight_is_blocked(entry["local_csg"], [float(local[i]) for i in range(3)],
-                                [float(local_toward[i]) for i in range(3)]):
+            if sight_is_blocked(entry["local_csg"], transform.global_to_local(world),
+                                transform.global_to_local_direction(world_toward)):
                 return True
         return False
 

@@ -165,5 +165,7 @@ def test_a_line_of_sight_along_a_surface_is_not_blocked_by_it():
 
     box = RectangularPrism(size=create_v2(2, 2), start_distance=scalar(0), end_distance=scalar(4))
 
-    assert not sight_is_blocked(box, [1.0, 1.0, 4.0], [0.0, -1.0, 0.0])
-    assert sight_is_blocked(box, [0.0, 1.0, 2.0], [0.0, -1.0, 0.0])
+    from kumiki.rule import create_v3
+
+    assert not sight_is_blocked(box, create_v3(1, 1, 4), create_v3(0, -1, 0))
+    assert sight_is_blocked(box, create_v3(0, 1, 2), create_v3(0, -1, 0))
