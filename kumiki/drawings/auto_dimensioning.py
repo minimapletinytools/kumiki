@@ -8,7 +8,8 @@ Temporary, and expected to be renamed.
 """
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
@@ -26,11 +27,24 @@ PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 
 @dataclass(frozen=True)
 class Candidate:
-    """A measurement that could be added, in the view named `view`, with its row and length."""
+    """A measurement that could be added, in the view named `view`, with its length.
+
+    Its row is worked out only when asked for: that is the dear part, and most candidates are never
+    looked at closely enough to need one.
+    """
     view: str
     measure: Measure
-    row: Row
     length: float
+    axes: ViewAxes = field(repr=False, compare=False)
+    carriers: CarrierMap = field(repr=False, compare=False)
+
+    @cached_property
+    def row(self) -> Optional[Row]:
+        """What the measurement fixes (measure_row), or None where it cannot be written as a row."""
+        try:
+            return measure_row(self.measure, self.carriers, self.axes)
+        except ValueError:
+            return None
 
 
 @dataclass(frozen=True)
@@ -144,20 +158,20 @@ def auto_dimension(
     `known_rows` is what is already known: fixed features' rows, assumptions.
     """
     target_rows = [row for handle in targets for row in feature_handle_dof_rows(handle, carriers)]
-    columns = list(dict.fromkeys(column for row in (*known_rows, *target_rows, *(c.row for c in candidates))
-                                 for column in row))
+    columns = list(dict.fromkeys(column for row in (*known_rows, *target_rows) for column in row))
+    index = {column: i for i, column in enumerate(columns)}
     known_matrix, target_matrix = _matrix(known_rows, columns), _matrix(target_rows, columns)
-    candidate_matrix = _matrix([candidate.row for candidate in candidates], columns)
     tolerance = 1e-9 * max(float(np.linalg.norm(np.vstack([known_matrix, target_matrix]), 2)), 1.0)
 
     # Everything works on rows with what is known projected out; a pick removes its direction
-    # from every matrix (incremental Gram-Schmidt).
-    target_left, candidate_left = target_matrix, candidate_matrix
+    # from every target row (incremental Gram-Schmidt). `known` is an orthonormal basis of what is
+    # known and picked, which a candidate is projected off when it is looked at.
+    target_left = target_matrix
+    known = np.zeros((0, len(columns)))
     if len(known_rows):
         _, values, basis = np.linalg.svd(known_matrix, full_matrices=False)
-        basis = basis[values > tolerance]
-        target_left = target_matrix - target_matrix @ basis.T @ basis
-        candidate_left = candidate_matrix - candidate_matrix @ basis.T @ basis
+        known = basis[values > tolerance]
+        target_left = target_matrix - target_matrix @ known.T @ known
 
     spans: Dict[Tuple[int, str], slice] = {}
     start = 0
@@ -174,6 +188,26 @@ def auto_dimension(
         _, values, directions = np.linalg.svd(target_left, full_matrices=False)
         return directions[values > tolerance]
 
+    def helpful_direction(candidate: Candidate, unsolved: np.ndarray) -> Optional[np.ndarray]:
+        """The unit direction the candidate adds to what is known, if all of it is still unsolved."""
+        row = candidate.row
+        if row is None:
+            return None
+        vector, outside = np.zeros(len(columns)), 0.0
+        for column, value in row.items():
+            if column in index:
+                vector[index[column]] = value
+            else:
+                outside += value * value  # an unknown no target asks about, which nothing projects off
+        vector = vector - known.T @ (known @ vector)
+        size = float(np.sqrt(vector @ vector + outside))
+        if size < tolerance:
+            return None
+        direction = vector / size
+        # It helps exactly when what it adds to the known rows lies in what is still unsolved.
+        off = direction - unsolved.T @ (unsolved @ direction)
+        return direction if float(np.sqrt(off @ off + outside / (size * size))) <= 1e-6 else None
+
     picks: List[Pick] = []
     context = PickContext(solved=solved, picks=picks)
     available = list(range(len(candidates)))
@@ -182,30 +216,32 @@ def auto_dimension(
         unsolved = unsolved_basis()
         if not len(unsolved):
             break
-        helpful: List[Tuple[int, np.ndarray]] = []
-        for index in available:
-            residual = candidate_left[index]
-            size = float(np.linalg.norm(residual))
-            if size < tolerance:
+        # In the policy's order, so the first that helps (and passes the rules) is the pick: only the
+        # candidates down to it need rows. Ties go to the earlier candidate.
+        scored = sorted(available, key=lambda i: (
+            tuple(criterion(candidates[i], context) for criterion in policy.prefer), i))
+        chosen: Optional[Tuple[int, np.ndarray, bool]] = None
+        first_helpful: Optional[Tuple[int, np.ndarray, bool]] = None
+        for i in scored:
+            direction = helpful_direction(candidates[i], unsolved)
+            if direction is None:
                 continue
-            direction = residual / size
-            # It helps exactly when what it adds to the known rows lies in what is still unsolved.
-            if float(np.linalg.norm(direction - unsolved.T @ (unsolved @ direction))) <= 1e-6:
-                helpful.append((index, direction))
-        if not helpful:
+            if all(rule(candidates[i], context) == 0 for rule in policy.rules):
+                chosen = (i, direction, False)
+                break
+            if first_helpful is None:
+                first_helpful = (i, direction, True)
+        chosen = chosen or first_helpful
+        if chosen is None:
             break
-        passing = [(i, d) for i, d in helpful
-                   if all(rule(candidates[i], context) == 0 for rule in policy.rules)]
-        pool = passing or helpful
-        index, direction = min(
-            pool, key=lambda item: tuple(criterion(candidates[item[0]], context) for criterion in policy.prefer))
-        score = tuple(criterion(candidates[index], context) for criterion in policy.prefer)
+        index_, direction, broke_rules = chosen
+        score = tuple(criterion(candidates[index_], context) for criterion in policy.prefer)
         target_left = target_left - np.outer(target_left @ direction, direction)
-        candidate_left = candidate_left - np.outer(candidate_left @ direction, direction)
-        available.remove(index)
-        picks.append(Pick(candidates[index], score, broke_rules=not passing))
+        known = np.vstack([known, direction])
+        available.remove(index_)
+        picks.append(Pick(candidates[index_], score, broke_rules=broke_rules))
 
-    left_after = remaining([*known_rows, *(pick.candidate.row for pick in picks)], target_rows).count
+    left_after = remaining([*known_rows, *(pick.candidate.row or {} for pick in picks)], target_rows).count
     unsolved_targets = [handle for handle in targets if not solved(handle)]
     if unsolved_targets:
         # Often a feature no view shows -- a blind mortise's bottom is hidden in every one -- or
@@ -281,10 +317,5 @@ def sheet_candidates(
                 length = _separation(shape_a, shape_b)
                 if length is None or length < 1e-9:
                     continue
-                measure = Measure(a, b, kind=PERPENDICULAR)
-                try:
-                    row = measure_row(measure, carriers, axes)
-                except ValueError:
-                    continue
-                candidates.append(Candidate(view, measure, row, length))
+                candidates.append(Candidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes, carriers))
     return candidates
