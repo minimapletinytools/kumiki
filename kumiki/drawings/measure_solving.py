@@ -5,7 +5,7 @@ that out is drawing's: each feature's span, what it draws as on the sheet, and w
 between the two attaches (distance_anchors).
 """
 
-from typing import Dict, Hashable, Optional
+from typing import TYPE_CHECKING, Dict, Hashable, Optional, Sequence
 
 import numpy as np
 
@@ -16,18 +16,25 @@ from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, Meas
                       MeasurementSpace, PointSpan, ViewAxes, distance_anchors)
 from .feature_span import feature_span
 
+if TYPE_CHECKING:
+    from ..timber import CutTimber
+
 THREE_D_DISTANCE = MeasurementKind(MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
 #: Features' spans, kept across the measurements of one solve: every candidate to a feature asks for it.
 SpanCache = Dict[Hashable, MeasureSpan]
 
 
-def _measured_span(handle: FeatureHandle, spans: Optional[SpanCache]) -> MeasureSpan:
-    """The feature in world space, as the viewer measures it (feature_span)."""
+def _measured_span(handle: FeatureHandle, cut_timbers: Sequence['CutTimber'],
+                   spans: Optional[SpanCache]) -> MeasureSpan:
+    """The feature in world space, on its cut timber, as the viewer measures it (feature_span)."""
     key = (id(handle.owner), handle.feature.name, id(handle.timber))
     if spans is not None and key in spans:
         return spans[key]
-    span = feature_span(handle, in_three_d=True)
+    cut = next((cut for cut in cut_timbers if cut.timber is handle.timber), None)
+    if cut is None:
+        raise ValueError(f"{handle.feature.name!r} is on a timber not in cut_timbers")
+    span = feature_span(handle, cut.render_timber_with_cuts_csg_local(), in_three_d=True)
     if span is None:
         raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
     if spans is not None:
@@ -72,9 +79,12 @@ def _gap_direction(at_a: np.ndarray, at_b: np.ndarray, look: Optional[np.ndarray
     return gap / length
 
 
-def solve_measurement(measure: Measure, view: Optional[ViewAxes] = None,
+def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view: Optional[ViewAxes] = None,
                       spans: Optional[SpanCache] = None) -> SolveMeasurement:
     """What `measure`, seen through `view` (world space), measures, for the solver.
+
+    Each feature is measured where it is on its cut timber, found among `cut_timbers` -- as the
+    viewer measures it.
 
     Distances and angles, in 3D or on a sheet, between features on one timber or two. Raises
     ValueError for one that measures nothing: a face seen at an angle, two features in one place.
@@ -87,7 +97,7 @@ def solve_measurement(measure: Measure, view: Optional[ViewAxes] = None,
     if kind.operation is MeasurementOperation.ANGLE:
         return SolveAngle(a, b, look)
 
-    first, second = _measured_span(a, spans), _measured_span(b, spans)
+    first, second = _measured_span(a, cut_timbers, spans), _measured_span(b, cut_timbers, spans)
     if look is None:
         at_a, at_b = (as_ndarray(point) for point in distance_anchors(first, second, kind, view))
         return SolveDistance(a, b, at_a, at_b, _gap_direction(at_a, at_b))

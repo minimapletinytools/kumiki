@@ -7,11 +7,11 @@ comes out clean. Asking such a primitive where its face is gives an answer that
 is nowhere near the timber.
 
 What a dimension wants instead is the part of the feature that survives cropping
-by what encloses it: a region in its own plane for a face, a segment along its
-own line for an edge. Both are computed here, and both are tractable for one
-reason: every primitive kumiki has is convex, so a section of one is convex and
-clipping one against another is half-space intersection rather than general
-boolean work.
+by what encloses it: a segment along its own line for an edge, computed here,
+and a region in its own plane for a face, which cross_sections.py cuts exactly
+from the half spaces solid_bounds gives here. Both are tractable for one reason:
+every primitive kumiki has is convex, so a section of one is convex and clipping
+one against another is half-space intersection rather than general boolean work.
 
 Deliberately not oriented to any viewport. Bounds along any axes -- a viewport's
 included -- fall out of projecting the polygon's corners, so a polygon answers
@@ -29,23 +29,16 @@ chord that is really there rather than the hexagon's. The rest still go through
 the bound, which is why solving one more shape can only tighten the answer and
 never invalidate anything built on it.
 
-One direction, consistently, is the point. Subtractions are not accounted for
-either (see below), which already makes a region too large, so erring inwards
-on primitives would leave a region that is neither a subset nor a superset of
-the truth -- no guarantee at all. Erring outwards everywhere keeps one:
+One direction, consistently, is the point. Erring inwards on some primitives
+and outwards on others would leave a region that is neither a subset nor a
+superset of the truth -- no guarantee at all. Erring outwards everywhere keeps one:
 whatever the region says is not there, really is not there. What it costs is
 that a point inside a region is not certainly on the feature, so an anchor on a
 curved primitive can sit slightly off it.
 
-The two dimensions differ in how far they get. A LINE is done properly: clipping
-one by a convex solid gives an interval, and intervals union, intersect and
-subtract exactly, so crop_line_to_segments_on_csg walks the whole tree and
-returns as many pieces as the cuts leave. A PLANE is not: subtracting in the
-plane means polygon booleans, and a result that can have holes, so
-approximately_crop_plane_to_area_on_csg still only intersects the solids that
-ENCLOSE the region and counts anything subtracted as still present. Its name
-says so. It shows up as an anchor placed where a later cut has since removed the
-material.
+A LINE is done here: clipping one by a convex solid gives an interval, and
+intervals union, intersect and subtract exactly, so crop_line_to_segments_on_csg
+walks the whole tree and returns as many pieces as the cuts leave.
 
 Exactness along a line buys one more thing: the difference between being ON a
 solid and being INSIDE it. Both readings of the walk already exist, so
@@ -64,10 +57,7 @@ from typing import List, Optional, Sequence, Tuple
 
 from ..geometry import (
     Line,
-    Plane,
-    ConvexPlanarRegion,
     LineSegment,
-    frame_for_plane,
     perpendicular_axes,
     unit_vector,
 )
@@ -394,107 +384,6 @@ def _extruded_hull_half_spaces(
         faces.append((direction, point))
 
     return faces + _extrusion_caps(axis, origin, start_distance, end_distance)
-
-
-def _clip_polygon(corners: List[Tuple[float, float]], a: float, b: float, c: float
-                  ) -> List[Tuple[float, float]]:
-    """Keep the part of a convex polygon where a*x + b*y <= c.
-
-    Sutherland-Hodgman, which is exact and stays convex because the polygon and
-    the half plane both are.
-    """
-    if not corners:
-        return corners
-    kept: List[Tuple[float, float]] = []
-    for index, current in enumerate(corners):
-        previous = corners[index - 1]
-        current_in = a * current[0] + b * current[1] <= c
-        previous_in = a * previous[0] + b * previous[1] <= c
-        if current_in != previous_in:
-            denominator = (a * (current[0] - previous[0]) + b * (current[1] - previous[1]))
-            if denominator != 0:
-                t = (c - a * previous[0] - b * previous[1]) / denominator
-                kept.append((
-                    previous[0] + t * (current[0] - previous[0]),
-                    previous[1] + t * (current[1] - previous[1]),
-                ))
-        if current_in:
-            kept.append(current)
-    return kept
-
-
-def approximately_crop_plane_to_area_on_csg(
-    plane: Plane,
-    bounding: Sequence,
-
-    # TODO this parameter is questionable, just use NaN for bounds?
-    seed_reach: Numeric,
-
-    near: Optional[V3] = None,
-) -> Optional[ConvexPlanarRegion]:
-    """The part of a plane left after clipping by a set of convex solids.
-
-    APPROXIMATELY, and the name says so because the difference matters. This
-    takes the solids that ENCLOSE the region and intersects them; it does not
-    walk the tree, so anything subtracted is still counted as present. A face
-    half removed by a housing comes back whole, and its centroid can sit over
-    material that is no longer there.
-
-    Its one-dimensional counterpart, crop_line_to_segments_on_csg, is exact:
-    clipping a line gives an interval, and intervals subtract cleanly, so it
-    walks the whole tree. Doing the same here means polygon booleans in the
-    plane, and a result that can have holes and several pieces -- worth doing,
-    not yet done.
-
-    Erring outwards is what keeps this useful meanwhile: the region always
-    CONTAINS the truth, so whatever it says is not there really is not there.
-
-    `near` is where the region is expected to be -- the timber, usually -- and
-    is what the work starts from, since a plane's own point may be nowhere near
-    it. `seed_reach` is how far the starting square extends from there: it
-    stands in for "everything", and only has to be bigger than the solids doing
-    the clipping. Anything still touching its edge afterwards was never bounded
-    in that direction.
-
-    None when any of the solids cannot be described as half spaces, since a
-    region clipped by only some of them would be silently too large. An empty
-    solid is not one of those: it contains nothing, so it crops everything away
-    and the region comes back empty -- the same answer the line crop gives.
-    """
-    frame = frame_for_plane(plane, near)
-    reach = float(seed_reach)
-    corners = [(-reach, -reach), (reach, -reach), (reach, reach), (-reach, reach)]
-
-    for solid in bounding:
-        bounds = solid_bounds(solid)
-        if bounds.is_unknown:
-            # Clipped by only the solids it understood, the region would be
-            # silently larger than the truth -- which is worse than no answer,
-            # because nothing downstream can tell.
-            return None
-        if bounds.is_empty:
-            # Nothing is inside it, so nothing survives being clipped by it.
-            return ConvexPlanarRegion(plane=plane, boundary=())
-
-        for normal, point in bounds.require_faces():
-            # The half space, written in the plane's own two axes.
-            a = float((normal.T * frame.u)[0, 0])
-            b = float((normal.T * frame.v)[0, 0])
-            offset = point - frame.origin
-            c = float((normal.T * offset)[0, 0])
-            if abs(a) < 1e-12 and abs(b) < 1e-12:
-                # Parallel to the plane: it either keeps all of it or none.
-                if c < 0:
-                    return ConvexPlanarRegion(plane=plane, boundary=())
-                continue
-            corners = _clip_polygon(corners, a, b, c)
-            if not corners:
-                return ConvexPlanarRegion(plane=plane, boundary=())
-
-    return ConvexPlanarRegion(
-        plane=plane,
-        boundary=tuple(frame.to_3d(x, y) for x, y in corners),
-    )
 
 
 # A stretch of the line, as the two parameter values bounding it.
@@ -868,7 +757,7 @@ def crop_line_to_segments_on_csg(
 ) -> Optional[List[LineSegment]]:
     """The parts of a line that lie on a CSG solid.
 
-    The one-dimensional counterpart to approximately_crop_plane_to_area_on_csg,
+    The one-dimensional counterpart to cross_sections.plane_cross_section,
     and exact where that one is not: clipping a line by a convex solid gives an
     interval, and intervals can be unioned, intersected and subtracted, so the
     whole tree is walked rather than only the solids that bound it. A cut that

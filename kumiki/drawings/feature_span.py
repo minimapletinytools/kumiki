@@ -9,7 +9,7 @@ from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from ..csg.cropcsg import approximately_crop_plane_to_area_on_csg, crop_line_to_segments_on_csg
+from ..csg.cropcsg import crop_line_to_segments_on_csg
 from ..csg.cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, SimpleRectangularPrismEdgeFeature,
                           SimpleRectangularPrismFeature)
 from ..csg.feature_paths import FeatureHandle
@@ -115,9 +115,9 @@ def feature_span(
 ) -> Optional[MeasureSpan]:
     """What a feature is, where the measurement is being taken, in world space.
 
-    The extent comes from what the feature occupies once cropped to the timber (`root_csg`, the cut
-    timber's tree the handle points into), not from what declared it. A line not on any timber -- a
-    bore's axis, or any line when `root_csg` is None -- is bounded by its own extent.
+    The extent is the feature's FeatureExtent: what it occupies once cropped to the timber
+    (`root_csg`, the cut timber's tree the handle points into). With no `root_csg`, or for a line
+    not on any timber (a bore's axis), it is what declared the feature.
 
     ON A SHEET (`plane_normal`, the view direction) a face is measurable only seen edge-on, where it
     draws as a line along itself; at an angle it falls back to a point. A line seen end-on is a point.
@@ -136,9 +136,6 @@ def feature_span(
 
     if isinstance(located, Point):
         return PointSpan(at=create_v3(*world(located.position)))
-
-    solid = timber.get_perfect_timber_within_csg_local()
-    reach = float(timber.length) * 4
 
     if isinstance(located, Line):
         # Its extent: where the feature itself says it ends, and where the timber leaves it -- but
@@ -159,32 +156,17 @@ def feature_span(
                         outward=None if outward is None else create_v3(*outward))
 
     if isinstance(located, Plane):
-        if root_csg is not None:
-            # Its extent on the cut timber -- or, cut away entirely, all of what declared it.
-            extent = extents.of(feature, owner)
-            if extent is None or extent.is_empty:
-                extent = FeatureExtents(None, timber).of(feature, owner)
-            if extent is None or extent.is_empty:
-                return None
-            middle, boundary = extent.anchor(), [corner for polygon in extent.polygons() for corner in polygon]
-            if middle is None:
-                return None
-            middle = create_v3(*middle)
-        else:
-            # No cut timber to crop to (the solver's spans, for now): the enclosing solids, which
-            # cannot subtract, so a face half taken away by a cut spans the whole face.
-            cropped = approximately_crop_plane_to_area_on_csg(
-                located, [owner, solid], seed_reach=reach, near=solid.transform.position)
-            if cropped is None or cropped.is_empty:
-                # A face on the timber's own boundary -- a tenon's end, flush with the end of the
-                # piece -- crops to nothing against it. Its own primitive still bounds it.
-                cropped = approximately_crop_plane_to_area_on_csg(
-                    located, [owner], seed_reach=reach, near=solid.transform.position)
-            if cropped is None or cropped.is_empty:
-                return None
-            middle, boundary = cropped.centroid(), list(cropped.boundary)
-            if middle is None:
-                return None
+        # Its extent on the cut timber -- or, with no cut timber or cut away entirely, all of what declared it.
+        extent = extents.of(feature, owner)
+        if (extent is None or extent.is_empty) and root_csg is not None:
+            extent = FeatureExtents(None, timber).of(feature, owner)
+        if extent is None or extent.is_empty:
+            return None
+        middle = extent.anchor()
+        if middle is None:
+            return None
+        boundary = [corner for polygon in extent.polygons() for corner in polygon]
+        middle = create_v3(*middle)
         at = world(middle)
         normal = _unit_or_up(as_ndarray(timber.transform.local_to_global_direction(located.normal)))
         if in_three_d:

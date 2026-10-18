@@ -14,7 +14,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 - **Breaking:** the feature solver moved from `kumiki.drawings` to `kumiki.csg`: `feature_solving`, `solve_recipe`, `dof_solver`, `required_features` and `assumptions`. `kumiki.drawings` keeps what is drawn, and `kumiki.drawings.measure_solving` turns a drawing's `Measure` into what the solver takes.
   - Migration: `from kumiki.drawings.feature_solving import ...` becomes `from kumiki.csg.feature_solving import ...`, and likewise for the other four.
-  - `measure_row`, `remaining_dofs` and `solve_report` take `SolveDistance` / `SolveAngle` instead of `Measure`, and no `view`: `measure_row(measure, carriers, view)` becomes `measure_row(solve_measurement(measure, view), carriers)`.
+  - `measure_row`, `remaining_dofs` and `solve_report` take `SolveDistance` / `SolveAngle` instead of `Measure`, and no `view`: `measure_row(measure, carriers, view)` becomes `measure_row(solve_measurement(measure, cut_timbers, view), carriers)`.
+- **Breaking:** the solver measures a face where it is on the cut timber, cuts subtracted, as the viewer does, and `approximately_crop_plane_to_area_on_csg` (with `geometry.PlaneFrame` and `frame_for_plane`) is removed. For a plane cropped to a solid use `kumiki.csg.cross_sections.plane_cross_section`.
 
 ## [0.8.0] - 2026-10-05
 

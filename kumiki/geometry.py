@@ -150,53 +150,6 @@ def perpendicular_axes(direction: V3) -> Tuple[V3, V3]:
     return u, unit_vector(v)
 
 
-# Only used by approximately_crop_plane_to_area_on_csg, and that IS still in
-# use: the runner crops a plane to a solid at two points when it resolves a
-# face, and test_cropcsg covers it. So this stays until that does.
-# DO NOT create new usages of this clas
-@dataclass(frozen=True)
-class PlaneFrame:
-    """Two axes on a plane, for working in it as if it were flat."""
-
-    origin: V3
-    u: V3
-    v: V3
-
-    def to_2d(self, point: V3) -> Tuple[float, float]:
-        offset = point - self.origin
-        return (
-            float((offset.T * self.u)[0, 0]),
-            float((offset.T * self.v)[0, 0]),
-        )
-
-    def to_3d(self, x: float, y: float) -> V3:
-        return self.origin + self.u * scalar(x) + self.v * scalar(y)
-
-
-def frame_for_plane(plane: 'Plane', near: Optional[V3] = None) -> PlaneFrame:
-    """Two perpendicular axes lying in a plane, with an origin near something.
-
-    The first axis is whichever world axis the normal leans on least, made
-    perpendicular -- any choice does, so long as it is never parallel to the
-    normal.
-
-    The origin matters more than it looks. A plane's stored point is any point
-    on it, and for a face declared on a cutter extended far past the timber it
-    is far past the timber too. Working from there and clipping to the timber
-    leaves nothing, having started nowhere near it. So the caller says what the
-    region is expected to be near -- the timber -- and that is projected onto
-    the plane to start from.
-    """
-    normal = unit_vector(plane.normal)
-    u, v = perpendicular_axes(normal)
-    origin = plane.point
-    if near is not None:
-        # Drop `near` onto the plane along the normal.
-        away = (near - plane.point).T * normal
-        origin = near - normal * away[0, 0]
-    return PlaneFrame(origin=origin, u=u, v=v)
-
-
 @dataclass(frozen=True)
 class LineSegment:
     """One stretch of a Line: the bounded counterpart of it.
