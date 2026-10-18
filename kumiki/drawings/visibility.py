@@ -13,12 +13,13 @@ import numpy as np
 from ..csg.cropcsg import crop_line_to_boundary_segments_on_csg, crop_line_to_interior_segments_on_csg
 from ..csg.cutcsg import CutCSG, FaceFeature
 from ..csg.feature_paths import FeatureHandle
-from ..csg.planar_region import (CannotSection, Region, SightFrame, area, face_on_surface, material_crossing,
-                                 segments_outside, shadow, subtract)
+from ..csg.planar_region import (CannotSection, Region, SightFrame, area, material_crossing, segments_outside,
+                                 shadow, subtract)
 from ..geometry import Line, Plane
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
 from .drawing import ViewAxes
+from .feature_extent import extents_of
 
 #: Material nearer the place than this is the surface it lies on, not something in front of it.
 NUDGE = 1e-5
@@ -95,7 +96,14 @@ def nearest_visible_depth(
     own = _frame_in(transform, *world)
     try:
         if isinstance(located, Plane):
-            region = face_on_surface(handle, root, own, reach)
+            # The face's region on the finished surface: its extent, kept for the tree and so shared
+            # by every view that asks, brought into this sight plane's frame.
+            extent = extents_of(root, handle.timber).of(handle.feature, handle.owner)
+            if extent is None:
+                return float(point @ look)
+            frame_origin, frame_u, frame_v = own[0], own[1], own[2]
+            region = [[(float((corner - frame_origin) @ frame_u), float((corner - frame_origin) @ frame_v))
+                       for corner in polygon] for polygon in extent.polygons()]
             if area(region) <= 0:
                 return None
             corners = [point for polygon in region for point in polygon]
