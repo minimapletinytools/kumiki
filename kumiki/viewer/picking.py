@@ -1297,3 +1297,248 @@ def extract_highlight_mesh(
             matched += 1
 
     return out_verts, out_idx, matched, total_tris
+
+
+# --- a pick: where navigation lands, what is under the pointer, and which of it is wanted -------
+
+#: Where navigating the tree lands: the path to the node, the node, and the feature named there
+#: (None while a click is still drilling through compounds).
+Navigated = Tuple[List[str], 'CutCSG', Optional[str]]
+
+
+def navigate(root: 'CutCSG', local_pt: Float3, eps: float, ctrl_click: bool, current_path: List[str]) -> Navigated:
+    """Where a click lands in the tree. A plain click goes straight to the feature; Ctrl holds it to
+    one level per click, from `current_path` while the point is still on that node."""
+    if not ctrl_click:
+        return navigate_csg_to_leaf(root, local_pt, eps)
+    node = root
+    if current_path:
+        node = resolve_csg_at_path(root, current_path, local_pt, eps)
+        if not csg_point_on_boundary(node, local_pt, eps):
+            node, current_path = root, []
+    return navigate_csg_one_level(node, local_pt, current_path, eps)
+
+
+class Candidates(NamedTuple):
+    """Every feature under the pointer, visible ones first: `hits[:visible_count]` can be taken,
+    the rest are listed greyed."""
+    hits: List['OwnedFeatureHit']
+    visible_count: int
+
+
+def find_candidates(
+    root: 'CutCSG', local_pt: Float3, eps: float, tolerances: 'FeatureTestTolerances',
+    local_ray: Optional[LocalRay], in_drawing: bool, blocked: Optional[Callable[[Float3], bool]],
+) -> Candidates:
+    """What is under the pointer. In a drawing's view everything along the ray is drawn at one
+    place, at whatever depth -- so all of it is a candidate, and what is hidden goes last; in 3D,
+    the features at the point."""
+    if in_drawing and local_ray is not None:
+        visible, hidden = split_hidden(candidates_under_pointer(root, local_pt, tolerances, local_ray),
+                                       local_ray[1], float(tolerances.edge), blocked)
+        return Candidates([candidate.hit for candidate in visible + hidden], len(visible))
+    hits = features_at_point(root, local_pt, eps, tolerances, local_ray=local_ray)
+    return Candidates(hits, len(hits))
+
+
+def sight_blocker(transform: Transform, occluders: List[Tuple['CutCSG', Transform]],
+                  direction: Float3) -> Callable[[Float3], bool]:
+    """`blocked(place)`: whether an occluder's material hides a place (local to `transform`) from
+    a camera looking along `direction` (also local). visibility.hidden_at, per place."""
+    from kumiki.drawings.visibility import hidden_at
+    from kumiki.rule import as_ndarray
+
+    look = as_ndarray(transform.local_to_global_direction(direction.v3()))
+    return lambda place: hidden_at(as_ndarray(transform.local_to_global(place.v3())), look, occluders)
+
+
+def best_matching_candidate(hits: List['OwnedFeatureHit'], timber: 'PerfectTimberWithin', held: Any, look: Any,
+                            space: Any) -> Optional[int]:
+    """Which feature under the pointer best finishes the measurement in hand.
+
+    The most specific feature is the right answer to "what is this thing here", and the wrong one
+    while measuring: holding a face and being handed the arris beside it means most hovers refuse.
+    So a candidate that admits a measurement with the held end beats one that does not, and among
+    those, one of the held end's type breaks the tie (earlier, more specific, wins among equals).
+    None when nothing is held, there is no camera, or no candidate admits anything.
+    """
+    from kumiki.csg.feature_paths import FeatureHandle
+    from kumiki.drawings.measuring import kinds_for_pair, world_geometry
+
+    if held is None or not look or not hits:
+        return None
+    best = None
+    for index, hit in enumerate(hits):
+        geometry = world_geometry(FeatureHandle(timber=timber, hit=hit))
+        if not geometry or not kinds_for_pair(held, geometry, look, space):
+            continue
+        rank = (0 if type(geometry) is type(held) else 1, index)
+        if best is None or rank < best[0]:
+            best = (rank, index)
+    return None if best is None else best[1]
+
+
+class Pick(NamedTuple):
+    """What a pick chose: the node it selects (`path`, `node`), the feature named in it (`label`,
+    `kind`, its feature type's name), an edge or point to draw (`edge` derived, or
+    `declared_edge`), and the candidate it is (`hit`)."""
+    path: List[str]
+    node: 'CutCSG'
+    label: Optional[str]
+    kind: Optional[str] = None
+    edge: Optional['CSGFeature'] = None
+    declared_edge: Optional['CSGFeature'] = None
+    hit: Optional['OwnedFeatureHit'] = None
+
+    @property
+    def edge_feature(self) -> Optional['CSGFeature']:
+        return self.edge if self.edge is not None else self.declared_edge
+
+    def located(self) -> Optional[Tuple['CSGFeature', 'CutCSG', Any]]:
+        """The chosen feature, the node it is shown under, and what it lies on: an edge or point
+        under the node navigation placed it at, anything else under its own owner."""
+        if self.hit is None:
+            return None
+        owner = self.node if self.edge_feature is not None else self.hit.owner
+        return (self.hit.feature, owner, self.hit.feature.locate_simple_unbounded(owner))
+
+
+def pick_from_candidate(root: 'CutCSG', hit: 'OwnedFeatureHit') -> Optional[Pick]:
+    """The pick one chosen feature makes, or None when its owner cannot be placed in the tree.
+
+    A derived edge or point is placed by the deeper of the two parents that form it; a declared one
+    belongs to whoever declared it. Trying derived first tells them apart.
+    """
+    from kumiki.csg.cutcsg import CSGFeatureType
+
+    feature = hit.feature
+    kind = feature.feature_type().name
+    if feature.feature_type() in (CSGFeatureType.EDGE, CSGFeatureType.POINT):
+        owned = derived_feature_owner(root, feature)
+        if owned is not None:
+            return Pick(owned[1], owned[0], feature.name, kind, edge=feature, hit=hit)
+        placed = node_positions(root).get(id(hit.owner))
+        return None if placed is None else Pick(placed[2], hit.owner, feature.name, kind, declared_edge=feature, hit=hit)
+    placed = node_positions(root).get(id(hit.owner))
+    return None if placed is None else Pick(placed[2], hit.owner, feature.name, kind, hit=hit)
+
+
+def choose(root: 'CutCSG', navigated: Navigated, found: Candidates, candidate_index: Optional[int],
+           preferred: Callable[[List['OwnedFeatureHit']], Optional[int]], in_drawing: bool, ctrl_click: bool) -> Pick:
+    """Which of the features under the pointer is wanted, as a Pick.
+
+    In order: the one the caller names (Tab, the menu) -- final, since the rules below only guess
+    what was meant -- or else `preferred` (best_matching_candidate while measuring), or else in a
+    drawing the first, the candidates being in the order a click should take them. Failing those:
+    a derived edge or point under the click, then a declared one (a timber's own arris), then the
+    face navigation landed on. Zero is a choice: stepping round to the first feature is the caller
+    naming one.
+    """
+    from kumiki.csg.cutcsg import CSGFeatureType
+
+    path, node, label = navigated
+    hits, visible = found
+    edge = resolve_derived_feature(hits) if label is not None else None
+    if candidate_index is None:
+        candidate_index = preferred(hits[:visible])
+    if candidate_index is None and in_drawing and not ctrl_click and visible:
+        candidate_index = 0
+    if candidate_index is not None and visible:
+        picked = pick_from_candidate(root, hits[int(candidate_index) % visible])  # never a hidden one
+        if picked is not None:
+            return picked
+
+    pick = Pick(path, node, label, edge=edge)
+    if edge is not None:
+        owned = derived_feature_owner(root, edge)
+        if owned is not None:
+            # resolve_derived_feature's answer is the best one.
+            pick = Pick(owned[1], owned[0], edge.name, edge.feature_type().name, edge=edge, hit=hits[0])
+    elif label is not None and hits:
+        # A declared edge or point beats the face a click lands on, as a derived one does: the more
+        # specific answer there. It belongs to the node that declared it.
+        best = hits[0]
+        if best.feature.feature_type() in (CSGFeatureType.EDGE, CSGFeatureType.POINT):
+            placed = node_positions(root).get(id(best.owner))
+            if placed is not None:
+                pick = Pick(placed[2], best.owner, best.feature.name, best.feature.feature_type().name,
+                            declared_edge=best.feature, hit=best)
+    if pick.hit is None and pick.label is not None:
+        # Navigation landed on a face: the candidate is the one its node declares under that name.
+        named = [hit for hit in hits if hit.feature.name == pick.label]
+        hit = next((hit for hit in named if hit.owner is pick.node), named[0] if named else None)
+        pick = pick._replace(hit=hit)
+    return pick
+
+
+class Derivation(NamedTuple):
+    """For a derived feature: the path to the node owning it, and each parent's (path, name)."""
+    owner_path: Optional[List[str]]
+    parents: List[Tuple[List[str], str]]
+
+
+def derivation(root: 'CutCSG', hits: List['OwnedFeatureHit'], feature: Optional['CSGFeature']) -> Optional[Derivation]:
+    if feature is None or not feature.is_derived():
+        return None
+    positions = node_positions(root)
+
+    def path_of(owner) -> Optional[List[str]]:
+        placed = positions.get(id(owner))
+        return placed[2] if placed is not None else None
+
+    owner = next((hit.owner for hit in hits if hit.feature is feature), None)
+    return Derivation(path_of(owner) if owner is not None else None,
+                      [(path_of(parent.owner) or [], parent.feature.name)
+                       for parent in getattr(feature, "parents", ()) if parent is not None])
+
+
+def non_real_plane_outline(feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
+                           root: 'CutCSG') -> Optional[List[WorldSegment]]:
+    """A non-real plane's outline -- a perfect face in rough stock, a centerplane -- which has no
+    surface to light: its extent's outline, in world space, which a drawing shows edge-on as the
+    line it draws dotted. None for anything else."""
+    from kumiki.csg.feature_extent import extents_of
+    from kumiki.geometry import Plane
+    from kumiki.rule import create_v3
+
+    if feature.real or not isinstance(feature.locate_simple_unbounded(owner), Plane):
+        return None
+    extent = extents_of(root, timber).of(feature, owner)
+    if extent is None:
+        return None
+    to_world = lambda point: Float3.of(timber.transform.local_to_global(create_v3(*point)))
+    return [{"start": to_world(start), "end": to_world(end)} for start, end in extent.outline()]
+
+
+class PlaneOutline(NamedTuple):
+    """A plane's outline, in world space: its normal, and its segments' ends, flat."""
+    normal: List[float]
+    positions: List[float]
+
+
+def perfect_reference_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG', centerplanes: bool) -> List[PlaneOutline]:
+    """The rough body's perfect references, each outlined as cropped to the cut timber `root`, in
+    world space: what a drawing draws dotted, edge-on. Its centerplanes, or its perfect faces --
+    those the rough body has no face for (ptw.*); a face it has (rptw.*) is drawn as the timber
+    already, and a joint's faces are not these."""
+    from kumiki.csg.cutcsg import Difference, FeatureNature, MidplaneFeature, PlaneFeature
+    from kumiki.csg.feature_extent import extents_of
+    from kumiki.geometry import Plane
+    from kumiki.rule import create_v3
+
+    body = root.base if isinstance(root, Difference) else root
+    kind = MidplaneFeature if centerplanes else PlaneFeature
+    extents = extents_of(root, timber)
+    to_world = lambda point: [float(v) for v in timber.transform.local_to_global(create_v3(*point))]
+    outlines: List[PlaneOutline] = []
+    for feature in body.get_declared_features():
+        if not isinstance(feature, kind) or feature.nature is not FeatureNature.PERFECT_REFERENCE:
+            continue
+        plane = feature.locate_simple_unbounded(body)
+        extent = extents.of(feature, body)
+        if not isinstance(plane, Plane) or extent is None:
+            continue
+        positions = [v for start, end in extent.outline() for v in (*to_world(start), *to_world(end))]
+        outlines.append(PlaneOutline([float(v) for v in timber.transform.local_to_global_direction(plane.normal)],
+                                     positions))
+    return outlines
