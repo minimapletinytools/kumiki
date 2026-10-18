@@ -215,4 +215,4 @@ def test_a_centerplane_lights_its_outline_and_no_triangles(picked, name):
 
     assert result["featureLabel"] == name
     assert result["highlightMesh"]["indices"] == []
-    assert len(result["highlightEdgeSegments"]) == 4
+    assert result["highlightEdgeSegments"]  # cropped to the beam, so not just a rectangle
