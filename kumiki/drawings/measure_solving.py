@@ -5,7 +5,7 @@ that out is drawing's: each feature's span, what it draws as on the sheet, and w
 between the two attaches (distance_anchors).
 """
 
-from typing import TYPE_CHECKING, Dict, Hashable, Optional, Sequence
+from typing import TYPE_CHECKING, Dict, Hashable, Optional, Sequence, Union
 
 import numpy as np
 
@@ -116,13 +116,27 @@ def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view
 
 
 class DrawingSolve(Solve):
-    """A Solve that takes a drawing's Measures, keeping each feature's span for the solve."""
+    """A Solve that takes a drawing's Measures, keeping each feature's span and each measure's row
+    for the solve."""
 
     def __init__(self, cut_timbers: Sequence['CutTimber']):
         super().__init__(cut_timbers)
         self.spans_memo: SpanMemo = {}
+        # A row, or why there is none, per (measure, view).
+        self.rows_memo: Dict[Hashable, Union[Row, ValueError]] = {}
 
     def row(self, measure: Measure, view: Optional[ViewAxes] = None) -> Row:
         """How `measure`, seen through `view`, changes with the carriers' unknowns. Raises ValueError
         for one that measures nothing (solve_measurement)."""
-        return self.measure_row(solve_measurement(measure, self.cut_timbers, view, self.spans_memo))
+        view = view or ViewAxes()
+        key = (measure, *(float(part) for axis in (view.look, view.right, view.up) for part in axis))
+        if key not in self.rows_memo:
+            try:
+                self.rows_memo[key] = self.measure_row(
+                    solve_measurement(measure, self.cut_timbers, view, self.spans_memo))
+            except ValueError as refused:
+                self.rows_memo[key] = refused
+        found = self.rows_memo[key]
+        if isinstance(found, ValueError):
+            raise found
+        return found
