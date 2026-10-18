@@ -1,6 +1,8 @@
 # Introduction
 This doc describes the kumiki geometry feature system.
 
+How a feature goes on to be picked, measured, solved and drawn is in `featureflow.md`.
+
 kumiki implements its own CSG (constructive solid geometry) system to generate all timber and joint geometry. 
 
 # Files
@@ -16,6 +18,10 @@ kumiki implements its own CSG (constructive solid geometry) system to generate a
 - geometry.py: contains shared geometry feature classes like Plane Line Vertex etc
 - drawings/drawing.py: contains all code relate to generating measurements from CSG features
 - drawings/: also the layout of a sheet, and measure_solving: a drawing's Measure as the solver's SolveDistance / SolveAngle
+- drawings/sheet_shape.py, visibility.py: what a feature is on a sheet, and whether a view can see it
+- drawings/feature_span.py, measuring.py: what a measurement attaches to, and how it is placed and what it comes to
+- drawings/cameras.py: where a drawing's views look from
+- viewer/picking.py: what is under a pointer, and which of it a pick takes
 
 # Overview
 
