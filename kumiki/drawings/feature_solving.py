@@ -52,9 +52,22 @@ def _recipe(handle: FeatureHandle) -> Recipe:
     return recipe
 
 
-def _span(handle: FeatureHandle) -> MeasureSpan:
-    """The feature as drawing's measuring rules see it, in world space: the viewer's span (feature_span)."""
+def _span(handle: FeatureHandle, carriers: Optional[CarrierMap] = None) -> MeasureSpan:
+    """The feature as drawing's measuring rules see it, in world space: the viewer's span (feature_span).
+
+    Kept on `carriers` when given, which lasts one solve: every candidate measurement to a feature
+    asks for its span, and it is the same each time.
+    """
+    # TODO: feature_solving should be organised around a solve -- an object holding what one solve
+    # works out, spans included -- so caches like this one have a home. Stashing it on the
+    # CarrierMap's __dict__ is a side effect on an argument, not very functional of us.
+    cache = None if carriers is None else carriers.__dict__.setdefault("_spans", {})
+    key = (id(handle.owner), handle.feature.name, id(handle.timber))
+    if cache is not None and key in cache:
+        return cache[key]
     span = feature_span(handle, in_three_d=True)
+    if cache is not None and span is not None:
+        cache[key] = span
     if span is None:
         raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
     return span
@@ -163,7 +176,7 @@ def measure_row(measure: Measure, carriers: CarrierMap, view: Optional[ViewAxes]
     if kind.operation is MeasurementOperation.ANGLE:
         return _angle_row(measure, carriers, look)
 
-    first, second = _span(measure.anchor_a), _span(measure.anchor_b)
+    first, second = _span(measure.anchor_a, carriers), _span(measure.anchor_b, carriers)
     if look is None:
         at_a, at_b = (_np(point) for point in distance_anchors(first, second, kind, view))
         return _distance_row(measure, at_a, at_b, _gap_direction(at_a, at_b), carriers)
