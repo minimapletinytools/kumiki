@@ -54,6 +54,16 @@ class TestIsReference:
         assert not is_reference(self._handle("ptw.centerplane_left_right", (TimberFeature.FRONT_BACK_CENTER_PLANE,)))
 
 
+class TestTheGround:
+
+    def test_the_fixed_timber_gives_where_it_is_and_not_how_big_so_both_views_dimension_something(self, solve):
+        # Lined-up features only tie each other: something still has to say how far apart a line-up
+        # is from the rest, and the fixed timber's own sizes are not given.
+        _, result, _ = solve()
+
+        assert {pick.candidate.view for pick in result.picks} == {"top", "front"}
+
+
 class TestPolicy:
 
     def test_by_default_every_dimension_is_from_a_reference_and_all_is_solved(self, solve):
