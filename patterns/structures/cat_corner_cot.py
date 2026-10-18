@@ -1,18 +1,27 @@
 """Cat Corner Cot - A timber frame cat cot designed against a corner supporting structure.
 
+The file builds two frames, shown together where they stand:
+- `supporting_structure`: the corner walls and the sloped roof they carry.
+- `cat_corner_cot`: the cot itself, tucked into the corner under the roof.
+
 Defines:
 1. house_footprint: The supporting "r"-shaped corner structure footprint.
    - Inside corner is at (0, 0).
    - Inside walls along +X (100") and -Y (70").
    - Wraps around back (+50" Y, -200" X, -120" Y).
-2. cot_footprint: The 6' (X) x 64" (Y) footprint for the cot structure.
+2. cot_footprint: The 64" (X) x 75" (Y) footprint for the cot structure.
    - Corner nearest the inside corner sits at (1/2", -1/2").
 3. Supporting structure timbers:
-   - Two 15' tall timbers on corners 1 and 5 filling up the footprint and forming the 2 inside walls.
+   - Two 15' tall timbers on corners 1 and 5 forming the 2 inside walls.
+   - The left wall is 80" deep: its front face sits 10" past the footprint's front edge,
+     so it reaches past the cot's front face.
    - Trimmed along the roof slope using a custom HalfSpace joint to remove everything above the roof plane.
 4. Supporting structure sloped roof:
-   - Intersects with the front of the structure (Y = -70") at 11' (Z = 132").
-   - Slopes upwards in +Y at 20 degrees.
+   - Roof underside passes through (Y = -70", Z = 112"), the line the pitch is measured from.
+   - Roof underside meets the recessed front-facing wall (Y = 0") at 11' (Z = 132").
+   - Pitch is derived from those two measured heights: 20" rise over a 70" run (~15.95 degrees).
+   - The wall timbers are trimmed to that underside plane, so the roof bears on them (the left wall
+     reaches out to Y = -80", where the underside is correspondingly lower).
    - Overhangs by 18" on all sides (including 18" overhanging into the inside corner).
    - Uses `cut_free_house_joint` with a cutout block located 18" out of the corner.
 5. Cat cot structure:
@@ -20,21 +29,23 @@ Defines:
       - BL post stops under front rail at Z = 50 5/8".
       - BR post connects into lower rafter and front roof beam (top plate).
       - TR post stops under right rail at Z = 50 5/8".
-      - TL post connects into underside of back roof beam (top plate).
+      - TL post runs from the ground to the underside of the back roof beam.
       - Upper front-left post sits on front rail, offset 1.5" from wall, and connects into front roof beam.
       - Upper back-right post sits on right rail, offset 1.5" from wall, and connects into lower rafter and back roof beam.
       - Door post on right side connects into top of right rim joist at bottom, right rail, and extends up to the lower rafter.
-    - 3.5" x 3.5" tilted lower rafter along the right wall matching the 20 degree roof slope:
+    - 3.5" x 3.5" tilted lower rafter along the right wall matching the roof slope:
       - Sits 2 3/4" below the top plates and overhangs 10" beyond the front plate.
       - All 3 right posts (BR post, door post, and upper back-right post) connect into the lower rafter with mortise and tenon joints (no pegs).
-      - Front and back top plates connect into BR post and upper back-right post with mortise and tenon joints (no pegs).
+      - BR post and upper back-right post carry stacked tenons: a 1.5" x 2" through tenon in the lower rafter whose tip is
+        reduced to a 1.5" x 1" tenon running 2.5" into the front / back top plate. Both are pegged, and each peg head
+        sits on the front (south, -Y) side.
       - Housing joints cut between the top plates (housed) and the lower rafter (housing).
     - 3 3/8" square horizontal stepped girts along the right wall (creating a step appearance):
       - Front bay girt: 2" below where lower rafter meets front post, connecting post BR to door post (with pegs).
       - Back bay girt: 2" below where lower rafter meets mid door post, connecting door post to upper back-right post (with pegs).
-    - 3 3/8" square rim joists around the entire footprint perimeter at floor height 16" (top of rim joist at 16").
+    - 3 3/8" square rim joists around the entire footprint perimeter at floor height 18" (top of rim joist at 18").
     - 3 evenly spaced 3 3/8" square floor joists running from the front to back rim joists:
-      - Middle joist (joist 2, aligned with front mid stud at X = 36.5") connects to front and back rim joists with 3" long x 1" thick mortise and tenon joints (offset -13/16" down in Z) with 5/8" square pegs.
+      - Middle joist (joist 2, aligned with front mid stud at X = 32.5") connects to front and back rim joists with 3" long x 1" thick mortise and tenon joints (offset -13/16" down in Z) with 5/8" square pegs.
       - Outer joists (joist 1 and joist 3) connect to front and back rim joists with 1.5" deep drop-in housed butt joints.
     - Mortise and tenon joints connecting rim joists to corner posts:
       - 1" x 1.5" tenons, 3" long (stopped, not extending beyond posts).
@@ -63,21 +74,18 @@ Defines:
       - Extend 1/2" into bounding floor joists and rim joists.
       - Dynamically adapt to any number of floor joists or timber sizes.
     - 3 3/8" square upper roof support beams:
-      - Back beam at back_beam_height (top at 11' / 132"), reaching inside corner to the left and sticking out 6" to the right.
-      - Front beam over front posts, lowered based on the 20 degree roof pitch to match the support structure roof pitch.
+      - Back beam at back_beam_height (top at 9' 6" / 114"), reaching inside corner to the left and sticking out 6" to the right.
+      - Front beam over front posts, lowered based on the roof pitch to match the support structure roof pitch.
+      - The back beam is pegged to the TL post and the upper back-right post, and the front beam to the BR post.
+        Every one of those pegs enters from the front (south, -Y) side of the cot.
     - 7 evenly spaced rafters (1.5" wide x 2.5" tall in Z) recessed 0.25" into the front and back plates,
       extending 14" beyond the front plate.
 """
 
 import math
+from typing import Optional
+
 from kumiki import *
-from kumiki.csg.cutcsg import HalfSpace, adopt_csg
-from kumiki.joints.workshop.free import cut_free_house_joint
-from kumiki.construction import ButtJointTimberArrangement, CrossJointTimberArrangement
-from kumiki.joints.workshop.mixed import cut_mortise_and_tenon_joint_on_face_aligned_timbers
-from kumiki.joints.workshop.butt import cut_dropin_housed_butt_joint_on_face_aligned_timbers
-from kumiki.joints.workshop.cross import cut_plain_cross_lap_house_joint
-from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters, PegShape
 
 
 # ============================================================================
@@ -87,27 +95,31 @@ from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters, Pe
 # House supporting structure footprint dimensions
 house_inside_corner_x = inches(100)           # Inside wall length along +X
 house_inside_corner_y = inches(70)            # Inside wall length along -Y
+house_left_wall_depth_y = house_inside_corner_y + inches(10)  # 80": the left wall's front face runs 10" past the footprint
 house_back_right_up = inches(50)              # Up along +Y from right point
 house_back_top_left = inches(200)             # Left along -X across top back
 house_back_left_down = inches(120)            # Down along -Y along left back
 house_wall_height = feet(15)                  # 15' tall supporting structure walls before roof trim
 
 # Roof dimensions & parameters
-roof_front_wall_intersect_z = feet(11)        # Roof intersects front wall (Y = -70") at 11' (132")
-roof_slope_deg = degrees(20)                  # 20 degree upward slope along +Y
+# Measured heights of the roof underside at two datum lines (the pitch is derived from them):
+roof_front_wall_z = inches(112)               # Roof underside at Y = -70"
+roof_recessed_wall_z = feet(11)               # Roof underside at the recessed front-facing wall (Y = 0"), 11' (132")
+roof_slope_deg = atan((roof_recessed_wall_z - roof_front_wall_z) / house_inside_corner_y)  # ~15.95 degrees
 roof_overhang = inches(18)                    # 18" overhang on all sides
 roof_thickness = inches(6)                    # 6" roof thickness
+roof_underside_to_mid_plane = (roof_thickness / scalar(2)) / cos(roof_slope_deg)  # ~3 1/8" rise in Z from the roof underside to the roof timber's placement plane
 
 # Cat cot footprint dimensions
-cot_width_x = feet(6)                         # 6' (72") width along X
-cot_length_y = inches(64)                     # 64" length along Y
+cot_width_x = inches(64)                      # 64" width along X (front face)
+cot_length_y = inches(75)                     # 75" length along Y (side)
 cot_corner_offset_x = inches(1, 2)            # 1/2" gap from house wall along X
 cot_corner_offset_y = -inches(1, 2)           # 1/2" gap from house wall along Y (-0.5")
 
 # Cat cot timber dimensions
 cot_timber_cross_section = inches(27, 8)      # 3 3/8" square (nominal 4x4 actual size)
 cot_timber_size = create_v2(cot_timber_cross_section, cot_timber_cross_section)
-cot_floor_height = inches(16)                 # Top of rim joists at 16" from ground
+cot_floor_height = inches(18)                 # Top of rim joists at 18" from ground
 cot_rail_height = inches(54)                  # Top of rails at 54" from ground
 cot_door_width = inches(28)                   # 28" clear door opening on right side
 
@@ -120,6 +132,15 @@ cot_rim_tenon_height = inches(3, 2)           # 1.5" tenon height for rim joists
 cot_rim_tenon_length = inches(3)              # 3" tenon length (stopped within 3 3/8" post)
 cot_peg_size = inches(5, 8)                   # 5/8" square peg
 cot_rail_tenon_width = inches(3)              # 3" wide tenon for non-intersecting rail joints
+
+# Stacked post tenons: post BR and the upper back-right post each pass through the lower
+# rafter and on into a top plate (like the oscarshed back corner posts, which pass through
+# a side girt into the back top plate). The lower tenon is a through tenon in the rafter,
+# the upper one is cut out of its tip, and both tenons end at the same height.
+cot_stacked_tenon_thickness = inches(3, 2)        # 1.5" across the lower rafter (left to right), shared by both tenons
+cot_stacked_through_tenon_width = inches(2)       # 2" along the lower rafter (lower tenon)
+cot_stacked_plate_tenon_width = inches(1)         # 1" across the top plate (upper tenon)
+cot_stacked_plate_tenon_length = inches(5, 2)     # 2.5" into the top plate
 
 # Upper left & back-right post parameters
 cot_upper_left_post_offset_x = inches(3, 2)   # 1.5" offset away from house wall at X = 0
@@ -157,8 +178,144 @@ cot_board_max_width = inches(6)               # Max board face width (prefer wid
 cot_board_min_width = inches(3)               # Min board face width
 
 # Upper roof support beam dimensions
-back_beam_height = feet(11)                   # Top of back beam at 11' (132") from ground
+back_beam_height = inches(114)                # Top of back beam at 9' 6" (114") from ground
 beam_stickout_right = inches(6)               # 6" stickout past right posts
+
+
+# ============================================================================
+# REFERENCE FEATURES
+# ============================================================================
+# A timber is measured from its reference features (see docs/concepts.md). The names are
+# local to each timber's own frame, so the same structural meaning can need different
+# names on different members; the assignments below were derived from how each timber is
+# oriented when it is built.
+#
+#   posts                    -> the outer arris, where its two outward-facing long faces meet
+#   outer horizontal members -> the outer upper arris (outer long face meeting the top face)
+#   mid vertical members     -> the centre plane perpendicular to their wall + the outer long face
+#   inner floor joist & rafters -> the vertical centre plane + the top face
+
+REFERENCE_POST_OUTER_EDGE = TimberFeature.LEFT_BACK_EDGE                  # posts built on footprint corners
+REFERENCE_POST_OUTER_EDGE_BACK_RIGHT = TimberFeature.RIGHT_FRONT_EDGE     # upper back-right post
+
+REFERENCE_OUTER_UPPER_EDGE_FRONT = TimberFeature.RIGHT_FRONT_EDGE         # outer horizontals whose outer long face is local FRONT
+REFERENCE_OUTER_UPPER_EDGE_BACK = TimberFeature.BACK_RIGHT_EDGE           # ... whose outer long face is local BACK
+
+REFERENCE_MID_VERTICAL = (TimberFeature.RIGHT_LEFT_CENTER_PLANE, TimberFeature.BACK_FACE)
+REFERENCE_INNER_JOIST = (TimberFeature.FRONT_BACK_CENTER_PLANE, TimberFeature.RIGHT_FACE)
+REFERENCE_RAFTER = (TimberFeature.RIGHT_LEFT_CENTER_PLANE, TimberFeature.BACK_FACE)
+
+# Tenons are laid out from the reference feature of the timber they enter: the tenon's
+# face nearest that reference sits this far in from it. Only the position moves, never
+# the tenon's length.
+cot_tenon_reference_distance = inches(5, 4)   # 1 1/4"
+
+
+def tenon_position_from_reference(
+    mortise: Timber,
+    butt: Timber,
+    end: TimberEnd,
+    tenon_size: V2,
+    other_axis_offset: Numeric = scalar(0),
+    distance: Numeric = cot_tenon_reference_distance,
+) -> Matrix:
+    """Offset that sets the tenon's position from the mortise timber's reference feature.
+
+    The relevant reference feature is the one resting on a long face of the mortise timber
+    that runs parallel to one of the butt timber's two end-face axes; the tenon's face
+    toward that reference is placed `distance` in from it. The tenon's other end-face axis
+    keeps `other_axis_offset`, which is where clearance from neighbouring joinery lives.
+
+    `tenon_size` is the tenon's cross-section as (along the butt timber's local X, along its
+    local Y) -- the same pair the joint is given as tenon width and height.
+    """
+    local_axes = [
+        butt.get_face_direction_global(TimberLongFace.RIGHT),
+        butt.get_face_direction_global(TimberLongFace.FRONT),
+    ]
+
+    for feature in mortise.ticket.reference_features:
+        for face in feature.long_faces_it_rests_on():
+            outward = mortise.get_face_direction_global(face)
+            dots = [safe_dot_product(outward, axis) for axis in local_axes]
+            index = 0 if Abs(dots[0]) >= Abs(dots[1]) else 1
+            if Abs(dots[index]) < scalar(99, 100):
+                continue  # this reference face is not parallel to either end-face axis
+
+            inward = outward * scalar(-1)
+            face_size = (
+                mortise.size[0]
+                if face in (TimberLongFace.RIGHT, TimberLongFace.LEFT)
+                else mortise.size[1]
+            )
+            mortise_centre = mortise.get_bottom_position_global() + (
+                mortise.get_length_direction_global() * mortise.length / scalar(2)
+            )
+            reference_coordinate = safe_dot_product(mortise_centre, inward) - face_size / scalar(2)
+
+            butt_end_centre = butt.get_bottom_position_global()
+            if end == TimberEnd.TOP:
+                butt_end_centre = butt_end_centre + (
+                    butt.get_length_direction_global() * butt.length
+                )
+
+            tenon_centre = (
+                reference_coordinate + distance + tenon_size[index] / scalar(2)
+            )
+            shift = tenon_centre - safe_dot_product(butt_end_centre, inward)
+
+            offsets = [scalar(0), scalar(0)]
+            offsets[index] = shift * safe_dot_product(inward, local_axes[index])
+
+            # A member thinner than the tenon cannot hold it a full 1 1/4" in from the
+            # reference: the tenon is then set as far that way as the member allows, which
+            # leaves it barefaced on the reference side.
+            limit = (butt.size[index] - tenon_size[index]) / scalar(2)
+            if offsets[index] > limit:
+                offsets[index] = limit
+            elif offsets[index] < -limit:
+                offsets[index] = -limit
+
+            offsets[1 - index] = other_axis_offset
+            return Matrix(offsets)
+
+    raise ValueError(
+        f"No reference feature of '{mortise.ticket.path}' can position the tenon "
+        f"of '{butt.ticket.path}': none rests on a face parallel to the butt timber's end-face axes."
+    )
+
+
+def stacked_through_tenon_length(post: Timber, lower_member: Timber, upper_tenon_length: Numeric) -> Numeric:
+    """Length of the lower tenon of a stack, so that it ends level with the upper tenon.
+
+    The post is built up to the underside of the upper member, so its top end is the upper
+    tenon's shoulder. The lower tenon's shoulder is where the post's centreline meets the
+    underside of `lower_member`; from there it has to pass through that member and carry
+    on for the upper tenon's length.
+    """
+    up = post.get_length_direction_global()
+    post_top = post.get_bottom_position_global() + up * post.length
+    underside = lower_member.get_closest_oriented_long_face_from_global_direction(-up)
+    normal = lower_member.get_face_direction_global(underside)
+    shoulder_below_post_top = safe_dot_product(
+        post_top - get_center_point_on_face_global(underside, lower_member), normal
+    ) / safe_dot_product(up, normal)
+    return shoulder_below_post_top + upper_tenon_length
+
+
+def stacked_through_tenon_offset(upper_tenon_offset: Numeric, upper_tenon_width: Numeric, through_tenon_width: Numeric) -> Numeric:
+    """Offset of the lower tenon of a stack along the axis the upper tenon is positioned on.
+
+    The upper tenon is cut out of the lower one, so it has to sit inside it. The lower
+    tenon stays centred on the post unless that leaves the upper tenon sticking out, in
+    which case it moves just far enough for the two cheeks on that side to be flush.
+    """
+    slack = (through_tenon_width - upper_tenon_width) / scalar(2)
+    if upper_tenon_offset > slack:
+        return upper_tenon_offset - slack
+    if upper_tenon_offset < -slack:
+        return upper_tenon_offset + slack
+    return scalar(0)
 
 
 # ============================================================================
@@ -176,11 +333,11 @@ house_footprint_corners = [
 ]
 house_footprint = Footprint(house_footprint_corners)
 
-# 2. Cot structure footprint (6' x 64" starting at (1/2", -1/2"))
+# 2. Cot structure footprint (64" x 75" starting at (1/2", -1/2"))
 cot_footprint_corners = [
-    create_v2(cot_corner_offset_x, cot_corner_offset_y - cot_length_y),                # (0.5", -64.5") Bottom-left (Corner 0)
-    create_v2(cot_corner_offset_x + cot_width_x, cot_corner_offset_y - cot_length_y),  # (72.5", -64.5") Bottom-right (Corner 1)
-    create_v2(cot_corner_offset_x + cot_width_x, cot_corner_offset_y),                 # (72.5", -0.5") Top-right (Corner 2)
+    create_v2(cot_corner_offset_x, cot_corner_offset_y - cot_length_y),                # (0.5", -75.5") Bottom-left (Corner 0)
+    create_v2(cot_corner_offset_x + cot_width_x, cot_corner_offset_y - cot_length_y),  # (64.5", -75.5") Bottom-right (Corner 1)
+    create_v2(cot_corner_offset_x + cot_width_x, cot_corner_offset_y),                 # (64.5", -0.5") Top-right (Corner 2)
     create_v2(cot_corner_offset_x, cot_corner_offset_y),                                # (0.5", -0.5") Top-left (Corner 3)
 ]
 cot_footprint = Footprint(cot_footprint_corners)
@@ -192,8 +349,12 @@ cot_footprint = Footprint(cot_footprint_corners)
 
 def create_supporting_structure_timbers() -> list[Timber]:
     """
-    Creates two 15' tall timbers on the bottom-right corners of the house footprint
-    (corner 1 and corner 5) that fill the footprint and form the 2 inside walls.
+    Creates two 15' tall timbers on the corners of the house footprint (corner 1 and corner 5)
+    that form the 2 inside walls.
+
+    The left wall is deeper than the footprint side it sits on (80" instead of 70"), so it is
+    placed from its back face at Y = 0 rather than from the footprint corner; its front face
+    then runs 10" past the footprint's front edge, where the roof still bears on it.
     """
     top_wall = create_vertical_timber_on_footprint_corner(
         footprint=house_footprint,
@@ -204,12 +365,16 @@ def create_supporting_structure_timbers() -> list[Timber]:
         ticket=TimberTicket(path="supporting_wall_top", tags=("house", "supporting_structure")),
     )
 
-    left_wall = create_vertical_timber_on_footprint_corner(
-        footprint=house_footprint,
-        corner_index=5,
+    left_wall = create_axis_aligned_timber(
+        bottom_position=create_v3(
+            -house_inside_corner_x / scalar(2),
+            -house_left_wall_depth_y / scalar(2),
+            scalar(0),
+        ),
         length=house_wall_height,
-        location_type=FootprintLocation.INSIDE,
-        size=create_v2(house_inside_corner_y, house_inside_corner_x),
+        size=create_v2(house_left_wall_depth_y, house_inside_corner_x),
+        length_direction=TimberFace.TOP,
+        width_direction=TimberFace.FRONT,
         ticket=TimberTicket(path="supporting_wall_left", tags=("house", "supporting_structure")),
     )
 
@@ -241,8 +406,10 @@ def create_supporting_roof_cut_timber() -> CutTimber:
     """
     Creates the sloped roof over the supporting structure:
     - 18" overhang on all sides
-    - Intersects front wall (Y = -70") at 11' (Z = 132")
-    - Slopes upward in +Y at 20 degrees
+    - Roof underside passes through (Y = -70", Z = 112"), the line the pitch is measured from
+    - Roof underside meets the recessed front-facing wall (Y = 0") at 11' (Z = 132")
+    - Pitch derived from those two measured heights
+    - Roof timber is raised by half its thickness so its underside (not its placement plane) sits on those measured lines
     - Uses cut_free_house_joint to remove the courtyard quadrant (18" out of the corner)
     """
     house_x_min = -house_inside_corner_x       # -100"
@@ -263,7 +430,9 @@ def create_supporting_roof_cut_timber() -> CutTimber:
     length_dir = create_v3(scalar(0), cos(roof_slope_deg), sin(roof_slope_deg))
     width_dir = create_v3(scalar(1), scalar(0), scalar(0))
 
-    z_at_front_eave = roof_front_wall_intersect_z - roof_overhang * tan(roof_slope_deg)
+    z_at_front_eave = (
+        roof_front_wall_z - roof_overhang * tan(roof_slope_deg) + roof_underside_to_mid_plane
+    )  # underside of the roof at the front eave, plus half the roof thickness
 
     bottom_pos = create_v3(
         scalar(0),
@@ -330,7 +499,7 @@ def create_cot_posts() -> list[Timber]:
     - Corner 0: Bottom-Left post connects into underside of front rail (top at 50 5/8")
     - Corner 1: Bottom-Right post connects into underside of front beam
     - Corner 2: Bottom-Right (TR) post connects into underside of right rail (top at 50 5/8")
-    - Corner 3: Top-Left post connects into underside of back beam
+    - Corner 3: Top-Left post runs from the ground to the underside of the back beam
     - Upper Left Post: sits on front rail (offset 1.5" from house wall at X=0) and reaches front beam
     - Upper Back-Right Post: sits on right rail (offset 1.5" from house wall at Y=0) and reaches back beam
     """
@@ -349,7 +518,7 @@ def create_cot_posts() -> list[Timber]:
         length=bl_post_height,
         location_type=FootprintLocation.INSIDE,
         size=cot_timber_size,
-        ticket=TimberTicket(path="cot_post_BL", tags=("post", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_post_BL", tags=("post", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE,)),
     )
 
     # 2. Bottom-Right Post
@@ -359,7 +528,7 @@ def create_cot_posts() -> list[Timber]:
         length=front_beam_bottom_z,
         location_type=FootprintLocation.INSIDE,
         size=cot_timber_size,
-        ticket=TimberTicket(path="cot_post_BR", tags=("post", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_post_BR", tags=("post", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE,)),
     )
 
     # 3. Top-Right Post (Bottom Back-Right Post)
@@ -369,17 +538,17 @@ def create_cot_posts() -> list[Timber]:
         length=tr_post_height,
         location_type=FootprintLocation.INSIDE,
         size=cot_timber_size,
-        ticket=TimberTicket(path="cot_post_TR", tags=("post", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_post_TR", tags=("post", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE,)),
     )
 
-    # 4. Top-Left Post
+    # 4. Top-Left Post (single corner post, up to the underside of the back beam)
     post_tl = create_vertical_timber_on_footprint_corner(
         footprint=cot_footprint,
         corner_index=3,
         length=back_beam_bottom_z,
         location_type=FootprintLocation.INSIDE,
         size=cot_timber_size,
-        ticket=TimberTicket(path="cot_post_TL", tags=("post", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_post_TL", tags=("post", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE,)),
     )
 
     # 5. Upper Left Post (between front rail and front beam, offset 1.5" from wall at X=0)
@@ -393,7 +562,7 @@ def create_cot_posts() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.TOP,
         width_direction=TimberFace.RIGHT,
-        ticket=TimberTicket(path="cot_post_front_upper_left", tags=("post", "cot", "upper_post", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_post_front_upper_left", tags=("post", "cot", "upper_post", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE,)),
     )
 
     # 6. Upper Back-Right Post (between right rail and back beam, offset 1.5" from wall at Y=0)
@@ -408,7 +577,7 @@ def create_cot_posts() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.TOP,
         width_direction=TimberFace.RIGHT,
-        ticket=TimberTicket(path="cot_post_back_upper_right", tags=("post", "cot", "upper_post", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_post_back_upper_right", tags=("post", "cot", "upper_post", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE_BACK_RIGHT,)),
     )
 
     return [post_bl, post_br, post_tr, post_tl, upper_left_post, upper_back_right_post]
@@ -417,7 +586,7 @@ def create_cot_posts() -> list[Timber]:
 def create_cot_rim_joists() -> list[Timber]:
     """
     Creates four 3 3/8" square rim joists around the cot footprint perimeter.
-    The top of the rim joists is at 16" from the ground (floor height).
+    The top of the rim joists is at 18" from the ground (floor height).
     """
     z_center = cot_floor_height - cot_timber_cross_section / scalar(2)
 
@@ -435,7 +604,7 @@ def create_cot_rim_joists() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.RIGHT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_rim_joist_front", tags=("rim_joist", "floor", "cot")),
+        ticket=TimberTicket(path="cot_rim_joist_front", tags=("rim_joist", "floor", "cot"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_FRONT,)),
     )
 
     right_rim = create_axis_aligned_timber(
@@ -444,7 +613,7 @@ def create_cot_rim_joists() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.FRONT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_rim_joist_right", tags=("rim_joist", "floor", "cot")),
+        ticket=TimberTicket(path="cot_rim_joist_right", tags=("rim_joist", "floor", "cot"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_FRONT,)),
     )
 
     back_rim = create_axis_aligned_timber(
@@ -453,7 +622,7 @@ def create_cot_rim_joists() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.RIGHT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_rim_joist_back", tags=("rim_joist", "floor", "cot")),
+        ticket=TimberTicket(path="cot_rim_joist_back", tags=("rim_joist", "floor", "cot"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_BACK,)),
     )
 
     left_rim = create_axis_aligned_timber(
@@ -462,7 +631,7 @@ def create_cot_rim_joists() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.FRONT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_rim_joist_left", tags=("rim_joist", "floor", "cot")),
+        ticket=TimberTicket(path="cot_rim_joist_left", tags=("rim_joist", "floor", "cot"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_BACK,)),
     )
 
     return [front_rim, right_rim, back_rim, left_rim]
@@ -474,6 +643,9 @@ def cut_rim_joist_corner_joints(
 ) -> tuple[dict[str, list[Cutting]], list[Accessory]]:
     """
     Connects each of the rim joists to the corner posts using mortise and tenon joints:
+    - Tenon positions come from the receiving post's reference feature: the tenon's face
+      toward that reference sits 1 1/4" in from it (see tenon_position_from_reference). The
+      other end-face axis keeps its clearance offset.
     - Tenons: 1" x 1.5", 3" long (stopped mortise inside 3 3/8" posts).
     - Offsets:
       - X-running rim joists (front, back): Upper offset (+13/16" along Z).
@@ -492,8 +664,8 @@ def cut_rim_joist_corner_joints(
         tenon_hole_offset=inches(1, 16),
     )
 
-    offset_upper = Matrix([inches(13, 16), scalar(0)])
-    offset_lower = Matrix([-inches(13, 16), scalar(0)])
+    offset_upper = inches(13, 16)     # tenon offset on the free axis, X-running rim joists
+    offset_lower = -inches(13, 16)    # ... Y-running rim joists
 
     # 1. Front Rim @ BL Post (Upper tenon)
     j_front_bl = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -507,7 +679,7 @@ def cut_rim_joist_corner_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=offset_upper,
+        tenon_position=tenon_position_from_reference(post_bl, front_rim, TimberEnd.BOTTOM, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=offset_upper),
         peg_parameters=peg_params,
     )
 
@@ -523,7 +695,7 @@ def cut_rim_joist_corner_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=offset_lower,
+        tenon_position=tenon_position_from_reference(post_bl, left_rim, TimberEnd.BOTTOM, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=offset_lower),
         peg_parameters=peg_params,
     )
 
@@ -539,7 +711,7 @@ def cut_rim_joist_corner_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=offset_upper,
+        tenon_position=tenon_position_from_reference(post_br, front_rim, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=offset_upper),
         peg_parameters=peg_params,
     )
 
@@ -555,7 +727,7 @@ def cut_rim_joist_corner_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=offset_lower,
+        tenon_position=tenon_position_from_reference(post_br, right_rim, TimberEnd.BOTTOM, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=offset_lower),
         peg_parameters=peg_params,
     )
 
@@ -571,7 +743,7 @@ def cut_rim_joist_corner_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=offset_upper,
+        tenon_position=tenon_position_from_reference(post_tr, back_rim, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=offset_upper),
         peg_parameters=peg_params,
     )
 
@@ -587,7 +759,7 @@ def cut_rim_joist_corner_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=offset_lower,
+        tenon_position=tenon_position_from_reference(post_tr, right_rim, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=offset_lower),
         peg_parameters=peg_params,
     )
 
@@ -603,7 +775,7 @@ def cut_rim_joist_corner_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=offset_upper,
+        tenon_position=tenon_position_from_reference(post_tl, back_rim, TimberEnd.BOTTOM, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=offset_upper),
         peg_parameters=peg_params,
     )
 
@@ -619,7 +791,7 @@ def cut_rim_joist_corner_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=offset_lower,
+        tenon_position=tenon_position_from_reference(post_tl, left_rim, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=offset_lower),
         peg_parameters=peg_params,
     )
 
@@ -639,7 +811,7 @@ def cut_rim_joist_corner_joints(
 
 def create_cot_lower_rafter() -> Timber:
     """
-    Creates a 3.5" x 3.5" tilted lower rafter along the right wall matching the 20 degree roof slope.
+    Creates a 3.5" x 3.5" tilted lower rafter along the right wall matching the roof slope.
     The top of the lower rafter sits 2 3/4" below the top plates and overhangs 10" beyond the front plate.
     """
     timber_cs = cot_timber_cross_section
@@ -652,10 +824,10 @@ def create_cot_lower_rafter() -> Timber:
     lower_rafter_size = cot_lower_rafter_size
     overhang = cot_lower_rafter_overhang_front
 
-    y_front_plate_face = cot_corner_offset_y - cot_length_y  # -64.5"
-    y_start = y_front_plate_face - overhang                  # -76.5"
+    y_front_plate_face = cot_corner_offset_y - cot_length_y  # -75.5"
+    y_start = y_front_plate_face - overhang                  # -85.5"
     y_end = cot_corner_offset_y                              # -0.5"
-    y_span = y_end - y_start                                 # 76.0"
+    y_span = y_end - y_start                                 # 85.0"
     rafter_length = y_span / cos(roof_slope)
 
     length_dir = create_v3(scalar(0), cos(roof_slope), sin(roof_slope))
@@ -678,7 +850,7 @@ def create_cot_lower_rafter() -> Timber:
         bottom_position=bottom_pos,
         length_direction=length_dir,
         width_direction=width_dir,
-        ticket=TimberTicket(path="cot_lower_rafter_right", tags=("rafter", "lower_rafter", "cot", "3.5x3.5")),
+        ticket=TimberTicket(path="cot_lower_rafter_right", tags=("rafter", "lower_rafter", "cot", "3.5x3.5"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_BACK,)),
     )
 
 
@@ -698,10 +870,10 @@ def create_cot_stepped_girts() -> list[Timber]:
     drop_from_top_plate = cot_lower_rafter_drop_from_top_plate
     girt_drop = cot_stepped_girt_drop_from_rafter
 
-    y_front_plate_face = cot_corner_offset_y - cot_length_y              # -64.5"
-    y_front_center = y_front_plate_face + timber_cs / scalar(2)          # -62.8125"
-    door_post_y_front = y_front_plate_face + timber_cs + cot_door_width  # -33.125"
-    door_post_y_center = door_post_y_front + timber_cs / scalar(2)        # -31.4375"
+    y_front_plate_face = cot_corner_offset_y - cot_length_y              # -75.5"
+    y_front_center = y_front_plate_face + timber_cs / scalar(2)          # -73.8125"
+    door_post_y_front = y_front_plate_face + timber_cs + cot_door_width  # -44.125"
+    door_post_y_center = door_post_y_front + timber_cs / scalar(2)        # -42.4375"
     y_upper_back_center = -cot_upper_back_post_offset_y - timber_cs / scalar(2)  # -3.1875"
 
     # Underside of lower rafter at front post and door post
@@ -722,7 +894,7 @@ def create_cot_stepped_girts() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.FRONT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_girt_right_front", tags=("girt", "beam", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_girt_right_front", tags=("girt", "beam", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_FRONT,)),
     )
 
     # 2. Back bay girt (2" below rafter at door post)
@@ -738,7 +910,7 @@ def create_cot_stepped_girts() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.FRONT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_girt_right_back", tags=("girt", "beam", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_girt_right_back", tags=("girt", "beam", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_FRONT,)),
     )
 
     return [girt_front, girt_back]
@@ -773,7 +945,7 @@ def create_cot_upper_front_studs() -> list[Timber]:
         size=cot_upper_stud_size,
         length_direction=TimberFace.TOP,
         width_direction=TimberFace.RIGHT,
-        ticket=TimberTicket(path="cot_stud_upper_front_1", tags=("stud", "cot", "upper_stud", "2x1")),
+        ticket=TimberTicket(path="cot_stud_upper_front_1", tags=("stud", "cot", "upper_stud", "2x1"), reference_features=REFERENCE_MID_VERTICAL),
     )
 
     stud2 = create_axis_aligned_timber(
@@ -782,7 +954,7 @@ def create_cot_upper_front_studs() -> list[Timber]:
         size=cot_upper_stud_size,
         length_direction=TimberFace.TOP,
         width_direction=TimberFace.RIGHT,
-        ticket=TimberTicket(path="cot_stud_upper_front_2", tags=("stud", "cot", "upper_stud", "2x1")),
+        ticket=TimberTicket(path="cot_stud_upper_front_2", tags=("stud", "cot", "upper_stud", "2x1"), reference_features=REFERENCE_MID_VERTICAL),
     )
 
     return [stud1, stud2]
@@ -800,6 +972,12 @@ def cut_rail_and_post_joints(
 ) -> tuple[dict[str, list[Cutting]], list[Accessory]]:
     """
     Connects rails, posts, roof beams, lower rafter, stepped girts, upper front studs, floor joists, and rim joists:
+    - Every tenon is positioned from the receiving timber's reference feature: the tenon's face
+      toward that reference sits 1 1/4" in from it (see tenon_position_from_reference). Where a
+      member is thinner than the tenon allows, the tenon ends up barefaced on that side.
+    - The peg face named on the tenon is the cheek the peg hole passes through, so the peg
+      enters the mortise from the opposite side. The beam joints below all name the post's
+      south (-Y) face, so their peg heads sit on the front side of the cot.
     - Front rail to BR post: 3" x 1" tenon, centered (with peg).
     - Right rail to door post: 3" x 1" tenon, centered (with peg).
     - BL post top into front rail underside: 1.5" x 1" tenon, offset +9/16" along X to preserve end grain relish (with peg).
@@ -807,13 +985,13 @@ def cut_rail_and_post_joints(
     - Upper left post top into front beam: 1.5" x 1" tenon, centered (with peg).
     - Post TR (bottom back-right post) top into right rail underside: 1.5" x 1" tenon, offset +9/16" along Y (with peg).
     - Upper back-right post bottom into right rail top: 1.5" x 1" tenon, offset -15/16" along Y (with peg).
-    - TL post top into back beam: 1.5" x 1" tenon, centered (with peg).
+    - TL post top into back beam: 1.5" x 1" tenon, centered (with peg from the front / south).
     - Door post bottom into right rim joist top: 1.5" x 1" tenon, centered (with peg).
-    - Post BR top into lower rafter: 1.5" x 1" tenon (no pegs).
+    - Post BR top through lower rafter: 1.5" x 2" through tenon, ending level with the tenon into the front beam (no pegs).
     - Door post top into lower rafter: 1.5" x 1" tenon (no pegs).
-    - Upper back-right post top into lower rafter: 1.5" x 1" tenon (no pegs).
-    - Post BR top into front beam: 1.5" x 1" tenon (no pegs).
-    - Upper back-right post top into back beam: 1.5" x 1" tenon, offset +15/16" along Y towards back edge (no pegs).
+    - Upper back-right post top through lower rafter: 1.5" x 2" through tenon, ending level with the tenon into the back beam (no pegs).
+    - Post BR top into front beam: 1.5" x 1" tenon, 2.5" long, cut out of the tip of the through tenon (with peg from the front / south).
+    - Upper back-right post top into back beam: 1.5" x 1" tenon, 2.5" long, cut out of the tip of the through tenon (with peg from the front / south).
     - Housing joint between front top plate (housed) and lower rafter (housing).
     - Housing joint between back top plate (housed) and lower rafter (housing).
     - Stepped girt front into BR post (with peg).
@@ -854,7 +1032,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(post_br, front_rail, TimberEnd.TOP, create_v2(cot_rail_tenon_width, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
@@ -870,7 +1048,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(door_post_right, right_rail, TimberEnd.BOTTOM, create_v2(cot_rail_tenon_width, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
@@ -886,7 +1064,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
-        tenon_position=Matrix([inches(9, 16), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_rail, post_bl, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=inches(9, 16)),
         peg_parameters=peg_params,
     )
 
@@ -902,7 +1080,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
-        tenon_position=Matrix([inches(15, 16), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_rail, upper_left_post, TimberEnd.BOTTOM, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=inches(15, 16)),
         peg_parameters=peg_params,
     )
 
@@ -918,7 +1096,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_beam, upper_left_post, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
@@ -934,7 +1112,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
-        tenon_position=Matrix([scalar(0), inches(9, 16)]),
+        tenon_position=tenon_position_from_reference(right_rail, post_tr, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=inches(9, 16)),
         peg_parameters=peg_params,
     )
 
@@ -950,23 +1128,25 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
-        tenon_position=Matrix([scalar(0), -inches(15, 16)]),
+        tenon_position=tenon_position_from_reference(right_rail, upper_back_right_post, TimberEnd.BOTTOM, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=-inches(15, 16)),
         peg_parameters=peg_params,
     )
 
-    # 8. Post TL top into Back Beam (1.5" x 1" tenon, centered, with peg)
+    # 8. TL Post top into Back Beam (1.5" x 1" tenon, centered, with peg from the front / south)
+    # Post TL is built rotated, so its local X (front to back) carries the 1" thickness and its
+    # local Y (left to right) carries the 1 1/2" width, hence the order of the tenon size.
     j_post_tl_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=back_beam,
             butt_timber=post_tl,
             butt_timber_end=TimberEnd.TOP,
-            front_face_on_butt_timber=TimberLongFace.LEFT,
+            front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
         tenon_width_relative_to_joint=cot_rim_tenon_height,
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(back_beam, post_tl, TimberEnd.TOP, create_v2(cot_rim_tenon_thickness, cot_rim_tenon_height)),
         peg_parameters=peg_params,
     )
 
@@ -982,11 +1162,27 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(right_rim, door_post_right, TimberEnd.BOTTOM, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
-    # 10. Post BR top into Lower Rafter (1.5" x 1" tenon, NO PEGS)
+    # Stacked tenons on post BR and the upper back-right post (see cot_stacked_* parameters):
+    # the upper tenon into the top plate is positioned from the plate's reference feature, and
+    # the through tenon below it is positioned so that the upper tenon can be cut out of it.
+    # Tenon sizes passed to tenon_position_from_reference are in each post's own local X/Y;
+    # post BR's local X runs front to back, the upper back-right post's runs left to right.
+    post_br_beam_tenon_position = tenon_position_from_reference(
+        front_beam, post_br, TimberEnd.TOP,
+        create_v2(cot_stacked_plate_tenon_width, cot_stacked_tenon_thickness),
+    )
+    post_br_rafter_tenon_length = stacked_through_tenon_length(post_br, lower_rafter, cot_stacked_plate_tenon_length)
+    upper_back_beam_tenon_position = tenon_position_from_reference(
+        back_beam, upper_back_right_post, TimberEnd.TOP,
+        create_v2(cot_stacked_tenon_thickness, cot_stacked_plate_tenon_width),
+    )
+    upper_back_rafter_tenon_length = stacked_through_tenon_length(upper_back_right_post, lower_rafter, cot_stacked_plate_tenon_length)
+
+    # 10. Post BR top through Lower Rafter (1.5" x 2" through tenon, NO PEGS)
     j_post_br_rafter = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=lower_rafter,
@@ -994,10 +1190,16 @@ def cut_rail_and_post_joints(
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_width_relative_to_joint=inches(3, 2),
-        tenon_height_relative_to_joint=inches(1),
-        tenon_length=inches(5, 2),
-        mortise_depth=inches(5, 2),
+        tenon_position=tenon_position_from_reference(
+            lower_rafter, post_br, TimberEnd.TOP,
+            create_v2(cot_stacked_through_tenon_width, cot_stacked_tenon_thickness),
+            other_axis_offset=stacked_through_tenon_offset(post_br_beam_tenon_position[0], cot_stacked_plate_tenon_width, cot_stacked_through_tenon_width),
+            distance=inches(1),
+        ),
+        tenon_width_relative_to_joint=cot_stacked_through_tenon_width,
+        tenon_height_relative_to_joint=cot_stacked_tenon_thickness,
+        tenon_length=post_br_rafter_tenon_length,
+        mortise_depth=post_br_rafter_tenon_length,
     )
 
     # 11. Door Post top into Lower Rafter (1.5" x 1" tenon, NO PEGS)
@@ -1008,13 +1210,14 @@ def cut_rail_and_post_joints(
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
+        tenon_position=tenon_position_from_reference(lower_rafter, door_post_right, TimberEnd.TOP, create_v2(inches(3, 2), inches(1))),
         tenon_width_relative_to_joint=inches(3, 2),
         tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
     )
 
-    # 12. Upper Back-Right Post top into Lower Rafter (1.5" x 1" tenon, NO PEGS)
+    # 12. Upper Back-Right Post top through Lower Rafter (1.5" x 2" through tenon, NO PEGS)
     j_upper_back_rafter = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=lower_rafter,
@@ -1022,13 +1225,19 @@ def cut_rail_and_post_joints(
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_width_relative_to_joint=inches(3, 2),
-        tenon_height_relative_to_joint=inches(1),
-        tenon_length=inches(5, 2),
-        mortise_depth=inches(5, 2),
+        tenon_position=tenon_position_from_reference(
+            lower_rafter, upper_back_right_post, TimberEnd.TOP,
+            create_v2(cot_stacked_tenon_thickness, cot_stacked_through_tenon_width),
+            other_axis_offset=stacked_through_tenon_offset(upper_back_beam_tenon_position[1], cot_stacked_plate_tenon_width, cot_stacked_through_tenon_width),
+            distance=inches(1),
+        ),
+        tenon_width_relative_to_joint=cot_stacked_through_tenon_width,
+        tenon_height_relative_to_joint=cot_stacked_tenon_thickness,
+        tenon_length=upper_back_rafter_tenon_length,
+        mortise_depth=upper_back_rafter_tenon_length,
     )
 
-    # 13. Post BR top into Front Beam (1.5" x 1" tenon, NO PEGS)
+    # 13. Post BR top into Front Beam (1.5" x 1" tenon cut out of the through tenon's tip, with peg from the front / south)
     j_post_br_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_beam,
@@ -1036,26 +1245,28 @@ def cut_rail_and_post_joints(
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.LEFT,
         ),
-        tenon_width_relative_to_joint=inches(3, 2),
-        tenon_height_relative_to_joint=inches(1),
-        tenon_length=inches(5, 2),
-        mortise_depth=inches(5, 2),
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_width_relative_to_joint=cot_stacked_tenon_thickness,
+        tenon_height_relative_to_joint=cot_stacked_plate_tenon_width,
+        tenon_length=cot_stacked_plate_tenon_length,
+        mortise_depth=cot_stacked_plate_tenon_length,
+        tenon_position=post_br_beam_tenon_position,
+        peg_parameters=peg_params,
     )
 
-    # 14. Upper Back-Right Post top into Back Beam (1.5" x 1" tenon, offset +15/16" in Y, NO PEGS)
+    # 14. Upper Back-Right Post top into Back Beam (1.5" x 1" tenon cut out of the through tenon's tip, with peg from the front / south)
     j_upper_back_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=back_beam,
             butt_timber=upper_back_right_post,
             butt_timber_end=TimberEnd.TOP,
-            front_face_on_butt_timber=TimberLongFace.FRONT,
+            front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_width_relative_to_joint=inches(3, 2),
-        tenon_height_relative_to_joint=inches(1),
-        tenon_length=inches(5, 2),
-        mortise_depth=inches(5, 2),
-        tenon_position=Matrix([scalar(0), inches(15, 16)]),
+        tenon_width_relative_to_joint=cot_stacked_tenon_thickness,
+        tenon_height_relative_to_joint=cot_stacked_plate_tenon_width,
+        tenon_length=cot_stacked_plate_tenon_length,
+        mortise_depth=cot_stacked_plate_tenon_length,
+        tenon_position=upper_back_beam_tenon_position,
+        peg_parameters=peg_params,
     )
 
     # 15. Housing joints between Top Plates (housed) and Lower Rafter (housing)
@@ -1078,7 +1289,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(post_br, girt_front, TimberEnd.BOTTOM, create_v2(cot_rail_tenon_width, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
@@ -1094,7 +1305,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(door_post_right, girt_front, TimberEnd.TOP, create_v2(cot_rail_tenon_width, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
@@ -1110,7 +1321,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(door_post_right, girt_back, TimberEnd.BOTTOM, create_v2(cot_rail_tenon_width, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
@@ -1126,7 +1337,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=cot_rim_tenon_length,
         mortise_depth=cot_rim_tenon_length,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(upper_back_right_post, girt_back, TimberEnd.TOP, create_v2(cot_rail_tenon_width, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
@@ -1142,7 +1353,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_upper_stud_thickness_y,
         tenon_length=cot_upper_stud_tenon_depth,
         mortise_depth=cot_upper_stud_tenon_depth,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_rail, stud1, TimberEnd.BOTTOM, create_v2(cot_upper_stud_width_x, cot_upper_stud_thickness_y)),
     )
 
     # 21. Upper Front Stud 1 @ Front Beam (1" deep M&T, no pegs)
@@ -1157,7 +1368,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_upper_stud_thickness_y,
         tenon_length=cot_upper_stud_tenon_depth,
         mortise_depth=cot_upper_stud_tenon_depth,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_beam, stud1, TimberEnd.TOP, create_v2(cot_upper_stud_width_x, cot_upper_stud_thickness_y)),
     )
 
     # 22. Upper Front Stud 2 @ Front Rail (1" deep M&T, no pegs)
@@ -1172,7 +1383,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_upper_stud_thickness_y,
         tenon_length=cot_upper_stud_tenon_depth,
         mortise_depth=cot_upper_stud_tenon_depth,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_rail, stud2, TimberEnd.BOTTOM, create_v2(cot_upper_stud_width_x, cot_upper_stud_thickness_y)),
     )
 
     # 23. Upper Front Stud 2 @ Front Beam (1" deep M&T, no pegs)
@@ -1187,7 +1398,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_upper_stud_thickness_y,
         tenon_length=cot_upper_stud_tenon_depth,
         mortise_depth=cot_upper_stud_tenon_depth,
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_beam, stud2, TimberEnd.TOP, create_v2(cot_upper_stud_width_x, cot_upper_stud_thickness_y)),
     )
 
     # 24. Front Mid Stud bottom @ Front Rim (M&T with peg from outside, 3" tenon length, 1" thick, offset +15/16" in X to the right)
@@ -1202,7 +1413,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(3),
-        tenon_position=Matrix([inches(15, 16), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_rim, front_mid_stud, TimberEnd.BOTTOM, create_v2(inches(3, 2), inches(1)), other_axis_offset=inches(15, 16)),
         peg_parameters=peg_params,
     )
 
@@ -1218,7 +1429,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(3),
-        tenon_position=Matrix([scalar(0), scalar(0)]),
+        tenon_position=tenon_position_from_reference(front_rail, front_mid_stud, TimberEnd.TOP, create_v2(inches(3, 2), inches(1))),
         peg_parameters=peg_params,
     )
 
@@ -1234,7 +1445,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(3),
-        tenon_position=Matrix([scalar(0), -inches(13, 16)]),
+        tenon_position=tenon_position_from_reference(front_rim, joist_2, TimberEnd.BOTTOM, create_v2(inches(3, 2), inches(1)), other_axis_offset=-inches(13, 16)),
         peg_parameters=peg_params,
     )
 
@@ -1250,7 +1461,7 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(3),
-        tenon_position=Matrix([scalar(0), -inches(13, 16)]),
+        tenon_position=tenon_position_from_reference(back_rim, joist_2, TimberEnd.TOP, create_v2(inches(3, 2), inches(1)), other_axis_offset=-inches(13, 16)),
         peg_parameters=peg_params,
     )
 
@@ -1361,7 +1572,7 @@ def cut_rail_and_post_joints(
 def create_cot_rafters() -> list[Timber]:
     """
     Creates 7 evenly spaced rafters (1.5" wide x 2.5" tall in Z) across the front and back plates,
-    recessed 0.25" into the plates (lifted 1/2" higher than 0.75") and extending 12" beyond the front plate.
+    recessed 0.25" into the plates (lifted 1/2" higher than 0.75") and extending 14" beyond the front plate.
     """
     roof_slope = roof_slope_deg
     front_beam_top_z = compute_front_beam_height()
@@ -1369,10 +1580,10 @@ def create_cot_rafters() -> list[Timber]:
     front_overhang = cot_rafter_overhang_front
 
     y_front_center = cot_corner_offset_y - cot_length_y + cot_timber_cross_section / scalar(2)
-    y_front_plate_face = cot_corner_offset_y - cot_length_y  # -64.5"
-    y_start = y_front_plate_face - front_overhang            # -76.5"
+    y_front_plate_face = cot_corner_offset_y - cot_length_y  # -75.5"
+    y_start = y_front_plate_face - front_overhang            # -89.5"
     y_end = cot_corner_offset_y                              # -0.5"
-    y_span = y_end - y_start                                 # 76.0"
+    y_span = y_end - y_start                                 # 89.0"
     rafter_length = y_span / cos(roof_slope)
 
     length_dir = create_v3(scalar(0), cos(roof_slope), sin(roof_slope))
@@ -1383,7 +1594,7 @@ def create_cot_rafters() -> list[Timber]:
     z_bot_at_y_start = z_bot_at_y_front - (y_front_center - y_start) * tan(roof_slope)
 
     # First rafter centered at X = 1.25" (flush with X = 0.5" left end),
-    # Last rafter centered at X = 77.75" (flush with X = 78.5" right end)
+    # Last rafter centered at X = 69.75" (flush with X = 70.5" right end)
     x_start = cot_corner_offset_x + cot_rafter_width_x / scalar(2)
     x_end = cot_corner_offset_x + cot_width_x + beam_stickout_right - cot_rafter_width_x / scalar(2)
     x_span = x_end - x_start
@@ -1402,7 +1613,7 @@ def create_cot_rafters() -> list[Timber]:
             bottom_position=bottom_pos_center,
             length_direction=length_dir,
             width_direction=width_dir,
-            ticket=TimberTicket(path=f"cot_rafter_{i}", tags=("rafter", "roof", "cot")),
+            ticket=TimberTicket(path=f"cot_rafter_{i}", tags=("rafter", "roof", "cot"), reference_features=REFERENCE_RAFTER),
         )
         rafters.append(rafter)
 
@@ -1429,7 +1640,7 @@ def cut_rafter_housing_joints(
 def create_cot_floor_joists() -> list[Timber]:
     """
     Creates 3 evenly spaced 3 3/8" square floor joists running between the inside faces of
-    the front and back rim joists at 16" floor height.
+    the front and back rim joists at 18" floor height.
     Middle joist (joist 2) aligns with the front center stud at X = 36.5".
     """
     timber_cs = cot_timber_cross_section
@@ -1454,7 +1665,13 @@ def create_cot_floor_joists() -> list[Timber]:
             size=cot_timber_size,
             length_direction=TimberFace.FRONT,
             width_direction=TimberFace.TOP,
-            ticket=TimberTicket(path=f"cot_floor_joist_{i}", tags=("floor_joist", "floor", "cot", "3_3_8x3_3_8")),
+            ticket=TimberTicket(
+                path=f"cot_floor_joist_{i}",
+                tags=("floor_joist", "floor", "cot", "3_3_8x3_3_8"),
+                # All three floor joists are the inner horizontal members of the floor, so
+                # each is measured from its vertical centre plane and its top face.
+                reference_features=REFERENCE_INNER_JOIST,
+            ),
         )
         joists.append(joist)
 
@@ -1538,20 +1755,20 @@ def create_cot_rails_and_studs() -> list[Timber]:
     Creates front rail, front middle stud, right door post, and right rail.
     - Front rail: 3 3/8" square, top at 54", spans between front posts
     - Front mid stud: 3 3/8" square, right in the middle (X = 36.5"), connecting rim joist to rail
-    - Right door post: 3 3/8" square, starts on top of right rim joist (Z = 16") and stops at right side tie beam underside
+    - Right door post: 3 3/8" square, starts on top of right rim joist (Z = 18") and stops at right side tie beam underside
     - Right rail: 3 3/8" square, top at 54", connecting door post to back-right post
     """
     timber_cs = cot_timber_cross_section
     x_start = cot_corner_offset_x                                        # 0.5"
-    x_length = cot_width_x                                               # 72"
-    x_end = x_start + x_length                                           # 72.5"
-    x_center = x_start + x_length / scalar(2)                            # 36.5"
-    x_right_center = x_end - timber_cs / scalar(2)                       # 70.8125"
+    x_length = cot_width_x                                               # 64"
+    x_end = x_start + x_length                                           # 64.5"
+    x_center = x_start + x_length / scalar(2)                            # 32.5"
+    x_right_center = x_end - timber_cs / scalar(2)                       # 62.8125"
 
-    y_start = cot_corner_offset_y - cot_length_y                         # -64.5"
-    y_length = cot_length_y                                              # 64"
+    y_start = cot_corner_offset_y - cot_length_y                         # -75.5"
+    y_length = cot_length_y                                              # 75"
     y_end = cot_corner_offset_y                                          # -0.5"
-    y_front_center = y_start + timber_cs / scalar(2)                     # -62.8125"
+    y_front_center = y_start + timber_cs / scalar(2)                     # -73.8125"
 
     z_center_rail = cot_rail_height - timber_cs / scalar(2)
 
@@ -1562,12 +1779,12 @@ def create_cot_rails_and_studs() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.RIGHT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_rail_front", tags=("rail", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_rail_front", tags=("rail", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_FRONT,)),
     )
 
     # 2. Middle Stud connecting front rail to front rim joist
-    stud_bottom_z = cot_floor_height                                     # 16"
-    stud_length = (cot_rail_height - timber_cs) - cot_floor_height       # 34 5/8"
+    stud_bottom_z = cot_floor_height                                     # 18"
+    stud_length = (cot_rail_height - timber_cs) - cot_floor_height       # 32 5/8"
 
     front_mid_stud = create_axis_aligned_timber(
         bottom_position=create_v3(x_center, y_front_center, stud_bottom_z),
@@ -1575,13 +1792,13 @@ def create_cot_rails_and_studs() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.TOP,
         width_direction=TimberFace.RIGHT,
-        ticket=TimberTicket(path="cot_stud_front_mid", tags=("stud", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_stud_front_mid", tags=("stud", "cot", "3_3_8x3_3_8"), reference_features=REFERENCE_MID_VERTICAL),
     )
 
     # 3. Right Door Post (space between front-right post and door post is door_width = 28")
-    # Starts on top of right rim joist (Z = 16") and extends up to the underside of the lower rafter
-    door_post_y_front = y_start + timber_cs + cot_door_width             # -33.125"
-    door_post_y_center = door_post_y_front + timber_cs / scalar(2)       # -31.4375"
+    # Starts on top of right rim joist (Z = 18") and extends up to the underside of the lower rafter
+    door_post_y_front = y_start + timber_cs + cot_door_width             # -44.125"
+    door_post_y_center = door_post_y_front + timber_cs / scalar(2)       # -42.4375"
 
     roof_slope = roof_slope_deg
     front_beam_top_z = compute_front_beam_height()
@@ -1598,7 +1815,7 @@ def create_cot_rails_and_studs() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.TOP,
         width_direction=TimberFace.FRONT,
-        ticket=TimberTicket(path="cot_post_door_right", tags=("post", "cot", "door_post", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_post_door_right", tags=("post", "cot", "door_post", "3_3_8x3_3_8"), reference_features=REFERENCE_MID_VERTICAL),
     )
 
     # 4. Right Rail connecting door post to back-right post (top at 54")
@@ -1611,7 +1828,7 @@ def create_cot_rails_and_studs() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.FRONT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_rail_right", tags=("rail", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_rail_right", tags=("rail", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_FRONT,)),
     )
 
     return [front_rail, front_mid_stud, door_post_right, right_rail]
@@ -1740,23 +1957,23 @@ def create_cot_infill_boards() -> list[Timber]:
 def create_cot_roof_beams() -> list[Timber]:
     """
     Creates upper roof support beams across the cot:
-    - Back beam: top at back_beam_height (11' / 132"), reaching inside corner to the left (X = 0.5")
+    - Back beam: top at back_beam_height (9' 6" / 114"), reaching inside corner to the left (X = 0.5")
       and sticks out 6" past the right posts (X = 78.5").
-    - Front beam: over front posts, lowered based on the 20 degree roof pitch:
-      delta_z = delta_y * tan(20 degrees) so a roof placed over both beams matches the roof pitch.
+    - Front beam: over front posts, lowered based on the roof pitch:
+      delta_z = delta_y * tan(roof_pitch) so a roof placed over both beams matches the roof pitch.
     """
     timber_cs = cot_timber_cross_section
     x_start = cot_corner_offset_x                                        # 0.5"
-    x_length = cot_width_x                                               # 72"
-    beam_length = x_length + beam_stickout_right                         # 78"
+    x_length = cot_width_x                                               # 64"
+    beam_length = x_length + beam_stickout_right                         # 70"
 
-    y_start = cot_corner_offset_y - cot_length_y                         # -64.5"
+    y_start = cot_corner_offset_y - cot_length_y                         # -75.5"
     y_end = cot_corner_offset_y                                          # -0.5"
 
     y_back_center = y_end - timber_cs / scalar(2)                        # -2.1875"
-    y_front_center = y_start + timber_cs / scalar(2)                     # -62.8125"
+    y_front_center = y_start + timber_cs / scalar(2)                     # -73.8125"
 
-    front_beam_height = compute_front_beam_height()                      # ~109.934"
+    front_beam_height = compute_front_beam_height()                      # ~93.536"
 
     z_center_back_beam = back_beam_height - timber_cs / scalar(2)
     z_center_front_beam = front_beam_height - timber_cs / scalar(2)
@@ -1768,7 +1985,7 @@ def create_cot_roof_beams() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.RIGHT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_beam_back", tags=("beam", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_beam_back", tags=("beam", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_BACK,)),
     )
 
     # 2. Front Beam
@@ -1778,23 +1995,24 @@ def create_cot_roof_beams() -> list[Timber]:
         size=cot_timber_size,
         length_direction=TimberFace.RIGHT,
         width_direction=TimberFace.TOP,
-        ticket=TimberTicket(path="cot_beam_front", tags=("beam", "cot", "3_3_8x3_3_8")),
+        ticket=TimberTicket(path="cot_beam_front", tags=("beam", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_OUTER_UPPER_EDGE_FRONT,)),
     )
 
     return [back_beam, front_beam]
 
 
 # ============================================================================
-# FRAME DEFINITION
+# FRAMES
 # ============================================================================
 
-def build_frame() -> Frame:
-    """Build the complete cat corner cot frame with all timbers, joints, and accessories."""
+@frame
+def supporting_structure(k: Optional[Kiwari] = None) -> Frame:
+    """Builds the corner walls and the sloped roof they carry."""
     # 1. Supporting structure walls
     top_wall, left_wall = create_supporting_structure_timbers()
 
-    # 2. Trim walls along the 20 degree roof slope plane
-    roof_plane_datum = create_v3(scalar(0), -house_inside_corner_y, roof_front_wall_intersect_z)
+    # 2. Trim walls along the roof slope plane (the roof underside, which bears on the walls)
+    roof_plane_datum = create_v3(scalar(0), -house_inside_corner_y, roof_front_wall_z)
     wall_trim_joint = cut_roof_slope_trim_joint([top_wall, left_wall], roof_plane_datum, roof_slope_deg)
 
     cut_top_wall = CutTimber(
@@ -1809,7 +2027,17 @@ def build_frame() -> Frame:
     # 3. Supporting structure sloped roof
     cut_roof = create_supporting_roof_cut_timber()
 
-    # 4. Cat cot posts, rim joists, rails, studs, roof beams, lower rafter, stepped girts, upper studs, floor joists, rafters, and floor boards
+    return Frame(
+        cut_timbers=[cut_top_wall, cut_left_wall, cut_roof],
+        name="Supporting Structure",
+        footprints=[house_footprint],
+    )
+
+
+@frame
+def cat_corner_cot(k: Optional[Kiwari] = None) -> Frame:
+    """Builds the cat cot with all of its timbers, joints, and accessories."""
+    # 1. Cat cot posts, rim joists, rails, studs, roof beams, lower rafter, stepped girts, upper studs, floor joists, rafters, and floor boards
     cot_posts = create_cot_posts()
     cot_rim_joists = create_cot_rim_joists()
     cot_rails_and_studs = create_cot_rails_and_studs()
@@ -1821,7 +2049,7 @@ def build_frame() -> Frame:
     cot_rafters = create_cot_rafters()
     cot_floor_boards = create_cot_floor_boards()
 
-    # 5. Cut mortise and tenon joints and housing joints
+    # 2. Cut mortise and tenon joints and housing joints
     rim_cuts_by_path, rim_pegs = cut_rim_joist_corner_joints(cot_posts, cot_rim_joists)
     rail_cuts_by_path, rail_pegs = cut_rail_and_post_joints(
         posts=cot_posts,
@@ -1856,14 +2084,11 @@ def build_frame() -> Frame:
     cut_floor_joists = [CutTimber(timber=j, cuts=all_cuts.get(j.ticket.path, [])) for j in cot_floor_joists]
     cut_rafters = [CutTimber(timber=rf) for rf in cot_rafters]
 
-    # 6. Infill wall boards for all 3 bays
+    # 3. Infill wall boards for all 3 bays
     cot_infill_boards = create_cot_infill_boards()
 
     return Frame(
         cut_timbers=[
-            cut_top_wall,
-            cut_left_wall,
-            cut_roof,
             *cut_posts,
             *cut_rim_joists,
             *cut_rails_and_studs,
@@ -1878,8 +2103,5 @@ def build_frame() -> Frame:
         ],
         accessories=all_accessories,
         name="Cat Corner Cot",
-        footprints=[house_footprint, cot_footprint],
+        footprints=[cot_footprint],
     )
-
-
-example = build_frame
