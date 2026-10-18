@@ -16,7 +16,7 @@ from ..csg.feature_paths import FeatureHandle
 from ..csg.planar_region import (CannotSection, Region, SightFrame, area, face_on_surface, material_crossing,
                                  segments_outside, shadow, subtract)
 from ..geometry import Line, Plane
-from ..rule import Transform, V3, as_floats, create_v3, safe_dot_product, safe_normalize_vector
+from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
 from .drawing import ViewAxes
 
@@ -50,8 +50,8 @@ Occluder = Tuple[CutCSG, Transform]
 def _frame_in(transform: Transform, origin: np.ndarray, u: np.ndarray, v: np.ndarray,
               normal: np.ndarray) -> SightFrame:
     """A world-space plane frame, in the local space of something placed by `transform`."""
-    local = lambda direction: as_floats(transform.global_to_local_direction(create_v3(*direction)))
-    return (as_floats(transform.global_to_local(create_v3(*origin))), local(u), local(v), local(normal))
+    local = lambda direction: as_ndarray(transform.global_to_local_direction(create_v3(*direction)))
+    return (as_ndarray(transform.global_to_local(create_v3(*origin))), local(u), local(v), local(normal))
 
 
 def nearest_visible_depth(
@@ -73,13 +73,13 @@ def nearest_visible_depth(
     located = handle.feature.locate_simple_unbounded(handle.owner)
     if not isinstance(located, (Plane, Line)):
         return None
-    point = as_floats(transform.local_to_global(located.point))
+    point = as_ndarray(transform.local_to_global(located.point))
     if not handle.feature.real:
         return float(point @ look)
     if isinstance(located, Plane):
-        normal = as_floats(transform.local_to_global_direction(located.normal))
+        normal = as_ndarray(transform.local_to_global_direction(located.normal))
     else:
-        run = as_floats(transform.local_to_global_direction(located.direction))
+        run = as_ndarray(transform.local_to_global_direction(located.direction))
         run /= np.linalg.norm(run)
         if abs(abs(float(run @ look)) - 1) < 1e-9:
             return _end_on_depth(located, root, transform, look, occluders, reach)
@@ -106,7 +106,7 @@ def nearest_visible_depth(
             pieces = crop_line_to_boundary_segments_on_csg(located, root, seed_reach=reach, near=located.point)
             if pieces is None:
                 return float(point @ look)
-            to_2d = lambda end: tuple(float((as_floats(transform.local_to_global(end)) - origin) @ axis)
+            to_2d = lambda end: tuple(float((as_ndarray(transform.local_to_global(end)) - origin) @ axis)
                                       for axis in (across, look))
             segments = [(to_2d(piece.start), to_2d(piece.end)) for piece in pieces]
             ends = [end for segment in segments for end in segment]
@@ -154,8 +154,8 @@ def _end_on_depth(line: Line, root: CutCSG, transform: Transform, look: np.ndarr
     """A line seen end-on draws as a point: seen if the sight line from its nearest end is clear."""
     pieces = crop_line_to_boundary_segments_on_csg(line, root, seed_reach=reach, near=line.point)
     if not pieces:
-        return None if pieces is not None else float(as_floats(transform.local_to_global(line.point)) @ look)
-    ends = [as_floats(transform.local_to_global(end)) for piece in pieces for end in (piece.start, piece.end)]
+        return None if pieces is not None else float(as_ndarray(transform.local_to_global(line.point)) @ look)
+    ends = [as_ndarray(transform.local_to_global(end)) for piece in pieces for end in (piece.start, piece.end)]
     nearest = min(ends, key=lambda end: float(end @ look))
     toward = create_v3(*(-look))
     for solid, placed in occluders:
@@ -179,7 +179,7 @@ def visible_by_view(
                      for cut in drawn), default=1.0)
     visible: Dict[str, List[FeatureHandle]] = {}
     for view, axes in views.items():
-        look = as_floats(axes.look)
+        look = as_ndarray(axes.look)
         look /= np.linalg.norm(look)
         visible[view] = [handle for handle in anchors if id(handle.timber) in roots
                          and nearest_visible_depth(handle, roots[id(handle.timber)], look, occluders, reach)
