@@ -10,6 +10,8 @@ const path = require('path');
 const REPO = path.resolve(__dirname, '..', '..', '..');
 const FRAME = path.join(REPO, 'patterns', 'structures', 'my_cute_frame.py');
 const PARAMETER_FRAME = path.join(REPO, 'patterns', 'structures', 'dovetailed_sawhorse.py');
+// A frame with drawings, in rough stock: its views draw dotted perfect faces and centerlines.
+const DRAWING_FRAME = path.join(REPO, 'patterns', 'structures', 'my_cute_frame_drawing_test.py');
 const ARTIFACTS = process.env.KIGUMI_TEST_ARTIFACTS || null;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -184,6 +186,53 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             const controls = frame && frame.contentDocument.getElementById('top-controls');
             return !!controls && frame.contentWindow.getComputedStyle(controls).display === 'none';
         })()`));
+
+        // A drawing's dotted lines, clipped per timber by the member id pass: drawn, and every shader
+        // they need compiled. Nothing else here enters a drawing, so nothing else draws them.
+        // Drawings are behind a beta setting, read when a viewer opens.
+        fs.writeFileSync(settings.filePath, JSON.stringify(
+            { ...JSON.parse(fs.readFileSync(settings.filePath, 'utf8')), 'viewer.drawingBeta': true }, null, 2));
+        await waitFor(() => settings.get('viewer.drawingBeta') === true, { timeoutMs: 5000 });
+        await runAppCommand('kigumi.openFrameFromSidebar', DRAWING_FRAME);
+        const viewerApp = 'document.querySelector("#slot-center iframe:not([hidden])").contentDocument.querySelector("kigumi-app")';
+        const drawingId = await waitFor(() => inShell(`(() => {
+            const app = ${viewerApp};
+            const drawings = app && app.sceneStore ? app.sceneStore.drawings() : [];
+            return drawings.length && Array.from(app.sceneManager.bundles()).length ? drawings[drawings.length - 1].id : null;
+        })()`), { timeoutMs: 90000 }).catch(() => null);
+        let entered = null;
+        const drawn = drawingId && await (async () => {
+            entered = await inShell(`(() => { try { ${viewerApp}.enterDrawing(${JSON.stringify(drawingId)}); return 'ok'; }
+                catch (error) { return String(error && error.stack || error); } })()`);
+            return waitFor(() => inShell(`(() => {
+                const app = ${viewerApp};
+                const lines = Array.from(app.sceneManager.bundles()).flatMap((bundle) => bundle.drawingLines || []);
+                const shown = lines.filter((line) => line.object.visible).length;
+                const programs = app.renderer.info.programs || [];
+                const broken = programs.filter((program) => program.diagnostics && !program.diagnostics.runnable).length;
+                return shown > 0 ? { shown, lines: lines.length, broken, glError: app.renderer.getContext().getError() } : null;
+            })()`), { timeoutMs: 30000 });
+        })().catch(() => null);
+        const state = drawn ? null : await inShell(`(() => {
+            const frames = [...document.querySelectorAll('#slot-center iframe')].map((f) => (f.hidden ? 'hidden' : 'shown')
+                + ':' + (f.contentDocument && f.contentDocument.querySelector('kigumi-app') ? 'app' : 'no app'));
+            const app = ${viewerApp};
+            const lines = app ? Array.from(app.sceneManager.bundles()).flatMap((bundle) => bundle.drawingLines || []) : [];
+            const meshes = app ? Array.from(app.sceneManager.bundles()).map((bundle) => [
+                (bundle.drawingLines || []).length, !!bundle.idMesh]) : [];
+            return JSON.stringify({ entered: ${'${JSON.stringify(entered)}'}, inDrawing: app && app.isInDrawing,
+                active: app && app.sceneStore.activeScene().id, lines: lines.length, meshes,
+                frames, scenes: app && app.sceneStore ? app.sceneStore.sceneIds() : null,
+                drawings: app && app.sceneStore ? app.sceneStore.drawings().length : null,
+                members: app && app.sceneManager ? Array.from(app.sceneManager.bundles()).length : null,
+                title: app && app.frameName });
+        })()`).catch((error) => String(error));
+        check('a drawing draws its dotted lines, clipped per timber, with every shader compiled',
+            !!drawn && drawn.broken === 0 && drawn.glError === 0,
+            drawn ? `${drawn.shown} of ${drawn.lines} lines shown, ${drawn.broken} broken programs, GL error ${drawn.glError}`
+                : `drawing ${drawingId}; ${state}`);
+        await capture('03c-drawing-dotted-lines');
+        connection().activePanel.dispose();
 
         // A frame's parameters: typed in the inspector, held by the view, shown back.
         await runAppCommand('kigumi.openFrameFromSidebar', PARAMETER_FRAME);

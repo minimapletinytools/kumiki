@@ -135,6 +135,11 @@
                 bundle.edges.visible = visible && appearance.edgesVisible;
             }
 
+            // A drawing's faded context hides nothing: its id is left out of the member id pass.
+            if (bundle.idMesh) {
+                bundle.idMesh.visible = visible && appearance.name !== 'ghost';
+            }
+
             if (bundle.reflection && bundle.reflection.material) {
                 bundle.reflection.material.opacity = appearance.reflectionOpacity;
                 // Hides, never shows. Whether a reflection is wanted at all is
@@ -196,9 +201,14 @@
             if (bundle.cylinderSilhouette) {
                 bundle.cylinderSilhouette.line.geometry.dispose();
             }
-            // Children of bundle.edges too; their materials are the viewer's, shared by every member.
+            // Children of bundle.edges too, each with its own material: it is clipped to its member.
             for (const line of bundle.drawingLines || []) {
                 line.object.geometry.dispose();
+                line.object.material.dispose();
+            }
+            // A child of bundle.mesh, sharing its geometry, disposed above.
+            if (bundle.idMesh) {
+                bundle.idMesh.material.dispose();
             }
         }
 

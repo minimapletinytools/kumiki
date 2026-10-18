@@ -28,6 +28,7 @@ const WEBVIEW_ASSETS = [
     ['__CAMERA_CONTROLLER_JS_URI__', 'camera-controller.js'],
     ['__CAMERA_CONTROLS_JS_URI__', 'camera-controls.js'],
     ['__SCENE_MANAGER_JS_URI__', 'scene-manager.js'],
+    ['__MEMBER_ID_BUFFER_JS_URI__', 'member-id-buffer.js'],
     ['__INPUT_CONTROLLER_JS_URI__', 'input-controller.js'],
     ['__MEASUREMENTS_JS_URI__', 'measurements.js'],
     ['__MEASURE_DRAFT_JS_URI__', 'measure-draft.js'],

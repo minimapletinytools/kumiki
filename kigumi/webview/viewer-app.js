@@ -1342,6 +1342,9 @@ class KigumiViewerApp extends LitElement {
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.setSize(viewport.offsetWidth, viewport.offsetHeight, false);
         this.renderer.outputEncoding = THREE.sRGBEncoding;
+        // Which member is frontmost at each pixel: what clips a drawing's dotted lines to their own
+        // timber. See member-id-buffer.js.
+        this.memberIds = new window.KigumiMemberIdBuffer.MemberIdBuffer({ THREE, renderer: this.renderer });
         this.renderer.shadowMap.enabled = false;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -1580,13 +1583,13 @@ class KigumiViewerApp extends LitElement {
      * Hovering or selecting one of those planes lights it through the usual highlight, from the
      * outline the runner sends for it (highlightEdgeSegments).
      */
-    _drawingLinesFor(mesh) {
+    _drawingLinesFor(mesh, memberKey) {
         const materials = this._drawingLineMaterials();
         const lines = [];
-        const add = (positions, material, normal, option) => {
+        const add = (positions, shared, normal, option) => {
             const geometry = new THREE.LineSegmentsGeometry();
             geometry.setPositions(positions);
-            const object = new THREE.LineSegments2(geometry, material);
+            const object = new THREE.LineSegments2(geometry, this._memberLineMaterial(shared, memberKey));
             object.computeLineDistances();
             object.renderOrder = 11;
             object.visible = false;
@@ -1603,7 +1606,18 @@ class KigumiViewerApp extends LitElement {
         return lines;
     }
 
-    /** The two dotted materials every member's drawing lines share, made once. */
+    /**
+     * A member's own copy of one of the two dotted materials, clipped to it: hidden by another
+     * timber in front, never by its own faces around it (member-id-buffer.js). Its resolution is the
+     * shared one, so a resize reaches every copy.
+     */
+    _memberLineMaterial(shared, memberKey) {
+        const material = shared.clone();
+        material.uniforms.resolution = shared.uniforms.resolution;
+        return this.memberIds ? this.memberIds.clipLineMaterial(material, memberKey) : material;
+    }
+
+    /** The two dotted materials every member's drawing lines are copied from, made once. */
     _drawingLineMaterials() {
         if (!this._drawingMaterials) {
             const dotted = (color, dashSize, gapSize) => {
@@ -1637,12 +1651,15 @@ class KigumiViewerApp extends LitElement {
      */
     _showDrawingLinesFor(viewport) {
         const look = viewport.camera.getWorldDirection(this._drawingLook || (this._drawingLook = new THREE.Vector3()));
+        let any = false;
         for (const bundle of this.sceneManager.bundles()) {
             for (const line of bundle.drawingLines || []) {
                 line.object.visible = this.isInDrawing && Boolean(this[line.option])
                     && Math.abs(line.normal.dot(look)) < FACE_ON_DOT;
+                any = any || line.object.visible;
             }
         }
+        return any;
     }
 
     renderViewports() {
@@ -1667,8 +1684,14 @@ class KigumiViewerApp extends LitElement {
         this.renderer.setScissorTest(scissored);
         for (const viewport of this.viewports) {
             this._showHighlightsFor(viewport.id);
-            this._showDrawingLinesFor(viewport);
+            const anyDrawingLines = this._showDrawingLinesFor(viewport);
             const rect = viewport.pixelRect(pageRect, size.y);
+            if (anyDrawingLines && this.memberIds) {
+                // Who is in front where, for the dotted lines to clip themselves by.
+                const ratio = this.renderer.getPixelRatio();
+                this.memberIds.render(this.scene, viewport.camera, viewport.id,
+                    [rect.x * ratio, rect.y * ratio, rect.width * ratio, rect.height * ratio]);
+            }
             this.renderer.setViewport(rect.x, rect.y, rect.width, rect.height);
             if (scissored) {
                 this.renderer.setScissor(rect.x, rect.y, rect.width, rect.height);
@@ -6518,7 +6541,8 @@ class KigumiViewerApp extends LitElement {
             }
 
             // Parented like the silhouette, so they follow the member's visibility and offset.
-            const drawingLines = this._drawingLinesFor(mesh);
+            const drawingLines = this._drawingLinesFor(mesh, key);
+            const idMesh = this.memberIds ? this.memberIds.attach(key, solidMesh) : null;
             for (const line of drawingLines) {
                 edgeMesh.add(line.object);
             }
@@ -6540,6 +6564,7 @@ class KigumiViewerApp extends LitElement {
                 reflection: reflectionMesh,
                 cylinderSilhouette,
                 drawingLines,
+                idMesh,
             });
             meshBuildMs += performance.now() - meshT0;
             processed += 1;
