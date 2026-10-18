@@ -7057,7 +7057,7 @@ class KigumiViewerApp extends LitElement {
         if (value.unit === 'angle') {
             this._drawAngle(into, viewport, pageRect, from, to,
                             status.formA, status.formB, value,
-                            { ...options, rays: measure.angle || null, extents: measure.extents || null });
+                            { ...options, rays: measure.angle || null });
             return;
         }
 
@@ -7143,8 +7143,8 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * Each feature drawn on, dashed, to a point of the dimension past its end -- an anchor slid off
-     * it, or an angle's corner -- so the dimension is seen to belong to it.
+     * Each feature drawn on, dashed, to its anchor where the anchor is past its end -- slid off it,
+     * say -- so the dimension is seen to belong to it.
      */
     _drawPhantoms(into, viewport, pageRect, extents, points, extra = '') {
         if (!extents) {
@@ -7180,12 +7180,6 @@ class KigumiViewerApp extends LitElement {
             : this._angleArcOnTheScreen(viewport, pageRect, from, to, formA, formB);
         if (!drawn) {
             return;
-        }
-
-        if (rays) {
-            // Each feature on to the corner, where it does not reach it.
-            this._drawPhantoms(into, viewport, pageRect, options.extents, [rays.vertex, rays.vertex],
-                               options.className ? ` ${options.className}` : '');
         }
 
         const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');

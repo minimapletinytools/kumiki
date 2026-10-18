@@ -84,3 +84,15 @@ def test_a_point_has_no_line_to_extend_and_a_point_to_line_distance_does_not_sli
 
     assert placed.slide is None
     assert placed.extents[0] is None and placed.extents[1] is not None
+
+
+def test_an_angle_gets_no_extents_or_slide():
+    # Angles are left as they were; drawing their features on to the corner is for another pass.
+    across = _line((0, 0, 0), (0, 0, 1), (0.0, 2.0))
+    angle = MeasurementKind.parse("projected_angle")
+
+    placed = place_pair(Line(point=create_v3(0, 0, 0), direction=create_v3(1, 0, 0)),
+                        Line(point=create_v3(0, 0, 0), direction=create_v3(0, 0, 1)),
+                        LOW, across, angle, create_v3(0, 1, 0), None, False)
+
+    assert placed.extents == (None, None) and placed.slide is None

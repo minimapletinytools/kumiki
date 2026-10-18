@@ -555,10 +555,9 @@
     const PHANTOM_MIN_LENGTH = 1e-6;
 
     /**
-     * The feature drawn on to a point past its end, in world space: from the nearer end of
-     * `extent` ([start, end], how far the feature goes) to `point`, which lies on its line -- an
-     * anchor slid past the end, or the corner of an angle. Null when the point is on the feature,
-     * or there is no extent (a point, or a plane).
+     * The feature drawn on to an anchor past its end, in world space: from the nearer end of
+     * `extent` ([start, end], how far the feature goes) to `point`, which lies on its line. Null
+     * when the point is on the feature, or there is no extent (a point, or a plane).
      */
     function phantomSegment(extent, point) {
         if (!extent || !point) {
