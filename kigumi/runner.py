@@ -654,9 +654,11 @@ if TYPE_CHECKING:
     # TYPE_CHECKING there is no runtime import at all, so annotations can be
     # concrete while every isinstance check still imports inside its function.
     from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
-    from kumiki.drawings.drawing import (AngleRays, MeasureSpan, MeasurementKind, MeasurementSpace, VectorLike,
-                                         Viewport, ViewAxes, ViewportId)
+    from kumiki.drawings.drawing import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlane, MeasurementSpace,
+                                         VectorLike, Viewport, ViewAxes, ViewportId)
+    from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.cameras import CameraFrame, OrientedBox
+    from kumiki.drawings.measuring import EndForm, Settled
     from kumiki.drawings.layout import PlacedViewport
     from kumiki.geometry import Line, Plane, Point
     from kumiki.identity import FeaturePath
@@ -2067,114 +2069,6 @@ def deserialize_feature_path(source: Any) -> Optional['FeaturePath']:
 # orbits, and a measurement evaluated against it would read a different number
 # from one moment to the next.
 
-def _plane_constraints(one: GeometryWire, other: GeometryWire) -> List[List[float]]:
-    """Directions the plane's normal has to be square to, for these two features.
-
-    Each rule in the spec's priority order turns into the same kind of thing:
-
-      perpendicular to a measured FACE  ->  normal square to that face's normal
-      parallel to a measured EDGE       ->  normal square to that edge's run
-      contains both measured POINTS     ->  normal square to the line between
-
-    the last only when both anchors are points, since one point constrains where
-    the plane sits rather than which way it faces.
-    """
-    constraints = []
-    for geometry in (one, other):
-        kind = (geometry or {}).get("kind")
-        if kind == "plane":
-            constraints.append([float(part) for part in geometry.get("normal") or []])
-        elif kind == "line":
-            constraints.append([float(part) for part in geometry.get("direction") or []])
-    if (one or {}).get("kind") == "point" and (other or {}).get("kind") == "point":
-        here, there = one.get("at") or [], other.get("at") or []
-        if len(here) == 3 and len(there) == 3:
-            constraints.append([float(there[i]) - float(here[i]) for i in range(3)])
-    return [c for c in constraints if len(c) == 3 and any(c)]
-
-
-def _plane_normal(constraints: List[List[float]], look: List[float]) -> Optional[List[float]]:
-    """A normal square to every constraint, and otherwise as close to `look` as it can be.
-
-    Two anchors give at most two constraints, and two constraints can always be
-    met: square to both is their cross product, and when they are parallel it is
-    the one-constraint case again. So this does not fail for want of a solution
-    -- it returns None only when there is no direction left to choose, which is
-    the caller's cue to fall back to the camera's own plane.
-
-    Closest to `look` means the dimension is drawn as nearly face-on as its
-    constraints allow, which is the difference between reading it and seeing it
-    edge-on as a line.
-    """
-    gaze = _normalize(look)
-    distinct = []
-    for constraint in constraints:
-        unit = _normalize(constraint)
-        if not any(abs(abs(_dot(unit, seen)) - 1.0) < 1e-9 for seen in distinct):
-            distinct.append(unit)
-
-    if not distinct:
-        # Nothing to be square to: face the camera.
-        return gaze
-    if len(distinct) >= 2:
-        normal = _cross(distinct[0], distinct[1])
-        if not any(abs(part) > 1e-12 for part in normal):
-            return None
-        normal = _normalize(normal)
-        # A plane has no front, so take whichever way round faces the camera.
-        return normal if _dot(normal, gaze) >= 0 else [-part for part in normal]
-
-    # One constraint: a whole family of planes contains it. Take the camera's
-    # direction with the part along the constraint removed, which is the member
-    # of that family nearest to facing the camera.
-    only = distinct[0]
-    along = _dot(gaze, only)
-    flattened = [gaze[i] - only[i] * along for i in range(3)]
-    if not any(abs(part) > 1e-9 for part in flattened):
-        # Looking straight down the one thing the plane must contain, so every
-        # member of the family is equally edge-on. Any of them will do.
-        fallback = [1.0, 0.0, 0.0] if abs(only[0]) < 0.9 else [0.0, 1.0, 0.0]
-        return _normalize(_cross(only, fallback))
-    return _normalize(flattened)
-
-
-def _measurement_plane(
-    one: GeometryWire,
-    other: GeometryWire,
-    at_one: Optional[List[float]],
-    at_other: Optional[List[float]],
-    look: List[float],
-    in_view_plane: bool = False,
-) -> PlaneWire:
-    """Where a measurement between these two features is taken and drawn.
-
-    `look` is the camera's view direction at the moment it was made, which
-    settles whatever the features leave free -- and settles all of it when they
-    constrain nothing.
-
-    Position: through a measured point if there is one, since the plane has to
-    contain it; otherwise midway between the two anchors, which puts the
-    dimension among what it measures rather than off beside it.
-
-    `in_view_plane` for a drawing's view, where the features are projected onto the sheet: the
-    plane is the view's own, whatever they are. Held to the features instead, an edge running
-    into the sheet tilted it, and the measurement refused the very view it was made in.
-    """
-    normal = None if in_view_plane else _plane_normal(_plane_constraints(one, other), look)
-    if normal is None:
-        normal = _normalize(look)
-
-    at = None
-    for geometry in (one, other):
-        if (geometry or {}).get("kind") == "point" and geometry.get("at"):
-            at = [float(part) for part in geometry["at"]]
-            break
-    if at is None and at_one and at_other and len(at_one) == 3 and len(at_other) == 3:
-        at = [(float(at_one[i]) + float(at_other[i])) / 2 for i in range(3)]
-
-    return {"at": at or [0.0, 0.0, 0.0], "normal": normal}
-
-
 def _derivation_wire(
     local_csg: 'CutCSG', feature_hits: List['OwnedFeatureHit'], feature: Optional['CSGFeature'],
 ) -> Optional[DerivationWire]:
@@ -2289,12 +2183,14 @@ def _best_matching_candidate(
     if not held_geometry or not look or not feature_hits:
         return None
 
+    from kumiki.drawings.measuring import kinds_for_pair, world_geometry
+
     held = _geometry_from_wire(held_geometry)
+    space = _pick_space(payload or PickRequest())
     best = None
     for index, hit in enumerate(feature_hits):
-        located = hit.feature.locate_simple_unbounded(hit.owner)
-        geometry = _located_geometry(located, timber)
-        if not geometry or not _kinds_for_pair(held, geometry, look, payload or PickRequest()):
+        geometry = world_geometry(_handle_of(hit.feature, hit.owner, timber))
+        if not geometry or not kinds_for_pair(held, geometry, look, space):
             continue
         # Earlier is more specific, so among equals the first wins. Same TYPE as
         # the held end breaks the tie -- an edge matching an edge -- which is
@@ -2329,7 +2225,8 @@ def _pick_verdict(
     and a refusal derived separately will eventually disagree, and the
     disagreement is invisible until someone clicks.
     """
-    from kumiki.drawings.drawing import ViewAxes, measures_nothing
+    from kumiki.drawings.drawing import ViewAxes
+    from kumiki.drawings.measuring import pick_verdict, world_geometry
 
     held_geometry, look = payload.get("heldGeometry"), payload.get("look")
     if not held_geometry or not look:
@@ -2337,49 +2234,24 @@ def _pick_verdict(
     if located_pick is None:
         return {"kinds": [], "plane": None, "anchors": None,
                 "reason": "nothing-under-pointer"}
-    geometry = _located_geometry(located_pick[2], timber)
-    if geometry is None:
-        # A cylinder's barrel, a lofted side: good to select, nothing to
-        # measure to.
-        return {"kinds": [], "plane": None, "anchors": None,
-                "reason": "not-measurable"}
-    # The end already held comes back as the viewer stored it, so it is turned
-    # into the shape the rules take. This is the one edge that conversion
-    # happens at; everything past it works in primitives.
-    held = _geometry_from_wire(held_geometry)
-    # The plane comes first and stands whether or not a kind does: where a pair
-    # would be measured is a property of the two features and the camera, not of
-    # what the pair happens to admit.
-    plane = _plane_for_pick(located_pick, timber, payload)
-    # Structured, not named: `angle` composes for a 3D angle and is also what
-    # every measurement written before spaces called a projected one.
-    admitted = _kinds_for_pair(held, geometry, look, payload)
-    if not admitted:
-        return {"kinds": [], "plane": plane, "anchors": None, "reason": "no-kind"}
-    # A kind that comes to nothing is not a kind this pair admits. Asked of the
-    # two features, NOT of placed ends: what a distance comes to is a property
-    # of the geometries and the space, and holds wherever the dimension is
-    # drawn. An arris lying ON a face is the ordinary way to reach this, and a
-    # single tenoned timber offers a dozen such pairs.
-    #
-    # Per kind, because they do not fail together: two points one above the
-    # other have a vertical distance worth measuring and a horizontal one that
-    # is nothing at all.
-    view = ViewAxes.from_wire(payload)
-    kinds = [kind.as_wire() for kind in admitted
-             if not measures_nothing(held, geometry, kind, view)]
-    if not kinds:
-        # Refused here, so the hover paints it red and the click says why --
-        # both following from the verdict without either knowing this rule.
-        return {"kinds": [], "plane": plane, "anchors": None, "angle": None,
-                "reason": "degenerate"}
-    # Where it would sit: anchors for a distance, a corner for an angle. By the
-    # rules that place it once written, so the preview IS the measurement rather
-    # than a likeness of one.
+    geometry = world_geometry(_handle_of(located_pick[0], located_pick[1], timber))
+    # The plane only for something measurable: a cylinder's barrel is good to select, and nothing
+    # to measure to.
+    plane = _plane_for_pick(located_pick, timber, payload) if geometry is not None else None
+    verdict = pick_verdict(_geometry_from_wire(held_geometry), geometry, plane, look, _pick_space(payload),
+                           ViewAxes.from_wire(payload))
+    plane_wire = cast(PlaneWire, plane.as_wire()) if plane is not None else None
+    if not verdict.kinds:
+        refused: VerdictWire = {"kinds": [], "plane": plane_wire, "anchors": None, "reason": verdict.reason}
+        if verdict.reason == "degenerate":
+            refused["angle"] = None
+        return refused
+    # Where it would sit, by the rules that place it once written, so the preview IS the
+    # measurement rather than a likeness of one.
     placement = _pick_placement(state, located_pick, timber, payload, slot_state)
     return {
-        "kinds": kinds,
-        "plane": plane,
+        "kinds": [cast(MeasureKindWire, kind.as_wire()) for kind in verdict.kinds],
+        "plane": plane_wire,
         **placement,
         "reason": None,
     }
@@ -2400,24 +2272,6 @@ def _pick_space(payload: PickRequest) -> 'MeasurementSpace':
             else MeasurementSpace.PROJECTED)
 
 
-def _kinds_for_pair(
-    one: Optional[Any], other: Optional[Any],
-    look: Sequence[float], payload: PickRequest,
-) -> Tuple[Any, ...]:
-    """What a pair admits, judged in whichever space the view is.
-
-    In the 3D view a face is a plane, not whatever shape it happens to present
-    from here -- so two faces meeting at a corner admit an angle, and two
-    parallel ones a distance. Projecting there instead called almost every face
-    an AREA and refused it.
-    """
-    from kumiki.drawings.drawing import MeasurementSpace, projected_kinds, three_d_kinds
-
-    if _pick_space(payload) is MeasurementSpace.THREE_D:
-        return three_d_kinds(one, other)
-    return projected_kinds(one, other, look)
-
-
 def _pick_placement(
     state: RunnerState, located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: PickRequest,
     slot_state: Optional[SlotState],
@@ -2435,8 +2289,9 @@ def _pick_placement(
     and the two drifted: a half-made measurement was drawn at each feature's own
     middle while the finished one went to the middle of their overlap.
     """
-    from kumiki.drawings.drawing import (MeasurementSpace, ViewAxes, angle_rays,
-                                distance_anchors)
+    from kumiki.drawings.drawing import MeasurementSpace, ViewAxes
+    from kumiki.drawings.feature_span import feature_span
+    from kumiki.drawings.measuring import place_pair, world_geometry
 
     empty = PickPlacementWire(anchors=None, angle=None, settled=None)
     held = payload.get("heldReference")
@@ -2450,41 +2305,26 @@ def _pick_placement(
 
     in_three_d = _pick_space(payload) is MeasurementSpace.THREE_D
     plane = _plane_for_pick(located_pick, timber, payload)
-    normal = (plane or {}).get("normal") or look
+    normal = list(plane.normal) if plane is not None else look
     placed = _resolve_anchor_placed(frame, held, normal, in_three_d)
     if placed is None or placed[1] is None:
         return empty
-    held_span = placed[1]
-
-    picked_span = _measure_span(
-        located_pick[0], located_pick[1], timber, located_pick[2],
-        _root_csg_of(ss, payload.get("memberKey")), normal, in_three_d)
+    handle = _handle_of(located_pick[0], located_pick[1], timber)
+    picked_span = feature_span(handle, _root_csg_of(ss, payload.get("memberKey")), normal, in_three_d)
     if picked_span is None:
         return empty
-
-    geometry = _located_geometry(located_pick[2], timber)
-    held_geometry = _geometry_from_wire(placed[0].get("geometry"))
-    admitted = _kinds_for_pair(held_geometry, geometry, normal, payload)
-    if not admitted:
+    # The same answer a written measurement travels with, so the preview shows the number the
+    # finished one will carry rather than a second derivation of it.
+    placement = place_pair(_geometry_from_wire(placed[0].get("geometry")), world_geometry(handle), placed[1],
+                           picked_span, None, normal, ViewAxes.from_wire({**payload, "look": look}), in_three_d)
+    if not placement.admitted:
         return empty
-    kind = admitted[0]
-    view = ViewAxes.from_wire({**payload, "look": look})
-    # The same answer a written measurement travels with, so the preview shows
-    # the number the finished one will carry rather than a second derivation of
-    # it. .claude/plans/measuring-states.md asks for exactly this and only half had it:
-    # the picture came from the verdict, the number was worked out again in the
-    # viewer.
-    ends = {"a": held_geometry, "b": geometry}
-    if kind.operation.value == "angle":
-        rays = angle_rays(held_span, picked_span)
-        settled = _settled_measurement(ends, rays, None, kind, admitted, in_three_d, normal, view)
-        return {"anchors": None,
-                "angle": rays.as_wire() if rays is not None else None,
-                "settled": settled}
-    at_held, at_picked = distance_anchors(held_span, picked_span, kind, view)
-    settled = _settled_measurement(ends, None, None, kind, admitted, in_three_d, normal, view)
-    return {"anchors": {"a": list(at_held), "b": list(at_picked)},
-            "angle": None, "settled": settled}
+    settled = _settled_wire(placement.settled)
+    if placement.anchors is not None:
+        at_held, at_picked = placement.anchors
+        return {"anchors": {"a": list(at_held), "b": list(at_picked)}, "angle": None, "settled": settled}
+    return {"anchors": None, "angle": placement.rays.as_wire() if placement.rays is not None else None,
+            "settled": settled}
 
 
 def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']:
@@ -2494,23 +2334,25 @@ def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']
 
 def _plane_for_pick(
     located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: PickRequest,
-) -> Optional[PlaneWire]:
-    """The plane a measurement to this pick would be taken on, or None.
+) -> Optional['MeasurementPlane']:
+    """The plane a measurement to this pick would be taken on (measuring.measurement_plane), or None.
 
     None unless something is held and the viewer said which way it is looking:
     a plane needs both ends and a camera, and a first pick has neither.
     """
+    from kumiki.drawings.drawing import MeasurementSpace
+    from kumiki.drawings.measuring import feature_anchor, measurement_plane, world_geometry
+
     held_geometry = payload.get("heldGeometry")
     look = payload.get("look")
     if located_pick is None or not held_geometry or not look:
         return None
-    geometry = _located_geometry_payload(located_pick[2], timber)
+    handle = _handle_of(located_pick[0], located_pick[1], timber)
+    geometry = world_geometry(handle)
     if geometry is None:
         return None
-    anchor = _feature_anchor(located_pick[0], located_pick[1], timber, located_pick[2])
-    from kumiki.drawings.drawing import MeasurementSpace
-    return _measurement_plane(
-        held_geometry, geometry, payload.get("heldAt"), anchor, look,
+    return measurement_plane(
+        _geometry_from_wire(held_geometry), geometry, payload.get("heldAt"), feature_anchor(handle), look,
         in_view_plane=_pick_space(payload) is MeasurementSpace.PROJECTED)
 
 
@@ -3051,36 +2893,6 @@ def scalar_of(value: float) -> float:
     return scalar(repr(float(value)))
 
 
-def _measure_span(
-    feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
-    root_csg: Optional['CutCSG'],
-    plane_normal: Optional['VectorLike'],
-    in_three_d: bool = False,
-) -> Optional['MeasureSpan']:
-    """What a feature is, where the measurement is being taken.
-
-    See MeasureSpan. The extent comes from what the feature occupies once
-    cropped to the timber, not from what declared it: a cutter extended past the
-    timber puts its declared extent out there with it.
-
-    ON A SHEET a FACE becomes a line, because a face is only measurable when it
-    is seen edge-on and a face seen edge-on draws as a line along itself. Which
-    line depends on the plane, which is why this needs it. Without a plane, or
-    for a face that is not edge-on, it falls back to the point it used to be.
-
-    IN THE SOLID nothing is projected away: a face is a PLANE, and an edge
-    pointing at the reader is still an edge. Both collapses below are the
-    sheet's, and applying them there put an edge and the face it runs parallel
-    to through the two-lines rule, which leaned the dimension.
-    """
-    from kumiki.csg.cutcsg import OwnedFeatureHit
-    from kumiki.csg.feature_paths import FeatureHandle
-    from kumiki.drawings.feature_span import feature_span
-
-    handle = FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=node))
-    return feature_span(handle, root_csg, plane_normal, in_three_d)
-
-
 def _resolve_measurement(
     frame: 'Frame', measure: MeasureWire, view: Optional['ViewAxes'] = None,
 ) -> MeasureWire:
@@ -3098,11 +2910,8 @@ def _resolve_measurement(
     Only when the pair cannot be placed together does each fall back to a point
     of its own, which is what a feature that resolves to nothing else can offer.
     """
-    from kumiki.drawings.drawing import (DEGENERATE_SEPARATION, MeasurementDirection,
-                               MeasurementKind, MeasurementOperation,
-                               MeasurementSpace, ViewAxes, angle_between,
-                               angle_rays, distance_anchors, pair_separation,
-                               projected_kinds, three_d_kinds)
+    from kumiki.drawings.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace, ViewAxes
+    from kumiki.drawings.measuring import place_pair
 
     resolved: MeasureWire = {**measure}
     broken = []
@@ -3142,32 +2951,19 @@ def _resolve_measurement(
     ends = {key: _geometry_from_wire((resolved.get(key) or {}).get("geometry"))
             for key in ("a", "b")}
     if spans.get("a") is not None and spans.get("b") is not None and plane is not None:
-        # What this pair admits from here, so the anchors are placed for the
-        # measurement that will actually be drawn. Defaulting to perpendicular
-        # instead put two crossing faces -- which admit an ANGLE and nothing
-        # else -- through the parallel-line rule, and came out square to one of
-        # them and not the other.
-        # Judged in the same space, so what the pair admits and what its ends
-        # came back as cannot disagree. Projecting a 3D measurement here
-        # called its faces AREAs and left it with no kind at all.
-        admitted = (three_d_kinds(ends["a"], ends["b"]) if in_three_d
-                    else projected_kinds(ends["a"], ends["b"], plane))
-        kind = declared or (admitted[0] if admitted else None)
-        rays = None
-        if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
-            at_a, at_b = distance_anchors(spans["a"], spans["b"], kind, view)
+        # Placed for the measurement that will actually be drawn, judged in the space its ends came
+        # back in (measuring.place_pair).
+        placement = place_pair(ends["a"], ends["b"], spans["a"], spans["b"], declared, plane, view, in_three_d)
+        kind = placement.kind
+        if kind is not None and kind.operation is MeasurementOperation.DISTANCE and placement.anchors is not None:
+            at_a, at_b = placement.anchors
             resolved["a"] = {**resolved["a"], "at": list(at_a)}
             resolved["b"] = {**resolved["b"], "at": list(at_b)}
         elif kind is not None and kind.operation is MeasurementOperation.ANGLE:
-            # Where the corner IS and which two ways it opens, worked out from
-            # both features together. The viewer used to build the arc from each
-            # feature's own anchor and its normal, which put the vertex wherever
-            # two unrelated screen lines happened to cross -- often touching
-            # neither of the features being measured.
-            rays = angle_rays(spans["a"], spans["b"])
+            # Where the corner IS and which two ways it opens, from both features together.
+            rays = placement.rays
             resolved["angle"] = cast(AngleWire, rays.as_wire()) if rays is not None else None
-        resolved["settled"] = _settled_measurement(
-            ends, rays, declared, kind, admitted, in_three_d, plane, view)
+        resolved["settled"] = _settled_wire(placement.settled)
     else:
         resolved["settled"] = _unplaceable_measurement(measure, spans, plane)
     return resolved
@@ -3195,6 +2991,8 @@ def _unplaceable_measurement(
     the timber's CSG would not render or a face would not crop -- all worth
     seeing in the log rather than silently not drawing.
     """
+    from kumiki.drawings.measuring import unplaceable
+
     missing = [key for key in ("a", "b") if spans.get(key) is None]
     if plane is None:
         reason, why = "no-plane", (
@@ -3208,107 +3006,15 @@ def _unplaceable_measurement(
         f"Warning: not drawing the measurement between "
         f"{_measure_end_name(measure, 'a')} and {_measure_end_name(measure, 'b')}: "
         f"{why}.")
-    return {"kind": None, "available": [], "space": None, "value": None,
-            "reason": reason, "a": None, "b": None}
+    settled = unplaceable(has_plane=plane is not None)
+    assert settled.reason == reason
+    return _settled_wire(settled)
 
 
 def _measure_end_name(measure: MeasureWire, key: str) -> str:
     """One end of a measurement, named the way a person would look for it."""
     end = measure.get(key) or {}
     return str(end.get("feature") or end.get("timber") or "?")
-
-
-def _settled_measurement(
-    ends: Dict[str, Optional['Located']], rays: Optional['AngleRays'],
-    declared: Optional['MeasurementKind'], kind: Optional['MeasurementKind'],
-    admitted: Sequence['MeasurementKind'], in_three_d: bool, plane: 'VectorLike', view: Optional['ViewAxes'],
-) -> SettledWire:
-    """What this measurement comes to, decided here and sent with it.
-
-    The viewer worked the same thing out for itself on every frame, from its own
-    copy of the rules in measurements.js. Two derivations of one number is how
-    the number drifts, and .claude/plans/measuring-states.md already asks for the other
-    one -- "the preview is drawn from the verdict, never from a second
-    calculation" -- which was true of the picture and not of the number beside
-    it.
-
-    It can be answered here because it does not depend on the camera: a
-    measurement carries the plane it was taken on, and the value is read against
-    that rather than against wherever the reader is standing. What the viewer
-    still decides for itself is whether the view it is drawing into IS that
-    plane, which is the one question a fixed answer cannot cover.
-
-    `reason` is why there is nothing to draw, in the same words and the same
-    order the viewer uses, so a row that says why and a dimension that is
-    missing cannot disagree.
-    """
-    from dataclasses import replace
-
-    from kumiki.drawings.drawing import (DEGENERATE_SEPARATION, MeasurementOperation,
-                                ViewAxes, angle_between, pair_separation)
-    from kumiki.rule import create_v3
-
-    names = [one.name for one in admitted]
-    space = "3d" if in_three_d else "projected"
-    settled: SettledWire = {
-        "kind": cast(MeasureKindWire, kind.as_wire()) if kind is not None else None,
-        "available": names, "space": space, "value": None, "reason": None,
-        "a": _settled_form(ends["a"], in_three_d, plane),
-        "b": _settled_form(ends["b"], in_three_d, plane)}
-    if not admitted:
-        settled["reason"] = "not-measurable"
-        return settled
-    if declared is not None and declared.name not in names:
-        settled["reason"] = "kind-unavailable"
-        return settled
-    if kind is None:
-        settled["reason"] = "not-measurable"
-        return settled
-
-    if kind.operation is MeasurementOperation.ANGLE:
-        # Off the RAYS, which are the two ways the corner opens -- so the number
-        # and the arc drawn from them are one answer. Normals alone give the
-        # same absolute dot for 45 degrees and 135.
-        value = angle_between(rays)
-        settled["value"] = {"unit": "angle", "value": 0.0 if value is None else value}
-        return settled
-
-    # Against the measurement's own plane, not the viewport's: `plane` is
-    # already the one or the other, decided above.
-    length = pair_separation(
-        ends["a"], ends["b"], kind,
-        replace(ViewAxes.from_wire(view), look=create_v3(*plane)))
-    if length is None:
-        settled["reason"] = "not-measurable"
-        return settled
-    settled["value"] = {"unit": "length", "value": length}
-    if length < DEGENERATE_SEPARATION:
-        settled["reason"] = "degenerate"
-    return settled
-
-
-def _settled_form(geometry: Optional['Located'], in_three_d: bool, plane: Any) -> SettledEndWire:
-    """What one end behaves as, in the shape the viewer's own forms took.
-
-    Settled here so the rule has one implementation; what crosses is the answer.
-    "area" and "none" both mean nothing to measure to, and only this edge tells
-    them apart.
-    """
-    from kumiki.drawings.drawing import project_geometry_for_measuring
-    from kumiki.geometry import Line, Plane, Point, unit_vector
-
-    if not in_three_d:
-        seen = project_geometry_for_measuring(geometry, plane)
-        if seen is None:
-            return {"form": "area" if isinstance(geometry, Plane) else "none"}
-        geometry = seen
-    if isinstance(geometry, Plane):
-        return {"form": "plane", "normal": list(unit_vector(geometry.normal))}
-    if isinstance(geometry, Line):
-        return {"form": "line", "direction": list(unit_vector(geometry.direction))}
-    if isinstance(geometry, Point):
-        return {"form": "point"}
-    return {"form": "none"}
 
 
 def _viewport_axes(scene: DrawingWire, viewport_id: str) -> Optional['ViewAxes']:
@@ -3465,37 +3171,45 @@ def _candidate_segments(node: 'CutCSG') -> Dict[int, str]:
     return candidate_segments(node)
 
 
-def _located_geometry(located: Optional['Located'], timber: 'PerfectTimberWithin') -> Optional['Located']:
-    """A feature's unbounded geometry, in world space.
+def _handle_of(feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin') -> 'FeatureHandle':
+    from kumiki.csg.cutcsg import OwnedFeatureHit
+    from kumiki.csg.feature_paths import FeatureHandle
 
-    The same Point, Line or Plane the CSG located, carried out of the timber's
-    frame into the world's. This is what python measures with; the mapping the
-    viewer reads is this, serialised -- see _located_geometry_payload.
+    return FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=node))
 
-    A plane keeps its normal and a line its direction, because those are what
-    decide whether two features are parallel once projected -- which is what
-    separates a separation from a distance between two points.
-    """
-    from kumiki.geometry import Line, Plane, Point
 
-    def to_world(point: Any) -> Any:
-        return timber.transform.local_to_global(point)
+def _anchor_floats(handle: 'FeatureHandle', root: Optional['CutCSG'] = None) -> Optional[List[float]]:
+    """Where a dimension attaches to the feature (measuring.feature_anchor), as the wire has it."""
+    from kumiki.drawings.measuring import feature_anchor
 
-    def direction_to_world(direction: Any) -> Any:
-        return timber.transform.local_to_global_direction(direction)
+    at = feature_anchor(handle, root)
+    return None if at is None else _vector3_to_floats(at)
 
-    if isinstance(located, Point):
-        return Point(position=to_world(located.position))
-    if isinstance(located, Line):
-        return Line(point=to_world(located.point),
-                    direction=direction_to_world(located.direction))
-    if isinstance(located, Plane):
-        # Plane, not whatever subclass it arrived as: an UnsignedPlane means
-        # "ignore the sign of the normal", which is a fact about the cut that
-        # declared it and not about the geometry being measured to.
-        return Plane(point=to_world(located.point),
-                     normal=direction_to_world(located.normal))
-    return None
+
+def _world_geometry_payload(handle: 'FeatureHandle') -> Optional[GeometryWire]:
+    """A feature's unbounded geometry, in world space, as the viewer wants it."""
+    from kumiki.drawings.measuring import world_geometry
+
+    return _geometry_payload(world_geometry(handle))
+
+
+def _settled_wire(settled: 'Settled') -> SettledWire:
+    """What a measurement comes to (measuring.Settled), as the viewer reads it."""
+    def end(form: Optional['EndForm']) -> Optional[SettledEndWire]:
+        if form is None:
+            return None
+        wire: SettledEndWire = {"form": form.form}
+        if form.normal is not None:
+            wire["normal"] = list(form.normal)
+        if form.direction is not None:
+            wire["direction"] = list(form.direction)
+        return wire
+
+    return {"kind": cast(MeasureKindWire, settled.kind.as_wire()) if settled.kind is not None else None,
+            "available": list(settled.available), "space": settled.space,
+            "value": (None if settled.unit is None or settled.value is None
+                      else {"unit": settled.unit, "value": settled.value}),
+            "reason": settled.reason, "a": end(settled.a), "b": end(settled.b)}
 
 
 def _geometry_payload(geometry: Optional['Located']) -> Optional[GeometryWire]:
@@ -3544,36 +3258,6 @@ def _geometry_from_wire(value: Optional[GeometryWire]) -> Optional['Located']:
     return None
 
 
-def _located_geometry_payload(located: Optional['Located'], timber: 'PerfectTimberWithin') -> Optional[GeometryWire]:
-    """A feature's unbounded geometry, in world space, as the viewer wants it."""
-    return _geometry_payload(_located_geometry(located, timber))
-
-
-def _feature_anchor(
-    feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
-    root_csg: Optional['CutCSG'] = None,
-) -> Optional[List[float]]:
-    """Where to attach a dimension to this feature, in world space: its extent's anchor
-    (kumiki.csg.feature_extent), cropped to the cut timber `root_csg` when given -- a face's
-    region on the finished surface, a line's longest piece, a perfect reference's cross-section.
-
-    Falls back to the declared extent when the feature cannot be placed -- a curved primitive, say --
-    since somewhere approximate beats nowhere.
-    """
-    from kumiki.csg.feature_extent import FeatureExtents, extents_of
-    from kumiki.rule import create_v3
-
-    extents = extents_of(root_csg, timber) if root_csg is not None else FeatureExtents(None, timber)
-    extent = extents.of(feature, node)
-    anchor = None if extent is None else extent.anchor()
-    if anchor is not None:
-        return _vector3_to_floats(timber.transform.local_to_global(create_v3(*anchor)))
-    declared = feature.get_extent(node)
-    if declared is None:
-        return None
-    return _vector3_to_floats(timber.transform.local_to_global(declared.anchor))
-
-
 def _resolve_anchor_placed(
     frame: 'Frame', anchor: Optional[AnchorWire], plane: Optional['VectorLike'],
     solid_space: bool = False,
@@ -3608,11 +3292,13 @@ def _anchor_payload(
     back to. Both come from one lookup so they cannot end up describing
     different features.
     """
-    span = _measure_span(feature, node, timber, located, root_csg, plane, solid_space)
+    from kumiki.drawings.feature_span import feature_span
+
+    handle = _handle_of(feature, node, timber)
     return ({
-        "at": _feature_anchor(feature, node, timber, located, root_csg),
-        "geometry": _located_geometry_payload(located, timber),
-    }, span)
+        "at": _anchor_floats(handle, root_csg),
+        "geometry": _world_geometry_payload(handle),
+    }, feature_span(handle, root_csg, plane, solid_space))
 
 
 def _reference_features_payload(timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None) -> List[ReferenceLineWire]:
@@ -3740,8 +3426,7 @@ def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> Highligh
     feature_type = handle.feature.feature_type().name
     result["featureType"] = feature_type
     if feature_type == "POINT":
-        located = handle.feature.locate_simple_unbounded(handle.owner)
-        result["at"] = _feature_anchor(handle.feature, handle.owner, timber, located, root)
+        result["at"] = _anchor_floats(handle, root)
     elif feature_type == "EDGE":
         segments, _absent = edge_highlight_segments(handle.feature, handle.owner, timber, root)
         if segments:
@@ -5465,14 +5150,13 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         # a pair can be dimensioned is what each PROJECTS to, and the viewer
         # projects on every pointer move -- so it gets the plane or the line and
         # works that out itself between asking.
-        "geometry": (_located_geometry_payload(located_pick[2], timber)
+        "geometry": (_world_geometry_payload(_handle_of(located_pick[0], located_pick[1], timber))
                      if located_pick is not None else None),
         # And where a dimension would attach, cropped to the solid the cuts have
         # left, which is the same anchor the saved measurement resolves to. An
         # edge in particular anchors at the middle of its longest surviving
         # piece, not at the extent it was declared with.
-        "at": (_feature_anchor(located_pick[0], located_pick[1], timber,
-                               located_pick[2], local_csg)
+        "at": (_anchor_floats(_handle_of(located_pick[0], located_pick[1], timber), local_csg)
                if located_pick is not None else None),
         # What a measurement to this pick would BE: one answer, asked once, and
         # read by the hover colour, the preview and the click alike. See
