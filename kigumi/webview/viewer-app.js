@@ -3538,6 +3538,13 @@ class KigumiViewerApp extends LitElement {
         return typeof offset === 'number' ? offset : null;
     }
 
+    /** How far a dimension has been slid along its two lines, in world units; 0 for not at all. */
+    _measurementAlong(measure) {
+        const placement = measure && measure.placement;
+        const along = placement && placement.along;
+        return typeof along === 'number' ? along : 0;
+    }
+
     /**
      * How many screen pixels one world unit is worth along this dimension.
      *
@@ -3607,6 +3614,7 @@ class KigumiViewerApp extends LitElement {
             angle: preview.angle || null,
             // What it comes to, from the same verdict the picture came from.
             settled: preview.settled || null,
+            extents: preview.extents || null,
         };
     }
 
@@ -3633,6 +3641,7 @@ class KigumiViewerApp extends LitElement {
             plane: verdict.plane || null,
             kind: verdict.kinds[0],
             settled: verdict.settled || null,
+            extents: verdict.extents || null,
         } : null;
         if (was || this._measurePreview) {
             this.renderMeasurements();
@@ -3652,6 +3661,8 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const was = this._measurementOffset(measure);
+        const wasPlacement = measure.placement || { offset: was };
+        const startAlong = this._measurementAlong(measure);
         const start = { x: event.clientX, y: event.clientY };
         let moved = false;
 
@@ -3668,6 +3679,18 @@ class KigumiViewerApp extends LitElement {
                 return;
             }
             moved = true;
+            if (run.slide) {
+                // Between two lines: the anchors follow the pointer along them, and the dimension
+                // sits right between them -- past the end of a line, a phantom carries it on.
+                const along = KigumiMeasurements.alongForPointer(
+                    startAlong, { x: moveEvent.clientX - start.x, y: moveEvent.clientY - start.y }, run.slide);
+                if (along === null) {
+                    return;
+                }
+                this._draggingMeasurement = { viewportId, measureKey, offset: 0, along };
+                this.renderMeasurements();
+                return;
+            }
             const inPixels = KigumiMeasurements.offsetForPointer(
                 run.from, run.to, pageOf(moveEvent));
             if (inPixels === null || !run.perWorld) {
@@ -3689,8 +3712,10 @@ class KigumiViewerApp extends LitElement {
                 return;
             }
             this.renderMeasurements();
-            this._writeMeasurementPlacement(
-                viewportId, measureKey, { offset: dragged.offset }, { offset: was });
+            const placement = typeof dragged.along === 'number'
+                ? { offset: 0, along: dragged.along }
+                : { offset: dragged.offset };
+            this._writeMeasurementPlacement(viewportId, measureKey, placement, wasPlacement);
         };
 
         this._beginPointerGesture('measurement-drag', { onMove, onEnd: onUp });
@@ -7011,9 +7036,18 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const into = this._measurementGroup(overlay, viewport, measure, options);
-        const from = measure.a.at;
-        const to = measure.b.at;
+        let from = measure.a.at;
+        let to = measure.b.at;
         const value = status.value;
+        const dragging = this._draggingMeasurement;
+        if (measure.slide && dragging && typeof dragging.along === 'number'
+            && dragging.viewportId === viewport.id && dragging.measureKey === measurementKey(measure)) {
+            // Being slid: both anchors move along the lines together, until the runner places them.
+            const shift = dragging.along - this._measurementAlong(measure);
+            const moveBy = (point) => point.map((part, axis) => part + measure.slide[axis] * shift);
+            from = moveBy(from);
+            to = moveBy(to);
+        }
 
         // What the value IS, not what the kind is called. The kinds became
         // composed names -- `projected_angle` -- and this still asked for the
@@ -7023,7 +7057,7 @@ class KigumiViewerApp extends LitElement {
         if (value.unit === 'angle') {
             this._drawAngle(into, viewport, pageRect, from, to,
                             status.formA, status.formB, value,
-                            { ...options, rays: measure.angle || null });
+                            { ...options, rays: measure.angle || null, extents: measure.extents || null });
             return;
         }
 
@@ -7068,7 +7102,10 @@ class KigumiViewerApp extends LitElement {
         const extra = options.className ? ` ${options.className}` : '';
         // What a drag measures against. Kept from the drawing rather than
         // projected again, so what is dragged is exactly what is on screen.
-        into._dimensionRun = { from: ends.from, to: ends.to, perWorld };
+        into._dimensionRun = {
+            from: ends.from, to: ends.to, perWorld,
+            slide: measure.slide ? this._slideOnPage(from, measure.slide, ends.from, viewport, pageRect) : null,
+        };
         const draw = (from_, to_, className) => {
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', from_.x);
@@ -7082,6 +7119,7 @@ class KigumiViewerApp extends LitElement {
         for (const witness of layout.witness) {
             draw(witness.from, witness.to, 'dim-witness');
         }
+        this._drawPhantoms(into, viewport, pageRect, measure.extents, [from, to], extra);
         draw(layout.line.from, layout.line.to, 'dim-line');
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -7091,6 +7129,42 @@ class KigumiViewerApp extends LitElement {
         text.setAttribute('transform', `rotate(${layout.label.angle} ${layout.label.x} ${layout.label.y})`);
         text.textContent = this.fmt(value.value);
         into.appendChild(text);
+    }
+
+    /**
+     * Which way a dimension slides on the page, and how many pixels a world unit along it is
+     * worth: what a drag along the features is measured against.
+     */
+    _slideOnPage(anchor, slide, anchorOnPage, viewport, pageRect) {
+        const ahead = this._projectToPage(anchor.map((part, axis) => part + slide[axis]), viewport, pageRect);
+        const step = { x: ahead.x - anchorOnPage.x, y: ahead.y - anchorOnPage.y };
+        const perWorld = Math.hypot(step.x, step.y);
+        return perWorld > 1e-9 ? { x: step.x / perWorld, y: step.y / perWorld, perWorld } : null;
+    }
+
+    /**
+     * Each feature drawn on, dashed, to a point of the dimension past its end -- an anchor slid off
+     * it, or an angle's corner -- so the dimension is seen to belong to it.
+     */
+    _drawPhantoms(into, viewport, pageRect, extents, points, extra = '') {
+        if (!extents) {
+            return;
+        }
+        [['a', points[0]], ['b', points[1]]].forEach(([key, point]) => {
+            const segment = KigumiMeasurements.phantomSegment(extents[key], point);
+            if (!segment) {
+                return;
+            }
+            const from = this._projectToPage(segment.from, viewport, pageRect);
+            const to = this._projectToPage(segment.to, viewport, pageRect);
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', from.x);
+            line.setAttribute('y1', from.y);
+            line.setAttribute('x2', to.x);
+            line.setAttribute('y2', to.y);
+            line.setAttribute('class', `dim-phantom${extra}`);
+            into.appendChild(line);
+        });
     }
 
     /**
@@ -7106,6 +7180,12 @@ class KigumiViewerApp extends LitElement {
             : this._angleArcOnTheScreen(viewport, pageRect, from, to, formA, formB);
         if (!drawn) {
             return;
+        }
+
+        if (rays) {
+            // Each feature on to the corner, where it does not reach it.
+            this._drawPhantoms(into, viewport, pageRect, options.extents, [rays.vertex, rays.vertex],
+                               options.className ? ` ${options.className}` : '');
         }
 
         const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');

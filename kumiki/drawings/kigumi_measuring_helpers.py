@@ -13,10 +13,10 @@ from ..csg.feature_paths import FeatureHandle
 from ..csg.cutcsg import CutCSG
 from ..geometry import Line, Plane, Point, unit_vector
 from ..rule import V3, as_ndarray, create_v3
-from .drawing import (DEGENERATE_SEPARATION, AngleRays, MeasureSpan, MeasurementKind, MeasurementOperation,
-                      MeasurementPlane, MeasurementSpace, ViewAxes, angle_between, angle_rays, distance_anchors,
-                      measures_nothing, pair_separation, project_geometry_for_measuring, projected_kinds,
-                      three_d_kinds)
+from .drawing import (DEGENERATE_SEPARATION, AngleRays, LineSpan, MeasureSpan, MeasurementDirection, MeasurementKind,
+                      MeasurementOperation, MeasurementPlane, MeasurementSpace, ViewAxes, angle_between, angle_rays,
+                      distance_anchors, measures_nothing, pair_separation, project_geometry_for_measuring,
+                      projected_kinds, slide_axis, three_d_kinds)
 
 Located = Union[Point, Line, Plane]
 
@@ -221,17 +221,32 @@ def unplaceable(has_plane: bool) -> Settled:
 @dataclass(frozen=True)
 class PairPlacement:
     """Where a measurement between two features sits, and what it comes to: anchors for a distance,
-    a corner for an angle, neither when the pair admits nothing."""
+    a corner for an angle, neither when the pair admits nothing.
+
+    `extents` are each end's line as far as the feature goes, (start, end) in world space, or None
+    for a point or a plane: where an anchor or the corner is past them, the viewer draws the line
+    on to it. `slide` is the direction the anchors slide in (MeasurementPlacement.along), for a
+    distance between two lines; None where they cannot slide.
+    """
     kind: Optional[MeasurementKind]
     admitted: Tuple[MeasurementKind, ...]
     anchors: Optional[Tuple[V3, V3]]
     rays: Optional[AngleRays]
     settled: Settled
+    extents: Tuple[Optional[Tuple[V3, V3]], Optional[Tuple[V3, V3]]] = (None, None)
+    slide: Optional[V3] = None
+
+
+def _extent(span: MeasureSpan) -> Optional[Tuple[V3, V3]]:
+    if isinstance(span, LineSpan) and span.interval is not None:
+        start, end = span.ends_global()
+        return (start, end)
+    return None
 
 
 def place_pair(one: Optional[Located], other: Optional[Located], one_span: MeasureSpan, other_span: MeasureSpan,
                declared: Optional[MeasurementKind], plane, view: Optional[ViewAxes], in_three_d: bool,
-               ) -> PairPlacement:
+               along: Optional[float] = None) -> PairPlacement:
     """Where a measurement between two features attaches, and what it comes to.
 
     The two ends together: where a dimension attaches is a property of the pair and its plane, and
@@ -241,13 +256,17 @@ def place_pair(one: Optional[Located], other: Optional[Located], one_span: Measu
     """
     admitted = (three_d_kinds(one, other) if in_three_d else projected_kinds(one, other, plane))
     kind = declared or (admitted[0] if admitted else None)
-    anchors, rays = None, None
+    anchors, rays, slide = None, None, None
     if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
-        anchors = distance_anchors(one_span, other_span, kind, view)
+        anchors = distance_anchors(one_span, other_span, kind, view, along)
+        if (kind.direction is MeasurementDirection.PERPENDICULAR
+                and isinstance(one_span, LineSpan) and isinstance(other_span, LineSpan)):
+            slide = slide_axis(one_span)
     elif kind is not None and kind.operation is MeasurementOperation.ANGLE:
         rays = angle_rays(one_span, other_span)
     return PairPlacement(kind, tuple(admitted), anchors, rays,
-                         settle(one, other, rays, declared, kind, admitted, in_three_d, plane, view))
+                         settle(one, other, rays, declared, kind, admitted, in_three_d, plane, view),
+                         extents=(_extent(one_span), _extent(other_span)), slide=slide)
 
 
 @dataclass(frozen=True)

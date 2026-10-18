@@ -773,11 +773,22 @@ def angle_between(rays: Optional[AngleRays]) -> Optional[float]:
     return math.degrees(math.acos(facing))
 
 
+def slide_axis(line: LineSpan) -> V3:
+    """Which way a dimension between two lines slides: along the lines, the same way whichever end
+    is first -- the first of x, y, z it has any of is positive."""
+    run = line.along
+    for part in run:
+        if abs(float(part)) > 1e-9:
+            return run if float(part) > 0 else run * -1
+    return run
+
+
 def distance_anchors(
     first: MeasureSpan,
     second: MeasureSpan,
     kind: MeasurementKind,
     view: Optional[ViewAxes] = None,
+    along: Optional[float] = None,
 ) -> Tuple[V3, V3]:
     """Where a distance between these two features attaches, at both ends.
 
@@ -792,6 +803,8 @@ def distance_anchors(
     dimension lands where the two features actually face each other. Where they
     do not overlap there is no such place, so it goes to the end of the FIRST
     nearest the second, and the other end is projected across from there.
+    `along` (MeasurementPlacement.along) slides that station, along slide_axis;
+    past the end of a line, the viewer draws the line on to its anchor.
 
     PERPENDICULAR, a point and a line: the point does not move -- it is the
     whole of what is being measured from -- and the other end is the foot of the
@@ -851,16 +864,19 @@ def distance_anchors(
     if isinstance(second, PointSpan):
         return (_foot_on(first, second.at), second.at)
 
-    along = first.along
-    first_low, first_high = _stations_global(first, along)
-    second_low, second_high = _stations_global(second, along)
+    run = first.along
+    first_low, first_high = _stations_global(first, run)
+    second_low, second_high = _stations_global(second, run)
     low, high = max(first_low, second_low), min(first_high, second_high)
     if low <= high:
         station = (low + high) / 2
     else:
         # Nothing faces anything: go to the end of the first that is nearest.
         station = first_high if first_high < second_low else first_low
-    return (_at_station(first, along, station), _at_station(second, along, station))
+    if along is not None:
+        # Slid by whoever placed it, both ends together, so it stays square to both.
+        station += along * _dot(slide_axis(first), run)
+    return (_at_station(first, run, station), _at_station(second, run, station))
 
 
 def projected_kinds(
@@ -1037,16 +1053,21 @@ class MeasurementPlacement:
     #: dimension sitting a readable distance away at any zoom is the better
     #: default.
     offset: Optional[float] = None
+    #: How far the anchors have been slid along the two features, in WORLD units, from where they
+    #: sit by default (the middle of where the features overlap). Only a distance between two lines
+    #: can slide -- anywhere else the anchors are fixed by the features -- and it reads along
+    #: slide_axis, so it does not depend on which end is which. None is the default.
+    along: Optional[float] = None
 
     @classmethod
     def from_wire(cls, value) -> Optional['MeasurementPlacement']:
-        """
-        """
+        """A placement as a file or the viewer has it: {"offset", "along"}, either optional."""
         if value is None or isinstance(value, cls):
             return value
         if isinstance(value, Mapping):
-            offset = value.get("offset")
-            return cls(offset=None if offset is None else float(offset))
+            offset, along = value.get("offset"), value.get("along")
+            return cls(offset=None if offset is None else float(offset),
+                       along=None if along is None else float(along))
         raise TypeError(f"Expected a placement or a mapping, got {type(value).__name__}")
 
 

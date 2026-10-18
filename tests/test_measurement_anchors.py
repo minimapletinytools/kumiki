@@ -615,7 +615,7 @@ class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
         # `settled` rides along with the placement -- what the measurement
         # would come to, so the preview shows the number the finished one will
         # carry rather than working it out a second time in the viewer.
-        nothing = {"anchors": None, "angle": None, "settled": None}
+        nothing = {"anchors": None, "angle": None, "settled": None, "extents": None}
         assert runner._pick_placement(None, None, None, {}, None) == nothing
         assert runner._pick_placement(
             None, None, None, {"heldReference": {"timber": "t"}}, None) == nothing
