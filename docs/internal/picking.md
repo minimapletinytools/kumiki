@@ -1,7 +1,7 @@
 # The Feature Picking System
 
 How a hover or click becomes a picked feature. The CSG feature system it picks from is in
-`featuresystem.md`.
+`featuresystem.md`; where picking sits among measuring, solving and drawing, in `featureflow.md`.
 
 Feature picking differes if we are in the 3d view or if we are in a 2d orthographic drawing view. 
 
