@@ -84,6 +84,7 @@ def test_a_perfect_reference_is_cropped_to_the_cut_timber(loaded):
     handle = FeatureHandle(timber=slot.mesh_cache[key]["cut_timber"].timber,
                            hit=OwnedFeatureHit(feature=right, owner=body))
     at = feature_anchor(handle, root)
-    assert round(float(transform.global_to_local(create_v3(*at))[2]), 4) == 0.25
+    assert at is not None
+    assert round(float(transform.global_to_local(at)[2]), 4) == 0.25
     low, high = along("ptw.centerplane_left_right")
     assert low < 0 and high > 0.5
