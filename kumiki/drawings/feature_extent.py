@@ -20,8 +20,8 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 
 from ..csg.cutcsg import CSGFeature, CutCSG, FaceFeature, FeatureNature
-from ..csg.planar_region import (Section, face_section, plane_section, section_centroid, section_outline,
-                                 section_polygons)
+from ..csg.cross_sections import (CrossSection, cross_section_centroid, cross_section_outline, cross_section_polygons,
+                                  face_cross_section, plane_cross_section)
 from ..geometry import Line, Plane, Point
 from ..rule import as_ndarray, create_v3, exact_scalar
 from ..timber import PerfectTimberWithin
@@ -35,11 +35,11 @@ class FeatureExtent:
     """A feature's extent on its cut timber, in the timber's local space.
 
     `located` is the feature's unbounded place; `pieces`, for a line, are intervals along its
-    direction from its point; `section`, for a plane, is the region it covers, in the plane's frame.
+    direction from its point; `cross_section`, for a plane, is the region it covers, in the plane's frame.
     """
     located: Union[Point, Line, Plane]
     pieces: Tuple[Interval, ...] = ()
-    section: Optional[Section] = None
+    cross_section: Optional[CrossSection] = None
 
     @property
     def is_empty(self) -> bool:
@@ -47,7 +47,7 @@ class FeatureExtent:
             return False
         if isinstance(self.located, Line):
             return not self.pieces
-        return self.section is None or not self.section[1]
+        return self.cross_section is None or not self.cross_section[1]
 
     def anchor(self) -> Optional[np.ndarray]:
         """Where a dimension hangs on it: a point itself, the middle of a line's longest piece (the
@@ -59,20 +59,20 @@ class FeatureExtent:
                 return None
             low, high = max(self.pieces, key=lambda piece: piece[1] - piece[0])
             return self._on_line((low + high) / 2)
-        return None if self.section is None else section_centroid(self.section)
+        return None if self.cross_section is None else cross_section_centroid(self.cross_section)
 
     def outline(self) -> List[Segment3]:
         """What lights or draws it: a line's pieces, a plane region's boundary (seams between its
         convex pieces removed)."""
         if isinstance(self.located, Line):
             return [(self._on_line(low), self._on_line(high)) for low, high in self.pieces]
-        if isinstance(self.located, Plane) and self.section is not None:
-            return section_outline(self.section)
+        if isinstance(self.located, Plane) and self.cross_section is not None:
+            return cross_section_outline(self.cross_section)
         return []
 
     def polygons(self) -> List[List[np.ndarray]]:
         """A plane's region as convex polygons of points; nothing for a line or a point."""
-        return [] if self.section is None else section_polygons(self.section)
+        return [] if self.cross_section is None else cross_section_polygons(self.cross_section)
 
     def _on_line(self, station: float) -> np.ndarray:
         line = self.located
@@ -112,12 +112,13 @@ class FeatureExtents:
             return FeatureExtent(located, pieces=tuple(pieces))
         if isinstance(located, Plane):
             if feature.nature is FeatureNature.PERFECT_REFERENCE and self.root is not None:
-                section = plane_section(located, self.root, self.near, self.reach)
+                cross_section = plane_cross_section(located, self.root, self.near, self.reach)
             elif isinstance(feature, FaceFeature):
-                section = face_section(feature, owner, None if auxiliary else self.root, self.near, self.reach)
+                root = None if auxiliary else self.root
+                cross_section = face_cross_section(feature, owner, root, self.near, self.reach)
             else:
                 return None
-            return None if section is None else FeatureExtent(located, section=section)
+            return None if cross_section is None else FeatureExtent(located, cross_section=cross_section)
         return None
 
 

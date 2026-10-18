@@ -7,7 +7,7 @@ from typing import Callable, Iterator, List
 from ..csg.cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
                      OwnedFeatureHit, csg_children, measured_by_default)
 from ..csg.feature_paths import FeatureHandle
-from ..csg.planar_region import face_reaches_surface
+from ..csg.cross_sections import face_reaches_surface
 from ..rule import V3, create_v3
 from ..timber import CutTimber
 

@@ -3893,7 +3893,7 @@ def _feature_anchor(
 ) -> Optional[List[float]]:
     """Where to attach a dimension to this feature, in world space: its extent's anchor
     (kumiki.drawings.feature_extent), cropped to the cut timber `root_csg` when given -- a face's
-    region on the finished surface, a line's longest piece, a perfect reference's section.
+    region on the finished surface, a line's longest piece, a perfect reference's cross-section.
 
     Falls back to the declared extent when the feature cannot be placed -- a curved primitive, say --
     since somewhere approximate beats nowhere.

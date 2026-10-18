@@ -2,7 +2,7 @@
 
 Analytic, over the whole CSG, not sampled: a place's line of sight is clipped exactly to the solid
 (cropcsg), and a feature drawn as a line is decided in the one plane holding all its lines of sight,
-cut exactly by each solid (planar_region). Only a solid's inside hides; a line of sight along its
+cut exactly by each solid (cross_sections). Only a solid's inside hides; a line of sight along its
 surface does not.
 """
 
@@ -13,8 +13,8 @@ import numpy as np
 from ..csg.cropcsg import crop_line_to_boundary_segments_on_csg, crop_line_to_interior_segments_on_csg
 from ..csg.cutcsg import CutCSG, FaceFeature
 from ..csg.feature_paths import FeatureHandle
-from ..csg.planar_region import (CannotSection, Region, SightFrame, area, material_crossing, segments_outside,
-                                 shadow, subtract)
+from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, SightFrame, area, material_crossing,
+                                  segments_outside, shadow, subtract)
 from ..geometry import Line, Plane
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
@@ -122,7 +122,7 @@ def nearest_visible_depth(
                 return None
             near = _overlapping(_blocking(occluders, world, reach, _across_sheet(ends)), ends)
             depths = [end[1] for segment in segments_outside(segments, near) for end in segment]
-    except CannotSection:
+    except CannotCrossSection:
         return float(point @ look)
     return min(depths) + float(origin @ look) if depths else None
 
@@ -132,7 +132,7 @@ def _across_sheet(points: Sequence[Tuple[float, float]]) -> Tuple[float, float]:
     return min(p[0] for p in points) - 1e-6, max(p[0] for p in points) + 1e-6
 
 
-def _overlapping(region: Region, points: Sequence[Tuple[float, float]]) -> Region:
+def _overlapping(region: PolygonRegions, points: Sequence[Tuple[float, float]]) -> PolygonRegions:
     """The pieces of `region` whose bounding box meets that of `points`: the only ones that can
     hide any of them. Most shadows in a plane are nowhere near the feature asked about."""
     if not points:
@@ -145,14 +145,14 @@ def _overlapping(region: Region, points: Sequence[Tuple[float, float]]) -> Regio
 
 
 def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reach: float,
-              across: Tuple[float, float]) -> Region:
+              across: Tuple[float, float]) -> PolygonRegions:
     """What the occluders hide in the world frame's plane, within the `across` strip of it: their
     material across it, swept away from the camera."""
-    hidden: Region = []
+    hidden: PolygonRegions = []
     for solid, transform in occluders:
         try:
             hidden += shadow(material_crossing(solid, _frame_in(transform, *world), reach, across), 2 * reach)
-        except CannotSection:
+        except CannotCrossSection:
             continue  # unsure means seen
     return hidden
 

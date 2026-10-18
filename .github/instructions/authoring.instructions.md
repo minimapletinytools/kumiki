@@ -63,7 +63,7 @@ After taking a screenshot, always make sure to show it to the user in the agent 
 - `kumiki/rule.py` — Math types, units, and math-related utilities. All math code must use these types and helpers.
 - `kumiki/measuring.py` — Measure/mark pattern for locating features on timbers and marking things relative to features.
 - `kumiki/kiwari.py` — `Kiwari`, the numbers a frame or pattern may be adjusted by in Kigumi: what they are, what they default to, and what they are allowed to be. Declared inside the builder and handed back on the `Frame`, or declared on a `Pattern`.
-- `kumiki/csg/` — The CSG system: `cutcsg.py`, `pathcsg.py`, cropping (`cropcsg.py`, `planar_region.py`), meshing (`triangles.py`), carriers (`carriers.py`) and feature handles (`feature_paths.py`). Imports nothing from `kumiki/drawings/`.
+- `kumiki/csg/` — The CSG system: `cutcsg.py`, `pathcsg.py`, cropping (`cropcsg.py`, `cross_sections.py`), meshing (`triangles.py`), carriers (`carriers.py`) and feature handles (`feature_paths.py`). Imports nothing from `kumiki/drawings/`.
 - `kumiki/drawings/` — Drawings and the feature solver: `drawing.py`, `layout.py`, `solve_recipe.py`, `dof_solver.py`, `feature_solving.py`, `required_features.py`.
 - `kumiki/csg/cutcsg.py` — `CutCSG`: the solid a timber and its cuts make, as primitives and boolean operations, plus the feature system on their boundaries — what can be named, selected and measured to.
 - `kumiki/geometry.py` — The unbounded primitives `Point`, `Line` and `Plane`, and their bounded counterparts. Below `cutcsg.py` in the import chain so both the CSG and measuring layers can share them; depends on nothing but `rule.py`.

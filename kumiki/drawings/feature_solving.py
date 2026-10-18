@@ -17,7 +17,7 @@ from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, Meas
                       MeasurementSpace, PlaneSpan, PointSpan, ViewAxes, distance_anchors)
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
-from ..csg.planar_region import face_reaches_surface
+from ..csg.cross_sections import face_reaches_surface
 from .required_features import FaceTest, required_features
 from ..rule import Matrix, V3, as_ndarray, unit_ndarray
 from ..csg.carriers import CarrierMap, Recipe, Row
