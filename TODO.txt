@@ -1,68 +1,16 @@
+:: 10/17/2026 PTW rough measuring notes
 
-::10/12/2026 agent panel mega refactor
+Every timber has a "Perfect Timber Within" which may differ from its actual "rough" shape.
 
+This introduces a challenge in the fetaure/measurement system. We must render the "rough" shape, however all measurements must be taken from "reference features" which coincide with the PTW.
 
--no general docking system YET
-  -panels only go in hardocde locations for now, but we may want to add general docking system later
+To address this, we use the `Timber.get_extended_rough_csg_with_perfect_features_local` method which returns the timber's rough CSG with the following changes:
 
--must have tabs
-  -multiple views
-  -multiple source code files open
-  -maybe organize it so source code and view tabs go together somehow?
-
--2 types of panels
-  -generic panels (the kigumi "sidebar", filebrowser, and agent panel)
-  -view specific panels. these contents change depending on which view is "active"
-    -I am somewhat undecided on this one i'm considering moving the tree view and all the kigumi panels that are below the 3d view into their own panels... what do you think?
-
--agent panel
-  -does this need any work? should be fine as is?
-  -should be able to query current open panel, any open panel, and contents selected in an open panel
-  -how to setup backend and user account system for web??
-  -can it hook up to other AIs?
+- face features that coincide with PTW faces relabeled from rough.* to rptw.*
+- non-coinciding PTW face features added as non-real features labeled ptw.*
+- PTW centerplanes added as non-real features labeled ptw.*
 
 
-:: 10/10/2026 selecting second feature via drilling notes
-
-
-❯ ok change gears othe apprcoah, right now you can "drill into" a timbers CSG allowing yo uto be specifci about which timber you areselecting on. this only works for the first         
-  feature, the second fetaure does not do this. what would it take to be able to toggle this selection mode for the second feature? it's weird because the current drilling works by    
-  drilling into whatever is selected, so etiher we need a second selection for the second feature we're finding, or we unselect the timber we are measuring from, what do you think?    
-  
-⏺ I'll look at how a measurement's first end is taken and held, and what that does to the selection.
-
-  Ran 2 shell commands 
-
-⏺ I'd go with unselecting. The measuring flow was already designed for it: measure-draft.js says the held end "is NOT the selection" and has to survive the focus moving off it. A
-  second selection would duplicate machinery that exists once today. That covers the selection itself, the focus inside a timber, which timber is dimmed, and what Tab and ctrl-click
-  act on. You'd also need a rule for which selection each click goes to.
-
-  How it works today:
-  - Normal mode: choosePickAction (webview/selection-store.js) looks for a selected timber anywhere along the ray. If it finds one, it drills into that timber even when something else
-    is in front. That's what lets you be specific about the first end.
-  - While an end is held: a separate branch skips that and always goes to the nearest timber. That was done so the second end can be on a timber you never selected. It's also why the
-    second end can't be pinned to a timber.
-  - The first timber stays selected while you measure, but measuring ignores the selection, so nothing currently conflicts.
-    
-  What it would take:
-  1. Clear the timber selection when the first end is taken (in startMeasurementFromFocus). The held end keeps its own green highlight and doesn't depend on the selection. This step is
-     required, not just tidy. If the first timber stayed selected, a second end anywhere in front of it would drill through to the first timber, which breaks measuring between
-     timbers.
-  2. While measuring, let selection steer the pick, in choosePickAction: if a selected timber is on the ray, drill into it the way normal mode does. If nothing is selected, use the
-     nearest timber as now. So the default stays the same, and the drill-through mode is on whenever you've selected a target timber.
-  3. A way to select a timber mid-measurement without taking it as the end. A plain click is already the end, so either:
-     - Shift-click selects the timber under the pointer while measuring. Today shift toggles timber selection in normal mode, and while measuring it's swallowed by the measuring
-       branch, so this is just reordering two checks.
-     - The timber list: clicking a timber there selects it, so this should work once step 2 is in.
-  
-     Clicking empty space or pressing Escape would clear the target. Escape currently also drops the held end, so that needs deciding: perhaps the first Escape clears the target and
-     the second releases the end.
-  4. Hover: it already runs the same choosePickAction, so it would follow automatically. The right-click candidate list would then come from the selected timber, which is exactly your
-     housing case. Select the plate, and the rafter in front of its walls no longer wins.
-  5. Tests: choosePickAction cases for measuring with and without a selected timber on the ray, plus clearing the selection on hold.
-     
-  It's a small change: mostly choosePickAction, the hold handler and the shift-click path, plus tests. No runner changes. Want me to go ahead in a worktree, with shift-click as the
-  gesture?
 
   
 
@@ -145,9 +93,7 @@ DONE-BUG from side view I can select the behind dovetail edge and then try to me
   -1. it's weird that I could even select the inside edge of the dovetail, and in fact it was picking that over the outside edge of the dovetail, so we should mayb edo some z sorting (although this may be part of a bigger project of disallowing selecing hidden features so ignore this for now)
   -2. it should be permitted, as that edge gets projected into the viewport and taht's what wed' be measuring, so I
   -3. yo ushouldnt' be able to create unpermitted measurements (it should hover as red, but I guessi it's beacues the hover logic understands 2 but something goes wrong when the measueremnt actually gets created)
-
-
--DECISION TIME ON DRAWING FEATURES
+DONE-DECISION TIME ON DRAWING FEATURES
   NOTED-the high level issue here is that each view in 2d drawing only has some features visible and you only want to make measuremints for those features. Except you can totally mesauer other featuers and its' kind NBD so maybe ther' sjust ntonig to do here.
   NOTED-hidden feature weirdnesse xample
     it's weird that I could even select the inside edge of the dovetail, and in fact it was picking that over the outside edge of the dovetail, so we should mayb edo some z sorting (although this may be part of a bigger project of disallowing selecing hidden features so ignore this for now)
@@ -155,40 +101,76 @@ DONE-BUG from side view I can select the behind dovetail edge and then try to me
     -paus eher for a moment, one thing I realized is that in 2d view, there are sorta equivalency groups for measurements when locked to an orthographic view. so for example, a pirsm has 6 faces, and a bunch of edgse/vertices. When we measure betwene 2 edges on a face that's parallel with the viewport plane, we are also measuring the distance bteew all other edges, vertices of the perpendicular face that edge is a part of. IN the measurement, we say it's just the edge being measured, but in. thesolver wesay that a DOF got removed from all the features I mentioned. Is there some way to solve for all features that had their DOfs solved in this way even though just teh edge was measured. 
     -don't really need to do this...
   DONE-restrict measuring selection to viewport
-  -force selection to visible features only? thus restricting mesauring to visible fetauers only
+  DONE-force selection to visible features only? thus restricting mesauring to visible fetauers only
     -this needs to still allow XRAY features though.
-
-  
--DECISION TIME PTW
+DONE-2d featuer seleciton ifxes
+  -fix right lcick mkultiple features not seeming to work right
+  -also tab/right click selection in 2d view for choosing other featuers seems a little broken.
+IGNORE-rework left hand view or whatever, it sholud be cllapsoable but maybe yous hould justc remaigen it for the standalone app...
+DONE-side bar should be collaspsable
+DONE-DECISION TIME PTW
   -the remaining high level issue here is when to show rough/PTW features, when to allow them to be measured etc
   DONE-rough faces matching PTW faces should be given PTW labels?
+  -cuttimber caches its csg, and it needs to decide which object to return, rather thna make it customizable per query (I think this is better)
+    -always include ptw features as non real features including centerplanes
+    -centerplanes are the weird/special ones and should be tagged as centerplanes, so they can be treated separately in different circumstances (v)
   -rough fetaures are marked as do not measure
   -when entering drawing mode
     -PTW features are added 
+DONE-review the hidden selection PR...
+DONE-viewports in measurings panel should be collapsable
+DONE-selecting feature enabels xray renedring in 2d view, remove that, incorrect rendering state for selceted timber in 2d view
+DONE-right cilckinga measurement in the view shows copy cut paste, instead it shoud be the same as if you right click in the list view
+DONE-auto drawing
+  DONE-add preferences in auto drawing algoirthm, pick measurements from reference face/edge always (maybe not a bad rule for now..)
+  DONE-test auto drawing generation on a single timber with joints
+  DONE-test auto drawing on a rough/PTW timber
+  DONE-hidden feature detection in drawing view (featurelist, view) to see what's hidden
+    -you need this so mesaurements only get created in the viwe that shows the feature on the surface <- this is the important thing. so if you look at  my_cute_Frame-drawing_test.py you can see it measures the peg hole axis to the mortise hole wall which is hidden in the left side view
+DONE-do aonther picking perf pass, it seems to have gotten very slow...
+DONE-centerplanes have hella triangulation artifacts 
+DONE-figure out selection story within 2d view, you actually still have multi-timber 2d views which behave like selecting in 3d views and that's kind aweird
+  -disable selection drilling in these view,s you always select features directly as if all timbmers were selecetd.
+IGNORE-you did rough relief, but maybe you want perfect relief group whatever that is
+DONE-perfect non-real features should also be extended and cropped
+DONE-why are tenons getting blue dotted lines in my_cute_frame_drawing_test, they are'nt perfect face features
+IGNORE-measurement anchors in 2d view should be in a shared project plane, right now when you rotate the camera it shows anchors attaching directly to their unprojected featuers which is not what we want... maybe just ignore this for now though
 
+  
 -DECISION TIME STANDALONE APP
   -decide how to do file browser, maybe combine with kigumi explorer probably
   -make sure using external agent works, don't allow self api key
   -decide if you want to setup backend, auth, billing, subscription or pay per token or both? or just get rid of the agent panel entirely
   -can we bring vscoed kigumi more in parity with standalone app
     -need to decide how to deal with the  stuff below the main view
-
--auto drawing
-  DONE-add preferences in auto drawing algoirthm, pick measurements from reference face/edge always (maybe not a bad rule for now..)
-  DONE-test auto drawing generation on a single timber with joints
-  -test auto drawing on a rough/PTW timber
-  -hidden feature detection in drawing view (featurelist, view) to see what's hidden
-    -you need this so mesaurements only get created in the viwe that shows the feature on the surface <- this is the important thing.
-    -ask agent what its currentyl doing though
+  -should be able to right click file and say open in viewer or osmetihng(both vscoed and electron), or maybe have it open both in electron
+  -cilkcing on patterns borken in electron ivew..
 
 
--angle mesaurement anchor positon derivatino needs to be improved
-    -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
-    -definitely highlight the features being measured...
+-midplanes (and probably perfect-erfecet fetaures) not selectable in 3d view of drawing.
+-space out dotted lines more
+-the active view you are measuring in should be highlighted somehow
 
--2d featuer seleciton ifxes
-  -stuff like [dovetailed_sawhorse.py] [webview:viewer:info] csg-selection v2026.03.17.4 {"path":["free_dovetail#1","dovetail"],"featureLabel":"rptw.front_left×dovetail_left_flank","meshWalkMs":13.08,"trianglesMatched":2,"totalTriangles":108,"candidates":["> POINT derived real NONE p0 rptw.front_left×dovetail_left_flank","  EDGE declared real PERFECT p0 rptw.front_left","  EDGE derived real NONE p0 rptw.front×dovetail_left_flank","  EDGE derived real NONE p0 rptw.left×dovetail_left_flank","  FACE declared real PERFECT p0 rptw.front"]}. is hard to select, I think points should always be first priority
-  -also tab/right click selection in 2d view for choosing other featuers seems a little broken.
+-rough timber wiht PTW features decsisions
+  1. double down on what we have now, you'll need PTW fetaures to intersect with shoulder planes too to get those derived features
+  2. remove PTW fetaures as part of rough CSG tree, instead take the ptw planes, intersect it with all rough planes and shoulder planes and expose those edges 
+    - those edges could be added as etxra features to the rough CSG tree OR you could have extra featuers at teh timber level... 
+    - one thing is now we're working with edges not planes, but the edges still need the planes as carriers when it comes to solving...
+  3. don't do PTW stuff, instead just solev everything from a reference feature (simplest for now)
+    - won't work if there are no real references faces though
+    - a simplified version of this is that you just add the reference PTW faces 
+      - but in this case, the midplanes need a different recipe...
+
+
+
+-ANCHOR REWORK
+  -when dragging measurements the anchros should drag too until they can't anymore at least
+  -angle mesaurement anchor positon derivatino needs to be improved
+      -show invisible feature plans/edges when the measurement is selected (not just for nagles, anytime an anchor doesn't fall on the actual feature itself)
+      -definitely highlight the features being measured...
+
+
+-when dragging python measurements, theres' a flicker as it tries to reload from python, can you reomve that?
 
 
 -add beta features section to option
@@ -199,14 +181,6 @@ DONE-BUG from side view I can select the behind dovetail edge and then try to me
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
 -decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
-
--do the standalone app 
-  -rework left hand view or whatever, it sholud be cllapsoable but maybe yous hould justc remaigen it for the standalone app...
-  -side bar should be collaspsable
-  -need file explorer in addition to side bar
-  -should be able to right click file and say open in viewer or osmetihng(both vscoed and electron), or maybe have it open both in electron
-  -cilkcing on patterns borken in electron ivew..
-
 
 
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
@@ -1831,6 +1805,71 @@ IGNORE- you need a better system for determining timber orientation after each t
 :: ARCHIVE
 
 
+
+::10/12/2026 agent panel mega refactor
+
+
+-no general docking system YET
+  -panels only go in hardocde locations for now, but we may want to add general docking system later
+
+-must have tabs
+  -multiple views
+  -multiple source code files open
+  -maybe organize it so source code and view tabs go together somehow?
+
+-2 types of panels
+  -generic panels (the kigumi "sidebar", filebrowser, and agent panel)
+  -view specific panels. these contents change depending on which view is "active"
+    -I am somewhat undecided on this one i'm considering moving the tree view and all the kigumi panels that are below the 3d view into their own panels... what do you think?
+
+-agent panel
+  -does this need any work? should be fine as is?
+  -should be able to query current open panel, any open panel, and contents selected in an open panel
+  -how to setup backend and user account system for web??
+  -can it hook up to other AIs?
+
+
+:: 10/10/2026 selecting second feature via drilling notes
+
+
+❯ ok change gears othe apprcoah, right now you can "drill into" a timbers CSG allowing yo uto be specifci about which timber you areselecting on. this only works for the first         
+  feature, the second fetaure does not do this. what would it take to be able to toggle this selection mode for the second feature? it's weird because the current drilling works by    
+  drilling into whatever is selected, so etiher we need a second selection for the second feature we're finding, or we unselect the timber we are measuring from, what do you think?    
+  
+⏺ I'll look at how a measurement's first end is taken and held, and what that does to the selection.
+
+  Ran 2 shell commands 
+
+⏺ I'd go with unselecting. The measuring flow was already designed for it: measure-draft.js says the held end "is NOT the selection" and has to survive the focus moving off it. A
+  second selection would duplicate machinery that exists once today. That covers the selection itself, the focus inside a timber, which timber is dimmed, and what Tab and ctrl-click
+  act on. You'd also need a rule for which selection each click goes to.
+
+  How it works today:
+  - Normal mode: choosePickAction (webview/selection-store.js) looks for a selected timber anywhere along the ray. If it finds one, it drills into that timber even when something else
+    is in front. That's what lets you be specific about the first end.
+  - While an end is held: a separate branch skips that and always goes to the nearest timber. That was done so the second end can be on a timber you never selected. It's also why the
+    second end can't be pinned to a timber.
+  - The first timber stays selected while you measure, but measuring ignores the selection, so nothing currently conflicts.
+    
+  What it would take:
+  1. Clear the timber selection when the first end is taken (in startMeasurementFromFocus). The held end keeps its own green highlight and doesn't depend on the selection. This step is
+     required, not just tidy. If the first timber stayed selected, a second end anywhere in front of it would drill through to the first timber, which breaks measuring between
+     timbers.
+  2. While measuring, let selection steer the pick, in choosePickAction: if a selected timber is on the ray, drill into it the way normal mode does. If nothing is selected, use the
+     nearest timber as now. So the default stays the same, and the drill-through mode is on whenever you've selected a target timber.
+  3. A way to select a timber mid-measurement without taking it as the end. A plain click is already the end, so either:
+     - Shift-click selects the timber under the pointer while measuring. Today shift toggles timber selection in normal mode, and while measuring it's swallowed by the measuring
+       branch, so this is just reordering two checks.
+     - The timber list: clicking a timber there selects it, so this should work once step 2 is in.
+  
+     Clicking empty space or pressing Escape would clear the target. Escape currently also drops the held end, so that needs deciding: perhaps the first Escape clears the target and
+     the second releases the end.
+  4. Hover: it already runs the same choosePickAction, so it would follow automatically. The right-click candidate list would then come from the selected timber, which is exactly your
+     housing case. Select the plate, and the rafter in front of its walls no longer wins.
+  5. Tests: choosePickAction cases for measuring with and without a selected timber on the ray, plus clearing the selection on hold.
+     
+  It's a small change: mostly choosePickAction, the hold handler and the shift-click path, plus tests. No runner changes. Want me to go ahead in a worktree, with shift-click as the
+  gesture?
 
 
 
