@@ -91,14 +91,17 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
 
     fixed = next(cut for cut in cut_timbers if cut.timber.ticket.path == FIXED_TIMBER)
     body = fixed.get_extended_rough_csg_with_perfect_features_local()
-    known = [FeatureHandle(timber=fixed.timber, hit=OwnedFeatureHit(feature=feature, owner=body))
+    faces = [FeatureHandle(timber=fixed.timber, hit=OwnedFeatureHit(feature=feature, owner=body))
              for feature in body.get_declared_features()
              if feature.feature_type().name == "FACE" and not isinstance(feature, MidplaneFeature)
              and measured_by_default(feature.properties.purpose)]
+    # The ground: where the fixed timber is and which way it lies -- its reference faces and its
+    # bottom end -- and not how big it is, which is drawn like everything else.
+    known = [handle for handle in faces if is_reference(handle)] + [_end_datum(faces, fixed.timber)]
 
     targets = [required.handle for cut in cut_timbers for required in planning_features(cut)]
     # The fixed timber's faces are targets too; each feature once.
-    directed = list({(id(handle.owner), handle.feature.name): handle for handle in targets + known}.values())
+    directed = list({(id(handle.owner), handle.feature.name): handle for handle in targets + faces}.values())
     assumptions = square_assumptions(directed, carriers)
     for view in VIEWS:
         assumptions += sheet_axis_assumptions(directed, carriers, _sheet(view)[1])
@@ -112,7 +115,7 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     candidates = sheet_candidates(visible, views, solve)
     result = auto_dimension(candidates, targets, known_rows, solve, policy)
 
-    report = [f"fixed: {FIXED_TIMBER} ({len(known)} faces known), {len(assumptions)} assumptions",
+    report = [f"fixed: {FIXED_TIMBER} (from {[_name(handle) for handle in known]}), {len(assumptions)} assumptions",
               f"targets: {len(targets)} features, {len(candidates)} candidate dimensions",
               f"left before dimensioning: {result.left_before}"]
     for count, pick in enumerate(result.picks, start=1):
