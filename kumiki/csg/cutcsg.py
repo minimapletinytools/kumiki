@@ -462,6 +462,21 @@ def measured_by_default(purpose: FeaturePurpose) -> bool:
     return purpose not in (FeaturePurpose.ROUGH_FACE, FeaturePurpose.ROUGH_RELIEF)
 
 
+class FeatureNature(Enum):
+    """Where a feature lives, which says how far it reaches.
+
+    REAL: on the solid's surface -- a face, an arris -- and cropped away with it by the cuts.
+    AUXILIARY: in a void, standing for something no surface is -- a bore's axis. Bounded by its own
+        extent, never by the solid, which has nothing there to bound it with.
+    PERFECT_REFERENCE: inside the material -- the perfect timber within's faces and centerplanes,
+        carried by rough stock. Extended, then cropped to the cut timber's solid.
+    """
+
+    REAL = 0
+    AUXILIARY = 1
+    PERFECT_REFERENCE = 2
+
+
 @dataclass(frozen=True)
 class FeatureProperties:
     """Metadata every feature carries, independent of how it is identified.
@@ -475,10 +490,9 @@ class FeatureProperties:
             pairing anyone wants is a shoulder plane against the timber's own
             prism.
         priority: lower wins when several features claim the same point.
-        real: False for a feature that names no actual surface (a bore's centre
-            axis, a reference plane). Real features can be cropped away by the
-            CSG tree and so are tested against the triangulated result first;
-            non-real ones are unaffected by boolean operations.
+        nature: where the feature lives (FeatureNature). Only a REAL one names an actual surface:
+            those can be cropped away by the CSG tree and so are tested against the triangulated
+            result first; the others are unaffected by boolean operations.
         marking_override: how to mark this feature on a drawing, when the
             default for its kind is not what is wanted. None means the default.
             Declared intent: carried, not yet read -- see FeatureMarkingSpec.
@@ -490,9 +504,13 @@ class FeatureProperties:
 
     group: FeatureGroup = FeatureGroup.NONE
     priority: int = 0
-    real: bool = True
+    nature: FeatureNature = FeatureNature.REAL
     marking_override: Optional[FeatureMarkingSpec] = None
     purpose: FeaturePurpose = FeaturePurpose.NOT_SPECIFIED
+
+    @property
+    def real(self) -> bool:
+        return self.nature is FeatureNature.REAL
 
 
 # An authored feature beats an anonymous default wherever both could answer.
@@ -528,6 +546,11 @@ def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']
     7. The order they were found in.
     """
     return sorted(hits, key=feature_hit_sort_key)
+
+
+def _derived_nature(one: 'CSGFeature', other: 'CSGFeature') -> FeatureNature:
+    """A derived feature's nature: real only where both parents are, else whichever is not."""
+    return next((parent.nature for parent in (one, other) if not parent.real), FeatureNature.REAL)
 
 
 def feature_hit_sort_key(hit: 'OwnedFeatureHit') -> Tuple:
@@ -893,8 +916,12 @@ class CSGFeature(ABC):
         return self.group.value
 
     @property
+    def nature(self) -> FeatureNature:
+        return self.properties.nature
+
+    @property
     def real(self) -> bool:
-        return self.properties.real
+        return self.nature is FeatureNature.REAL
 
     @property
     def priority(self) -> int:
@@ -1144,7 +1171,7 @@ class DerivedEdgeFeature(EdgeFeature):
             name=f"{first.feature.name}\u00d7{second.feature.name}",
             properties=FeatureProperties(
                 # An edge exists only where both its faces do.
-                real=a.feature.real and b.feature.real,
+                nature=_derived_nature(a.feature, b.feature),
                 priority=max(a.feature.priority, b.feature.priority),
                 # NONE, derived features do not create more derived features for now
                 group=FeatureGroup.NONE,
@@ -1242,7 +1269,7 @@ class DerivedPointFeature(PointFeature):
             name=f"{first.feature.name}\u00d7{second.feature.name}",
             properties=FeatureProperties(
                 # A point exists only where both its parents do.
-                real=a.feature.real and b.feature.real,
+                nature=_derived_nature(a.feature, b.feature),
                 priority=max(a.feature.priority, b.feature.priority),
                 # Nothing pairs points; see DerivedEdgeFeature on why this is
                 # said rather than defaulted.
@@ -1400,7 +1427,7 @@ class PrismCenterplaneFeature(FaceFeature):
     Solved as the midplane of its two faces, so knowing both faces solves it.
     """
     faces: Tuple[PrismFace, PrismFace] = (PrismFace.RIGHT, PrismFace.LEFT)
-    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(real=False))
+    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(nature=FeatureNature.PERFECT_REFERENCE))
 
     def __post_init__(self):
         if set(self.faces) not in ({PrismFace.RIGHT, PrismFace.LEFT}, {PrismFace.FRONT, PrismFace.BACK}):
@@ -1459,7 +1486,7 @@ class PlaneFeature(FaceFeature):
     """
     normal: Tuple[Numeric, Numeric, Numeric] = (scalar(1), scalar(0), scalar(0))
     offset: Numeric = scalar(0)
-    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(real=False))
+    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(nature=FeatureNature.AUXILIARY))
 
     def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
         transform = getattr(owner, "transform", None)
@@ -1491,7 +1518,7 @@ class MidplaneFeature(FaceFeature):
     Solved as the midplane of theirs, so knowing both solves it: it is no unknown of its own.
     """
     between: Tuple[str, str] = ("", "")
-    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(real=False))
+    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(nature=FeatureNature.AUXILIARY))
 
     def _sides(self, owner: 'CutCSG') -> Optional[Tuple['CSGFeature', 'CSGFeature']]:
         named = {feature.name: feature for feature in owner.get_declared_features()}
@@ -1800,8 +1827,8 @@ class CylinderAxisFeature(EdgeFeature):
     """
 
     @property
-    def real(self) -> bool:
-        return False
+    def nature(self) -> FeatureNature:
+        return FeatureNature.AUXILIARY
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         if self._cylinder(owner) is None:

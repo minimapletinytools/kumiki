@@ -847,7 +847,8 @@ class PerfectTimberWithin(ABC):
                 normal = safe_transform_vector(transform.orientation.matrix.T, normal)
             planes.append((face, (normal[0], normal[1], normal[2]), offset))
         on_rough = {feature.name for feature in rough.get_declared_features()}
-        perfect = FeatureProperties(group=FeatureGroup.PERFECT, real=False)
+        perfect = FeatureProperties(group=FeatureGroup.PERFECT, nature=FeatureNature.PERFECT_REFERENCE)
+        centerplane = FeatureProperties(nature=FeatureNature.PERFECT_REFERENCE)
         added: List[CSGFeature] = []
         named: Dict[TimberFace, str] = {}
         for face, normal, offset in planes:
@@ -857,9 +858,9 @@ class PerfectTimberWithin(ABC):
                 named[face] = PTW_FACE_PREFIX + face.name.lower()
                 added.append(PlaneFeature(name=named[face], normal=normal, offset=offset, properties=perfect))
         added.append(MidplaneFeature(name=PTW_FACE_PREFIX + "centerplane_left_right",
-                                     between=(named[TimberFace.RIGHT], named[TimberFace.LEFT])))
+                                     between=(named[TimberFace.RIGHT], named[TimberFace.LEFT]), properties=centerplane))
         added.append(MidplaneFeature(name=PTW_FACE_PREFIX + "centerplane_front_back",
-                                     between=(named[TimberFace.FRONT], named[TimberFace.BACK])))
+                                     between=(named[TimberFace.FRONT], named[TimberFace.BACK]), properties=centerplane))
         return cast(CutCSG, dataclass_replace(rough, extra_features=tuple(rough.extra_features) + tuple(added)))
 
     def rough_face_tags(self) -> Tuple[FeatureOverride, ...]:

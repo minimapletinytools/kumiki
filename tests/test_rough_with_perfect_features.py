@@ -97,6 +97,16 @@ class TestWhatTheyAre:
 
         assert all(not feature.real for name, feature in _features(carrying).items() if name.startswith("ptw."))
 
+    def test_all_of_them_are_perfect_references(self):
+        # Inside the material, so cropped to the cut timber -- unlike a bore's axis, in a void.
+        from kumiki.csg.cutcsg import FeatureNature
+
+        features = _features(_oversawn().get_extended_rough_csg_with_perfect_features_local())
+        added = [feature for name, feature in features.items() if name.startswith("ptw.")]
+
+        assert len(added) == 4
+        assert all(feature.nature is FeatureNature.PERFECT_REFERENCE and not feature.real for feature in added)
+
     def test_faces_are_perfect_and_centerplanes_pair_with_nothing(self):
         # As on the perfect timber within itself.
         features = _features(_oversawn().get_extended_rough_csg_with_perfect_features_local())
