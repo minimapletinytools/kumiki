@@ -13,6 +13,7 @@ from kumiki.geometry import (Line, Plane, Point, closest_stations, intersect_lin
                              intersect_planes, lines_are_coincident, planes_are_coincident,
                              planes_are_parallel, points_are_coincident)
 from kumiki.csg.cutcsg import (
+    FeatureNature,
     FaceFeature,
     hit_of_kind,
     shared_ancestor,
@@ -3090,7 +3091,7 @@ class TestFeatureProperties:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "body_right", FeatureProperties(group=FeatureGroup.PERFECT, real=False, priority=7))],
+            feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "body_right", FeatureProperties(group=FeatureGroup.PERFECT, nature=FeatureNature.AUXILIARY, priority=7))],
         )
         hit = prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert hit is not None
@@ -3551,7 +3552,7 @@ class TestFeatureOverridesAndExtras:
         return next(f for f in prism.get_declared_features() if f.name == name)
 
     def test_an_override_is_the_default_with_a_new_name_and_properties(self):
-        properties = FeatureProperties(group=FeatureGroup.SHOULDER_PLANE, real=False, priority=3)
+        properties = FeatureProperties(group=FeatureGroup.SHOULDER_PLANE, nature=FeatureNature.AUXILIARY, priority=3)
         prism = self._prism([FeatureOverride(prism_face_key(PrismFace.RIGHT), "joint", properties)])
         default = prism.default_features()[prism_face_key(PrismFace.RIGHT)]
         joint = self._named(prism, "joint")
@@ -3661,7 +3662,7 @@ class TestCSGFeatureType:
     def test_it_survives_the_round_trip_through_a_query(self):
         axis = ProgrammableEdgeFeature(
             "centre_axis",
-            properties=FeatureProperties(real=False),
+            properties=FeatureProperties(nature=FeatureNature.AUXILIARY),
             predicate=lambda owner, point, eps: True)
         hit = self._prism(axis).find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert hit is not None
@@ -3673,7 +3674,7 @@ class TestCSGFeatureType:
         """What a feature *is* and how it should be *treated* are separate."""
         feature = SimpleRectangularPrismFeature(
             "r", face=PrismFace.RIGHT,
-            properties=FeatureProperties(group=FeatureGroup.PERFECT, real=False),
+            properties=FeatureProperties(group=FeatureGroup.PERFECT, nature=FeatureNature.AUXILIARY),
         )
         assert feature.feature_type() == CSGFeatureType.FACE
         assert feature.group == FeatureGroup.PERFECT
@@ -3854,7 +3855,7 @@ class TestFeatureExtent:
 
 
 class TestNonRealFeatures:
-    """real=False features name nothing the CSG tree could have cut away."""
+    """nature=FeatureNature.AUXILIARY features name nothing the CSG tree could have cut away."""
 
     def _bore_in_a_timber(self, axis_feature):
         body = RectangularPrism(
@@ -3878,7 +3879,7 @@ class TestNonRealFeatures:
         """A bore's centre axis: real geometry nowhere, selectable anyway."""
         return ProgrammableEdgeFeature(
             "peg_axis",
-            properties=FeatureProperties(real=False),
+            properties=FeatureProperties(nature=FeatureNature.AUXILIARY),
             predicate=lambda owner, point, eps: safe_zero_test_sq(
                 float(point[1]) ** 2 + (float(point[2]) - 5.0) ** 2, eps))
 
@@ -3906,9 +3907,9 @@ class TestNonRealFeatures:
             feature_overrides=[FeatureOverride(prism_face_key(PrismFace.RIGHT), "the_face",
                                                FeatureProperties(priority=0))],
             extra_features=[ProgrammableEdgeFeature("the_axis",
-                                                   properties=FeatureProperties(real=False, priority=99),
+                                                   properties=FeatureProperties(nature=FeatureNature.AUXILIARY, priority=99),
                                                    predicate=lambda owner, point, eps: True),
-                            ProgrammableFaceFeature("the_plane", properties=FeatureProperties(real=False),
+                            ProgrammableFaceFeature("the_plane", properties=FeatureProperties(nature=FeatureNature.AUXILIARY),
                                                     predicate=lambda owner, point, eps: True)],
         )
         on_face = create_v3(scalar(2), scalar(0), scalar(5))
@@ -3926,7 +3927,7 @@ class TestNonRealFeatures:
             end_distance=scalar(10),
             extra_features=[ProgrammableEdgeFeature(
                     "centre_line",
-                    properties=FeatureProperties(real=False),
+                    properties=FeatureProperties(nature=FeatureNature.AUXILIARY),
                     predicate=lambda owner, point, eps: safe_zero_test_sq(
                         float(point[0]) ** 2 + float(point[1]) ** 2, eps))],
         )
@@ -4347,7 +4348,7 @@ class TestDerivedEdges:
         prism = self._prism(
             self._face("right", PrismFace.RIGHT),
             FeatureOverride(prism_face_key(PrismFace.FRONT), "front",
-                            FeatureProperties(group=FeatureGroup.SHOULDER_PLANE, real=False)),
+                            FeatureProperties(group=FeatureGroup.SHOULDER_PLANE, nature=FeatureNature.AUXILIARY)),
         )
         edge = DerivedEdgeFeature.derive(self._owned(prism, "right"), self._owned(prism, "front"))
         assert edge is not None and edge.real is False
@@ -4652,7 +4653,7 @@ class TestACylindersAxis:
             axis_direction=create_v3(0, 0, 1), radius=scalar(1),
             position=create_v3(2, 3, 0), start_distance=scalar(0), end_distance=scalar(10),
             extra_features=[CylinderAxisFeature(
-                "peg_hole_axis", properties=FeatureProperties(real=True))])
+                "peg_hole_axis", properties=FeatureProperties())])
         assert not self._axis(bore).real
 
     def test_it_runs_down_the_middle(self):
@@ -4701,7 +4702,7 @@ class TestACylindersAxis:
         assert axis.test_point_unbounded(bore, create_v3(scalar(2), scalar(3), scalar(50)))
 
     def test_it_is_selectable_in_the_void_the_bore_made(self):
-        """Which is what real=False buys: no boundary gate, so it survives there."""
+        """Which is what nature=FeatureNature.AUXILIARY buys: no boundary gate, so it survives there."""
         body = RectangularPrism(
             size=Matrix([scalar(8), scalar(8)]), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(20))
@@ -4867,7 +4868,7 @@ class TestDerivedPoints:
         ghost = self._plane(create_v3(0, 0, 1), scalar(5))
         ghost = OwnedFeatureHit(
             feature=HalfSpaceFeature("shoulder", properties=FeatureProperties(
-                group=FeatureGroup.SHOULDER_PLANE, real=False)),
+                group=FeatureGroup.SHOULDER_PLANE, nature=FeatureNature.AUXILIARY)),
             owner=ghost.owner)
         point = DerivedPointFeature.derive(self._arris(), ghost)
 
