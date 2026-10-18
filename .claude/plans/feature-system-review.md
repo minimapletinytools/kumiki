@@ -11,6 +11,23 @@ The short version: each new capability was added where the bug that asked for it
 one concept -- *where a feature is* -- is now worked out in five places, three of them different.
 Most of the simplification is giving a few concepts one home each.
 
+## Status
+
+| Item | State | Where |
+|---|---|---|
+| 1. FeatureExtent | Done | #112; the solver too, and the approximate plane crop removed, #113 |
+| 2. sheet_shape | Done | #115 |
+| 3. Domain logic out of the runner | Done | #117: `drawings/measuring.py`, `drawings/cameras.py`, picking into `viewer/picking.py` |
+| 4. The Pick split | Done | #117: `navigate`, `find_candidates`, `choose` -> `Pick` |
+| 5. Caches with a home | Done, but one part | #114: per-tree extents in `csg`, `Solve` / `DrawingSolve`, no `__dict__` stashing. The per-timber `TimberFeatures` index of declared features was skipped: `get_declared_features` is about 1% of the generator's time |
+| 6. Visibility written once | Done | #116 |
+| 7. Vector helpers | Done | #111 (`as_ndarray`, `unit_ndarray` in `rule.py`); `exact_scalar` deleted, #118 |
+| 8. Smaller things | Done, but one part | Names, the duplicate centerplane class, the overlays module (#110); the perfect tree's one use documented (#119); one flow page, `docs/internal/featureflow.md` (#120). `picking.py` kept one file, by choice. `feature_at` / `extract_highlight_mesh` left as they are: each is one `feature.real` check, which `FeatureExtent` does not replace, since the highlight walks the rendered mesh |
+
+Also: the feature solver moved to `kumiki/csg` with its own measurement types; `planar_region` is
+`cross_sections`. Generator time on the rough cute frame: 725 ms before #113, about 550 ms after.
+What is left for speed is in `visibility-performance.md`.
+
 ## 1. "Where a feature is" is computed five ways
 
 The single biggest source of complication. Given a feature on a cut timber, the code needs: its
