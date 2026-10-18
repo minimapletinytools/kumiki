@@ -223,8 +223,8 @@ class PairPlacement:
     """Where a measurement between two features sits, and what it comes to: anchors for a distance,
     a corner for an angle, neither when the pair admits nothing.
 
-    `extents` are each end's line as far as the feature goes, (start, end) in world space, or None
-    for a point or a plane: where an anchor or the corner is past them, the viewer draws the line
+    `extents`, for a distance, are each end's line as far as the feature goes, (start, end) in world
+    space, or None for a point or a plane: where an anchor is past them, the viewer draws the line
     on to it. `slide` is the direction the anchors slide in (MeasurementPlacement.along), for a
     distance between two lines; None where they cannot slide.
     """
@@ -256,9 +256,10 @@ def place_pair(one: Optional[Located], other: Optional[Located], one_span: Measu
     """
     admitted = (three_d_kinds(one, other) if in_three_d else projected_kinds(one, other, plane))
     kind = declared or (admitted[0] if admitted else None)
-    anchors, rays, slide = None, None, None
+    anchors, rays, slide, extents = None, None, None, (None, None)
     if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
         anchors = distance_anchors(one_span, other_span, kind, view, along)
+        extents = (_extent(one_span), _extent(other_span))
         if (kind.direction is MeasurementDirection.PERPENDICULAR
                 and isinstance(one_span, LineSpan) and isinstance(other_span, LineSpan)):
             slide = slide_axis(one_span)
@@ -266,7 +267,7 @@ def place_pair(one: Optional[Located], other: Optional[Located], one_span: Measu
         rays = angle_rays(one_span, other_span)
     return PairPlacement(kind, tuple(admitted), anchors, rays,
                          settle(one, other, rays, declared, kind, admitted, in_three_d, plane, view),
-                         extents=(_extent(one_span), _extent(other_span)), slide=slide)
+                         extents=extents, slide=slide)
 
 
 @dataclass(frozen=True)
