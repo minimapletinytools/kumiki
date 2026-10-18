@@ -19,6 +19,7 @@ from ..geometry import Line, Plane
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
 from .drawing import ViewAxes
+from .sheet_shape import SheetPoint, sheet_shape
 from ..csg.feature_extent import extents_of
 
 #: Material nearer the place than this is the surface it lies on, not something in front of it.
@@ -77,17 +78,16 @@ def nearest_visible_depth(
     point = as_ndarray(transform.local_to_global(located.point))
     if not handle.feature.real:
         return float(point @ look)
+    shape = sheet_shape(located, as_ndarray(transform.global_to_local_direction(create_v3(*look))))
+    if shape is None:
+        return None  # a face seen at an angle: drawn as an area, not a line
+    if isinstance(shape, SheetPoint):
+        return _end_on_depth(located, root, transform, look, occluders, reach)
     if isinstance(located, Plane):
         normal = as_ndarray(transform.local_to_global_direction(located.normal))
     else:
-        run = as_ndarray(transform.local_to_global_direction(located.direction))
-        run /= np.linalg.norm(run)
-        if abs(abs(float(run @ look)) - 1) < 1e-9:
-            return _end_on_depth(located, root, transform, look, occluders, reach)
-        normal = np.cross(run, look)
+        normal = np.cross(as_ndarray(transform.local_to_global_direction(located.direction)), look)
     normal /= np.linalg.norm(normal)
-    if abs(float(normal @ look)) > 1e-9:
-        return None  # seen at an angle: drawn as an area, not a line
     across = np.cross(look, normal)
     # One frame per plane, whichever feature asks: its point nearest the world's origin.
     offset = float(normal @ point)

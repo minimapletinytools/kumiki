@@ -19,9 +19,10 @@ from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
-from ..rule import as_ndarray
+from ..rule import as_ndarray, create_v3, unit_ndarray
 from .drawing import Measure, MeasurementKind, ViewAxes
 from .measure_solving import DrawingSolve
+from .sheet_shape import SQUARE_TO_VIEW, SheetPoint, sheet_shape
 
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 
@@ -256,33 +257,30 @@ def auto_dimension(
 
 
 def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[Tuple]:
-    """How a feature draws, looking along `look`, in world space.
+    """How a feature draws, looking along `look`, in world space (sheet_shape).
 
     ("line", in-sheet unit normal, offset along it) for a face seen edge-on or a line lying along
-    the sheet; ("point", position) for a line seen end-on; None for anything seen at an angle.
+    the sheet; ("point", position) for a line seen end-on; None for anything else. A line slanting
+    into the sheet draws foreshortened, so nothing is measured along it.
     """
     located = handle.feature.locate_simple_unbounded(handle.owner)
+    if not isinstance(located, (Line, Plane)):
+        return None
     transform = handle.timber.transform
-    if isinstance(located, Plane):
-        normal, point = located.normal, located.point
-    elif isinstance(located, Line):
-        normal, point = located.direction, located.point
-    else:
+    look_local = unit_ndarray(as_ndarray(transform.global_to_local_direction(create_v3(*look))))
+    shape = sheet_shape(located, look_local)
+    if shape is None:
         return None
-    direction = as_ndarray(transform.local_to_global_direction(normal))
-    direction /= np.linalg.norm(direction)
-    at = as_ndarray(transform.local_to_global(point))
-    along_look = float(direction @ look)
+    at = as_ndarray(transform.local_to_global(create_v3(*shape.at)))
+    if isinstance(shape, SheetPoint):
+        return ("point", at)
     if isinstance(located, Line):
-        if abs(abs(along_look) - 1) < 1e-9:
-            return ("point", at)
-        if abs(along_look) > 1e-9:
+        slant = float(unit_ndarray(as_ndarray(located.direction)) @ look_local)
+        if abs(slant) > SQUARE_TO_VIEW:
             return None
-        direction = np.cross(direction, look)
-        direction /= np.linalg.norm(direction)
-    elif abs(along_look) > 1e-9:
-        return None
-    return ("line", direction, float(direction @ at))
+    run = as_ndarray(transform.local_to_global_direction(create_v3(*shape.run)))
+    normal = unit_ndarray(np.cross(run, look))
+    return ("line", normal, float(normal @ at))
 
 
 def _separation(one: Tuple, other: Tuple) -> Optional[float]:

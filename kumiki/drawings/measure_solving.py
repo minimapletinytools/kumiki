@@ -12,10 +12,12 @@ import numpy as np
 from ..csg.feature_paths import FeatureHandle
 from ..csg.carriers import Row
 from ..csg.feature_solving import Solve, SolveAngle, SolveDistance, SolveMeasurement
+from ..geometry import Line, Plane
 from ..rule import Matrix, as_ndarray, unit_ndarray
 from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, MeasurementKind, MeasurementOperation,
                       MeasurementSpace, PointSpan, ViewAxes, distance_anchors)
 from .feature_span import feature_span
+from .sheet_shape import SheetLine, sheet_shape
 
 if TYPE_CHECKING:
     from ..timber import CutTimber
@@ -44,20 +46,22 @@ def _measured_span(handle: FeatureHandle, cut_timbers: Sequence['CutTimber'],
 
 
 def _projected(span: MeasureSpan, look: np.ndarray) -> MeasureSpan:
-    """A span as it is seen on a sheet looking along `look`: a point stays a point, an edge-on face is a line."""
+    """A span as it is seen on a sheet looking along `look` (sheet_shape): a point stays a point, a
+    line seen end-on is one, an edge-on face is a line."""
     if isinstance(span, PointSpan):
         return span
     if isinstance(span, LineSpan):
-        flat = as_ndarray(span.along) - look * float(as_ndarray(span.along) @ look)
-        if np.linalg.norm(flat) < 1e-9:
+        shape = sheet_shape(Line(direction=span.along, point=span.at), look)
+        if not isinstance(shape, SheetLine):
             return PointSpan(at=span.at)
-        scale = float(np.linalg.norm(flat))
+        # Lengths along the line shrink by how far it leans into the sheet.
+        scale = float(as_ndarray(span.along) @ shape.run)
         interval = None if span.interval is None else (span.interval[0] * scale, span.interval[1] * scale)
-        return LineSpan(at=span.at, direction=Matrix(flat / scale), interval=interval)
-    edge = np.cross(as_ndarray(span.facing), look)
-    if np.linalg.norm(edge) < 1e-9 or abs(float(as_ndarray(span.facing) @ look)) > 1e-6:
+        return LineSpan(at=span.at, direction=Matrix(shape.run), interval=interval)
+    shape = sheet_shape(Plane(normal=span.facing, point=span.at), look)
+    if not isinstance(shape, SheetLine):
         raise ValueError("a face seen at an angle covers the sheet, so nothing is measured to it")
-    return LineSpan(at=span.at, direction=Matrix(unit_ndarray(edge)))
+    return LineSpan(at=span.at, direction=Matrix(shape.run))
 
 
 def _on_feature(span: MeasureSpan, anchor: np.ndarray, look: np.ndarray) -> np.ndarray:
