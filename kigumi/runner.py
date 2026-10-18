@@ -975,11 +975,6 @@ def prism_to_mesh(prism: Any) -> MeshWire:
     }
 
 
-def _build_perfect_timber_within_csg_local(cut_timber: 'CutTimber') -> 'CutCSG':
-    """The perfect timber within with the same cuts applied, for previewing non-perfect timbers."""
-    return cut_timber.render_perfect_timber_within_with_cuts_csg_local()
-
-
 def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> TriangulatedMesh:
     """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
     from kumiki.csg.cutcsg import adopt_csg
@@ -1150,7 +1145,7 @@ def _cut_timber_to_triangle_mesh_payload(
     # so the viewer can swap meshes locally without round-tripping to Python.
     if has_non_rectangular_actual:
         try:
-            perfect_csg = _build_perfect_timber_within_csg_local(cut_timber)
+            perfect_csg = cut_timber.render_perfect_timber_within_with_cuts_csg_local()
             perfect = _triangulate_local_csg(cut_timber, perfect_csg)
             payload["perfectTimberWithinVertices"] = perfect["vertices"]
             payload["perfectTimberWithinIndices"] = perfect["indices"]
