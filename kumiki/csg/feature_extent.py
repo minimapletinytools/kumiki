@@ -144,15 +144,15 @@ class FeatureExtents:
         # Everything that matters is within reach of the timber's middle.
         self.near = create_v3(0, 0, length / 2)
         self.reach = 4 * (length + float(max(timber.size[0], timber.size[1])))
-        self._extent_cache: Dict[Tuple[int, str], Optional[FeatureExtent]] = {}
+        self._extent_memo: Dict[Tuple[int, str], Optional[FeatureExtent]] = {}
 
     def of(self, feature: CSGFeature, owner: CutCSG) -> Optional[FeatureExtent]:
         """The extent of `feature`, declared on `owner` (a node of this timber's tree); None where it
         cannot be placed -- a curved face, or a tree that cannot be cut by its plane."""
         key = (id(owner), feature.name)
-        if key not in self._extent_cache:
-            self._extent_cache[key] = self._work_out(feature, owner)
-        return self._extent_cache[key]
+        if key not in self._extent_memo:
+            self._extent_memo[key] = self._work_out(feature, owner)
+        return self._extent_memo[key]
 
     def _work_out(self, feature: CSGFeature, owner: CutCSG) -> Optional[FeatureExtent]:
         located = feature.locate_simple_unbounded(owner)
@@ -178,14 +178,14 @@ class FeatureExtents:
 
 # One FeatureExtents per tree, for as long as the tree lives. Keyed by identity -- a tree is not
 # hashable -- and dropped when the tree is.
-_extents_cache: Dict[int, FeatureExtents] = {}
+_extents_memo: Dict[int, FeatureExtents] = {}
 
 
 def extents_of(root: CutCSG, timber: 'PerfectTimberWithin') -> FeatureExtents:
     """The FeatureExtents of a cut timber's tree, kept for as long as the tree is."""
-    extents = _extents_cache.get(id(root))
+    extents = _extents_memo.get(id(root))
     if extents is None or extents.root is not root:
         extents = FeatureExtents(root, timber)
-        _extents_cache[id(root)] = extents
-        weakref.finalize(root, _extents_cache.pop, id(root), None)
+        _extents_memo[id(root)] = extents
+        weakref.finalize(root, _extents_memo.pop, id(root), None)
     return extents

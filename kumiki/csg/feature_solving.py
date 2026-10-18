@@ -133,13 +133,13 @@ class Solve:
     def __init__(self, cut_timbers: Sequence['CutTimber']):
         self.cut_timbers: Tuple['CutTimber', ...] = tuple(cut_timbers)
         self.carriers = carrier_map_of(*self.cut_timbers)
-        self._dof_rows_cache: Dict[FeatureHandle, List[Row]] = {}
+        self._dof_rows_memo: Dict[FeatureHandle, List[Row]] = {}
 
     def dof_rows(self, handle: FeatureHandle) -> List[Row]:
         """The feature's own DOFs as rows (feature_handle_dof_rows)."""
-        if handle not in self._dof_rows_cache:
-            self._dof_rows_cache[handle] = feature_handle_dof_rows(handle, self.carriers)
-        return self._dof_rows_cache[handle]
+        if handle not in self._dof_rows_memo:
+            self._dof_rows_memo[handle] = feature_handle_dof_rows(handle, self.carriers)
+        return self._dof_rows_memo[handle]
 
     def measure_row(self, measure: SolveMeasurement) -> Row:
         return measure_row(measure, self.carriers)

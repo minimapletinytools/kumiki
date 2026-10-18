@@ -2891,12 +2891,12 @@ class RectangularPrism(HasFeatures, CutCSG):
 
     # Every prism has the same defaults (they locate against their owner), so
     # they are built once and shared.
-    _default_features_cache: ClassVar[Optional[Dict[FeatureKey, CSGFeature]]] = None
+    _default_features_memo: ClassVar[Optional[Dict[FeatureKey, CSGFeature]]] = None
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        if RectangularPrism._default_features_cache is None:
-            RectangularPrism._default_features_cache = self._build_default_features()
-        return dict(RectangularPrism._default_features_cache)
+        if RectangularPrism._default_features_memo is None:
+            RectangularPrism._default_features_memo = self._build_default_features()
+        return dict(RectangularPrism._default_features_memo)
 
     def _build_default_features(self) -> Dict[FeatureKey, CSGFeature]:
         features: Dict[FeatureKey, CSGFeature] = {}
