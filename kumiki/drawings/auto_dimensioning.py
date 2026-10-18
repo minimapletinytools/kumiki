@@ -10,7 +10,7 @@ Temporary, and expected to be renamed.
 import warnings
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -23,6 +23,9 @@ from ..timber_features import TimberFeature
 from ..rule import as_ndarray
 from .drawing import Measure, MeasurementKind, ViewAxes
 from .measure_solving import SpanCache, solve_measurement
+
+if TYPE_CHECKING:
+    from ..timber import CutTimber
 
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 
@@ -39,6 +42,7 @@ class DimensionCandidate:
     length: float
     axes: ViewAxes = field(repr=False, compare=False)
     carriers: CarrierMap = field(repr=False, compare=False)
+    cut_timbers: Sequence['CutTimber'] = field(repr=False, compare=False)
     #: Shared by every candidate of one solve.
     spans: SpanCache = field(repr=False, compare=False)
 
@@ -46,7 +50,7 @@ class DimensionCandidate:
     def row(self) -> Optional[Row]:
         """What the measurement fixes (measure_row), or None where it cannot be written as a row."""
         try:
-            return measure_row(solve_measurement(self.measure, self.axes, self.spans), self.carriers)
+            return measure_row(solve_measurement(self.measure, self.cut_timbers, self.axes, self.spans), self.carriers)
         except ValueError:
             return None
 
@@ -303,6 +307,7 @@ def _separation(one: Tuple, other: Tuple) -> Optional[float]:
 
 def sheet_candidates(
     anchors: Mapping[str, Sequence[FeatureHandle]], carriers: CarrierMap, views: Mapping[str, ViewAxes],
+    cut_timbers: Sequence['CutTimber'],
 ) -> List[DimensionCandidate]:
     """Every perpendicular dimension a view can draw between two of the anchors it can see.
 
@@ -323,5 +328,5 @@ def sheet_candidates(
                 if length is None or length < 1e-9:
                     continue
                 candidates.append(DimensionCandidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes,
-                                                      carriers, spans))
+                                                      carriers, cut_timbers, spans))
     return candidates

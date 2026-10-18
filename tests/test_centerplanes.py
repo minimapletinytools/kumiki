@@ -29,7 +29,7 @@ def timber():
 def _left(cut_timber, known, measures, target):
     carriers = carrier_map_of(cut_timber)
     rows = [row for handle in known for row in feature_handle_dof_rows(handle, carriers)]
-    rows += [measure_row(solve_measurement(measure), carriers) for measure in measures]
+    rows += [measure_row(solve_measurement(measure, [cut_timber]), carriers) for measure in measures]
     return remaining(rows, [row for handle in target for row in feature_handle_dof_rows(handle, carriers)]).count
 
 

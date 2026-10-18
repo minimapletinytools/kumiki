@@ -11,16 +11,16 @@ from dataclasses import dataclass
 
 from kumiki.csg.cutcsg import AxisAlignedBoundingBox, CutCSG, HalfSpace, RectangularPrism
 from kumiki.geometry import (
-    ConvexPlanarRegion, Line, LineSegment, Plane, frame_for_plane,
+    ConvexPlanarRegion, Line, LineSegment, Plane,
 )
 from kumiki.csg.cropcsg import (
-    approximately_crop_plane_to_area_on_csg,
     BoundsKind,
     solid_bounds,
     convex_hull_2d,
     crop_line_to_segments_on_csg,
 )
-from kumiki.rule import Matrix, Transform, create_v2, create_v3, mm, scalar
+from kumiki.csg.cross_sections import cross_section_centroid, cross_section_polygons, plane_cross_section
+from kumiki.rule import Matrix, Transform, as_ndarray, create_v2, create_v3, mm, scalar
 from tests.testing_shavings import present
 
 
@@ -51,10 +51,16 @@ def _dot(a, b):
 # refusal further down, calling them by their real names. These are for the far
 # more common case of a test that knows the answer is there: `present` says so,
 # and fails with that sentence rather than a TypeError on None a line later.
-def _area(plane, bounding, **options):
-    """The area a plane covers within some solids, which is expected to exist."""
-    return present(
-        approximately_crop_plane_to_area_on_csg(plane, bounding, **options), "an area")
+def _section(plane, csg, near=None):
+    """Where a plane crosses a solid (plane_cross_section), which is expected to be answerable."""
+    return present(plane_cross_section(plane, csg, near if near is not None else _v(0, 0, 0), 10), "a cross-section")
+
+
+def _section_reach(section, direction):
+    """How far a cross-section reaches along a direction, as (min, max)."""
+    along = as_ndarray(direction)
+    stations = [float(point @ along) for polygon in cross_section_polygons(section) for point in polygon]
+    return min(stations), max(stations)
 
 
 def _segments(line, csg, **options):
@@ -65,31 +71,6 @@ def _segments(line, csg, **options):
 def _reach(area, direction):
     """How far an area reaches along a direction, as (min, max)."""
     return present(area.extent_along(direction), "an extent")
-
-
-class TestPlaneFrame:
-    def test_the_axes_are_perpendicular_to_the_normal_and_each_other(self):
-        for normal in (_v(0, 0, 1), _v(1, 0, 0), _v(0.3, -0.5, 0.81)):
-            frame = frame_for_plane(Plane(normal=normal, point=_v(0, 0, 0)))
-
-            assert _dot(frame.u, normal) == pytest.approx(0, abs=1e-9)
-            assert _dot(frame.v, normal) == pytest.approx(0, abs=1e-9)
-            assert _dot(frame.u, frame.v) == pytest.approx(0, abs=1e-9)
-
-    def test_a_point_survives_the_round_trip(self):
-        frame = frame_for_plane(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 5)))
-
-        assert frame.to_2d(frame.to_3d(2.0, -3.0)) == pytest.approx((2.0, -3.0), abs=1e-9)
-
-    def test_the_origin_can_be_put_near_something(self):
-        # A plane's own point may be nowhere near the material: an extended
-        # cutter's face plane holds a point out where the cutter ends. Starting
-        # there and clipping to the timber leaves nothing.
-        far = Plane(normal=_v(0, 0, 1), point=_v(0, 500, 0))
-
-        frame = frame_for_plane(far, near=_v(0, 0, 0))
-
-        assert frame.to_2d(_v(0, 0, 0)) == pytest.approx((0.0, 0.0), abs=1e-9)
 
 
 class TestBoundingHalfSpaces:
@@ -139,80 +120,64 @@ class TestBoundingHalfSpaces:
                 list(solid_bounds(csg).require_faces())
 
 
-class TestRegionInPlane:
+class TestPlaneCrossSection:
+    """plane_cross_section, through the half spaces solid_bounds gives each primitive."""
+
     def test_a_plane_through_a_box_is_the_box_cross_section(self):
         box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5))
+        section = _section(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)), box)
 
-        region = _area(plane, [box], seed_reach=10, near=_v(0, 0, 0))
-
-        assert len(region.boundary) == 4
-        width = _reach(region, _v(1, 0, 0))
-        height = _reach(region, _v(0, 1, 0))
+        width = _section_reach(section, _v(1, 0, 0))
+        height = _section_reach(section, _v(0, 1, 0))
         assert width[1] - width[0] == pytest.approx(0.1, abs=1e-9)
         assert height[1] - height[0] == pytest.approx(0.2, abs=1e-9)
 
     def test_an_unbounded_solid_is_cropped_by_a_bounded_one(self):
-        # The whole point: a half space has no extent of its own, and gets one
-        # from whatever encloses it.
+        # A half space has no extent of its own, and gets one from whatever it is intersected with.
+        from kumiki.csg.cutcsg import Intersection
+
         timber = _box(size=(0.1, 0.2), start=0.0, end=1.0)
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5))
+        half = HalfSpace(normal=_v(1, 0, 0), offset=scalar(0))
+        section = _section(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)), Intersection(half, timber))
 
-        region = _area(plane, [HalfSpace(normal=_v(0, 0, 1), offset=scalar(0)), timber],
-                                 seed_reach=10, near=_v(0, 0, 0))
-
-        assert len(region.boundary) == 4
-        assert _reach(region, _v(1, 0, 0))[1] == pytest.approx(0.05, abs=1e-9)
+        assert _section_reach(section, _v(1, 0, 0)) == pytest.approx((0.0, 0.05), abs=1e-9)  # x >= 0 of the box
 
     def test_a_plane_that_misses_everything_leaves_nothing(self):
         # Which is how a feature says it is not on the finished piece at all.
-        box = _box(start=0.0, end=1.0)
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 5))
+        section = _section(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 5)), _box(start=0.0, end=1.0), near=_v(0, 0, 5))
 
-        region = _area(plane, [box], seed_reach=20, near=_v(0, 0, 5))
-
-        assert region.is_empty
+        assert not section[1]
 
     def test_it_gives_up_rather_than_returning_too_much(self):
-        # A region clipped by only the solids it understood would be silently
-        # larger than the truth, which is worse than no answer.
+        # A section of only the solids it understood would be silently wrong.
+        from kumiki.csg.cutcsg import SolidUnion
+
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
 
-        assert approximately_crop_plane_to_area_on_csg(
-            plane, [_box(), _undescribable()], seed_reach=10, near=_v(0, 0, 0)) is None
+        assert plane_cross_section(plane, SolidUnion(children=[_box(), _undescribable()]), _v(0, 0, 0), 10) is None
 
-    def test_an_empty_solid_crops_everything_away_rather_than_giving_up(self):
-        # "Contains nothing" is an answer; "cannot describe" is not. The two
-        # crops used to disagree about which one this was, and an empty solid
-        # is not hypothetical -- a timber whose stock is already perfect puts
-        # one in its own tree.
+    def test_an_empty_solid_crosses_nothing_rather_than_giving_up(self):
+        # "Contains nothing" is an answer; "cannot describe" is not. A timber whose stock is
+        # already perfect puts one in its own tree.
         from kumiki.csg.cutcsg import EmptyCSG
 
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
-
-        region = _area(
-            plane, [_box(), EmptyCSG()], seed_reach=10, near=_v(0, 0, 0))
-
-        assert region is not None and region.is_empty
+        assert not _section(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)), EmptyCSG())[1]
 
     def test_the_centroid_lies_in_the_plane(self):
         box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.25))
 
-        centre = _area(plane, [box], seed_reach=10, near=_v(0, 0, 0)).centroid()
+        centre = cross_section_centroid(_section(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.25)), box))
 
-        assert float(centre[2, 0]) == pytest.approx(0.25, abs=1e-9)
+        assert centre is not None and centre[2] == pytest.approx(0.25, abs=1e-9)
 
+
+class TestConvexPlanarRegion:
     def test_extent_along_answers_for_any_direction(self):
-        # What makes orienting the region to a viewport unnecessary: ask along
-        # the viewport's own axes and the answer is the bounds in that view.
-        box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
-        region = _area(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
-                                 [box], seed_reach=10, near=_v(0, 0, 0))
+        square = (_v(1, -1, 0), _v(-1, -1, 0), _v(-1, 1, 0), _v(1, 1, 0))
+        region = ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)), boundary=square)
 
-        diagonal = _v(0.7071, 0.7071, 0)
-        along = _reach(region, diagonal)
-        assert along[1] > along[0]
+        low, high = _reach(region, _v(0.7071, 0.7071, 0))
+        assert high - low == pytest.approx(2 * 2 * 0.7071, abs=1e-9)
 
     def test_an_empty_region_has_no_centroid_to_offer(self):
         assert ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
@@ -291,10 +256,8 @@ class TestLoftedSolids:
         taper = self._loft(self._square(0.1), self._square(0.05))
 
         for height, width in ((0.0, 0.2), (0.5, 0.15), (1.0, 0.1)):
-            region = _area(
-                Plane(normal=_v(0, 0, 1), point=_v(0, 0, height)),
-                [taper], seed_reach=10, near=_v(0, 0, 0))
-            low, high = _reach(region, _v(1, 0, 0))
+            section = _section(Plane(normal=_v(0, 0, 1), point=_v(0, 0, height)), taper)
+            low, high = _section_reach(section, _v(1, 0, 0))
             assert high - low == pytest.approx(width, abs=1e-9), height
 
 
@@ -1023,22 +986,13 @@ class TestCurvedAndPointyPrimitives:
         assert len(solid_bounds(self._cylinder(start=None, end=None)).require_faces()) == 6
 
     def test_the_hexagon_contains_the_cylinder(self):
-        # Outwards, per the rule at the top of cropcsg: one direction,
-        # consistently, so that what a region excludes really is excluded.
-        region = _area(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
-                                 [self._cylinder(radius=0.05)], seed_reach=10, near=_v(0, 0, 0))
-        across = _reach(region, _v(1, 0, 0))
+        # Outwards, per the rule at the top of cropcsg: one direction, consistently, so that what
+        # a bound excludes really is excluded. Tangent sides: each exactly the radius out.
+        faces = solid_bounds(self._cylinder(radius=0.05)).require_faces()
+        sides = [(normal, point) for normal, point in faces if abs(float(normal[2, 0])) < 1e-9]
 
-        # Tangent faces, so it holds the diameter exactly across the flats,
-        # and reaches past it at the corners -- never short of it.
-        assert across[1] - across[0] >= 0.1 - 1e-9
-        assert across[1] - across[0] < 0.125  # 2r/cos(30) at the widest
-
-    def test_a_cylinder_sections_as_a_hexagon(self):
-        region = _area(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
-                                 [self._cylinder()], seed_reach=10, near=_v(0, 0, 0))
-
-        assert len(region.boundary) == 6
+        assert len(sides) == 6
+        assert all(_dot(normal, point) == pytest.approx(0.05, abs=1e-9) for normal, point in sides)
 
     def _extrusion(self, points, start=0.0, end=2.0):
         from kumiki.csg.cutcsg import ConvexPolygonExtrusion
@@ -1063,9 +1017,7 @@ class TestCurvedAndPointyPrimitives:
 
     def test_an_extrusion_sections_to_its_cross_section(self):
         square = self._extrusion([(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)])
-        region = _area(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 1)),
-                                 [square], seed_reach=10, near=_v(0, 0, 0))
-        across = _reach(region, _v(1, 0, 0))
+        across = _section_reach(_section(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 1)), square), _v(1, 0, 0))
 
         assert across[1] - across[0] == pytest.approx(1.0, abs=1e-9)
 
