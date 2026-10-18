@@ -1,7 +1,7 @@
 """Carriers: the planes, lines, points and barrels a CSG's features lie on, and their unknowns.
 
 A primitive names its carriers (`CutCSG.carriers`), and each feature names the carriers that
-produce it (`CSGFeature.solve_recipe`). Rows over the unknowns are in drawings/solve_recipe.py.
+produce it (`CSGFeature.solve_recipe`). Rows over the unknowns are in csg/solve_recipe.py.
 """
 
 from dataclasses import dataclass

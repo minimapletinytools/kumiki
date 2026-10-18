@@ -6,9 +6,10 @@ from kumiki.construction import create_timber
 from kumiki.csg.cutcsg import OwnedFeatureHit
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.drawings.drawing import Measure
-from kumiki.drawings.dof_solver import remaining
-from kumiki.drawings.feature_solving import carrier_map_of, feature_handle_dof_rows, measure_row
-from kumiki.drawings.required_features import Reason, required_features
+from kumiki.drawings.measure_solving import solve_measurement
+from kumiki.csg.dof_solver import remaining
+from kumiki.csg.feature_solving import carrier_map_of, feature_handle_dof_rows, measure_row
+from kumiki.csg.required_features import Reason, required_features
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.timber import CutTimber
 
@@ -28,7 +29,7 @@ def timber():
 def _left(cut_timber, known, measures, target):
     carriers = carrier_map_of(cut_timber)
     rows = [row for handle in known for row in feature_handle_dof_rows(handle, carriers)]
-    rows += [measure_row(measure, carriers) for measure in measures]
+    rows += [measure_row(solve_measurement(measure), carriers) for measure in measures]
     return remaining(rows, [row for handle in target for row in feature_handle_dof_rows(handle, carriers)]).count
 
 

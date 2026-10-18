@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from kumiki.csg.cutcsg import CutCSGLabel, Difference, RectangularPrism
-from kumiki.drawings.required_features import required_features
+from kumiki.csg.required_features import required_features
 from kumiki.drawings.visibility import nearest_visible_depth, sight_is_blocked
 from kumiki.rule import Transform, create_v2, create_v3, scalar
 

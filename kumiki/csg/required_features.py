@@ -2,14 +2,16 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Iterator, List
+from typing import TYPE_CHECKING, Callable, Iterator, List
 
-from ..csg.cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
+from .cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
                      OwnedFeatureHit, csg_children, measured_by_default)
-from ..csg.feature_paths import FeatureHandle
-from ..csg.cross_sections import face_reaches_surface
+from .feature_paths import FeatureHandle
+from .cross_sections import face_reaches_surface
 from ..rule import V3, create_v3
-from ..timber import CutTimber
+
+if TYPE_CHECKING:
+    from ..timber import CutTimber
 
 # Whether a flat face is on the finished surface: (face, root, near, reach) -> bool.
 FaceTest = Callable[[FeatureHandle[FaceFeature], CutCSG, V3, float], bool]
@@ -35,7 +37,7 @@ def _nodes(root: CutCSG) -> Iterator[CutCSG]:
         yield from _nodes(child)
 
 
-def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_surface,
+def required_features(cut_timber: 'CutTimber', face_test: FaceTest = face_reaches_surface,
                       include_unmeasured: bool = False) -> List[RequiredFeature]:
     """The features of `cut_timber` that need solving, each with why.
 
@@ -81,7 +83,7 @@ def required_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_
     return required
 
 
-def planning_features(cut_timber: CutTimber, face_test: FaceTest = face_reaches_surface) -> List[RequiredFeature]:
+def planning_features(cut_timber: 'CutTimber', face_test: FaceTest = face_reaches_surface) -> List[RequiredFeature]:
     """The required features a planning drawing solves for: the perfect timber within and its joints' shoulder planes."""
     # TODO figure out what do here, we probably want to return centerplanes as well?
     body = cut_timber.get_extended_rough_csg_with_perfect_features_local()

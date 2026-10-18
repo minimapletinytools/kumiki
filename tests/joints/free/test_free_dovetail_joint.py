@@ -4,7 +4,7 @@ import pytest
 
 from kumiki import *
 from kumiki.csg.cutcsg import FeaturePurpose
-from kumiki.drawings.required_features import planning_features
+from kumiki.csg.required_features import planning_features
 
 
 def _beam():

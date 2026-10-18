@@ -15,13 +15,14 @@ from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 import numpy as np
 
 from ..csg.carriers import CarrierMap, Row
+from ..csg.dof_solver import remaining
+from ..csg.feature_solving import feature_handle_dof_rows, measure_row
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
 from ..rule import as_ndarray
-from .dof_solver import remaining
 from .drawing import Measure, MeasurementKind, ViewAxes
-from .feature_solving import feature_handle_dof_rows, measure_row
+from .measure_solving import SpanCache, solve_measurement
 
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 
@@ -38,12 +39,14 @@ class DimensionCandidate:
     length: float
     axes: ViewAxes = field(repr=False, compare=False)
     carriers: CarrierMap = field(repr=False, compare=False)
+    #: Shared by every candidate of one solve.
+    spans: SpanCache = field(repr=False, compare=False)
 
     @cached_property
     def row(self) -> Optional[Row]:
         """What the measurement fixes (measure_row), or None where it cannot be written as a row."""
         try:
-            return measure_row(self.measure, self.carriers, self.axes)
+            return measure_row(solve_measurement(self.measure, self.axes, self.spans), self.carriers)
         except ValueError:
             return None
 
@@ -308,6 +311,7 @@ def sheet_candidates(
     them (visibility.visible_by_view), so nothing is measured in a view that hides it.
     """
     candidates = []
+    spans: SpanCache = {}
     for view, axes in views.items():
         look = as_ndarray(axes.look)
         look /= np.linalg.norm(look)
@@ -318,5 +322,6 @@ def sheet_candidates(
                 length = _separation(shape_a, shape_b)
                 if length is None or length < 1e-9:
                     continue
-                candidates.append(DimensionCandidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes, carriers))
+                candidates.append(DimensionCandidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes,
+                                                      carriers, spans))
     return candidates

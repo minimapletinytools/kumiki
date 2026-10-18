@@ -11,8 +11,8 @@ from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from ..csg.carriers import CarrierMap, Row
-from ..csg.feature_paths import FeatureHandle
+from .carriers import CarrierMap, Row
+from .feature_paths import FeatureHandle
 from ..rule import Transform
 from .solve_recipe import VectorRow, combine, direction_motion, dot_vector_row, transform_vector_row
 

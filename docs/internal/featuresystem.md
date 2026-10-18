@@ -9,11 +9,12 @@ kumiki implements its own CSG (constructive solid geometry) system to generate a
 - csg/pathcsg.py: adds PathExtrusion csg class
 - csg/cropcsg.py, csg/cross_sections.py: cropping lines and planes against a csg, and which faces are on its surface
 - csg/carriers.py: the planes, lines and points features lie on, for the solver
+- csg/feature_solving.py: the feature solver (with solve_recipe, dof_solver, required_features, assumptions): measurements in, rows and remaining DOFs out
 - csg/feature_paths.py: FeatureHandle, and feature references on the wire
 - csg/triangles.py: meshing and raycasting a csg
 - geometry.py: contains shared geometry feature classes like Plane Line Vertex etc
 - drawings/drawing.py: contains all code relate to generating measurements from CSG features
-- drawings/: also the layout of a sheet and the feature solver (solve_recipe, dof_solver, feature_solving, required_features)
+- drawings/: also the layout of a sheet, and measure_solving: a drawing's Measure as the solver's SolveDistance / SolveAngle
 
 # Overview
 

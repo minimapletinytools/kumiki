@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import pytest
 
-from kumiki.drawings.dof_solver import remaining
+from kumiki.csg.dof_solver import remaining
 from kumiki.csg.cutcsg import (
     EdgeFeature, FaceFeature, hit_of_kind,
     CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
@@ -18,7 +18,7 @@ from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are
 from kumiki.rule import Matrix, Orientation, Transform, create_v2, create_v3, scalar
 from tests.testing_shavings import present
 from kumiki.csg.carriers import BarrelCoord, CarrierRef, PlaneCoord
-from kumiki.drawings.solve_recipe import (
+from kumiki.csg.solve_recipe import (
     Anchor, DistanceMeasurement, feature_dof_rows, locate_recipe,
     direction_motion, measurement_row, motion_along, moved_by, perturbed,
 )

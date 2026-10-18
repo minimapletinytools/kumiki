@@ -8,6 +8,14 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kumiki
+
+#### Changed
+
+- **Breaking:** the feature solver moved from `kumiki.drawings` to `kumiki.csg`: `feature_solving`, `solve_recipe`, `dof_solver`, `required_features` and `assumptions`. `kumiki.drawings` keeps what is drawn, and `kumiki.drawings.measure_solving` turns a drawing's `Measure` into what the solver takes.
+  - Migration: `from kumiki.drawings.feature_solving import ...` becomes `from kumiki.csg.feature_solving import ...`, and likewise for the other four.
+  - `measure_row`, `remaining_dofs` and `solve_report` take `SolveDistance` / `SolveAngle` instead of `Measure`, and no `view`: `measure_row(measure, carriers, view)` becomes `measure_row(solve_measurement(measure, view), carriers)`.
+
 ## [0.8.0] - 2026-10-05
 
 kumiki and kigumi move to 0.8 together: kigumi 0.8 needs kumiki 0.8's module layout, and refuses an older kumiki with a message to upgrade rather than skipping every timber's geometry with `No module named 'kumiki.csg'`.

@@ -1,14 +1,14 @@
-"""Rows taken as known without drawing them (kumiki/drawings/assumptions.py)."""
+"""Rows taken as known without drawing them (kumiki/csg/assumptions.py)."""
 
 import math
 
 from kumiki.construction import create_timber
 from kumiki.csg.carriers import PlaneCoord
 from kumiki.csg.cutcsg import CutCSGLabel, HalfSpace
-from kumiki.drawings.assumptions import sheet_axis_assumptions, square_assumptions
-from kumiki.drawings.dof_solver import remaining
-from kumiki.drawings.feature_solving import carrier_map_of, feature_handle_dof_rows
-from kumiki.drawings.required_features import Reason, required_features
+from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
+from kumiki.csg.dof_solver import remaining
+from kumiki.csg.feature_solving import carrier_map_of, feature_handle_dof_rows
+from kumiki.csg.required_features import Reason, required_features
 from kumiki.rule import Orientation, Transform, create_v2, create_v3, mm, safe_normalize_vector, sqrt
 from kumiki.timber import CutTimber, Cutting
 

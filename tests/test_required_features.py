@@ -11,8 +11,8 @@ from kumiki.csg.cutcsg import (CutCSGLabel, Cylinder, Difference, FeatureMarking
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.pathcsg import FancyPath, PathExtrusion, StraightSegment
 from kumiki.csg.cross_sections import face_reaches_surface
-from kumiki.drawings.feature_solving import carrier_map_of, feature_handle_dof_rows
-from kumiki.drawings.required_features import Reason, planning_features, required_features
+from kumiki.csg.feature_solving import carrier_map_of, feature_handle_dof_rows
+from kumiki.csg.required_features import Reason, planning_features, required_features
 from kumiki.joints.workshop.shavings.shavings import chop_timber_end_with_half_plane, chop_timber_end_with_prism
 from kumiki.rule import Transform, create_v2, create_v3, mm, scalar
 from kumiki.timber import TimberEnd

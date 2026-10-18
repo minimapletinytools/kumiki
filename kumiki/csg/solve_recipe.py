@@ -9,7 +9,7 @@ from typing import Callable, List, Mapping, Optional, Tuple, Union
 
 import numpy as np
 
-from ..csg.carriers import (BarrelCoord, Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane,
+from .carriers import (BarrelCoord, Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane,
                             CarrierPoint, CarrierRef, Coord, LineCoord, Midplane, PlaneCoord, PointCoord, Recipe,
                             RecipePart, Row)
 from ..geometry import Line, Plane, Point, intersect_line_plane, intersect_planes, perpendicular_axes

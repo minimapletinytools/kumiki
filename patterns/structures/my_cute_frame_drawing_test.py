@@ -21,15 +21,15 @@ from kumiki import *
 from kumiki.csg.cutcsg import MidplaneFeature, OwnedFeatureHit, measured_by_default
 from kumiki.csg.carriers import Row
 from kumiki.csg.feature_paths import FeatureHandle
-from kumiki.drawings.assumptions import sheet_axis_assumptions, square_assumptions
+from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
 from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, Policy, auto_dimension, is_reference,
                                               sheet_candidates)
 from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, ViewAxes, elevation_viewports,
                                     shop_drawing_viewports)
 from kumiki.geometry import Plane
-from kumiki.drawings.feature_solving import carrier_map_of, feature_handle_dof_rows
+from kumiki.csg.feature_solving import carrier_map_of, feature_handle_dof_rows
 from kumiki.drawings.visibility import visible_by_view
-from kumiki.drawings.required_features import planning_features, required_features
+from kumiki.csg.required_features import planning_features, required_features
 
 
 ROUGH_ALLOWANCE = inches(1)
