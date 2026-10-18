@@ -52,7 +52,7 @@ def _recipe(handle: FeatureHandle) -> Recipe:
     return recipe
 
 
-def _span(handle: FeatureHandle, carriers: Optional[CarrierMap] = None) -> MeasureSpan:
+def _measured_span(handle: FeatureHandle, carriers: Optional[CarrierMap] = None) -> MeasureSpan:
     """The feature as drawing's measuring rules see it, in world space: the viewer's span (feature_span).
 
     Kept on `carriers` when given, which lasts one solve: every candidate measurement to a feature
@@ -176,7 +176,7 @@ def measure_row(measure: Measure, carriers: CarrierMap, view: Optional[ViewAxes]
     if kind.operation is MeasurementOperation.ANGLE:
         return _angle_row(measure, carriers, look)
 
-    first, second = _span(measure.anchor_a, carriers), _span(measure.anchor_b, carriers)
+    first, second = _measured_span(measure.anchor_a, carriers), _measured_span(measure.anchor_b, carriers)
     if look is None:
         at_a, at_b = (_np(point) for point in distance_anchors(first, second, kind, view))
         return _distance_row(measure, at_a, at_b, _gap_direction(at_a, at_b), carriers)

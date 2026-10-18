@@ -24,7 +24,7 @@ from .rule_at_home import Float3, Rows3
 LocalRay = Tuple[Float3, Float3]
 
 
-class Segment(TypedDict):
+class WorldSegment(TypedDict):
     start: Float3
     end: Float3
 
@@ -303,7 +303,7 @@ def cropped_edge_segments(
     timber: 'PerfectTimberWithin',
     root_csg: 'CutCSG',
     owner: Optional['CutCSG'] = None,
-) -> Tuple[Optional[List[Segment]], bool]:
+) -> Tuple[Optional[List[WorldSegment]], bool]:
     """The edge's line, clipped to where the edge actually exists.
 
     Returns (segments, absent). Each segment is a {"start", "end"} pair in world
@@ -444,7 +444,7 @@ def edge_highlight_segments(
     owner: 'CutCSG',
     timber: 'PerfectTimberWithin',
     root_csg: 'CutCSG',
-) -> Tuple[Optional[List[Segment]], bool]:
+) -> Tuple[Optional[List[WorldSegment]], bool]:
     """Where a selected edge runs, in world space, and whether it is there at all.
 
     An edge is a line, and a highlight built out of triangles can only ever
@@ -478,7 +478,7 @@ def edge_highlight_segments(
 
 def non_real_highlight_segments(
     feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
-) -> Optional[List[Segment]]:
+) -> Optional[List[WorldSegment]]:
     """Where a non-real feature is drawn: its own extent, in world space.
 
     NOT cropped to the cut solid the way a real edge is. A bore's axis lies in
@@ -501,7 +501,7 @@ def non_real_highlight_segments(
 
 def plane_outline_segments(
     plane: Any, timber: 'PerfectTimberWithin',
-) -> Optional[List[Segment]]:
+) -> Optional[List[WorldSegment]]:
     """The rectangle *plane* (timber-local) cuts across the perfect timber, in world space.
 
     For a plane along the timber's length -- a perfect face, a centerplane -- which is where a
@@ -554,7 +554,7 @@ def features_at_point(
     return merge_ray_hits(root, hits, local_ray, resolved)
 
 
-class Candidate(NamedTuple):
+class PointerCandidate(NamedTuple):
     """A feature under the pointer in a drawing's view: where along the ray it was found, and
     the depth group it is in (see order_along_ray), named by the depth the group starts at."""
     hit: 'OwnedFeatureHit'
@@ -565,14 +565,14 @@ class Candidate(NamedTuple):
 
 def candidates_under_pointer(
     root: 'CutCSG', local_pt: Float3, tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
-) -> List[Candidate]:
+) -> List[PointerCandidate]:
     """Everything under the pointer at any depth, for a drawing's view: only what the view can
     measure (measurable_in_view), nearest first (order_along_ray)."""
     local_pt = Float3.of(local_pt)
     hits = root.find_all_features(local_pt.v3(), tolerances)
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
     if direction is None:
-        return [Candidate(hit, local_pt, 0.0, 0.0) for hit in hits]
+        return [PointerCandidate(hit, local_pt, 0.0, 0.0) for hit in hits]
     found: Dict[Tuple[str, int], Tuple[float, Float3]] = {}
 
     def found_at(at_place: List['OwnedFeatureHit'], place: Float3) -> None:
@@ -607,7 +607,7 @@ def candidates_under_pointer(
     ordered = order_along_ray(measurable_in_view(hits, direction, separation),
                               {key: along for key, (along, _place) in found.items()}, separation)
     groups = _depth_groups(ordered, {key: along for key, (along, _place) in found.items()}, separation)
-    return [Candidate(hit, found.get(_hit_key(hit), (math.inf, None))[1],
+    return [PointerCandidate(hit, found.get(_hit_key(hit), (math.inf, None))[1],
                       found.get(_hit_key(hit), (math.inf, None))[0], groups[_hit_key(hit)])
             for hit in ordered]
 
@@ -633,9 +633,9 @@ def _nearest_on(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3) -> Op
 
 
 def split_hidden(
-    candidates: List[Candidate], direction: Float3, tolerance: float,
+    candidates: List[PointerCandidate], direction: Float3, tolerance: float,
     blocked: Optional[Callable[[Float3], bool]] = None,
-) -> Tuple[List[Candidate], List[Candidate]]:
+) -> Tuple[List[PointerCandidate], List[PointerCandidate]]:
     """Splits *candidates* into those the camera can see and those it cannot.
 
     Args:
@@ -650,8 +650,8 @@ def split_hidden(
         bore's axis) are never hidden.
     """
     unit = Float3.of(direction).unit() or Float3.of(direction)
-    visible: List[Candidate] = []
-    hidden: List[Candidate] = []
+    visible: List[PointerCandidate] = []
+    hidden: List[PointerCandidate] = []
     for candidate in candidates:
         hit = candidate.hit
         if not hit.feature.real:
@@ -683,7 +683,7 @@ def _sheet_shape(hit: 'OwnedFeatureHit', direction: Float3):
     return None
 
 
-def _covers(front: Candidate, behind: Candidate, direction: Float3, tolerance: float) -> bool:
+def _covers(front: PointerCandidate, behind: PointerCandidate, direction: Float3, tolerance: float) -> bool:
     """Whether *front* lands where *behind* does on the sheet, under the pointer."""
     near, far = _sheet_shape(front.hit, direction), _sheet_shape(behind.hit, direction)
     if near is None or far is None:
