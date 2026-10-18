@@ -19,7 +19,7 @@ from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
 from ..csg.planar_region import face_reaches_surface
 from .required_features import FaceTest, required_features
-from ..rule import Matrix, V3
+from ..rule import Matrix, V3, as_floats, unit_floats
 from ..csg.carriers import CarrierMap, Recipe, Row
 from .solve_recipe import (combine, direction_motion, dot_vector_row, feature_dof_rows, motion_along,
                            transform_vector_row)
@@ -35,14 +35,6 @@ def carrier_map_of(cut_timber: CutTimber, *more: CutTimber) -> CarrierMap:
     """
     return CarrierMap.union([carrier_map(timber.render_timber_with_cuts_csg_local())
                              for timber in (cut_timber, *more)])
-
-
-def _np(vector: V3) -> np.ndarray:
-    return np.array([float(vector[i, 0]) for i in range(3)])
-
-
-def _unit(vector: np.ndarray) -> np.ndarray:
-    return vector / np.linalg.norm(vector)
 
 
 def _recipe(handle: FeatureHandle) -> Recipe:
@@ -78,25 +70,25 @@ def _projected(span: MeasureSpan, look: np.ndarray) -> MeasureSpan:
     if isinstance(span, PointSpan):
         return span
     if isinstance(span, LineSpan):
-        flat = _np(span.along) - look * float(_np(span.along) @ look)
+        flat = as_floats(span.along) - look * float(as_floats(span.along) @ look)
         if np.linalg.norm(flat) < 1e-9:
             return PointSpan(at=span.at)
         scale = float(np.linalg.norm(flat))
         interval = None if span.interval is None else (span.interval[0] * scale, span.interval[1] * scale)
         return LineSpan(at=span.at, direction=Matrix(flat / scale), interval=interval)
-    edge = np.cross(_np(span.facing), look)
-    if np.linalg.norm(edge) < 1e-9 or abs(float(_np(span.facing) @ look)) > 1e-6:
+    edge = np.cross(as_floats(span.facing), look)
+    if np.linalg.norm(edge) < 1e-9 or abs(float(as_floats(span.facing) @ look)) > 1e-6:
         raise ValueError("a face seen at an angle covers the sheet, so nothing is measured to it")
-    return LineSpan(at=span.at, direction=Matrix(_unit(edge)))
+    return LineSpan(at=span.at, direction=Matrix(unit_floats(edge)))
 
 
 def _on_feature(span: MeasureSpan, anchor: np.ndarray, look: np.ndarray) -> np.ndarray:
     """The point of the 3D feature that a sheet anchor stands for."""
     if isinstance(span, LineSpan):
-        direction = _np(span.along)
+        direction = as_floats(span.along)
         flat = direction - look * float(direction @ look)
         if float(flat @ flat) > 1e-18:
-            return _np(span.at) + direction * float((anchor - _np(span.at)) @ flat) / float(flat @ flat)
+            return as_floats(span.at) + direction * float((anchor - as_floats(span.at)) @ flat) / float(flat @ flat)
     return anchor
 
 
@@ -171,24 +163,24 @@ def measure_row(measure: Measure, carriers: CarrierMap, view: Optional[ViewAxes]
     """
     kind = measure.kind or THREE_D_DISTANCE
     view = view or ViewAxes()
-    look = _unit(_np(view.look)) if kind.space is MeasurementSpace.PROJECTED else None
+    look = unit_floats(as_floats(view.look)) if kind.space is MeasurementSpace.PROJECTED else None
 
     if kind.operation is MeasurementOperation.ANGLE:
         return _angle_row(measure, carriers, look)
 
     first, second = _measured_span(measure.anchor_a, carriers), _measured_span(measure.anchor_b, carriers)
     if look is None:
-        at_a, at_b = (_np(point) for point in distance_anchors(first, second, kind, view))
+        at_a, at_b = (as_floats(point) for point in distance_anchors(first, second, kind, view))
         return _distance_row(measure, at_a, at_b, _gap_direction(at_a, at_b), carriers)
 
     if kind.direction is not MeasurementDirection.PERPENDICULAR:
         if not (isinstance(first, PointSpan) and isinstance(second, PointSpan)):
             raise ValueError(f"a {kind.name} is only taken between two points")
-        along = _unit(_np(view.right if kind.direction is MeasurementDirection.HORIZONTAL else view.up))
-        return _distance_row(measure, _np(first.at), _np(second.at), along, carriers)
+        along = unit_floats(as_floats(view.right if kind.direction is MeasurementDirection.HORIZONTAL else view.up))
+        return _distance_row(measure, as_floats(first.at), as_floats(second.at), along, carriers)
 
     flat_first, flat_second = _projected(first, look), _projected(second, look)
-    anchor_a, anchor_b = (_np(point) for point in distance_anchors(flat_first, flat_second, kind, view))
+    anchor_a, anchor_b = (as_floats(point) for point in distance_anchors(flat_first, flat_second, kind, view))
     along = _gap_direction(anchor_a, anchor_b, look)
     return _distance_row(measure, _on_feature(first, anchor_a, look), _on_feature(second, anchor_b, look),
                          along, carriers)

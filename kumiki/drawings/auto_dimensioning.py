@@ -18,6 +18,7 @@ from ..csg.carriers import CarrierMap, Row
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
+from ..rule import as_floats
 from .dof_solver import remaining
 from .drawing import Measure, MeasurementKind, ViewAxes
 from .feature_solving import feature_handle_dof_rows, measure_row
@@ -267,9 +268,9 @@ def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[Tuple]:
         normal, point = located.direction, located.point
     else:
         return None
-    direction = np.array([float(v) for v in transform.local_to_global_direction(normal)])
+    direction = as_floats(transform.local_to_global_direction(normal))
     direction /= np.linalg.norm(direction)
-    at = np.array([float(v) for v in transform.local_to_global(point)])
+    at = as_floats(transform.local_to_global(point))
     along_look = float(direction @ look)
     if isinstance(located, Line):
         if abs(abs(along_look) - 1) < 1e-9:
@@ -308,7 +309,7 @@ def sheet_candidates(
     """
     candidates = []
     for view, axes in views.items():
-        look = np.array([float(v) for v in axes.look])
+        look = as_floats(axes.look)
         look /= np.linalg.norm(look)
         drawn = [(handle, _on_sheet(handle, look)) for handle in anchors.get(view, ())]
         drawn = [(handle, shape) for handle, shape in drawn if shape is not None]

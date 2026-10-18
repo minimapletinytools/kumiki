@@ -13,20 +13,12 @@ from ..csg.carriers import (BarrelCoord, Carrier, CarrierBarrel, CarrierLine, Ca
                             CarrierPoint, CarrierRef, Coord, LineCoord, Midplane, PlaneCoord, PointCoord, Recipe,
                             RecipePart, Row)
 from ..geometry import Line, Plane, Point, intersect_line_plane, intersect_planes, perpendicular_axes
-from ..rule import Matrix, V3
-
-
-def _np(vector: V3) -> np.ndarray:
-    return np.array([float(vector[i, 0]) for i in range(3)])
-
-
-def _unit(vector: np.ndarray) -> np.ndarray:
-    return vector / np.linalg.norm(vector)
+from ..rule import Matrix, V3, as_floats, unit_floats
 
 
 def _axes(direction: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     first, second = perpendicular_axes(Matrix(direction))
-    return _np(first), _np(second)
+    return as_floats(first), as_floats(second)
 
 
 # One first-order constraint on how a point x of the feature moves: normal . dx = form.
@@ -34,9 +26,9 @@ Constraint = Tuple[np.ndarray, Row]
 
 
 def _line_constraints(column: CarrierRef, line: Line, at: np.ndarray) -> List[Constraint]:
-    direction = _unit(_np(line.direction))
+    direction = unit_floats(as_floats(line.direction))
     first, second = _axes(direction)
-    along = float((at - _np(line.point)) @ direction)
+    along = float((at - as_floats(line.point)) @ direction)
     return [
         (first, {(column, LineCoord.SHIFT_1): 1.0, (column, LineCoord.TURN_1): along}),
         (second, {(column, LineCoord.SHIFT_2): 1.0, (column, LineCoord.TURN_2): along}),
@@ -48,7 +40,7 @@ def _carrier_constraints(ref: CarrierRef, carriers: CarrierMap, at: np.ndarray) 
     carrier = carriers.carrier(ref)
 
     if isinstance(carrier, CarrierPlane):
-        normal = _unit(_np(carrier.plane.normal))
+        normal = unit_floats(as_floats(carrier.plane.normal))
         first, second = _axes(normal)
         return [(normal, {(column, PlaneCoord.OFFSET): 1.0,
                           (column, PlaneCoord.TILT_1): -float(at @ first),
@@ -64,12 +56,12 @@ def _carrier_constraints(ref: CarrierRef, carriers: CarrierMap, at: np.ndarray) 
     axis_ref = CarrierRef(ref.owner, carrier.axis)
     axis = carriers.carrier(axis_ref)
     assert isinstance(axis, CarrierLine)
-    direction = _unit(_np(axis.line.direction))
-    offset = at - _np(axis.line.point)
+    direction = unit_floats(as_floats(axis.line.direction))
+    offset = at - as_floats(axis.line.point)
     radial = offset - direction * float(offset @ direction)
     if np.linalg.norm(radial) < 1e-12:
         raise ValueError("a point on the axis is not on the barrel")
-    radial = _unit(radial)
+    radial = unit_floats(radial)
     row: Row = {(column, BarrelCoord.RADIUS): 1.0}
     for normal, form in _line_constraints(carriers.canonical(axis_ref), axis.line, at):
         for key, value in form.items():
@@ -84,7 +76,7 @@ def _midplane_normal(part: Midplane, carriers: CarrierMap) -> Tuple[np.ndarray, 
         carrier = carriers.carrier(ref)
         if not isinstance(carrier, CarrierPlane):
             raise ValueError("a midplane is between two planes")
-        normals.append(_unit(_np(carrier.plane.normal)))
+        normals.append(unit_floats(as_floats(carrier.plane.normal)))
     difference = normals[0] - normals[1]
     length = float(np.linalg.norm(difference))
     if length < 1e-12:
@@ -108,12 +100,12 @@ def motion_along(recipe: Recipe, carriers: CarrierMap, at: V3, along: V3) -> Row
     The motion is the smallest one that keeps `at` on the moved feature, so sliding along
     the feature doesn't count.
     """
-    constraints = [c for part in recipe for c in _part_constraints(part, carriers, _np(at))]
+    constraints = [c for part in recipe for c in _part_constraints(part, carriers, as_floats(at))]
     normals = np.array([normal for normal, _ in constraints])
     gram = normals @ normals.T
     if abs(np.linalg.det(gram)) < 1e-12:
         raise ValueError("the recipe's carriers don't meet in a single line or point")
-    weights = np.linalg.solve(gram, normals @ _np(along))
+    weights = np.linalg.solve(gram, normals @ as_floats(along))
     row: Row = {}
     for weight, (_, form) in zip(weights, constraints):
         for key, value in form.items():
@@ -200,12 +192,12 @@ def _scale_row(row: Row, factor: float) -> Row:
 def _carrier_direction(ref: CarrierRef, carriers: CarrierMap) -> Tuple[np.ndarray, VectorRow]:
     column, carrier = carriers.canonical(ref), carriers.carrier(ref)
     if isinstance(carrier, CarrierPlane):
-        normal = _unit(_np(carrier.plane.normal))
+        normal = unit_floats(as_floats(carrier.plane.normal))
         first, second = _axes(normal)
         return normal, _sum_vector_rows(_vector_row(first, column, PlaneCoord.TILT_1),
                                         _vector_row(second, column, PlaneCoord.TILT_2))
     if isinstance(carrier, CarrierLine):
-        direction = _unit(_np(carrier.line.direction))
+        direction = unit_floats(as_floats(carrier.line.direction))
         first, second = _axes(direction)
         return direction, _sum_vector_rows(_vector_row(first, column, LineCoord.TURN_1),
                                            _vector_row(second, column, LineCoord.TURN_2))
@@ -252,8 +244,8 @@ def feature_dof_rows(recipe: Recipe, carriers: CarrierMap) -> List[Row]:
     if len(recipe) == 1 and isinstance(recipe[0], Midplane):
         plane = locate_recipe(recipe, carriers.carrier)
         assert isinstance(plane, Plane)
-        normal = _unit(_np(plane.normal))
-        points = [_np(plane.point) + offset for offset in (np.zeros(3), *_axes(normal))]
+        normal = unit_floats(as_floats(plane.normal))
+        points = [as_floats(plane.point) + offset for offset in (np.zeros(3), *_axes(normal))]
         return [motion_along(recipe, carriers, Matrix(point), Matrix(normal)) for point in points]
     if len(recipe) == 1:
         (ref,) = recipe
@@ -268,8 +260,8 @@ def feature_dof_rows(recipe: Recipe, carriers: CarrierMap) -> List[Row]:
     if isinstance(located, Point):
         return [motion_along(recipe, carriers, located.position, Matrix(axis)) for axis in np.eye(3)]
     if isinstance(located, Line):
-        direction = _unit(_np(located.direction))
-        ends = (_np(located.point), _np(located.point) + direction)
+        direction = unit_floats(as_floats(located.direction))
+        ends = (as_floats(located.point), as_floats(located.point) + direction)
         return [motion_along(recipe, carriers, Matrix(end), Matrix(axis))
                 for end in ends for axis in _axes(direction)]
     raise ValueError("the recipe's carriers don't meet in a single line or point")
@@ -293,12 +285,12 @@ def _part_geometry(part: RecipePart,
               if isinstance(carrier, CarrierPlane)]
     if len(planes) != 2:
         return None
-    normals = [_unit(_np(plane.normal)) for plane in planes]
-    offsets = [float(n @ _np(plane.point)) for n, plane in zip(normals, planes)]
+    normals = [unit_floats(as_floats(plane.normal)) for plane in planes]
+    offsets = [float(n @ as_floats(plane.point)) for n, plane in zip(normals, planes)]
     normal, offset = normals[0] - normals[1], offsets[0] - offsets[1]
     if float(normal @ normal) < 1e-24:
         return None
-    return Plane(normal=Matrix(_unit(normal)), point=Matrix(normal * offset / float(normal @ normal)))
+    return Plane(normal=Matrix(unit_floats(normal)), point=Matrix(normal * offset / float(normal @ normal)))
 
 
 def locate_recipe(
@@ -326,22 +318,22 @@ def moved_by(carrier: Carrier, changes: Mapping[Coord, float]) -> Carrier:
         return float(changes.get(coord, 0.0))
 
     if isinstance(carrier, CarrierPlane):
-        normal = _unit(_np(carrier.plane.normal))
-        offset = float(normal @ _np(carrier.plane.point)) + amount(PlaneCoord.OFFSET)
+        normal = unit_floats(as_floats(carrier.plane.normal))
+        offset = float(normal @ as_floats(carrier.plane.point)) + amount(PlaneCoord.OFFSET)
         first, second = _axes(normal)
         moved = normal + amount(PlaneCoord.TILT_1) * first + amount(PlaneCoord.TILT_2) * second
         return CarrierPlane(Plane(normal=Matrix(moved), point=Matrix(moved * offset / float(moved @ moved))))
 
     if isinstance(carrier, CarrierPoint):
-        return CarrierPoint(Matrix(_np(carrier.point) + np.array([amount(coord) for coord in PointCoord])))
+        return CarrierPoint(Matrix(as_floats(carrier.point) + np.array([amount(coord) for coord in PointCoord])))
 
     if isinstance(carrier, CarrierBarrel):
         return CarrierBarrel(axis=carrier.axis, radius=float(carrier.radius) + amount(BarrelCoord.RADIUS))
 
     line = carrier.line
-    direction = _unit(_np(line.direction))
+    direction = unit_floats(as_floats(line.direction))
     first, second = _axes(direction)
-    point = _np(line.point) + amount(LineCoord.SHIFT_1) * first + amount(LineCoord.SHIFT_2) * second
+    point = as_floats(line.point) + amount(LineCoord.SHIFT_1) * first + amount(LineCoord.SHIFT_2) * second
     moved = direction + amount(LineCoord.TURN_1) * first + amount(LineCoord.TURN_2) * second
     return CarrierLine(Line(direction=Matrix(moved), point=Matrix(point)))
 

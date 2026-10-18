@@ -16,7 +16,7 @@ from ..csg.cutcsg import CSGFeature, CutCSG, FeatureTestTolerances, OwnedFeature
 from ..csg.feature_paths import candidate_segments
 from ..drawings.feature_span import Interval
 from ..geometry import Line
-from ..rule import Transform, V3, scalar
+from ..rule import Transform, V3, exact_scalar, scalar
 from ..timber import PerfectTimberWithin
 from .rule_at_home import Float3, Rows3
 
@@ -42,11 +42,6 @@ def label_name(labeled: Any) -> Optional[str]:
 
 
 
-
-
-def _exact(value: float):
-    """A float as the exact scalar the geometry code multiplies by."""
-    return scalar(repr(float(value)))
 
 
 def build_inv_transform_float(transform: 'Transform') -> Tuple[Rows3, Float3]:
@@ -429,7 +424,7 @@ def cropped_edge_segments(
         return (None, True)
 
     at = lambda reached: timber.transform.local_to_global(
-        line.point + line.direction * _exact(reached))
+        line.point + line.direction * exact_scalar(reached))
     return ([
         {
             "start": Float3.of(at(low)),

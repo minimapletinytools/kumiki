@@ -17,7 +17,7 @@ from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, CutCSG, Cy
 from .feature_paths import FeatureHandle
 from ..geometry import Plane, perpendicular_axes
 from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
-from ..rule import Matrix, V3
+from ..rule import Matrix, V3, as_floats, unit_floats
 
 Polygon = List[Tuple[float, float]]
 Region = List[Polygon]
@@ -34,19 +34,15 @@ class _CannotSection(Exception):
     """A primitive this module can't cut by a plane."""
 
 
-def _np(vector: V3) -> np.ndarray:
-    return np.array([float(vector[i, 0]) for i in range(3)])
-
-
 class _Frame:
     """A plane's 2D frame: origin, two in-plane axes, and its unit normal (the front side)."""
 
     def __init__(self, plane: Plane, near: V3):
-        self.normal = _np(plane.normal) / np.linalg.norm(_np(plane.normal))
-        point, centre = _np(plane.point), _np(near)
+        self.normal = as_floats(plane.normal) / np.linalg.norm(as_floats(plane.normal))
+        point, centre = as_floats(plane.point), as_floats(near)
         self.origin = centre - self.normal * float((centre - point) @ self.normal)
         u, v = perpendicular_axes(Matrix(self.normal))
-        self.u, self.v = _np(u), _np(v)
+        self.u, self.v = as_floats(u), as_floats(v)
 
     def to_2d(self, point: np.ndarray) -> Tuple[float, float]:
         offset = point - self.origin
@@ -176,7 +172,7 @@ def _half_space_section(
     """(front, back) for the intersection of half spaces dot(normal, p - point) <= 0, from `start`."""
     region, front, back = start, True, True
     for normal, point in faces:
-        n, q = _np(normal), _np(point)
+        n, q = as_floats(normal), as_floats(point)
         a, b = float(n @ frame.u), float(n @ frame.v)
         c = float(n @ (q - frame.origin))
         length = float(np.linalg.norm(n))
@@ -195,8 +191,8 @@ def _half_space_section(
 
 
 def _cylinder_section(csg: Cylinder, frame: _Frame, seed: Region) -> Sides:
-    axis = _np(csg.axis_direction) / np.linalg.norm(_np(csg.axis_direction))
-    centre, radius = _np(csg.position), float(csg.radius)
+    axis = as_floats(csg.axis_direction) / np.linalg.norm(as_floats(csg.axis_direction))
+    centre, radius = as_floats(csg.position), float(csg.radius)
     across = float(axis @ frame.normal)
     if abs(across) < 1e-9:
         height = float(frame.normal @ (centre - frame.origin))
@@ -209,7 +205,7 @@ def _cylinder_section(csg: Cylinder, frame: _Frame, seed: Region) -> Sides:
         region = [_clip(_clip(polygon, a, b, c + half_width), -a, -b, -c + half_width) for polygon in seed]
     else:
         middle = centre + axis * float(frame.normal @ (frame.origin - centre)) / across
-        e1, e2 = (_np(axis_) for axis_ in perpendicular_axes(Matrix(axis)))
+        e1, e2 = (as_floats(axis_) for axis_ in perpendicular_axes(Matrix(axis)))
         points = []
         for k in range(ELLIPSE_POINTS):
             angle = 2 * math.pi * k / ELLIPSE_POINTS
