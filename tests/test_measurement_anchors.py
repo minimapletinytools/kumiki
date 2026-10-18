@@ -21,7 +21,8 @@ from kumiki.geometry import Line
 from kumiki.rule import create_v3
 from tests.testing_shavings import load_module, present
 
-from kumiki.csg.feature_paths import find_csg_by_labels, find_declared_feature, roots_for_path
+from kumiki.csg.feature_paths import FeatureHandle, find_csg_by_labels, find_declared_feature, roots_for_path
+from kumiki.drawings.feature_span import feature_span
 from kumiki.viewer.rule_at_home import Float3
 
 def v(triple):
@@ -416,9 +417,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
             for hit in picking.features_at_point(root, Float3.of(point), 5e-4, FeatureTestTolerances(face=5e-4)):
                 if hit.feature.feature_type() != CSGFeatureType.EDGE:
                     continue
-                found.setdefault(hit.feature.name, runner._measure_span(
-                    hit.feature, hit.owner, timber, hit.feature.locate_simple_unbounded(hit.owner),
-                    root, look))
+                found.setdefault(hit.feature.name, feature_span(FeatureHandle(timber=timber, hit=hit), root, look))
         return found, float(timber.length)
 
     def test_an_arris_of_the_hole_is_as_long_as_the_hole(self, receiving):
@@ -583,7 +582,7 @@ class TestAFeatureKnowsItsOwnEnds:
 class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
     """A preview that sits somewhere else is a preview of nothing.
 
-    Both go through distance_anchors now. Before, a pick carried each feature's
+    Both go through measuring.place_pair now. Before, a pick carried each feature's
     own anchor and the preview was drawn between those, while the written
     measurement was placed at the middle of their overlap -- so confirming moved
     the dimension, sometimes the length of the timber.
@@ -602,10 +601,10 @@ class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
         source = inspect.getsource(runner._pick_placement)
 
         assert "_resolve_anchor_placed" in source
-        assert "distance_anchors" in source
-        # And an angle is placed by the same rules from the same spans, rather
-        # than by a second derivation in the viewer.
-        assert "angle_rays" in source
+        # Placed by the one function a written measurement is placed by -- anchors for a distance
+        # and a corner for an angle, from the same spans -- rather than a second derivation.
+        assert "place_pair" in source
+        assert "place_pair" in inspect.getsource(runner._resolve_measurement)
 
     def test_a_pick_with_nothing_held_places_nothing(self):
         from pathlib import Path
@@ -784,7 +783,7 @@ class TestDroppingAPerpendicularOntoAFace:
 class TestAFaceIsOnlyAPlaneInTheSolid:
     """On a sheet it stays the line it draws as.
 
-    `_measure_span` takes the space as an argument, and the name it first took
+    `feature_span` takes the space as an argument, and the name it first took
     was already the name of the timber's own CSG a few lines below -- so the
     check was always true, and every face came back a plane in drawings too.
     """
