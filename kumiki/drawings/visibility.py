@@ -69,6 +69,9 @@ def nearest_visible_depth(
     the way, that tree included. Only a face seen edge-on or a line lying along or across the sheet
     is asked about, as only those draw as a line or a point. Not real (a bore's axis, a centerplane):
     never hidden. Unsure -- a solid that cannot be cut exactly -- means seen.
+
+    Only the strip of the plane the feature spans across the sheet is cut: nothing beside it can
+    stand between it and the camera.
     """
     transform = handle.timber.transform
     located = handle.feature.locate_simple_unbounded(handle.owner)
@@ -89,36 +92,62 @@ def nearest_visible_depth(
     if abs(float(normal @ look)) > 1e-9:
         return None  # seen at an angle: drawn as an area, not a line
     across = np.cross(look, normal)
-    world = (point, across, look, normal)
+    # One frame per plane, whichever feature asks: its point nearest the world's origin.
+    offset = float(normal @ point)
+    origin = normal * offset
+    world = (origin, across, look, normal)
     own = _frame_in(transform, *world)
     try:
         if isinstance(located, Plane):
             region = face_on_surface(handle, root, own, reach)
             if area(region) <= 0:
                 return None
-            blocking = _blocking(occluders, world, reach)
-            visible = subtract(region, blocking)
+            corners = [point for polygon in region for point in polygon]
+            blocked = _blocking(occluders, world, reach, _span(corners))
+            visible = subtract(region, _overlapping(blocked, corners))
             depths = [y for polygon in visible for _x, y in polygon]
         else:
             pieces = crop_line_to_boundary_segments_on_csg(located, root, seed_reach=reach, near=located.point)
             if pieces is None:
                 return float(point @ look)
-            to_2d = lambda end: tuple(float((_np(transform.local_to_global(end)) - point) @ axis)
+            to_2d = lambda end: tuple(float((_np(transform.local_to_global(end)) - origin) @ axis)
                                       for axis in (across, look))
             segments = [(to_2d(piece.start), to_2d(piece.end)) for piece in pieces]
-            visible_segments = segments_outside(segments, _blocking(occluders, world, reach))
-            depths = [end[1] for segment in visible_segments for end in segment]
+            ends = [end for segment in segments for end in segment]
+            if not ends:
+                return None
+            near = _overlapping(_blocking(occluders, world, reach, _span(ends)), ends)
+            depths = [end[1] for segment in segments_outside(segments, near) for end in segment]
     except CannotSection:
         return float(point @ look)
-    return min(depths) + float(point @ look) if depths else None
+    return min(depths) + float(origin @ look) if depths else None
 
 
-def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reach: float) -> Region:
-    """What the occluders hide, in the world frame's plane: their material across it, swept away from the camera."""
+def _span(points: Sequence[Tuple[float, float]]) -> Tuple[float, float]:
+    """How far `points` reach across the sheet (u), a little widened so an edge on its border counts."""
+    return min(p[0] for p in points) - 1e-6, max(p[0] for p in points) + 1e-6
+
+
+def _overlapping(region: Region, points: Sequence[Tuple[float, float]]) -> Region:
+    """The pieces of `region` whose bounding box meets that of `points`: the only ones that can
+    hide any of them. Most shadows in a plane are nowhere near the feature asked about."""
+    if not points:
+        return []
+    low_x, high_x = min(p[0] for p in points), max(p[0] for p in points)
+    low_y, high_y = min(p[1] for p in points), max(p[1] for p in points)
+    return [polygon for polygon in region
+            if min(p[0] for p in polygon) <= high_x and max(p[0] for p in polygon) >= low_x
+            and min(p[1] for p in polygon) <= high_y and max(p[1] for p in polygon) >= low_y]
+
+
+def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reach: float,
+              across: Tuple[float, float]) -> Region:
+    """What the occluders hide in the world frame's plane, within the `across` strip of it: their
+    material across it, swept away from the camera."""
     hidden: Region = []
     for solid, transform in occluders:
         try:
-            hidden += shadow(material_crossing(solid, _frame_in(transform, *world), reach), 2 * reach)
+            hidden += shadow(material_crossing(solid, _frame_in(transform, *world), reach, across), 2 * reach)
         except CannotSection:
             continue  # unsure means seen
     return hidden
@@ -157,5 +186,6 @@ def visible_by_view(
         look = _np(axes.look)
         look /= np.linalg.norm(look)
         visible[view] = [handle for handle in anchors if id(handle.timber) in roots
-                         and nearest_visible_depth(handle, roots[id(handle.timber)], look, occluders, reach) is not None]
+                         and nearest_visible_depth(handle, roots[id(handle.timber)], look, occluders, reach)
+                         is not None]
     return visible
