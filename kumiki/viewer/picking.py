@@ -16,7 +16,7 @@ from ..csg.cutcsg import CSGFeature, CutCSG, FeatureTestTolerances, OwnedFeature
 from ..csg.feature_paths import candidate_segments
 from ..csg.feature_extent import Interval
 from ..geometry import Line
-from ..rule import Transform, V3, exact_scalar, scalar
+from ..rule import Transform, V3, scalar
 from ..timber import PerfectTimberWithin
 from .rule_at_home import Float3, Rows3
 
@@ -424,7 +424,7 @@ def cropped_edge_segments(
         return (None, True)
 
     at = lambda reached: timber.transform.local_to_global(
-        line.point + line.direction * exact_scalar(reached))
+        line.point + line.direction * float(reached))
     return ([
         {
             "start": Float3.of(at(low)),
