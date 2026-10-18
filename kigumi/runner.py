@@ -1009,32 +1009,11 @@ def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> Tria
 def _perfect_reference_outlines(
     timber: 'PerfectTimberWithin', root: 'CutCSG', centerplanes: bool,
 ) -> List[PlaneOutlineWire]:
-    """The rough body's perfect references, each outlined as cropped to the cut timber `root`
-    (kumiki.csg.feature_extent), in world space: what a drawing draws dotted, edge-on. Its
-    centerplanes, or its perfect faces -- those the rough body has no face for (ptw.*); a face it
-    has (rptw.*) is drawn as the timber already, and a joint's faces are not these.
-    """
-    from kumiki.csg.cutcsg import Difference, FeatureNature, MidplaneFeature, PlaneFeature
-    from kumiki.csg.feature_extent import extents_of
-    from kumiki.geometry import Plane
-    from kumiki.rule import create_v3
+    """What a drawing draws dotted, edge-on (picking.perfect_reference_outlines), as the wire has it."""
+    from kumiki.viewer.picking import perfect_reference_outlines
 
-    body = root.base if isinstance(root, Difference) else root
-    kind = MidplaneFeature if centerplanes else PlaneFeature
-    extents = extents_of(root, timber)
-    to_world = lambda point: [float(v) for v in timber.transform.local_to_global(create_v3(*point))]
-    outlines: List[PlaneOutlineWire] = []
-    for feature in body.get_declared_features():
-        if not isinstance(feature, kind) or feature.nature is not FeatureNature.PERFECT_REFERENCE:
-            continue
-        plane = feature.locate_simple_unbounded(body)
-        extent = extents.of(feature, body)
-        if not isinstance(plane, Plane) or extent is None:
-            continue
-        positions = [v for start, end in extent.outline() for v in (*to_world(start), *to_world(end))]
-        direction = timber.transform.local_to_global_direction(plane.normal)
-        outlines.append({"normal": [float(v) for v in direction], "positions": positions})
-    return outlines
+    return [{"normal": outline.normal, "positions": outline.positions}
+            for outline in perfect_reference_outlines(timber, root, centerplanes)]
 
 
 def _base_member_payload(
@@ -2072,133 +2051,31 @@ def deserialize_feature_path(source: Any) -> Optional['FeaturePath']:
 def _derivation_wire(
     local_csg: 'CutCSG', feature_hits: List['OwnedFeatureHit'], feature: Optional['CSGFeature'],
 ) -> Optional[DerivationWire]:
-    """For a derived feature: the path to the node owning it, and each parent's path and name."""
-    from kumiki.viewer.picking import node_positions
+    """For a derived feature (picking.derivation): the path to the node owning it, and each parent's."""
+    from kumiki.viewer.picking import derivation
 
-    if feature is None or not feature.is_derived():
+    found = derivation(local_csg, feature_hits, feature)
+    if found is None:
         return None
-    positions = node_positions(local_csg)
-
-    def path_of(owner) -> Optional[List[str]]:
-        placed = positions.get(id(owner))
-        return placed[2] if placed is not None else None
-
-    owner = next((hit.owner for hit in feature_hits if hit.feature is feature), None)
-    return {
-        "ownerPath": path_of(owner) if owner is not None else None,
-        "parents": [{"path": path_of(parent.owner) or [], "name": parent.feature.name}
-                    for parent in getattr(feature, "parents", ()) if parent is not None],
-    }
-
-
-def _pick_from_candidate(
-    local_csg: 'CutCSG', hit: 'OwnedFeatureHit',
-) -> Optional[Tuple[List[str], 'CutCSG', str, str, Optional['CSGFeature'], Optional['CSGFeature']]]:
-    """Everything a pick needs, for one chosen feature at the point.
-
-    Returns (path, node, label, type, edge, declared_edge), or None when the
-    feature's owner cannot be placed in the tree, which leaves the caller with
-    what it had.
-    """
-    from kumiki.viewer.picking import derived_feature_owner, node_positions
-    from kumiki.csg.cutcsg import CSGFeatureType
-
-    feature = hit.feature
-    positions = node_positions(local_csg)
-    if feature.feature_type() in (CSGFeatureType.EDGE, CSGFeatureType.POINT):
-        # A derived feature is placed by the deeper of the two parents that
-        # form it; a declared one belongs to whoever declared it, and has no
-        # such pair for derived_feature_owner to read. Trying derived first
-        # tells them apart.
-        kind = feature.feature_type().name
-        owned = derived_feature_owner(local_csg, feature)
-        if owned is not None:
-            return (owned[1], owned[0], feature.name, kind, feature, None)
-        placed = positions.get(id(hit.owner))
-        if placed is None:
-            return None
-        return (placed[2], hit.owner, feature.name, kind, None, feature)
-
-    placed = positions.get(id(hit.owner))
-    if placed is None:
-        return None
-    return (placed[2], hit.owner, feature.name, feature.feature_type().name, None, None)
+    return {"ownerPath": found.owner_path,
+            "parents": [{"path": path, "name": name} for path, name in found.parents]}
 
 
 def _sight_blocker(
     ss: 'SlotState', own: 'CutTimber', own_root: 'CutCSG', payload: PickRequest, direction: 'Float3',
 ) -> Callable[['Float3'], bool]:
-    """Returns a function `blocked(place) -> bool`: whether material hides *place* from the camera.
-
-    Args:
-        ss: the loaded frame; its other members can be in the way.
-        own: the member being picked on. *place* is in its local space.
-        own_root: *own*'s CSG, in that same local space.
-        payload: the pick request; its `drawnMembers` are the members that can be in the way
-            (every member when it is None).
-        direction: the view direction, from the camera, in *own*'s local space.
-    """
-    from kumiki.drawings.visibility import Occluder, hidden_at
-    from kumiki.rule import as_ndarray
+    """`blocked(place)` (picking.sight_blocker): whether a drawn member's material hides *place*, in
+    *own*'s local space, from the camera. The members that can be in the way are the request's
+    `drawnMembers` (every member when it is None), *own* among them."""
+    from kumiki.viewer.picking import sight_blocker
 
     drawn = payload.get("drawnMembers")
-    transform = own.timber.transform
-    occluders: List[Occluder] = [(own_root, transform)] + [
+    occluders = [(own_root, own.timber.transform)] + [
         (cast('CutCSG', entry["local_csg"]), entry["cut_timber"].timber.transform)
         for key, entry in ss.mesh_cache.items()
         if entry.get("cut_timber") is not None and entry.get("cut_timber") is not own
         and entry.get("local_csg") is not None and (drawn is None or key in drawn)]
-    look = as_ndarray(transform.local_to_global_direction(direction.v3()))
-
-    def blocked(place: 'Float3') -> bool:
-        return hidden_at(as_ndarray(transform.local_to_global(place.v3())), look, occluders)
-
-    return blocked
-
-
-def _best_matching_candidate(
-    feature_hits: List['OwnedFeatureHit'],
-    timber: 'PerfectTimberWithin',
-    held_geometry: Optional[GeometryWire],
-    look: Optional[List[float]],
-    payload: Optional[PickRequest] = None,
-) -> Optional[int]:
-    """Which feature under the pointer best finishes the measurement in hand.
-
-    The most specific feature is the right answer to "what is this thing here" --
-    an edge beats the two faces that form it -- and the wrong one while a
-    measurement is being made. Holding a face and being handed the arris beside
-    it means most hovers refuse, and the face you want is never the best answer
-    anywhere: it shows as a line, and on that line the edge wins.
-
-    So while something is held, a candidate that ADMITS A MEASUREMENT with it
-    beats one that does not, and among those, one of the same type as the held
-    feature breaks the tie. Type matching is the tie-break rather than the rule:
-    a candidate matching by type that admits nothing is worse than one that does
-    not match and admits a distance.
-
-    None when nothing is held, when there is no camera to project by, or when no
-    candidate admits anything -- all of which leave the ordinary answer standing.
-    """
-    if not held_geometry or not look or not feature_hits:
-        return None
-
-    from kumiki.drawings.measuring import kinds_for_pair, world_geometry
-
-    held = _geometry_from_wire(held_geometry)
-    space = _pick_space(payload or PickRequest())
-    best = None
-    for index, hit in enumerate(feature_hits):
-        geometry = world_geometry(_handle_of(hit.feature, hit.owner, timber))
-        if not geometry or not kinds_for_pair(held, geometry, look, space):
-            continue
-        # Earlier is more specific, so among equals the first wins. Same TYPE as
-        # the held end breaks the tie -- an edge matching an edge -- which is
-        # now asked of the two primitives rather than of two "kind" strings.
-        rank = (0 if type(geometry) is type(held) else 1, index)
-        if best is None or rank < best[0]:
-            best = (rank, index)
-    return None if best is None else best[1]
+    return sight_blocker(own.timber.transform, occluders, direction)
 
 
 def _pick_verdict(
@@ -4897,14 +4774,17 @@ def _nothing_at_point(member_key: str) -> PickResultWire:
 
 def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Process a find_csg_at_point request and return the result dict."""
-    from kumiki.viewer.picking import build_inv_transform_float, csg_point_on_boundary, derived_feature_owner, edge_highlight_segments, extract_highlight_mesh, features_at_point, inv_transform_point, navigate_csg_one_level, navigate_csg_to_leaf, node_positions, resolve_csg_at_path, resolve_derived_feature
+    from kumiki.drawings.drawing import MeasurementSpace
+    from kumiki.viewer.picking import (best_matching_candidate, build_inv_transform_float, choose,
+                                       edge_highlight_segments, extract_highlight_mesh, find_candidates,
+                                       inv_transform_point, navigate, non_real_plane_outline,
+                                       resolve_csg_at_path)
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
     point = payload.get("point")
     current_path = payload.get("currentPath") or []
     # A drawing's view picks features directly, every timber alike: there is no drilling down the
     # tree there, so Ctrl is a plain click.
-    from kumiki.drawings.drawing import MeasurementSpace
     ctrl_click = bool(payload.get("ctrlClick", False)) and payload.get("space") != MeasurementSpace.PROJECTED.value
     eps = 5e-4  # generous epsilon for raycast-based click points
     # Edge and vertex slack scaled to what a pixel is worth where the click
@@ -4947,117 +4827,27 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
 
     t0 = time.monotonic()
 
-    # A plain click goes straight to the feature, which is what someone
-    # clicking a shoulder or an edge is after. Ctrl holds it back to one level
-    # per click, for walking down through the compounds on the way.
-    if not ctrl_click:
-        new_path, target_csg, feature_label = navigate_csg_to_leaf(local_csg, local_pt, eps)
-    else:
-        if current_path:
-            node = resolve_csg_at_path(local_csg, current_path, local_pt, eps)
-            on_boundary = csg_point_on_boundary(node, local_pt, eps)
-            if not on_boundary:
-                node = local_csg
-                current_path = []
-        else:
-            node = local_csg
-
-        new_path, target_csg, feature_label = navigate_csg_one_level(
-            node, local_pt, current_path, eps,
-        )
-
-    # A click that has drilled far enough to name a face can name an edge
-    # instead, when one is the better answer at that point. Only then: while a
-    # click is still descending through compounds it selects them whole, and
-    # jumping to an edge deep inside would skip the levels between.
-    feature_type = None
-    declared_edge = None
-    from kumiki.drawings.drawing import MeasurementSpace
-    from kumiki.viewer.picking import candidates_under_pointer, split_hidden
+    # Three steps, kumiki's (picking.py): where navigating the tree lands, what is under the pointer,
+    # and which of it is wanted -- named by the caller (Tab, the menu), else the one that finishes the
+    # measurement in hand, else the first in a drawing, else what navigation found.
     in_drawing = _pick_space(payload) is MeasurementSpace.PROJECTED
     local_ray = _local_ray_from_payload(payload, timber_rot, timber_pos)
-    if in_drawing and local_ray is not None:
-        # In a drawing's view everything under the pointer is drawn at one place, at whatever
-        # depth -- so all of it is a candidate, and what is hidden goes last.
-        visible, hidden = split_hidden(
-            candidates_under_pointer(local_csg, local_pt, tolerances, local_ray),
-            local_ray[1], float(tolerances.edge), _sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1]))
-        feature_hits = [candidate.hit for candidate in visible + hidden]
-        visible_count = len(visible)
-        if not visible and not ctrl_click:
-            # Only hidden features here: nothing to take, but the menu still lists them, greyed.
-            return {**_nothing_at_point(member_key),
-                    "candidates": _candidates_wire(local_csg, feature_hits, visible_count)}
-    else:
-        feature_hits = features_at_point(local_csg, local_pt, eps, tolerances, local_ray=local_ray)
-        visible_count = len(feature_hits)
-    edge = resolve_derived_feature(feature_hits) if feature_label is not None else None
-
-    # Which of the features at this point is wanted, when more than one is.
-    #
-    # The caller may name one outright -- Tab steps through them -- or leave it
-    # to the preference, which while a measurement is being made picks whichever
-    # can actually finish it. Either way the choice is FINAL: the rules below
-    # exist to guess what was meant, and they have nothing left to decide once
-    # it has been said. Letting them run anyway puts the most specific feature
-    # back, which is how cycling to a face landed on the arris again every time.
-    held_geometry = payload.get("heldGeometry")
+    navigated = navigate(local_csg, local_pt, eps, ctrl_click, current_path)
+    blocked = (_sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1])
+               if in_drawing and local_ray is not None else None)
+    found = find_candidates(local_csg, local_pt, eps, tolerances, local_ray, in_drawing, blocked)
+    feature_hits, visible_count = found
+    if in_drawing and local_ray is not None and not visible_count and not ctrl_click:
+        # Only hidden features here: nothing to take, but the menu still lists them, greyed.
+        return {**_nothing_at_point(member_key),
+                "candidates": _candidates_wire(local_csg, feature_hits, visible_count)}
+    held = _geometry_from_wire(payload.get("heldGeometry")) if payload.get("heldGeometry") else None
     look = payload.get("look")
-    candidate_index = payload.get("candidateIndex")
-    if candidate_index is None:
-        candidate_index = _best_matching_candidate(
-            feature_hits[:visible_count], timber, held_geometry, look, payload)
-    if candidate_index is None and in_drawing and not ctrl_click and visible_count:
-        # In a drawing the candidates are already in the order a click should take them --
-        # nearest first, and only what the view can measure -- so the first is the answer,
-        # rather than whatever face the walk down the tree happened to stop at.
-        candidate_index = 0
-    picked = None
-    # The candidate this answer is, settled once by whichever branch chooses it, and then read
-    # for the geometry and the menu's active row alike. Looked up again by name afterwards, two
-    # features named alike (a dovetail_wide_face on each of two dovetails) answered as one.
-    chosen_hit: Optional['OwnedFeatureHit'] = None
-    # `is not None`, because ZERO IS A CHOICE. Stepping round to the first
-    # feature, or picking the first row of the menu, is the caller naming one --
-    # and treating it as "nothing named" dropped it back to the most specific
-    # answer, which is the very thing cycling exists to get away from.
-    if candidate_index is not None and visible_count:
-        chosen = feature_hits[int(candidate_index) % visible_count]  # never a hidden one
-        picked = _pick_from_candidate(local_csg, chosen)
-        if picked is not None:
-            new_path, target_csg, feature_label, feature_type, edge, declared_edge = picked
-            chosen_hit = chosen
-
-    if picked is None:
-        if edge is not None:
-            owned = derived_feature_owner(local_csg, edge)
-            if owned is not None:
-                target_csg, new_path = owned[0], owned[1]
-                feature_label = edge.name
-                feature_type = edge.feature_type().name
-                chosen_hit = feature_hits[0]  # resolve_derived_feature's answer is the best one
-        elif feature_label is not None and feature_hits:
-            # A declared edge or point -- a timber's own arris or corner --
-            # beats the face a click lands on, the same way a derived one does
-            # and for the same reason: it is the more specific answer at that
-            # point. Unlike a derived one it belongs to the node that declared
-            # it, so it is placed the way any declared feature is.
-            from kumiki.csg.cutcsg import CSGFeatureType
-
-            best = feature_hits[0]
-            if best.feature.feature_type() in (CSGFeatureType.EDGE, CSGFeatureType.POINT):
-                placed = node_positions(local_csg).get(id(best.owner))
-                if placed is not None:
-                    new_path, target_csg = placed[2], best.owner
-                    feature_label = best.feature.name
-                    feature_type = best.feature.feature_type().name
-                    declared_edge = best.feature
-                    chosen_hit = best
-        if chosen_hit is None and feature_label is not None:
-            # Navigation landed on a face: it names a node and a label, so the candidate is the
-            # one that node declares under that name.
-            named = [hit for hit in feature_hits if hit.feature.name == feature_label]
-            chosen_hit = next((hit for hit in named if hit.owner is target_csg), named[0] if named else None)
+    space = _pick_space(payload)
+    pick = choose(local_csg, navigated, found, payload.get("candidateIndex"),
+                  lambda hits: best_matching_candidate(hits, timber, held, look, space), in_drawing, ctrl_click)
+    new_path, target_csg, feature_label = pick.path, pick.node, pick.label
+    feature_type, edge = pick.kind, pick.edge
 
     parent_csg = None
     if new_path:
@@ -5068,19 +4858,14 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     # was picked and then nothing was drawn for it.
     highlight_edge = None
     edge_absent = False
-    edge_feature = edge if edge is not None else declared_edge
-    located_pick: Optional['LocatedPick'] = None
-    if chosen_hit is not None:
-        # An edge or point is shown under the node navigation placed it at; anything else is
-        # its own owner's.
-        owner = target_csg if edge_feature is not None else chosen_hit.owner
-        located_pick = (chosen_hit.feature, owner, chosen_hit.feature.locate_simple_unbounded(owner))
+    edge_feature = pick.edge_feature
+    located_pick: Optional['LocatedPick'] = pick.located()
     if edge_feature is not None:
         highlight_edge, edge_absent = edge_highlight_segments(
             edge_feature, target_csg, timber, local_csg,
         )
     elif located_pick is not None:
-        highlight_edge = _non_real_plane_outline(located_pick[0], located_pick[1], timber, local_csg)
+        highlight_edge = non_real_plane_outline(located_pick[0], located_pick[1], timber, local_csg)
 
     # Extract highlight mesh for the selected target
     hl_verts, hl_idx, matched, total = extract_highlight_mesh(
@@ -5145,7 +4930,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         # or from one of the fallbacks, and all of them have to be reported the
         # same way.
         "candidateIndex": next(
-            (index for index, hit in enumerate(feature_hits) if hit is chosen_hit), None),
+            (index for index, hit in enumerate(feature_hits) if hit is pick.hit), None),
         # Where the feature is, unbounded, in world space. What decides whether
         # a pair can be dimensioned is what each PROJECTS to, and the viewer
         # projects on every pointer move -- so it gets the plane or the line and
@@ -5235,28 +5020,10 @@ def _log_pick(
     )
 
 
-def _non_real_plane_outline(
-    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin', root: 'CutCSG',
-) -> Optional[List[SegmentWire]]:
-    """A non-real plane's outline -- a perfect face in rough stock, a centerplane -- which has no
-    surface to light: its extent's outline (kumiki.csg.feature_extent), which a drawing shows
-    edge-on, as the line it draws dotted. None for anything else."""
-    from kumiki.csg.feature_extent import extents_of
-    from kumiki.geometry import Plane
-    from kumiki.rule import create_v3
-
-    if feature.real or not isinstance(feature.locate_simple_unbounded(owner), Plane):
-        return None
-    extent = extents_of(root, timber).of(feature, owner)
-    if extent is None:
-        return None
-    to_world = lambda point: [float(v) for v in timber.transform.local_to_global(create_v3(*point))]
-    return [{"start": to_world(start), "end": to_world(end)} for start, end in extent.outline()]
-
-
 def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Resolve a CSG at a known path and return highlight mesh for the viewer."""
-    from kumiki.viewer.picking import build_inv_transform_float, extract_highlight_mesh, resolve_csg_at_path, label_name
+    from kumiki.viewer.picking import (build_inv_transform_float, extract_highlight_mesh, label_name,
+                                       non_real_plane_outline, resolve_csg_at_path)
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
     path = payload.get("path") or []
@@ -5340,7 +5107,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
         result["parentHighlightMesh"] = parent_hl
     if actual_feature_label:
         named = next((f for f in target_csg.get_declared_features() if f.name == actual_feature_label), None)
-        outline = None if named is None else _non_real_plane_outline(named, target_csg, cut_timber.timber, local_csg)
+        outline = None if named is None else non_real_plane_outline(named, target_csg, cut_timber.timber, local_csg)
         if outline:
             result["highlightEdgeSegments"] = outline
     return result
