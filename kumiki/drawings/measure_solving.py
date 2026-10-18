@@ -85,7 +85,8 @@ def _gap_direction(at_a: np.ndarray, at_b: np.ndarray, look: Optional[np.ndarray
 
 
 def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view: Optional[ViewAxes] = None,
-                      spans_memo: Optional[SpanMemo] = None) -> SolveMeasurement:
+                      spans_memo: Optional[SpanMemo] = None, across: Optional[np.ndarray] = None,
+                      ) -> SolveMeasurement:
     """What `measure`, seen through `view` (world space), measures, for the solver.
 
     Each feature is measured where it is on its cut timber, found among `cut_timbers` -- as the
@@ -93,6 +94,8 @@ def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view
 
     Distances and angles, in 3D or on a sheet, between features on one timber or two. Raises
     ValueError for one that measures nothing: a face seen at an angle, two features in one place.
+    `across` (world space) is the direction a perpendicular distance is read along, for two
+    features in one place, where the gap between them gives none.
     """
     kind = measure.kind or THREE_D_DISTANCE
     view = view or ViewAxes()
@@ -105,7 +108,7 @@ def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view
     first, second = _measured_span(a, cut_timbers, spans_memo), _measured_span(b, cut_timbers, spans_memo)
     if look is None:
         at_a, at_b = (as_ndarray(point) for point in distance_anchors(first, second, kind, view))
-        return SolveDistance(a, b, at_a, at_b, _gap_direction(at_a, at_b))
+        return SolveDistance(a, b, at_a, at_b, across if across is not None else _gap_direction(at_a, at_b))
 
     if kind.direction is not MeasurementDirection.PERPENDICULAR:
         if not (isinstance(first, PointSpan) and isinstance(second, PointSpan)):
@@ -116,7 +119,7 @@ def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view
     flat_first, flat_second = _projected(first, look), _projected(second, look)
     anchor_a, anchor_b = (as_ndarray(point) for point in distance_anchors(flat_first, flat_second, kind, view))
     return SolveDistance(a, b, _on_feature(first, anchor_a, look), _on_feature(second, anchor_b, look),
-                         _gap_direction(anchor_a, anchor_b, look))
+                         across if across is not None else _gap_direction(anchor_a, anchor_b, look))
 
 
 class DrawingSolve(Solve):
@@ -129,15 +132,16 @@ class DrawingSolve(Solve):
         # A row, or why there is none, per (measure, view).
         self.rows_memo: Dict[Hashable, Union[Row, ValueError]] = {}
 
-    def row(self, measure: Measure, view: Optional[ViewAxes] = None) -> Row:
+    def row(self, measure: Measure, view: Optional[ViewAxes] = None, across: Optional[np.ndarray] = None) -> Row:
         """How `measure`, seen through `view`, changes with the carriers' unknowns. Raises ValueError
-        for one that measures nothing (solve_measurement)."""
+        for one that measures nothing (solve_measurement, which `across` is passed on to)."""
         view = view or ViewAxes()
-        key = (measure, *(float(part) for axis in (view.look, view.right, view.up) for part in axis))
+        key = (measure, *(float(part) for axis in (view.look, view.right, view.up) for part in axis),
+               None if across is None else tuple(float(part) for part in across))
         if key not in self.rows_memo:
             try:
                 self.rows_memo[key] = self.measure_row(
-                    solve_measurement(measure, self.cut_timbers, view, self.spans_memo))
+                    solve_measurement(measure, self.cut_timbers, view, self.spans_memo, across))
             except ValueError as refused:
                 self.rows_memo[key] = refused
         found = self.rows_memo[key]

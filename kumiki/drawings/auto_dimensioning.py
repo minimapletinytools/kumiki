@@ -13,6 +13,7 @@ from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
+from ..csg.assumptions import Assumption
 from ..csg.carriers import Row
 from ..csg.dof_solver import remaining
 from ..csg.feature_solving import Solve
@@ -25,6 +26,10 @@ from .measure_solving import DrawingSolve
 from .sheet_shape import SQUARE_TO_VIEW, SheetPoint, sheet_shape
 
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
+HORIZONTAL = MeasurementKind.parse("projected_horizontal_distance")
+VERTICAL = MeasurementKind.parse("projected_vertical_distance")
+#: Closer than this on the sheet, in world units, two drawn features are one on top of the other.
+COINCIDENT = 1e-9
 
 
 @dataclass(frozen=True)
@@ -315,8 +320,65 @@ def sheet_candidates(
         for i, (a, shape_a) in enumerate(drawn):
             for b, shape_b in drawn[i + 1:]:
                 length = _separation(shape_a, shape_b)
-                if length is None or length < 1e-9:
-                    continue
+                if length is None or length < COINCIDENT:
+                    continue  # one on top of the other: coincidence_assumptions
                 candidates.append(DimensionCandidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes,
                                                       solve))
     return candidates
+
+
+def coincidence_assumptions(
+    anchors: Mapping[str, Sequence[FeatureHandle]], views: Mapping[str, ViewAxes], solve: DrawingSolve,
+) -> List[Assumption]:
+    """What a view shows without a dimension: features it draws one on top of the other.
+
+    Two lines on one line of the sheet (faces seen edge-on, flush), a point on a line, two points on
+    one spot: a reader sees they line up, so the distance between them across the sheet is known --
+    the row a zero dimension would add. Only what each view can see (`anchors`, as for
+    sheet_candidates): a hidden feature draws nothing to line up with. Features on one line or spot
+    are chained to the first of them rather than paired with each other.
+    """
+    assumptions: List[Assumption] = []
+
+    def add(view: str, a: FeatureHandle, b: FeatureHandle, kind: MeasurementKind, across=None) -> None:
+        try:
+            row = solve.row(Measure(a, b, kind=kind), views[view], across)
+        except ValueError:
+            return
+        assumptions.append(Assumption(
+            f"{a.feature.name} and {b.feature.name} line up in the {view} view ({kind.name})", (row,)))
+
+    for view, axes in views.items():
+        look = unit_ndarray(as_ndarray(axes.look))
+        right, up = unit_ndarray(as_ndarray(axes.right)), unit_ndarray(as_ndarray(axes.up))
+        lines: List[Tuple[np.ndarray, float, FeatureHandle]] = []  # a sheet line's normal, offset, first feature
+        spots: List[Tuple[float, float, FeatureHandle]] = []  # a spot on the sheet, first feature
+        for handle in anchors.get(view, ()):
+            shape = _on_sheet(handle, look)
+            if shape is None:
+                continue
+            if shape[0] == "line":
+                normal, offset = shape[1], shape[2]
+                same = next((line for line in lines if abs(abs(float(line[0] @ normal)) - 1) < COINCIDENT
+                             and abs(line[1] - float(line[0] @ normal) * offset) < COINCIDENT), None)
+                if same is None:
+                    lines.append((normal, offset, handle))
+                else:
+                    add(view, same[2], handle, PERPENDICULAR, same[0])
+                continue
+            at = shape[1]
+            x, y = float(at @ right), float(at @ up)
+            spot = next((spot for spot in spots if abs(spot[0] - x) < COINCIDENT and abs(spot[1] - y) < COINCIDENT),
+                        None)
+            if spot is not None:
+                add(view, spot[2], handle, HORIZONTAL)
+                add(view, spot[2], handle, VERTICAL)
+                continue
+            spots.append((x, y, handle))
+        # A point on a line: one row, across the line.
+        for x, y, handle in spots:
+            at = right * x + up * y
+            on = next((line for line in lines if abs(float(line[0] @ at) - line[1]) < COINCIDENT), None)
+            if on is not None:
+                add(view, on[2], handle, PERPENDICULAR, on[0])
+    return assumptions

@@ -22,7 +22,7 @@ from kumiki.csg.cutcsg import MidplaneFeature, OwnedFeatureHit, measured_by_defa
 from kumiki.csg.carriers import Row
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
-from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, Policy, auto_dimension, is_reference,
+from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, Policy, auto_dimension, coincidence_assumptions, is_reference,
                                               sheet_candidates)
 from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, ViewAxes, elevation_viewports,
                                     shop_drawing_viewports)
@@ -102,12 +102,14 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     assumptions = square_assumptions(directed, carriers)
     for view in VIEWS:
         assumptions += sheet_axis_assumptions(directed, carriers, _sheet(view)[1])
-    known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
-
     # Centerplanes can't be referenced by a drawing yet, so they're solved for but never dimensioned to.
     anchors = [handle for handle in directed if not isinstance(handle.feature, MidplaneFeature)]
     views = {view: _sheet(view)[0] for view in VIEWS}
-    candidates = sheet_candidates(visible_by_view(anchors, views, cut_timbers), views, solve)
+    visible = visible_by_view(anchors, views, cut_timbers)
+    # What the views show lined up needs no dimension.
+    assumptions += coincidence_assumptions(visible, views, solve)
+    known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
+    candidates = sheet_candidates(visible, views, solve)
     result = auto_dimension(candidates, targets, known_rows, solve, policy)
 
     report = [f"fixed: {FIXED_TIMBER} ({len(known)} faces known), {len(assumptions)} assumptions",
@@ -166,11 +168,12 @@ def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
     assumptions = square_assumptions(targets, carriers)
     for _, sheet in sheets.values():
         assumptions += sheet_axis_assumptions(targets, carriers, sheet)
-    known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
-
     anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
     views = {view: axes for view, (axes, _) in sheets.items()}
-    candidates = sheet_candidates(visible_by_view(anchors, views, [cut]), views, solve)
+    visible = visible_by_view(anchors, views, [cut])
+    assumptions += coincidence_assumptions(visible, views, solve)
+    known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
+    candidates = sheet_candidates(visible, views, solve)
     result = auto_dimension(candidates, targets, known_rows, solve, policy)
 
     report = [f"{cut.timber.ticket.path}: {len(targets)} features, from {[_name(h) for h in known]}, "
