@@ -135,7 +135,7 @@ IGNORE-you did rough relief, but maybe you want perfect relief group whatever th
 DONE-perfect non-real features should also be extended and cropped
 DONE-why are tenons getting blue dotted lines in my_cute_frame_drawing_test, they are'nt perfect face features
 IGNORE-measurement anchors in 2d view should be in a shared project plane, right now when you rotate the camera it shows anchors attaching directly to their unprojected featuers which is not what we want... maybe just ignore this for now though
-
+DONE-spilt out feature solving into a csg/feature_solving if possible. drawings is only manages actualy drawing stuff. ideally measurements lives in drawing and fetaure_solving has a simplified measurement class that only has the acutal info it needs.
   
 -DECISION TIME STANDALONE APP
   -decide how to do file browser, maybe combine with kigumi explorer probably
@@ -173,7 +173,10 @@ IGNORE-measurement anchors in 2d view should be in a shared project plane, right
 -when dragging python measurements, theres' a flicker as it tries to reload from python, can you reomve that?
 
 -do a full end to end review and find opportunities to refactor..
--spilt out feature solving into a csg/feature_solving if possible. drawings is only manages actualy drawing stuff. ideally measurements lives in drawing and fetaure_solving has a simplified measurement class that only has the acutal info it needs.
+
+-The remaining inconsistency: this only holds when there's a root_csg. The solver's call (feature_solving.py:60) passes no root. For planes, that path still uses the old approximate crop (approximately_crop_plane_to_area_on_csg), which can't subtract cuts. That's why the generator's picks didn't change in #112. Moving the solver onto FeatureExtent too would let the approximate crop go. That's the leftover part of review item 1, together with the Solve object (item 5).
+
+
 
 -add beta features section to option
 -add support to run @tools from the parameter section

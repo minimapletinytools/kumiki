@@ -1,4 +1,4 @@
-"""What a drawing's view can see: whether a place, or any of a feature, is hidden behind material.
+"""What a drawing's 2D view can see: whether a place, or any of a feature, is hidden behind material, computed analytically.
 
 Two questions, one set of rules:
 
@@ -11,10 +11,6 @@ only a solid's inside hides, and a line of sight along its surface does not; uns
 cannot be cut exactly -- means seen. The one difference: under a pointer, a feature drawn over by a
 nearer one is hidden too, so a click takes what is on top; a view keeps it, since two timbers' tops
 in line are dimensioned at the one line both draw.
-
-Analytic, over the whole CSG, not sampled: a place's line of sight is clipped exactly to the solid
-(edges_on_csg), and a feature drawn as a line is decided in the one plane holding all its lines of sight,
-cut exactly by each solid (cross_sections).
 """
 
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
@@ -35,6 +31,7 @@ from .sheet_shape import SheetLine, SheetPoint, sheet_gap, sheet_shape
 Geometry = Union[Point, Line, Plane]
 from ..csg.feature_extent import extents_of, timber_reach
 
+# TODO probably should make these relative to timber size if it's not alerady, i.e. epsilon per meter kinda deal
 #: Material nearer the place than this is the surface it lies on, not something in front of it.
 NUDGE = 1e-5
 #: How far the line of sight is followed toward the camera. Only has to pass every solid.
