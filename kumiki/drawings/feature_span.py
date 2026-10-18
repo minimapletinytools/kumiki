@@ -14,7 +14,7 @@ from ..csg.cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, SimpleRectangu
                           SimpleRectangularPrismFeature)
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
-from ..rule import Matrix, as_floats, create_v3, exact_scalar, scalar, unit_floats
+from ..rule import Matrix, as_ndarray, create_v3, exact_scalar, scalar, unit_ndarray
 from ..timber import PerfectTimberWithin
 from .drawing import ALIGNMENT_EPSILON, LineSpan, MeasureSpan, PlaneSpan, PointSpan, VectorLike
 
@@ -28,7 +28,7 @@ _UP = np.array([0.0, 0.0, 1.0])
 
 def _unit_or_up(vector: np.ndarray) -> np.ndarray:
     """At length one; a zero vector is taken as up, so a degenerate span still has a direction."""
-    return unit_floats(vector, _UP)
+    return unit_ndarray(vector, _UP)
 
 def _station(located: Line, point) -> float:
     return float(((point - located.point).T * located.direction)[0, 0])
@@ -92,7 +92,7 @@ def edge_outward_normal(feature: CSGFeature, owner: CutCSG, timber: PerfectTimbe
     elif isinstance(feature, SimpleRectangularPrismEdgeFeature):
         located = [SimpleRectangularPrismFeature(name=feature.name, face=face).locate_simple_unbounded(owner)
                    for face in feature.faces]
-    normals = [_unit_or_up(as_floats(timber.transform.local_to_global_direction(found.normal)))
+    normals = [_unit_or_up(as_ndarray(timber.transform.local_to_global_direction(found.normal)))
                for found in located if isinstance(found, Plane)]
     if len(normals) != 2:
         return None
@@ -104,7 +104,7 @@ def edge_outward_normal(feature: CSGFeature, owner: CutCSG, timber: PerfectTimbe
 
 def projects_to_a_point(direction: Union[VectorLike, np.ndarray], plane_normal: VectorLike) -> bool:
     """Whether a line seen from this plane draws as a point, by the same threshold the viewer projects by."""
-    return abs(float(_unit_or_up(as_floats(direction)) @ _unit_or_up(as_floats(plane_normal)))) > 1 - ALIGNMENT_EPSILON
+    return abs(float(_unit_or_up(as_ndarray(direction)) @ _unit_or_up(as_ndarray(plane_normal)))) > 1 - ALIGNMENT_EPSILON
 
 
 def feature_span(
@@ -129,7 +129,7 @@ def feature_span(
     located = feature.locate_simple_unbounded(owner)
 
     def world(point) -> np.ndarray:
-        return as_floats(timber.transform.local_to_global(point))
+        return as_ndarray(timber.transform.local_to_global(point))
 
     if isinstance(located, Point):
         return PointSpan(at=create_v3(*world(located.position)))
@@ -170,13 +170,13 @@ def feature_span(
         if middle is None:
             return None
         at = world(middle)
-        normal = _unit_or_up(as_floats(timber.transform.local_to_global_direction(located.normal)))
+        normal = _unit_or_up(as_ndarray(timber.transform.local_to_global_direction(located.normal)))
         if in_three_d:
             return PlaneSpan(at=create_v3(*at), normal=create_v3(*normal))
         if plane_normal is None:
             return PointSpan(at=create_v3(*at))
         # Edge-on, it draws as a line along the face, square to its normal and to the view.
-        along = np.cross(normal, _unit_or_up(as_floats(plane_normal)))
+        along = np.cross(normal, _unit_or_up(as_ndarray(plane_normal)))
         if not np.any(np.abs(along) > 1e-9) or not cropped.boundary:
             return PointSpan(at=create_v3(*at))  # facing the reader: it covers the view
         along = _unit_or_up(along)

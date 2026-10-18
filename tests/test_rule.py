@@ -7,7 +7,10 @@ This module contains tests for the Orientation class which represents
 
 import pytest
 import math
+
+import numpy as np
 from kumiki.rule import (
+    as_ndarray, exact_scalar, unit_ndarray,
     scalar,
     Matrix,
     Orientation,
@@ -1287,3 +1290,22 @@ def test_a_direction_is_rotated_but_not_translated():
     rotated = transform.local_to_global_direction(direction)
     assert (transform.local_to_global(direction) - transform.local_to_global(direction * 0) - rotated).norm() < 1e-12
     assert (transform.global_to_local_direction(rotated) - direction).norm() < 1e-12
+
+
+# --- numpy arrays, for numeric code -----------------------------------------------------------
+
+
+def test_a_v3_an_array_and_a_list_are_the_same_three_floats():
+    expected = np.array([1.0, 2.0, 3.0])
+    for given in (create_v3(1, 2, 3), np.array([1, 2, 3]), [1, 2, 3], (1.0, 2.0, 3.0)):
+        assert np.array_equal(as_ndarray(given), expected)
+
+
+def test_a_unit_vector_and_a_zero_one_given_a_fallback():
+    assert np.allclose(unit_ndarray(np.array([3.0, 0.0, 4.0])), [0.6, 0.0, 0.8])
+    up = np.array([0.0, 0.0, 1.0])
+    assert unit_ndarray(np.zeros(3), up) is up
+
+
+def test_an_exact_scalar_is_the_float_it_was_given():
+    assert float(exact_scalar(0.1)) == 0.1

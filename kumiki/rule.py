@@ -31,7 +31,7 @@ floats -- there is no lazy/symbolic expression tree, and no separate
 import math
 import re
 import numpy as np
-from typing import Mapping, Optional, Union, List, Tuple
+from typing import Mapping, Optional, Sequence, Union, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -667,20 +667,20 @@ def create_v3(x: Numeric, y: Numeric, z: Numeric) -> V3:
 
 
 
-# --- floats, for numeric code (numpy) ------------------------------------------------------------
+# --- numpy arrays, for numeric code ---------------------------------------------------------------
 # The exact geometry works in V3; code that only computes numbers -- solving, sections, visibility --
-# works in numpy floats, converting at its edges with these.
+# works in numpy arrays, converting at its edges with these.
 
-def as_floats(vector) -> np.ndarray:
-    """Three floats, from a V3 (3x1), a numpy array or any sequence of three numbers."""
+def as_ndarray(vector: Union[V3, np.ndarray, Sequence[Numeric]]) -> np.ndarray:
+    """Three floats as a numpy array, from a V3 (3x1), a numpy array or any sequence of three numbers."""
     if isinstance(vector, np.ndarray):
-        return vector.astype(float).reshape(-1)[:3]
-    if hasattr(vector, "shape"):
+        return np.asarray(vector, dtype=float).reshape(-1)[:3]
+    if isinstance(vector, Matrix):
         return np.array([float(vector[i, 0]) for i in range(3)])
     return np.array([float(part) for part in vector][:3])
 
 
-def unit_floats(vector: np.ndarray, fallback: Optional[np.ndarray] = None) -> np.ndarray:
+def unit_ndarray(vector: np.ndarray, fallback: Optional[np.ndarray] = None) -> np.ndarray:
     """`vector` at length one. A zero vector gives `fallback` when one is given; otherwise the
     caller has said it cannot be zero."""
     length = float(np.linalg.norm(vector))
@@ -691,6 +691,8 @@ def unit_floats(vector: np.ndarray, fallback: Optional[np.ndarray] = None) -> np
 
 def exact_scalar(value: float):
     """A float as the exact scalar the geometry code multiplies by."""
+    # TODO delete: scalar() is a float now, so this is float(value). It meant something when scalar
+    # built exact rationals; its callers can multiply by the float itself.
     return scalar(repr(float(value)))
 
 def cross_product(v1: V3, v2: V3) -> V3:
