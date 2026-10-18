@@ -345,8 +345,8 @@ class CylinderAxisWire(TypedDict):
     radius: float
 
 
-class CenterplaneWire(TypedDict):
-    """A centerplane's outline across the perfect timber, in world space, for drawing it edge-on."""
+class PlaneOutlineWire(TypedDict):
+    """A perfect reference plane's outline, cropped to the cut timber, in world space, for drawing it edge-on."""
     normal: Vec3
     positions: List[float]  # segment pairs, flat
 
@@ -378,7 +378,8 @@ class MemberMeshWire(TypedDict, total=False):
     hasActualGeometryDifferentFromPerfect: bool
     perfectTimberWithinVertices: List[float]
     perfectTimberWithinIndices: List[int]
-    centerplanes: List[CenterplaneWire]
+    centerplanes: List[PlaneOutlineWire]
+    perfectFaces: List[PlaneOutlineWire]
     perfectBoxNoJointsVertices: List[float]
     perfectBoxNoJointsIndices: List[int]
     roughBoxNoJointsVertices: List[float]
@@ -1002,7 +1003,7 @@ def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> Tria
     }
 
 
-def _centerplane_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG') -> List[CenterplaneWire]:
+def _centerplane_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG') -> List[PlaneOutlineWire]:
     """Each centerplane's outline, cropped to the cut timber `root`, in world space.
 
     Seen edge-on, which is the only way a drawing shows one, the outline is the centerline.
@@ -1010,11 +1011,33 @@ def _centerplane_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG') -> List
     from kumiki.geometry import Plane
     from kumiki.rule import create_v3
 
-    outlines: List[CenterplaneWire] = []
+    outlines: List[PlaneOutlineWire] = []
     for normal in (create_v3(1, 0, 0), create_v3(0, 1, 0)):
         segments = _perfect_reference_outline(Plane(normal=normal, point=create_v3(0, 0, 0)), root, timber) or []
         positions = [float(v) for segment in segments for v in (*segment["start"], *segment["end"])]
         direction = timber.transform.local_to_global_direction(normal)
+        outlines.append({"normal": [float(v) for v in direction], "positions": positions})
+    return outlines
+
+
+def _perfect_face_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG') -> List[PlaneOutlineWire]:
+    """Each perfect face the rough body has no face for (a ptw.* PlaneFeature, a perfect reference),
+    cropped to the cut timber `root`, in world space: what a drawing draws dotted, edge-on. A face
+    the rough body has (rptw.*) is drawn as the timber already, and a joint's faces are not these."""
+    from kumiki.csg.cutcsg import Difference, FeatureNature, PlaneFeature
+    from kumiki.geometry import Plane
+
+    body = root.base if isinstance(root, Difference) else root
+    outlines: List[PlaneOutlineWire] = []
+    for feature in body.get_declared_features():
+        if not isinstance(feature, PlaneFeature) or feature.nature is not FeatureNature.PERFECT_REFERENCE:
+            continue
+        plane = feature.locate_simple_unbounded(body)
+        if not isinstance(plane, Plane):
+            continue
+        segments = _perfect_reference_outline(plane, root, timber) or []
+        positions = [float(v) for segment in segments for v in (*segment["start"], *segment["end"])]
+        direction = timber.transform.local_to_global_direction(plane.normal)
         outlines.append({"normal": [float(v) for v in direction], "positions": positions})
     return outlines
 
@@ -1148,17 +1171,8 @@ def _cut_timber_to_triangle_mesh_payload(
             payload["hasActualGeometryDifferentFromPerfect"] = False
     else:
         payload["hasActualGeometryDifferentFromPerfect"] = False
-        if not is_perfect:
-            # Rough stock: a drawing draws the perfect timber within inside it, dashed. Not a
-            # geometry mode, so the flag stays off.
-            try:
-                perfect = _triangulate_local_csg(cut_timber, _build_perfect_timber_within_csg_local(cut_timber))
-                payload["perfectTimberWithinVertices"] = perfect["vertices"]
-                payload["perfectTimberWithinIndices"] = perfect["indices"]
-            except Exception as exc:  # noqa: BLE001 — best-effort optional payload
-                log_stderr(f"Warning: failed to build the perfect timber within for "
-                           f"{get_timber_display_name(timber)}: {exc}")
     payload["centerplanes"] = _centerplane_outlines(timber, local_csg)
+    payload["perfectFaces"] = _perfect_face_outlines(timber, local_csg)
 
     # No-joints box geometry: plain rectangular boxes with no CSG cuts applied at
     # all (no joint cuts, no mortise holes), cropped in length only by this

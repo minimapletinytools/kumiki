@@ -128,8 +128,8 @@ const DRAWING_DOT = 0.0008;
 const DRAWING_DOT_GAP = 0.004;
 const PERFECT_TIMBER_LINE_COLOR = 0x2f6fd0;
 const CENTERPLANE_LINE_COLOR = 0xd0582f;
-// How square to the view a centerplane must be to be drawn: seen edge-on, it is a line.
-const EDGE_ON_DOT = 1e-3;
+// How square to the view a plane may be and still be drawn: seen face-on, it is not.
+const FACE_ON_DOT = 1 - 1e-3;
 
 // How strongly a selection shows in a drawing's views other than its own.
 const SELECTION_ECHO_OPACITY = 0.3;
@@ -1572,8 +1572,10 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * Lines only a drawing's views draw: the perfect timber within, dotted, where the rough stock
-     * is not it, and each centerplane, dotted in its own colour. See _showDrawingLinesFor.
+     * Lines only a drawing's views draw: each perfect face the rough stock has no face for (ptw.*),
+     * dotted, and each centerplane, dotted in its own colour -- both cropped to the cut timber, so a
+     * perfect face ends at a shoulder and a tenon, being the timber's own, gets none. See
+     * _showDrawingLinesFor.
      *
      * Hovering or selecting one of those planes lights it through the usual highlight, from the
      * outline the runner sends for it (highlightEdgeSegments).
@@ -1581,28 +1583,22 @@ class KigumiViewerApp extends LitElement {
     _drawingLinesFor(mesh) {
         const materials = this._drawingLineMaterials();
         const lines = [];
-        const add = (positions, material, normal) => {
+        const add = (positions, material, normal, option) => {
             const geometry = new THREE.LineSegmentsGeometry();
             geometry.setPositions(positions);
             const object = new THREE.LineSegments2(geometry, material);
             object.computeLineDistances();
             object.renderOrder = 11;
             object.visible = false;
-            lines.push({ object, normal, option: normal ? 'showDrawingCenterplanes' : 'showDrawingPerfectFaces' });
+            lines.push({ object, normal, option });
         };
-        if (mesh.perfectTimberWithinVertices && mesh.perfectTimberWithinIndices) {
-            const indexed = new THREE.BufferGeometry();
-            indexed.setAttribute('position', new THREE.Float32BufferAttribute(mesh.perfectTimberWithinVertices, 3));
-            indexed.setIndex(mesh.perfectTimberWithinIndices);
-            const flat = indexed.toNonIndexed();
-            const edges = new THREE.EdgesGeometry(flat, 25);
-            add(edges.attributes.position.array, materials.perfect, null);
-            edges.dispose();
-            flat.dispose();
-            indexed.dispose();
+        // Both are planes, cropped to the cut timber by the runner, drawn where seen edge-on.
+        for (const face of mesh.perfectFaces || []) {
+            add(face.positions, materials.perfect, new THREE.Vector3(...face.normal), 'showDrawingPerfectFaces');
         }
         for (const centerplane of mesh.centerplanes || []) {
-            add(centerplane.positions, materials.centerplane, new THREE.Vector3(...centerplane.normal));
+            add(centerplane.positions, materials.centerplane, new THREE.Vector3(...centerplane.normal),
+                'showDrawingCenterplanes');
         }
         return lines;
     }
@@ -1633,13 +1629,18 @@ class KigumiViewerApp extends LitElement {
         return this._drawingMaterials;
     }
 
-    /** Drawing lines in a drawing's views only, as its options say, and a centerplane only where it is seen edge-on. */
+    /**
+     * Drawing lines in a drawing's views only, as its options say, and never where a plane is seen
+     * face-on: its outline would only retrace the faces around it. Seen edge-on it is a line; in a
+     * view turned off square, the planes draw as a wireframe of the perfect timber within. (Edge-on
+     * only, they all vanished at the first touch of a drag, which turns a drawing's camera.)
+     */
     _showDrawingLinesFor(viewport) {
         const look = viewport.camera.getWorldDirection(this._drawingLook || (this._drawingLook = new THREE.Vector3()));
         for (const bundle of this.sceneManager.bundles()) {
             for (const line of bundle.drawingLines || []) {
                 line.object.visible = this.isInDrawing && Boolean(this[line.option])
-                    && (!line.normal || Math.abs(line.normal.dot(look)) < EDGE_ON_DOT);
+                    && Math.abs(line.normal.dot(look)) < FACE_ON_DOT;
             }
         }
     }
