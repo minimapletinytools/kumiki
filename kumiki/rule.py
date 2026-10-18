@@ -665,6 +665,34 @@ def create_v3(x: Numeric, y: Numeric, z: Numeric) -> V3:
     """Create a 3D vector"""
     return Matrix([x, y, z])
 
+
+
+# --- floats, for numeric code (numpy) ------------------------------------------------------------
+# The exact geometry works in V3; code that only computes numbers -- solving, sections, visibility --
+# works in numpy floats, converting at its edges with these.
+
+def as_floats(vector) -> np.ndarray:
+    """Three floats, from a V3 (3x1), a numpy array or any sequence of three numbers."""
+    if isinstance(vector, np.ndarray):
+        return vector.astype(float).reshape(-1)[:3]
+    if hasattr(vector, "shape"):
+        return np.array([float(vector[i, 0]) for i in range(3)])
+    return np.array([float(part) for part in vector][:3])
+
+
+def unit_floats(vector: np.ndarray, fallback: Optional[np.ndarray] = None) -> np.ndarray:
+    """`vector` at length one. A zero vector gives `fallback` when one is given; otherwise the
+    caller has said it cannot be zero."""
+    length = float(np.linalg.norm(vector))
+    if length == 0 and fallback is not None:
+        return fallback
+    return vector / length
+
+
+def exact_scalar(value: float):
+    """A float as the exact scalar the geometry code multiplies by."""
+    return scalar(repr(float(value)))
+
 def cross_product(v1: V3, v2: V3) -> V3:
     """Calculate cross product of two 3D vectors"""
     return Matrix([

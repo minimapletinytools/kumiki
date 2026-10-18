@@ -14,7 +14,7 @@ from ..csg.cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, SimpleRectangu
                           SimpleRectangularPrismFeature)
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
-from ..rule import Matrix, scalar
+from ..rule import Matrix, as_floats, create_v3, exact_scalar, scalar, unit_floats
 from ..timber import PerfectTimberWithin
 from .drawing import ALIGNMENT_EPSILON, LineSpan, MeasureSpan, PlaneSpan, PointSpan, VectorLike
 
@@ -22,28 +22,13 @@ from .drawing import ALIGNMENT_EPSILON, LineSpan, MeasureSpan, PlaneSpan, PointS
 Interval = Tuple[float, float]
 
 
-def _floats(vector) -> np.ndarray:
-    """Three floats from a 3x1 Matrix, a numpy array or a sequence."""
-    if isinstance(vector, np.ndarray):
-        return vector.astype(float).reshape(-1)[:3]
-    if hasattr(vector, "shape"):
-        return np.array([float(vector[i, 0]) for i in range(3)])
-    return np.array([float(vector[i]) for i in range(3)])
+
+_UP = np.array([0.0, 0.0, 1.0])
 
 
-def _unit(vector: np.ndarray) -> np.ndarray:
-    length = float(np.linalg.norm(vector))
-    return vector / length if length > 0 else np.array([0.0, 0.0, 1.0])
-
-
-def _v3(parts) -> Matrix:
-    return Matrix([float(part) for part in parts])
-
-
-def _exact(value: float):
-    """A float as the exact scalar the geometry code multiplies by."""
-    return scalar(repr(float(value)))
-
+def _unit_or_up(vector: np.ndarray) -> np.ndarray:
+    """At length one; a zero vector is taken as up, so a degenerate span still has a direction."""
+    return unit_floats(vector, _UP)
 
 def _station(located: Line, point) -> float:
     return float(((point - located.point).T * located.direction)[0, 0])
@@ -107,19 +92,19 @@ def edge_outward_normal(feature: CSGFeature, owner: CutCSG, timber: PerfectTimbe
     elif isinstance(feature, SimpleRectangularPrismEdgeFeature):
         located = [SimpleRectangularPrismFeature(name=feature.name, face=face).locate_simple_unbounded(owner)
                    for face in feature.faces]
-    normals = [_unit(_floats(timber.transform.local_to_global_direction(found.normal)))
+    normals = [_unit_or_up(as_floats(timber.transform.local_to_global_direction(found.normal)))
                for found in located if isinstance(found, Plane)]
     if len(normals) != 2:
         return None
     total = normals[0] + normals[1]
     if not np.any(np.abs(total) > 1e-9):
         return None  # two faces looking opposite ways form no edge
-    return _unit(total)
+    return _unit_or_up(total)
 
 
 def projects_to_a_point(direction: Union[VectorLike, np.ndarray], plane_normal: VectorLike) -> bool:
     """Whether a line seen from this plane draws as a point, by the same threshold the viewer projects by."""
-    return abs(float(_unit(_floats(direction)) @ _unit(_floats(plane_normal)))) > 1 - ALIGNMENT_EPSILON
+    return abs(float(_unit_or_up(as_floats(direction)) @ _unit_or_up(as_floats(plane_normal)))) > 1 - ALIGNMENT_EPSILON
 
 
 def feature_span(
@@ -144,10 +129,10 @@ def feature_span(
     located = feature.locate_simple_unbounded(owner)
 
     def world(point) -> np.ndarray:
-        return _floats(timber.transform.local_to_global(point))
+        return as_floats(timber.transform.local_to_global(point))
 
     if isinstance(located, Point):
-        return PointSpan(at=_v3(world(located.position)))
+        return PointSpan(at=create_v3(*world(located.position)))
 
     solid = timber.get_perfect_timber_within_csg_local()
     reach = float(timber.length) * 4
@@ -162,14 +147,14 @@ def feature_span(
             return None
         # The longest: a cut can leave an edge in several, and the biggest is the one a reader points at.
         low, high = max(pieces, key=lambda piece: piece[1] - piece[0])
-        start = world(located.point + located.direction * _exact(low))
-        end = world(located.point + located.direction * _exact(high))
-        direction = _unit(end - start)
+        start = world(located.point + located.direction * exact_scalar(low))
+        end = world(located.point + located.direction * exact_scalar(high))
+        direction = _unit_or_up(end - start)
         if not in_three_d and plane_normal is not None and projects_to_a_point(direction, plane_normal):
-            return PointSpan(at=_v3((start + end) / 2))
+            return PointSpan(at=create_v3(*(start + end) / 2))
         outward = edge_outward_normal(feature, owner, timber)
-        return LineSpan(at=_v3(start), direction=_v3(direction), interval=(0.0, math.dist(start, end)),
-                        outward=None if outward is None else _v3(outward))
+        return LineSpan(at=create_v3(*start), direction=create_v3(*direction), interval=(0.0, math.dist(start, end)),
+                        outward=None if outward is None else create_v3(*outward))
 
     if isinstance(located, Plane):
         cropped = approximately_crop_plane_to_area_on_csg(
@@ -185,19 +170,19 @@ def feature_span(
         if middle is None:
             return None
         at = world(middle)
-        normal = _unit(_floats(timber.transform.local_to_global_direction(located.normal)))
+        normal = _unit_or_up(as_floats(timber.transform.local_to_global_direction(located.normal)))
         if in_three_d:
-            return PlaneSpan(at=_v3(at), normal=_v3(normal))
+            return PlaneSpan(at=create_v3(*at), normal=create_v3(*normal))
         if plane_normal is None:
-            return PointSpan(at=_v3(at))
+            return PointSpan(at=create_v3(*at))
         # Edge-on, it draws as a line along the face, square to its normal and to the view.
-        along = np.cross(normal, _unit(_floats(plane_normal)))
+        along = np.cross(normal, _unit_or_up(as_floats(plane_normal)))
         if not np.any(np.abs(along) > 1e-9) or not cropped.boundary:
-            return PointSpan(at=_v3(at))  # facing the reader: it covers the view
-        along = _unit(along)
+            return PointSpan(at=create_v3(*at))  # facing the reader: it covers the view
+        along = _unit_or_up(along)
         # The region is timber-local and the direction world, so the boundary is brought over.
         stations = [float(world(corner) @ along) for corner in cropped.boundary]
         here = float(at @ along)
-        return LineSpan(at=_v3(at), direction=_v3(along), interval=(min(stations) - here, max(stations) - here))
+        return LineSpan(at=create_v3(*at), direction=create_v3(*along), interval=(min(stations) - here, max(stations) - here))
 
     return None
