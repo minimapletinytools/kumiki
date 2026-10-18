@@ -10,7 +10,7 @@ import math
 
 import numpy as np
 from kumiki.rule import (
-    as_ndarray, exact_scalar, unit_ndarray,
+    as_ndarray, unit_ndarray,
     scalar,
     Matrix,
     Orientation,
@@ -1307,5 +1307,3 @@ def test_a_unit_vector_and_a_zero_one_given_a_fallback():
     assert unit_ndarray(np.zeros(3), up) is up
 
 
-def test_an_exact_scalar_is_the_float_it_was_given():
-    assert float(exact_scalar(0.1)) == 0.1

@@ -24,7 +24,7 @@ from .cross_sections import (CrossSection, cross_section_centroid, cross_section
                              face_cross_section, plane_cross_section)
 from .cutcsg import CSGFeature, CutCSG, FaceFeature, FeatureNature
 from ..geometry import Line, Plane, Point
-from ..rule import as_ndarray, create_v3, exact_scalar
+from ..rule import as_ndarray, create_v3
 
 if TYPE_CHECKING:
     from ..timber import PerfectTimberWithin
@@ -131,7 +131,7 @@ class FeatureExtent:
     def _on_line(self, station: float) -> np.ndarray:
         line = self.located
         assert isinstance(line, Line)
-        return as_ndarray(line.point + line.direction * exact_scalar(station))
+        return as_ndarray(line.point + line.direction * float(station))
 
 
 class FeatureExtents:

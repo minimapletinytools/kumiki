@@ -14,7 +14,7 @@ from ..csg.cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, SimpleRectangu
 from ..csg.feature_extent import FeatureExtents, extents_of
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
-from ..rule import as_ndarray, create_v3, exact_scalar, unit_ndarray
+from ..rule import as_ndarray, create_v3, unit_ndarray
 from ..timber import PerfectTimberWithin
 from .drawing import LineSpan, MeasureSpan, PlaneSpan, PointSpan, VectorLike
 from .sheet_shape import SheetLine, SheetPoint, sheet_shape
@@ -85,8 +85,8 @@ def feature_span(
             return None
         # The longest: a cut can leave an edge in several, and the biggest is the one a reader points at.
         low, high = max(pieces, key=lambda piece: piece[1] - piece[0])
-        start = world(located.point + located.direction * exact_scalar(low))
-        end = world(located.point + located.direction * exact_scalar(high))
+        start = world(located.point + located.direction * float(low))
+        end = world(located.point + located.direction * float(high))
         direction = _unit_or_up(end - start)
         if not in_three_d and plane_normal is not None and isinstance(
                 sheet_shape(Line(direction=create_v3(*direction), point=create_v3(*start)), plane_normal), SheetPoint):

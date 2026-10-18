@@ -689,12 +689,6 @@ def unit_ndarray(vector: np.ndarray, fallback: Optional[np.ndarray] = None) -> n
     return vector / length
 
 
-def exact_scalar(value: float):
-    """A float as the exact scalar the geometry code multiplies by."""
-    # TODO delete: scalar() is a float now, so this is float(value). It meant something when scalar
-    # built exact rationals; its callers can multiply by the float itself.
-    return scalar(repr(float(value)))
-
 def cross_product(v1: V3, v2: V3) -> V3:
     """Calculate cross product of two 3D vectors"""
     return Matrix([
