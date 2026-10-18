@@ -121,16 +121,6 @@ function describeAnchor(anchor) {
     return anchor.feature ? trail.concat(anchor.feature).join(' > ') : trail.join(' > ');
 }
 
-// A drawing's dotted lines: the perfect timber within inside rough stock, and centerplanes.
-const DRAWING_LINE_WIDTH_PX = 2;
-// In world units (metres), as LineMaterial dashes are: a dot is a dash shorter than the line is wide.
-const DRAWING_DOT = 0.0008;
-const DRAWING_DOT_GAP = 0.004;
-const PERFECT_TIMBER_LINE_COLOR = 0x2f6fd0;
-const CENTERPLANE_LINE_COLOR = 0xd0582f;
-// How square to the view a plane may be and still be drawn: seen face-on, it is not.
-const FACE_ON_DOT = 1 - 1e-3;
-
 // How strongly a selection shows in a drawing's views other than its own.
 const SELECTION_ECHO_OPACITY = 0.3;
 
@@ -1345,6 +1335,9 @@ class KigumiViewerApp extends LitElement {
         // Which member is frontmost at each pixel: what clips a drawing's dotted lines to their own
         // timber. See member-id-buffer.js.
         this.memberIds = new window.KigumiMemberIdBuffer.MemberIdBuffer({ THREE, renderer: this.renderer });
+        // A drawing's dotted perfect faces and centerlines, clipped by the id pass. See drawing-overlays.js.
+        this.drawingOverlays = new window.KigumiDrawingOverlays.DrawingOverlays({
+            THREE, memberIds: this.memberIds, resolution: this._getRendererResolution() });
         this.renderer.shadowMap.enabled = false;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -1574,94 +1567,6 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    /**
-     * Lines only a drawing's views draw: each perfect face the rough stock has no face for (ptw.*),
-     * dotted, and each centerplane, dotted in its own colour -- both cropped to the cut timber, so a
-     * perfect face ends at a shoulder and a tenon, being the timber's own, gets none. See
-     * _showDrawingLinesFor.
-     *
-     * Hovering or selecting one of those planes lights it through the usual highlight, from the
-     * outline the runner sends for it (highlightEdgeSegments).
-     */
-    _drawingLinesFor(mesh, memberKey) {
-        const materials = this._drawingLineMaterials();
-        const lines = [];
-        const add = (positions, shared, normal, option) => {
-            const geometry = new THREE.LineSegmentsGeometry();
-            geometry.setPositions(positions);
-            const object = new THREE.LineSegments2(geometry, this._memberLineMaterial(shared, memberKey));
-            object.computeLineDistances();
-            object.renderOrder = 11;
-            object.visible = false;
-            lines.push({ object, normal, option });
-        };
-        // Both are planes, cropped to the cut timber by the runner, drawn where seen edge-on.
-        for (const face of mesh.perfectFaces || []) {
-            add(face.positions, materials.perfect, new THREE.Vector3(...face.normal), 'showDrawingPerfectFaces');
-        }
-        for (const centerplane of mesh.centerplanes || []) {
-            add(centerplane.positions, materials.centerplane, new THREE.Vector3(...centerplane.normal),
-                'showDrawingCenterplanes');
-        }
-        return lines;
-    }
-
-    /**
-     * A member's own copy of one of the two dotted materials, clipped to it: hidden by another
-     * timber in front, never by its own faces around it (member-id-buffer.js). Its resolution is the
-     * shared one, so a resize reaches every copy.
-     */
-    _memberLineMaterial(shared, memberKey) {
-        const material = shared.clone();
-        material.uniforms.resolution = shared.uniforms.resolution;
-        return this.memberIds ? this.memberIds.clipLineMaterial(material, memberKey) : material;
-    }
-
-    /** The two dotted materials every member's drawing lines are copied from, made once. */
-    _drawingLineMaterials() {
-        if (!this._drawingMaterials) {
-            const dotted = (color, dashSize, gapSize) => {
-                const material = new THREE.LineMaterial({
-                    color,
-                    linewidth: DRAWING_LINE_WIDTH_PX,
-                    resolution: this._getRendererResolution(),
-                    dashed: true,
-                    dashSize,
-                    gapSize,
-                    // Inside the rough stock, so drawn through it.
-                    depthTest: false,
-                });
-                // This LineMaterial dashes only with the define set; `dashed` alone does nothing.
-                material.defines.USE_DASH = '';
-                return material;
-            };
-            this._drawingMaterials = {
-                perfect: dotted(PERFECT_TIMBER_LINE_COLOR, DRAWING_DOT, DRAWING_DOT_GAP),
-                centerplane: dotted(CENTERPLANE_LINE_COLOR, DRAWING_DOT, DRAWING_DOT_GAP),
-            };
-        }
-        return this._drawingMaterials;
-    }
-
-    /**
-     * Drawing lines in a drawing's views only, as its options say, and never where a plane is seen
-     * face-on: its outline would only retrace the faces around it. Seen edge-on it is a line; in a
-     * view turned off square, the planes draw as a wireframe of the perfect timber within. (Edge-on
-     * only, they all vanished at the first touch of a drag, which turns a drawing's camera.)
-     */
-    _showDrawingLinesFor(viewport) {
-        const look = viewport.camera.getWorldDirection(this._drawingLook || (this._drawingLook = new THREE.Vector3()));
-        let any = false;
-        for (const bundle of this.sceneManager.bundles()) {
-            for (const line of bundle.drawingLines || []) {
-                line.object.visible = this.isInDrawing && Boolean(this[line.option])
-                    && Math.abs(line.normal.dot(look)) < FACE_ON_DOT;
-                any = any || line.object.visible;
-            }
-        }
-        return any;
-    }
-
     renderViewports() {
         if (!this.renderer || !this.scene) {
             return;
@@ -1684,7 +1589,8 @@ class KigumiViewerApp extends LitElement {
         this.renderer.setScissorTest(scissored);
         for (const viewport of this.viewports) {
             this._showHighlightsFor(viewport.id);
-            const anyDrawingLines = this._showDrawingLinesFor(viewport);
+            const anyDrawingLines = this.drawingOverlays.showFor(
+                this.sceneManager.bundles(), viewport.camera, { inDrawing: this.isInDrawing, options: this });
             const rect = viewport.pixelRect(pageRect, size.y);
             if (anyDrawingLines && this.memberIds) {
                 // Who is in front where, for the dotted lines to clip themselves by.
@@ -2842,8 +2748,8 @@ class KigumiViewerApp extends LitElement {
                 bundle.edges.material.resolution = resolution;
             }
         }
-        for (const material of Object.values(this._drawingMaterials || {})) {
-            material.resolution = resolution;
+        if (this.drawingOverlays) {
+            this.drawingOverlays.setResolution(resolution);
         }
         // Every overlay, not only the selection's: the hover and held lines
         // had their own fields and were missed here, so they went thin on a
@@ -6541,7 +6447,7 @@ class KigumiViewerApp extends LitElement {
             }
 
             // Parented like the silhouette, so they follow the member's visibility and offset.
-            const drawingLines = this._drawingLinesFor(mesh, key);
+            const drawingLines = this.drawingOverlays.linesFor(mesh, key);
             const idMesh = this.memberIds ? this.memberIds.attach(key, solidMesh) : null;
             for (const line of drawingLines) {
                 edgeMesh.add(line.object);
