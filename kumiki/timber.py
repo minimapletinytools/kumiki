@@ -1655,11 +1655,15 @@ def _ptw_face_tags() -> Tuple[FeatureOverride, ...]:
 
 
 @functools.lru_cache(maxsize=None)
-def _ptw_centerplanes() -> Tuple[PrismCenterplaneFeature, ...]:
-    """The perfect timber within's two centerplanes, midway between left and right and between front and back."""
+def _ptw_centerplanes() -> Tuple[MidplaneFeature, ...]:
+    """The perfect timber within's two centerplanes, midway between left and right and between front
+    and back. Between the prism's faces by key, so they hold whether or not the faces are named."""
+    centerplane = FeatureProperties(nature=FeatureNature.PERFECT_REFERENCE)
     return (
-        PrismCenterplaneFeature(name=PTW_FACE_PREFIX + "centerplane_left_right", faces=(PrismFace.RIGHT, PrismFace.LEFT)),
-        PrismCenterplaneFeature(name=PTW_FACE_PREFIX + "centerplane_front_back", faces=(PrismFace.FRONT, PrismFace.BACK)),
+        MidplaneFeature(name=PTW_FACE_PREFIX + "centerplane_left_right", properties=centerplane,
+                        between=(prism_face_key(PrismFace.RIGHT), prism_face_key(PrismFace.LEFT))),
+        MidplaneFeature(name=PTW_FACE_PREFIX + "centerplane_front_back", properties=centerplane,
+                        between=(prism_face_key(PrismFace.FRONT), prism_face_key(PrismFace.BACK))),
     )
 
 
