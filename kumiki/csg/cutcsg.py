@@ -1420,44 +1420,6 @@ class SimpleRectangularPrismFeature(FaceFeature):
         return False
 
 
-@dataclass(frozen=True)
-class PrismCenterplaneFeature(FaceFeature):
-    """The plane midway between two opposite long faces of a RectangularPrism. Not real: no surface lies on it.
-
-    Solved as the midplane of its two faces, so knowing both faces solves it.
-    """
-    faces: Tuple[PrismFace, PrismFace] = (PrismFace.RIGHT, PrismFace.LEFT)
-    properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(nature=FeatureNature.PERFECT_REFERENCE))
-
-    def __post_init__(self):
-        if set(self.faces) not in ({PrismFace.RIGHT, PrismFace.LEFT}, {PrismFace.FRONT, PrismFace.BACK}):
-            raise ValueError(f"{self.name!r}: a centerplane is between RIGHT and LEFT or FRONT and BACK, "
-                             f"not {self.faces[0].name} and {self.faces[1].name}")
-
-    def _sides(self) -> Tuple[SimpleRectangularPrismFeature, SimpleRectangularPrismFeature]:
-        return (SimpleRectangularPrismFeature(name=self.name, face=self.faces[0]),
-                SimpleRectangularPrismFeature(name=self.name, face=self.faces[1]))
-
-    def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
-        first, second = (side.locate_simple_unbounded(owner) for side in self._sides())
-        if first is None or second is None:
-            return None
-        return Plane(normal=first.normal, point=(first.point + second.point) / 2)
-
-    def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
-        refs = [CarrierRef(owner, prism_face_key(face)) for face in self.faces]
-        if not all(ref.local in owner.carriers() for ref in refs):
-            return None
-        return (Midplane(front=refs[0], back=refs[1]),)
-
-    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        if not isinstance(owner, RectangularPrism):
-            return False
-        x, y, _ = owner._local_coords(point)
-        return safe_equality_test(x if PrismFace.RIGHT in self.faces else y, 0, eps=test_tolerance)
-
-
-
 def _plane_extent(owner: 'CutCSG', plane: Optional[Plane]) -> Optional[CSGFeatureExtent]:
     """Where *plane* crosses a RectangularPrism *owner*, for one that runs along its length."""
     if plane is None or not isinstance(owner, RectangularPrism):
@@ -1513,16 +1475,21 @@ class PlaneFeature(FaceFeature):
 
 @dataclass(frozen=True)
 class MidplaneFeature(FaceFeature):
-    """The plane midway between two of its owner's planes, named in `between`. Not real by default.
+    """The plane midway between two parallel planes of its owner, given in `between`. Not real by
+    default.
 
-    Solved as the midplane of theirs, so knowing both solves it: it is no unknown of its own.
+    Each of `between` is a feature's name, or the FeatureKey of one of the owner's defaults -- a
+    prism's face is a key whether or not anyone named it. Solved as the midplane of theirs, so
+    knowing both solves it: it is no unknown of its own. Two planes that are not parallel have no
+    midplane, and it locates nowhere.
     """
-    between: Tuple[str, str] = ("", "")
+    between: Tuple[Union[str, FeatureKey], Union[str, FeatureKey]] = ("", "")
     properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(nature=FeatureNature.AUXILIARY))
 
     def _sides(self, owner: 'CutCSG') -> Optional[Tuple['CSGFeature', 'CSGFeature']]:
         named = {feature.name: feature for feature in owner.get_declared_features()}
-        first, second = (named.get(name) for name in self.between)
+        defaults = owner.default_features() if isinstance(owner, HasFeatures) else {}
+        first, second = (named.get(side) if isinstance(side, str) else defaults.get(side) for side in self.between)
         return None if first is None or second is None else (first, second)
 
     def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Plane]:
@@ -1531,6 +1498,8 @@ class MidplaneFeature(FaceFeature):
             return None
         first, second = (side.locate_simple_unbounded(owner) for side in sides)
         if not isinstance(first, Plane) or not isinstance(second, Plane):
+            return None
+        if abs(abs(float(safe_dot_product(first.normal, second.normal))) - 1) > 1e-9:
             return None
         return Plane(normal=first.normal, point=(first.point + second.point) / 2)
 

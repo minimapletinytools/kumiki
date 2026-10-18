@@ -3,13 +3,15 @@
 import math
 
 import numpy as np
+from dataclasses import replace
+
 import pytest
 
 from kumiki.drawings.dof_solver import remaining
 from kumiki.csg.cutcsg import (
     EdgeFeature, FaceFeature, hit_of_kind,
     CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
-    DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, PrismCenterplaneFeature, PrismFace, RectangularPrism,
+    DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, MidplaneFeature, PrismFace, RectangularPrism,
     SolidUnion, prism_arris_key, prism_corner_key, prism_face_key, carrier_map,
 )
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
@@ -507,10 +509,10 @@ class TestMidplane:
             size=create_v2(scalar(size[0]), scalar(size[1])),
             transform=Transform(position=_v(1, 2, 0), orientation=orientation),
             start_distance=scalar(0), end_distance=scalar(4),
-            extra_features=(PrismCenterplaneFeature(name="across", faces=(PrismFace.FRONT, PrismFace.BACK)),))
+            extra_features=(MidplaneFeature(name="across", between=(prism_face_key(PrismFace.FRONT), prism_face_key(PrismFace.BACK))),))
 
     def _centerplane(self, prism):
-        feature = next(f for f in prism.get_declared_features() if isinstance(f, PrismCenterplaneFeature))
+        feature = next(f for f in prism.get_declared_features() if isinstance(f, MidplaneFeature))
         recipe = feature.solve_recipe(prism)
         assert recipe is not None
         return feature, recipe
@@ -569,6 +571,9 @@ class TestMidplane:
         _assert_rows_match(_measure(carriers, anchors, _v(0.2, 1, 0.5)),
                            _finite_difference_row(carriers, anchors, _v(0.2, 1, 0.5)))
 
-    def test_only_opposite_long_faces(self):
-        with pytest.raises(ValueError, match="centerplane"):
-            PrismCenterplaneFeature(name="bad", faces=(PrismFace.RIGHT, PrismFace.FRONT))
+    def test_two_faces_that_are_not_parallel_have_no_midplane(self):
+        prism = replace(self._prism(), extra_features=(
+            MidplaneFeature(name="bad", between=(prism_face_key(PrismFace.RIGHT), prism_face_key(PrismFace.FRONT))),))
+        bad = next(f for f in prism.get_declared_features() if f.name == "bad")
+
+        assert bad.locate_simple_unbounded(prism) is None
