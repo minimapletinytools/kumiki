@@ -1947,7 +1947,12 @@ class CutTimber:
         return self._rendered_csg_local_precomputed
 
     def render_perfect_timber_within_with_cuts_csg_local(self) -> CutCSG:
-        """The perfect timber within with every cut subtracted. Built once, at construction."""
+        """The perfect timber within with every cut subtracted. Built once, at construction.
+
+        Only for showing the piece without its rough stock: the viewer's perfect mesh of a timber
+        whose stock is not its perfect box. What is drawn, measured, picked and solved is the
+        rough tree carrying every perfect feature, render_timber_with_cuts_csg_local.
+        """
         return self._rendered_perfect_csg_local_precomputed
 
     
