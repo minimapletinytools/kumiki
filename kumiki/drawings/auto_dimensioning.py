@@ -9,7 +9,6 @@ Temporary, and expected to be renamed.
 
 import warnings
 from dataclasses import dataclass, field
-from functools import cached_property
 from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
@@ -31,8 +30,8 @@ PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 class DimensionCandidate:
     """A measurement that could be added, in the view named `view`, with its length.
 
-    Its row is worked out only when asked for: that is the dear part, and most candidates are never
-    looked at closely enough to need one.
+    Its row is worked out only when asked for, and kept by the solve: that is the dear part, and most
+    candidates are never looked at closely enough to need one.
     """
     view: str
     measure: Measure
@@ -41,7 +40,7 @@ class DimensionCandidate:
     #: Shared by every candidate of one solve.
     solve: DrawingSolve = field(repr=False, compare=False)
 
-    @cached_property
+    @property
     def row(self) -> Optional[Row]:
         """What the measurement fixes (measure_row), or None where it cannot be written as a row."""
         try:

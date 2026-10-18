@@ -1569,20 +1569,10 @@ class ButtJointTimberArrangement:
     front_face_on_butt_timber: Optional[TimberLongFace] = None
     top_face_on_butt_timber: Optional[TimberLongFace] = None
 
-    # this is totally silly. please delete me. We're not doing any hard computations in here...
-    # I'm leavin git here as an example of a potential optimization we could do.
-    _results_memo: Dict[str, Any] = field(default_factory=dict, repr=False)
-
-
     def compute_normalized_timber_cross_product(self) -> Direction3D:
         """Compute the normalized cross product of the butt timber and receiving timber length directions."""
-        key = "normalized_timber_cross_product"
-        if self._results_memo.get(key) is not None:
-            return self._results_memo[key]
-
-        result = safe_normalize_vector(cross_product(self.butt_timber.get_face_direction_global(self.butt_timber_end), self.receiving_timber.get_length_direction_global()))
-        self._results_memo[key] = result
-        return result
+        return safe_normalize_vector(cross_product(self.butt_timber.get_face_direction_global(self.butt_timber_end),
+                                                   self.receiving_timber.get_length_direction_global()))
 
     def compute_arrangement_acute_angle(self) -> Numeric:
         """Compute the angle between the 2 timbers"""
