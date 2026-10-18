@@ -77,8 +77,13 @@ def test_a_perfect_reference_is_cropped_to_the_cut_timber(loaded):
     root = slot.mesh_cache[key]["local_csg"]
     body = root.base
     right = next(f for f in body.get_declared_features() if f.name == "ptw.right")
-    at = runner._feature_anchor(right, body, slot.mesh_cache[key]["cut_timber"].timber,
-                                right.locate_simple_unbounded(body), root)
+    from kumiki.csg.cutcsg import OwnedFeatureHit
+    from kumiki.csg.feature_paths import FeatureHandle
+    from kumiki.drawings.measuring import feature_anchor
+
+    handle = FeatureHandle(timber=slot.mesh_cache[key]["cut_timber"].timber,
+                           hit=OwnedFeatureHit(feature=right, owner=body))
+    at = feature_anchor(handle, root)
     assert round(float(transform.global_to_local(create_v3(*at))[2]), 4) == 0.25
     low, high = along("ptw.centerplane_left_right")
     assert low < 0 and high > 0.5
