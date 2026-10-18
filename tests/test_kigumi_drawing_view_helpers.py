@@ -1,8 +1,8 @@
-"""Where a drawing's views look from (kumiki/drawings/cameras.py)."""
+"""Where a drawing's views look from (kumiki/drawings/kigumi_drawing_view_helpers.py)."""
 
 import pytest
 
-from kumiki.drawings.cameras import OrientedBox, orient_by_search, orient_from_box
+from kumiki.drawings.kigumi_drawing_view_helpers import OrientedBox, orient_by_search, orient_from_box
 
 
 class TestOrientationStrategies:

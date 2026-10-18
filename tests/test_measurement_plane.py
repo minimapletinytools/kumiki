@@ -17,7 +17,7 @@ import pytest
 
 from tests.testing_shavings import load_module
 
-from kumiki.drawings import measuring
+from kumiki.drawings import kigumi_measuring_helpers as measuring
 from kumiki.drawings.drawing import MeasurementPlane
 from kumiki.geometry import Line, Plane, Point
 from kumiki.rule import create_v3

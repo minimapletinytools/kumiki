@@ -1,8 +1,5 @@
-"""Where a drawing's views look from: camera frames, the boxes they are fitted to, and the extent
-that holds a box in a viewport.
-
-Plain lists of floats, world space, as the viewer takes them. The runner turns these into
-viewports; nothing here knows about the wire.
+"""Camera helpers for kigumi's drawing views: which way each view looks, and how much of the model
+it shows. World space, as lists of floats; the runner turns these into viewports.
 """
 
 import math
@@ -10,10 +7,10 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, NamedTuple, Sequence, Tuple
 
+from ..viewer.rule_at_home import FloatList3
+
 if TYPE_CHECKING:
     from ..timber import CutTimber
-
-Vec = List[float]
 
 #: Leaves a margin around the model rather than framing it edge to edge.
 DRAWING_EXTENT_PADDING = 1.15
@@ -32,31 +29,31 @@ _PIECE_LOOK_IN_BOX = (0.38, 0.86, -0.55)
 class CameraFrame:
     """Which way a camera looks, and which way is across and up its screen. right x up == -look,
     the frame of a camera looking down its own -Z, which keeps the view from coming out mirrored."""
-    right: Vec
-    up: Vec
-    look: Vec
+    right: FloatList3
+    up: FloatList3
+    look: FloatList3
 
-    def as_dict(self) -> Dict[str, Vec]:
+    def as_dict(self) -> Dict[str, FloatList3]:
         return {"right": self.right, "up": self.up, "look": self.look}
 
 
-def _cross(a: Vec, b: Vec) -> Vec:
+def _cross(a: FloatList3, b: FloatList3) -> FloatList3:
     return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 
 
-def normalize(vec: Vec) -> Vec:
+def normalize(vec: FloatList3) -> FloatList3:
     """At length one; a zero vector is taken as up."""
     length = math.sqrt(sum(component * component for component in vec))
     return [component / length for component in vec] if length > 0 else [0.0, 0.0, 1.0]
 
 
-def camera_looking_at_face(normal: Vec, along: Vec) -> CameraFrame:
+def camera_looking_at_face(normal: FloatList3, along: FloatList3) -> CameraFrame:
     """Square-on to a face, with `along` (a timber's length) across the screen. The camera sits
     outside the face along its outward normal and looks back at it."""
     return CameraFrame(right=list(along), up=_cross(normal, along), look=[-component for component in normal])
 
 
-def camera_frame_looking(look: Vec) -> CameraFrame:
+def camera_frame_looking(look: FloatList3) -> CameraFrame:
     """Looking along `look`, kept upright: `up` is world Z with the part along the view taken out,
     which stops a three-quarter view arriving on its side."""
     forward = normalize(look)
@@ -66,7 +63,7 @@ def camera_frame_looking(look: Vec) -> CameraFrame:
     return CameraFrame(right=normalize(_cross(forward, up)), up=up, look=forward)
 
 
-def frame_from_look_and_up(look: Vec, up_hint: Vec) -> CameraFrame:
+def frame_from_look_and_up(look: FloatList3, up_hint: FloatList3) -> CameraFrame:
     """Looking along `look`, as close to `up_hint` as it can; upright when the hint is along the
     view, where it says nothing about which way is up."""
     forward = normalize(look)
@@ -96,11 +93,11 @@ def cut_extent(cut_timber: 'CutTimber', stock_length: float) -> Tuple[float, flo
         return 0.0, stock_length
 
 
-def _floats(vec) -> Vec:
+def _floats(vec) -> FloatList3:
     return [float(vec[i, 0]) for i in range(3)]
 
 
-def timber_world_corners(cut_timber: 'CutTimber') -> List[Vec]:
+def timber_world_corners(cut_timber: 'CutTimber') -> List[FloatList3]:
     """The 8 corners of a timber's finished piece, in world space."""
     timber = cut_timber.timber
     origin = _floats(timber.get_bottom_position_global())
@@ -114,7 +111,7 @@ def timber_world_corners(cut_timber: 'CutTimber') -> List[Vec]:
             for width in (-half_width, half_width) for height in (-half_height, half_height)]
 
 
-def world_bounds(cut_timbers: Sequence['CutTimber']) -> Tuple[Vec, Vec]:
+def world_bounds(cut_timbers: Sequence['CutTimber']) -> Tuple[FloatList3, FloatList3]:
     """(centre, half_size) of the finished pieces, world-aligned; a unit box if there are none."""
     lows = [float("inf")] * 3
     highs = [float("-inf")] * 3
@@ -129,13 +126,13 @@ def world_bounds(cut_timbers: Sequence['CutTimber']) -> Tuple[Vec, Vec]:
             [(highs[axis] - lows[axis]) / 2.0 for axis in range(3)])
 
 
-def view_extent(half_size: Vec, right: Vec, up: Vec, aspect: float = 1.0) -> float:
+def view_extent(half_size: FloatList3, right: FloatList3, up: FloatList3, aspect: float = 1.0) -> float:
     """Half-height that fits a world-aligned box in a view with these screen axes.
 
     The viewer widens the frustum from the half-height by the viewport's aspect, so the width the
     box needs is divided by that aspect before the two are compared.
     """
-    def projected(axis: Vec) -> float:
+    def projected(axis: FloatList3) -> float:
         return sum(abs(axis[i]) * half_size[i] for i in range(3))
 
     safe_aspect = aspect if aspect > 0 else 1.0
@@ -151,16 +148,16 @@ class OrientedBox(NamedTuple):
     seeing the space it takes up.
     """
 
-    centre: Vec
-    axes: Tuple[Vec, Vec, Vec]
+    centre: FloatList3
+    axes: Tuple[FloatList3, FloatList3, FloatList3]
     half_sizes: Tuple[float, float, float]
 
-    def reach(self, direction: Vec) -> float:
+    def reach(self, direction: FloatList3) -> float:
         """How far the box extends along a direction, from its centre."""
         return sum(abs(sum(direction[i] * self.axes[axis][i] for i in range(3))) * self.half_sizes[axis]
                    for axis in range(3))
 
-    def silhouette_area(self, look: Vec) -> float:
+    def silhouette_area(self, look: FloatList3) -> float:
         """How much of the box a viewer sees looking along `look`: each face pair's area, scaled by
         how squarely it faces the camera."""
         a, b, c = self.half_sizes
@@ -172,7 +169,7 @@ class OrientedBox(NamedTuple):
         return max(range(3), key=lambda axis: self.half_sizes[axis])
 
 
-def world_box(centre: Vec, half_size: Vec) -> OrientedBox:
+def world_box(centre: FloatList3, half_size: FloatList3) -> OrientedBox:
     """The world-aligned box a group of members occupies."""
     return OrientedBox(centre=centre, axes=([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]),
                        half_sizes=(half_size[0], half_size[1], half_size[2]))
@@ -203,8 +200,8 @@ def preview_extent(box: OrientedBox, frame: CameraFrame, aspect: float) -> float
 # guess-and-check and may not survive; both take an OrientedBox and the viewport's aspect, so either
 # can be dropped without touching what calls it.
 
-def _preview_look_candidates() -> List[Vec]:
-    candidates: List[Vec] = []
+def _preview_look_candidates() -> List[FloatList3]:
+    candidates: List[FloatList3] = []
     for elevation_deg in _PREVIEW_ELEVATIONS_DEG:
         elevation = math.radians(elevation_deg)
         for step in range(_PREVIEW_AZIMUTH_STEPS):

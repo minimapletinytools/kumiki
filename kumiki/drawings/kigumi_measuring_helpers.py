@@ -1,9 +1,6 @@
-"""Measuring between two features: the plane a measurement is taken on, what the pair admits, where
-it attaches and what it comes to.
-
-Geometry in, answers out, in world space; the runner decodes the viewer's request into these and
-encodes what comes back. Measuring in progress (a pick's preview) and a written measurement go
-through the same `place_pair`, so what is drawn while deciding is where it lands once decided.
+"""Measuring helpers for kigumi: for two features, the plane a measurement is taken on, which
+kinds it can be, where it attaches and its value. The runner uses these for both a pick's preview
+and a saved measurement.
 """
 
 from dataclasses import dataclass, replace
