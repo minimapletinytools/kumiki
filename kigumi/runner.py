@@ -1662,14 +1662,6 @@ def _dot(a: List[float], b: List[float]) -> float:
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
 
-def _cross(a: List[float], b: List[float]) -> List[float]:
-    return [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-
-
 def build_default_drawing_for_debugging(frame: 'Frame') -> DrawingWire:
     """A four-viewport scene over the whole frame: three elevations and a preview.
 
@@ -2756,13 +2748,6 @@ def collect_drawings(
         )
 
     return drawings
-
-
-def scalar_of(value: float) -> float:
-    """A float as the exact scalar the geometry code multiplies by."""
-    from kumiki.rule import scalar
-
-    return scalar(repr(float(value)))
 
 
 def _resolve_measurement(
