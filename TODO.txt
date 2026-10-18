@@ -172,6 +172,8 @@ IGNORE-measurement anchors in 2d view should be in a shared project plane, right
 
 -when dragging python measurements, theres' a flicker as it tries to reload from python, can you reomve that?
 
+-do a full end to end review and find opportunities to refactor..
+-spilt out feature solving into a csg/feature_solving if possible. drawings is only manages actualy drawing stuff. ideally measurements lives in drawing and fetaure_solving has a simplified measurement class that only has the acutal info it needs.
 
 -add beta features section to option
 -add support to run @tools from the parameter section

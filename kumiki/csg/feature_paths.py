@@ -1,9 +1,9 @@
-"""Feature references: a FeatureHandle in Python, a FeaturePath on the wire.
+"""
 
-Python code refers to features directly, by the objects themselves. A FeaturePath
-names a feature by timber, CSG labels and feature name, and is only for crossing
-to the viewer or the drawings file. `to_feature_path` and `resolve_feature_path`
-convert between the two.
+TODO rename this file to "FeatureHandle"
+
+A FeatureHandle is a reference to a feature. Serializable into FeaturePath for use over the wire.
+
 """
 
 from dataclasses import dataclass
@@ -30,10 +30,8 @@ def _same_hit(one: OwnedFeatureHit, other: OwnedFeatureHit) -> bool:
 
 @dataclass(frozen=True, eq=False)
 class FeatureHandle(Generic[F_co]):
-    """A feature of one timber: the timber, and the feature with the node that owns it.
-
-    Generic in the feature's type, like OwnedFeatureHit. A derived feature carries its two parents,
-    so one type covers declared and derived features. Equal when it is the same timber and node, compared by identity, and the same feature.
+    """A feature of one timber: the timber, and the feature with the node that owns it. Generic in the feature's type. 
+    Equal when it is the same timber and node, compared by reference.
     """
     timber: 'PerfectTimberWithin'
     hit: OwnedFeatureHit[F_co]

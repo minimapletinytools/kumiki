@@ -1,7 +1,9 @@
-"""Rows a drawing takes as known without drawing them: square features, and features along the sheet's axes.
+"""
+Handles assumptions about what fetaures are already "known" in the list of timbers you're trying to auto-dimension.
 
-Add these to the known rows before solving. Each comes with a reason, so a report can say why
-something counts as solved.
+e.g. the position/orientation of the bottom point of a timber is given as known, measurements can be added to every other feature to solve with this assumption.
+
+Stored as rows in the solver's matrix together with the reason its known.
 """
 
 from dataclasses import dataclass

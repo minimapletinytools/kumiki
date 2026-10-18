@@ -113,6 +113,7 @@ class BoundsKind(Enum):
     UNKNOWN = 2
 
 
+# TODO this is Convex right? can we rename this to 3dConvexHull or something?
 @dataclass(frozen=True)
 class SolidBounds:
     """What can be said about a solid in half spaces. Three answers, not two.
