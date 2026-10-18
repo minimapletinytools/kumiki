@@ -551,6 +551,48 @@
         return (pointer.x - from.x) * away.x + (pointer.y - from.y) * away.y;
     }
 
+    /** Below this, in world units, an anchor counts as on its feature: no phantom to draw. */
+    const PHANTOM_MIN_LENGTH = 1e-6;
+
+    /**
+     * The feature drawn on to a point past its end, in world space: from the nearer end of
+     * `extent` ([start, end], how far the feature goes) to `point`, which lies on its line -- an
+     * anchor slid past the end, or the corner of an angle. Null when the point is on the feature,
+     * or there is no extent (a point, or a plane).
+     */
+    function phantomSegment(extent, point) {
+        if (!extent || !point) {
+            return null;
+        }
+        const [start, end] = extent;
+        const run = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
+        const length = Math.hypot(run[0], run[1], run[2]);
+        if (length < PHANTOM_MIN_LENGTH) {
+            return null;
+        }
+        const station = ((point[0] - start[0]) * run[0] + (point[1] - start[1]) * run[1]
+            + (point[2] - start[2]) * run[2]) / length;
+        if (station < -PHANTOM_MIN_LENGTH) {
+            return { from: start, to: point };
+        }
+        if (station > length + PHANTOM_MIN_LENGTH) {
+            return { from: end, to: point };
+        }
+        return null;
+    }
+
+    /**
+     * How far a dimension has been slid along its features, given how far the pointer has moved
+     * since the drag began (`moved`, page pixels) and the slide direction as drawn (`slide`: unit
+     * `x`, `y` on the page, and `perWorld` pixels per world unit along it).
+     */
+    function alongForPointer(startAlong, moved, slide) {
+        if (!slide || !(slide.perWorld > 1e-9)) {
+            return null;
+        }
+        return startAlong + (moved.x * slide.x + moved.y * slide.y) / slide.perWorld;
+    }
+
     /**
      * Why a measurement cannot be drawn, when the reason is not about the view.
      *
@@ -584,6 +626,8 @@
         isDeleted,
         measurementKey,
         offsetForPointer,
+        alongForPointer,
+        phantomSegment,
         anchorReference,
         normalizeKind,
         measureSpace,

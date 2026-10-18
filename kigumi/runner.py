@@ -79,8 +79,15 @@ class MeasureKindWire(TypedDict):
     direction: str
 
 
-class PlacementWire(TypedDict):
+class PlacementWire(TypedDict, total=False):
     offset: float
+    along: float  # MeasurementPlacement.along
+
+
+class ExtentsWire(TypedDict):
+    """Each end's line, as far as its feature goes, or None (a point, a plane). See PairPlacement."""
+    a: Optional[List[Vec3]]
+    b: Optional[List[Vec3]]
 
 
 AngleWire = TypedDict("AngleWire", {"vertex": Vec3, "from": Vec3, "to": Vec3, "normal": Vec3})
@@ -121,6 +128,8 @@ class MeasureWire(TypedDict, total=False):
     unresolved: List[str]
     angle: Optional[AngleWire]
     settled: SettledWire
+    extents: ExtentsWire
+    slide: Optional[Vec3]  # which way `along` slides the anchors; None where they cannot
 
 
 class MeasurementRequest(MeasureWire, total=False):
@@ -189,6 +198,7 @@ class PickPlacementWire(TypedDict):
     anchors: Optional[AnchorPointsWire]
     angle: Optional[AngleWire]
     settled: Optional[SettledWire]
+    extents: Optional[ExtentsWire]
 
 
 class VerdictWire(TypedDict, total=False):
@@ -198,6 +208,7 @@ class VerdictWire(TypedDict, total=False):
     anchors: Optional[AnchorPointsWire]
     angle: Optional[AngleWire]
     settled: Optional[SettledWire]
+    extents: Optional[ExtentsWire]
     reason: Optional[str]
 
 
@@ -654,11 +665,12 @@ if TYPE_CHECKING:
     # TYPE_CHECKING there is no runtime import at all, so annotations can be
     # concrete while every isinstance check still imports inside its function.
     from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
-    from kumiki.drawings.drawing import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlane, MeasurementSpace,
-                                         VectorLike, Viewport, ViewAxes, ViewportId)
+    from kumiki.drawings.drawing import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement,
+                                         MeasurementPlane, MeasurementSpace, VectorLike, Viewport, ViewAxes,
+                                         ViewportId)
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
-    from kumiki.drawings.kigumi_measuring_helpers import EndForm, Settled
+    from kumiki.drawings.kigumi_measuring_helpers import EndForm, PairPlacement, Settled
     from kumiki.drawings.layout import PlacedViewport
     from kumiki.geometry import Line, Plane, Point
     from kumiki.identity import FeaturePath
@@ -2157,7 +2169,7 @@ def _pick_placement(
     from kumiki.drawings.feature_span import feature_span
     from kumiki.drawings.kigumi_measuring_helpers import place_pair, world_geometry
 
-    empty = PickPlacementWire(anchors=None, angle=None, settled=None)
+    empty = PickPlacementWire(anchors=None, angle=None, settled=None, extents=None)
     held = payload.get("heldReference")
     look = payload.get("look")
     if not held or not look or located_pick is None:
@@ -2186,9 +2198,10 @@ def _pick_placement(
     settled = _settled_wire(placement.settled)
     if placement.anchors is not None:
         at_held, at_picked = placement.anchors
-        return {"anchors": {"a": list(at_held), "b": list(at_picked)}, "angle": None, "settled": settled}
+        return {"anchors": {"a": list(at_held), "b": list(at_picked)}, "angle": None, "settled": settled,
+                "extents": _extents_wire(placement)}
     return {"anchors": None, "angle": placement.rays.as_wire() if placement.rays is not None else None,
-            "settled": settled}
+            "settled": settled, "extents": _extents_wire(placement)}
 
 
 def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']:
@@ -2220,6 +2233,13 @@ def _plane_for_pick(
         in_view_plane=_pick_space(payload) is MeasurementSpace.PROJECTED)
 
 
+def _placement_wire(placement: 'MeasurementPlacement') -> PlacementWire:
+    wire = cast(PlacementWire, {"offset": placement.offset})
+    if placement.along is not None:
+        wire["along"] = placement.along
+    return wire
+
+
 def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWire]:
     anchors = measure.wire_anchors(frame)
     if anchors is None:
@@ -2239,7 +2259,7 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWir
         # is also what every measurement written before spaces called a
         # projected one, so a bare name cannot carry both.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
-        "placement": {"offset": placement.offset} if placement is not None else None,
+        "placement": _placement_wire(placement) if placement is not None else None,
         # Likewise not identity. Absent on the wire means "take the viewport's
         # plane", which is what an orthographic viewport's measurements may
         # always mean -- FromViewport.as_wire() is how the python side says it.
@@ -2810,7 +2830,9 @@ def _resolve_measurement(
     if spans.get("a") is not None and spans.get("b") is not None and plane is not None:
         # Placed for the measurement that will actually be drawn, judged in the space its ends came
         # back in (kigumi_measuring_helpers.place_pair).
-        placement = place_pair(ends["a"], ends["b"], spans["a"], spans["b"], declared, plane, view, in_three_d)
+        along = (measure.get("placement") or {}).get("along")
+        placement = place_pair(ends["a"], ends["b"], spans["a"], spans["b"], declared, plane, view, in_three_d,
+                               None if along is None else float(along))
         kind = placement.kind
         if kind is not None and kind.operation is MeasurementOperation.DISTANCE and placement.anchors is not None:
             at_a, at_b = placement.anchors
@@ -2821,6 +2843,8 @@ def _resolve_measurement(
             rays = placement.rays
             resolved["angle"] = cast(AngleWire, rays.as_wire()) if rays is not None else None
         resolved["settled"] = _settled_wire(placement.settled)
+        resolved["extents"] = _extents_wire(placement)
+        resolved["slide"] = list(placement.slide) if placement.slide is not None else None
     else:
         resolved["settled"] = _unplaceable_measurement(measure, spans, plane)
     return resolved
@@ -3048,6 +3072,14 @@ def _world_geometry_payload(handle: 'FeatureHandle') -> Optional[GeometryWire]:
     from kumiki.drawings.kigumi_measuring_helpers import world_geometry
 
     return _geometry_payload(world_geometry(handle))
+
+
+def _extents_wire(placement: 'PairPlacement') -> ExtentsWire:
+    """Each end's line as far as its feature goes (PairPlacement.extents), as the wire has it."""
+    def ends(extent) -> Optional[List[Vec3]]:
+        return None if extent is None else [list(extent[0]), list(extent[1])]
+
+    return {"a": ends(placement.extents[0]), "b": ends(placement.extents[1])}
 
 
 def _settled_wire(settled: 'Settled') -> SettledWire:
