@@ -281,13 +281,19 @@ CannotSection = _CannotSection
 SightFrame = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 
 
-def material_crossing(root: CutCSG, frame: SightFrame, reach: float) -> Region:
+def material_crossing(root: CutCSG, frame: SightFrame, reach: float,
+                      across: Optional[Tuple[float, float]] = None) -> Region:
     """Where `root` has material on both sides of the frame's plane: what a line of sight lying in
     the plane cannot pass. Material on one side only is surface, which a sight line runs along.
 
+    `across`, a (low, high) span of u, cuts only that strip of the plane, the whole way along v:
+    all a feature spanning it can be hidden by, and far less to cut than the plane.
+
     Raises CannotSection for a tree this module can't cut by a plane.
     """
-    front, back = _sides(root, _Frame.with_axes(*frame), [_square(reach)])
+    seed = _square(reach) if across is None else [(across[0], -reach), (across[1], -reach),
+                                                  (across[1], reach), (across[0], reach)]
+    front, back = _sides(root, _Frame.with_axes(*frame), [seed])
     return _intersect(front, back)
 
 
