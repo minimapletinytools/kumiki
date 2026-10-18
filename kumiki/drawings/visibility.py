@@ -19,7 +19,7 @@ from ..geometry import Line, Plane
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
 from .drawing import ViewAxes
-from .feature_extent import extents_of
+from ..csg.feature_extent import extents_of
 
 #: Material nearer the place than this is the surface it lies on, not something in front of it.
 NUDGE = 1e-5

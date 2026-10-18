@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Typed
 
 from ..csg.cutcsg import CSGFeature, CutCSG, FeatureTestTolerances, OwnedFeatureHit
 from ..csg.feature_paths import candidate_segments
-from ..drawings.feature_span import Interval
+from ..csg.feature_extent import Interval
 from ..geometry import Line
 from ..rule import Transform, V3, exact_scalar, scalar
 from ..timber import PerfectTimberWithin
@@ -335,7 +335,7 @@ def cropped_edge_segments(
     a parent made the parent's own face count as boundary, which is the whole
     length of the arris.
     """
-    from kumiki.drawings.feature_span import declared_line_span, intersected_intervals
+    from kumiki.csg.feature_extent import declared_line_span, intersected_intervals
     from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
                                 crop_line_to_segments_on_csg)
     from kumiki.geometry import Line, unit_vector

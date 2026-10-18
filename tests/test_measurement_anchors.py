@@ -540,7 +540,7 @@ class TestAFeatureKnowsItsOwnEnds:
 
         from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
 
-        from kumiki.drawings.feature_span import declared_line_span
+        from kumiki.csg.feature_extent import declared_line_span
 
         box = self._box()
         arris = SimpleRectangularPrismEdgeFeature(
@@ -561,7 +561,7 @@ class TestAFeatureKnowsItsOwnEnds:
         from kumiki.csg.cutcsg import SimpleRectangularPrismEdgeFeature
         from kumiki.rule import create_v2, scalar
 
-        from kumiki.drawings.feature_span import declared_line_span
+        from kumiki.csg.feature_extent import declared_line_span
 
         endless = RectangularPrism(
             size=create_v2(scalar("0.1"), scalar("0.2")),
