@@ -1,25 +1,38 @@
 """What a drawing's view can see: whether a place, or any of a feature, is hidden behind material.
 
+Two questions, one set of rules:
+
+- PER PLACE, for a pointer: is what is under it hidden? `hidden_at` a place, and a feature
+  `drawn_over` by a nearer one there (picking.split_hidden).
+- PER FEATURE, for a view: can any of it be seen? `nearest_visible_depth` (visible_by_view).
+
+The rules both keep: a feature that is not real (a bore's axis, a centerplane) is `never_hidden`;
+only a solid's inside hides, and a line of sight along its surface does not; unsure -- a solid that
+cannot be cut exactly -- means seen. The one difference: under a pointer, a feature drawn over by a
+nearer one is hidden too, so a click takes what is on top; a view keeps it, since two timbers' tops
+in line are dimensioned at the one line both draw.
+
 Analytic, over the whole CSG, not sampled: a place's line of sight is clipped exactly to the solid
 (cropcsg), and a feature drawn as a line is decided in the one plane holding all its lines of sight,
-cut exactly by each solid (cross_sections). Only a solid's inside hides; a line of sight along its
-surface does not.
+cut exactly by each solid (cross_sections).
 """
 
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from ..csg.cropcsg import crop_line_to_boundary_segments_on_csg, crop_line_to_interior_segments_on_csg
-from ..csg.cutcsg import CutCSG, FaceFeature
+from ..csg.cutcsg import CSGFeature, CutCSG
 from ..csg.feature_paths import FeatureHandle
 from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, SightFrame, area, material_crossing,
                                   segments_outside, shadow, subtract)
-from ..geometry import Line, Plane
+from ..geometry import Line, Plane, Point
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
 from .drawing import ViewAxes
-from .sheet_shape import SheetPoint, sheet_shape
+from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, sheet_shape
+
+Geometry = Union[Point, Line, Plane]
 from ..csg.feature_extent import extents_of
 
 #: Material nearer the place than this is the surface it lies on, not something in front of it.
@@ -49,6 +62,46 @@ def sight_is_blocked(root: CutCSG, place: V3, toward_camera: V3) -> bool:
 Occluder = Tuple[CutCSG, Transform]
 
 
+def never_hidden(feature: CSGFeature) -> bool:
+    """Whether nothing can hide `feature`: one that is not real names no material, so it is drawn
+    wherever it is."""
+    return not feature.real
+
+
+def hidden_at(place: np.ndarray, look: np.ndarray, occluders: Sequence[Occluder]) -> bool:
+    """Whether any occluder's material lies between `place` and the camera, looking along `look`
+    (both world space)."""
+    toward = create_v3(*(-np.asarray(look, dtype=float)))
+    at = create_v3(*place)
+    return any(sight_is_blocked(solid, placed.global_to_local(at), placed.global_to_local_direction(toward))
+               for solid, placed in occluders)
+
+
+def drawn_over(front: Optional[Geometry], behind: Optional[Geometry], look, tolerance: float) -> bool:
+    """Whether `front` is drawn where `behind` is on the sheet, both under one pointer (sheet_shape).
+
+    Two lines under one pointer cross it, so parallel is on top of each other; two points, within
+    `tolerance`; a point under a line, within `tolerance` of it. A line behind a point is seen
+    either side of it. All in one frame.
+    """
+    look = as_ndarray(look)
+    look = look / np.linalg.norm(look)
+    near, far = sheet_shape(front, look), sheet_shape(behind, look)
+    if near is None or far is None:
+        return False
+
+    def across(vector: np.ndarray, axis: np.ndarray) -> np.ndarray:
+        return vector - axis * float(vector @ axis)
+
+    if isinstance(near, SheetLine) and isinstance(far, SheetLine):
+        return float(np.linalg.norm(np.cross(near.run, far.run))) <= SQUARE_TO_VIEW
+    if isinstance(far, SheetPoint) and isinstance(near, SheetPoint):
+        return float(np.linalg.norm(across(far.at - near.at, look))) <= tolerance
+    if isinstance(far, SheetPoint) and isinstance(near, SheetLine):
+        return float(np.linalg.norm(across(across(far.at - near.at, look), near.run))) <= tolerance
+    return False
+
+
 def _frame_in(transform: Transform, origin: np.ndarray, u: np.ndarray, v: np.ndarray,
               normal: np.ndarray) -> SightFrame:
     """A world-space plane frame, in the local space of something placed by `transform`."""
@@ -76,7 +129,7 @@ def nearest_visible_depth(
     if not isinstance(located, (Plane, Line)):
         return None
     point = as_ndarray(transform.local_to_global(located.point))
-    if not handle.feature.real:
+    if never_hidden(handle.feature):
         return float(point @ look)
     shape = sheet_shape(located, as_ndarray(transform.global_to_local_direction(create_v3(*look))))
     if shape is None:
@@ -165,11 +218,7 @@ def _end_on_depth(line: Line, root: CutCSG, transform: Transform, look: np.ndarr
         return None if pieces is not None else float(as_ndarray(transform.local_to_global(line.point)) @ look)
     ends = [as_ndarray(transform.local_to_global(end)) for piece in pieces for end in (piece.start, piece.end)]
     nearest = min(ends, key=lambda end: float(end @ look))
-    toward = create_v3(*(-look))
-    for solid, placed in occluders:
-        if sight_is_blocked(solid, placed.global_to_local(create_v3(*nearest)), placed.global_to_local_direction(toward)):
-            return None
-    return float(nearest @ look)
+    return None if hidden_at(nearest, look, occluders) else float(nearest @ look)
 
 
 def visible_by_view(
