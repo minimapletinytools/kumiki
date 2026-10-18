@@ -107,10 +107,26 @@ def _inside_lines(polygon: Polygon) -> List[Tuple[float, float, float]]:
     return lines
 
 
+def _box(polygon: Polygon) -> Tuple[float, float, float, float]:
+    xs, ys = [p[0] for p in polygon], [p[1] for p in polygon]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _apart(one: Tuple[float, float, float, float], other: Tuple[float, float, float, float]) -> bool:
+    """Whether two bounding boxes miss each other: then their polygons do too, and clipping one by
+    the other is all cost for no change."""
+    return (one[2] < other[0] - COINCIDENT or other[2] < one[0] - COINCIDENT
+            or one[3] < other[1] - COINCIDENT or other[3] < one[1] - COINCIDENT)
+
+
 def _intersect(one: Region, other: Region) -> Region:
     out: Region = []
+    other_boxes = [_box(clipper) for clipper in other]
     for polygon in one:
-        for clipper in other:
+        box = _box(polygon)
+        for clipper, clipper_box in zip(other, other_boxes):
+            if _apart(box, clipper_box):
+                continue
             piece = polygon
             for a, b, c in _inside_lines(clipper):
                 piece = _clip(piece, a, b, c)
@@ -123,8 +139,12 @@ def _intersect(one: Region, other: Region) -> Region:
 def _subtract(one: Region, other: Region) -> Region:
     pieces = list(one)
     for clipper in other:
+        clipper_box = _box(clipper)
         remaining: Region = []
         for polygon in pieces:
+            if _apart(_box(polygon), clipper_box):
+                remaining.append(polygon)
+                continue
             rest = polygon
             for a, b, c in _inside_lines(clipper):
                 remaining.append(_clip(rest, -a, -b, -c))
