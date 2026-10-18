@@ -12,7 +12,7 @@ feature (csg/cutcsg.py)
        -> pick       (viewer/picking.py)        what is under the pointer, and which is wanted
        -> visibility (drawings/visibility.py)   whether a view can see it
        -> span       (drawings/feature_span.py) what a measurement attaches to
-       -> measuring  (drawings/measuring.py)    the plane, the kinds, the anchors, the value
+       -> measuring  (drawings/kigumi_measuring_helpers.py)  the plane, the kinds, the anchors, the value
        -> solving    (csg/feature_solving.py)   what the measurements leave unsolved
   -> drawing: auto-dimensioning picks measurements (drawings/auto_dimensioning.py)
 ```
@@ -69,7 +69,7 @@ A measurement (`drawing.Measure`) names two features and a kind. To place it:
 
 - each end's **span** (`feature_span`): the extent, as what the measurement attaches to in world
   space -- a point, a line, or in 3D a plane; on a sheet a face edge-on is a line along itself;
-- the **plane** it is taken on (`measuring.measurement_plane`): containing any measured point,
+- the **plane** it is taken on (`kigumi_measuring_helpers.measurement_plane`): containing any measured point,
   square to any face, along any edge, otherwise facing the camera;
 - the **kinds** the pair admits (`kinds_for_pair`), and `place_pair`: anchors for a distance, a
   corner for an angle, and what it comes to (`settle` -> `Settled`, with a reason when nothing).
@@ -91,4 +91,4 @@ The generator (`patterns/structures/my_cute_frame_drawing_test.py` is the worked
 what must be solved (`required_features`), what each view can see (`visible_by_view`), every
 dimension a view could draw between those (`sheet_candidates`), and picks until everything is
 solved (`auto_dimension`). The runner resolves each written measurement through step 6 and sends
-the viewer its anchors and value; cameras for the views come from `drawings/cameras.py`.
+the viewer its anchors and value; cameras for the views come from `drawings/kigumi_drawing_view_helpers.py`.
