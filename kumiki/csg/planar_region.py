@@ -374,3 +374,69 @@ def _convex_hull(points: Polygon) -> Polygon:
 
     lower, upper = half(ordered), half(list(reversed(ordered)))
     return lower[:-1] + upper[:-1]
+
+
+# --- a plane cropped to a solid ----------------------------------------------------------------
+
+Section = Tuple[_Frame, Region]
+
+
+def plane_section(plane: Plane, root: CutCSG, near: V3, reach: float) -> Optional[Section]:
+    """The part of `plane` that `root` has material against, on either side: the plane cropped to
+    the solid, as a region in the plane's own frame. None for a tree this module can't cut."""
+    frame = _Frame(plane, near)
+    try:
+        front, back = _sides(root, frame, [_square(reach)])
+    except _CannotSection:
+        return None
+    return frame, _union(front, back)
+
+
+def _to_3d(frame: _Frame, point: Tuple[float, float]) -> np.ndarray:
+    return frame.origin + frame.u * point[0] + frame.v * point[1]
+
+
+def section_outline(section: Section) -> List[Tuple[np.ndarray, np.ndarray]]:
+    """The section's boundary, in the solid's space: every piece's edges, less the seams where two
+    pieces of the one region meet."""
+    frame, region = section
+    edges = [(polygon[i], polygon[(i + 1) % len(polygon)]) for polygon in region for i in range(len(polygon))]
+    outline: List[Tuple[np.ndarray, np.ndarray]] = []
+    for index, (start, end) in enumerate(edges):
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        length_sq = dx * dx + dy * dy
+        if length_sq < SLIVER_AREA:
+            continue
+        kept = [(0.0, 1.0)]
+        for other_index, (other_start, other_end) in enumerate(edges):
+            if other_index == index:
+                continue
+            # A seam: another piece's edge along this one, running the other way.
+            ox, oy = other_end[0] - other_start[0], other_end[1] - other_start[1]
+            if ox * dx + oy * dy >= 0:
+                continue
+            off = [((p[0] - start[0]) * dy - (p[1] - start[1]) * dx) / math.sqrt(length_sq)
+                   for p in (other_start, other_end)]
+            if max(abs(off[0]), abs(off[1])) > COINCIDENT:
+                continue
+            along = sorted(((p[0] - start[0]) * dx + (p[1] - start[1]) * dy) / length_sq
+                           for p in (other_start, other_end))
+            kept = [piece for low, high in kept for piece in
+                    ((low, min(high, along[0])), (max(low, along[1]), high)) if piece[1] - piece[0] > 1e-9]
+        for low, high in kept:
+            point = lambda t: (start[0] + dx * t, start[1] + dy * t)
+            outline.append((_to_3d(frame, point(low)), _to_3d(frame, point(high))))
+    return outline
+
+
+def section_centroid(section: Section) -> Optional[np.ndarray]:
+    """The section's centroid, in the solid's space; None if it has no area."""
+    frame, region = section
+    total, x, y = 0.0, 0.0, 0.0
+    for polygon in region:
+        for (ax, ay), (bx, by) in zip(polygon, polygon[1:] + polygon[:1]):
+            cross = ax * by - bx * ay  # signed: each piece's own winding cancels out below
+            total, x, y = total + cross, x + (ax + bx) * cross, y + (ay + by) * cross
+    if abs(total) / 2 <= SLIVER_AREA:
+        return None
+    return _to_3d(frame, (x / (3 * total), y / (3 * total)))

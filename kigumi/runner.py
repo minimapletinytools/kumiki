@@ -1002,18 +1002,17 @@ def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> Tria
     }
 
 
-def _centerplane_outlines(timber: 'PerfectTimberWithin') -> List[CenterplaneWire]:
-    """Each centerplane as the rectangle it cuts across the perfect timber, in world space.
+def _centerplane_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG') -> List[CenterplaneWire]:
+    """Each centerplane's outline, cropped to the cut timber `root`, in world space.
 
-    Seen edge-on, which is the only way a drawing shows one, the rectangle is the centerline.
+    Seen edge-on, which is the only way a drawing shows one, the outline is the centerline.
     """
     from kumiki.geometry import Plane
     from kumiki.rule import create_v3
-    from kumiki.viewer.picking import plane_outline_segments
 
     outlines: List[CenterplaneWire] = []
     for normal in (create_v3(1, 0, 0), create_v3(0, 1, 0)):
-        segments = plane_outline_segments(Plane(normal=normal, point=create_v3(0, 0, 0)), timber) or []
+        segments = _perfect_reference_outline(Plane(normal=normal, point=create_v3(0, 0, 0)), root, timber) or []
         positions = [float(v) for segment in segments for v in (*segment["start"], *segment["end"])]
         direction = timber.transform.local_to_global_direction(normal)
         outlines.append({"normal": [float(v) for v in direction], "positions": positions})
@@ -1159,7 +1158,7 @@ def _cut_timber_to_triangle_mesh_payload(
             except Exception as exc:  # noqa: BLE001 — best-effort optional payload
                 log_stderr(f"Warning: failed to build the perfect timber within for "
                            f"{get_timber_display_name(timber)}: {exc}")
-    payload["centerplanes"] = _centerplane_outlines(timber)
+    payload["centerplanes"] = _centerplane_outlines(timber, local_csg)
 
     # No-joints box geometry: plain rectangular boxes with no CSG cuts applied at
     # all (no joint cuts, no mortise holes), cropped in length only by this
@@ -3897,8 +3896,10 @@ def _feature_anchor(
     Falls back to the declared extent when neither can be worked out -- a curved
     primitive, say -- since somewhere approximate beats nowhere.
     """
+    from kumiki.csg.cutcsg import FeatureNature
     from kumiki.drawings.feature_span import declared_line_span, line_pieces
     from kumiki.geometry import Line, Plane, Point
+    from kumiki.rule import create_v3
     from kumiki.csg.cropcsg import (
         approximately_crop_plane_to_area_on_csg,
         crop_line_to_segments_on_csg,
@@ -3908,6 +3909,14 @@ def _feature_anchor(
     # say it is off the piece, which is a different question from where it is.
     if isinstance(located, Point):
         return _vector3_to_floats(timber.transform.local_to_global(located.position))
+
+    if isinstance(located, Plane) and root_csg is not None and feature.nature is FeatureNature.PERFECT_REFERENCE:
+        # Inside the material: at the middle of what the cut timber still has of it.
+        from kumiki.csg.planar_region import section_centroid
+        section = _perfect_reference_section(located, root_csg, timber)
+        centre = None if section is None else section_centroid(section)
+        if centre is not None:
+            return _vector3_to_floats(timber.transform.local_to_global(create_v3(*centre)))
 
     if isinstance(located, (Plane, Line)):
         solid = timber.get_perfect_timber_within_csg_local()
@@ -5769,7 +5778,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
             edge_feature, target_csg, timber, local_csg,
         )
     elif located_pick is not None:
-        highlight_edge = _non_real_plane_outline(located_pick[0], located_pick[1], timber)
+        highlight_edge = _non_real_plane_outline(located_pick[0], located_pick[1], timber, local_csg)
 
     # Extract highlight mesh for the selected target
     hl_verts, hl_idx, matched, total = extract_highlight_mesh(
@@ -5926,17 +5935,51 @@ def _log_pick(
 
 
 def _non_real_plane_outline(
-    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
+    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin', root: 'CutCSG',
 ) -> Optional[List[SegmentWire]]:
     """A non-real plane's outline (a perfect face in rough stock, a centerplane), which has no
-    surface to light: a drawing shows it edge-on, as the line it draws dotted. None for anything else."""
+    surface to light: a drawing shows it edge-on, as the line it draws dotted. A perfect reference
+    is cropped to the cut timber `root`; anything auxiliary keeps the whole of its rectangle. None
+    for anything else."""
+    from kumiki.csg.cutcsg import FeatureNature
     from kumiki.geometry import Plane
     from kumiki.viewer.picking import plane_outline_segments
 
     plane = feature.locate_simple_unbounded(owner)
     if feature.real or not isinstance(plane, Plane):
         return None
+    if feature.nature is FeatureNature.PERFECT_REFERENCE:
+        return _perfect_reference_outline(plane, root, timber)
     return plane_outline_segments(plane, timber)
+
+
+def _perfect_reference_section(plane: 'Plane', root: 'CutCSG', timber: 'PerfectTimberWithin'):
+    """A perfect reference's plane cropped to the cut timber `root` (planar_region.plane_section)."""
+    from kumiki.csg.planar_region import plane_section
+    from kumiki.rule import create_v3
+
+    length = float(timber.length)
+    return plane_section(plane, root, create_v3(0, 0, length / 2),
+                         4 * (length + float(max(timber.size[0], timber.size[1]))))
+
+
+def _perfect_reference_outline(
+    plane: 'Plane', root: 'CutCSG', timber: 'PerfectTimberWithin',
+) -> Optional[List[SegmentWire]]:
+    """The outline of a perfect reference's plane cropped to the cut timber, in world space."""
+    from kumiki.csg.planar_region import section_outline
+    from kumiki.rule import create_v3
+
+    # Kept on the cut timber's tree, which never changes: a centerplane pierced by peg holes takes a
+    # good part of a second to work out, and hover asks again on every rest of the pointer.
+    cache = root.__dict__.setdefault("_perfect_reference_outlines", {})
+    key = (tuple(float(v) for v in plane.normal), tuple(float(v) for v in plane.point))
+    if key not in cache:
+        section = _perfect_reference_section(plane, root, timber)
+        to_world = lambda point: [float(v) for v in timber.transform.local_to_global(create_v3(*point))]
+        cache[key] = None if section is None else [{"start": to_world(start), "end": to_world(end)}
+                                                   for start, end in section_outline(section)]
+    return cache[key]
 
 
 def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
@@ -6025,7 +6068,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
         result["parentHighlightMesh"] = parent_hl
     if actual_feature_label:
         named = next((f for f in target_csg.get_declared_features() if f.name == actual_feature_label), None)
-        outline = None if named is None else _non_real_plane_outline(named, target_csg, cut_timber.timber)
+        outline = None if named is None else _non_real_plane_outline(named, target_csg, cut_timber.timber, local_csg)
         if outline:
             result["highlightEdgeSegments"] = outline
     return result
