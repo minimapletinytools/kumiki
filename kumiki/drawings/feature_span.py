@@ -5,7 +5,7 @@ is the length the other solves with.
 """
 
 import math
-from typing import Optional, Union
+from typing import Optional
 
 import numpy as np
 
@@ -16,7 +16,8 @@ from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
 from ..rule import as_ndarray, create_v3, exact_scalar, unit_ndarray
 from ..timber import PerfectTimberWithin
-from .drawing import ALIGNMENT_EPSILON, LineSpan, MeasureSpan, PlaneSpan, PointSpan, VectorLike
+from .drawing import LineSpan, MeasureSpan, PlaneSpan, PointSpan, VectorLike
+from .sheet_shape import SheetLine, SheetPoint, sheet_shape
 
 _UP = np.array([0.0, 0.0, 1.0])
 
@@ -45,11 +46,6 @@ def edge_outward_normal(feature: CSGFeature, owner: CutCSG, timber: PerfectTimbe
     if not np.any(np.abs(total) > 1e-9):
         return None  # two faces looking opposite ways form no edge
     return _unit_or_up(total)
-
-
-def projects_to_a_point(direction: Union[VectorLike, np.ndarray], plane_normal: VectorLike) -> bool:
-    """Whether a line seen from this plane draws as a point, by the same threshold the viewer projects by."""
-    return abs(float(_unit_or_up(as_ndarray(direction)) @ _unit_or_up(as_ndarray(plane_normal)))) > 1 - ALIGNMENT_EPSILON
 
 
 def feature_span(
@@ -92,7 +88,8 @@ def feature_span(
         start = world(located.point + located.direction * exact_scalar(low))
         end = world(located.point + located.direction * exact_scalar(high))
         direction = _unit_or_up(end - start)
-        if not in_three_d and plane_normal is not None and projects_to_a_point(direction, plane_normal):
+        if not in_three_d and plane_normal is not None and isinstance(
+                sheet_shape(Line(direction=create_v3(*direction), point=create_v3(*start)), plane_normal), SheetPoint):
             return PointSpan(at=create_v3(*(start + end) / 2))
         outward = edge_outward_normal(feature, owner, timber)
         return LineSpan(at=create_v3(*start), direction=create_v3(*direction), interval=(0.0, math.dist(start, end)),
@@ -117,10 +114,10 @@ def feature_span(
         if plane_normal is None:
             return PointSpan(at=create_v3(*at))
         # Edge-on, it draws as a line along the face, square to its normal and to the view.
-        along = np.cross(normal, _unit_or_up(as_ndarray(plane_normal)))
-        if not np.any(np.abs(along) > 1e-9) or not boundary:
-            return PointSpan(at=create_v3(*at))  # facing the reader: it covers the view
-        along = _unit_or_up(along)
+        shape = sheet_shape(Plane(normal=create_v3(*normal), point=create_v3(*at)), plane_normal)
+        if not isinstance(shape, SheetLine) or not boundary:
+            return PointSpan(at=create_v3(*at))  # seen at an angle: it covers the view
+        along = shape.run
         # The region is timber-local and the direction world, so the boundary is brought over.
         stations = [float(world(create_v3(*as_ndarray(corner))) @ along) for corner in boundary]
         here = float(at @ along)

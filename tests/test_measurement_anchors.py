@@ -17,6 +17,7 @@ from kumiki.viewer import picking
 from kumiki.drawings.drawing import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
                             ViewAxes,
                             MeasurementOperation, MeasurementSpace, distance_anchors)
+from kumiki.geometry import Line
 from kumiki.rule import create_v3
 from tests.testing_shavings import load_module, present
 
@@ -334,7 +335,11 @@ class TestAFeatureSeenEndOn:
     def test_a_line_along_the_view_is_a_point_to_the_rules(self):
         from pathlib import Path
 
-        from kumiki.drawings.feature_span import projects_to_a_point
+        from kumiki.drawings.sheet_shape import SheetPoint, sheet_shape
+
+        def projects_to_a_point(direction, look):
+            return isinstance(sheet_shape(Line(direction=create_v3(*direction), point=create_v3(0, 0, 0)), look),
+                              SheetPoint)
 
         assert projects_to_a_point((0, 1, 0), (0, 1, 0)) is True
         assert projects_to_a_point((0, -1, 0), (0, 1, 0)) is True
@@ -345,9 +350,10 @@ class TestAFeatureSeenEndOn:
         # dimension that is drawable.
         from pathlib import Path
 
-        from kumiki.drawings.feature_span import projects_to_a_point
+        from kumiki.drawings.sheet_shape import SheetLine, sheet_shape
 
-        assert projects_to_a_point((0.05, 1, 0), (0, 1, 0)) is False
+        assert isinstance(sheet_shape(Line(direction=create_v3(0.05, 1, 0), point=create_v3(0, 0, 0)), (0, 1, 0)),
+                          SheetLine)
 
     def test_a_point_and_a_line_do_not_go_through_the_parallel_rule(self):
         # The point stays where it is and the line takes the foot. The parallel

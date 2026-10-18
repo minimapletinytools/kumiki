@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 from ..rule import (Matrix, Numeric, V3, are_vectors_parallel,
                    are_vectors_perpendicular, create_v3, cross_product,
                    safe_dot_product, safe_norm, safe_zero_test_sq)
+from .sheet_shape import SheetPoint, sheet_shape
 
 
 class MeasurementSpace(Enum):
@@ -158,11 +159,6 @@ def _three_d(operation) -> MeasurementKind:
 #: never worth making -- so a pair this close is refused at the pick instead.
 DEGENERATE_SEPARATION = 1e-6
 
-#: How square something has to be to the view before it counts as square. An
-#: edge a hair off end-on still projects to a line, just a very short one, and
-#: calling it a point would refuse a dimension that is drawable.
-ALIGNMENT_EPSILON = 1e-3
-
 #: Two projected directions within this of parallel are treated as parallel: the
 #: angle between them would be a number nobody wrote down deliberately, and
 #: their separation is what was meant.
@@ -245,33 +241,26 @@ def project_geometry_for_measuring(
     """A feature as it is seen on the sheet that *normal* faces out of.
 
     A point stays a point. An edge seen end-on becomes one, and otherwise stays
-    a line, flattened onto the sheet. A face is a line edge-on.
+    a line, flattened onto the sheet. A face is a line edge-on. The rule is
+    sheet_shape's; this answers it as geometry.
 
     None if it does not project to a line -- a face seen at any other angle
     projects to an area -- or if it is not a recognized piece of projectable
     geometry.
     """
-    gaze = _unit(normal)
     if isinstance(geometry, Point):
         return geometry
-    if isinstance(geometry, Line):
-        direction = _unit(geometry.direction)
-        if are_vectors_parallel(direction, gaze, eps=ALIGNMENT_EPSILON):
-            return Point(position=geometry.point)
-        return Line(direction=_flatten(direction, gaze), point=geometry.point)
-    if isinstance(geometry, Plane):
-        facing = _unit(geometry.normal)
-        if not are_vectors_perpendicular(facing, gaze, eps=ALIGNMENT_EPSILON):
-            return None
-        # Edge-on, so it draws as a line along the face, square to its normal
-        # and to the line of sight.
-        #
-        # TODO mostly redundant. Edges outrank projected faces, and most faces are
-        # fully determined by declared or derived edges. Only things like a
-        # Cylinder's cap are not covered. We should label these exceptional
-        # features and only project those ones.
-        return Line(direction=_cross(facing, gaze), point=geometry.point)
-    return None
+    shape = sheet_shape(geometry, _v3(normal))
+    if shape is None or not isinstance(geometry, (Line, Plane)):
+        return None
+    if isinstance(shape, SheetPoint):
+        return Point(position=geometry.point)
+    # A face edge-on draws as a line along itself, square to its normal and to the line of sight.
+    #
+    # TODO mostly redundant. Edges outrank projected faces, and most faces are fully determined by
+    # declared or derived edges. Only things like a Cylinder's cap are not covered. We should label
+    # these exceptional features and only project those ones.
+    return Line(direction=create_v3(*shape.run), point=geometry.point)
 
 
 def form_of(geometry: Optional[Geometry]) -> Optional[MeasurementFeature]:
@@ -310,12 +299,6 @@ def _are_parallel(
         return are_vectors_perpendicular(_unit(line.direction), _unit(plane.normal),
                                          eps=PARALLEL_EPSILON)
     return None
-
-
-def _flatten(direction: VectorLike, gaze: VectorLike) -> V3:
-    """The part of a direction that survives projection."""
-    direction, gaze = _v3(direction), _v3(gaze)
-    return _unit(direction - gaze * _dot(direction, gaze))
 
 
 def _raw_cross(a: VectorLike, b: VectorLike) -> V3:

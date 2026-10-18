@@ -636,41 +636,33 @@ def split_hidden(
     return visible, hidden
 
 
-def _sheet_shape(hit: 'OwnedFeatureHit', direction: Float3):
-    """What a feature is on the sheet: ('line', point, run) or ('point', point), flattened along
-    *direction*; None for anything else (a face seen at an angle, a curved surface)."""
-    from kumiki.geometry import Line, Plane, Point
+def _drawn_as(hit: 'OwnedFeatureHit', direction: Float3):
+    """What a feature is on the sheet (sheet_shape), flattened along *direction*: ('line', point,
+    run) or ('point', point); None for anything else (a face seen at an angle, a curved surface)."""
+    from kumiki.drawings.sheet_shape import SheetPoint, sheet_shape
 
-    located = hit.feature.locate_simple_unbounded(hit.owner)
-    if isinstance(located, Point):
-        return ("point", Float3.of(located.position).across(direction))
-    if isinstance(located, Line):
-        run = Float3.of(located.direction).across(direction).unit()
-        point = Float3.of(located.point).across(direction)
-        return ("point", point) if run is None else ("line", point, run)
-    if isinstance(located, Plane):
-        run = Float3.of(located.normal).cross(direction).unit()
-        return None if run is None else ("line", Float3.of(located.point).across(direction), run)
-    return None
+    shape = sheet_shape(hit.feature.locate_simple_unbounded(hit.owner), direction)
+    if shape is None:
+        return None
+    point = Float3.of(shape.at).across(direction)
+    return ("point", point) if isinstance(shape, SheetPoint) else ("line", point, Float3.of(shape.run))
 
 
 def _covers(front: PointerCandidate, behind: PointerCandidate, direction: Float3, tolerance: float) -> bool:
     """Whether *front* lands where *behind* does on the sheet, under the pointer."""
-    near, far = _sheet_shape(front.hit, direction), _sheet_shape(behind.hit, direction)
+    from kumiki.drawings.sheet_shape import SQUARE_TO_VIEW
+
+    near, far = _drawn_as(front.hit, direction), _drawn_as(behind.hit, direction)
     if near is None or far is None:
         return False
     if near[0] == "line" and far[0] == "line":
-        return near[2].cross(far[2]).length() <= EDGE_ON
+        return near[2].cross(far[2]).length() <= SQUARE_TO_VIEW
     if far[0] == "point" and near[0] == "point":
         return near[1].dist(far[1]) <= tolerance
     if far[0] == "point" and near[0] == "line":
         offset = far[1] - near[1]
         return offset.across(near[2]).length() <= tolerance
     return False  # a line behind a point is seen either side of it
-
-
-#: How far off square to the view a face's normal may be and the face still count as edge-on.
-EDGE_ON = 1e-6
 
 
 def measurable_in_view(
@@ -685,6 +677,7 @@ def measurable_in_view(
     thing naming its line, and stays. Seen at any other angle a face is an area, and goes.
     """
     from kumiki.csg.cutcsg import CSGFeatureType
+    from kumiki.drawings.sheet_shape import SQUARE_TO_VIEW, sheet_shape
     from kumiki.geometry import Line, Plane
 
     located = [(hit, hit.feature.locate_simple_unbounded(hit.owner)) for hit in hits]
@@ -697,11 +690,12 @@ def measurable_in_view(
         normal = Float3.of(where.normal).unit()
         if normal is None:
             return True
-        if abs(normal.dot(direction)) > EDGE_ON:
+        if sheet_shape(where, direction) is None:
             return False
         on_plane = Float3.of(where.point)
         return not any(
-            run is not None and abs(normal.dot(run)) <= EDGE_ON and abs(normal.dot(point - on_plane)) <= tolerance
+            run is not None and abs(normal.dot(run)) <= SQUARE_TO_VIEW
+            and abs(normal.dot(point - on_plane)) <= tolerance
             for point, run in lines)
 
     return [hit for hit, where in located if keep(hit, where)]
