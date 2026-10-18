@@ -1363,7 +1363,7 @@ def best_matching_candidate(hits: List['OwnedFeatureHit'], timber: 'PerfectTimbe
     None when nothing is held, there is no camera, or no candidate admits anything.
     """
     from kumiki.csg.feature_paths import FeatureHandle
-    from kumiki.drawings.measuring import kinds_for_pair, world_geometry
+    from kumiki.drawings.kigumi_measuring_helpers import kinds_for_pair, world_geometry
 
     if held is None or not look or not hits:
         return None

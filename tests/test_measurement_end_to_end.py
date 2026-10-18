@@ -16,7 +16,7 @@ import pytest
 
 from kumiki.viewer import picking
 from kumiki.drawings.drawing import ViewAxes
-from kumiki.drawings.measuring import settle
+from kumiki.drawings.kigumi_measuring_helpers import settle
 
 from tests.testing_shavings import load_module
 

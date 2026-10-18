@@ -79,7 +79,7 @@ def test_a_perfect_reference_is_cropped_to_the_cut_timber(loaded):
     right = next(f for f in body.get_declared_features() if f.name == "ptw.right")
     from kumiki.csg.cutcsg import OwnedFeatureHit
     from kumiki.csg.feature_paths import FeatureHandle
-    from kumiki.drawings.measuring import feature_anchor
+    from kumiki.drawings.kigumi_measuring_helpers import feature_anchor
 
     handle = FeatureHandle(timber=slot.mesh_cache[key]["cut_timber"].timber,
                            hit=OwnedFeatureHit(feature=right, owner=body))

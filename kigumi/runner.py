@@ -657,8 +657,8 @@ if TYPE_CHECKING:
     from kumiki.drawings.drawing import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlane, MeasurementSpace,
                                          VectorLike, Viewport, ViewAxes, ViewportId)
     from kumiki.csg.feature_paths import FeatureHandle
-    from kumiki.drawings.cameras import CameraFrame, OrientedBox
-    from kumiki.drawings.measuring import EndForm, Settled
+    from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
+    from kumiki.drawings.kigumi_measuring_helpers import EndForm, Settled
     from kumiki.drawings.layout import PlacedViewport
     from kumiki.geometry import Line, Plane, Point
     from kumiki.identity import FeaturePath
@@ -1670,7 +1670,7 @@ def build_default_drawing_for_debugging(frame: 'Frame') -> DrawingWire:
     lets pan/zoom deltas ride on top; the perspective one is left free and is
     the same kind of viewport the default 3D scene uses.
     """
-    from kumiki.drawings.cameras import orient_by_search, view_extent, world_bounds, world_box
+    from kumiki.drawings.kigumi_drawing_view_helpers import orient_by_search, view_extent, world_bounds, world_box
     from kumiki.drawings.drawing import ELEVATION_IDS, elevation_viewports
 
     centre, half_size = world_bounds(frame.cut_timbers)
@@ -1759,7 +1759,7 @@ def _preview_viewport(
     empty preview. `orient` is the strategy that picks the angle and `orbit`
     says how far it may be turned afterwards.
     """
-    from kumiki.drawings.cameras import preview_extent
+    from kumiki.drawings.kigumi_drawing_view_helpers import preview_extent
 
     rect = list(placed.rect)
     aspect = _viewport_aspect(rect, page)
@@ -1787,7 +1787,7 @@ def _long_face_viewports(entry: TimberEntry, page: PageWire,
         "width": _vector3_to_floats(timber.get_width_direction_global()),
         "height": _vector3_to_floats(timber.get_height_direction_global()),
     }
-    from kumiki.drawings.cameras import camera_looking_at_face, view_extent, world_bounds
+    from kumiki.drawings.kigumi_drawing_view_helpers import camera_looking_at_face, view_extent, world_bounds
 
     centre, half_size = world_bounds([entry["cutTimber"]])
 
@@ -1814,7 +1814,7 @@ def _world_elevation_viewports(
     entries: List[TimberEntry], page: PageWire, placed_by_role: Dict[str, 'PlacedViewport'],
 ) -> List[ViewportWire]:
     """Front, top and right elevations in world axes, for a group of members."""
-    from kumiki.drawings.cameras import view_extent, world_bounds
+    from kumiki.drawings.kigumi_drawing_view_helpers import view_extent, world_bounds
 
     centre, half_size = world_bounds([entry["cutTimber"] for entry in entries])
     viewports: List[ViewportWire] = []
@@ -1871,7 +1871,7 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dra
     The drawing names its members. The scene still holds every timber -- the
     rest are ghosted, present for context and not part of what is drawn.
     """
-    from kumiki.drawings.cameras import orient_by_search, orient_from_box, timber_box, world_bounds, world_box
+    from kumiki.drawings.kigumi_drawing_view_helpers import orient_by_search, orient_from_box, timber_box, world_bounds, world_box
 
     page = PageWire(**_SELECTION_DRAWING_PAGE)
     timber_entries, _ = _assign_member_keys(frame)
@@ -2090,7 +2090,7 @@ def _pick_verdict(
     disagreement is invisible until someone clicks.
     """
     from kumiki.drawings.drawing import ViewAxes
-    from kumiki.drawings.measuring import pick_verdict, world_geometry
+    from kumiki.drawings.kigumi_measuring_helpers import pick_verdict, world_geometry
 
     held_geometry, look = payload.get("heldGeometry"), payload.get("look")
     if not held_geometry or not look:
@@ -2155,7 +2155,7 @@ def _pick_placement(
     """
     from kumiki.drawings.drawing import MeasurementSpace, ViewAxes
     from kumiki.drawings.feature_span import feature_span
-    from kumiki.drawings.measuring import place_pair, world_geometry
+    from kumiki.drawings.kigumi_measuring_helpers import place_pair, world_geometry
 
     empty = PickPlacementWire(anchors=None, angle=None, settled=None)
     held = payload.get("heldReference")
@@ -2199,13 +2199,13 @@ def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']
 def _plane_for_pick(
     located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: PickRequest,
 ) -> Optional['MeasurementPlane']:
-    """The plane a measurement to this pick would be taken on (measuring.measurement_plane), or None.
+    """The plane a measurement to this pick would be taken on (kigumi_measuring_helpers.measurement_plane), or None.
 
     None unless something is held and the viewer said which way it is looking:
     a plane needs both ends and a camera, and a first pick has neither.
     """
     from kumiki.drawings.drawing import MeasurementSpace
-    from kumiki.drawings.measuring import feature_anchor, measurement_plane, world_geometry
+    from kumiki.drawings.kigumi_measuring_helpers import feature_anchor, measurement_plane, world_geometry
 
     held_geometry = payload.get("heldGeometry")
     look = payload.get("look")
@@ -2768,7 +2768,7 @@ def _resolve_measurement(
     of its own, which is what a feature that resolves to nothing else can offer.
     """
     from kumiki.drawings.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace, ViewAxes
-    from kumiki.drawings.measuring import place_pair
+    from kumiki.drawings.kigumi_measuring_helpers import place_pair
 
     resolved: MeasureWire = {**measure}
     broken = []
@@ -2809,7 +2809,7 @@ def _resolve_measurement(
             for key in ("a", "b")}
     if spans.get("a") is not None and spans.get("b") is not None and plane is not None:
         # Placed for the measurement that will actually be drawn, judged in the space its ends came
-        # back in (measuring.place_pair).
+        # back in (kigumi_measuring_helpers.place_pair).
         placement = place_pair(ends["a"], ends["b"], spans["a"], spans["b"], declared, plane, view, in_three_d)
         kind = placement.kind
         if kind is not None and kind.operation is MeasurementOperation.DISTANCE and placement.anchors is not None:
@@ -2848,7 +2848,7 @@ def _unplaceable_measurement(
     the timber's CSG would not render or a face would not crop -- all worth
     seeing in the log rather than silently not drawing.
     """
-    from kumiki.drawings.measuring import unplaceable
+    from kumiki.drawings.kigumi_measuring_helpers import unplaceable
 
     missing = [key for key in ("a", "b") if spans.get(key) is None]
     if plane is None:
@@ -3036,8 +3036,8 @@ def _handle_of(feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWith
 
 
 def _anchor_floats(handle: 'FeatureHandle', root: Optional['CutCSG'] = None) -> Optional[List[float]]:
-    """Where a dimension attaches to the feature (measuring.feature_anchor), as the wire has it."""
-    from kumiki.drawings.measuring import feature_anchor
+    """Where a dimension attaches to the feature (kigumi_measuring_helpers.feature_anchor), as the wire has it."""
+    from kumiki.drawings.kigumi_measuring_helpers import feature_anchor
 
     at = feature_anchor(handle, root)
     return None if at is None else _vector3_to_floats(at)
@@ -3045,13 +3045,13 @@ def _anchor_floats(handle: 'FeatureHandle', root: Optional['CutCSG'] = None) -> 
 
 def _world_geometry_payload(handle: 'FeatureHandle') -> Optional[GeometryWire]:
     """A feature's unbounded geometry, in world space, as the viewer wants it."""
-    from kumiki.drawings.measuring import world_geometry
+    from kumiki.drawings.kigumi_measuring_helpers import world_geometry
 
     return _geometry_payload(world_geometry(handle))
 
 
 def _settled_wire(settled: 'Settled') -> SettledWire:
-    """What a measurement comes to (measuring.Settled), as the viewer reads it."""
+    """What a measurement comes to (kigumi_measuring_helpers.Settled), as the viewer reads it."""
     def end(form: Optional['EndForm']) -> Optional[SettledEndWire]:
         if form is None:
             return None

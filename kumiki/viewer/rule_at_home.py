@@ -9,9 +9,12 @@ A Float3 is a tuple, so it goes to the viewer as a JSON array as it is.
 """
 
 import math
-from typing import NamedTuple, Optional, Sequence, Tuple
+from typing import List, NamedTuple, Optional, Sequence, Tuple
 
 from ..rule import V3, create_v3
+
+#: A point or direction as a list of three floats, the way the viewer sends and takes one.
+FloatList3 = List[float]
 
 
 class Float3(NamedTuple):
