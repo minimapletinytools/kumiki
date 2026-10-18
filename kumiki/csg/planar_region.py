@@ -313,18 +313,6 @@ def material_crossing(root: CutCSG, frame: SightFrame, reach: float,
     return _intersect(front, back)
 
 
-def face_on_surface(face: FeatureHandle[FaceFeature], root: CutCSG, frame: SightFrame, reach: float) -> Region:
-    """The part of `face`, which lies in the frame's plane, that is on the finished surface of `root`
-    (see face_reaches_surface). Raises CannotSection as material_crossing does."""
-    plane_frame = _Frame.with_axes(*frame)
-    own_front, own_back = _sides(face.owner, plane_frame, [_square(reach)])
-    own = own_front or own_back
-    if not own:
-        return []
-    front, back = _sides(root, plane_frame, own)
-    return _intersect(own, _xor(front, back))
-
-
 def shadow(region: Region, reach: float) -> Region:
     """What `region` hides from a viewer looking along +v: each piece swept that way, `reach` far."""
     swept: Region = []
@@ -412,6 +400,33 @@ def plane_section(plane: Plane, root: CutCSG, near: V3, reach: float) -> Optiona
     except _CannotSection:
         return None
     return frame, _union(front, back)
+
+
+def face_section(
+    face: FaceFeature, owner: CutCSG, root: Optional[CutCSG], near: V3, reach: float,
+) -> Optional[Section]:
+    """The part of `face` (declared on `owner`) that is on the finished surface of `root`, as a
+    region in the face's own plane frame -- or, with no `root`, all of the face `owner` gives it.
+    None for a tree this module can't cut by a plane. See face_reaches_surface."""
+    plane = face.locate_simple_unbounded(owner)
+    if plane is None:
+        return None
+    frame = _Frame(plane, near)
+    try:
+        own_front, own_back = _sides(owner, frame, [_square(reach)])
+        own = own_front or own_back
+        if not own or root is None:
+            return frame, own
+        front, back = _sides(root, frame, own)
+    except _CannotSection:
+        return None
+    return frame, _intersect(own, _xor(front, back))
+
+
+def section_polygons(section: Section) -> List[List[np.ndarray]]:
+    """The section's pieces, each a convex polygon of points in the solid's space."""
+    frame, region = section
+    return [[_to_3d(frame, point) for point in polygon] for polygon in region]
 
 
 def _to_3d(frame: _Frame, point: Tuple[float, float]) -> np.ndarray:

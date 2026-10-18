@@ -125,8 +125,11 @@ def feature_span(
 
     None when the feature cannot be placed.
     """
+    from .feature_extent import FeatureExtents, extents_of
+
     feature, owner, timber = handle.feature, handle.owner, handle.timber
     located = feature.locate_simple_unbounded(owner)
+    extents = extents_of(root_csg, timber) if root_csg is not None else FeatureExtents(None, timber)
 
     def world(point) -> np.ndarray:
         return as_ndarray(timber.transform.local_to_global(point))
@@ -138,11 +141,10 @@ def feature_span(
     reach = float(timber.length) * 4
 
     if isinstance(located, Line):
-        # Where the feature itself says it ends, and where the timber leaves it -- but not for a
-        # non-real line, which lies where there is no timber.
-        solids = [root_csg] if root_csg is not None and feature.real else []
-        pieces = line_pieces(located, solids, reach, solid.transform.position,
-                             declared=declared_line_span(feature, owner, located))
+        # Its extent: where the feature itself says it ends, and where the timber leaves it -- but
+        # not for a line in a void, which lies where there is no timber.
+        extent = extents.of(feature, owner)
+        pieces = list(extent.pieces) if extent is not None else []
         if not pieces:
             return None
         # The longest: a cut can leave an edge in several, and the biggest is the one a reader points at.
@@ -157,18 +159,32 @@ def feature_span(
                         outward=None if outward is None else create_v3(*outward))
 
     if isinstance(located, Plane):
-        cropped = approximately_crop_plane_to_area_on_csg(
-            located, [owner, solid], seed_reach=reach, near=solid.transform.position)
-        if cropped is None or cropped.is_empty:
-            # A face on the timber's own boundary -- a tenon's end, flush with the end of the piece --
-            # crops to nothing against it. Its own primitive still bounds it.
+        if root_csg is not None:
+            # Its extent on the cut timber -- or, cut away entirely, all of what declared it.
+            extent = extents.of(feature, owner)
+            if extent is None or extent.is_empty:
+                extent = FeatureExtents(None, timber).of(feature, owner)
+            if extent is None or extent.is_empty:
+                return None
+            middle, boundary = extent.anchor(), [corner for polygon in extent.polygons() for corner in polygon]
+            if middle is None:
+                return None
+            middle = create_v3(*middle)
+        else:
+            # No cut timber to crop to (the solver's spans, for now): the enclosing solids, which
+            # cannot subtract, so a face half taken away by a cut spans the whole face.
             cropped = approximately_crop_plane_to_area_on_csg(
-                located, [owner], seed_reach=reach, near=solid.transform.position)
-        if cropped is None or cropped.is_empty:
-            return None
-        middle = cropped.centroid()
-        if middle is None:
-            return None
+                located, [owner, solid], seed_reach=reach, near=solid.transform.position)
+            if cropped is None or cropped.is_empty:
+                # A face on the timber's own boundary -- a tenon's end, flush with the end of the
+                # piece -- crops to nothing against it. Its own primitive still bounds it.
+                cropped = approximately_crop_plane_to_area_on_csg(
+                    located, [owner], seed_reach=reach, near=solid.transform.position)
+            if cropped is None or cropped.is_empty:
+                return None
+            middle, boundary = cropped.centroid(), list(cropped.boundary)
+            if middle is None:
+                return None
         at = world(middle)
         normal = _unit_or_up(as_ndarray(timber.transform.local_to_global_direction(located.normal)))
         if in_three_d:
@@ -177,11 +193,11 @@ def feature_span(
             return PointSpan(at=create_v3(*at))
         # Edge-on, it draws as a line along the face, square to its normal and to the view.
         along = np.cross(normal, _unit_or_up(as_ndarray(plane_normal)))
-        if not np.any(np.abs(along) > 1e-9) or not cropped.boundary:
+        if not np.any(np.abs(along) > 1e-9) or not boundary:
             return PointSpan(at=create_v3(*at))  # facing the reader: it covers the view
         along = _unit_or_up(along)
         # The region is timber-local and the direction world, so the boundary is brought over.
-        stations = [float(world(corner) @ along) for corner in cropped.boundary]
+        stations = [float(world(create_v3(*as_ndarray(corner))) @ along) for corner in boundary]
         here = float(at @ along)
         return LineSpan(at=create_v3(*at), direction=create_v3(*along), interval=(min(stations) - here, max(stations) - here))
 
