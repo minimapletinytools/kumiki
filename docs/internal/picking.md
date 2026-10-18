@@ -124,11 +124,11 @@ removing its component along the view:
 This settles edges stacked exactly along the view from the candidates alone, without asking
 whether a grazing line of sight blocks.
 
-**Behind material: `blocked`,** built by the runner's `_sight_blocker`. It asks
-`sight_is_blocked` of the clicked timber, then of each other drawn member in the slot's mesh
-cache: those in `drawnMembers`, or every member when none are sent. The place and the direction
-to the camera are converted into each timber's own space first. A drawing's faded context is not
-in `drawnMembers`, so it hides nothing.
+**Behind material: `blocked`,** `picking.sight_blocker` over occluders the runner's `_sight_blocker`
+gathers: the clicked timber, then each other drawn member in the slot's mesh cache -- those in
+`drawnMembers`, or every member when none are sent. It is `visibility.hidden_at` per place, which
+asks `sight_is_blocked` of each, the place and the direction to the camera converted into each
+timber's own space first. A drawing's faded context is not in `drawnMembers`, so it hides nothing.
 
 **`sight_is_blocked(root, place, toward_camera)`** (`kumiki/drawings/visibility.py`):
 1. Crop the line through `place`, in the camera's direction, to the solid's *inside*
@@ -145,10 +145,13 @@ A drawing's generator asks the same of a whole feature rather than a place: see
 `nearest_visible_depth` in the same module, which decides a face seen edge-on, or a line lying
 along the sheet, in the one plane holding all its lines of sight, cut exactly by each solid.
 
-### 3. The runner uses the result (`_handle_find_csg_at_point`)
+### 3. Choosing one (`picking.choose`)
+
+`_handle_find_csg_at_point` runs three steps of `picking.py` -- `navigate`, `find_candidates`,
+`choose` -- and builds its reply from the `Pick` that comes back.
 
 - Candidates: visible first, then hidden, each in order; `visible_count` is how many are visible.
-- Default choice: while measuring, `_best_matching_candidate` considers only the visible ones.
+- Default choice: while measuring, `best_matching_candidate` considers only the visible ones.
   Otherwise in a drawing, a plain click with no index takes candidate 0, the first visible one.
   With nothing visible, nothing is taken: the answer is empty but for the (hidden) candidates.
 - A named index (Tab, a menu row) wraps round the visible candidates only, so it is never a
