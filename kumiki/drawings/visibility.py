@@ -103,7 +103,7 @@ def nearest_visible_depth(
             if area(region) <= 0:
                 return None
             corners = [point for polygon in region for point in polygon]
-            blocked = _blocking(occluders, world, reach, _span(corners))
+            blocked = _blocking(occluders, world, reach, _across_sheet(corners))
             visible = subtract(region, _overlapping(blocked, corners))
             depths = [y for polygon in visible for _x, y in polygon]
         else:
@@ -116,14 +116,14 @@ def nearest_visible_depth(
             ends = [end for segment in segments for end in segment]
             if not ends:
                 return None
-            near = _overlapping(_blocking(occluders, world, reach, _span(ends)), ends)
+            near = _overlapping(_blocking(occluders, world, reach, _across_sheet(ends)), ends)
             depths = [end[1] for segment in segments_outside(segments, near) for end in segment]
     except CannotSection:
         return float(point @ look)
     return min(depths) + float(origin @ look) if depths else None
 
 
-def _span(points: Sequence[Tuple[float, float]]) -> Tuple[float, float]:
+def _across_sheet(points: Sequence[Tuple[float, float]]) -> Tuple[float, float]:
     """How far `points` reach across the sheet (u), a little widened so an edge on its border counts."""
     return min(p[0] for p in points) - 1e-6, max(p[0] for p in points) + 1e-6
 

@@ -26,7 +26,7 @@ PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 
 
 @dataclass(frozen=True)
-class Candidate:
+class DimensionCandidate:
     """A measurement that could be added, in the view named `view`, with its length.
 
     Its row is worked out only when asked for: that is the dear part, and most candidates are never
@@ -55,7 +55,7 @@ class PickContext:
 
 
 #: Scores a candidate; lower is better.
-Criterion = Callable[[Candidate, PickContext], float]
+Criterion = Callable[[DimensionCandidate, PickContext], float]
 
 
 def is_reference(handle: FeatureHandle) -> bool:
@@ -75,26 +75,26 @@ _CENTERPLANE_NAMES = {
 }
 
 
-def _ends(candidate: Candidate) -> Tuple[FeatureHandle, FeatureHandle]:
+def _ends(candidate: DimensionCandidate) -> Tuple[FeatureHandle, FeatureHandle]:
     return candidate.measure.anchor_a, candidate.measure.anchor_b
 
 
-def from_reference(candidate: Candidate, context: PickContext) -> float:
+def from_reference(candidate: DimensionCandidate, context: PickContext) -> float:
     """Measured from a reference feature of its own timber."""
     return 0.0 if any(is_reference(end) for end in _ends(candidate)) else 1.0
 
 
-def from_solved(candidate: Candidate, context: PickContext) -> float:
+def from_solved(candidate: DimensionCandidate, context: PickContext) -> float:
     """Measured from something already solved, so dimensions chain."""
     return 0.0 if any(context.solved(end) for end in _ends(candidate)) else 1.0
 
 
-def perfect_over_rough(candidate: Candidate, context: PickContext) -> float:
+def perfect_over_rough(candidate: DimensionCandidate, context: PickContext) -> float:
     """How many ends are rough faces."""
     return float(sum(end.feature.name.startswith("rough.") for end in _ends(candidate)))
 
 
-def shortest(candidate: Candidate, context: PickContext) -> float:
+def shortest(candidate: DimensionCandidate, context: PickContext) -> float:
     return candidate.length
 
 
@@ -115,7 +115,7 @@ DEFAULT_POLICY = Policy()
 
 @dataclass(frozen=True)
 class Pick:
-    candidate: Candidate
+    candidate: DimensionCandidate
     score: Tuple[float, ...]
     broke_rules: bool = False
 
@@ -147,7 +147,7 @@ def _key(handle: FeatureHandle) -> Tuple[int, str]:
 
 
 def auto_dimension(
-    candidates: Sequence[Candidate],
+    candidates: Sequence[DimensionCandidate],
     targets: Sequence[FeatureHandle],
     known_rows: Sequence[Row],
     carriers: CarrierMap,
@@ -188,7 +188,7 @@ def auto_dimension(
         _, values, directions = np.linalg.svd(target_left, full_matrices=False)
         return directions[values > tolerance]
 
-    def helpful_direction(candidate: Candidate, unsolved: np.ndarray) -> Optional[np.ndarray]:
+    def helpful_direction(candidate: DimensionCandidate, unsolved: np.ndarray) -> Optional[np.ndarray]:
         """The unit direction the candidate adds to what is known, if all of it is still unsolved."""
         row = candidate.row
         if row is None:
@@ -299,7 +299,7 @@ def _separation(one: Tuple, other: Tuple) -> Optional[float]:
 
 def sheet_candidates(
     anchors: Mapping[str, Sequence[FeatureHandle]], carriers: CarrierMap, views: Mapping[str, ViewAxes],
-) -> List[Candidate]:
+) -> List[DimensionCandidate]:
     """Every perpendicular dimension a view can draw between two of the anchors it can see.
 
     Between two parallel lines on the sheet (a face seen edge-on, a line lying along the sheet), or
@@ -317,5 +317,5 @@ def sheet_candidates(
                 length = _separation(shape_a, shape_b)
                 if length is None or length < 1e-9:
                     continue
-                candidates.append(Candidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes, carriers))
+                candidates.append(DimensionCandidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes, carriers))
     return candidates
