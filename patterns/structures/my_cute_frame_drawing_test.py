@@ -27,7 +27,7 @@ from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, Policy, auto_dime
 from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, ViewAxes, elevation_viewports,
                                     shop_drawing_viewports)
 from kumiki.geometry import Plane
-from kumiki.csg.feature_solving import carrier_map_of, feature_handle_dof_rows
+from kumiki.drawings.measure_solving import DrawingSolve
 from kumiki.drawings.visibility import visible_by_view
 from kumiki.csg.required_features import planning_features, required_features
 
@@ -78,15 +78,16 @@ def _sheet(view: str) -> Tuple[ViewAxes, Transform]:
             Transform(position=create_v3(0, 0, 0), orientation=Orientation.from_x_and_y(right, up)))
 
 
-def _rows(handles: Sequence[FeatureHandle], carriers) -> List[Row]:
-    return [row for handle in handles for row in feature_handle_dof_rows(handle, carriers)]
+def _rows(handles: Sequence[FeatureHandle], solve: DrawingSolve) -> List[Row]:
+    return [row for handle in handles for row in solve.dof_rows(handle)]
 
 
 def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     """Pick dimensions until every planning feature is solved. Returns (frame, AutoDimensioning, report lines)."""
     frame = _load_cute_frame()()
     cut_timbers = list(frame.cut_timbers)
-    carriers = carrier_map_of(*cut_timbers)
+    solve = DrawingSolve(cut_timbers)
+    carriers = solve.carriers
 
     fixed = next(cut for cut in cut_timbers if cut.timber.ticket.path == FIXED_TIMBER)
     body = fixed.get_extended_rough_csg_with_perfect_features_local()
@@ -101,13 +102,13 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     assumptions = square_assumptions(directed, carriers)
     for view in VIEWS:
         assumptions += sheet_axis_assumptions(directed, carriers, _sheet(view)[1])
-    known_rows = _rows(known, carriers) + [row for assumption in assumptions for row in assumption.rows]
+    known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
 
     # Centerplanes can't be referenced by a drawing yet, so they're solved for but never dimensioned to.
     anchors = [handle for handle in directed if not isinstance(handle.feature, MidplaneFeature)]
     views = {view: _sheet(view)[0] for view in VIEWS}
-    candidates = sheet_candidates(visible_by_view(anchors, views, cut_timbers), carriers, views, cut_timbers)
-    result = auto_dimension(candidates, targets, known_rows, carriers, policy)
+    candidates = sheet_candidates(visible_by_view(anchors, views, cut_timbers), views, solve)
+    result = auto_dimension(candidates, targets, known_rows, solve, policy)
 
     report = [f"fixed: {FIXED_TIMBER} ({len(known)} faces known), {len(assumptions)} assumptions",
               f"targets: {len(targets)} features, {len(candidates)} candidate dimensions",
@@ -157,19 +158,20 @@ def _end_datum(targets: Sequence[FeatureHandle], timber) -> FeatureHandle:
 
 def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
     """Every required feature of one timber, dimensioned from its reference faces and its bottom end."""
-    carriers = carrier_map_of(cut)
+    solve = DrawingSolve([cut])
+    carriers = solve.carriers
     targets = list({(id(r.handle.owner), r.handle.feature.name): r.handle for r in required_features(cut)}.values())
     known = [handle for handle in targets if is_reference(handle)] + [_end_datum(targets, cut.timber)]
     sheets = _shop_sheets(cut.timber)
     assumptions = square_assumptions(targets, carriers)
     for _, sheet in sheets.values():
         assumptions += sheet_axis_assumptions(targets, carriers, sheet)
-    known_rows = _rows(known, carriers) + [row for assumption in assumptions for row in assumption.rows]
+    known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
 
     anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
     views = {view: axes for view, (axes, _) in sheets.items()}
-    candidates = sheet_candidates(visible_by_view(anchors, views, [cut]), carriers, views, [cut])
-    result = auto_dimension(candidates, targets, known_rows, carriers, policy)
+    candidates = sheet_candidates(visible_by_view(anchors, views, [cut]), views, solve)
+    result = auto_dimension(candidates, targets, known_rows, solve, policy)
 
     report = [f"{cut.timber.ticket.path}: {len(targets)} features, from {[_name(h) for h in known]}, "
               f"{len(candidates)} candidates, {result.left_before} left before"]

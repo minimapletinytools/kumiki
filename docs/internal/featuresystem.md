@@ -11,6 +11,7 @@ kumiki implements its own CSG (constructive solid geometry) system to generate a
 - csg/carriers.py: the planes, lines and points features lie on, for the solver
 - csg/feature_solving.py: the feature solver (with solve_recipe, dof_solver, required_features, assumptions): measurements in, rows and remaining DOFs out
 - csg/feature_paths.py: FeatureHandle, and feature references on the wire
+- csg/feature_extent.py: FeatureExtent, where a feature is on its cut timber, cropped once by its nature and kept per tree
 - csg/triangles.py: meshing and raycasting a csg
 - geometry.py: contains shared geometry feature classes like Plane Line Vertex etc
 - drawings/drawing.py: contains all code relate to generating measurements from CSG features

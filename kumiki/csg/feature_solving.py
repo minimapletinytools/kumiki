@@ -8,16 +8,15 @@ own timber's local space, where its carriers are.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from .carriers import CarrierMap, Recipe, Row
-from .cross_sections import face_reaches_surface
 from .cutcsg import carrier_map
 from .dof_solver import Remaining, remaining
 from .feature_paths import FeatureHandle
-from .required_features import FaceTest, required_features
+from .required_features import FaceTest, on_finished_surface, required_features
 from .solve_recipe import (combine, direction_motion, dot_vector_row, feature_dof_rows, motion_along,
                            transform_vector_row)
 from ..geometry import Plane
@@ -127,6 +126,25 @@ def measure_row(measure: SolveMeasurement, carriers: CarrierMap) -> Row:
     return _distance_row(measure, carriers)
 
 
+class Solve:
+    """What one solve over some cut timbers works out once and asks for again: their carriers, and
+    each feature's own DOF rows. Lasts as long as the solve; the timbers must not change under it."""
+
+    def __init__(self, cut_timbers: Sequence['CutTimber']):
+        self.cut_timbers: Tuple['CutTimber', ...] = tuple(cut_timbers)
+        self.carriers = carrier_map_of(*self.cut_timbers)
+        self._dof_rows: Dict[FeatureHandle, List[Row]] = {}
+
+    def dof_rows(self, handle: FeatureHandle) -> List[Row]:
+        """The feature's own DOFs as rows (feature_handle_dof_rows)."""
+        if handle not in self._dof_rows:
+            self._dof_rows[handle] = feature_handle_dof_rows(handle, self.carriers)
+        return self._dof_rows[handle]
+
+    def measure_row(self, measure: SolveMeasurement) -> Row:
+        return measure_row(measure, self.carriers)
+
+
 def _carriers_for(handles: Sequence[FeatureHandle], cut_timbers: Sequence['CutTimber']) -> CarrierMap:
     """Carriers of every timber the handles are on, each found among `cut_timbers`."""
     touched: List['CutTimber'] = []
@@ -205,6 +223,6 @@ def solve_report(
     return SolveReport(features=reports, total=remaining(known_rows, target_rows))
 
 
-def required_targets(cut_timber: 'CutTimber', face_test: FaceTest = face_reaches_surface) -> List[FeatureHandle]:
+def required_targets(cut_timber: 'CutTimber', face_test: FaceTest = on_finished_surface) -> List[FeatureHandle]:
     """The features `required_features` finds on `cut_timber`, as targets for `solve_report`."""
     return [required.handle for required in required_features(cut_timber, face_test)]

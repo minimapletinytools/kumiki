@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, Dict, Hashable, Optional, Sequence
 import numpy as np
 
 from ..csg.feature_paths import FeatureHandle
-from ..csg.feature_solving import SolveAngle, SolveDistance, SolveMeasurement
+from ..csg.carriers import Row
+from ..csg.feature_solving import Solve, SolveAngle, SolveDistance, SolveMeasurement
 from ..rule import Matrix, as_ndarray, unit_ndarray
 from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, MeasurementKind, MeasurementOperation,
                       MeasurementSpace, PointSpan, ViewAxes, distance_anchors)
@@ -112,3 +113,16 @@ def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view
     anchor_a, anchor_b = (as_ndarray(point) for point in distance_anchors(flat_first, flat_second, kind, view))
     return SolveDistance(a, b, _on_feature(first, anchor_a, look), _on_feature(second, anchor_b, look),
                          _gap_direction(anchor_a, anchor_b, look))
+
+
+class DrawingSolve(Solve):
+    """A Solve that takes a drawing's Measures, keeping each feature's span for the solve."""
+
+    def __init__(self, cut_timbers: Sequence['CutTimber']):
+        super().__init__(cut_timbers)
+        self.spans: SpanCache = {}
+
+    def row(self, measure: Measure, view: Optional[ViewAxes] = None) -> Row:
+        """How `measure`, seen through `view`, changes with the carriers' unknowns. Raises ValueError
+        for one that measures nothing (solve_measurement)."""
+        return self.measure_row(solve_measurement(measure, self.cut_timbers, view, self.spans))

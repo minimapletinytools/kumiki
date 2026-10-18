@@ -1,11 +1,11 @@
-"""Where a feature is on its cut timber (kumiki/drawings/feature_extent.py): cropped once, by its nature."""
+"""Where a feature is on its cut timber (kumiki/csg/feature_extent.py): cropped once, by its nature."""
 
 import numpy as np
 import pytest
 
 from kumiki import *
 from kumiki.csg.cutcsg import Cylinder, CylinderAxisFeature, Difference, RectangularPrism, csg_children
-from kumiki.drawings.feature_extent import extents_of
+from kumiki.csg.feature_extent import extents_of
 
 
 def _box(x, y, z):

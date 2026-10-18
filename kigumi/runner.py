@@ -1007,12 +1007,12 @@ def _perfect_reference_outlines(
     timber: 'PerfectTimberWithin', root: 'CutCSG', centerplanes: bool,
 ) -> List[PlaneOutlineWire]:
     """The rough body's perfect references, each outlined as cropped to the cut timber `root`
-    (kumiki.drawings.feature_extent), in world space: what a drawing draws dotted, edge-on. Its
+    (kumiki.csg.feature_extent), in world space: what a drawing draws dotted, edge-on. Its
     centerplanes, or its perfect faces -- those the rough body has no face for (ptw.*); a face it
     has (rptw.*) is drawn as the timber already, and a joint's faces are not these.
     """
     from kumiki.csg.cutcsg import Difference, FeatureNature, MidplaneFeature, PlaneFeature
-    from kumiki.drawings.feature_extent import extents_of
+    from kumiki.csg.feature_extent import extents_of
     from kumiki.geometry import Plane
     from kumiki.rule import create_v3
 
@@ -3892,13 +3892,13 @@ def _feature_anchor(
     root_csg: Optional['CutCSG'] = None,
 ) -> Optional[List[float]]:
     """Where to attach a dimension to this feature, in world space: its extent's anchor
-    (kumiki.drawings.feature_extent), cropped to the cut timber `root_csg` when given -- a face's
+    (kumiki.csg.feature_extent), cropped to the cut timber `root_csg` when given -- a face's
     region on the finished surface, a line's longest piece, a perfect reference's cross-section.
 
     Falls back to the declared extent when the feature cannot be placed -- a curved primitive, say --
     since somewhere approximate beats nowhere.
     """
-    from kumiki.drawings.feature_extent import FeatureExtents, extents_of
+    from kumiki.csg.feature_extent import FeatureExtents, extents_of
     from kumiki.rule import create_v3
 
     extents = extents_of(root_csg, timber) if root_csg is not None else FeatureExtents(None, timber)
@@ -5893,9 +5893,9 @@ def _non_real_plane_outline(
     feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin', root: 'CutCSG',
 ) -> Optional[List[SegmentWire]]:
     """A non-real plane's outline -- a perfect face in rough stock, a centerplane -- which has no
-    surface to light: its extent's outline (kumiki.drawings.feature_extent), which a drawing shows
+    surface to light: its extent's outline (kumiki.csg.feature_extent), which a drawing shows
     edge-on, as the line it draws dotted. None for anything else."""
-    from kumiki.drawings.feature_extent import extents_of
+    from kumiki.csg.feature_extent import extents_of
     from kumiki.geometry import Plane
     from kumiki.rule import create_v3
 

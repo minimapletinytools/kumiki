@@ -16,6 +16,9 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
   - Migration: `from kumiki.drawings.feature_solving import ...` becomes `from kumiki.csg.feature_solving import ...`, and likewise for the other four.
   - `measure_row`, `remaining_dofs` and `solve_report` take `SolveDistance` / `SolveAngle` instead of `Measure`, and no `view`: `measure_row(measure, carriers, view)` becomes `measure_row(solve_measurement(measure, cut_timbers, view), carriers)`.
 - **Breaking:** the solver measures a face where it is on the cut timber, cuts subtracted, as the viewer does, and `approximately_crop_plane_to_area_on_csg` (with `geometry.PlaneFrame` and `frame_for_plane`) is removed. For a plane cropped to a solid use `kumiki.csg.cross_sections.plane_cross_section`.
+- **Breaking:** one solve's working is a `Solve` (`kumiki.csg.feature_solving`: carriers, each feature's DOF rows) or a `DrawingSolve` (`kumiki.drawings.measure_solving`: also each feature's span, and `row(measure, view)`). `sheet_candidates(anchors, carriers, views, cut_timbers)` becomes `sheet_candidates(anchors, views, solve)`, and `auto_dimension(..., carriers, policy)` becomes `auto_dimension(..., solve, policy)`, with `solve = DrawingSolve(cut_timbers)`.
+- **Breaking:** `FeatureExtent` moved to `kumiki.csg.feature_extent`, with the line helpers `Interval`, `declared_line_span`, `intersected_intervals`, `line_intervals` and `line_pieces` (from `kumiki.drawings.feature_span`).
+- `required_features` reads whether a face is on the finished surface from the tree's `FeatureExtents`, so the cut is shared with visibility and the solver (`on_finished_surface`; `face_test` still swaps it).
 
 ## [0.8.0] - 2026-10-05
 

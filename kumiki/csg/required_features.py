@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Callable, Iterator, List
 from .cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
                      OwnedFeatureHit, csg_children, measured_by_default)
 from .feature_paths import FeatureHandle
-from .cross_sections import face_reaches_surface
+from .feature_extent import extents_of
 from ..rule import V3, create_v3
 
 if TYPE_CHECKING:
@@ -15,6 +15,13 @@ if TYPE_CHECKING:
 
 # Whether a flat face is on the finished surface: (face, root, near, reach) -> bool.
 FaceTest = Callable[[FeatureHandle[FaceFeature], CutCSG, V3, float], bool]
+
+
+def on_finished_surface(face: FeatureHandle[FaceFeature], root: CutCSG, near: V3, reach: float) -> bool:
+    """cross_sections.face_reaches_surface, read off the tree's FeatureExtents: the face is cut once,
+    and kept for whatever else asks where it is. A tree that can't be cut counts as on the surface."""
+    extent = extents_of(root, face.timber).of(face.feature, face.owner)
+    return extent is None or not extent.is_empty
 
 
 class Reason(Enum):
@@ -37,7 +44,7 @@ def _nodes(root: CutCSG) -> Iterator[CutCSG]:
         yield from _nodes(child)
 
 
-def required_features(cut_timber: 'CutTimber', face_test: FaceTest = face_reaches_surface,
+def required_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished_surface,
                       include_unmeasured: bool = False) -> List[RequiredFeature]:
     """The features of `cut_timber` that need solving, each with why.
 
@@ -83,7 +90,7 @@ def required_features(cut_timber: 'CutTimber', face_test: FaceTest = face_reache
     return required
 
 
-def planning_features(cut_timber: 'CutTimber', face_test: FaceTest = face_reaches_surface) -> List[RequiredFeature]:
+def planning_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished_surface) -> List[RequiredFeature]:
     """The required features a planning drawing solves for: the perfect timber within and its joints' shoulder planes."""
     # TODO figure out what do here, we probably want to return centerplanes as well?
     body = cut_timber.get_extended_rough_csg_with_perfect_features_local()

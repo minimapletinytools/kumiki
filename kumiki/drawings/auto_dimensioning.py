@@ -10,22 +10,19 @@ Temporary, and expected to be renamed.
 import warnings
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
-from ..csg.carriers import CarrierMap, Row
+from ..csg.carriers import Row
 from ..csg.dof_solver import remaining
-from ..csg.feature_solving import feature_handle_dof_rows, measure_row
+from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
 from ..rule import as_ndarray
 from .drawing import Measure, MeasurementKind, ViewAxes
-from .measure_solving import SpanCache, solve_measurement
-
-if TYPE_CHECKING:
-    from ..timber import CutTimber
+from .measure_solving import DrawingSolve
 
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 
@@ -41,16 +38,14 @@ class DimensionCandidate:
     measure: Measure
     length: float
     axes: ViewAxes = field(repr=False, compare=False)
-    carriers: CarrierMap = field(repr=False, compare=False)
-    cut_timbers: Sequence['CutTimber'] = field(repr=False, compare=False)
     #: Shared by every candidate of one solve.
-    spans: SpanCache = field(repr=False, compare=False)
+    solve: DrawingSolve = field(repr=False, compare=False)
 
     @cached_property
     def row(self) -> Optional[Row]:
         """What the measurement fixes (measure_row), or None where it cannot be written as a row."""
         try:
-            return measure_row(solve_measurement(self.measure, self.cut_timbers, self.axes, self.spans), self.carriers)
+            return self.solve.row(self.measure, self.axes)
         except ValueError:
             return None
 
@@ -158,14 +153,14 @@ def auto_dimension(
     candidates: Sequence[DimensionCandidate],
     targets: Sequence[FeatureHandle],
     known_rows: Sequence[Row],
-    carriers: CarrierMap,
+    solve: Solve,
     policy: Policy = DEFAULT_POLICY,
 ) -> AutoDimensioning:
     """Pick from `candidates` until `targets` are solved or nothing more helps.
 
     `known_rows` is what is already known: fixed features' rows, assumptions.
     """
-    target_rows = [row for handle in targets for row in feature_handle_dof_rows(handle, carriers)]
+    target_rows = [row for handle in targets for row in solve.dof_rows(handle)]
     columns = list(dict.fromkeys(column for row in (*known_rows, *target_rows) for column in row))
     index = {column: i for i, column in enumerate(columns)}
     known_matrix, target_matrix = _matrix(known_rows, columns), _matrix(target_rows, columns)
@@ -184,7 +179,7 @@ def auto_dimension(
     spans: Dict[Tuple[int, str], slice] = {}
     start = 0
     for handle in targets:
-        count = len(feature_handle_dof_rows(handle, carriers))
+        count = len(solve.dof_rows(handle))
         spans[_key(handle)] = slice(start, start + count)
         start += count
 
@@ -306,8 +301,7 @@ def _separation(one: Tuple, other: Tuple) -> Optional[float]:
 
 
 def sheet_candidates(
-    anchors: Mapping[str, Sequence[FeatureHandle]], carriers: CarrierMap, views: Mapping[str, ViewAxes],
-    cut_timbers: Sequence['CutTimber'],
+    anchors: Mapping[str, Sequence[FeatureHandle]], views: Mapping[str, ViewAxes], solve: DrawingSolve,
 ) -> List[DimensionCandidate]:
     """Every perpendicular dimension a view can draw between two of the anchors it can see.
 
@@ -316,7 +310,6 @@ def sheet_candidates(
     them (visibility.visible_by_view), so nothing is measured in a view that hides it.
     """
     candidates = []
-    spans: SpanCache = {}
     for view, axes in views.items():
         look = as_ndarray(axes.look)
         look /= np.linalg.norm(look)
@@ -328,5 +321,5 @@ def sheet_candidates(
                 if length is None or length < 1e-9:
                     continue
                 candidates.append(DimensionCandidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes,
-                                                      carriers, cut_timbers, spans))
+                                                      solve))
     return candidates
