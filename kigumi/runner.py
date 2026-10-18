@@ -2576,26 +2576,20 @@ def _sight_blocker(
             (every member when it is None).
         direction: the view direction, from the camera, in *own*'s local space.
     """
-    from kumiki.drawings.visibility import sight_is_blocked
+    from kumiki.drawings.visibility import Occluder, hidden_at
+    from kumiki.rule import as_ndarray
 
-    toward = (-direction).v3()
     drawn = payload.get("drawnMembers")
-    others = [entry for key, entry in ss.mesh_cache.items()
-              if entry.get("cut_timber") is not None and entry.get("cut_timber") is not own
-              and entry.get("local_csg") is not None and (drawn is None or key in drawn)]
+    transform = own.timber.transform
+    occluders: List[Occluder] = [(own_root, transform)] + [
+        (cast('CutCSG', entry["local_csg"]), entry["cut_timber"].timber.transform)
+        for key, entry in ss.mesh_cache.items()
+        if entry.get("cut_timber") is not None and entry.get("cut_timber") is not own
+        and entry.get("local_csg") is not None and (drawn is None or key in drawn)]
+    look = as_ndarray(transform.local_to_global_direction(direction.v3()))
 
     def blocked(place: 'Float3') -> bool:
-        at = place.v3()
-        if sight_is_blocked(own_root, at, toward):
-            return True
-        world = own.timber.transform.local_to_global(at)
-        world_toward = own.timber.transform.local_to_global_direction(toward)
-        for entry in others:
-            transform = entry["cut_timber"].timber.transform
-            if sight_is_blocked(cast('CutCSG', entry["local_csg"]), transform.global_to_local(world),
-                                transform.global_to_local_direction(world_toward)):
-                return True
-        return False
+        return hidden_at(as_ndarray(transform.local_to_global(place.v3())), look, occluders)
 
     return blocked
 

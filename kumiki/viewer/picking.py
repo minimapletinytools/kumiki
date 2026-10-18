@@ -616,16 +616,18 @@ def split_hidden(
         blocked: whether material hides a place from the camera; None checks no material.
 
     Returns:
-        (visible, hidden), each in the order given. A candidate is hidden when a nearer visible
-        one covers it on the sheet, or when *blocked* says so of its place. Non-real features (a
-        bore's axis) are never hidden.
+        (visible, hidden), each in the order given. The rules are visibility's, asked per place: a
+        candidate is hidden when a nearer visible one is drawn over it, or when *blocked* (made
+        from visibility.hidden_at) says so of its place; one never_hidden never is.
     """
+    from kumiki.drawings.visibility import never_hidden
+
     unit = Float3.of(direction).unit() or Float3.of(direction)
     visible: List[PointerCandidate] = []
     hidden: List[PointerCandidate] = []
     for candidate in candidates:
         hit = candidate.hit
-        if not hit.feature.real:
+        if never_hidden(hit.feature):
             visible.append(candidate)
             continue
         if (any(other.group < candidate.group and _covers(other, candidate, unit, tolerance) for other in visible)
@@ -636,33 +638,12 @@ def split_hidden(
     return visible, hidden
 
 
-def _drawn_as(hit: 'OwnedFeatureHit', direction: Float3):
-    """What a feature is on the sheet (sheet_shape), flattened along *direction*: ('line', point,
-    run) or ('point', point); None for anything else (a face seen at an angle, a curved surface)."""
-    from kumiki.drawings.sheet_shape import SheetPoint, sheet_shape
-
-    shape = sheet_shape(hit.feature.locate_simple_unbounded(hit.owner), direction)
-    if shape is None:
-        return None
-    point = Float3.of(shape.at).across(direction)
-    return ("point", point) if isinstance(shape, SheetPoint) else ("line", point, Float3.of(shape.run))
-
-
 def _covers(front: PointerCandidate, behind: PointerCandidate, direction: Float3, tolerance: float) -> bool:
-    """Whether *front* lands where *behind* does on the sheet, under the pointer."""
-    from kumiki.drawings.sheet_shape import SQUARE_TO_VIEW
+    """Whether *front* lands where *behind* does on the sheet, under the pointer (visibility.drawn_over)."""
+    from kumiki.drawings.visibility import drawn_over
 
-    near, far = _drawn_as(front.hit, direction), _drawn_as(behind.hit, direction)
-    if near is None or far is None:
-        return False
-    if near[0] == "line" and far[0] == "line":
-        return near[2].cross(far[2]).length() <= SQUARE_TO_VIEW
-    if far[0] == "point" and near[0] == "point":
-        return near[1].dist(far[1]) <= tolerance
-    if far[0] == "point" and near[0] == "line":
-        offset = far[1] - near[1]
-        return offset.across(near[2]).length() <= tolerance
-    return False  # a line behind a point is seen either side of it
+    return drawn_over(front.hit.feature.locate_simple_unbounded(front.hit.owner),
+                      behind.hit.feature.locate_simple_unbounded(behind.hit.owner), direction, tolerance)
 
 
 def measurable_in_view(
