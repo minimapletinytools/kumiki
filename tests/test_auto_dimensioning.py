@@ -85,16 +85,22 @@ class TestPolicy:
 class TestEachTimber:
     """A shop drawing per timber, solving every required feature from its reference faces and end."""
 
-    def test_everything_but_the_bore_radii_is_dimensioned(self, pattern):
-        # A bore's radius would need a diameter dimension, which no measurement kind takes yet.
+    def test_everything_but_the_bore_radii_and_blind_mortise_bottoms_is_dimensioned(self, pattern):
+        # A bore's radius would need a diameter dimension, which no measurement kind takes yet. A
+        # blind mortise's bottom is hidden in every view that draws it as a line, and a view measures
+        # only what it can see; an x-ray view will let it be dimensioned.
         from kumiki.csg.cutcsg import SimpleCylinderBarrelFeature
+        from kumiki.drawings.auto_dimensioning import UnsolvedFeaturesWarning
 
         frame = pattern["_load_cute_frame"]()()
         for cut in frame.cut_timbers:
-            result, _ = pattern["solve_timber"](cut)
+            with pytest.warns(UnsolvedFeaturesWarning):
+                result, _ = pattern["solve_timber"](cut)
             assert result.unsolved, cut.timber.ticket.path
-            assert all(isinstance(h.feature, SimpleCylinderBarrelFeature) for h in result.unsolved)
-            assert result.left_after == len(result.unsolved)
+            assert all(isinstance(h.feature, SimpleCylinderBarrelFeature) or h.feature.name == "mortise_bottom"
+                       for h in result.unsolved)
+            # Two mortise bottoms in one plane are one unknown between them.
+            assert 0 < result.left_after <= len(result.unsolved)
 
     def test_a_peg_axis_is_dimensioned_seen_end_on(self, pattern):
         frame = pattern["_load_cute_frame"]()()

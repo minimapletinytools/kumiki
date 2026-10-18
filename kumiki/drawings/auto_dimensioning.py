@@ -7,6 +7,7 @@ that are kept unless nothing would be left to pick.
 Temporary, and expected to be renamed.
 """
 
+import warnings
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -105,6 +106,10 @@ class Pick:
     broke_rules: bool = False
 
 
+class UnsolvedFeaturesWarning(UserWarning):
+    """auto_dimension left features unsolved: nothing its candidates measure fixes them."""
+
+
 @dataclass(frozen=True)
 class AutoDimensioning:
     picks: List[Pick]
@@ -201,8 +206,15 @@ def auto_dimension(
         picks.append(Pick(candidates[index], score, broke_rules=not passing))
 
     left_after = remaining([*known_rows, *(pick.candidate.row for pick in picks)], target_rows).count
-    return AutoDimensioning(picks=picks, unsolved=[handle for handle in targets if not solved(handle)],
-                            left_before=left_before, left_after=left_after)
+    unsolved_targets = [handle for handle in targets if not solved(handle)]
+    if unsolved_targets:
+        # Often a feature no view shows -- a blind mortise's bottom is hidden in every one -- or
+        # one no measurement kind takes, such as a bore's radius.
+        warnings.warn(
+            f"{len(unsolved_targets)} feature(s) left unsolved: "
+            + ", ".join(f"{handle.timber.ticket.path}:{handle.feature.name}" for handle in unsolved_targets),
+            UnsolvedFeaturesWarning, stacklevel=2)
+    return AutoDimensioning(picks=picks, unsolved=unsolved_targets, left_before=left_before, left_after=left_after)
 
 
 def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[Tuple]:
