@@ -1821,10 +1821,11 @@ class CutTimber:
     timber: PerfectTimberWithin
     cuts: List['Cutting']
     joints: List['Joint']
-    _extended_rough_csg_local: CutCSG  # with every perfect feature: see get_extended_rough_csg_with_perfect_features_local
-    _extended_perfect_csg_local: CutCSG
-    _rendered_csg_local: CutCSG
-    _rendered_perfect_csg_local: CutCSG
+    # With every perfect feature: see get_extended_rough_csg_with_perfect_features_local.
+    _extended_rough_csg_local_precomputed: CutCSG
+    _extended_perfect_csg_local_precomputed: CutCSG
+    _rendered_csg_local_precomputed: CutCSG
+    _rendered_perfect_csg_local_precomputed: CutCSG
 
     def __init__(
         self,
@@ -1850,19 +1851,19 @@ class CutTimber:
 
         # Built once here, so every caller gets the same node objects.
         extend_bot, extend_top = _ends_extended_by_cuts(timber, self.cuts)
-        self._extended_rough_csg_local = timber.get_extended_rough_csg_with_perfect_features_local(
+        self._extended_rough_csg_local_precomputed = timber.get_extended_rough_csg_with_perfect_features_local(
             extend_bot=extend_bot, extend_top=extend_top)
-        self._extended_perfect_csg_local = timber.get_extended_perfect_csg_local(
+        self._extended_perfect_csg_local_precomputed = timber.get_extended_perfect_csg_local(
             extend_bot=extend_bot, extend_top=extend_top)
 
         # A cut that removes nothing contributes no node.
         negative_csgs = [csg for csg in (cut.get_negative_csg_local() for cut in self.cuts) if csg is not None]
-        self._rendered_csg_local = (
-            Difference(self._extended_rough_csg_local, negative_csgs) if negative_csgs
-            else self._extended_rough_csg_local)
-        self._rendered_perfect_csg_local = (
-            Difference(self._extended_perfect_csg_local, negative_csgs) if negative_csgs
-            else self._extended_perfect_csg_local)
+        self._rendered_csg_local_precomputed = (
+            Difference(self._extended_rough_csg_local_precomputed, negative_csgs) if negative_csgs
+            else self._extended_rough_csg_local_precomputed)
+        self._rendered_perfect_csg_local_precomputed = (
+            Difference(self._extended_perfect_csg_local_precomputed, negative_csgs) if negative_csgs
+            else self._extended_perfect_csg_local_precomputed)
 
     def resolve_joint_path(self, path: 'JointPath') -> List['ResolvedJointPath']:
         """Which of this timber's joints a name refers to.
@@ -1935,19 +1936,19 @@ class CutTimber:
     def get_extended_rough_csg_with_perfect_features_local(self) -> CutCSG:
         """The rough timber, carrying every perfect feature, with each end that has an end cut extended
         to infinity: what is drawn and solved, before the cuts. Built once, at construction."""
-        return self._extended_rough_csg_local
+        return self._extended_rough_csg_local_precomputed
 
     def get_extended_perfect_csg_local(self) -> CutCSG:
         """The perfect timber within, with each end that has an end cut extended to infinity. Built once, at construction."""
-        return self._extended_perfect_csg_local
+        return self._extended_perfect_csg_local_precomputed
 
     def render_timber_with_cuts_csg_local(self) -> CutCSG:
         """The rough timber with every cut subtracted. Built once, at construction."""
-        return self._rendered_csg_local
+        return self._rendered_csg_local_precomputed
 
     def render_perfect_timber_within_with_cuts_csg_local(self) -> CutCSG:
         """The perfect timber within with every cut subtracted. Built once, at construction."""
-        return self._rendered_perfect_csg_local
+        return self._rendered_perfect_csg_local_precomputed
 
     
     def _bounding_box_prism_for_cross_section(

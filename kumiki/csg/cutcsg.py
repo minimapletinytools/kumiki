@@ -2937,13 +2937,14 @@ class RectangularPrism(HasFeatures, CutCSG):
     start_distance: Optional[Numeric] = None  # starting distance of the prism in the direction of the +Z axis. None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # ending distance of the prism in the direction of the +Z axis. None means infinite in positive direction
     # (width_dir, height_dir, length_dir), unit vectors in global coordinates: every point test asks.
-    _axes: Tuple[Direction3D, Direction3D, Direction3D] = field(init=False, repr=False, compare=False)
+    _axes_precomputed: Tuple[Direction3D, Direction3D, Direction3D] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self):
         super().__post_init__()
         m = self.transform.orientation.matrix
-        object.__setattr__(self, "_axes", (Matrix([m[0, 0], m[1, 0], m[2, 0]]), Matrix([m[0, 1], m[1, 1], m[2, 1]]),
-                                           Matrix([m[0, 2], m[1, 2], m[2, 2]])))
+        axes = (Matrix([m[0, 0], m[1, 0], m[2, 0]]), Matrix([m[0, 1], m[1, 1], m[2, 1]]),
+                Matrix([m[0, 2], m[1, 2], m[2, 2]]))
+        object.__setattr__(self, "_axes_precomputed", axes)
 
     # Features this primitive names on its own boundary. Private: read it
     def get_bottom_position(self) -> V3:
@@ -3028,7 +3029,7 @@ class RectangularPrism(HasFeatures, CutCSG):
     
     def _local_axes(self) -> Tuple[Direction3D, Direction3D, Direction3D]:
         """Return (width_dir, height_dir, length_dir) unit vectors in global coordinates."""
-        return self._axes
+        return self._axes_precomputed
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
         """Project a global point onto this prism's local (width, height, length) axes."""
