@@ -327,6 +327,17 @@ describe('choosePickAction', () => {
             .toEqual({ action: 'clear' });
     });
 
+    test('in a drawing, a pointer on no surface still picks along its ray: the runner decides', () => {
+        // A corner on a silhouette is under the pointer with no member's surface there.
+        expect(choosePickAction({ hits: [], selectedTimbers: [], inDrawing: true, alongRay: true }))
+            .toEqual({ action: 'csg', memberKey: null, hit: null });
+        // Without a ray to look along, or outside a drawing, empty space is still empty.
+        expect(choosePickAction({ hits: [], selectedTimbers: [], inDrawing: true, alongRay: false }))
+            .toEqual({ action: 'clear' });
+        expect(choosePickAction({ hits: [], selectedTimbers: [], inDrawing: false, alongRay: true }))
+            .toEqual({ action: 'clear' });
+    });
+
     test('clicking an unselected timber selects it', () => {
         const decision = choosePickAction({ hits: [hit('B')], selectedTimbers: ['A'] });
         expect(decision.action).toBe('select');

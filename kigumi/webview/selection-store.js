@@ -457,10 +457,16 @@
      * picks its feature.
      */
     function choosePickAction({
-        hits, selectedTimbers, shiftKey, inDrawing, measuring, timberModeInDrawings,
+        hits, selectedTimbers, shiftKey, inDrawing, measuring, timberModeInDrawings, alongRay,
     }) {
         const along = hits || [];
         if (along.length === 0) {
+            // A drawing's view draws every member flat, so a feature can be under the pointer
+            // with no member's surface there -- a corner on a silhouette. With the ray to look
+            // along, the runner asks every member drawn there (memberKey null: it decides).
+            if (alongRay && inDrawing && pickMode({ inDrawing, measuring, shiftKey, timberModeInDrawings }) === 'feature') {
+                return { action: 'csg', memberKey: null, hit: null };
+            }
             return { action: 'clear' };
         }
         const selected = selectedTimbers instanceof Set
