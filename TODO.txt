@@ -138,6 +138,8 @@ IGNORE-measurement anchors in 2d view should be in a shared project plane, right
 DONE-spilt out feature solving into a csg/feature_solving if possible. drawings is only manages actualy drawing stuff. ideally measurements lives in drawing and fetaure_solving has a simplified measurement class that only has the acutal info it needs.
 DONE-when dragging measurements the anchros should drag too until they can't anymore at least
 DONE-definitely highlight the features being measured...
+DONE-do a full end to end review and find opportunities to refactor..
+DONE-The remaining inconsistency: this only holds when there's a root_csg. The solver's call (feature_solving.py:60) passes no root. For planes, that path still uses the old approximate crop (approximately_crop_plane_to_area_on_csg), which can't subtract cuts. That's why the generator's picks didn't change in #112. Moving the solver onto FeatureExtent too would let the approximate crop go. That's the leftover part of review item 1, together with the Solve object (item 5).
 
 -DECISION TIME STANDALONE APP
   -decide how to do file browser, maybe combine with kigumi explorer probably
@@ -149,13 +151,16 @@ DONE-definitely highlight the features being measured...
   -cilkcing on patterns borken in electron ivew..
 
 
+-solver should know that any coinicident feature in the ortognal plane to the viewer plane is solved for free
+
+
 -angle mesaurement anchor positon derivatino needs to be improved
   -extend featuers with dotted line out to angle anchors need sto be different in 3d view (you need the entire plane I think)
     
 -midplanes (and probably perfect-reference fetaures) not selectable in 3d view of drawing.
 -space out dotted lines more
 -the active view you are measuring in should be highlighted somehow
--solver should know that any coinicident feature in the ortognal plane to the viewer plane is solved for free
+
 
 -review the featureflow.md docs and stuff and rewrite them
 
@@ -175,9 +180,7 @@ DONE-definitely highlight the features being measured...
 
 -when dragging python measurements, theres' a flicker as it tries to reload from python, can you reomve that?
 
--do a full end to end review and find opportunities to refactor..
 
--The remaining inconsistency: this only holds when there's a root_csg. The solver's call (feature_solving.py:60) passes no root. For planes, that path still uses the old approximate crop (approximately_crop_plane_to_area_on_csg), which can't subtract cuts. That's why the generator's picks didn't change in #112. Moving the solver onto FeatureExtent too would let the approximate crop go. That's the leftover part of review item 1, together with the Solve object (item 5).
 
 
 
