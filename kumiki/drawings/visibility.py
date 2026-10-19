@@ -21,7 +21,7 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from ..csg.cropcsg import crop_line_to_boundary_segments_on_csg, crop_line_to_interior_segments_on_csg
+from ..csg.cropcsg import crop_line_to_crease_segments_on_csg, crop_line_to_interior_segments_on_csg
 from ..csg.cutcsg import CSGFeature, CutCSG
 from ..csg.feature_paths import FeatureHandle
 from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, SightFrame, area, material_crossing,
@@ -164,7 +164,7 @@ def nearest_visible_depth(
             visible = subtract(region, _overlapping(blocked, corners))
             depths = [y for polygon in visible for _x, y in polygon]
         else:
-            pieces = crop_line_to_boundary_segments_on_csg(located, root, seed_reach=reach, near=located.point)
+            pieces = crop_line_to_crease_segments_on_csg(located, root, seed_reach=reach, near=located.point)
             if pieces is None:
                 return float(point @ look)
             to_2d = lambda end: tuple(float((as_ndarray(transform.local_to_global(end)) - origin) @ axis)
@@ -213,7 +213,7 @@ def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reac
 def _end_on_depth(line: Line, root: CutCSG, transform: Transform, look: np.ndarray,
                   occluders: Sequence[Occluder], reach: float) -> Optional[float]:
     """A line seen end-on draws as a point: seen if the sight line from its nearest end is clear."""
-    pieces = crop_line_to_boundary_segments_on_csg(line, root, seed_reach=reach, near=line.point)
+    pieces = crop_line_to_crease_segments_on_csg(line, root, seed_reach=reach, near=line.point)
     if not pieces:
         return None if pieces is not None else float(as_ndarray(transform.local_to_global(line.point)) @ look)
     ends = [as_ndarray(transform.local_to_global(end)) for piece in pieces for end in (piece.start, piece.end)]

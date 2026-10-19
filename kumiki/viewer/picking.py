@@ -336,8 +336,7 @@ def cropped_edge_segments(
     length of the arris.
     """
     from kumiki.csg.feature_extent import declared_line_span, intersected_intervals
-    from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
-                                crop_line_to_segments_on_csg)
+    from kumiki.csg.cropcsg import crop_line_to_crease_segments_on_csg, crop_line_to_segments_on_csg
     from kumiki.geometry import Line, unit_vector
 
     # Normalised first, because everything below measures along it in metres:
@@ -369,7 +368,8 @@ def cropped_edge_segments(
     declared = declared_line_span(edge_feature, owner, line) if owner is not None else None
 
     def clipped(tolerance: float) -> Optional[List[Interval]]:
-        found = spans(crop_line_to_boundary_segments_on_csg(
+        # Where the surface creases along it: on the surface, and not a line through a flat face.
+        found = spans(crop_line_to_crease_segments_on_csg(
             line, root_csg, seed_reach=reach, near=near, tolerance=tolerance))
         if found is None:
             return None
@@ -513,10 +513,34 @@ def features_at_point(
     from kumiki.csg.cutcsg import FeatureTestTolerances
 
     resolved = tolerances or FeatureTestTolerances(face=eps)
-    hits = root.find_all_features(to_v3(local_pt), resolved)
+    hits = _only_creases(root, root.find_all_features(to_v3(local_pt), resolved), local_pt)
     if local_ray is None:
         return hits
     return merge_ray_hits(root, hits, local_ray, resolved)
+
+
+def _only_creases(root: 'CutCSG', hits: List['OwnedFeatureHit'], point: Any) -> List['OwnedFeatureHit']:
+    """`hits` without a real edge whose line, where the pointer is, only runs through a flat face:
+    a line on the surface that is no edge of it (cropcsg.is_crease_at) -- a relief's copy of another
+    timber's arris, flush in this one's face."""
+    from kumiki.csg.cutcsg import CSGFeatureType
+    from kumiki.csg.cropcsg import is_crease_at
+    from kumiki.geometry import Line, unit_vector
+
+    at = Float3.of(point)
+
+    def keep(hit: 'OwnedFeatureHit') -> bool:
+        if not hit.feature.real or hit.feature.feature_type() is not CSGFeatureType.EDGE:
+            return True
+        line = hit.feature.locate_simple_unbounded(hit.owner)
+        if not isinstance(line, Line):
+            return True
+        run = Float3.of(unit_vector(line.direction))
+        start = Float3.of(line.point)
+        foot = start + run * (at - start).dot(run)
+        return is_crease_at(line, root, foot.v3())
+
+    return [hit for hit in hits if keep(hit)]
 
 
 class PointerCandidate(NamedTuple):
@@ -540,7 +564,7 @@ def candidates_under_pointer(
     silhouette is found from the side its own surface is on; a point on a surface flush with
     another member's is found from either, each member being asked at the one surface point."""
     local_pt = Float3.of(local_pt) if local_pt is not None else None
-    hits = root.find_all_features(local_pt.v3(), tolerances) if local_pt is not None else []
+    hits = _only_creases(root, root.find_all_features(local_pt.v3(), tolerances), local_pt) if local_pt is not None else []
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
     if direction is None:
         return [PointerCandidate(hit, local_pt, 0.0, 0.0) for hit in hits]
