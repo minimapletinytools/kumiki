@@ -100,6 +100,7 @@ def test_two_derived_features_named_alike_on_one_node_are_kept_apart():
             "kind": "point", "timber": "Back Cross#0", "type": "POINT",
             "a": {"csgPath": [tenon, "scribe_relief_cut", "tenon_cut", "tenon_waste", "shoulder"], "feature": "shoulder"},
             "b": {"csgPath": ["timber (rough, extended)"], "feature": "rough.front_right"}})
+        assert path is not None
         handle = resolve_feature_path(path, frame)
         assert handle is not None
         root = frame.cut_timber_of(handle.timber).render_timber_with_cuts_csg_local()
