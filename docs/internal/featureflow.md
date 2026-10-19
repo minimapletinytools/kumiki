@@ -51,8 +51,8 @@ visibility all ask it.
 ## 4. Picking
 
 The runner decodes a pointer request and runs `picking.py`'s three steps: `navigate` (the tree
-walk, Ctrl-drilling in 3D), `find_candidates` (in a drawing, everything along the ray, hidden ones
-last), `choose` (the caller's index, the measuring preference, the first in a drawing, then
+walk, Ctrl-drilling in 3D), `find_candidates` (in a drawing, every member's features at the
+ray's surface hit, hidden ones last), `choose` (the caller's index, the measuring preference, the first in a drawing, then
 fallbacks) -> a `Pick`. The reply -- highlight mesh, edge segments, the feature's reference,
 geometry and anchor, and a measuring verdict -- is built from the Pick. Details in `picking.md`.
 

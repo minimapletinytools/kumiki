@@ -496,7 +496,7 @@ def non_real_highlight_segments(
 
 def features_at_point(
     root: 'CutCSG', local_pt: Float3, eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
-    local_ray: Optional[LocalRay] = None, whole_ray: bool = False,
+    local_ray: Optional[LocalRay] = None,
 ) -> List['OwnedFeatureHit']:
     """Every feature the WHOLE tree sees at the click, best first.
 
@@ -509,16 +509,10 @@ def features_at_point(
     non_real_features_along_ray. The point alone cannot find them: it is where
     the ray struck a surface, and the middle of a bore is a bore's radius away
     from every surface the bore has.
-
-    With `whole_ray`, for a drawing's view, everything on the boundary under the
-    pointer at any depth too (real_features_along_ray), nearest first: see
-    order_along_ray.
     """
     from kumiki.csg.cutcsg import FeatureTestTolerances
 
     resolved = tolerances or FeatureTestTolerances(face=eps)
-    if local_ray is not None and whole_ray:
-        return [candidate.hit for candidate in candidates_under_pointer(root, local_pt, resolved, local_ray)]
     hits = root.find_all_features(to_v3(local_pt), resolved)
     if local_ray is None:
         return hits
@@ -537,9 +531,14 @@ class PointerCandidate(NamedTuple):
 def candidates_under_pointer(
     root: 'CutCSG', local_pt: Optional[Float3], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
 ) -> List[PointerCandidate]:
-    """Everything under the pointer at any depth, for a drawing's view: only what the view can
-    measure (measurable_in_view), nearest first (order_along_ray). `local_pt` is where the ray met
-    this solid's surface, or None where it did not: what is near the ray is found either way."""
+    """What is under the pointer, for a drawing's view: the features at the surface the ray meets
+    (`local_pt`, None where it meets none of this solid), and those on no surface the ray passes near
+    (a bore's axis) -- only what the view can measure (measurable_in_view), nearest first
+    (order_along_ray).
+
+    Nothing deeper than the surface: what is behind it is hidden, and is not offered. An edge on a
+    silhouette is found from the side its own surface is on; a point on a surface flush with
+    another member's is found from either, each member being asked at the one surface point."""
     local_pt = Float3.of(local_pt) if local_pt is not None else None
     hits = root.find_all_features(local_pt.v3(), tolerances) if local_pt is not None else []
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
@@ -556,9 +555,6 @@ def candidates_under_pointer(
 
     if local_pt is not None:
         found_at(hits, local_pt)
-    for at_place, place in real_features_along_ray(root, local_ray, tolerances):
-        found_at(at_place, place)
-        hits = _merge_hits(hits, at_place)
     hits = merge_ray_hits(root, hits, local_ray, tolerances)
     for hit in hits:
         if _hit_key(hit) not in found:
@@ -726,20 +722,15 @@ def _depth_groups(
     return starts
 
 
-def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
-    """*hits* and *more*, each feature once (see _hit_key), in the library's order."""
-    from kumiki.csg.cutcsg import _sort_feature_hits
-
-    seen = {_hit_key(hit) for hit in hits}
-    extra = []
-    for hit in more:
-        key = _hit_key(hit)
-        if key not in seen:
-            seen.add(key)
-            extra.append(hit)
-    return _sort_feature_hits(hits + extra) if extra else hits
-
-
+# NOT USED. Kept for reference. A drawing's pick swept the whole ray with this, to offer
+# everything drawn under the pointer at any depth: the back edge of a flank behind the front one,
+# features on members the ray never hit. Hidden features can no longer be picked, and every member
+# near the ray is now asked at the ray's one surface hit (candidates_under_pointer), so the surface
+# finds what can be picked. It cost ~40ms per member, against ~6ms for the surface lookup.
+# To make it cheap again: test each plane crossing against the face's own primitive (or the
+# member's box) before the whole-tree is_point_on_boundary and find_all_features -- most crossings
+# land far from their face -- and keep the last answer per member and ray for the click that
+# follows a hover.
 def real_features_along_ray(
     root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
 ) -> List[Tuple[List['OwnedFeatureHit'], Float3]]:
@@ -809,6 +800,20 @@ def _ray_meets_plane(origin: Float3, direction: Float3, plane: Any) -> Optional[
         return None
     along = (at - origin).dot(normal) / facing
     return None if along < 0 else origin + direction * along
+
+
+def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
+    """*hits* and *more*, each feature once (see _hit_key), in the library's order."""
+    from kumiki.csg.cutcsg import _sort_feature_hits
+
+    seen = {_hit_key(hit) for hit in hits}
+    extra = []
+    for hit in more:
+        key = _hit_key(hit)
+        if key not in seen:
+            seen.add(key)
+            extra.append(hit)
+    return _sort_feature_hits(hits + extra) if extra else hits
 
 
 def merge_ray_hits(

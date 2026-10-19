@@ -65,23 +65,17 @@ single-point lookup, `features_at_point`.
 Returns `Candidate(hit, place, depth, group)`: each feature, where along the ray it is, how deep
 that is, and its depth group.
 
-1. **At the hit point:** `root.find_all_features(local_pt)`, the features where the ray first hit
-   a surface.
-2. **Along the rest of the ray:** `real_features_along_ray`. For each declared real feature in
-   the tree it finds a place on the ray:
-   - a face: `_ray_meets_plane`, where the ray crosses its plane;
-   - an edge: `ray_nears_segment`, the point of the segment nearest the ray, if within the edge
-     tolerance;
-   - a corner: the corner itself, if within the edge tolerance of the ray.
-
-   It keeps only places on the solid's surface (`is_point_on_boundary`) and takes
-   `find_all_features` there, which brings in derived edges and points. A feature's depth is the
-   smallest at which it was found.
+1. **At the surface:** `root.find_all_features(local_pt)`, the features where the ray first hit a
+   surface. In a drawing every drawn member near the ray is asked at that one point, so a corner
+   flush with it on another member is found too. Nothing deeper is offered: it is behind the
+   surface. An edge on a silhouette is found from the side its own surface is on.
+2. *(No longer done: the whole ray was swept for features at any depth. See the note on
+   `real_features_along_ray`.)*
 3. **Features in voids:** `merge_ray_hits` adds non-real ones, like a bore's axis, at their
    nearest approach to the ray.
 4. **Exact places for edges and corners:** `_nearest_on`. A corner is placed at itself; an edge at
-   the point of its line nearest the pointer's ray. Step 2 may have found an edge where the ray
-   crossed a face, up to a pixel off it, and testing visibility from there gets it wrong.
+   the point of its line nearest the pointer's ray. The surface point can be a pixel off it, and
+   testing visibility from there gets it wrong.
 5. **Drop what the view can't measure:** `measurable_in_view`. Edges, points and curved faces
    stay. A flat face goes if:
    - it is seen at an angle (|normal · view| > `EDGE_ON`), so it is an area; or
