@@ -82,11 +82,11 @@ def picked():
     return pick
 
 
-@pytest.mark.parametrize("offset", [-0.0004, 0.0004])
-def test_both_edges_of_a_flank_seen_edge_on_are_candidates_whichever_side_the_click_lands(picked, offset):
-    labels = picked(offset, "projected")
-
-    assert FRONT in labels and BACK in labels
+def test_an_edge_on_a_silhouette_is_picked_from_its_own_side(picked):
+    # The pointer on the beam's face beside the flank's front edge: found at that surface. From the
+    # socket side the ray lands on the flank behind it, and the front edge is not there to find.
+    assert FRONT in picked(-0.0004, "projected")
+    assert FRONT not in picked(0.0004, "projected")
 
 
 def test_the_3d_view_still_picks_the_surface_the_pointer_is_on(picked):
@@ -94,14 +94,13 @@ def test_the_3d_view_still_picks_the_surface_the_pointer_is_on(picked):
     assert FRONT not in picked(0.0004, "3d")
 
 
-@pytest.mark.parametrize("offset", [-0.0004, 0.0004])
-def test_nearest_the_viewer_comes_first(picked, offset):
-    # The front edge leads, ahead of the face it lies on (no depth between them), and the back
-    # edge comes after both, however the declared-before-derived order would have had it.
-    labels = picked(offset, "projected")
+def test_nothing_behind_the_surface_is_offered(picked):
+    # The flank's back edge is stacked behind the front one along the view: seen from the beam's
+    # face, the surface is in front of it, and it is not a candidate at all.
+    labels = picked(-0.0004, "projected")
 
     assert labels[0] == FRONT
-    assert labels.index(FRONT) < labels.index(BACK)
+    assert BACK not in labels
 
 
 def test_whichever_candidate_is_chosen_is_the_one_answered(picked):
@@ -153,16 +152,13 @@ def test_a_cylinder_cap_seen_edge_on_is_kept_and_a_face_beside_its_edge_is_not()
     assert front not in kept  # an area from here
 
 
-@pytest.mark.parametrize("offset", [-0.0004, 0.0004])
-def test_what_is_not_seen_under_the_pointer_is_offered_but_not_taken(picked, offset):
-    # The back edge is stacked exactly behind the front one along the view; the far dovetail's
-    # edges are behind the beam itself. Both are listed, last and marked, and none is chosen.
-    result = picked(offset, "projected", drawnMembers=["m#0"])
+def test_what_material_hides_at_the_surface_is_offered_but_not_taken(picked):
+    # From the socket the ray lands on the flank's back, where the back edge is -- with the beam in
+    # front of it. Listed, last and marked, and not chosen.
+    result = picked(0.0004, "projected", drawnMembers=["m#0"])
     hidden = {candidate["label"]: candidate["hidden"] for candidate in result["candidates"]}
 
-    assert result["featureLabel"] == FRONT and not hidden[FRONT]
-    assert hidden[BACK]
-    assert hidden["rptw.left×dovetail_left_flank"]
+    assert hidden[BACK] and result["featureLabel"] != BACK
     assert result["candidateCount"] == sum(1 for is_hidden in hidden.values() if not is_hidden)
     assert [candidate["hidden"] for candidate in result["candidates"]] == sorted(hidden.values())
 
@@ -183,7 +179,8 @@ def test_a_line_of_sight_along_a_surface_is_not_blocked_by_it():
 
 
 def test_where_everything_under_the_pointer_is_hidden_nothing_is_taken(picked):
-    # The beam's side, face-on, just over the dovetail socket: only the socket's edges behind it.
+    # The beam's side, face-on, just over the dovetail socket: the socket's edges are behind it,
+    # and nothing at the surface is measurable from here.
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         result = picked.ask({
@@ -192,7 +189,7 @@ def test_where_everything_under_the_pointer_is_hidden_nothing_is_taken(picked):
             "tolerances": {"face": 0.0005, "edge": 0.002, "point": 0.004},
         })
 
-    assert result["candidates"] and all(candidate["hidden"] for candidate in result["candidates"])
+    assert all(candidate["hidden"] for candidate in result["candidates"])
     assert result["candidateCount"] == 0
     assert result["featureLabel"] is None and result["candidateIndex"] is None and result["path"] == []
 

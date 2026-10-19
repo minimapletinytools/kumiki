@@ -4735,7 +4735,8 @@ def _drawing_candidates(
     """What is under the pointer in a drawing, on every member it draws (picking.drawing_candidates).
 
     The drawn members are the request's `drawnMembers` (every timber when it is None). One whose box
-    the ray does not come near is skipped. The member the viewer's ray met carries where it met it.
+    the ray does not come near is skipped. Each is asked at the one surface the viewer's ray met,
+    whichever member that is on: a corner flush with it is found there, from either member's side.
     """
     from kumiki.viewer.picking import (DrawnMember, build_inv_transform_float, drawing_candidates,
                                        inv_transform_direction, inv_transform_point)
@@ -4757,7 +4758,7 @@ def _drawing_candidates(
             continue
         rotation, position = build_inv_transform_float(cut_timber.timber.transform)
         surface = (inv_transform_point(rotation, position, point)
-                   if key == hit_member and isinstance(point, list) and len(point) == 3 else None)
+                   if isinstance(hit_member, str) and isinstance(point, list) and len(point) == 3 else None)
         members.append(DrawnMember(key, root, cut_timber.timber, surface))
 
     def blocked_for(key: str) -> Callable[['Float3'], bool]:
