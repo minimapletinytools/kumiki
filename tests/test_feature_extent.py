@@ -75,3 +75,36 @@ def test_each_is_worked_out_once_per_tree(notched):
     body = _body(root)
     assert extents_of(root, timber) is extents
     assert extents.of(_named(body, "rptw.left"), body) is extents.of(_named(body, "rptw.left"), body)
+
+
+def test_two_derived_features_named_alike_on_one_node_are_kept_apart():
+    # A cross piece tenoned at both ends has a shoulder corner at each end, both called
+    # shoulder×rough.front_right and both derived on the cut timber's root. Kept by owner and name,
+    # the second was handed the first one's extent, and a measurement between them lit one end twice.
+    import contextlib
+    import io
+    import runpy
+    from pathlib import Path
+
+    from kumiki.csg.feature_paths import deserialize_feature_path, resolve_feature_path
+    from kumiki.drawings.kigumi_measuring_helpers import feature_anchor
+
+    # The rough cute frame the drawing pattern builds.
+    source = Path(__file__).resolve().parent.parent / "patterns" / "structures" / "my_cute_frame_drawing_test.py"
+    with contextlib.redirect_stdout(io.StringIO()):
+        frame = runpy.run_path(str(source))["_load_cute_frame"]()()
+
+    anchors = []
+    for tenon in ("mortise_and_tenon#1", "mortise_and_tenon"):
+        path = deserialize_feature_path({
+            "kind": "point", "timber": "Back Cross#0", "type": "POINT",
+            "a": {"csgPath": [tenon, "scribe_relief_cut", "tenon_cut", "tenon_waste", "shoulder"], "feature": "shoulder"},
+            "b": {"csgPath": ["timber (rough, extended)"], "feature": "rough.front_right"}})
+        handle = resolve_feature_path(path, frame)
+        assert handle is not None
+        root = frame.cut_timber_of(handle.timber).render_timber_with_cuts_csg_local()
+        anchors.append(feature_anchor(handle, root))
+
+    one, other = anchors
+    assert one is not None and other is not None
+    assert float(one[0]) == pytest.approx(-float(other[0])) and abs(float(one[0])) > 0.1

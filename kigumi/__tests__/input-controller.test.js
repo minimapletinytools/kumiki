@@ -133,6 +133,14 @@ describe('resolvePointers', () => {
             .toEqual(['under']);
     });
 
+    test('each says how many pixels high it is drawn: what its camera spans', () => {
+        // A pick's slack is pixels of THIS view: measured against the canvas, the small one's
+        // snaps would come out half the size.
+        const [top, beneath] = resolvePointers([under, over], 100, 100, CANVAS);
+        expect(top.pixelHeight).toBeCloseTo(300, 9);
+        expect(beneath.pixelHeight).toBeCloseTo(600, 9);
+    });
+
     test('each candidate carries coordinates relative to its own viewport', () => {
         const [top, beneath] = resolvePointers([under, over], 200, 150, CANVAS);
         // The same screen point is the centre of the small viewport and

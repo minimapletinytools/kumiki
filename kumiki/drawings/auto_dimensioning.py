@@ -17,7 +17,7 @@ from ..csg.assumptions import Assumption
 from ..csg.carriers import Row
 from ..csg.dof_solver import remaining
 from ..csg.feature_solving import Solve
-from ..csg.feature_paths import FeatureHandle
+from ..csg.feature_paths import FeatureHandle, hit_identity
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
 from ..rule import as_ndarray, create_v3, unit_ndarray
@@ -150,8 +150,8 @@ def _matrix(rows: Sequence[Row], columns: list) -> np.ndarray:
     return out
 
 
-def _key(handle: FeatureHandle) -> Tuple[int, str]:
-    return id(handle.owner), handle.feature.name
+def _key(handle: FeatureHandle) -> Tuple:
+    return hit_identity(handle.feature, handle.owner)
 
 
 def auto_dimension(

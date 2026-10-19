@@ -24,20 +24,22 @@
      * How much world distance one screen pixel covers at `point`.
      *
      * Both camera kinds come down to the height of the visible world divided by
-     * the height of the canvas. A perspective camera's visible height depends on
+     * how many pixels high it is drawn: `viewHeight`, the height of the viewport
+     * the camera draws into -- on a drawing's sheet a fraction of the canvas, and
+     * the canvas would make every snap that fraction too small. A perspective camera's visible height depends on
      * how far away the point is; an orthographic camera's does not, but does
      * depend on its zoom.
      *
      * Zero when it cannot be worked out, which callers read as "no scaled
      * tolerance" rather than as a tolerance of nothing.
      */
-    function worldUnitsPerPixel(camera, canvasHeight, point) {
-        if (!camera || !(canvasHeight > 0)) {
+    function worldUnitsPerPixel(camera, viewHeight, point) {
+        if (!camera || !(viewHeight > 0)) {
             return 0;
         }
         if (camera.isOrthographicCamera) {
             const zoom = camera.zoom || 1;
-            return ((camera.top - camera.bottom) / zoom) / canvasHeight;
+            return ((camera.top - camera.bottom) / zoom) / viewHeight;
         }
         if (camera.isPerspectiveCamera && Array.isArray(point)) {
             const dx = camera.position.x - point[0];
@@ -45,7 +47,7 @@
             const dz = camera.position.z - point[2];
             const away = Math.sqrt(dx * dx + dy * dy + dz * dz);
             const height = 2 * away * Math.tan((camera.fov * Math.PI / 180) / 2);
-            return height / canvasHeight;
+            return height / viewHeight;
         }
         return 0;
     }
@@ -56,8 +58,8 @@
      * Null when the view cannot say, so the runner keeps its own defaults
      * rather than being handed a number made up here.
      */
-    function pickTolerances(camera, canvasHeight, point) {
-        const perPixel = worldUnitsPerPixel(camera, canvasHeight, point);
+    function pickTolerances(camera, viewHeight, point) {
+        const perPixel = worldUnitsPerPixel(camera, viewHeight, point);
         if (!(perPixel > 0)) {
             return null;
         }
