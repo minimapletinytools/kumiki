@@ -535,16 +535,17 @@ class PointerCandidate(NamedTuple):
 
 
 def candidates_under_pointer(
-    root: 'CutCSG', local_pt: Float3, tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
+    root: 'CutCSG', local_pt: Optional[Float3], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
 ) -> List[PointerCandidate]:
     """Everything under the pointer at any depth, for a drawing's view: only what the view can
-    measure (measurable_in_view), nearest first (order_along_ray)."""
-    local_pt = Float3.of(local_pt)
-    hits = root.find_all_features(local_pt.v3(), tolerances)
+    measure (measurable_in_view), nearest first (order_along_ray). `local_pt` is where the ray met
+    this solid's surface, or None where it did not: what is near the ray is found either way."""
+    local_pt = Float3.of(local_pt) if local_pt is not None else None
+    hits = root.find_all_features(local_pt.v3(), tolerances) if local_pt is not None else []
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
     if direction is None:
         return [PointerCandidate(hit, local_pt, 0.0, 0.0) for hit in hits]
-    found: Dict[Tuple[str, int], Tuple[float, Float3]] = {}
+    found: Dict[Tuple, Tuple[float, Float3]] = {}
 
     def found_at(at_place: List['OwnedFeatureHit'], place: Float3) -> None:
         along = _along_ray(origin, direction, place)
@@ -553,7 +554,8 @@ def candidates_under_pointer(
             if key not in found or along < found[key][0]:
                 found[key] = (along, place)
 
-    found_at(hits, local_pt)
+    if local_pt is not None:
+        found_at(hits, local_pt)
     for at_place, place in real_features_along_ray(root, local_ray, tolerances):
         found_at(at_place, place)
         hits = _merge_hits(hits, at_place)
@@ -1365,13 +1367,19 @@ def best_matching_candidate(hits: List['OwnedFeatureHit'], timber: 'PerfectTimbe
     None when nothing is held, there is no camera, or no candidate admits anything.
     """
     from kumiki.csg.feature_paths import FeatureHandle
+
+    return best_matching_handle([FeatureHandle(timber=timber, hit=hit) for hit in hits], held, look, space)
+
+
+def best_matching_handle(handles: List[Any], held: Any, look: Any, space: Any) -> Optional[int]:
+    """best_matching_candidate, over features that may be on different timbers (FeatureHandles)."""
     from kumiki.drawings.kigumi_measuring_helpers import kinds_for_pair, world_geometry
 
-    if held is None or not look or not hits:
+    if held is None or not look or not handles:
         return None
     best = None
-    for index, hit in enumerate(hits):
-        geometry = world_geometry(FeatureHandle(timber=timber, hit=hit))
+    for index, handle in enumerate(handles):
+        geometry = world_geometry(handle)
         if not geometry or not kinds_for_pair(held, geometry, look, space):
             continue
         rank = (0 if type(geometry) is type(held) else 1, index)
@@ -1544,3 +1552,82 @@ def perfect_reference_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG', ce
         outlines.append(PlaneOutline([float(v) for v in timber.transform.local_to_global_direction(plane.normal)],
                                      positions))
     return outlines
+
+
+# --- a drawing's pick: every member drawn under the pointer -------------------------------------
+
+class DrawnMember(NamedTuple):
+    """A member a drawing's pick may land on: its key, its cut timber's tree (local space), where it
+    is, and where the pointer's ray met its surface (local), if it did."""
+    key: str
+    root: 'CutCSG'
+    timber: 'PerfectTimberWithin'
+    surface_point: Optional[Float3]
+
+
+class MemberCandidate(NamedTuple):
+    """A feature under the pointer, and the member it is on. `candidate` is in that member's space."""
+    member: str
+    timber: 'PerfectTimberWithin'
+    candidate: PointerCandidate
+
+
+def drawing_candidates(
+    members: List[DrawnMember], world_ray: LocalRay, tolerances: 'FeatureTestTolerances',
+    blocked_for: Callable[[str], Optional[Callable[[Float3], bool]]],
+) -> Tuple[List[MemberCandidate], int]:
+    """Everything under the pointer in a drawing's view, on every member drawn there: (candidates,
+    how many are visible). Visible first, then hidden, each nearest first.
+
+    A sheet draws every member flat, so what the pointer is near need not be on the member its ray
+    meets first -- where two members meet, the corner aimed at is often the other one's, and off a
+    silhouette the ray meets none at all. Each member is searched along the ray in its own space;
+    depth along the ray is the same in every space, so they are ordered as one (order_along_ray),
+    and what is hidden is decided across them (visibility: drawn_over, and `blocked_for` a member's
+    places).
+    """
+    from kumiki.csg.cutcsg import feature_hit_sort_key
+    from kumiki.csg.feature_paths import FeatureHandle
+    from kumiki.drawings.kigumi_measuring_helpers import world_geometry
+    from kumiki.drawings.visibility import drawn_over, never_hidden
+
+    origin, direction = Float3.of(world_ray[0]), Float3.of(world_ray[1]).unit()
+    if direction is None:
+        return [], 0
+    found: List[MemberCandidate] = []
+    for member in members:
+        rotation, position = build_inv_transform_float(member.timber.transform)
+        local_ray = (inv_transform_point(rotation, position, origin), inv_transform_direction(rotation, direction))
+        for candidate in candidates_under_pointer(member.root, member.surface_point, tolerances, local_ray):
+            found.append(MemberCandidate(member.key, member.timber, candidate))
+
+    # One depth order over every member: grouped as order_along_ray groups, then the library's order.
+    separation = float(tolerances.edge)
+    start: Optional[float] = None
+    by_depth = sorted(range(len(found)), key=lambda index: found[index].candidate.depth)
+    group_of = {}
+    for index in by_depth:
+        depth = found[index].candidate.depth
+        if start is None or depth - start > separation:
+            start = depth
+        group_of[index] = start
+    ordered = sorted(range(len(found)), key=lambda index: (group_of[index], feature_hit_sort_key(found[index].candidate.hit)))
+    found = [found[index]._replace(candidate=found[index].candidate._replace(group=group_of[index])) for index in ordered]
+
+    look = direction
+    world = lambda one: world_geometry(FeatureHandle(timber=one.timber, hit=one.candidate.hit))
+    visible: List[MemberCandidate] = []
+    hidden: List[MemberCandidate] = []
+    for one in found:
+        hit, candidate = one.candidate.hit, one.candidate
+        if never_hidden(hit.feature):
+            visible.append(one)
+            continue
+        blocked = blocked_for(one.member)
+        covered = any(other.candidate.group < candidate.group
+                      and drawn_over(world(other), world(one), look, float(tolerances.edge)) for other in visible)
+        if covered or (blocked is not None and candidate.place is not None and blocked(candidate.place)):
+            hidden.append(one)
+        else:
+            visible.append(one)
+    return visible + hidden, len(visible)

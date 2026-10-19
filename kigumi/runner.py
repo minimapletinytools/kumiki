@@ -212,7 +212,8 @@ class VerdictWire(TypedDict, total=False):
     reason: Optional[str]
 
 
-class CandidateWire(TypedDict):
+class CandidateWire(TypedDict, total=False):
+    memberKey: str  # in a drawing, which member it is on
     label: str
     type: str
     real: bool
@@ -671,6 +672,7 @@ if TYPE_CHECKING:
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
     from kumiki.drawings.kigumi_measuring_helpers import EndForm, PairPlacement, Settled
+    from kumiki.viewer.picking import DrawnMember, MemberCandidate
     from kumiki.drawings.layout import PlacedViewport
     from kumiki.geometry import Line, Plane, Point
     from kumiki.identity import FeaturePath
@@ -4727,6 +4729,75 @@ def _pick_tolerances(payload: PickRequest, eps: float) -> 'FeatureTestTolerances
 ACCESSORY_KEY_PREFIX = "accessory:"
 
 
+def _drawing_candidates(
+    ss: SlotState, payload: PickRequest, tolerances: 'FeatureTestTolerances',
+) -> Tuple[List['MemberCandidate'], int]:
+    """What is under the pointer in a drawing, on every member it draws (picking.drawing_candidates).
+
+    The drawn members are the request's `drawnMembers` (every timber when it is None). One whose box
+    the ray does not come near is skipped. The member the viewer's ray met carries where it met it.
+    """
+    from kumiki.viewer.picking import (DrawnMember, build_inv_transform_float, drawing_candidates,
+                                       inv_transform_direction, inv_transform_point)
+    from kumiki.viewer.rule_at_home import Float3
+
+    ray = payload.get("ray") or {}
+    origin, direction = Float3.of(ray["origin"]), Float3.of(ray["direction"]).unit()
+    if direction is None:
+        return [], 0
+    reach = max(float(tolerances.edge), float(tolerances.point or 0.0))
+    drawn = payload.get("drawnMembers")
+    hit_member, point = payload.get("memberKey"), payload.get("point")
+    members: List['DrawnMember'] = []
+    for key, entry in ss.mesh_cache.items():
+        cut_timber, root, mesh = entry.get("cut_timber"), entry.get("local_csg"), entry.get("mesh")
+        if cut_timber is None or root is None or mesh is None or (drawn is not None and key not in drawn):
+            continue
+        if not _ray_nears_box(origin, direction, mesh["vertices"], reach):
+            continue
+        rotation, position = build_inv_transform_float(cut_timber.timber.transform)
+        surface = (inv_transform_point(rotation, position, point)
+                   if key == hit_member and isinstance(point, list) and len(point) == 3 else None)
+        members.append(DrawnMember(key, root, cut_timber.timber, surface))
+
+    def blocked_for(key: str) -> Callable[['Float3'], bool]:
+        entry = ss.mesh_cache[key]
+        cut_timber, root = entry["cut_timber"], cast('CutCSG', entry["local_csg"])
+        rotation, position = build_inv_transform_float(cut_timber.timber.transform)
+        return _sight_blocker(ss, cut_timber, root, payload, inv_transform_direction(rotation, direction))
+
+    return drawing_candidates(members, (origin, direction), tolerances, blocked_for)
+
+
+def _ray_nears_box(origin: 'Float3', direction: 'Float3', vertices: List[float], reach: float) -> bool:
+    """Whether a ray passes within `reach` of the box around these world-space vertices."""
+    lows = [min(vertices[axis::3]) - reach for axis in range(3)]
+    highs = [max(vertices[axis::3]) + reach for axis in range(3)]
+    near, far = 0.0, math.inf
+    for axis in range(3):
+        start, step = origin[axis], direction[axis]
+        if abs(step) < 1e-12:
+            if start < lows[axis] or start > highs[axis]:
+                return False
+            continue
+        one, other = (lows[axis] - start) / step, (highs[axis] - start) / step
+        near, far = max(near, min(one, other)), min(far, max(one, other))
+        if near > far:
+            return False
+    return True
+
+
+def _member_candidates_wire(ss: SlotState, merged: List['MemberCandidate'], visible_count: int) -> List[CandidateWire]:
+    """_candidates_wire, for candidates on several members: each says which."""
+    wires: List[CandidateWire] = []
+    for index, one in enumerate(merged):
+        wire = _candidates_wire(cast('CutCSG', ss.mesh_cache[one.member]["local_csg"]), [one.candidate.hit],
+                                1 if index < visible_count else 0)[0]
+        wire["memberKey"] = one.member
+        wires.append(wire)
+    return wires
+
+
 def _candidates_wire(
     local_csg: 'CutCSG', feature_hits: List['OwnedFeatureHit'], visible_count: int,
 ) -> List[CandidateWire]:
@@ -4787,7 +4858,7 @@ def _nothing_at_point(member_key: str) -> PickResultWire:
 def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Process a find_csg_at_point request and return the result dict."""
     from kumiki.drawings.drawing import MeasurementSpace
-    from kumiki.viewer.picking import (best_matching_candidate, build_inv_transform_float, choose,
+    from kumiki.viewer.picking import (Candidates, best_matching_candidate, build_inv_transform_float, choose,
                                        edge_highlight_segments, extract_highlight_mesh, find_candidates,
                                        inv_transform_point, navigate, non_real_plane_outline,
                                        resolve_csg_at_path)
@@ -4802,6 +4873,36 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     # Edge and vertex slack scaled to what a pixel is worth where the click
     # landed, which the viewer works out and sends. See _pick_tolerances.
     tolerances = _pick_tolerances(payload, eps)
+    in_drawing = _pick_space(payload) is MeasurementSpace.PROJECTED
+    look = payload.get("look")
+    space = _pick_space(payload)
+
+    # In a drawing, every member drawn under the pointer, not only the one its ray meets first: the
+    # corner aimed at is often the neighbour's, and off a silhouette the ray meets nothing at all.
+    # The pick is then made on the chosen candidate's member, as any pick is.
+    across: Optional[Tuple[List['MemberCandidate'], int, int]] = None
+    if in_drawing and isinstance(payload.get("ray"), dict) and not ctrl_click:
+        from kumiki.csg.feature_paths import FeatureHandle
+        from kumiki.viewer.picking import best_matching_handle
+
+        merged, merged_visible = _drawing_candidates(ss, payload, tolerances)
+        if not merged_visible:
+            # Only hidden features here: nothing to take, but the menu still lists them, greyed.
+            return {**_nothing_at_point(member_key if isinstance(member_key, str) else ""),
+                    "candidates": _member_candidates_wire(ss, merged, merged_visible)}
+        index = payload.get("candidateIndex")
+        if index is None:
+            held = _geometry_from_wire(payload.get("heldGeometry")) if payload.get("heldGeometry") else None
+            index = best_matching_handle(
+                [FeatureHandle(timber=one.timber, hit=one.candidate.hit) for one in merged[:merged_visible]],
+                held, look, space)
+        chosen_index = int(index if index is not None else 0) % merged_visible
+        chosen = merged[chosen_index]
+        member_key = chosen.member
+        if chosen.candidate.place is not None:
+            point = [float(v) for v in ss.mesh_cache[member_key]["cut_timber"].timber.transform.local_to_global(
+                chosen.candidate.place.v3())]
+        across = (merged, merged_visible, chosen_index)
 
     if not isinstance(member_key, str) or member_key not in ss.mesh_cache:
         raise ValueError(f"Unknown memberKey: {member_key}")
@@ -4842,21 +4943,26 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
     # Three steps, kumiki's (picking.py): where navigating the tree lands, what is under the pointer,
     # and which of it is wanted -- named by the caller (Tab, the menu), else the one that finishes the
     # measurement in hand, else the first in a drawing, else what navigation found.
-    in_drawing = _pick_space(payload) is MeasurementSpace.PROJECTED
     local_ray = _local_ray_from_payload(payload, timber_rot, timber_pos)
     navigated = navigate(local_csg, local_pt, eps, ctrl_click, current_path)
-    blocked = (_sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1])
-               if in_drawing and local_ray is not None else None)
-    found = find_candidates(local_csg, local_pt, eps, tolerances, local_ray, in_drawing, blocked)
+    candidate_index = payload.get("candidateIndex")
+    if across is not None:
+        # This member's share of what is under the pointer, in the same order, and the chosen one.
+        merged, merged_visible, chosen_index = across
+        mine = [(index, one.candidate.hit) for index, one in enumerate(merged) if one.member == member_key]
+        found = Candidates([hit for _index, hit in mine], sum(1 for index, _hit in mine if index < merged_visible))
+        candidate_index = next(position for position, (index, _hit) in enumerate(mine) if index == chosen_index)
+    else:
+        blocked = (_sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1])
+                   if in_drawing and local_ray is not None else None)
+        found = find_candidates(local_csg, local_pt, eps, tolerances, local_ray, in_drawing, blocked)
     feature_hits, visible_count = found
     if in_drawing and local_ray is not None and not visible_count and not ctrl_click:
         # Only hidden features here: nothing to take, but the menu still lists them, greyed.
         return {**_nothing_at_point(member_key),
                 "candidates": _candidates_wire(local_csg, feature_hits, visible_count)}
     held = _geometry_from_wire(payload.get("heldGeometry")) if payload.get("heldGeometry") else None
-    look = payload.get("look")
-    space = _pick_space(payload)
-    pick = choose(local_csg, navigated, found, payload.get("candidateIndex"),
+    pick = choose(local_csg, navigated, found, candidate_index,
                   lambda hits: best_matching_candidate(hits, timber, held, look, space), in_drawing, ctrl_click)
     new_path, target_csg, feature_label = pick.path, pick.node, pick.label
     feature_type, edge = pick.kind, pick.edge
@@ -4977,6 +5083,12 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
             "totalTriangles": total,
         },
     }
+    if across is not None:
+        # The menu and Tab go through everything under the pointer, every member's.
+        merged, merged_visible, chosen_index = across
+        result["candidates"] = _member_candidates_wire(ss, merged, merged_visible)
+        result["candidateCount"] = merged_visible
+        result["candidateIndex"] = chosen_index
     if parent_hl is not None:
         result["parentHighlightMesh"] = parent_hl
     if highlight_edge is not None:

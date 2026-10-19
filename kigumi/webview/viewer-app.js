@@ -2815,12 +2815,26 @@ class KigumiViewerApp extends LitElement {
         // the first that actually hits something. A drawing's viewports draw on
         // nothing, so where the one on top is empty you are looking straight
         // through it at the one beneath, and that is what the click means.
+        // Through the topmost viewport when nothing is hit: a drawing still looks along that ray,
+        // for features near it on no surface (choosePickAction, alongRay).
+        let missed = null;
         for (const resolved of this._resolvePointers(clientX, clientY)) {
             // Through that viewport's own camera: the same screen point means
             // different things in each of a drawing's views.
             this.navigationPointer.set(resolved.ndc.x, resolved.ndc.y);
             this.navigationRaycaster.setFromCamera(this.navigationPointer, resolved.viewport.camera);
             const hits = this.sceneManager.memberAtRay(this.navigationRaycaster, { isPickable });
+            if (!missed) {
+                missed = {
+                    hits: [],
+                    camera: resolved.viewport.camera,
+                    viewHeight: resolved.pixelHeight,
+                    ray: {
+                        origin: this.navigationRaycaster.ray.origin.toArray(),
+                        direction: this.navigationRaycaster.ray.direction.clone().normalize().toArray(),
+                    },
+                };
+            }
             if (hits.length > 0) {
                 // The camera travels with the hits, and is not looked up again
                 // later. A sheet has several viewports at different scales, and
@@ -2846,7 +2860,7 @@ class KigumiViewerApp extends LitElement {
                 };
             }
         }
-        return { hits: [], camera: this.camera, ray: null };
+        return missed || { hits: [], camera: this.camera, ray: null };
     }
 
     // The closest visible, unlocked member hit, or null. Used where only the
@@ -2914,8 +2928,10 @@ class KigumiViewerApp extends LitElement {
             shiftKey: this._shiftHeld,
             inDrawing: this.selectionManager.inDrawing,
             measuring: this.measureDraft.isActive,
+            alongRay: Boolean(along.ray),
         });
-        const target = window.KigumiHover.hoverTarget(decision);
+        const target = window.KigumiHover.hoverTarget(decision)
+            || (decision.action === 'csg' && along.ray ? { memberKey: null, point: along.ray.origin } : null);
         if (decision.action !== 'csg' || !target) {
             // Either nothing under the pointer, or a click here would take the
             // whole timber rather than anything inside it.
@@ -3962,6 +3978,7 @@ class KigumiViewerApp extends LitElement {
             // it lights what a click will not take.
             inDrawing: this.selectionManager.inDrawing,
             measuring: this.measureDraft.isActive,
+            alongRay: Boolean(pickRay),
         });
 
         if (decision.action === 'clear') {
@@ -3979,7 +3996,8 @@ class KigumiViewerApp extends LitElement {
             // Drilling into a timber that is already selected. Ask the runner
             // what sits under the cursor; the answer comes back as a
             // csgSelectionResult and becomes the new focus.
-            const point = [hit.point.x, hit.point.y, hit.point.z];
+            // No surface hit (a drawing's pick along the ray): the ray's start stands in for it.
+            const point = hit ? [hit.point.x, hit.point.y, hit.point.z] : pickRay.origin;
             const focus = this.selectionManager.csgFocus;
             const currentPath = (focus && focus.timberKey === memberKey) ? focus.path : [];
             if (typeof vscode !== 'undefined') {
@@ -4279,6 +4297,12 @@ class KigumiViewerApp extends LitElement {
         }
         const path = Array.isArray(message.path) ? message.path : [];
         const featureLabel = message.featureLabel || null;
+        if (message.memberKey === '' && !featureLabel && path.length === 0) {
+            // A drawing's pick along the ray that found nothing on any member: a click on nothing.
+            this._dropCsgFocus();
+            this.selectionManager.clearTimberSelection();
+            return;
+        }
         // Kept so that "measure from this" has something to start from without
         // asking again: the reference, where it is, and what it lies on.
         this._lastPickAnchor = this._anchorFromPick(message);
