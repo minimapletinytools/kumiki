@@ -2837,6 +2837,8 @@ class KigumiViewerApp extends LitElement {
                 return {
                     hits,
                     camera: resolved.viewport.camera,
+                    // How high that viewport is drawn: what a pixel of slack is measured against.
+                    viewHeight: resolved.pixelHeight,
                     ray: {
                         origin: this.navigationRaycaster.ray.origin.toArray(),
                         direction: this.navigationRaycaster.ray.direction.clone().normalize().toArray(),
@@ -2946,7 +2948,7 @@ class KigumiViewerApp extends LitElement {
             // a click then refuses to select -- and through the camera the ray
             // actually went through, which on a sheet need not be the active
             // viewport's.
-            tolerances: this._pickTolerances(target.point, along.camera),
+            tolerances: this._pickTolerances(target.point, along.camera, along.viewHeight),
             // The line the pointer went along, so features that lie in a void
             // rather than on a surface can be found at all. See _findMembersAlongRay.
             ray: along.ray,
@@ -3948,7 +3950,8 @@ class KigumiViewerApp extends LitElement {
         if (under) {
             this.selectionManager.enterScope(under.viewport.id);
         }
-        const { hits, camera: pickCamera, ray: pickRay } = this._findMembersAlongRay(event.clientX, event.clientY);
+        const { hits, camera: pickCamera, ray: pickRay, viewHeight: pickViewHeight } =
+            this._findMembersAlongRay(event.clientX, event.clientY);
         const decision = choosePickAction({
             hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
@@ -3987,7 +3990,7 @@ class KigumiViewerApp extends LitElement {
                     currentPath,
                     // No drilling in a drawing: its views pick features directly, every timber alike.
                     ctrlClick: !this.isInDrawing && (!!event.ctrlKey || !!event.metaKey),
-                    tolerances: this._pickTolerances(point, pickCamera),
+                    tolerances: this._pickTolerances(point, pickCamera, pickViewHeight),
                     // See _findMembersAlongRay: a hit point is on a surface, and
                     // a feature in a void is not near any surface.
                     ray: pickRay,
@@ -5794,11 +5797,13 @@ class KigumiViewerApp extends LitElement {
      * belongs to the view the ray went through -- and on a sheet that is
      * whichever viewport the pointer is over, not the one that happens to be
      * active. Reading `this.camera` here silently used the wrong scale for
-     * every hover over a viewport the reader had not clicked in.
+     * every hover over a viewport the reader had not clicked in. Likewise the
+     * height that viewport is drawn at (`viewHeight`): measured against the
+     * whole canvas, a sheet's views snapped at a fraction of their pixels.
      */
-    _pickTolerances(worldPoint, camera) {
+    _pickTolerances(worldPoint, camera, viewHeight) {
         return window.KigumiPickTolerances.pickTolerances(
-            camera || this.camera, this._getRendererResolution().y, worldPoint);
+            camera || this.camera, viewHeight || this._getRendererResolution().y, worldPoint);
     }
 
     _getRendererResolution() {

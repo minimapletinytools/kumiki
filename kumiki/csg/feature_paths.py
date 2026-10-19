@@ -18,6 +18,16 @@ if TYPE_CHECKING:
     from ..timber import CutTimber, Frame, PerfectTimberWithin
 
 
+def hit_identity(feature: CSGFeature, owner: CutCSG) -> Tuple:
+    """Which feature this is, hashably, for keying a memo: its owner node and its name, or for a
+    derived feature its parents'. Two derived features can share an owner and a name -- the same
+    joint at each end of a timber gives one shoulder corner per end, both named alike."""
+    if isinstance(feature, (DerivedEdgeFeature, DerivedPointFeature)):
+        return (type(feature).__name__,
+                tuple(hit_identity(parent.feature, parent.owner) for parent in feature.parents if parent is not None))
+    return (id(owner), feature.name)
+
+
 def _same_hit(one: OwnedFeatureHit, other: OwnedFeatureHit) -> bool:
     """Same owner node, and the same feature on it: by name, or by parents for a derived one."""
     if one.owner is not other.owner or type(one.feature) is not type(other.feature):
@@ -49,7 +59,7 @@ class FeatureHandle(Generic[F_co]):
                 and _same_hit(self.hit, other.hit))
 
     def __hash__(self) -> int:
-        return hash((id(self.timber), id(self.hit.owner), self.hit.feature.name))
+        return hash((id(self.timber), hit_identity(self.hit.feature, self.hit.owner)))
 
 
 def label_name(labeled: Any) -> Optional[str]:

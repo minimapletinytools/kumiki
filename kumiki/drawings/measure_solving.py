@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Dict, Hashable, Optional, Sequence, Union
 
 import numpy as np
 
-from ..csg.feature_paths import FeatureHandle
+from ..csg.feature_paths import FeatureHandle, hit_identity
 from ..csg.carriers import Row
 from ..csg.feature_solving import Solve, SolveAngle, SolveDistance, SolveMeasurement
 from ..geometry import Line, Plane
@@ -31,7 +31,7 @@ SpanMemo = Dict[Hashable, MeasureSpan]
 def _measured_span(handle: FeatureHandle, cut_timbers: Sequence['CutTimber'],
                    spans_memo: Optional[SpanMemo]) -> MeasureSpan:
     """The feature in world space, on its cut timber, as the viewer measures it (feature_span)."""
-    key = (id(handle.owner), handle.feature.name, id(handle.timber))
+    key = (id(handle.timber), hit_identity(handle.feature, handle.owner))
     if spans_memo is not None and key in spans_memo:
         return spans_memo[key]
     cut = next((cut for cut in cut_timbers if cut.timber is handle.timber), None)

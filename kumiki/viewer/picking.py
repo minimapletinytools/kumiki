@@ -682,10 +682,12 @@ def measurable_in_view(
     return [hit for hit, where in located if keep(hit, where)]
 
 
-def _hit_key(hit: 'OwnedFeatureHit') -> Tuple[str, int]:
+def _hit_key(hit: 'OwnedFeatureHit') -> Tuple:
     """One feature, however many times it was found: a derived one found at two places is two
-    objects, so by name and owner."""
-    return (hit.feature.name, id(hit.owner))
+    objects, so by what it is (feature_paths.hit_identity) and not by object."""
+    from kumiki.csg.feature_paths import hit_identity
+
+    return hit_identity(hit.feature, hit.owner)
 
 
 def _along_ray(origin: Float3, direction: Float3, point) -> float:

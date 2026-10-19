@@ -45,7 +45,8 @@
      * viewports draw on nothing, so where the one on top is empty the thing
      * under the cursor belongs to the one beneath -- the caller decides by
      * asking each in turn what it actually hit. Empty for a point outside every
-     * viewport, which is a miss rather than the first one.
+     * viewport, which is a miss rather than the first one. Each comes with how
+     * many pixels high it is drawn (`pixelHeight`): its camera's view spans that.
      */
     function resolvePointers(viewports, pointX, pointY, pageRect) {
         const found = [];
@@ -53,7 +54,11 @@
             const viewport = viewports[index];
             const rect = viewport.spec ? viewport.spec.rect : viewport.rect;
             if (rectContains(rect, pointX, pointY, pageRect)) {
-                found.push({ viewport, ndc: viewportNdc(rect, pointX, pointY, pageRect) });
+                found.push({
+                    viewport,
+                    ndc: viewportNdc(rect, pointX, pointY, pageRect),
+                    pixelHeight: Math.max(1, rect[3] * pageRect.height),
+                });
             }
         }
         return found;

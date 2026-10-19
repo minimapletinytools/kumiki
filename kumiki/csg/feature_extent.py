@@ -23,6 +23,7 @@ from .cropcsg import crop_line_to_segments_on_csg
 from .cross_sections import (CrossSection, cross_section_centroid, cross_section_outline, cross_section_polygons,
                              face_cross_section, plane_cross_section)
 from .cutcsg import CSGFeature, CutCSG, FaceFeature, FeatureNature
+from .feature_paths import hit_identity
 from ..geometry import Line, Plane, Point
 from ..rule import as_ndarray, create_v3
 
@@ -149,7 +150,7 @@ class FeatureExtents:
     def of(self, feature: CSGFeature, owner: CutCSG) -> Optional[FeatureExtent]:
         """The extent of `feature`, declared on `owner` (a node of this timber's tree); None where it
         cannot be placed -- a curved face, or a tree that cannot be cut by its plane."""
-        key = (id(owner), feature.name)
+        key = hit_identity(feature, owner)
         if key not in self._extent_memo:
             self._extent_memo[key] = self._work_out(feature, owner)
         return self._extent_memo[key]
