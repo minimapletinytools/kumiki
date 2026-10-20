@@ -10,10 +10,9 @@ is compared by object rather than by value.
 
 import pytest
 
-from kumiki.drawings.drawing import (Drawing, ELEVATION_IDS, Length, Measure, Page,
-                            Portion, SHOP_DRAWING_IDS, Share,
-                            SplitDirection, Subdivision, Viewport, columns,
-                            covering_page, rows)
+from kumiki.drawings.drawing import (Drawing, ELEVATION_IDS, Length, Page, Portion, SHOP_DRAWING_IDS, Share,
+                                     SplitDirection, Subdivision, Viewport, columns, covering_page, rows)
+from kumiki.drawings.measure import Measure
 from kumiki.identity import ViewportId
 from kumiki.drawings.layout import resolve_drawing, resolve_viewports
 from kumiki.rule import mm

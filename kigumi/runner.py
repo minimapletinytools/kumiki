@@ -668,9 +668,9 @@ if TYPE_CHECKING:
     # TYPE_CHECKING there is no runtime import at all, so annotations can be
     # concrete while every isinstance check still imports inside its function.
     from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
-    from kumiki.drawings.drawing import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement,
-                                         MeasurementPlane, MeasurementSpace, VectorLike, Viewport, ViewAxes,
-                                         ViewportId)
+    from kumiki.drawings.drawing import Viewport, ViewportId
+    from kumiki.drawings.measure import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement,
+                                           MeasurementPlane, MeasurementSpace, VectorLike, ViewAxes)
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
     from kumiki.drawings.kigumi_measuring_helpers import EndForm, PairPlacement, Settled
@@ -2021,7 +2021,7 @@ def _measure_identity(measure: MeasureWire) -> Tuple[Any, Any, Any, str]:
     it. A kind is normalized through MeasurementKind first, so one written
     under an older name matches the same kind written under the new one.
     """
-    from kumiki.drawings.drawing import Measure, MeasurementKind
+    from kumiki.drawings.measure import Measure, MeasurementKind
 
     first, second = _measure_pair_identity(measure)
     kind = measure.get("kind")
@@ -2105,7 +2105,7 @@ def _pick_verdict(
     and a refusal derived separately will eventually disagree, and the
     disagreement is invisible until someone clicks.
     """
-    from kumiki.drawings.drawing import ViewAxes
+    from kumiki.drawings.measure import ViewAxes
     from kumiki.drawings.kigumi_measuring_helpers import pick_verdict, world_geometry
 
     held_geometry, look = payload.get("heldGeometry"), payload.get("look")
@@ -2144,7 +2144,7 @@ def _pick_space(payload: PickRequest) -> 'MeasurementSpace':
     in. A drawing's viewport has a declared camera and projects onto its sheet;
     the 3D view projects nothing, its camera being the reader's.
     """
-    from kumiki.drawings.drawing import MeasurementSpace
+    from kumiki.drawings.measure import MeasurementSpace
 
     named = (payload or {}).get("space")
     return (MeasurementSpace.THREE_D
@@ -2169,7 +2169,7 @@ def _pick_placement(
     and the two drifted: a half-made measurement was drawn at each feature's own
     middle while the finished one went to the middle of their overlap.
     """
-    from kumiki.drawings.drawing import MeasurementSpace, ViewAxes
+    from kumiki.drawings.measure import MeasurementSpace, ViewAxes
     from kumiki.drawings.feature_span import feature_span
     from kumiki.drawings.kigumi_measuring_helpers import place_pair, world_geometry
 
@@ -2221,7 +2221,7 @@ def _plane_for_pick(
     None unless something is held and the viewer said which way it is looking:
     a plane needs both ends and a camera, and a first pick has neither.
     """
-    from kumiki.drawings.drawing import MeasurementSpace
+    from kumiki.drawings.measure import MeasurementSpace
     from kumiki.drawings.kigumi_measuring_helpers import feature_anchor, measurement_plane, world_geometry
 
     held_geometry = payload.get("heldGeometry")
@@ -2302,7 +2302,7 @@ def merge_measurements(
             _duplicate_warning_given = True
         from_file[identity] = measure
 
-    from kumiki.drawings.drawing import MeasurementSource, does_override_identities
+    from kumiki.drawings.measure import MeasurementSource, does_override_identities
 
     merged: List[MeasureWire] = []
     used = set()
@@ -2791,7 +2791,7 @@ def _resolve_measurement(
     Only when the pair cannot be placed together does each fall back to a point
     of its own, which is what a feature that resolves to nothing else can offer.
     """
-    from kumiki.drawings.drawing import MeasurementKind, MeasurementOperation, MeasurementSpace, ViewAxes
+    from kumiki.drawings.measure import MeasurementKind, MeasurementOperation, MeasurementSpace, ViewAxes
     from kumiki.drawings.kigumi_measuring_helpers import place_pair
 
     resolved: MeasureWire = {**measure}
@@ -2904,7 +2904,7 @@ def _measure_end_name(measure: MeasureWire, key: str) -> str:
 
 def _viewport_axes(scene: DrawingWire, viewport_id: str) -> Optional['ViewAxes']:
     """A viewport's camera frame, as the measurement code wants it."""
-    from kumiki.drawings.drawing import ViewAxes
+    from kumiki.drawings.measure import ViewAxes
 
     for viewport in scene.get("viewports") or []:
         if viewport.get("id") != viewport_id:
@@ -4905,7 +4905,7 @@ _AcrossMembers = Tuple[List['MemberCandidate'], int, int]
 
 
 def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState']) -> PickResultWire:
-    from kumiki.drawings.drawing import MeasurementSpace
+    from kumiki.drawings.measure import MeasurementSpace
 
     ss = slot_state if slot_state is not None else state._active
     eps = 5e-4  # generous epsilon for raycast-based click points

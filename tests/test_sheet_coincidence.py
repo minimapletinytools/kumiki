@@ -5,7 +5,7 @@ from kumiki.csg.cutcsg import OwnedFeatureHit
 from kumiki.csg.dof_solver import remaining
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.drawings.auto_dimensioning import coincidence_assumptions
-from kumiki.drawings.drawing import ViewAxes
+from kumiki.drawings.measure import ViewAxes
 from kumiki.drawings.measure_solving import DrawingSolve
 
 # Looking along +y: x across the sheet, z up it.

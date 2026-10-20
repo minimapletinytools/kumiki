@@ -2787,7 +2787,7 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
 
     def test_and_what_it_offers_can_be_measured_against_what_is_held(
             self, mortise_and_tenon_frame):
-        from kumiki.drawings.drawing import projected_kinds
+        from kumiki.drawings.measure import projected_kinds
 
         _plain, held = self._where_the_default_is_an_edge(
             mortise_and_tenon_frame, "receiving_timber")

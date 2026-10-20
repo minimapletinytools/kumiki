@@ -16,10 +16,10 @@ kumiki implements its own CSG (constructive solid geometry) system to generate a
 - csg/feature_extent.py: FeatureExtent, where a feature is on its cut timber, cropped once by its nature and kept per tree
 - csg/triangles.py: meshing and raycasting a csg
 - geometry.py: contains shared geometry feature classes like Plane Line Vertex etc
-- drawings/drawing.py: contains all code relate to generating measurements from CSG features
-- drawings/: also the layout of a sheet, and measure_solving: a drawing's Measure as the solver's SolveDistance / SolveAngle
+- drawings/measure.py: what a pair of features can be measured as, where a dimension attaches and what it comes to
+- drawings/drawing.py, layout.py: the layout of a sheet; measure_solving.py: a drawing's Measure as the solver's SolveDistance / SolveAngle
 - drawings/sheet_shape.py, visibility.py: what a feature is on a sheet, and whether a view can see it
-- drawings/feature_span.py, measuring.py: what a measurement attaches to, and how it is placed and what it comes to
+- drawings/feature_span.py: what a measurement attaches to
 - drawings/cameras.py: where a drawing's views look from
 - viewer/picking.py: what is under a pointer, and which of it a pick takes
 

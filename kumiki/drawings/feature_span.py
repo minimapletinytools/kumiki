@@ -16,7 +16,7 @@ from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
 from ..rule import as_ndarray, create_v3, unit_ndarray
 from ..timber import PerfectTimberWithin
-from .drawing import LineSpan, MeasureSpan, PlaneSpan, PointSpan, VectorLike
+from .measure import LineSpan, MeasureSpan, PlaneSpan, PointSpan, VectorLike
 from .sheet_shape import SheetLine, SheetPoint, sheet_shape
 
 _UP = np.array([0.0, 0.0, 1.0])

@@ -21,7 +21,7 @@ from ..csg.feature_paths import FeatureHandle, hit_identity
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
 from ..rule import as_ndarray, create_v3, unit_ndarray
-from .drawing import Measure, MeasurementKind, ViewAxes
+from .measure import Measure, MeasurementKind, ViewAxes
 from .measure_solving import DrawingSolve
 from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, SheetShape, sheet_gap, sheet_shape
 

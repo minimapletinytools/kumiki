@@ -14,8 +14,8 @@ from ..csg.carriers import Row
 from ..csg.feature_solving import Solve, SolveAngle, SolveDistance, SolveMeasurement
 from ..geometry import Line, Plane
 from ..rule import Matrix, as_ndarray, unit_ndarray
-from .drawing import (LineSpan, Measure, MeasureSpan, MeasurementDirection, MeasurementKind, MeasurementOperation,
-                      MeasurementSpace, PointSpan, ViewAxes, distance_anchors)
+from .measure import (LineSpan, Measure, MeasureSpan, MeasurementDirection, MeasurementKind,
+                        MeasurementOperation, MeasurementSpace, PointSpan, ViewAxes, distance_anchors)
 from .feature_span import feature_span
 from .sheet_shape import SheetLine, sheet_shape
 

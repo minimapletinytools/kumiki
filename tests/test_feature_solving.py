@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from kumiki.csg.cutcsg import OwnedFeatureHit, PrismFace, prism_corner_key, prism_face_key
-from kumiki.drawings.drawing import Measure, MeasurementKind, ViewAxes
+from kumiki.drawings.measure import Measure, MeasurementKind, ViewAxes
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.feature_solving import carrier_map_of, measure_row, remaining_dofs, required_targets, solve_report
 from kumiki.drawings.measure_solving import solve_measurement
