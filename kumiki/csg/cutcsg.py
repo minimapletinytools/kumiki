@@ -18,6 +18,9 @@ analytic surface it stands for, and how far a click lands from an edge or a
 point it cannot hit exactly. See FeatureTestTolerances.
 """
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+import functools
 import re
 from typing import Callable, ClassVar, Dict, Generic, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 from dataclasses import dataclass, field, replace
@@ -28,6 +31,7 @@ from ..rule import *
 from ..geometry import (ConvexPlanarRegion, Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
+from .identity_memo import memo_by_identity
 from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Midplane, Recipe,
                        merge_coincident_planes)
 
@@ -2316,12 +2320,14 @@ class HasFeatures:
         self, source: 'FeatureSource' = FeatureSource.BOTH,
     ) -> List['CSGFeature']:
         """Features this node names on its own boundary, whether or not any
-        point lies on them.
+        point lies on them. Worked out once per node.
 
-        Built afresh on every call: an authored feature is a new object each
-        time, so tell authored from default by name (unique per primitive)
-        rather than by identity.
+        Tell authored from default by name (unique per primitive) rather than
+        by identity: an overridden default is a different object.
         """
+        return list(_declared_features(self, source))
+
+    def _work_out_declared_features(self, source: 'FeatureSource') -> List['CSGFeature']:
         defaults = self.default_features()
         if source is FeatureSource.DEFAULTS:
             return list(defaults.values())
@@ -2331,6 +2337,11 @@ class HasFeatures:
         if source is FeatureSource.OVERRIDES:
             return authored
         return authored + [feature for key, feature in defaults.items() if key not in overridden]
+
+
+@memo_by_identity
+def _declared_features(csg: 'HasFeatures', source: 'FeatureSource') -> List['CSGFeature']:
+    return csg._work_out_declared_features(source)
 
 
 def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
@@ -2405,10 +2416,52 @@ class CutCSGLabel:
         return f"CutCSGLabel({self.name!r})" if self.name is not None else "NoLabel"
 
 
+# Point tests a node answers recursively from its children's. Inside point_tests_memo each is
+# worked out once per node, point and eps -- a walk that asks every level of a tree otherwise asks
+# each node once per ancestor.
+_POINT_TESTS = ("contains_point", "is_point_on_boundary", "get_outward_normal")
+_point_tests_memo: ContextVar[Optional[Dict[Tuple, Tuple['CutCSG', object]]]] = ContextVar(
+    "_point_tests_memo", default=None)
+
+
+@contextmanager
+def point_tests_memo() -> Iterator[None]:
+    """Remember point tests (_POINT_TESTS) until the block ends."""
+    if _point_tests_memo.get() is not None:
+        yield
+        return
+    token = _point_tests_memo.set({})
+    try:
+        yield
+    finally:
+        _point_tests_memo.reset(token)
+
+
+def _memoized_point_test(test: Callable) -> Callable:
+    @functools.wraps(test)
+    def memoized(self: 'CutCSG', point: V3, eps: Optional[Numeric] = None):
+        memo = _point_tests_memo.get()
+        if memo is None:
+            return test(self, point, eps)
+        key = (test, id(self), float(point[0]), float(point[1]), float(point[2]), eps)
+        kept = memo.get(key)
+        if kept is None or kept[0] is not self:
+            kept = (self, test(self, point, eps))
+            memo[key] = kept
+        return kept[1]
+    return memoized
+
+
 @dataclass(frozen=True)
 class CutCSG(ABC):
     """Base class for all CSG operations."""
     label: CutCSGLabel = field(default_factory=CutCSGLabel.NoLabel, kw_only=True)
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        for name in _POINT_TESTS:
+            if name in cls.__dict__:
+                setattr(cls, name, _memoized_point_test(cls.__dict__[name]))
 
     @abstractmethod
     def __repr__(self) -> str:
@@ -2507,6 +2560,12 @@ class CutCSG(ABC):
         Derived duplicates come off at the end, once the ordering has settled
         which of them was the preferred way of naming the geometry.
         """
+        with point_tests_memo():
+            return self._find_all_features(point, test_tolerances)
+
+    def _find_all_features(
+        self, point: V3, test_tolerances: Optional[FeatureTestTolerances],
+    ) -> List['OwnedFeatureHit']:
         tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
         hits = self.collect_feature_hits(point, tolerances)
 

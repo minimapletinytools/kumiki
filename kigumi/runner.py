@@ -410,6 +410,8 @@ class MeshCacheEntry(TypedDict, total=False):
     mesh: MemberMeshWire
     local_csg: Optional['CutCSG']
     cut_timber: 'CutTimber'
+    # The mesh's world box, (lows, highs): worked out on first use.
+    world_box: Tuple[List[float], List[float]]
 
 
 class RemeshMetricWire(TypedDict, total=False):
@@ -4749,16 +4751,20 @@ def _drawing_candidates(
     reach = max(float(tolerances.edge), float(tolerances.point or 0.0))
     drawn = payload.get("drawnMembers")
     hit_member, point = payload.get("memberKey"), payload.get("point")
+    at = point if isinstance(hit_member, str) and isinstance(point, list) and len(point) == 3 else None
     members: List['DrawnMember'] = []
     for key, entry in ss.mesh_cache.items():
         cut_timber, root, mesh = entry.get("cut_timber"), entry.get("local_csg"), entry.get("mesh")
         if cut_timber is None or root is None or mesh is None or (drawn is not None and key not in drawn):
             continue
-        if not _ray_nears_box(origin, direction, mesh["vertices"], reach):
+        box = _member_world_box(entry)
+        if not _ray_nears_box(origin, direction, box, reach):
             continue
-        rotation, position = build_inv_transform_float(cut_timber.timber.transform)
-        surface = (inv_transform_point(rotation, position, point)
-                   if isinstance(hit_member, str) and isinstance(point, list) and len(point) == 3 else None)
+        # Nothing of a member is at a surface point out of its reach.
+        surface = None
+        if at is not None and all(low - reach <= x <= high + reach for x, low, high in zip(at, *box)):
+            rotation, position = build_inv_transform_float(cut_timber.timber.transform)
+            surface = inv_transform_point(rotation, position, at)
         members.append(DrawnMember(key, root, cut_timber.timber, surface))
 
     def blocked_for(key: str) -> Callable[['Float3'], bool]:
@@ -4770,10 +4776,20 @@ def _drawing_candidates(
     return drawing_candidates(members, (origin, direction), tolerances, blocked_for)
 
 
-def _ray_nears_box(origin: 'Float3', direction: 'Float3', vertices: List[float], reach: float) -> bool:
-    """Whether a ray passes within `reach` of the box around these world-space vertices."""
-    lows = [min(vertices[axis::3]) - reach for axis in range(3)]
-    highs = [max(vertices[axis::3]) + reach for axis in range(3)]
+def _member_world_box(entry: MeshCacheEntry) -> Tuple[List[float], List[float]]:
+    """The world box around a member's mesh, kept on its entry."""
+    if "world_box" not in entry:
+        vertices = entry["mesh"]["vertices"]
+        entry["world_box"] = ([min(vertices[axis::3]) for axis in range(3)],
+                              [max(vertices[axis::3]) for axis in range(3)])
+    return entry["world_box"]
+
+
+def _ray_nears_box(origin: 'Float3', direction: 'Float3', box: Tuple[List[float], List[float]],
+                   reach: float) -> bool:
+    """Whether a ray passes within `reach` of a world box (lows, highs)."""
+    lows = [low - reach for low in box[0]]
+    highs = [high + reach for high in box[1]]
     near, far = 0.0, math.inf
     for axis in range(3):
         start, step = origin[axis], direction[axis]
@@ -4858,6 +4874,14 @@ def _nothing_at_point(member_key: str) -> PickResultWire:
 
 def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Process a find_csg_at_point request and return the result dict."""
+    from kumiki.csg.cutcsg import point_tests_memo
+
+    # One pick asks the same trees the same point questions many times over.
+    with point_tests_memo():
+        return _find_csg_at_point(state, payload, slot_state)
+
+
+def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState']) -> PickResultWire:
     from kumiki.drawings.drawing import MeasurementSpace
     from kumiki.viewer.picking import (Candidates, best_matching_candidate, build_inv_transform_float, choose,
                                        edge_highlight_segments, extract_highlight_mesh, find_candidates,

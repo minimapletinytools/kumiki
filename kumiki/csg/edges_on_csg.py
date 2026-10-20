@@ -62,6 +62,7 @@ from ..geometry import (
     unit_vector,
 )
 from ..rule import V3, Matrix, Numeric, safe_magnitude, scalar
+from .identity_memo import memo_by_identity
 
 
 def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:
@@ -161,6 +162,7 @@ EMPTY_BOUNDS = SolidBounds(kind=BoundsKind.EMPTY)
 UNKNOWN_BOUNDS = SolidBounds(kind=BoundsKind.UNKNOWN)
 
 
+@memo_by_identity
 def solid_bounds(csg) -> SolidBounds:
     """How a solid is bounded: half spaces, nothing at all, or no idea.
 
@@ -690,6 +692,8 @@ def _spans_on_csg(
         left = _spans_on_csg(csg.left, line, seed, tolerance, removing, flush_removes)
         if left is None:
             return None
+        if not left:
+            return []
         right = _spans_on_csg(csg.right, line, seed, tolerance, removing, flush_removes)
         if right is None:
             return None
@@ -699,6 +703,9 @@ def _spans_on_csg(
         kept = _spans_on_csg(csg.base, line, seed, tolerance, removing, flush_removes)
         if kept is None:
             return None
+        if not kept:
+            # Nothing to cut from, whatever the cuts are.
+            return []
 
         # Where the line lies ON the base's own surface rather than inside it:
         # what the closed reading keeps and the strict one does not. An arris is
