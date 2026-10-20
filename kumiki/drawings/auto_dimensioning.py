@@ -23,7 +23,7 @@ from ..timber_features import TimberFeature
 from ..rule import as_ndarray, create_v3, unit_ndarray
 from .drawing import Measure, MeasurementKind, ViewAxes
 from .measure_solving import DrawingSolve
-from .sheet_shape import SQUARE_TO_VIEW, SheetPoint, sheet_shape
+from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, SheetShape, sheet_gap, sheet_shape
 
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 HORIZONTAL = MeasurementKind.parse("projected_horizontal_distance")
@@ -252,12 +252,10 @@ def auto_dimension(
     return AutoDimensioning(picks=picks, unsolved=unsolved_targets, left_before=left_before, left_after=left_after)
 
 
-def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[Tuple]:
-    """How a feature draws, looking along `look`, in world space (sheet_shape).
-
-    ("line", in-sheet unit normal, offset along it) for a face seen edge-on or a line lying along
-    the sheet; ("point", position) for a line seen end-on; None for anything else. A line slanting
-    into the sheet draws foreshortened, so nothing is measured along it.
+def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[SheetShape]:
+    """How a feature draws, looking along `look`, in world space (sheet_shape): a line for a face
+    seen edge-on or a line lying along the sheet, a point for a line seen end-on, None for anything
+    else. A line slanting into the sheet draws foreshortened, so nothing is measured along it.
     """
     located = handle.feature.locate_simple_unbounded(handle.owner)
     if not isinstance(located, (Line, Plane)):
@@ -269,28 +267,25 @@ def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[Tuple]:
         return None
     at = as_ndarray(transform.local_to_global(create_v3(*shape.at)))
     if isinstance(shape, SheetPoint):
-        return ("point", at)
+        return SheetPoint(at)
     if isinstance(located, Line):
         slant = float(unit_ndarray(as_ndarray(located.direction)) @ look_local)
         if abs(slant) > SQUARE_TO_VIEW:
             return None
-    run = as_ndarray(transform.local_to_global_direction(create_v3(*shape.run)))
-    normal = unit_ndarray(np.cross(run, look))
-    return ("line", normal, float(normal @ at))
+    return SheetLine(at, unit_ndarray(as_ndarray(transform.local_to_global_direction(create_v3(*shape.run)))))
 
 
-def _separation(one: Tuple, other: Tuple) -> Optional[float]:
-    """Perpendicular distance on the sheet between two drawn features, or None if there is none to take."""
-    if one[0] == "point" and other[0] == "point":
+def _separation(one: SheetShape, other: SheetShape, look: np.ndarray) -> Optional[float]:
+    """Perpendicular distance on the sheet between two drawn features, or None if there is none to
+    take: two points have none (a horizontal or vertical one is a different kind)."""
+    if isinstance(one, SheetPoint) and isinstance(other, SheetPoint):
         return None
-    if one[0] == "point":
-        one, other = other, one
-    if other[0] == "point":
-        return abs(float(one[1] @ other[1]) - one[2])
-    alignment = float(one[1] @ other[1])
-    if abs(abs(alignment) - 1) > 1e-9:
-        return None
-    return abs(one[2] - alignment * other[2])
+    return sheet_gap(one, other, look)
+
+
+def _across(line: SheetLine, look: np.ndarray) -> np.ndarray:
+    """The direction across a line on the sheet."""
+    return unit_ndarray(np.cross(line.run, look))
 
 
 def sheet_candidates(
@@ -310,7 +305,7 @@ def sheet_candidates(
         drawn = [(handle, shape) for handle, shape in drawn if shape is not None]
         for i, (a, shape_a) in enumerate(drawn):
             for b, shape_b in drawn[i + 1:]:
-                length = _separation(shape_a, shape_b)
+                length = _separation(shape_a, shape_b, look)
                 if length is None or length < COINCIDENT:
                     continue  # one on top of the other: coincidence_assumptions
                 candidates.append(DimensionCandidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes,
@@ -341,35 +336,33 @@ def coincidence_assumptions(
 
     for view, axes in views.items():
         look = unit_ndarray(as_ndarray(axes.look))
-        right, up = unit_ndarray(as_ndarray(axes.right)), unit_ndarray(as_ndarray(axes.up))
-        lines: List[Tuple[np.ndarray, float, FeatureHandle]] = []  # a sheet line's normal, offset, first feature
-        spots: List[Tuple[float, float, FeatureHandle]] = []  # a spot on the sheet, first feature
+        lines: List[Tuple[SheetLine, FeatureHandle]] = []  # a line on the sheet, its first feature
+        spots: List[Tuple[SheetPoint, FeatureHandle]] = []  # a spot on the sheet, its first feature
+
+        def lined_up(shape: SheetShape, drawn: SheetShape) -> bool:
+            gap = sheet_gap(shape, drawn, look)
+            return gap is not None and gap < COINCIDENT
+
         for handle in anchors.get(view, ()):
             shape = _on_sheet(handle, look)
             if shape is None:
                 continue
-            if shape[0] == "line":
-                normal, offset = shape[1], shape[2]
-                same = next((line for line in lines if abs(abs(float(line[0] @ normal)) - 1) < COINCIDENT
-                             and abs(line[1] - float(line[0] @ normal) * offset) < COINCIDENT), None)
+            if isinstance(shape, SheetLine):
+                same = next((line for line in lines if lined_up(shape, line[0])), None)
                 if same is None:
-                    lines.append((normal, offset, handle))
+                    lines.append((shape, handle))
                 else:
-                    add(view, same[2], handle, PERPENDICULAR, same[0])
+                    add(view, same[1], handle, PERPENDICULAR, _across(same[0], look))
                 continue
-            at = shape[1]
-            x, y = float(at @ right), float(at @ up)
-            spot = next((spot for spot in spots if abs(spot[0] - x) < COINCIDENT and abs(spot[1] - y) < COINCIDENT),
-                        None)
+            spot = next((spot for spot in spots if lined_up(shape, spot[0])), None)
             if spot is not None:
-                add(view, spot[2], handle, HORIZONTAL)
-                add(view, spot[2], handle, VERTICAL)
+                add(view, spot[1], handle, HORIZONTAL)
+                add(view, spot[1], handle, VERTICAL)
                 continue
-            spots.append((x, y, handle))
+            spots.append((shape, handle))
         # A point on a line: one row, across the line.
-        for x, y, handle in spots:
-            at = right * x + up * y
-            on = next((line for line in lines if abs(float(line[0] @ at) - line[1]) < COINCIDENT), None)
+        for point, handle in spots:
+            on = next((line for line in lines if lined_up(point, line[0])), None)
             if on is not None:
-                add(view, on[2], handle, PERPENDICULAR, on[0])
+                add(view, on[1], handle, PERPENDICULAR, _across(on[0], look))
     return assumptions

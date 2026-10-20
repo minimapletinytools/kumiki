@@ -3,7 +3,7 @@
 Two questions, one set of rules:
 
 - PER PLACE, for a pointer: is what is under it hidden? `hidden_at` a place, and a feature
-  `drawn_over` by a nearer one there (picking.split_hidden).
+  `drawn_over` by a nearer one there (sheet_shape.sheet_gap).
 - PER FEATURE, for a view: can any of it be seen? `nearest_visible_depth` (visible_by_view).
 
 The rules both keep: a feature that is not real (a bore's axis, a centerplane) is `never_hidden`;
@@ -30,7 +30,7 @@ from ..geometry import Line, Plane, Point
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
 from .drawing import ViewAxes
-from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, sheet_shape
+from .sheet_shape import SheetLine, SheetPoint, sheet_gap, sheet_shape
 
 Geometry = Union[Point, Line, Plane]
 from ..csg.feature_extent import extents_of, timber_reach
@@ -84,22 +84,13 @@ def drawn_over(front: Optional[Geometry], behind: Optional[Geometry], look, tole
     `tolerance`; a point under a line, within `tolerance` of it. A line behind a point is seen
     either side of it. All in one frame.
     """
-    look = as_ndarray(look)
-    look = look / np.linalg.norm(look)
     near, far = sheet_shape(front, look), sheet_shape(behind, look)
-    if near is None or far is None:
+    if near is None or far is None or (isinstance(near, SheetPoint) and isinstance(far, SheetLine)):
         return False
-
-    def across(vector: np.ndarray, axis: np.ndarray) -> np.ndarray:
-        return vector - axis * float(vector @ axis)
-
+    gap = sheet_gap(near, far, look)
     if isinstance(near, SheetLine) and isinstance(far, SheetLine):
-        return float(np.linalg.norm(np.cross(near.run, far.run))) <= SQUARE_TO_VIEW
-    if isinstance(far, SheetPoint) and isinstance(near, SheetPoint):
-        return float(np.linalg.norm(across(far.at - near.at, look))) <= tolerance
-    if isinstance(far, SheetPoint) and isinstance(near, SheetLine):
-        return float(np.linalg.norm(across(across(far.at - near.at, look), near.run))) <= tolerance
-    return False
+        return gap is not None
+    return gap is not None and gap <= tolerance
 
 
 def _frame_in(transform: Transform, origin: np.ndarray, u: np.ndarray, v: np.ndarray,

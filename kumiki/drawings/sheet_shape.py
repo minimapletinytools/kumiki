@@ -2,7 +2,10 @@
 
 A point is a point. A line seen end-on is a point, and otherwise a line, flattened onto the sheet.
 A plane seen edge-on is a line along itself, and otherwise an area -- None: nothing to draw as a
-line or to measure to. One tolerance, SQUARE_TO_VIEW, decides end-on and edge-on alike.
+line or to measure to. One tolerance, SQUARE_TO_VIEW, decides end-on, edge-on and parallel alike.
+
+How far apart two marks are on the sheet is `sheet_gap`: what lines up, what is drawn over what,
+and the length of a dimension between them all start there.
 
 The viewer's dotted lines ask another question -- whether a plane is seen face-on, where its
 outline would only retrace the faces around it -- and keep their own rule (drawing-overlays.js,
@@ -57,3 +60,20 @@ def sheet_shape(located: Optional[Union[Point, Line, Plane]], look) -> Optional[
             return None
         return SheetLine(as_ndarray(located.point), unit_ndarray(np.cross(normal, look)))
     return None
+
+
+def sheet_gap(one: SheetShape, other: SheetShape, look) -> Optional[float]:
+    """How far apart two marks are across the sheet, looking along `look`: two points, their
+    distance; a point and a line, the point's from the line; two lines, the distance between them
+    where they are parallel, and None where they cross."""
+    look = unit_ndarray(as_ndarray(look))
+    if isinstance(one, SheetLine) and isinstance(other, SheetLine):
+        if float(np.linalg.norm(np.cross(one.run, other.run))) > SQUARE_TO_VIEW:
+            return None
+    elif isinstance(one, SheetLine):
+        one, other = other, one
+    gap = other.at - one.at
+    gap = gap - look * float(gap @ look)
+    if isinstance(other, SheetLine):
+        gap = gap - other.run * float(gap @ other.run)
+    return float(np.linalg.norm(gap))
