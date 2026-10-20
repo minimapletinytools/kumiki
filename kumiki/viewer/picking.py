@@ -542,6 +542,7 @@ class PointerCandidate(NamedTuple):
 
 def candidates_under_pointer(
     root: 'CutCSG', local_pt: Optional[Float3], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
+    timber: Optional['PerfectTimberWithin'] = None,
 ) -> List[PointerCandidate]:
     """What is under the pointer, for a drawing's view: the features at the surface the ray meets
     (`local_pt`, None where it meets none of this solid), and those on no surface the ray passes near
@@ -550,7 +551,9 @@ def candidates_under_pointer(
 
     Nothing deeper than the surface: what is behind it is hidden, and is not offered. An edge on a
     silhouette is found from the side its own surface is on; a point on a surface flush with
-    another member's is found from either, each member being asked at the one surface point."""
+    another member's is found from either, each member being asked at the one surface point. With
+    `timber`, a non-real plane seen edge-on is found along the ray too, whatever surface the ray meets
+    (non_real_features_along_ray)."""
     local_pt = Float3.of(local_pt) if local_pt is not None else None
     hits = _only_creases(root, root.find_all_features(local_pt.v3(), tolerances), local_pt) if local_pt is not None else []
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
@@ -567,7 +570,7 @@ def candidates_under_pointer(
 
     if local_pt is not None:
         found_at(hits, local_pt)
-    hits = merge_ray_hits(root, hits, local_ray, tolerances)
+    hits = merge_ray_hits(root, hits, local_ray, tolerances, timber)
     for hit in hits:
         if _hit_key(hit) not in found:
             # Non-real, in a void: as deep as its nearest approach to the ray.
@@ -577,6 +580,10 @@ def candidates_under_pointer(
                     origin, direction, (Float3.of(extent.ends[0]), Float3.of(extent.ends[1])), math.inf)
                 if nearest is not None:
                     found_at([hit], nearest)
+            elif timber is not None:
+                on_ray = _plane_on_ray(hit, root, timber, origin, direction, math.inf)
+                if on_ray is not None:
+                    found_at([hit], on_ray)
     # An edge or corner is placed on itself, where it comes nearest the pointer: it was found
     # where the ray crossed some face, which can be a pixel off it.
     for hit in hits:
@@ -620,17 +627,23 @@ def measurable_in_view(
 
     A 2D view measures lines and points, so a face is only of use where it is a line -- seen
     edge-on -- and even then nearly always lies on the same line as one of its straight edges,
-    declared or derived, which measures the same. So a face stays only when it is edge-on and no
-    straight edge among *hits* lies in its plane: a cylinder's cap, rimmed by a circle, is the one
-    thing naming its line, and stays. Seen at any other angle a face is an area, and goes.
+    declared or derived, which measures the same. So a real face stays only when it is edge-on and
+    no real straight line among *hits* draws along it: a cylinder's cap, rimmed by a circle, is the
+    one thing naming its line, and stays. A line seen end-on draws a point, not the line.
+
+    A non-real face (a centerplane, a perfect-timber face) is never one of these: it names a
+    reference, not the surface, and measuring to it is not measuring to the edge that happens to
+    draw on it -- a peg's axis through a centerplane, a rough arris flush with a perfect face. Seen
+    at any other angle a face is an area, and goes.
     """
     from kumiki.csg.cutcsg import CSGFeatureType
-    from kumiki.drawings.sheet_shape import sheet_gap, sheet_shape
+    from kumiki.drawings.sheet_shape import SheetLine, sheet_gap, sheet_shape
     from kumiki.geometry import Line, Plane
 
     look = direction.v3()
     located = [(hit, hit.feature.locate_simple_unbounded(hit.owner)) for hit in hits]
-    lines = [sheet_shape(line, look) for _hit, line in located if isinstance(line, Line)]
+    drawn_lines = [sheet_shape(line, look) for hit, line in located if isinstance(line, Line) and hit.feature.real]
+    lines = [line for line in drawn_lines if isinstance(line, SheetLine)]
 
     def keep(hit: 'OwnedFeatureHit', where: Any) -> bool:
         if hit.feature.feature_type() is not CSGFeatureType.FACE or not isinstance(where, Plane):
@@ -638,7 +651,9 @@ def measurable_in_view(
         drawn = sheet_shape(where, look)
         if drawn is None:
             return False
-        gaps = (sheet_gap(drawn, line, look) for line in lines if line is not None)
+        if not hit.feature.real:
+            return True
+        gaps = (sheet_gap(drawn, line, look) for line in lines)
         return not any(gap is not None and gap <= tolerance for gap in gaps)
 
     return [hit for hit, where in located if keep(hit, where)]
@@ -782,7 +797,7 @@ def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) ->
 
 def merge_ray_hits(
     root: 'CutCSG', hits: List['OwnedFeatureHit'], local_ray: LocalRay,
-    tolerances: 'FeatureTestTolerances',
+    tolerances: 'FeatureTestTolerances', timber: Optional['PerfectTimberWithin'] = None,
 ) -> List['OwnedFeatureHit']:
     """*hits*, plus the void-dwelling features the ray passes through, re-sorted.
 
@@ -792,7 +807,7 @@ def merge_ray_hits(
     """
     from kumiki.csg.cutcsg import _sort_feature_hits
 
-    along_ray = non_real_features_along_ray(root, local_ray, tolerances)
+    along_ray = non_real_features_along_ray(root, local_ray, tolerances, timber)
     if not along_ray:
         return hits
     already = {(id(hit.feature), id(hit.owner)) for hit in hits}
@@ -802,6 +817,7 @@ def merge_ray_hits(
 
 def non_real_features_along_ray(
     root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
+    timber: Optional['PerfectTimberWithin'] = None,
 ) -> List['OwnedFeatureHit']:
     """Non-real features the ray passes close to, in timber-local space.
 
@@ -818,9 +834,13 @@ def non_real_features_along_ray(
     The tolerance is the edge one, which the viewer derives from what a pixel is
     worth -- so this is a screen-space snap, the way any CAD package snaps to a
     centre line.
+
+    With `timber` (a drawing's view), a plane too: a centerplane or a perfect-timber
+    face seen edge-on draws as a line, and is snapped to as one (_plane_on_ray).
+    Without it the surface point is what finds one.
     """
     from kumiki.csg.cutcsg import OwnedFeatureHit, csg_children
-    from kumiki.geometry import Line
+    from kumiki.geometry import Line, Plane
 
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
     if direction is None:
@@ -831,7 +851,13 @@ def non_real_features_along_ray(
     def consider(feature: 'CSGFeature', owner: 'CutCSG') -> None:
         # A non-real POINT would want a point-to-ray distance; nothing declares
         # one yet, so there is nothing here to guess at.
-        if not isinstance(feature.locate_simple_unbounded(owner), Line):
+        located = feature.locate_simple_unbounded(owner)
+        if isinstance(located, Plane) and timber is not None:
+            hit = OwnedFeatureHit(feature=feature, owner=owner)
+            if _plane_on_ray(hit, root, timber, origin, direction, tolerance) is not None:
+                found.append(hit)
+            return
+        if not isinstance(located, Line):
             return
         extent = feature.get_extent(owner)
         if extent is None or extent.ends is None:
@@ -852,6 +878,39 @@ def non_real_features_along_ray(
 
 
 
+
+
+def _plane_on_ray(hit: 'OwnedFeatureHit', root: 'CutCSG', timber: 'PerfectTimberWithin', origin: Float3,
+                  direction: Float3, tolerance: float) -> Optional[Float3]:
+    """Where the ray runs through a plane feature seen edge-on, within `tolerance` of it and across
+    its extent on the cut timber (FeatureExtent); None if it does not. The place is the ray's point
+    nearest the middle of that extent."""
+    from kumiki.csg.feature_extent import extents_of
+    from kumiki.drawings.sheet_shape import SQUARE_TO_VIEW
+    from kumiki.geometry import Plane
+
+    plane = hit.feature.locate_simple_unbounded(hit.owner)
+    if not isinstance(plane, Plane):
+        return None
+    normal = Float3.of(plane.normal).unit()
+    if normal is None or abs(normal.dot(direction)) > SQUARE_TO_VIEW:
+        return None  # seen at an angle: an area, not a line
+    if abs(normal.dot(origin - Float3.of(plane.point))) > tolerance:
+        return None
+    extent = extents_of(root, timber).of(hit.feature, hit.owner)
+    if extent is None or extent.is_empty:
+        return None
+    # Across the sheet, in the plane: the extent has to reach the ray's line from both sides.
+    across = normal.cross(direction).unit()
+    if across is None:
+        return None
+    reach = [[across.dot(Float3.of(corner) - origin) for corner in polygon] for polygon in extent.polygons()]
+    if not any(min(sides) <= tolerance and max(sides) >= -tolerance for sides in reach if sides):
+        return None
+    middle = extent.anchor()
+    if middle is None:
+        return None
+    return origin + direction * direction.dot(Float3.of(middle) - origin)
 
 
 def ray_reaches_segment(origin, direction, ends, tolerance: float) -> bool:
@@ -1506,7 +1565,8 @@ def drawing_candidates(
     for member in members:
         rotation, position = build_inv_transform_float(member.timber.transform)
         local_ray = (inv_transform_point(rotation, position, origin), inv_transform_direction(rotation, direction))
-        for candidate in candidates_under_pointer(member.root, member.surface_point, tolerances, local_ray):
+        for candidate in candidates_under_pointer(member.root, member.surface_point, tolerances, local_ray,
+                                                  member.timber):
             found.append(MemberCandidate(member.key, member.timber, candidate))
 
     # One depth order over every member: grouped as order_along_ray groups, then the library's order.
