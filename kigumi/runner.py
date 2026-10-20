@@ -674,7 +674,7 @@ if TYPE_CHECKING:
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.drawings.kigumi_drawing_view_helpers import CameraFrame, OrientedBox
     from kumiki.drawings.kigumi_measuring_helpers import EndForm, PairPlacement, Settled
-    from kumiki.viewer.picking import DrawnMember, MemberCandidate
+    from kumiki.viewer.picking import DrawnMember, MemberCandidate, Pick
     from kumiki.drawings.layout import PlacedViewport
     from kumiki.geometry import Line, Plane, Point
     from kumiki.identity import FeaturePath
@@ -4882,53 +4882,92 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
         return _find_csg_at_point(state, payload, slot_state)
 
 
+class _PickAsk(NamedTuple):
+    """What a pick request asks, read once."""
+    eps: float
+    tolerances: 'FeatureTestTolerances'
+    in_drawing: bool
+    space: 'MeasurementSpace'
+    look: Any
+    ctrl_click: bool
+    current_path: List[str]
+    held_wire: Optional[GeometryWire]
+
+    def held(self) -> Optional['Located']:
+        """The end of a measurement in hand. Read only where it is used: a pick on an accessory
+        returns before, and need not be able to."""
+        return _geometry_from_wire(self.held_wire) if self.held_wire else None
+
+
+#: Everything drawn under the pointer in a drawing (picking.drawing_candidates), how many of it
+#: can be taken, and which was taken.
+_AcrossMembers = Tuple[List['MemberCandidate'], int, int]
+
+
 def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState']) -> PickResultWire:
     from kumiki.drawings.drawing import MeasurementSpace
-    from kumiki.viewer.picking import (Candidates, best_matching_candidate, build_inv_transform_float, choose,
-                                       edge_highlight_segments, extract_highlight_mesh, find_candidates,
-                                       inv_transform_point, navigate, non_real_plane_outline,
-                                       resolve_csg_at_path)
+
     ss = slot_state if slot_state is not None else state._active
-    member_key = payload.get("memberKey")
-    point = payload.get("point")
-    current_path = payload.get("currentPath") or []
-    # A drawing's view picks features directly, every timber alike: there is no drilling down the
-    # tree there, so Ctrl is a plain click.
-    ctrl_click = bool(payload.get("ctrlClick", False)) and payload.get("space") != MeasurementSpace.PROJECTED.value
     eps = 5e-4  # generous epsilon for raycast-based click points
-    # Edge and vertex slack scaled to what a pixel is worth where the click
-    # landed, which the viewer works out and sends. See _pick_tolerances.
-    tolerances = _pick_tolerances(payload, eps)
-    in_drawing = _pick_space(payload) is MeasurementSpace.PROJECTED
-    look = payload.get("look")
     space = _pick_space(payload)
+    ask = _PickAsk(
+        eps=eps,
+        # Edge and vertex slack scaled to what a pixel is worth where the click
+        # landed, which the viewer works out and sends. See _pick_tolerances.
+        tolerances=_pick_tolerances(payload, eps),
+        in_drawing=space is MeasurementSpace.PROJECTED,
+        space=space,
+        look=payload.get("look"),
+        # A drawing's view picks features directly, every timber alike: there is no drilling down
+        # the tree there, so Ctrl is a plain click.
+        ctrl_click=bool(payload.get("ctrlClick", False)) and payload.get("space") != MeasurementSpace.PROJECTED.value,
+        current_path=payload.get("currentPath") or [],
+        held_wire=payload.get("heldGeometry"),
+    )
+    if ask.in_drawing and isinstance(payload.get("ray"), dict) and not ask.ctrl_click:
+        return _pick_in_drawing(state, ss, payload, ask)
+    return _pick_on_member(state, ss, payload, ask, payload.get("memberKey"), payload.get("point"), None)
 
-    # In a drawing, every member drawn under the pointer, not only the one its ray meets first: the
-    # corner aimed at is often the neighbour's, and off a silhouette the ray meets nothing at all.
-    # The pick is then made on the chosen candidate's member, as any pick is.
-    across: Optional[Tuple[List['MemberCandidate'], int, int]] = None
-    if in_drawing and isinstance(payload.get("ray"), dict) and not ctrl_click:
-        from kumiki.csg.feature_paths import FeatureHandle
-        from kumiki.viewer.picking import best_matching_handle
 
-        merged, merged_visible = _drawing_candidates(ss, payload, tolerances)
-        if not merged_visible:
-            # Only hidden features here: nothing to take, but the menu still lists them, greyed.
-            return {**_nothing_at_point(member_key if isinstance(member_key, str) else ""),
-                    "candidates": _member_candidates_wire(ss, merged, merged_visible)}
-        index = payload.get("candidateIndex")
-        if index is None:
-            held = _geometry_from_wire(payload.get("heldGeometry")) if payload.get("heldGeometry") else None
-            index = best_matching_handle(
-                [FeatureHandle(timber=one.timber, hit=one.candidate.hit) for one in merged[:merged_visible]],
-                held, look, space)
-        chosen_index = int(index if index is not None else 0) % merged_visible
-        chosen = merged[chosen_index]
-        member_key = chosen.member
-        if chosen.candidate.place is not None:
-            point = [float(v) for v in ss.mesh_cache[member_key]["cut_timber"].timber.transform.local_to_global(
-                chosen.candidate.place.v3())]
-        across = (merged, merged_visible, chosen_index)
+def _pick_in_drawing(state: RunnerState, ss: 'SlotState', payload: PickRequest, ask: _PickAsk) -> PickResultWire:
+    """A pick in a drawing: every member drawn under the pointer, not only the one its ray meets
+    first -- the corner aimed at is often the neighbour's, and off a silhouette the ray meets nothing
+    at all. The pick is then made on the chosen candidate's member, as any pick is."""
+    from kumiki.csg.feature_paths import FeatureHandle
+    from kumiki.viewer.picking import best_matching_handle
+
+    member_key, point = payload.get("memberKey"), payload.get("point")
+    merged, merged_visible = _drawing_candidates(ss, payload, ask.tolerances)
+    if not merged_visible:
+        # Only hidden features here: nothing to take, but the menu still lists them, greyed.
+        return {**_nothing_at_point(member_key if isinstance(member_key, str) else ""),
+                "candidates": _member_candidates_wire(ss, merged, merged_visible)}
+    index = payload.get("candidateIndex")
+    if index is None:
+        index = best_matching_handle(
+            [FeatureHandle(timber=one.timber, hit=one.candidate.hit) for one in merged[:merged_visible]],
+            ask.held(), ask.look, ask.space)
+    chosen_index = int(index if index is not None else 0) % merged_visible
+    chosen = merged[chosen_index]
+    if chosen.candidate.place is not None:
+        point = [float(v) for v in ss.mesh_cache[chosen.member]["cut_timber"].timber.transform.local_to_global(
+            chosen.candidate.place.v3())]
+    result = _pick_on_member(state, ss, payload, ask, chosen.member, point, (merged, merged_visible, chosen_index))
+    # The menu and Tab go through everything under the pointer, every member's.
+    result["candidates"] = _member_candidates_wire(ss, merged, merged_visible)
+    result["candidateCount"] = merged_visible
+    result["candidateIndex"] = chosen_index
+    return result
+
+
+def _pick_on_member(
+    state: RunnerState, ss: 'SlotState', payload: PickRequest, ask: _PickAsk, member_key: Any, point: Any,
+    across: Optional[_AcrossMembers],
+) -> PickResultWire:
+    """A pick on one member at one world point. `across`, in a drawing, is what is under the pointer
+    on every member and which of it was taken; otherwise the candidates are this member's own."""
+    from kumiki.viewer.picking import (Candidates, best_matching_candidate, build_inv_transform_float, choose,
+                                       find_candidates, inv_transform_point, navigate)
 
     if not isinstance(member_key, str) or member_key not in ss.mesh_cache:
         raise ValueError(f"Unknown memberKey: {member_key}")
@@ -4970,7 +5009,7 @@ def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Opt
     # and which of it is wanted -- named by the caller (Tab, the menu), else the one that finishes the
     # measurement in hand, else the first in a drawing, else what navigation found.
     local_ray = _local_ray_from_payload(payload, timber_rot, timber_pos)
-    navigated = navigate(local_csg, local_pt, eps, ctrl_click, current_path)
+    navigated = navigate(local_csg, local_pt, ask.eps, ask.ctrl_click, ask.current_path)
     candidate_index = payload.get("candidateIndex")
     if across is not None:
         # This member's share of what is under the pointer, in the same order, and the chosen one.
@@ -4980,72 +5019,23 @@ def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Opt
         candidate_index = next(position for position, (index, _hit) in enumerate(mine) if index == chosen_index)
     else:
         blocked = (_sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1])
-                   if in_drawing and local_ray is not None else None)
-        found = find_candidates(local_csg, local_pt, eps, tolerances, local_ray, in_drawing, blocked)
+                   if ask.in_drawing and local_ray is not None else None)
+        found = find_candidates(local_csg, local_pt, ask.eps, ask.tolerances, local_ray, ask.in_drawing, blocked)
     feature_hits, visible_count = found
-    if in_drawing and local_ray is not None and not visible_count and not ctrl_click:
+    if ask.in_drawing and local_ray is not None and not visible_count and not ask.ctrl_click:
         # Only hidden features here: nothing to take, but the menu still lists them, greyed.
         return {**_nothing_at_point(member_key),
                 "candidates": _candidates_wire(local_csg, feature_hits, visible_count)}
-    held = _geometry_from_wire(payload.get("heldGeometry")) if payload.get("heldGeometry") else None
+    look, space, eps = ask.look, ask.space, ask.eps
     pick = choose(local_csg, navigated, found, candidate_index,
-                  lambda hits: best_matching_candidate(hits, timber, held, look, space), in_drawing, ctrl_click)
+                  lambda hits: best_matching_candidate(hits, timber, ask.held(), look, space), ask.in_drawing,
+                  ask.ctrl_click)
     new_path, target_csg, feature_label = pick.path, pick.node, pick.label
     feature_type, edge = pick.kind, pick.edge
-
-    parent_csg = None
-    if new_path:
-        parent_csg = resolve_csg_at_path(local_csg, new_path)
-
-    # An edge is drawn as a line whether it was derived or declared: a timber's
-    # own arris needs the line as much as a joint's does, and without this it
-    # was picked and then nothing was drawn for it.
-    highlight_edge = None
-    edge_absent = False
-    edge_feature = pick.edge_feature
     located_pick: Optional['LocatedPick'] = pick.located()
-    if edge_feature is not None:
-        highlight_edge, edge_absent = edge_highlight_segments(
-            edge_feature, target_csg, timber, local_csg,
-        )
-    elif located_pick is not None:
-        highlight_edge = non_real_plane_outline(located_pick[0], located_pick[1], timber, local_csg)
-
-    # Extract highlight mesh for the selected target
-    hl_verts, hl_idx, matched, total = extract_highlight_mesh(
-        mesh["vertices"],
-        mesh["indices"],
-        target_csg,
-        timber_rot,
-        timber_pos,
-        eps,
-        root_csg=local_csg,
-        selected_path=new_path,
-        selected_ref=parent_csg if feature_label is not None else target_csg,
-        feature_label=feature_label,
-        edge_feature=edge if (highlight_edge is None and not edge_absent) else None,
-        feature_type=feature_type,
-    )
-
-    # When a feature (face) is selected, also extract the parent labeled CSG mesh
-    # so the viewer can render the parent dimmer and the feature brighter.
-    parent_hl: Optional[MeshWire] = None
-    if feature_label is not None and parent_csg is not None:
-        p_verts, p_idx, _, _ = extract_highlight_mesh(
-            mesh["vertices"],
-            mesh["indices"],
-            parent_csg,
-            timber_rot,
-            timber_pos,
-            eps,
-            root_csg=local_csg,
-            selected_path=new_path,
-            selected_ref=parent_csg,
-        )
-        if p_verts:
-            parent_hl = MeshWire(vertices=p_verts, indices=p_idx)
-
+    lit = _pick_highlights(mesh, local_csg, timber, timber_rot, timber_pos, eps, pick)
     mesh_walk_ms = (time.monotonic() - t0) * 1000.0
+    hl_verts, hl_idx, matched, total = lit.mesh
 
     result: PickResultWire = {
         # Echoed back because the viewer can have several timbers selected at
@@ -5091,7 +5081,7 @@ def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Opt
         # read by the hover colour, the preview and the click alike. See
         # .claude/plans/measuring-states.md -- three readers deriving it separately is
         # what every measurement bug on this branch came down to.
-        "verdict": _pick_verdict(state, located_pick, timber, payload, slot_state),
+        "verdict": _pick_verdict(state, located_pick, timber, payload, ss),
         # What was selected, and the feature within it if navigation resolved
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a
@@ -5109,19 +5099,82 @@ def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Opt
             "totalTriangles": total,
         },
     }
-    if across is not None:
-        # The menu and Tab go through everything under the pointer, every member's.
-        merged, merged_visible, chosen_index = across
-        result["candidates"] = _member_candidates_wire(ss, merged, merged_visible)
-        result["candidateCount"] = merged_visible
-        result["candidateIndex"] = chosen_index
-    if parent_hl is not None:
-        result["parentHighlightMesh"] = parent_hl
-    if highlight_edge is not None:
+    if lit.parent is not None:
+        result["parentHighlightMesh"] = lit.parent
+    if lit.edge_segments is not None:
         # A list: a cut through the middle of an edge leaves a piece either side.
-        result["highlightEdgeSegments"] = highlight_edge
-    _log_pick(member_key, local_pt, tolerances, feature_hits, result)
+        result["highlightEdgeSegments"] = lit.edge_segments
+    _log_pick(member_key, local_pt, ask.tolerances, feature_hits, result)
     return result
+
+
+class _PickHighlights(NamedTuple):
+    """What lights a pick: its triangles (vertices, indices, matched, total), its parent node's
+    triangles to draw dimmer, and the line segments of an edge or a non-real plane's outline."""
+    mesh: Tuple[List[float], List[int], int, int]
+    parent: Optional[MeshWire]
+    edge_segments: Optional[Any]
+
+
+def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', timber: 'PerfectTimberWithin', timber_rot: Any,
+                     timber_pos: Any, eps: float, pick: 'Pick') -> _PickHighlights:
+    """The mesh and lines that light `pick` on its member."""
+    from kumiki.viewer.picking import (edge_highlight_segments, extract_highlight_mesh, non_real_plane_outline,
+                                       resolve_csg_at_path)
+
+    new_path, target_csg, feature_label = pick.path, pick.node, pick.label
+    parent_csg = None
+    if new_path:
+        parent_csg = resolve_csg_at_path(local_csg, new_path)
+
+    # An edge is drawn as a line whether it was derived or declared: a timber's
+    # own arris needs the line as much as a joint's does, and without this it
+    # was picked and then nothing was drawn for it.
+    highlight_edge = None
+    edge_absent = False
+    edge_feature = pick.edge_feature
+    located_pick = pick.located()
+    if edge_feature is not None:
+        highlight_edge, edge_absent = edge_highlight_segments(
+            edge_feature, target_csg, timber, local_csg,
+        )
+    elif located_pick is not None:
+        highlight_edge = non_real_plane_outline(located_pick[0], located_pick[1], timber, local_csg)
+
+    # Extract highlight mesh for the selected target
+    lit = extract_highlight_mesh(
+        mesh["vertices"],
+        mesh["indices"],
+        target_csg,
+        timber_rot,
+        timber_pos,
+        eps,
+        root_csg=local_csg,
+        selected_path=new_path,
+        selected_ref=parent_csg if feature_label is not None else target_csg,
+        feature_label=feature_label,
+        edge_feature=pick.edge if (highlight_edge is None and not edge_absent) else None,
+        feature_type=pick.kind,
+    )
+
+    # When a feature (face) is selected, also extract the parent labeled CSG mesh
+    # so the viewer can render the parent dimmer and the feature brighter.
+    parent_hl: Optional[MeshWire] = None
+    if feature_label is not None and parent_csg is not None:
+        p_verts, p_idx, _, _ = extract_highlight_mesh(
+            mesh["vertices"],
+            mesh["indices"],
+            parent_csg,
+            timber_rot,
+            timber_pos,
+            eps,
+            root_csg=local_csg,
+            selected_path=new_path,
+            selected_ref=parent_csg,
+        )
+        if p_verts:
+            parent_hl = MeshWire(vertices=p_verts, indices=p_idx)
+    return _PickHighlights(lit, parent_hl, highlight_edge)
 
 
 def _log_pick(
