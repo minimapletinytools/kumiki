@@ -19,8 +19,8 @@ from kumiki.rule import Matrix, Orientation, Transform, create_v2, create_v3, sc
 from tests.testing_shavings import present
 from kumiki.csg.carriers import BarrelCoord, CarrierRef, PlaneCoord
 from kumiki.csg.solve_recipe import (
-    Anchor, DistanceMeasurement, feature_dof_rows, locate_recipe,
-    direction_motion, measurement_row, motion_along, moved_by, perturbed,
+    combine, feature_dof_rows, locate_recipe,
+    direction_motion, motion_along, moved_by, perturbed,
 )
 
 
@@ -120,7 +120,12 @@ def _measure(carriers, anchors, along):
         recipe, at, _ = anchors[0]
         return motion_along(recipe, carriers, at, along)
     (end, end_at, _), (start, start_at, _) = sorted(anchors, key=lambda anchor: -anchor[2])
-    return measurement_row(DistanceMeasurement(Anchor(start, start_at), Anchor(end, end_at), along), carriers)
+    return _distance_row(carriers, start, start_at, end, end_at, along)
+
+
+def _distance_row(carriers, start, start_at, end, end_at, along):
+    """How the distance from `start_at` on `start` to `end_at` on `end`, read along `along`, changes."""
+    return combine(motion_along(end, carriers, end_at, along), motion_along(start, carriers, start_at, along), -1.0)
 
 
 class TestRecipesLocateLikeTheirFeatures:
@@ -415,7 +420,7 @@ class TestSolvingAFace:
             corner = _recipe(box, key)
             at = _point(corner)
             foot = create_v3(*_closest(locate_recipe(left), at))
-            known.append(measurement_row(DistanceMeasurement(Anchor(left, foot), Anchor(corner, at), along), carriers))
+            known.append(_distance_row(carriers, left, foot, corner, at, along))
         return remaining(known, feature_dof_rows(_recipe(box, target_key), carriers))
 
     @pytest.mark.parametrize("box", [_box(), _box(turn=0.6, position=(1, -2, 0))])

@@ -7,17 +7,16 @@ from typing import TYPE_CHECKING, Callable, Iterator, List
 from .cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
                      OwnedFeatureHit, csg_children, measured_by_default)
 from .feature_paths import FeatureHandle
-from .feature_extent import extents_of, timber_reach
-from ..rule import V3, create_v3
+from .feature_extent import extents_of
 
 if TYPE_CHECKING:
     from ..timber import CutTimber
 
-# Whether a flat face is on the finished surface: (face, root, near, reach) -> bool.
-FaceTest = Callable[[FeatureHandle[FaceFeature], CutCSG, V3, float], bool]
+# Whether a flat face is on the finished surface of its timber's tree: (face, root) -> bool.
+FaceTest = Callable[[FeatureHandle[FaceFeature], CutCSG], bool]
 
 
-def on_finished_surface(face: FeatureHandle[FaceFeature], root: CutCSG, near: V3, reach: float) -> bool:
+def on_finished_surface(face: FeatureHandle[FaceFeature], root: CutCSG) -> bool:
     """cross_sections.face_reaches_surface, read off the tree's FeatureExtents: the face is cut once,
     and kept for whatever else asks where it is. A tree that can't be cut counts as on the surface."""
     extent = extents_of(root, face.timber).of(face.feature, face.owner)
@@ -61,8 +60,6 @@ def required_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished
     """
     root = cut_timber.render_timber_with_cuts_csg_local()
     timber = cut_timber.timber
-    near = create_v3(0, 0, float(timber.length) / 2)
-    reach = timber_reach(timber)
 
     required: List[RequiredFeature] = []
     for node in _nodes(root):
@@ -81,7 +78,7 @@ def required_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished
                 required.append(RequiredFeature(handle, Reason.NON_REAL))
             elif isinstance(feature, FaceFeature) and feature.locate_simple_unbounded(node) is not None:
                 face = FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=node))
-                if face_test(face, root, near, reach):
+                if face_test(face, root):
                     required.append(RequiredFeature(handle, Reason.ON_SURFACE))
             elif isinstance(feature, CurvedFaceFeature):
                 required.append(RequiredFeature(handle, Reason.CURVED))
