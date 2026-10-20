@@ -42,9 +42,9 @@ TODO
 
 ## 2D:
 
-Everything below runs on each hover and click in a drawing's view. The runner calls it from
-`_handle_find_csg_at_point` and gets back an ordered candidate list, split into visible and
-hidden. Plan and history: `.claude/plans/drawing-view-picking.md`; the exact visibility test
+Everything below runs on each hover and click in a drawing's view. The runner calls
+`picking.drawing_candidates` from `_pick_in_drawing`, over every drawn member near the ray, and gets
+back one ordered candidate list, split into visible and hidden. Plan and history: `.claude/plans/drawing-view-picking.md`; the exact visibility test
 began in PR #82.
 
 ### 0. What comes in (viewer → runner)
@@ -57,8 +57,8 @@ With the click point, the pointer's ray and the pick tolerances, the runner then
 point and the ray (in the clicked timber's local space), the edge tolerance (a few pixels' worth
 in metres), and the drawn members.
 
-When `space` is `'projected'` and there is a ray, steps 1–3 run. Otherwise it is the 3D view's
-single-point lookup, `features_at_point`.
+When `space` is `'projected'` and there is a ray, steps 1–2 run. Otherwise -- the 3D view, or a
+request with no `space` -- it is the single-point lookup, `features_at_point`.
 
 ### 1. Collect the candidates: `candidates_under_pointer` (`kumiki/viewer/picking.py`)
 
@@ -89,26 +89,26 @@ that is, and its depth group.
    non-real; point, edge, face; declared before derived; ...). So a face and the edges on it are
    one depth and the edge still leads, while anything a few millimetres further back comes after.
 
-### 2. Split into visible and hidden: `split_hidden`
+### 2. Split into visible and hidden (in `drawing_candidates`)
 
 In order, building a visible and a hidden list:
 - Non-real candidates (axes) are always visible: snap targets in empty space.
 - A candidate is hidden if either:
   - **stacked**: an already-visible candidate in an earlier depth group covers it on the sheet
-    (`_covers`); or
+    (`visibility.drawn_over`); or
   - **behind material**: `blocked(candidate.place)`.
 - Otherwise it is visible.
 
 Only earlier *visible* candidates count for stacking, so a hidden one hides nothing.
 
-**Stacked: `_sheet_shape` and `_covers`.** `_sheet_shape` flattens a feature onto the sheet,
+**Stacked: `sheet_shape` and `drawn_over`.** `sheet_shape` flattens a feature onto the sheet,
 removing its component along the view:
 - a corner is a point;
 - an edge is a line, or a point if it runs straight along the view;
 - a face seen edge-on is a line whose run is normal × view;
 - anything else is nothing, and neither covers nor is covered.
 
-`_covers(front, behind)`:
+`drawn_over(front, behind)`:
 - a line in front of a line covers it when their sheet directions are parallel (both are under
   the pointer, so parallel is the same line);
 - a point in front of a point, when within the tolerance on the sheet;
@@ -119,7 +119,7 @@ This settles edges stacked exactly along the view from the candidates alone, wit
 whether a grazing line of sight blocks.
 
 **Behind material: `blocked`,** `picking.sight_blocker` over occluders the runner's `_sight_blocker`
-gathers: the clicked timber, then each other drawn member in the slot's mesh cache -- those in
+gathers: the candidate's own timber, then each other drawn member in the slot's mesh cache -- those in
 `drawnMembers`, or every member when none are sent. It is `visibility.hidden_at` per place, which
 asks `sight_is_blocked` of each, the place and the direction to the camera converted into each
 timber's own space first. A drawing's faded context is not in `drawnMembers`, so it hides nothing.

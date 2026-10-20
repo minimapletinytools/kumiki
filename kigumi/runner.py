@@ -2142,14 +2142,15 @@ def _pick_space(payload: PickRequest) -> 'MeasurementSpace':
 
     The viewer says, because it is the one that knows which view the pointer is
     in. A drawing's viewport has a declared camera and projects onto its sheet;
-    the 3D view projects nothing, its camera being the reader's.
+    the 3D view projects nothing, its camera being the reader's. Not said is the
+    model's: only a drawing's view projects.
     """
     from kumiki.drawings.measure import MeasurementSpace
 
     named = (payload or {}).get("space")
-    return (MeasurementSpace.THREE_D
-            if named == MeasurementSpace.THREE_D.value
-            else MeasurementSpace.PROJECTED)
+    return (MeasurementSpace.PROJECTED
+            if named == MeasurementSpace.PROJECTED.value
+            else MeasurementSpace.THREE_D)
 
 
 def _pick_placement(
@@ -4920,7 +4921,7 @@ def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Opt
         look=payload.get("look"),
         # A drawing's view picks features directly, every timber alike: there is no drilling down
         # the tree there, so Ctrl is a plain click.
-        ctrl_click=bool(payload.get("ctrlClick", False)) and payload.get("space") != MeasurementSpace.PROJECTED.value,
+        ctrl_click=bool(payload.get("ctrlClick", False)) and space is not MeasurementSpace.PROJECTED,
         current_path=payload.get("currentPath") or [],
         held_wire=payload.get("heldGeometry"),
     )
@@ -5018,14 +5019,8 @@ def _pick_on_member(
         found = Candidates([hit for _index, hit in mine], sum(1 for index, _hit in mine if index < merged_visible))
         candidate_index = next(position for position, (index, _hit) in enumerate(mine) if index == chosen_index)
     else:
-        blocked = (_sight_blocker(ss, cut_timber, local_csg, payload, local_ray[1])
-                   if ask.in_drawing and local_ray is not None else None)
-        found = find_candidates(local_csg, local_pt, ask.eps, ask.tolerances, local_ray, ask.in_drawing, blocked)
+        found = find_candidates(local_csg, local_pt, ask.eps, ask.tolerances, local_ray)
     feature_hits, visible_count = found
-    if ask.in_drawing and local_ray is not None and not visible_count and not ask.ctrl_click:
-        # Only hidden features here: nothing to take, but the menu still lists them, greyed.
-        return {**_nothing_at_point(member_key),
-                "candidates": _candidates_wire(local_csg, feature_hits, visible_count)}
     look, space, eps = ask.look, ask.space, ask.eps
     pick = choose(local_csg, navigated, found, candidate_index,
                   lambda hits: best_matching_candidate(hits, timber, ask.held(), look, space), ask.in_drawing,
