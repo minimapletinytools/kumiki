@@ -32,6 +32,25 @@ def _by_column(values: np.ndarray, columns: List[Unknown]) -> Dict[Unknown, floa
     return {column: float(value) for column, value in zip(columns, values) if abs(value) > 1e-12}
 
 
+#: Below this a row entry is the leftovers of a projection, not data: the same floor
+#: `_by_column` uses when it drops a motion's weights.
+_DUST = 1e-12
+
+
+def rank_svd(matrix: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """SVD of a rows-of-unknowns matrix, with numerical dust rounded away first.
+
+    The rank tests subtract one projection from another, which leaves entries that should
+    be zero as tiny non-zero values. LAPACK's divide-and-conquer SVD can fail to converge
+    on those (seen at ~1e-35 against a matrix scaled to 1), so entries below `_DUST` are
+    zeroed first. That is far below the tolerance the rank is read at, so the answer does
+    not change.
+    """
+    cleaned = np.array(matrix, dtype=float, copy=True)
+    cleaned[np.abs(cleaned) < _DUST] = 0.0
+    return np.linalg.svd(cleaned, full_matrices=False)
+
+
 def _matrix(rows: Sequence[Mapping[Unknown, float]], columns: List[Unknown]) -> np.ndarray:
     index = {column: i for i, column in enumerate(columns)}
     out = np.zeros((len(rows), len(columns)))
@@ -60,11 +79,11 @@ def remaining(
     with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
         unknown_part = target_matrix
         if len(known):
-            _, values, basis = np.linalg.svd(known_matrix, full_matrices=False)
+            _, values, basis = rank_svd(known_matrix)
             basis = basis[values > tolerance]
             unknown_part = target_matrix - target_matrix @ basis.T @ basis
 
-        left, values, right = np.linalg.svd(unknown_part, full_matrices=False)
+        left, values, right = rank_svd(unknown_part)
         kept = values > tolerance
         weights = left[:, kept].T
         quantities = weights @ target_matrix
