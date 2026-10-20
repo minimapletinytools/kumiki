@@ -47,6 +47,7 @@ from .timber import *
 from .footprint import *
 from .construction import *
 from .csg.pathcsg import *
+from .csg.symmetry import *
 from .joints.workshop.shavings import *
 from .joints.workshop.butt import *
 from .joints.workshop.corner import *

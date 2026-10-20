@@ -207,6 +207,29 @@ When timbers are part of a structure, they may be referred to as members. Member
 
 
 
+## Finding the same piece: duplicates, turned and mirrored
+
+Once a frame is cut, many of its timbers are often the same piece: a row of identical studs, a
+left post that is the right one mirrored. `match_timbers(frame.cut_timbers)` groups them, so you
+can draw or dimension each piece once:
+
+```python
+for group in match_timbers(frame.cut_timbers):
+    print(group.representative.timber.ticket.path, "x", 1 + len(group.matches))
+    for match in group.matches:
+        print("  ", match.cut.timber.ticket.path, match.kind.value, match.differences)
+```
+
+Each match says how it relates to its group's first timber:
+
+- **identical**: the same piece;
+- **rotation**: the same piece turned over or end for end;
+- **reflection**: a mirror image, a "handed" piece you may want to draw on its own.
+
+`differences` lists what the shape doesn't settle -- labels, reference features, tags -- without
+stopping the match. `timber_symmetries(a, b)` gives every way one cut timber maps onto another,
+and `timber_symmetries(a, a)` a piece's own (a stretcher the same at both ends is its own mirror).
+
 # Joints 
 
 Once your timbers have been created, it's time to cut them to make joints. 
