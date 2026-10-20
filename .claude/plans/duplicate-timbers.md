@@ -1,6 +1,17 @@
 # Finding duplicate, rotated and mirrored timbers
 
-Status: research and a plan, nothing built (2026-10-20). Reflections are detected and reported; what to do with them is the caller's choice.
+Status: the functions are built (`kumiki/csg/symmetry.py`: `match_timbers`, `timber_symmetries`,
+`csg_symmetries`), comparing trees (approach A). Not done: using them in the generators, "×N"
+drawings. Reflections are detected and reported; what to do with them is the caller's choice.
+
+As built, three things the plan below didn't foresee:
+
+- Where a piece sits is solved for, not taken from box centres: every matched primitive gives
+  equations linear in one shift, solved together.
+- A difference's cuts and a union's children match in any order: turned end for end, one end's
+  joint is the other end's, but the tree lists them the same way round.
+- Two pieces built differently (a cutter placed otherwise inside removed material) match only
+  under the symmetries their trees agree on: oscarshed's identical side girts come out a reflection.
 
 A routine the user calls before solving drawings: which cut timbers are the same piece, so one solve
 (and one shop drawing, "×N") covers them all. It also says when two timbers are the same piece
