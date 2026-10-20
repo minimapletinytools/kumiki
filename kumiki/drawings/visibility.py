@@ -13,6 +13,7 @@ nearer one is hidden too, so a click takes what is on top; a view keeps it, sinc
 in line are dimensioned at the one line both draw.
 """
 
+import warnings
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -20,6 +21,7 @@ import numpy as np
 from ..csg.edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to_interior_segments_on_csg
 from ..csg.cutcsg import CSGFeature, CutCSG
 from ..csg.feature_paths import FeatureHandle
+from ..csg.identity_memo import memo_by_identity
 from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, SightFrame, area, material_crossing,
                                   segments_outside, shadow, subtract)
 from ..geometry import Line, Plane, Point
@@ -93,8 +95,14 @@ def drawn_over(front: Optional[Geometry], behind: Optional[Geometry], look, tole
 def _frame_in(transform: Transform, origin: np.ndarray, u: np.ndarray, v: np.ndarray,
               normal: np.ndarray) -> SightFrame:
     """A world-space plane frame, in the local space of something placed by `transform`."""
-    local = lambda direction: as_ndarray(transform.global_to_local_direction(create_v3(*direction)))
-    return (as_ndarray(transform.global_to_local(create_v3(*origin))), local(u), local(v), local(normal))
+    rotation, position = _placement(transform)
+    return ((origin - position) @ rotation, u @ rotation, v @ rotation, normal @ rotation)
+
+
+@memo_by_identity
+def _placement(transform: Transform) -> Tuple[np.ndarray, np.ndarray]:
+    """A transform's rotation and position as floats: world = rotation @ local + position."""
+    return np.array(transform.orientation.matrix.tolist(), dtype=float), as_ndarray(transform.position)
 
 
 def nearest_visible_depth(
@@ -189,13 +197,56 @@ def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reac
               across: Tuple[float, float]) -> PolygonRegions:
     """What the occluders hide in the world frame's plane, within the `across` strip of it: their
     material across it, swept away from the camera."""
+    origin, u, _v, normal = world
     hidden: PolygonRegions = []
     for solid, transform in occluders:
+        corners = _world_corners(solid, transform)
+        if corners is not None:
+            # Its box clear of the plane, or of the strip: nothing of it can be in the way.
+            side = (corners - origin) @ normal
+            spread = (corners - origin) @ u
+            if (side.min() > _CLEAR or side.max() < -_CLEAR
+                    or spread.max() < across[0] - _CLEAR or spread.min() > across[1] + _CLEAR):
+                continue
         try:
             hidden += shadow(material_crossing(solid, _frame_in(transform, *world), reach, across), 2 * reach)
         except CannotCrossSection:
             continue  # unsure means seen
     return hidden
+
+
+#: How far clear of a plane a box must be to be skipped, so one merely touching it is still cut.
+_CLEAR = 1e-6
+
+
+def _world_corners(solid: CutCSG, transform: Transform) -> Optional[np.ndarray]:
+    """The eight corners of `solid`'s box, world space, or None if it has no finite box. Kept per
+    solid and placement."""
+    memo = _corners_memo(solid)
+    if id(transform) not in memo:
+        memo[id(transform)] = (transform, _work_out_corners(solid, transform))
+    return memo[id(transform)][1]
+
+
+@memo_by_identity
+def _corners_memo(solid: CutCSG) -> Dict[int, Tuple[Transform, Optional[np.ndarray]]]:
+    return {}
+
+
+def _work_out_corners(solid: CutCSG, transform: Transform) -> Optional[np.ndarray]:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        box = solid.get_aabb()
+    ends = [box.min_x, box.min_y, box.min_z, box.max_x, box.max_y, box.max_z]
+    if box.is_empty:
+        return None
+    floats = [float(end) for end in ends if end is not None]
+    if len(floats) != 6:
+        return None
+    low, high = floats[:3], floats[3:]
+    rotation, position = _placement(transform)
+    local = np.array([[x, y, z] for x in (low[0], high[0]) for y in (low[1], high[1]) for z in (low[2], high[2])])
+    return local @ rotation.T + position
 
 
 def _end_on_depth(line: Line, root: CutCSG, transform: Transform, look: np.ndarray,

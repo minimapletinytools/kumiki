@@ -233,11 +233,15 @@ def _sides(csg: CutCSG, frame: _Frame, seed: PolygonRegions) -> Sides:
         return front, back
     if isinstance(csg, Intersection):
         left_front, left_back = _sides(csg.left, frame, seed)
+        if not left_front and not left_back:
+            return [], []
         right_front, right_back = _sides(csg.right, frame, seed)
         return _intersect(left_front, right_front), _intersect(left_back, right_back)
     if isinstance(csg, Difference):
         front, back = _sides(csg.base, frame, seed)
         for cut in csg.subtract:
+            if not front and not back:
+                break  # nothing left to cut from
             cut_front, cut_back = _sides(cut, frame, seed)
             front, back = _subtract(front, cut_front), _subtract(back, cut_back)
         return front, back

@@ -4,6 +4,7 @@ A measurement to any feature becomes a row over its carriers' unknowns, via `mot
 The carriers themselves are in csg/carriers.py. See docs/internal/featuresolving-plan.md, Part 2 B.
 """
 
+import functools
 from typing import Callable, List, Mapping, Optional, Tuple, Union
 
 import numpy as np
@@ -16,8 +17,17 @@ from ..rule import Matrix, V3, as_ndarray, unit_ndarray
 
 
 def _axes(direction: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    first, second = perpendicular_axes(Matrix(direction))
-    return as_ndarray(first), as_ndarray(second)
+    return _axes_of(tuple(float(x) for x in np.asarray(direction, dtype=float).reshape(-1)[:3]))
+
+
+@functools.lru_cache(maxsize=4096)
+def _axes_of(direction: Tuple[float, ...]) -> Tuple[np.ndarray, np.ndarray]:
+    """perpendicular_axes, kept per direction: a solve asks the same few again and again."""
+    first, second = perpendicular_axes(Matrix(np.array(direction)))
+    first, second = as_ndarray(first), as_ndarray(second)
+    first.setflags(write=False)
+    second.setflags(write=False)
+    return first, second
 
 
 # One first-order constraint on how a point x of the feature moves: normal . dx = form.

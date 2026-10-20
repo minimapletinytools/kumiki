@@ -2346,7 +2346,13 @@ def _declared_features(csg: 'HasFeatures', source: 'FeatureSource') -> List['CSG
 
 def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
     """A plane for each default face of `csg` that has one, keyed like the face; and one for each
-    extra PlaneFeature, keyed by its place among the extras (FeatureCategory.EXTRA)."""
+    extra PlaneFeature, keyed by its place among the extras (FeatureCategory.EXTRA). Worked out once
+    per node; the dict is the caller's to add to."""
+    return dict(_face_plane_carriers(csg))
+
+
+@memo_by_identity
+def _face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
     carriers: Dict[FeatureKey, Carrier] = {}
     for key, feature in csg.default_features().items():
         if not isinstance(feature, FaceFeature):

@@ -9,7 +9,7 @@ Temporary, and expected to be renamed.
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -18,6 +18,7 @@ from ..csg.carriers import Row
 from ..csg.dof_solver import rank_svd, remaining, rows_matrix
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
+from ..csg.identity_memo import memo_by_identity
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
 from ..rule import as_ndarray, create_v3, unit_ndarray
@@ -66,15 +67,27 @@ class PickContext:
 Criterion = Callable[[DimensionCandidate, PickContext], float]
 
 
+def fixed(criterion: Criterion) -> Criterion:
+    """Mark a criterion whose score never changes as picks are made (it reads nothing of the
+    context), so auto_dimension scores each candidate by it once."""
+    setattr(criterion, "fixed", True)
+    return criterion
+
+
 def is_reference(handle: FeatureHandle) -> bool:
     """Whether the feature is one of its timber's reference features, or a face of a reference edge."""
-    name = handle.feature.name.split(".", 1)[-1]
-    for reference in getattr(handle.timber.ticket, "reference_features", ()) or ():
-        if name in {face.name.lower() for face in reference.long_faces_it_rests_on()}:
-            return True
-        if name == _CENTERPLANE_NAMES.get(reference):
-            return True
-    return False
+    return handle.feature.name.split(".", 1)[-1] in _reference_names(handle.timber)
+
+
+@memo_by_identity
+def _reference_names(timber) -> FrozenSet[str]:
+    """The names of a timber's reference features' faces and centerplanes, without their prefix."""
+    names = set()
+    for reference in getattr(timber.ticket, "reference_features", ()) or ():
+        names |= {face.name.lower() for face in reference.long_faces_it_rests_on()}
+        if reference in _CENTERPLANE_NAMES:
+            names.add(_CENTERPLANE_NAMES[reference])
+    return frozenset(names)
 
 
 _CENTERPLANE_NAMES = {
@@ -87,6 +100,7 @@ def _ends(candidate: DimensionCandidate) -> Tuple[FeatureHandle, FeatureHandle]:
     return candidate.measure.anchor_a, candidate.measure.anchor_b
 
 
+@fixed
 def from_reference(candidate: DimensionCandidate, context: PickContext) -> float:
     """Measured from a reference feature of its own timber."""
     return 0.0 if any(is_reference(end) for end in _ends(candidate)) else 1.0
@@ -97,11 +111,13 @@ def from_solved(candidate: DimensionCandidate, context: PickContext) -> float:
     return 0.0 if any(context.solved(end) for end in _ends(candidate)) else 1.0
 
 
+@fixed
 def perfect_over_rough(candidate: DimensionCandidate, context: PickContext) -> float:
     """How many ends are rough faces."""
     return float(sum(end.feature.name.startswith("rough.") for end in _ends(candidate)))
 
 
+@fixed
 def shortest(candidate: DimensionCandidate, context: PickContext) -> float:
     return candidate.length
 
@@ -141,6 +157,7 @@ class AutoDimensioning:
     left_after: int
 
 
+@memo_by_identity
 def _key(handle: FeatureHandle) -> Tuple:
     return hit_identity(handle.feature, handle.owner)
 
@@ -179,9 +196,29 @@ def auto_dimension(
         spans[_key(handle)] = slice(start, start + count)
         start += count
 
+    # Whether each target is solved, until the next pick changes it.
+    solved_memo: Dict[Tuple, bool] = {}
+
     def solved(handle: FeatureHandle) -> bool:
-        span = spans.get(_key(handle))
-        return span is None or float(np.linalg.norm(target_left[span])) < tolerance
+        key = _key(handle)
+        if key not in solved_memo:
+            span = spans.get(key)
+            solved_memo[key] = span is None or float(np.linalg.norm(target_left[span])) < tolerance
+        return solved_memo[key]
+
+    # Each candidate's score by the fixed criteria, worked out once.
+    fixed_scores: Dict[Tuple[int, int], float] = {}
+
+    def score(i: int) -> Tuple[float, ...]:
+        parts = []
+        for k, criterion in enumerate(policy.prefer):
+            if getattr(criterion, "fixed", False):
+                if (i, k) not in fixed_scores:
+                    fixed_scores[(i, k)] = criterion(candidates[i], context)
+                parts.append(fixed_scores[(i, k)])
+            else:
+                parts.append(criterion(candidates[i], context))
+        return tuple(parts)
 
     def unsolved_basis() -> np.ndarray:
         _, values, directions = rank_svd(target_left)
@@ -217,13 +254,16 @@ def auto_dimension(
             break
         # In the policy's order, so the first that helps (and passes the rules) is the pick: only the
         # candidates down to it need rows. Ties go to the earlier candidate.
-        scored = sorted(available, key=lambda i: (
-            tuple(criterion(candidates[i], context) for criterion in policy.prefer), i))
+        scored = sorted(available, key=lambda i: (score(i), i))
         chosen: Optional[Tuple[int, np.ndarray, bool]] = None
         first_helpful: Optional[Tuple[int, np.ndarray, bool]] = None
         for i in scored:
             direction = helpful_direction(candidates[i], unsolved)
             if direction is None:
+                # Never helps again: what it adds beyond the known rows is either nothing, or partly
+                # outside what is unsolved -- and a pick only adds to the known rows a direction
+                # inside the unsolved, which leaves that outside part where it is.
+                available.remove(i)
                 continue
             if all(rule(candidates[i], context) == 0 for rule in policy.rules):
                 chosen = (i, direction, False)
@@ -234,11 +274,12 @@ def auto_dimension(
         if chosen is None:
             break
         index_, direction, broke_rules = chosen
-        score = tuple(criterion(candidates[index_], context) for criterion in policy.prefer)
+        picked_score = score(index_)
         target_left = target_left - np.outer(target_left @ direction, direction)
         known = np.vstack([known, direction])
         available.remove(index_)
-        picks.append(Pick(candidates[index_], score, broke_rules=broke_rules))
+        solved_memo.clear()
+        picks.append(Pick(candidates[index_], picked_score, broke_rules=broke_rules))
 
     left_after = remaining([*known_rows, *(pick.candidate.row or {} for pick in picks)], target_rows).count
     unsolved_targets = [handle for handle in targets if not solved(handle)]

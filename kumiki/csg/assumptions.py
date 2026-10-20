@@ -7,12 +7,13 @@ Stored as rows in the solver's matrix together with the reason its known.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from .carriers import CarrierMap, Row
 from .feature_paths import FeatureHandle
+from .identity_memo import memo_by_identity
 from ..rule import Transform
 from .solve_recipe import VectorRow, combine, direction_motion, dot_vector_row, transform_vector_row
 
@@ -36,18 +37,32 @@ class _Directed:
 
 def _directed(handles: Sequence[FeatureHandle], carriers: CarrierMap) -> List[_Directed]:
     """The handles that have a direction (a plane's normal, a line's direction), in world space."""
+    known = _directed_memo(carriers)
     directed = []
     for handle in handles:
-        recipe = handle.feature.solve_recipe(handle.owner)
-        if recipe is None:
-            continue
-        try:
-            direction, change = direction_motion(recipe, carriers)
-        except ValueError:
-            continue
-        rotation = np.array(handle.timber.transform.orientation.matrix.tolist(), dtype=float)
-        directed.append(_Directed(handle, rotation @ direction, transform_vector_row(change, rotation)))
+        if handle not in known:
+            known[handle] = _direct(handle, carriers)
+        if known[handle] is not None:
+            directed.append(known[handle])
     return directed
+
+
+@memo_by_identity
+def _directed_memo(carriers: CarrierMap) -> Dict[FeatureHandle, Optional[_Directed]]:
+    """Each handle's direction, kept for as long as the carriers are: every view's assumptions ask."""
+    return {}
+
+
+def _direct(handle: FeatureHandle, carriers: CarrierMap) -> Optional[_Directed]:
+    recipe = handle.feature.solve_recipe(handle.owner)
+    if recipe is None:
+        return None
+    try:
+        direction, change = direction_motion(recipe, carriers)
+    except ValueError:
+        return None
+    rotation = np.array(handle.timber.transform.orientation.matrix.tolist(), dtype=float)
+    return _Directed(handle, rotation @ direction, transform_vector_row(change, rotation))
 
 
 def _across(direction: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
