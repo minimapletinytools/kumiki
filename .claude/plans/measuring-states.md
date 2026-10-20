@@ -1,7 +1,7 @@
 # Measuring: the states, and every transition
 
 What the viewer does while a measurement is being made, after the change
-described in `selection-states.md` §7. That document is the investigation and
+described in `archive/selection-states.md` §7. That document is the investigation and
 the plan; this one is the target, and the code should be readable against it.
 
 `measurement-spec.md` says what a measurement IS. This says how one gets made.

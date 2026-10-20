@@ -8,7 +8,7 @@ Vectors here are rule.py's V3, as everywhere else in the library. The types a me
 as off the wire -- lists and tuples out of JSON -- are taken at the edge and converted once; see
 VectorLike.
 
-See .claude/plans/measurement-spec.md, and .claude/plans/drawing-rule-migration.md for what is
+See .claude/plans/measurement-spec.md, and .claude/plans/archive/drawing-rule-migration.md for what is
 still to do. Where a sheet's viewports sit, and the Drawing that holds them, are drawing.py.
 """
 

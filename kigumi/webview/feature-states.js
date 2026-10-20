@@ -9,7 +9,7 @@
     // feature key into a FeatureState: { key, roles }, where each role keeps
     // the geometry its source sent.
     //
-    // Pure. highlights.js draws from these. See .claude/plans/render-states.md.
+    // Pure. highlights.js draws from these. See .claude/plans/archive/render-states.md.
 
     /**
      * The roles a feature can have. The last two are for features nobody is

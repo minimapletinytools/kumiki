@@ -9,7 +9,7 @@
     // below, rather than a branch threaded into one function.
     //
     // Both are pure; the caller walks the members and applies the result. See
-    // .claude/plans/render-states.md.
+    // .claude/plans/archive/render-states.md.
 
     const { SELECTION_VISUAL_STATES } = (typeof module !== 'undefined' && module.exports)
         ? require('./selection-visuals.js')

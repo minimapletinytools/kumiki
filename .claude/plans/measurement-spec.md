@@ -1,6 +1,6 @@
 # Measurements — specification
 
-Status: built. Supersedes the measurement parts of `drawing-mode-plan.md`,
+Status: built. Supersedes the measurement parts of `archive/drawing-mode-plan.md`,
 which stands for everything about scenes, pages and viewports.
 
 What was built differs from this document in one way worth knowing before
