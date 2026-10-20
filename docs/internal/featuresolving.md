@@ -3,7 +3,7 @@
 How kumiki decides which features of a timber must be dimensioned, whether a set of
 measurements pins them down, and how it picks dimensions automatically until they are.
 
-See `featuresystem.md` for the features themselves, and `featuresolving-plan.md` for the plan and
+See `featuresystem.md` for the features themselves, and `.claude/plans/featuresolving-plan.md` for the plan and
 the decisions made along the way.
 
 ## The idea in one paragraph
