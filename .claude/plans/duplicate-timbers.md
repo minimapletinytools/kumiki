@@ -90,7 +90,16 @@ Steps:
    - No new trees are built. `adopt_csg` can move a tree by a rotation, but a reflected prism or
      extrusion would have a left-handed frame, which nothing else expects.
 3. **Group**: the first timber of a bucket is a representative; each other one joins the first
-   group it matches, trying the identity first, then rotations, then reflections.
+   group it matches. Try every symmetry, not just until the first fits: a piece that is symmetric
+   in itself (a stretcher the same at both ends) matches its twin under several, often both a
+   rotation and a reflection. Classify by the best one found:
+   - **identical** if the identity fits;
+   - else **rotation** if any rotation fits: the piece can simply be turned, so it is the same piece
+     even when a reflection fits too (the coffee table's tops and bottom stretchers);
+   - else **reflection**: only a mirror fits, a truly handed piece (the coffee table's legs).
+
+   Keep every symmetry that fit on the match, and each piece's own symmetries, for a caller that
+   wants to decide differently.
    The symmetries are about each piece's material box (its rough stock and extended ends), not its
    centreline.
 4. **Report differences** that the geometry doesn't settle, without refusing the match:
