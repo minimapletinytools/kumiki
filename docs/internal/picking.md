@@ -1,167 +1,165 @@
-# The Feature Picking System
+# Feature picking
 
-How a hover or click becomes a picked feature. The CSG feature system it picks from is in
+How a hover or a click becomes a picked feature. The features themselves are described in
 `featuresystem.md`; where picking sits among measuring, solving and drawing, in `featureflow.md`.
 
-Feature picking differes if we are in the 3d view or if we are in a 2d orthographic drawing view. 
+There are two ways to pick:
 
-## Feature priority
+- **3D view**: the pointer picks on the one timber it is over.
+- **Drawing view** (orthographic sheet): the pointer picks from every timber drawn under it, and
+  what is hidden behind material is listed but can't be taken.
 
-Several features can be under the pointer at once. `_sort_feature_hits` in `cutcsg.py` orders
-them, and a click takes the first. Each rule decides only where the ones before it tie:
+One rule holds for both: **the slack is in screen pixels**. An edge is picked within 6 px of it on
+screen, a corner within 10 px, on either side, whatever the zoom or the angle.
 
-1. **Non-real lines and points, then real features, then non-real planes.** A bore's axis is a
-   deliberate snap, so the surface it lies on does not steal the click. A non-real plane (a
-   centerplane, or a perfect face inside rough stock) runs through the whole body, so it would
-   take every click on its line; it comes last.
-2. **The more specific kind.** Point, then edge, then face (flat or curved). An edge beats the two
-   faces that formed it, and a corner beats its edges.
-3. **Declared before derived.** A feature something declared beats one derived from a pair of
-   faces.
-4. **Group rank** (`FeatureGroup`, lower is better): `SHOULDER_PLANE`, `PERFECT`, `ROUGH`, `TENON`,
-   `CROSSING`, then `NONE`. A derived feature takes the better rank of its two parents.
-5. **Author-set priority** (`FeatureProperties.priority`, lower wins). Default features carry a high
-   value, so anything a joint names beats the prism's anonymous defaults.
-6. **Name**, alphabetically.
-7. **The order they were found in**, as the last tie-break.
+## The words used below
 
-In a drawing's view the candidates come nearest the viewer first, and this order breaks ties at
-one depth (`order_along_ray`; see 2D below).
+- **Ray**: the line from the camera through the pointer.
+- **Hit point**: where the ray first meets a timber's mesh.
+- **Slack**: how close the pointer must be to a feature on screen. The viewer turns pixels into a
+  world distance at the hit point and sends it as `tolerances` (`face`, `edge`, `point`).
+- **Real / non-real**: a real feature is on the timber's surface (a face, an arris). A non-real one
+  is a reference that isn't surface: a centerplane, a perfect-timber (PTW) face, a bore's axis.
+- **Candidates**: every feature under the pointer, best first. A click takes the first one; Tab
+  steps through them; right-click lists them.
 
-In Kigumi, while the pointer is over a feature:
+## What the viewer sends (`viewer-app.js`)
 
-- **Tab** steps to the next feature under the pointer, wrapping round. The highlight shows what a
-  click would now take. Moving the pointer forgets the choice.
-- **Right-click** (without dragging) lists every feature under the pointer, best first, with its
-  kind; choosing a row selects that feature. With only one feature there, right-click opens the
-  member menu instead.
+On a click, and on a hover once the pointer has settled:
 
-## 3D:
+- Raycast the meshes for the hit point and the member it is on (`memberKey`). In a drawing, a ray
+  that hits nothing still sends a pick.
+- Work out the slack: pixels (`pick-tolerances.js`: 6 to an edge, 10 to a corner) times the world
+  size of one pixel at the hit point.
+- Send `findCSGAtPoint` with the hit point, the ray, the slack, `space` (`'projected'` in a
+  drawing, `'3d'` otherwise), the drawn members, the current CSG path, Ctrl, the end of a
+  measurement in hand (if any), and the candidate the hover settled on (if any).
 
-TODO
+## Entry point: `_handle_find_csg_at_point` (runner)
 
-## 2D:
+Click and hover both come here, so a hover always shows what a click would take.
 
-Everything below runs on each hover and click in a drawing's view. The runner calls
-`picking.drawing_candidates` from `_pick_in_drawing`, over every drawn member near the ray, and gets
-back one ordered candidate list, split into visible and hidden. Plan and history: `.claude/plans/drawing-view-picking.md`; the exact visibility test
-began in PR #82.
+- Turn on the point-test memo for this pick (`point_tests_memo`).
+- Read the request once (`_PickAsk`). A missing `space` means 3D.
+- In a drawing, with a ray: do a **drawing pick** (`_pick_in_drawing`).
+- Otherwise: do a **3D pick** (`_pick_on_member`) on the member that was hit.
 
-### 0. What comes in (viewer → runner)
+## 3D pick: `_pick_on_member`
 
-`_pickContext()` (`viewer-app.js`) goes with every hover and click:
-- `space`: `'projected'` in a drawing, `'3d'` otherwise;
-- `drawnMembers`: in a drawing, the members it draws.
+- Move the hit point and the ray into the timber's own space.
+- **Navigate** the CSG tree to the node under the point (`picking.navigate`):
+  - a plain click goes straight to the deepest labelled node under the point;
+  - Ctrl+click goes one level deeper than the current path per click.
+- **Find the candidates** (`find_candidates` → `features_at_point`):
+  - Ask the whole tree for features near the hit point (`find_all_features`, below). Edges and
+    corners are gathered from 3× further along the face than their slack (`SLANT_REACH`), because
+    a face seen at a slant puts a pixel on screen further away along the face.
+  - Keep an edge or a corner only if it comes within its slack of the ray, measured across the
+    view.
+  - Add a non-real plane (centerplane, PTW face) if the line where it crosses the struck face comes
+    within the edge slack of the ray.
+  - Add non-real lines (a bore's axis) the ray passes within the edge slack of, inside their
+    extent (`non_real_features_along_ray`).
+  - Drop an edge whose line is not really an edge of the surface there: a flush copy of another
+    timber's arris (`_only_creases`).
+- **Choose** one (`choose`, below).
+- **Highlight** it (`_pick_highlights`, below) and build the reply: the feature, its path, its
+  geometry and anchor, the candidate list, and a measurement verdict if a measurement is in hand.
 
-With the click point, the pointer's ray and the pick tolerances, the runner then has: the hit
-point and the ray (in the clicked timber's local space), the edge tolerance (a few pixels' worth
-in metres), and the drawn members.
+## Drawing pick: `_pick_in_drawing`
 
-When `space` is `'projected'` and there is a ray, steps 1–2 run. Otherwise -- the 3D view, or a
-request with no `space` -- it is the single-point lookup, `features_at_point`.
+- **Gather every member near the ray** (`_drawing_candidates`):
+  - Skip a member whose box the ray doesn't come within the slack of.
+  - The member that was hit, and any member the ray passes through, is asked at the hit point.
+  - A member the ray just misses is asked at the point of its mesh nearest the ray, so an edge is
+    picked from outside its silhouette as well as from inside.
+- **Find each member's candidates** (`candidates_under_pointer`), in that member's own space:
+  - Features near its point (`find_all_features`).
+  - Non-real lines and non-real planes along the ray (`non_real_features_along_ray`). A plane
+    counts when it is seen edge-on, the ray is within the edge slack of it, and the ray crosses the
+    part of the plane that lies in the timber (its `FeatureExtent`).
+  - Keep an edge or corner only within its slack of the ray, across the view; place it at its own
+    point nearest the ray.
+  - Drop what the sheet can't measure (`measurable_in_view`): a face seen at an angle is an area,
+    not a line. A real face seen edge-on is also dropped when a real edge draws the same line,
+    since the edge measures the same. Non-real faces always stay.
+- **Order them, nearest the camera first** (`drawing_candidates`): group by depth (a new group
+  whenever one is more than the edge slack deeper), and within a group use the feature priority.
+- **Split visible from hidden**, in order:
+  - a non-real feature is never hidden;
+  - a feature is hidden when a nearer visible one draws over it on the sheet
+    (`visibility.drawn_over`);
+  - or when material lies between it and the camera (`visibility.hidden_at`, below).
+- If nothing is visible, take nothing but still list the hidden ones (greyed in the menu).
+- **Choose**: the candidate the request names (Tab, a menu row), else the one that best finishes
+  the measurement in hand, else the first visible one.
+- Do the rest as a 3D pick on the chosen candidate's member, then reply with the whole list.
 
-### 1. Collect the candidates: `candidates_under_pointer` (`kumiki/viewer/picking.py`)
+## Is a place hidden? `visibility.hidden_at`
 
-Returns `Candidate(hit, place, depth, group)`: each feature, where along the ray it is, how deep
-that is, and its depth group.
+- For each drawn member, in its own space:
+  - Cut the line from the place toward the camera to the inside of the solid
+    (`crop_line_to_interior_segments_on_csg`, exact).
+  - The place is hidden if any piece of that reaches more than 10 µm toward the camera. A line of
+    sight that only runs along a surface is not blocked.
+- A solid that can't be cut exactly counts as not blocking: unsure means visible.
 
-1. **At the surface:** `root.find_all_features(local_pt)`, the features where the ray first hit a
-   surface. In a drawing every drawn member near the ray is asked at that one point, so a corner
-   flush with it on another member is found too. Nothing deeper is offered: it is behind the
-   surface. An edge on a silhouette is found from the side its own surface is on.
-2. *(No longer done: the whole ray was swept for features at any depth. See the note on
-   `real_features_along_ray`.)*
-3. **Features in voids:** `merge_ray_hits` adds non-real ones, like a bore's axis, at their
-   nearest approach to the ray.
-4. **Exact places for edges and corners:** `_nearest_on`. A corner is placed at itself; an edge at
-   the point of its line nearest the pointer's ray. The surface point can be a pixel off it, and
-   testing visibility from there gets it wrong.
-5. **Drop what the view can't measure:** `measurable_in_view`. Edges, points and curved faces
-   stay. A flat face goes if:
-   - it is seen at an angle (|normal · view| > `EDGE_ON`), so it is an area; or
-   - it is seen edge-on but a straight-edge candidate lies in its plane (square to the normal,
-     within the edge tolerance of it). That edge lands on the same line and measures the same.
+## Finding features at a point: `CutCSG.find_all_features` (library)
 
-   A cylinder's cap has no straight edge in its plane, so it stays.
-6. **Order:** `order_along_ray`, nearest first. `_depth_groups` walks the candidates by depth and
-   starts a new group whenever one is more than the edge tolerance past the start of the current
-   group. The sort key is the group, then the library's ranking (`feature_hit_sort_key`:
-   non-real; point, edge, face; declared before derived; ...). So a face and the edges on it are
-   one depth and the edge still leads, while anything a few millimetres further back comes after.
+- Walk the tree and collect every declared feature the point is on, each at its own tolerance
+  (`collect_feature_hits`).
+- At each node, drop the real ones if the point is not on that node's boundary. Non-real ones
+  skip this check.
+- Gather faces again at the corner slack, and make **derived edges** from pairs of them and
+  **derived points** from edges crossing faces; keep those the point is near.
+- Sort by feature priority, and drop derived duplicates of the same geometry.
 
-### 2. Split into visible and hidden (in `drawing_candidates`)
+## Choosing one: `picking.choose`
 
-In order, building a visible and a hidden list:
-- Non-real candidates (axes) are always visible: snap targets in empty space.
-- A candidate is hidden if either:
-  - **stacked**: an already-visible candidate in an earlier depth group covers it on the sheet
-    (`visibility.drawn_over`); or
-  - **behind material**: `blocked(candidate.place)`.
-- Otherwise it is visible.
+In order:
 
-Only earlier *visible* candidates count for stacking, so a hidden one hides nothing.
+- the candidate the request names (Tab, a menu row), wrapping round the visible ones;
+- else, while measuring, the visible one that can be measured against the held end, preferring
+  the same kind (face to face, edge to edge);
+- else, in a drawing, the first visible one;
+- else (3D): a derived edge or point under the click, then a declared edge or point, then the face
+  navigation landed on.
 
-**Stacked: `sheet_shape` and `drawn_over`.** `sheet_shape` flattens a feature onto the sheet,
-removing its component along the view:
-- a corner is a point;
-- an edge is a line, or a point if it runs straight along the view;
-- a face seen edge-on is a line whose run is normal × view;
-- anything else is nothing, and neither covers nor is covered.
+## Feature priority (`_sort_feature_hits`)
 
-`drawn_over(front, behind)`:
-- a line in front of a line covers it when their sheet directions are parallel (both are under
-  the pointer, so parallel is the same line);
-- a point in front of a point, when within the tolerance on the sheet;
-- a line in front of a point, when the point is within the tolerance of the line;
-- a point in front of a line, never: the line shows on both sides of it.
+When several features tie on depth, each rule decides only where the ones before it tie:
 
-This settles edges stacked exactly along the view from the candidates alone, without asking
-whether a grazing line of sight blocks.
+1. Non-real lines and points first, then real features, then non-real planes. An axis is a
+   deliberate snap; a centerplane runs through the whole body, so it comes last.
+2. More specific first: point, then edge, then face.
+3. Declared before derived.
+4. Group rank (`FeatureGroup`): `SHOULDER_PLANE`, `PERFECT`, `ROUGH`, `TENON`, `CROSSING`, then
+   `NONE`. A derived feature takes the better rank of its two parents.
+5. Author-set priority, lower first.
+6. Name, alphabetically.
+7. The order they were found in.
 
-**Behind material: `blocked`,** `picking.sight_blocker` over occluders the runner's `_sight_blocker`
-gathers: the candidate's own timber, then each other drawn member in the slot's mesh cache -- those in
-`drawnMembers`, or every member when none are sent. It is `visibility.hidden_at` per place, which
-asks `sight_is_blocked` of each, the place and the direction to the camera converted into each
-timber's own space first. A drawing's faded context is not in `drawnMembers`, so it hides nothing.
+## Lighting the pick: `_pick_highlights`
 
-**`sight_is_blocked(root, place, toward_camera)`** (`kumiki/drawings/visibility.py`):
-1. Crop the line through `place`, in the camera's direction, to the solid's *inside*
-   (`crop_line_to_interior_segments_on_csg`, exact): the stretches of it strictly within the solid,
-   not on its surface.
-2. Blocked if any of them reaches more than `NUDGE` (10 µm) toward the camera. A line of sight along
-   an edge-on face only runs along the surface, so a peg's cap seen edge-on, or the front edge of a
-   flank, stays visible -- and one that runs along a surface and then into material is blocked.
-   (It judged each stretch by its middle before, which missed the second.)
-3. A tree that cannot be cropped (`None`: curved primitives other than cylinders) is "not
-   blocked". Unsure means visible.
+- An edge: its line, cut to where it survives on the timber (`edge_highlight_segments`).
+- A non-real plane: its outline on the timber (`non_real_plane_outline`).
+- A face: the mesh triangles on it (`extract_highlight_mesh`):
+  - skip triangles outside the node's box;
+  - keep a triangle whose centre is on the feature's plane and on the node's boundary.
+- The selected node's own triangles too, drawn dimmer.
 
-A drawing's generator asks the same of a whole feature rather than a place: see
-`nearest_visible_depth` in the same module, which decides a face seen edge-on, or a line lying
-along the sheet, in the one plane holding all its lines of sight, cut exactly by each solid.
+## Entry point: `_handle_find_csg_by_path` (runner)
 
-### 3. Choosing one (`picking.choose`)
+Lights a node named by a path (the tree panel, a saved selection), with no point involved.
 
-`_handle_find_csg_at_point` runs three steps of `picking.py` -- `navigate`, `find_candidates`,
-`choose` -- and builds its reply from the `Pick` that comes back.
+- Walk the path down the tree (`resolve_csg_at_path`): each step is a label, `label#n` for the
+  n-th sibling with that label.
+- Light the node's triangles, or the named feature's.
 
-- Candidates: visible first, then hidden, each in order; `visible_count` is how many are visible.
-- Default choice: while measuring, `best_matching_candidate` considers only the visible ones.
-  Otherwise in a drawing, a plain click with no index takes candidate 0, the first visible one.
-  With nothing visible, nothing is taken: the answer is empty but for the (hidden) candidates.
-- A named index (Tab, a menu row) wraps round the visible candidates only, so it is never a
-  hidden one.
-- Returned: each candidate with `hidden: index >= visible_count` and its `path`, and
-  `candidateCount = visible_count`, which is what Tab cycles through.
+## Speed
 
-### 4. The viewer
+A drawing pick is around 5–15 ms on the cute frame and tinyhouse. What keeps it there:
 
-The right-click menu lists every candidate. Hidden rows are `disabled`, greyed, and marked
-"hidden" beside their type and path; hovering one does not preview it. Tab cycles through
-`candidateCount` only, so it never reaches them.
-
-### Cost
-
-One candidate list per hover (a pass over the tree's declared features), plus one
-`sight_is_blocked` crop per candidate place for each drawn member. About 60 ms a hover on the
-dovetailed sawhorse, against 13 ms for the 3D view's single hit point. Skipping timbers whose
-bounding box the line of sight misses would be the first speed-up.
+- the point-test memo: each node answers each point question once per pick;
+- members are skipped by box before anything else;
+- feature extents, solid bounds and declared features are worked out once per tree and kept.
