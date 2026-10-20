@@ -23,11 +23,16 @@ def frame():
     runner = importlib.util.module_from_spec(spec)
     sys.modules["kigumi_runner_reference_picks"] = runner
     spec.loader.exec_module(runner)
+    # Loading purges kumiki where it is installed from this checkout (as on CI); the rest of the
+    # session keeps the modules it imported, as test_kigumi_generated_drawings does.
+    saved_modules = dict(sys.modules)
     with warnings.catch_warnings(), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         warnings.simplefilter("ignore")
         slot = runner.load_slot_state(str(REPO / "patterns" / "structures" / "my_cute_frame_drawing_test.py"))
         runner.build_real_geometry(None, slot)
-    return runner, slot
+    yield runner, slot
+    sys.modules.clear()
+    sys.modules.update(saved_modules)
 
 
 def _first_hit(slot, origin, look):
