@@ -497,14 +497,101 @@ def features_at_point(
     non_real_features_along_ray. The point alone cannot find them: it is where
     the ray struck a surface, and the middle of a bore is a bore's radius away
     from every surface the bore has.
+
+    With a ray, the slack is the viewer's -- screen pixels -- across the view, not along the face the
+    point is on: a face seen at a slant puts an edge a pixel away on screen further away in it. So
+    edges and corners are gathered from wider (SLANT_REACH) and kept within their slack of the ray,
+    and a reference plane (non-real) is taken within the edge slack of the point, as the line it
+    draws across the surface, rather than the face tolerance a surface is struck within.
     """
-    from kumiki.csg.cutcsg import FeatureTestTolerances
+    from dataclasses import replace
+
+    from kumiki.csg.cutcsg import FeatureTestTolerances, _sort_feature_hits
 
     resolved = tolerances or FeatureTestTolerances(face=eps)
-    hits = _only_creases(root, root.find_all_features(to_v3(local_pt), resolved), local_pt)
     if local_ray is None:
-        return hits
+        return _only_creases(root, root.find_all_features(to_v3(local_pt), resolved), local_pt)
+    origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
+    if direction is None:
+        return _only_creases(root, root.find_all_features(to_v3(local_pt), resolved), local_pt)
+    wide = replace(resolved, edge=float(resolved.edge) * SLANT_REACH,
+                   point=float(resolved.point or resolved.edge) * SLANT_REACH)
+    gathered = _only_creases(root, root.find_all_features(to_v3(local_pt), wide), local_pt)
+    hits = [hit for hit in gathered if _within_slack(hit, origin, direction, resolved)]
+    known = {_hit_key(hit) for hit in hits}
+    planes = [hit for hit in _reference_planes_near(root, Float3.of(local_pt), origin, direction, float(resolved.edge))
+              if _hit_key(hit) not in known]
+    hits = _sort_feature_hits(hits + planes) if planes else hits
     return merge_ray_hits(root, hits, local_ray, resolved)
+
+
+#: How much further than its slack a 3D pick looks for an edge or a corner along the face it struck,
+#: before keeping those within the slack across the view: a face at 70 degrees to the view.
+SLANT_REACH = 3.0
+
+
+def _within_slack(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3,
+                  tolerances: 'FeatureTestTolerances') -> bool:
+    """Whether an edge or corner comes within its slack of the ray, across the view; anything else,
+    and a line along the ray, is not asked."""
+    from kumiki.csg.cutcsg import CSGFeatureType
+
+    exact = _nearest_on(hit, origin, direction)
+    if exact is None:
+        return True
+    offset = exact - origin
+    across = offset - direction * offset.dot(direction)
+    slack = tolerances.point if hit.feature.feature_type() is CSGFeatureType.POINT else tolerances.edge
+    return math.sqrt(across.dot(across)) <= float(slack or tolerances.edge)
+
+
+def _reference_planes_near(root: 'CutCSG', point: Float3, origin: Float3, direction: Float3,
+                           tolerance: float) -> List['OwnedFeatureHit']:
+    """The non-real planes declared in `root` whose line across the surface at `point` -- where each
+    crosses the face struck there -- comes within `tolerance` of the ray, across the view."""
+    from kumiki.csg.cutcsg import OwnedFeatureHit, csg_children
+    from kumiki.geometry import Plane
+
+    facing = root.get_outward_normal(point.v3())
+    surface = Float3.of(facing).unit() if facing is not None else None
+    found: List['OwnedFeatureHit'] = []
+
+    def near(plane: Plane) -> bool:
+        normal = Float3.of(plane.normal).unit()
+        if normal is None:
+            return False
+        gap = normal.dot(point - Float3.of(plane.point))
+        trace = normal.cross(surface).unit() if surface is not None else None
+        if surface is None or trace is None:
+            return abs(gap) <= tolerance  # no face to cross, or parallel to it: by distance alone
+        toward = surface.cross(trace)  # in the face, square to the trace
+        step = -gap / normal.dot(toward)
+        if abs(step) > tolerance * SLANT_REACH:
+            return False
+        on_trace = point + toward * step
+        across_trace = trace.dot(direction)
+        if abs(across_trace) > 1 - 1e-12:
+            nearest = on_trace
+        else:
+            to_origin = origin - on_trace
+            along = (to_origin.dot(trace) - across_trace * to_origin.dot(direction)) / (1 - across_trace * across_trace)
+            nearest = on_trace + trace * along
+        offset = nearest - origin
+        across = offset - direction * offset.dot(direction)
+        return math.sqrt(across.dot(across)) <= tolerance
+
+    def walk(node: 'CutCSG') -> None:
+        for feature in node.get_declared_features():
+            if feature.real:
+                continue
+            plane = feature.locate_simple_unbounded(node)
+            if isinstance(plane, Plane) and near(plane):
+                found.append(OwnedFeatureHit(feature=feature, owner=node))
+        for child in csg_children(node):
+            walk(child)
+
+    walk(root)
+    return found
 
 
 def _only_creases(root: 'CutCSG', hits: List['OwnedFeatureHit'], point: Any) -> List['OwnedFeatureHit']:
@@ -585,12 +672,19 @@ def candidates_under_pointer(
                 if on_ray is not None:
                     found_at([hit], on_ray)
     # An edge or corner is placed on itself, where it comes nearest the pointer: it was found
-    # where the ray crossed some face, which can be a pixel off it.
+    # where the ray crossed some face, which can be a pixel off it. And it is offered only within
+    # its slack of the pointer ACROSS the view -- screen pixels, the viewer's tolerances -- however
+    # near the point it was found at.
+    within: List['OwnedFeatureHit'] = []
     for hit in hits:
         key = _hit_key(hit)
+        if not _within_slack(hit, origin, direction, tolerances):
+            continue
         exact = _nearest_on(hit, origin, direction)
         if exact is not None:
             found[key] = (_along_ray(origin, direction, exact), exact)
+        within.append(hit)
+    hits = within
     separation = float(tolerances.edge)
     ordered = order_along_ray(measurable_in_view(hits, direction, separation),
                               {key: along for key, (along, _place) in found.items()}, separation)

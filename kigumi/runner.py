@@ -412,6 +412,8 @@ class MeshCacheEntry(TypedDict, total=False):
     cut_timber: 'CutTimber'
     # The mesh's world box, (lows, highs): worked out on first use.
     world_box: Tuple[List[float], List[float]]
+    # The mesh's triangles as numpy arrays of corners (a, b, c), world space: worked out on first use.
+    world_triangles: Any
 
 
 class RemeshMetricWire(TypedDict, total=False):
@@ -4739,8 +4741,11 @@ def _drawing_candidates(
     """What is under the pointer in a drawing, on every member it draws (picking.drawing_candidates).
 
     The drawn members are the request's `drawnMembers` (every timber when it is None). One whose box
-    the ray does not come near is skipped. Each is asked at the one surface the viewer's ray met,
-    whichever member that is on: a corner flush with it is found there, from either member's side.
+    the ray does not come near is skipped. Each the ray passes through is asked at the one surface the
+    viewer's ray met, whichever member that is on: a corner flush with it is found there, from either
+    member's side. One the ray misses but passes within reach of -- the pointer just off its
+    silhouette -- is asked at the point of its mesh nearest the ray, which is on its edge there: the
+    slack is in screen pixels either side of an edge, not only from inside it.
     """
     from kumiki.viewer.picking import (DrawnMember, build_inv_transform_float, drawing_candidates,
                                        inv_transform_direction, inv_transform_point)
@@ -4762,11 +4767,16 @@ def _drawing_candidates(
         box = _member_world_box(entry)
         if not _ray_nears_box(origin, direction, box, reach):
             continue
-        # Nothing of a member is at a surface point out of its reach.
+        rotation, position = build_inv_transform_float(cut_timber.timber.transform)
         surface = None
-        if at is not None and all(low - reach <= x <= high + reach for x, low, high in zip(at, *box)):
-            rotation, position = build_inv_transform_float(cut_timber.timber.transform)
-            surface = inv_transform_point(rotation, position, at)
+        if key == hit_member or _ray_meets_mesh(entry, origin, direction):
+            # Nothing of a member is at a surface point out of its reach.
+            if at is not None and all(low - reach <= x <= high + reach for x, low, high in zip(at, *box)):
+                surface = inv_transform_point(rotation, position, at)
+        else:
+            near = _mesh_point_near_ray(entry, origin, direction, reach)
+            if near is not None:
+                surface = inv_transform_point(rotation, position, near)
         members.append(DrawnMember(key, root, cut_timber.timber, surface))
 
     def blocked_for(key: str) -> Callable[['Float3'], bool]:
@@ -4785,6 +4795,60 @@ def _member_world_box(entry: MeshCacheEntry) -> Tuple[List[float], List[float]]:
         entry["world_box"] = ([min(vertices[axis::3]) for axis in range(3)],
                               [max(vertices[axis::3]) for axis in range(3)])
     return entry["world_box"]
+
+
+def _world_triangles(entry: MeshCacheEntry) -> Any:
+    """A member's mesh triangles as three (n, 3) arrays of corners, world space, kept on its entry."""
+    import numpy as np
+
+    if "world_triangles" not in entry:
+        vertices = np.array(entry["mesh"]["vertices"], dtype=float).reshape(-1, 3)
+        faces = np.array(entry["mesh"]["indices"], dtype=int).reshape(-1, 3)
+        entry["world_triangles"] = (vertices[faces[:, 0]], vertices[faces[:, 1]], vertices[faces[:, 2]])
+    return entry["world_triangles"]
+
+
+def _ray_meets_mesh(entry: MeshCacheEntry, origin: 'Float3', direction: 'Float3') -> bool:
+    """Whether the ray passes through any of a member's mesh triangles."""
+    import numpy as np
+
+    a, b, c = _world_triangles(entry)
+    o, d = np.array(origin, dtype=float), np.array(direction, dtype=float)
+    e1, e2 = b - a, c - a
+    p = np.cross(d, e2)
+    det = (e1 * p).sum(1)
+    usable = np.abs(det) > 1e-15
+    inverse = np.where(usable, 1.0 / np.where(usable, det, 1.0), 0.0)
+    s = o - a
+    u = (s * p).sum(1) * inverse
+    q = np.cross(s, e1)
+    v = (d * q).sum(1) * inverse
+    t = (e2 * q).sum(1) * inverse
+    return bool(np.any(usable & (u >= 0) & (v >= 0) & (u + v <= 1) & (t > 0)))
+
+
+def _mesh_point_near_ray(entry: MeshCacheEntry, origin: 'Float3', direction: 'Float3',
+                         reach: float) -> Optional[List[float]]:
+    """The point of a member's mesh edges nearest the ray across the view, the nearest the camera
+    among equals, if within `reach` of it; None otherwise."""
+    import numpy as np
+
+    a, b, c = _world_triangles(entry)
+    starts = np.concatenate([a, b, c])
+    runs = np.concatenate([b - a, c - b, a - c])
+    o, d = np.array(origin, dtype=float), np.array(direction, dtype=float)
+    # Across the view: everything with its component along the ray taken off.
+    flat_starts = (starts - o) - np.outer((starts - o) @ d, d)
+    flat_runs = runs - np.outer(runs @ d, d)
+    lengths = (flat_runs * flat_runs).sum(1)
+    t = np.clip(-(flat_starts * flat_runs).sum(1) / np.where(lengths > 1e-24, lengths, 1.0), 0.0, 1.0)
+    across = np.linalg.norm(flat_starts + flat_runs * t[:, None], axis=1)
+    nearest = float(across.min())
+    if nearest > reach:
+        return None
+    points = starts + runs * t[:, None]
+    depth = np.where(across <= nearest + 1e-9, (points - o) @ d, np.inf)
+    return [float(x) for x in points[int(np.argmin(depth))]]
 
 
 def _ray_nears_box(origin: 'Float3', direction: 'Float3', box: Tuple[List[float], List[float]],
