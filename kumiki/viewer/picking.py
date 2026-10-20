@@ -486,23 +486,14 @@ def features_at_point(
     root: 'CutCSG', local_pt: Float3, eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
     local_ray: Optional[LocalRay] = None,
 ) -> List['OwnedFeatureHit']:
-    """Every feature the WHOLE tree sees at the click, best first.
+    """Every feature the whole tree sees at the click, best first. The whole tree, since a derived
+    edge needs both its faces in scope.
 
-    Asked of the root rather than the node navigation landed on: a derived edge
-    comes from a face on each of two different primitives, so it exists only
-    where both are in scope. A leaf can never see one, which is why edges were
-    unselectable from a click while the machinery for them worked.
-
-    With a ray, features that lie in a VOID are found too -- see
-    non_real_features_along_ray. The point alone cannot find them: it is where
-    the ray struck a surface, and the middle of a bore is a bore's radius away
-    from every surface the bore has.
-
-    With a ray, the slack is the viewer's -- screen pixels -- across the view, not along the face the
-    point is on: a face seen at a slant puts an edge a pixel away on screen further away in it. So
-    edges and corners are gathered from wider (SLANT_REACH) and kept within their slack of the ray,
-    and a reference plane (non-real) is taken within the edge slack of the point, as the line it
-    draws across the surface, rather than the face tolerance a surface is struck within.
+    With a ray, the slack is in screen pixels across the view:
+    - edges and corners are gathered from further along the face (SLANT_REACH), then kept only
+      within their slack of the ray;
+    - a reference plane is taken where its line across the face is within the edge slack;
+    - features in a void, like a bore's axis, are found along the ray (non_real_features_along_ray).
     """
     from dataclasses import replace
 

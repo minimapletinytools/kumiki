@@ -405,6 +405,10 @@ class TriangulatedMesh(TypedDict):
     bounds: Any  # numpy (2, 3): low corner, high corner
 
 
+#: A mesh's triangles as three (n, 3) arrays: every triangle's first, second and third corner.
+WorldTriangles = Tuple['np.ndarray', 'np.ndarray', 'np.ndarray']
+
+
 class MeshCacheEntry(TypedDict, total=False):
     """Not a wire form: what a slot keeps per member between builds."""
     mesh: MemberMeshWire
@@ -412,8 +416,8 @@ class MeshCacheEntry(TypedDict, total=False):
     cut_timber: 'CutTimber'
     # The mesh's world box, (lows, highs): worked out on first use.
     world_box: Tuple[List[float], List[float]]
-    # The mesh's triangles as numpy arrays of corners (a, b, c), world space: worked out on first use.
-    world_triangles: Any
+    # The mesh's triangles, world space: worked out on first use.
+    world_triangles: 'WorldTriangles'
 
 
 class RemeshMetricWire(TypedDict, total=False):
@@ -662,6 +666,7 @@ class AccessoryEntry(TypedDict):
     type: str
 
 if TYPE_CHECKING:
+    import numpy as np
     # Annotations only. kumiki must NOT be imported at module scope for
     # anything used at runtime: _purge_project_modules drops modules under the
     # project root that are not in a venv, which in a dev checkout includes
@@ -4738,14 +4743,12 @@ ACCESSORY_KEY_PREFIX = "accessory:"
 def _drawing_candidates(
     ss: SlotState, payload: PickRequest, tolerances: 'FeatureTestTolerances',
 ) -> Tuple[List['MemberCandidate'], int]:
-    """What is under the pointer in a drawing, on every member it draws (picking.drawing_candidates).
+    """What is under the pointer in a drawing, on every drawn member near the ray
+    (picking.drawing_candidates).
 
-    The drawn members are the request's `drawnMembers` (every timber when it is None). One whose box
-    the ray does not come near is skipped. Each the ray passes through is asked at the one surface the
-    viewer's ray met, whichever member that is on: a corner flush with it is found there, from either
-    member's side. One the ray misses but passes within reach of -- the pointer just off its
-    silhouette -- is asked at the point of its mesh nearest the ray, which is on its edge there: the
-    slack is in screen pixels either side of an edge, not only from inside it.
+    - A member the ray passes through is asked at the surface point the viewer's ray hit.
+    - A member the ray just misses is asked at its mesh point nearest the ray, so an edge is
+      picked from outside its silhouette too.
     """
     from kumiki.viewer.picking import (DrawnMember, build_inv_transform_float, drawing_candidates,
                                        inv_transform_direction, inv_transform_point)
@@ -4797,8 +4800,8 @@ def _member_world_box(entry: MeshCacheEntry) -> Tuple[List[float], List[float]]:
     return entry["world_box"]
 
 
-def _world_triangles(entry: MeshCacheEntry) -> Any:
-    """A member's mesh triangles as three (n, 3) arrays of corners, world space, kept on its entry."""
+def _world_triangles(entry: MeshCacheEntry) -> WorldTriangles:
+    """A member's mesh triangles, world space, kept on its entry."""
     import numpy as np
 
     if "world_triangles" not in entry:
