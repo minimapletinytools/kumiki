@@ -15,10 +15,10 @@
     // somebody happened to be at.
 
     /** Pixels from an edge that still counts as clicking it. */
-    const EDGE_PICK_PIXELS = 12;
+    const EDGE_PICK_PIXELS = 6;
 
     /** Pixels from a vertex. Larger: a point is smaller to aim at than a line. */
-    const POINT_PICK_PIXELS = 20;
+    const POINT_PICK_PIXELS = 10;
 
     /**
      * How much world distance one screen pixel covers at `point`.
