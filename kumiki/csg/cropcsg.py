@@ -628,7 +628,7 @@ def _exact_spans(
     nobody has got round to.
 
     Not solved: PathExtrusion, which needs the line intersected with the path in
-    2D with arcs included, and a loft whose sides are not flat.
+    2D with angles included, and a loft whose sides are not flat.
     """
     from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
                          HalfSpace, RectangularPrism)
@@ -861,7 +861,7 @@ def crop_line_to_crease_segments_on_csg(
     near: Optional[V3] = None,
     tolerance: float = 0.0,
 ) -> Optional[List[LineSegment]]:
-    """The parts of a line where the solid's surface creases along it: where it is an edge.
+    """The parts of a line where the solid's surface creases along it: i.e. where it is a real edge on the surface.
 
     The boundary crop, less where the surface runs straight on across the line -- one flat face
     either side, as where another timber's arris, copied into this one's tree by a relief, lies
@@ -885,21 +885,24 @@ def is_crease_at(line: Line, csg, point: V3, tolerance: float = 0.0) -> bool:
 
 # --- which way the solid lies around a line ---------------------------------------------------
 #
-# Looking along a line at one place on it, the solid occupies some directions around it: a set of
-# arcs of the circle square to the line. None of it, or all of it: the line is off the solid, or
-# inside it. Exactly half, in one piece: it lies in one flat face. Anything else: the surface
-# creases along it. Each primitive gives its arcs exactly (the half circles of the planes the line
-# lies in), and the tree combines them as it combines solids.
+# Looking along a line at one place on it, the solid occupies some directions around it: spans of
+# angle, in the plane square to the line -- intervals, as a Span is along the line, not curved
+# geometry. None of the angles, or all: the line is off the solid, or inside it. Exactly half, in
+# one piece: it lies in one flat face. Anything else: the surface creases along it. Each primitive
+# gives its angles exactly (half a turn for each plane the line lies in), and the tree combines
+# them as it combines solids.
 
-# How far round the circle, in radians, two directions may be and count as one.
+# How close, in radians, two angles may be and count as one.
 _ANGLE_EPS = 1e-6
 _TAU = 2.0 * math.pi
 _FLAT = "flat"
-Arcs = List[Tuple[float, float]]
+# A span of angle around the line, (low, high) in radians within [0, 2pi].
+AngleSpan = Tuple[float, float]
+AngleSpans = List[AngleSpan]
 
 
-def _arcs_union(one: Arcs, other: Arcs) -> Arcs:
-    merged: Arcs = []
+def _angles_union(one: AngleSpans, other: AngleSpans) -> AngleSpans:
+    merged: AngleSpans = []
     for low, high in sorted(one + other):
         if merged and low <= merged[-1][1] + _ANGLE_EPS:
             merged[-1] = (merged[-1][0], max(merged[-1][1], high))
@@ -908,20 +911,21 @@ def _arcs_union(one: Arcs, other: Arcs) -> Arcs:
     return merged
 
 
-def _arcs_intersection(one: Arcs, other: Arcs) -> Arcs:
+def _angles_intersection(one: AngleSpans, other: AngleSpans) -> AngleSpans:
     out = [(max(a, c), min(b, d)) for a, b in one for c, d in other if min(b, d) - max(a, c) > _ANGLE_EPS]
-    return _arcs_union(out, [])
+    return _angles_union(out, [])
 
 
-def _arcs_less(one: Arcs, other: Arcs) -> Arcs:
+def _angles_less(one: AngleSpans, other: AngleSpans) -> AngleSpans:
     rest = [(0.0, _TAU)]
     for low, high in other:
-        rest = [piece for a, b in rest for piece in ((a, min(b, low)), (max(a, high), b)) if piece[1] - piece[0] > _ANGLE_EPS]
-    return _arcs_intersection(one, rest)
+        rest = [piece for a, b in rest for piece in ((a, min(b, low)), (max(a, high), b))
+                if piece[1] - piece[0] > _ANGLE_EPS]
+    return _angles_intersection(one, rest)
 
 
-def _half_circle(normal, basis) -> Arcs:
-    """The directions square to the line on a plane's solid side: within a quarter turn of -normal."""
+def _half_turn(normal, basis) -> AngleSpans:
+    """The angles square to the line on a plane's solid side: within a quarter turn of -normal."""
     u, v = basis
     centre = math.atan2(-float(normal @ v), -float(normal @ u)) % _TAU
     low, high = centre - math.pi / 2, centre + math.pi / 2
@@ -932,11 +936,11 @@ def _half_circle(normal, basis) -> Arcs:
     return [(low, high)]
 
 
-def _plane_arcs(faces, at, direction, basis, tolerance) -> Arcs:
-    """The arcs of a convex solid, given as half spaces (normal, point) keeping dot(n, p - point) <= 0."""
+def _plane_angles(faces, at, direction, basis, tolerance) -> AngleSpans:
+    """The angles of a convex solid, given as half spaces (normal, point) keeping dot(n, p - point) <= 0."""
     import numpy as np
 
-    arcs: Arcs = [(0.0, _TAU)]
+    angles: AngleSpans = [(0.0, _TAU)]
     for normal, point in faces:
         n = np.array([float(normal[i, 0]) for i in range(3)])
         n /= np.linalg.norm(n)
@@ -948,12 +952,12 @@ def _plane_arcs(faces, at, direction, basis, tolerance) -> Arcs:
         across = n - direction * float(n @ direction)
         if float(np.linalg.norm(across)) < 1e-12:
             continue  # square to the line: only where it crosses, which no tested place is
-        arcs = _arcs_intersection(arcs, _half_circle(across, basis))
-    return arcs
+        angles = _angles_intersection(angles, _half_turn(across, basis))
+    return angles
 
 
-def _primitive_arcs(csg, at, direction, basis, tolerance) -> Optional[Arcs]:
-    """A primitive's arcs at `at`, or None where it is only bounded, not solved (see _exact_spans)."""
+def _primitive_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
+    """A primitive's angles at `at`, or None where it is only bounded, not solved (see _exact_spans)."""
     import numpy as np
     from .cutcsg import ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder, HalfSpace, RectangularPrism
 
@@ -965,12 +969,12 @@ def _primitive_arcs(csg, at, direction, basis, tolerance) -> Optional[Arcs]:
         if distance > tolerance + _IN_PLANE_EPS:
             return []
         caps = _extrusion_caps(unit_vector(csg.axis_direction), csg.position, csg.start_distance, csg.end_distance)
-        arcs = _plane_arcs(caps, at, direction, basis, tolerance)
-        if arcs and distance >= -(tolerance + _IN_PLANE_EPS):
+        angles = _plane_angles(caps, at, direction, basis, tolerance)
+        if angles and distance >= -(tolerance + _IN_PLANE_EPS):
             across = radial - direction * float(radial @ direction)
             if float(np.linalg.norm(across)) > 1e-12:
-                arcs = _arcs_intersection(arcs, _half_circle(across, basis))
-        return arcs
+                angles = _angles_intersection(angles, _half_turn(across, basis))
+        return angles
     exact = isinstance(csg, (HalfSpace, RectangularPrism, ConvexPolygonExtrusion))
     if isinstance(csg, ConvexPolygonSimpleLoft):
         exact = _loft_sides_are_planar(csg)
@@ -981,39 +985,39 @@ def _primitive_arcs(csg, at, direction, basis, tolerance) -> Optional[Arcs]:
         return None
     if bounds.is_empty:
         return []
-    return _plane_arcs(bounds.require_faces(), at, direction, basis, tolerance)
+    return _plane_angles(bounds.require_faces(), at, direction, basis, tolerance)
 
 
-def _tree_arcs(csg, at, direction, basis, tolerance) -> Optional[Arcs]:
+def _tree_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
     from .cutcsg import Difference, Intersection, SolidUnion
 
     if isinstance(csg, SolidUnion):
-        out: Arcs = []
+        out: AngleSpans = []
         for child in csg.children:
-            arcs = _tree_arcs(child, at, direction, basis, tolerance)
-            if arcs is None:
+            angles = _tree_angles(child, at, direction, basis, tolerance)
+            if angles is None:
                 return None
-            out = _arcs_union(out, arcs)
+            out = _angles_union(out, angles)
         return out
     if isinstance(csg, Intersection):
-        left = _tree_arcs(csg.left, at, direction, basis, tolerance)
-        right = _tree_arcs(csg.right, at, direction, basis, tolerance) if left else []
-        return None if left is None or right is None else _arcs_intersection(left, right)
+        left = _tree_angles(csg.left, at, direction, basis, tolerance)
+        right = _tree_angles(csg.right, at, direction, basis, tolerance) if left else []
+        return None if left is None or right is None else _angles_intersection(left, right)
     if isinstance(csg, Difference):
-        kept = _tree_arcs(csg.base, at, direction, basis, tolerance)
+        kept = _tree_angles(csg.base, at, direction, basis, tolerance)
         if not kept:
             return kept
         for solid in csg.subtract:
-            removed = _tree_arcs(solid, at, direction, basis, tolerance)
+            removed = _tree_angles(solid, at, direction, basis, tolerance)
             if removed is None:
                 return None
-            kept = _arcs_less(kept, removed)
+            kept = _angles_less(kept, removed)
         return kept
-    return _primitive_arcs(csg, at, direction, basis, tolerance)
+    return _primitive_angles(csg, at, direction, basis, tolerance)
 
 
 def _directions_at(csg, line: Line, station: float, tolerance: float):
-    """At `station` along `line`: _FLAT where the solid lies in one flat face there, else its arcs
+    """At `station` along `line`: _FLAT where the solid lies in one flat face there, else its angles
     (or None, unsure)."""
     import numpy as np
 
@@ -1023,15 +1027,15 @@ def _directions_at(csg, line: Line, station: float, tolerance: float):
     u = np.cross(direction, seed)
     u /= np.linalg.norm(u)
     basis = (u, np.cross(direction, u))
-    arcs = _tree_arcs(csg, at, direction, basis, tolerance)
-    if arcs is None:
+    angles = _tree_angles(csg, at, direction, basis, tolerance)
+    if angles is None:
         return None
-    if len(arcs) == 1 and abs(arcs[0][1] - arcs[0][0] - math.pi) < 1e-4:
+    if len(angles) == 1 and abs(angles[0][1] - angles[0][0] - math.pi) < 1e-4:
         return _FLAT
-    if len(arcs) == 2 and arcs[0][0] < _ANGLE_EPS and arcs[1][1] > _TAU - _ANGLE_EPS \
-            and abs(arcs[0][1] + _TAU - arcs[1][0] - math.pi) < 1e-4:
-        return _FLAT  # one half circle, across the angle where the circle starts
-    return arcs
+    if len(angles) == 2 and angles[0][0] < _ANGLE_EPS and angles[1][1] > _TAU - _ANGLE_EPS \
+            and abs(angles[0][1] + _TAU - angles[1][0] - math.pi) < 1e-4:
+        return _FLAT  # one half turn, across angle 0 where the spans wrap
+    return angles
 
 
 def _stations(csg, line: Line, seed: Span) -> List[float]:
