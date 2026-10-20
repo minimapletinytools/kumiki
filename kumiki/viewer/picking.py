@@ -336,12 +336,12 @@ def cropped_edge_segments(
     length of the arris.
     """
     from kumiki.csg.feature_extent import declared_line_span, intersected_intervals
-    from kumiki.csg.cropcsg import crop_line_to_crease_segments_on_csg, crop_line_to_segments_on_csg
+    from kumiki.csg.edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to_segments_on_csg
     from kumiki.geometry import Line, unit_vector
 
     # Normalised first, because everything below measures along it in metres:
     # stations are compared against the edge tolerance and against what the
-    # feature declares, and cropcsg parameterises by its own unit direction. A
+    # feature declares, and edges_on_csg parameterises by its own unit direction. A
     # Line does not promise that its direction is one.
     line = Line(direction=unit_vector(line.direction), point=line.point)
 
@@ -454,7 +454,7 @@ def edge_highlight_segments(
     click is one point that is on the timber anyway.
 
     A list, because a cut through the middle of an edge leaves a piece either
-    side of it. None when the tree holds a primitive cropcsg cannot
+    side of it. None when the tree holds a primitive edges_on_csg cannot
     describe, and the caller falls back to lighting triangles.
 
     The second return says the edge was cropped away entirely. The caller wants
@@ -521,10 +521,10 @@ def features_at_point(
 
 def _only_creases(root: 'CutCSG', hits: List['OwnedFeatureHit'], point: Any) -> List['OwnedFeatureHit']:
     """`hits` without a real edge whose line, where the pointer is, only runs through a flat face:
-    a line on the surface that is no edge of it (cropcsg.is_crease_at) -- a relief's copy of another
+    a line on the surface that is no edge of it (edges_on_csg.is_crease_at) -- a relief's copy of another
     timber's arris, flush in this one's face."""
     from kumiki.csg.cutcsg import CSGFeatureType
-    from kumiki.csg.cropcsg import is_crease_at
+    from kumiki.csg.edges_on_csg import is_crease_at
     from kumiki.geometry import Line, unit_vector
 
     at = Float3.of(point)

@@ -1,9 +1,9 @@
 """Where a line is an edge of a solid: on its surface, and where the surface creases along it
-(cropcsg.crop_line_to_crease_segments_on_csg, is_crease_at)."""
+(edges_on_csg.crop_line_to_crease_segments_on_csg, is_crease_at)."""
 
 import pytest
 
-from kumiki.csg.cropcsg import crop_line_to_boundary_segments_on_csg, crop_line_to_crease_segments_on_csg, is_crease_at
+from kumiki.csg.edges_on_csg import crop_line_to_boundary_segments_on_csg, crop_line_to_crease_segments_on_csg, is_crease_at
 from kumiki.csg.cutcsg import Cylinder, Difference, RectangularPrism, SolidUnion
 from kumiki.geometry import Line
 from kumiki.rule import Transform, create_v2, create_v3, scalar

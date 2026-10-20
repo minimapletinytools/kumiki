@@ -11,7 +11,7 @@ from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from .cropcsg import _loft_sides_are_planar, solid_bounds
+from .edges_on_csg import _loft_sides_are_planar, solid_bounds
 from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, CutCSG, Cylinder, Difference, EmptyCSG,
                      FaceFeature, Intersection, SolidUnion)
 from .feature_paths import FeatureHandle

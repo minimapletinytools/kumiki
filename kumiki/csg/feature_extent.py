@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from .cropcsg import crop_line_to_segments_on_csg
+from .edges_on_csg import crop_line_to_segments_on_csg
 from .cross_sections import (CrossSection, cross_section_centroid, cross_section_outline, cross_section_polygons,
                              face_cross_section, plane_cross_section)
 from .cutcsg import CSGFeature, CutCSG, FaceFeature, FeatureNature

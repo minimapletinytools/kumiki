@@ -3261,7 +3261,7 @@ def _cropped_reference_segments(
     noise, as a declared edge is (see cropped_edge_segments).
     """
     from kumiki.viewer.picking import DECLARED_EDGE_FLOAT_NOISE
-    from kumiki.csg.cropcsg import (crop_line_to_boundary_segments_on_csg,
+    from kumiki.csg.edges_on_csg import (crop_line_to_boundary_segments_on_csg,
                                     crop_line_to_segments_on_csg)
     from kumiki.geometry import Line, unit_vector
     from kumiki.rule import create_v3
