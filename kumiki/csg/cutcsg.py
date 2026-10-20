@@ -2416,9 +2416,23 @@ class CutCSGLabel:
         return f"CutCSGLabel({self.name!r})" if self.name is not None else "NoLabel"
 
 
-# Point tests a node answers recursively from its children's. Inside point_tests_memo each is
-# worked out once per node, point and eps -- a walk that asks every level of a tree otherwise asks
-# each node once per ancestor.
+# =================================================================================================
+# TODO GLOBAL STATE -- REMOVE. A stopgap for pick speed, not a design.
+#
+# point_tests_memo hides a memo in a ContextVar, and every CutCSG subclass's contains_point,
+# is_point_on_boundary and get_outward_normal is wrapped (__init_subclass__) to read it. That is a
+# global in all but name: a point test answers differently depending on what block it runs inside,
+# and nothing in its signature says so.
+#
+# Why it exists: collect_feature_hits gates each level of a tree on is_point_on_boundary, and each
+# level's test asks every node below it again, so a walk asks each node once per ancestor. Inside
+# a pick, the memo makes that once per node (cute frame top-view picks 15 -> 5 ms).
+#
+# The refactor: pass a context object through the point tests and the feature walks
+# (find_all_features, collect_feature_hits, SolidsAtPoint, the Difference / SolidUnion tests),
+# owned by whoever asks -- a pick, a generator run -- and holding this memo. Then drop the
+# ContextVar, the wrapping in __init_subclass__ and point_tests_memo.
+# =================================================================================================
 _POINT_TESTS = ("contains_point", "is_point_on_boundary", "get_outward_normal")
 _point_tests_memo: ContextVar[Optional[Dict[Tuple, Tuple['CutCSG', object]]]] = ContextVar(
     "_point_tests_memo", default=None)
