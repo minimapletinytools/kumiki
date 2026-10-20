@@ -1,4 +1,6 @@
-const { DrawingOverlays, anchoredLineDistances, drawnFacing } = require('../webview/drawing-overlays');
+const fs = require('fs');
+const path = require('path');
+const { DrawingOverlays, anchoredLineDistances, drawnFacing, roundDotShader } = require('../webview/drawing-overlays');
 
 const vector = (x, y, z) => ({ x, y, z, dot: (o) => x * o.x + y * o.y + z * o.z });
 
@@ -55,5 +57,23 @@ describe('dots on one line fall in step', () => {
             0, 1, 0.2, 0, 1, 0.4,
         ]);
         expect(secondStart).toBeCloseTo(0.2, 6);
+    });
+});
+
+describe('round dots', () => {
+    // The vendored LineMaterial's fragment shader, as its file holds it.
+    const vendored = fs.readFileSync(path.join(__dirname, '..', 'webview', 'vendor', 'LineMaterial.js'), 'utf8');
+    const fragment = vendored.slice(vendored.indexOf('fragmentShader: `') + 'fragmentShader: `'.length);
+    const shader = fragment.slice(0, fragment.indexOf('`'));
+
+    test('the square dash test is replaced by a circle as wide as the line', () => {
+        const round = roundDotShader(shader);
+        expect(round).not.toContain('> dashSize ) discard');
+        expect(round).toContain('uniform float linewidth;');
+        expect(round).toContain('dot( dotOffset, dotOffset ) > 0.25 * linewidth * linewidth');
+    });
+
+    test('a shader with no dash test to replace is refused, not drawn square', () => {
+        expect(() => roundDotShader('void main() {}')).toThrow(/no dash test/);
     });
 });

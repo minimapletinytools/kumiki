@@ -11,14 +11,36 @@
     // Hovering or selecting one of those planes lights it through the usual highlight, from the
     // outline the runner sends for it (highlightEdgeSegments); nothing here.
 
-    const LINE_WIDTH_PX = 2;
-    // In world units (metres), as LineMaterial dashes are: a dot is a dash shorter than the line is wide.
+    // A dot's diameter, in pixels: the line's width.
+    const LINE_WIDTH_PX = 3;
+    // Dot to dot, in world units (metres), as LineMaterial dashes are.
     const DOT = 0.0008;
     const DOT_GAP = 0.004;
     const PERFECT_FACE_COLOR = 0x2f6fd0;
     const CENTERPLANE_COLOR = 0xd0582f;
     // How square to the view a plane may be and still be drawn: seen face-on, it is not.
     const FACE_ON_DOT = 1 - 1e-3;
+
+    // LineMaterial's dash test, which cuts the line into rectangles.
+    const SQUARE_DASH = 'if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard; // todo - FIX';
+    // A round dot instead, centred on each dash, as wide as the line: the distance to the nearest
+    // centre along the line, in pixels (vLineDistance's change per pixel), and across it.
+    const ROUND_DOT = `
+                float dotPeriod = dashSize + gapSize;
+                float dotAlong = mod( vLineDistance + dashOffset + 0.5 * dotPeriod, dotPeriod ) - 0.5 * dotPeriod;
+                float dotPerPixel = max( length( vec2( dFdx( vLineDistance ), dFdy( vLineDistance ) ) ), 1e-9 );
+                vec2 dotOffset = vec2( dotAlong / dotPerPixel, vUv.x * 0.5 * linewidth );
+                if ( dot( dotOffset, dotOffset ) > 0.25 * linewidth * linewidth ) discard;`;
+
+    /** A dashed LineMaterial fragment shader drawing round dots rather than square dashes. */
+    function roundDotShader(source) {
+        if (!source.includes(SQUARE_DASH)) {
+            throw new Error('drawing-overlays: the line shader has no dash test to replace');
+        }
+        return source
+            .replace('uniform float opacity;', 'uniform float opacity;\n\t\tuniform float linewidth;')
+            .replace(SQUARE_DASH, ROUND_DOT);
+    }
 
     /**
      * Where each segment's dots start and end, as LineSegments2 reads them (instanceDistanceStart,
@@ -89,6 +111,9 @@
                 });
                 // This LineMaterial dashes only with the define set; `dashed` alone does nothing.
                 material.defines.USE_DASH = '';
+                material.fragmentShader = roundDotShader(material.fragmentShader);
+                // dFdx / dFdy: built in on WebGL2, an extension on WebGL1.
+                material.extensions.derivatives = true;
                 return material;
             };
             // What every member's lines are copied from.
@@ -159,7 +184,7 @@
         }
     }
 
-    const KigumiDrawingOverlays = { DrawingOverlays, drawnFacing, anchoredLineDistances, FACE_ON_DOT };
+    const KigumiDrawingOverlays = { DrawingOverlays, drawnFacing, anchoredLineDistances, roundDotShader, FACE_ON_DOT };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = KigumiDrawingOverlays;
