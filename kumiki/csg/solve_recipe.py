@@ -1,10 +1,9 @@
 """Solve recipes as rows: how a feature moves when its carriers do.
 
-A measurement to any feature becomes a row over its carriers' unknowns, via `measurement_row`.
+A measurement to any feature becomes a row over its carriers' unknowns, via `motion_along`.
 The carriers themselves are in csg/carriers.py. See docs/internal/featuresolving-plan.md, Part 2 B.
 """
 
-from dataclasses import dataclass
 from typing import Callable, List, Mapping, Optional, Tuple, Union
 
 import numpy as np
@@ -119,28 +118,6 @@ def combine(first: Row, second: Row, sign: float = 1.0) -> Row:
     for key, value in second.items():
         row[key] = row.get(key, 0.0) + sign * value
     return {key: value for key, value in row.items() if abs(value) > 1e-12}
-
-
-@dataclass(frozen=True)
-class Anchor:
-    """Where a measurement attaches to a feature."""
-    recipe: Recipe
-    at: V3
-
-
-@dataclass(frozen=True)
-class DistanceMeasurement:
-    """The distance from `start` to `end`, read along `along`."""
-    start: Anchor
-    end: Anchor
-    along: V3
-
-
-def measurement_row(measurement: DistanceMeasurement, carriers: CarrierMap) -> Row:
-    """How the measured distance changes with the solving carriers' unknowns."""
-    end = motion_along(measurement.end.recipe, carriers, measurement.end.at, measurement.along)
-    start = motion_along(measurement.start.recipe, carriers, measurement.start.at, measurement.along)
-    return combine(end, start, -1.0)
 
 
 # A vector whose components are rows: the first-order change of a 3-vector.
