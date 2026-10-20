@@ -14,9 +14,8 @@ import math
 import pytest
 
 from kumiki.viewer import picking
-from kumiki.drawings.drawing import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
-                            ViewAxes,
-                            MeasurementOperation, MeasurementSpace, distance_anchors)
+from kumiki.drawings.measure import (LineSpan, PlaneSpan, PointSpan, MeasurementDirection, MeasurementKind,
+                                       ViewAxes, MeasurementOperation, MeasurementSpace, distance_anchors)
 from kumiki.geometry import Line
 from kumiki.rule import create_v3
 from tests.testing_shavings import load_module, present
@@ -247,7 +246,7 @@ class TestOnARealFrame:
         return runner, runner.collect_drawings(frame, None, [])
 
     def _measurements(self, runner, drawings):
-        from kumiki.drawings.drawing import projected_kinds
+        from kumiki.drawings.measure import projected_kinds
 
         for drawing in drawings:
             for viewport in drawing.get("viewports") or []:
@@ -711,14 +710,13 @@ class TestDroppingAPerpendicularOntoAFace:
     THREE_D = None  # built in setup_method, to keep the import local
 
     def setup_method(self):
-        from kumiki.drawings.drawing import (MeasurementKind, MeasurementOperation,
-                                    MeasurementSpace)
+        from kumiki.drawings.measure import MeasurementKind, MeasurementOperation, MeasurementSpace
 
         self.THREE_D = MeasurementKind(
             MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
 
     def _anchors(self, first, second):
-        from kumiki.drawings.drawing import distance_anchors
+        from kumiki.drawings.measure import distance_anchors
 
         return distance_anchors(first, second, present(self.THREE_D, "a kind"))
 
@@ -827,14 +825,14 @@ class TestWhereAnAngleSits:
     """
 
     def _span(self, **fields):
-        from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
+        from kumiki.drawings.measure import LineSpan, PlaneSpan, PointSpan
 
         kind = PlaneSpan if "normal" in fields else LineSpan if "direction" in fields else PointSpan
         return kind(**{key: v(value) if key in ('at', 'normal', 'direction')
                        else value for key, value in fields.items()})
 
     def _rays(self, first, second):
-        from kumiki.drawings.drawing import angle_rays
+        from kumiki.drawings.measure import angle_rays
 
         return angle_rays(first, second)
 
@@ -845,7 +843,7 @@ class TestWhereAnAngleSits:
         return present(self._rays(first, second), "rays for this pair")
 
     def _value(self, rays):
-        from kumiki.drawings.drawing import angle_between
+        from kumiki.drawings.measure import angle_between
 
         return angle_between(rays)
 
@@ -1072,7 +1070,7 @@ class TestAnObliqueCornerIsStillTheCorner:
     CORNER = (2000.0, 0.0, 1500.0)
 
     def _faces(self, degrees_apart):
-        from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
+        from kumiki.drawings.measure import LineSpan, PlaneSpan, PointSpan
 
         # Two planes through CORNER, their normals `degrees_apart`. Each holds a
         # point along its own face rather than the corner itself, which is what
@@ -1086,7 +1084,7 @@ class TestAnObliqueCornerIsStillTheCorner:
 
     def _off_the_faces(self, point, first, second):
         """How far `point` sits off each plane. Zero on both means it is on the corner."""
-        from kumiki.drawings.drawing import _dot, _unit
+        from kumiki.drawings.measure import _dot, _unit
 
         return tuple(
             abs(_dot(_unit(span.normal),
@@ -1096,7 +1094,7 @@ class TestAnObliqueCornerIsStillTheCorner:
 
     @pytest.mark.parametrize("degrees_apart", [90, 60, 45, 30, 15])
     def test_the_vertex_lies_on_both_faces(self, degrees_apart):
-        from kumiki.drawings.drawing import angle_rays
+        from kumiki.drawings.measure import angle_rays
         from tests.testing_shavings import present
 
         first, second = self._faces(degrees_apart)
@@ -1109,7 +1107,7 @@ class TestAnObliqueCornerIsStillTheCorner:
 
     def test_and_it_sits_on_the_line_the_two_faces_share(self):
         """Not merely on both planes: on their intersection, which runs along x."""
-        from kumiki.drawings.drawing import angle_rays
+        from kumiki.drawings.measure import angle_rays
         from tests.testing_shavings import present
 
         first, second = self._faces(45)
@@ -1144,7 +1142,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
     APART = [0.1, 0.5, 0.6, 1, 3, 5.7, 5.8, 8, 8.2, 12, 30, 45, 89]
 
     def _turned(self, degrees_apart, shape):
-        from kumiki.drawings.drawing import LineSpan, PlaneSpan, PointSpan
+        from kumiki.drawings.measure import LineSpan, PlaneSpan, PointSpan
 
         turn = math.radians(degrees_apart)
         second = v((0, math.cos(turn), math.sin(turn)))
@@ -1166,8 +1164,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
     @pytest.mark.parametrize("degrees_apart", APART)
     def test_whenever_an_angle_is_admitted_the_corner_can_be_placed(
             self, shape, degrees_apart):
-        from kumiki.drawings.drawing import (MeasurementOperation, angle_rays,
-                                    three_d_kinds)
+        from kumiki.drawings.measure import MeasurementOperation, angle_rays, three_d_kinds
 
         first, second = self._turned(degrees_apart, shape)
         # Ask the table what this pair admits, through the same geometry the
@@ -1193,7 +1190,7 @@ class TestAPairOfferedAnAngleCanAlwaysSayWhereItIs:
 
     def test_and_the_guard_refuses_a_narrower_band_than_the_table(self):
         """Stated as the numbers, so moving either epsilon fails here first."""
-        from kumiki.drawings.drawing import PARALLEL_EPSILON
+        from kumiki.drawings.measure import PARALLEL_EPSILON
 
         # kinds_for asks it of a cosine; the corner guards ask it of a sine.
         drafting = math.degrees(math.acos(1 - PARALLEL_EPSILON))
@@ -1215,7 +1212,7 @@ class TestALineLyingFlatAlongAFaceTurnsNoCorner:
     FACE = PlaneSpan(at=v((100, -50, 200)), normal=v((0, 1, 0)))
 
     def test_the_table_admits_no_angle(self):
-        from kumiki.drawings.drawing import MeasurementOperation, three_d_kinds
+        from kumiki.drawings.measure import MeasurementOperation, three_d_kinds
         from kumiki.geometry import Line, Plane
 
         kinds = three_d_kinds(
@@ -1225,7 +1222,7 @@ class TestALineLyingFlatAlongAFaceTurnsNoCorner:
 
     @pytest.mark.parametrize("swapped", [False, True])
     def test_and_no_rays_are_placed_either_way_round(self, swapped):
-        from kumiki.drawings.drawing import angle_rays
+        from kumiki.drawings.measure import angle_rays
 
         pair = (self.FACE, self.FLAT) if swapped else (self.FLAT, self.FACE)
         assert angle_rays(*pair) is None
@@ -1250,7 +1247,7 @@ class TestAViewWithNothingSaidAboutIt:
         assert placed(anchors[1]) == (4.0, 0.0, 0.0)
 
     def test_every_shape_of_missing_axis_reads_the_same(self):
-        from kumiki.drawings.drawing import DEFAULT_VIEW, ViewAxes
+        from kumiki.drawings.measure import DEFAULT_VIEW, ViewAxes
 
         for given in (None, {}, {"look": None, "right": None, "up": None}):
             assert ViewAxes.from_wire(given) == DEFAULT_VIEW

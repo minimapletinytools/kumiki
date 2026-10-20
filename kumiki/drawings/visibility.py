@@ -29,7 +29,7 @@ from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, SightFrame
 from ..geometry import Line, Plane, Point
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
 from ..timber import CutTimber
-from .drawing import ViewAxes
+from .measure import ViewAxes
 from .sheet_shape import SheetLine, SheetPoint, sheet_gap, sheet_shape
 
 Geometry = Union[Point, Line, Plane]

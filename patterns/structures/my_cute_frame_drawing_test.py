@@ -24,8 +24,9 @@ from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
 from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, Policy, auto_dimension, coincidence_assumptions, is_reference,
                                               sheet_candidates)
-from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, ViewAxes, elevation_viewports,
-                                    shop_drawing_viewports)
+from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, elevation_viewports,
+                                     shop_drawing_viewports)
+from kumiki.drawings.measure import ViewAxes
 from kumiki.geometry import Plane
 from kumiki.drawings.measure_solving import DrawingSolve
 from kumiki.drawings.visibility import visible_by_view

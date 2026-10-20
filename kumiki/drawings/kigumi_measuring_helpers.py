@@ -13,10 +13,10 @@ from ..csg.feature_paths import FeatureHandle
 from ..csg.cutcsg import CutCSG
 from ..geometry import Line, Plane, Point, unit_vector
 from ..rule import V3, as_ndarray, create_v3
-from .drawing import (DEGENERATE_SEPARATION, AngleRays, LineSpan, MeasureSpan, MeasurementDirection, MeasurementKind,
-                      MeasurementOperation, MeasurementPlane, MeasurementSpace, ViewAxes, angle_between, angle_rays,
-                      distance_anchors, measures_nothing, pair_separation, project_geometry_for_measuring,
-                      projected_kinds, slide_axis, three_d_kinds)
+from .measure import (DEGENERATE_SEPARATION, AngleRays, LineSpan, MeasureSpan, MeasurementDirection,
+                        MeasurementKind, MeasurementOperation, MeasurementPlane, MeasurementSpace, ViewAxes,
+                        angle_between, angle_rays, distance_anchors, measures_nothing, pair_separation,
+                        project_geometry_for_measuring, projected_kinds, slide_axis, three_d_kinds)
 
 Located = Union[Point, Line, Plane]
 

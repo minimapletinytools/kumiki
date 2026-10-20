@@ -5,7 +5,7 @@ import pytest
 from kumiki.construction import create_timber
 from kumiki.csg.cutcsg import OwnedFeatureHit
 from kumiki.csg.feature_paths import FeatureHandle
-from kumiki.drawings.drawing import Measure
+from kumiki.drawings.measure import Measure
 from kumiki.drawings.measure_solving import solve_measurement
 from kumiki.csg.dof_solver import remaining
 from kumiki.csg.feature_solving import carrier_map_of, feature_handle_dof_rows, measure_row

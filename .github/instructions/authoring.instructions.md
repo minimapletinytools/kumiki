@@ -64,11 +64,12 @@ After taking a screenshot, always make sure to show it to the user in the agent 
 - `kumiki/measuring.py` — Measure/mark pattern for locating features on timbers and marking things relative to features.
 - `kumiki/kiwari.py` — `Kiwari`, the numbers a frame or pattern may be adjusted by in Kigumi: what they are, what they default to, and what they are allowed to be. Declared inside the builder and handed back on the `Frame`, or declared on a `Pattern`.
 - `kumiki/csg/` — The CSG system: `cutcsg.py`, `pathcsg.py`, cropping (`edges_on_csg.py`, `cross_sections.py`), meshing (`triangles.py`), carriers (`carriers.py`), feature handles (`feature_paths.py`), where a feature is on its cut timber (`feature_extent.py`), and the feature solver (`feature_solving.py`, `solve_recipe.py`, `dof_solver.py`, `required_features.py`, `assumptions.py`). Imports nothing from `kumiki/drawings/`.
-- `kumiki/drawings/` — Drawings: `drawing.py`, `layout.py`, measuring (`feature_span.py`, `visibility.py`), auto-dimensioning, and `measure_solving.py`, which turns a drawing's measurements into the solver's.
+- `kumiki/drawings/` — Drawings: `drawing.py`, `layout.py`, `measure.py`, measuring helpers (`feature_span.py`, `visibility.py`), auto-dimensioning, and `measure_solving.py`, which turns a drawing's measurements into the solver's.
 - `kumiki/csg/cutcsg.py` — `CutCSG`: the solid a timber and its cuts make, as primitives and boolean operations, plus the feature system on their boundaries — what can be named, selected and measured to.
 - `kumiki/geometry.py` — The unbounded primitives `Point`, `Line` and `Plane`, and their bounded counterparts. Below `cutcsg.py` in the import chain so both the CSG and measuring layers can share them; depends on nothing but `rule.py`.
 - `kumiki/identity.py` — How things are named and how much a name can be trusted. Keeps authored names apart from positions, which move whenever something is inserted above them.
-- `kumiki/drawings/drawing.py` — Two halves: the layout of a sheet (`Drawing`, `Viewport`, `Subdivision`), and what a pair of features can be measured as and what that measurement comes to.
+- `kumiki/drawings/drawing.py` — The layout of a sheet (`Drawing`, `Viewport`, `Subdivision`).
+- `kumiki/drawings/measure.py` — What a pair of features can be measured as, where a dimension attaches, and what it comes to.
 - `kumiki/assembly.py` — Assembly constraints and the disassembly solver: which way each member can escape each joint, and in what order the frame comes apart.
 - `kumiki/ticket.py` — `Ticket` and friends: immutable labels carrying hierarchy and metadata for timbers, joints and accessories. The `/` in a path becomes a folder in the layer view.
 - `kumiki/librarian.py` — Discovery and loading of frame examples and pattern books. Reached through the librarian CLI rather than directly.

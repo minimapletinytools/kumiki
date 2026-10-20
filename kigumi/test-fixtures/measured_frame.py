@@ -13,7 +13,8 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
-from kumiki.drawings.drawing import Drawing, Measure
+from kumiki.drawings.drawing import Drawing
+from kumiki.drawings.measure import Measure
 from kumiki.csg.feature_paths import find_feature
 from kumiki.identity import ResolvedTimberPath, ViewportId
 from kumiki.timber import Frame

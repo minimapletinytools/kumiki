@@ -15,7 +15,8 @@ import pytest
 
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
-from kumiki.drawings.drawing import Drawing, Measure
+from kumiki.drawings.drawing import Drawing
+from kumiki.drawings.measure import Measure
 from kumiki.identity import (DerivedFeaturePath, DrawingId, FeaturePath, FeatureRef,
                              JointPath, MeasurementId, ViewportId,
                              ResolvedJointPath, ResolvedTimberPath, SingleFeaturePath,
@@ -779,7 +780,7 @@ class TestPuttingAPairInOneOrder:
         assert deep.sort_key != shallow.sort_key
 
     def test_measuring_a_to_b_is_measuring_b_to_a(self):
-        from kumiki.drawings.drawing import Measure, MeasurementKind, MeasurementPlacement
+        from kumiki.drawings.measure import Measure, MeasurementKind, MeasurementPlacement
 
         frame, found = mortise_and_tenon_handles()
         face, edge = found["tenon_left"], found["shoulder_edge"]
@@ -1169,7 +1170,7 @@ class TestMovingAMeasurementTheCodeNamesTheKindOf:
     """
 
     def _frame(self):
-        from kumiki.drawings.drawing import MeasurementKind
+        from kumiki.drawings.measure import MeasurementKind
 
         kind = MeasurementKind.parse("projected_perpendicular_distance")
         return _posts_with(lambda face, timber: [Drawing(

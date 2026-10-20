@@ -3,8 +3,8 @@ the viewer draws a feature on to its anchor from."""
 
 import pytest
 
-from kumiki.drawings.drawing import (LineSpan, MeasurementKind, MeasurementPlacement, PointSpan, distance_anchors,
-                                     slide_axis)
+from kumiki.drawings.measure import (LineSpan, MeasurementKind, MeasurementPlacement, PointSpan,
+                                       distance_anchors, slide_axis)
 from kumiki.drawings.kigumi_measuring_helpers import place_pair
 from kumiki.geometry import Line, Point
 from kumiki.rule import create_v3
