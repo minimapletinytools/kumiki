@@ -73,7 +73,9 @@ def _offered(frame, member, feature, look):
     declared = next(f for f in owner.get_declared_features() if f.name == feature)
     handle = FeatureHandle(timber=entry["cut_timber"].timber, hit=OwnedFeatureHit(feature=declared, owner=owner))
     look = np.array(look, dtype=float)
-    origin = as_ndarray(feature_anchor(handle, entry["local_csg"])) - look * 10
+    anchor = feature_anchor(handle, entry["local_csg"])
+    assert anchor is not None
+    origin = as_ndarray(anchor) - look * 10
     hit, point = _first_hit(slot, origin, look)
     payload = {"memberKey": hit, "point": [float(x) for x in point], "currentPath": [], "ctrlClick": False,
                "space": "projected", "tolerances": TOLERANCES, "look": list(look),
