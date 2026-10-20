@@ -1,4 +1,4 @@
-const { DrawingOverlays, drawnFacing } = require('../webview/drawing-overlays');
+const { DrawingOverlays, anchoredLineDistances, drawnFacing } = require('../webview/drawing-overlays');
 
 const vector = (x, y, z) => ({ x, y, z, dot: (o) => x * o.x + y * o.y + z * o.z });
 
@@ -28,5 +28,32 @@ describe('which of a drawing\'s planes are drawn', () => {
             inDrawing: true, options: { showDrawingPerfectFaces: false, showDrawingCenterplanes: true } })).toBe(false);
         expect(overlays.showFor(bundles, camera, {
             inDrawing: false, options: { showDrawingPerfectFaces: true, showDrawingCenterplanes: true } })).toBe(false);
+    });
+});
+
+describe('dots on one line fall in step', () => {
+    const PERIOD = 0.0048;  // a dot and a gap
+    const phase = (distance) => ((distance % PERIOD) + PERIOD) % PERIOD;
+
+    test('a front and a back edge drawn on top of each other, run either way, dot alike', () => {
+        // Along x at y = 0.3: the front edge at z = 0, the back one at z = -0.1, run the other way
+        // and starting elsewhere.
+        const [frontStart, frontEnd, backStart, backEnd] = anchoredLineDistances([
+            0.1, 0.3, 0, 0.9, 0.3, 0,
+            0.75, 0.3, -0.1, 0.2, 0.3, -0.1,
+        ]);
+        expect(frontEnd - frontStart).toBeCloseTo(0.8, 6);
+        // The same x has the same distance on both, so the same place in the pattern.
+        expect(phase(backStart)).toBeCloseTo(phase(0.75), 6);
+        expect(phase(backEnd)).toBeCloseTo(phase(0.2), 6);
+        expect(frontStart).toBeCloseTo(0.1, 6);
+    });
+
+    test('segments after the first do not inherit its length', () => {
+        const [, , secondStart] = anchoredLineDistances([
+            0, 0, 0, 0, 0, 5,
+            0, 1, 0.2, 0, 1, 0.4,
+        ]);
+        expect(secondStart).toBeCloseTo(0.2, 6);
     });
 });

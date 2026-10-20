@@ -21,6 +21,42 @@
     const FACE_ON_DOT = 1 - 1e-3;
 
     /**
+     * Where each segment's dots start and end, as LineSegments2 reads them (instanceDistanceStart,
+     * instanceDistanceEnd): a point's distance along its line from the world's origin, the line's
+     * direction taken one fixed way round. So every segment on one line dots in step whatever its
+     * ends or depth -- a plane's front and back edges, which a drawing's view draws on top of each
+     * other, show one row of dots rather than two out of step. (computeLineDistances counted from
+     * each object's first segment, adding up along the rest.)
+     *
+     * @param {ArrayLike<number>} positions x, y, z of each segment's start then end
+     * @returns {Float32Array} start and end distance per segment
+     */
+    function anchoredLineDistances(positions) {
+        const count = Math.floor(positions.length / 6);
+        const distances = new Float32Array(2 * count);
+        for (let i = 0; i < count; i++) {
+            const at = 6 * i;
+            let dx = positions[at + 3] - positions[at];
+            let dy = positions[at + 4] - positions[at + 1];
+            let dz = positions[at + 5] - positions[at + 2];
+            const length = Math.hypot(dx, dy, dz);
+            if (length > 0) {
+                // One way round: the largest component positive.
+                const largest = [dx, dy, dz].reduce((a, b) => (Math.abs(b) > Math.abs(a) ? b : a));
+                const sign = largest < 0 ? -1 : 1;
+                dx = (sign * dx) / length;
+                dy = (sign * dy) / length;
+                dz = (sign * dz) / length;
+            }
+            for (let end = 0; end < 2; end++) {
+                const p = at + 3 * end;
+                distances[2 * i + end] = positions[p] * dx + positions[p + 1] * dy + positions[p + 2] * dz;
+            }
+        }
+        return distances;
+    }
+
+    /**
      * Whether a plane's outline is drawn, looking along `look`: never seen face-on, where it would
      * only retrace the faces around it. Seen edge-on it is a line; in a view turned off square, the
      * planes draw as a wireframe of the perfect timber within. (Edge-on only, they all vanished at the
@@ -72,7 +108,9 @@
                 const geometry = new THREE.LineSegmentsGeometry();
                 geometry.setPositions(plane.positions);
                 const object = new THREE.LineSegments2(geometry, this._memberMaterial(shared, memberKey));
-                object.computeLineDistances();
+                const distances = new THREE.InstancedInterleavedBuffer(anchoredLineDistances(plane.positions), 2, 1);
+                geometry.setAttribute('instanceDistanceStart', new THREE.InterleavedBufferAttribute(distances, 1, 0));
+                geometry.setAttribute('instanceDistanceEnd', new THREE.InterleavedBufferAttribute(distances, 1, 1));
                 object.renderOrder = 11;
                 object.visible = false;
                 lines.push({ object, normal: new THREE.Vector3(...plane.normal), option });
@@ -121,7 +159,7 @@
         }
     }
 
-    const KigumiDrawingOverlays = { DrawingOverlays, drawnFacing, FACE_ON_DOT };
+    const KigumiDrawingOverlays = { DrawingOverlays, drawnFacing, anchoredLineDistances, FACE_ON_DOT };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = KigumiDrawingOverlays;
