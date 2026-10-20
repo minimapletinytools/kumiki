@@ -63,7 +63,10 @@ class FeatureHandle(Generic[F_co]):
 
 
 def label_name(labeled: Any) -> Optional[str]:
-    """The name on a CSG node's or a Cutting's label, or None."""
+    """The name on a CSG node's or a Cutting's label, or None.
+
+    Both hold a CutCSGLabel, never a bare string, so the name lives one level in.
+    """
     return getattr(getattr(labeled, "label", None), "name", None)
 
 
@@ -104,8 +107,23 @@ def candidate_segments(node: CutCSG) -> Dict[int, str]:
     return segments
 
 
+def walk_labels(csg: CutCSG, labels: Sequence[str]) -> Tuple[CutCSG, int]:
+    """Down from `csg` by path steps, as far as they lead: the node reached and how many steps
+    were taken. A step names a label and which of the siblings carrying it (`label#n`; bare is the
+    first), numbered as candidate_segments numbers them."""
+    node = csg
+    for taken, segment in enumerate(labels):
+        wanted = ResolvedJointPath.parse(segment)
+        candidates = labelled_candidates(node, wanted.path)
+        if wanted.occurrence >= len(candidates):
+            return node, taken
+        node = candidates[wanted.occurrence]
+    return node, len(labels)
+
+
 def find_csg_by_labels(csg: CutCSG, labels: Sequence[str]) -> Optional[CutCSG]:
-    """Walk down from `csg` by labels. A labelled `csg` consumes the first step itself."""
+    """Walk down from `csg` by labels, or None if they lead nowhere. A labelled `csg` consumes the
+    first step itself."""
     remaining = tuple(labels)
     label = label_name(csg)
     if label is not None:
@@ -114,15 +132,8 @@ def find_csg_by_labels(csg: CutCSG, labels: Sequence[str]) -> Optional[CutCSG]:
         if label != ResolvedJointPath.parse(remaining[0]).path:
             return None
         remaining = remaining[1:]
-
-    node = csg
-    for segment in remaining:
-        wanted = ResolvedJointPath.parse(segment)
-        candidates = labelled_candidates(node, wanted.path)
-        if wanted.occurrence >= len(candidates):
-            return None
-        node = candidates[wanted.occurrence]
-    return node
+    node, taken = walk_labels(csg, remaining)
+    return node if taken == len(remaining) else None
 
 
 def node_positions(root: CutCSG) -> Dict[int, Tuple[int, int, List[str]]]:
