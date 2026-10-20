@@ -668,26 +668,21 @@ def measurable_in_view(
     thing naming its line, and stays. Seen at any other angle a face is an area, and goes.
     """
     from kumiki.csg.cutcsg import CSGFeatureType
-    from kumiki.drawings.sheet_shape import SQUARE_TO_VIEW, sheet_shape
+    from kumiki.drawings.sheet_shape import sheet_gap, sheet_shape
     from kumiki.geometry import Line, Plane
 
+    look = direction.v3()
     located = [(hit, hit.feature.locate_simple_unbounded(hit.owner)) for hit in hits]
-    lines = [(Float3.of(line.point), Float3.of(line.direction).unit())
-             for _hit, line in located if isinstance(line, Line)]
+    lines = [sheet_shape(line, look) for _hit, line in located if isinstance(line, Line)]
 
     def keep(hit: 'OwnedFeatureHit', where: Any) -> bool:
         if hit.feature.feature_type() is not CSGFeatureType.FACE or not isinstance(where, Plane):
             return True
-        normal = Float3.of(where.normal).unit()
-        if normal is None:
-            return True
-        if sheet_shape(where, direction) is None:
+        drawn = sheet_shape(where, look)
+        if drawn is None:
             return False
-        on_plane = Float3.of(where.point)
-        return not any(
-            run is not None and abs(normal.dot(run)) <= SQUARE_TO_VIEW
-            and abs(normal.dot(point - on_plane)) <= tolerance
-            for point, run in lines)
+        gaps = (sheet_gap(drawn, line, look) for line in lines if line is not None)
+        return not any(gap is not None and gap <= tolerance for gap in gaps)
 
     return [hit for hit, where in located if keep(hit, where)]
 
