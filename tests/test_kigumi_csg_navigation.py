@@ -2766,7 +2766,8 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
         midpoints = [[(a + b) / 2 for a, b in zip(one, other)]
                      for one, other in zip(points, points[1:])]
         for point in points + midpoints:
-            base = {"memberKey": member, "point": point,
+            # In a drawing's view, where what is offered is judged as projected.
+            base = {"memberKey": member, "point": point, "space": "projected",
                     "currentPath": [], "ctrlClick": False}
             plain = runner._handle_find_csg_at_point(state, dict(base), slot)
             if plain.get("featureType") != "EDGE" or plain.get("candidateCount", 0) < 2:

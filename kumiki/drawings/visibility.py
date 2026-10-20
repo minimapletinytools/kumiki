@@ -3,7 +3,7 @@
 Two questions, one set of rules:
 
 - PER PLACE, for a pointer: is what is under it hidden? `hidden_at` a place, and a feature
-  `drawn_over` by a nearer one there (sheet_shape.sheet_gap).
+  `drawn_over` by a nearer one there (picking.drawing_candidates).
 - PER FEATURE, for a view: can any of it be seen? `nearest_visible_depth` (visible_by_view).
 
 The rules both keep: a feature that is not real (a bore's axis, a centerplane) is `never_hidden`;

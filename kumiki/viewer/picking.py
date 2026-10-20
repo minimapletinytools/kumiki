@@ -613,49 +613,6 @@ def _nearest_on(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3) -> Op
     return point + run * along_line
 
 
-def split_hidden(
-    candidates: List[PointerCandidate], direction: Float3, tolerance: float,
-    blocked: Optional[Callable[[Float3], bool]] = None,
-) -> Tuple[List[PointerCandidate], List[PointerCandidate]]:
-    """Splits *candidates* into those the camera can see and those it cannot.
-
-    Args:
-        candidates: everything under the pointer, nearest first (candidates_under_pointer).
-        direction: the view direction, from the camera.
-        tolerance: how close two features on the sheet must be to count as one on top of the other.
-        blocked: whether material hides a place from the camera; None checks no material.
-
-    Returns:
-        (visible, hidden), each in the order given. The rules are visibility's, asked per place: a
-        candidate is hidden when a nearer visible one is drawn over it, or when *blocked* (made
-        from visibility.hidden_at) says so of its place; one never_hidden never is.
-    """
-    from kumiki.drawings.visibility import never_hidden
-
-    unit = Float3.of(direction).unit() or Float3.of(direction)
-    visible: List[PointerCandidate] = []
-    hidden: List[PointerCandidate] = []
-    for candidate in candidates:
-        hit = candidate.hit
-        if never_hidden(hit.feature):
-            visible.append(candidate)
-            continue
-        if (any(other.group < candidate.group and _covers(other, candidate, unit, tolerance) for other in visible)
-                or (blocked is not None and candidate.place is not None and blocked(candidate.place))):
-            hidden.append(candidate)
-        else:
-            visible.append(candidate)
-    return visible, hidden
-
-
-def _covers(front: PointerCandidate, behind: PointerCandidate, direction: Float3, tolerance: float) -> bool:
-    """Whether *front* lands where *behind* does on the sheet, under the pointer (visibility.drawn_over)."""
-    from kumiki.drawings.visibility import drawn_over
-
-    return drawn_over(front.hit.feature.locate_simple_unbounded(front.hit.owner),
-                      behind.hit.feature.locate_simple_unbounded(behind.hit.owner), direction, tolerance)
-
-
 def measurable_in_view(
     hits: List['OwnedFeatureHit'], direction: Float3, tolerance: float,
 ) -> List['OwnedFeatureHit']:
@@ -1288,15 +1245,10 @@ class Candidates(NamedTuple):
 
 def find_candidates(
     root: 'CutCSG', local_pt: Float3, eps: float, tolerances: 'FeatureTestTolerances',
-    local_ray: Optional[LocalRay], in_drawing: bool, blocked: Optional[Callable[[Float3], bool]],
+    local_ray: Optional[LocalRay],
 ) -> Candidates:
-    """What is under the pointer. In a drawing's view everything along the ray is drawn at one
-    place, at whatever depth -- so all of it is a candidate, and what is hidden goes last; in 3D,
-    the features at the point."""
-    if in_drawing and local_ray is not None:
-        visible, hidden = split_hidden(candidates_under_pointer(root, local_pt, tolerances, local_ray),
-                                       local_ray[1], float(tolerances.edge), blocked)
-        return Candidates([candidate.hit for candidate in visible + hidden], len(visible))
+    """What is under the pointer on one member: the features at the point, all of them takeable. A
+    drawing's view asks every member drawn there instead (drawing_candidates)."""
     hits = features_at_point(root, local_pt, eps, tolerances, local_ray=local_ray)
     return Candidates(hits, len(hits))
 
