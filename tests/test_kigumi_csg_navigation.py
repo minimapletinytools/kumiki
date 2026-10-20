@@ -365,9 +365,7 @@ class TestResolveCSGAtPath:
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
         local_csg = cut_timber.render_timber_with_cuts_csg_local()
 
-        resolved = picking.resolve_csg_at_path(
-            local_csg, TENON_PATH, None, PICK_EPS
-        )
+        resolved = picking.resolve_csg_at_path(local_csg, TENON_PATH)
         assert resolved is not local_csg
         assert resolved.label.name == "tenon"
 

@@ -1537,7 +1537,7 @@ def _assign_member_keys(frame: 'Frame') -> Tuple[List[TimberEntry], List[Accesso
 
 
 def _serialize_cutting_summary(cut_timber: 'CutTimber') -> List[CuttingSummaryWire]:
-    from kumiki.viewer.picking import label_name
+    from kumiki.csg.feature_paths import label_name
     cuts_meta: List[CuttingSummaryWire] = []
     cuts = list(getattr(cut_timber, "cuts", []) or [])
     for idx, cut in enumerate(cuts):
@@ -3624,7 +3624,7 @@ def _serialize_csg_node(
     gone wrong. `path` still carries labels only, since that is what
     find_csg_by_path navigates by.
     """
-    from kumiki.viewer.picking import label_name
+    from kumiki.csg.feature_paths import label_name
     from kumiki.csg.cutcsg import (
         Difference, Intersection, SolidUnion, csg_children, csg_children_with_parity,
     )
@@ -4596,7 +4596,8 @@ def _describe_pick(
         feature was selected; and jointName, which is None for the timber's own
         body, since no joint produced that.
     """
-    from kumiki.viewer.picking import outward_normal_and_face, to_v3, label_name
+    from kumiki.csg.feature_paths import label_name
+    from kumiki.viewer.picking import outward_normal_and_face, to_v3
     from kumiki.csg.cutcsg import CSGFeatureType, FeatureTestTolerances
 
     described: NodeDescriptionWire = {
@@ -4994,7 +4995,7 @@ def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Opt
 
     parent_csg = None
     if new_path:
-        parent_csg = resolve_csg_at_path(local_csg, new_path, local_pt, eps)
+        parent_csg = resolve_csg_at_path(local_csg, new_path)
 
     # An edge is drawn as a line whether it was derived or declared: a timber's
     # own arris needs the line as much as a joint's does, and without this it
@@ -5171,7 +5172,8 @@ def _log_pick(
 
 def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Resolve a CSG at a known path and return highlight mesh for the viewer."""
-    from kumiki.viewer.picking import (build_inv_transform_float, extract_highlight_mesh, label_name,
+    from kumiki.csg.feature_paths import label_name
+    from kumiki.viewer.picking import (build_inv_transform_float, extract_highlight_mesh,
                                        non_real_plane_outline, resolve_csg_at_path)
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
@@ -5196,7 +5198,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
     timber_rot, timber_pos = build_inv_transform_float(timber.transform)
 
     # Resolve the CSG node at the given path (no point hint needed)
-    target_csg = resolve_csg_at_path(local_csg, path, None, eps)
+    target_csg = resolve_csg_at_path(local_csg, path)
 
     # If a feature name was requested, confirm the target actually declares it.
     # The mesh target stays the CSG either way -- extract_highlight_mesh does

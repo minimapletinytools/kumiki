@@ -13,7 +13,7 @@ import warnings
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, TypedDict
 
 from ..csg.cutcsg import CSGFeature, CutCSG, FeatureTestTolerances, OwnedFeatureHit
-from ..csg.feature_paths import candidate_segments
+from ..csg.feature_paths import candidate_segments, label_name, walk_labels
 from ..csg.feature_extent import Interval
 from ..geometry import Line
 from ..rule import Transform, V3, scalar
@@ -27,18 +27,6 @@ LocalRay = Tuple[Float3, Float3]
 class WorldSegment(TypedDict):
     start: Float3
     end: Float3
-
-
-def label_name(labeled: Any) -> Optional[str]:
-    """The name a CSG node or a Cutting carries, or None if nobody named it.
-
-    Both hold a CutCSGLabel, never a bare string and never None, so the name
-    lives one level in. Kept in one place because the runner reads it from a
-    dozen spots while navigating -- and because a CutCSGLabel that reaches the
-    payload unwrapped would serialize as an object where the viewer expects a
-    string.
-    """
-    return getattr(getattr(labeled, "label", None), "name", None)
 
 
 
@@ -1035,63 +1023,10 @@ def outward_normal_and_face(
     return Float3.of(normal), nearest_timber_local_face_name(normal)
 
 
-def resolve_csg_at_path(csg: 'CutCSG', path: List[str], local_pt: Optional[Float3] = None, eps: float = 1e-4) -> 'CutCSG':
-    """Walk the CSG tree following *path* of labeled CSG nodes.
-
-    Searches through unlabeled intermediate Difference/SolidUnion nodes
-    transparently.  When *local_pt* is given and multiple children share the
-    same label, prefer the one whose boundary contains *local_pt*.
-    """
-    from kumiki.csg.cutcsg import SolidUnion, Difference
-
-    def _find_labeled(node: 'CutCSG', wanted: str) -> List[Any]:
-        """Return all descendants of *node* with the given *label*, searching
-        through unlabeled compound intermediaries."""
-        results: List[Any] = []
-        children: List[Any] = []
-        if isinstance(node, Difference):
-            children = list(node.subtract)
-            # Also check base
-            base_label = label_name(node.base)
-            if base_label == wanted:
-                results.append(node.base)
-            elif isinstance(node.base, (SolidUnion, Difference)) and base_label is None:
-                results.extend(_find_labeled(node.base, wanted))
-        elif isinstance(node, SolidUnion):
-            children = list(node.children)
-        for ch in children:
-            ch_label = label_name(ch)
-            if ch_label == wanted:
-                results.append(ch)
-            elif isinstance(ch, (SolidUnion, Difference)) and ch_label is None:
-                results.extend(_find_labeled(ch, wanted))
-        return results
-
-    from kumiki.identity import ResolvedJointPath
-
-    node = csg
-    for segment in path:
-        # A segment may carry the occurrence that tells same-named siblings
-        # apart. Names match bare; the number, when given, chooses.
-        wanted = ResolvedJointPath.parse(segment)
-        candidates = _find_labeled(node, wanted.path)
-        if not candidates:
-            break
-        if wanted.occurrence and wanted.occurrence < len(candidates):
-            node = candidates[wanted.occurrence]
-        elif len(candidates) == 1 or local_pt is None:
-            node = candidates[0]
-        else:
-            # Multiple with same name — pick the one on boundary
-            picked = candidates[0]
-            for c in candidates:
-                if csg_point_on_boundary(c, local_pt, eps):
-                    picked = c
-                    break
-                if csg_contains_point(c, local_pt, eps):
-                    picked = c
-            node = picked
-    return node
+def resolve_csg_at_path(csg: 'CutCSG', path: List[str]) -> 'CutCSG':
+    """The node a navigation path names under *csg*, or the deepest one it leads to when a step no
+    longer matches (feature_paths.walk_labels)."""
+    return walk_labels(csg, path)[0]
 
 
 def navigate_csg_one_level(
@@ -1239,8 +1174,10 @@ def extract_highlight_mesh(
     matched = 0
 
     # The path to hold each triangle's owner to, or None to keep every triangle.
-    owner_path = (selected_path if root_csg is not None and selected_ref is not None and selected_path
-                  else None)
+    # Triangles are kept only where the selected path's node is the one selected.
+    if (root_csg is not None and selected_ref is not None and selected_path
+            and resolve_csg_at_path(root_csg, selected_path) is not selected_ref):
+        return [], [], 0, len(mesh_indices) // 3
 
     # Broadphase: a triangle whose centroid is outside the target's own box
     # cannot be on its boundary, and a box test is far cheaper than asking the
@@ -1287,10 +1224,6 @@ def extract_highlight_mesh(
         if wanted_feature is not None and not wanted_feature.test_point_unbounded(target_csg, to_v3(local_c), eps):
             continue
         if csg_point_on_boundary(target_csg, local_c, eps):
-            if owner_path is not None and root_csg is not None:
-                owner = resolve_csg_at_path(root_csg, owner_path, local_c, eps)
-                if owner is not selected_ref:
-                    continue
             if edge_feature is not None:
                 # The last fallback, and a poor one: it asks test_point_unbounded
                 # vertex without the boundary check, so it lights the strip
@@ -1345,7 +1278,7 @@ def navigate(root: 'CutCSG', local_pt: Float3, eps: float, ctrl_click: bool, cur
         return navigate_csg_to_leaf(root, local_pt, eps)
     node = root
     if current_path:
-        node = resolve_csg_at_path(root, current_path, local_pt, eps)
+        node = resolve_csg_at_path(root, current_path)
         if not csg_point_on_boundary(node, local_pt, eps):
             node, current_path = root, []
     return navigate_csg_one_level(node, local_pt, current_path, eps)
