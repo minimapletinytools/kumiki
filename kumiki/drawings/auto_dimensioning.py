@@ -15,7 +15,7 @@ import numpy as np
 
 from ..csg.assumptions import Assumption
 from ..csg.carriers import Row
-from ..csg.dof_solver import remaining
+from ..csg.dof_solver import rank_svd, remaining
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
 from ..geometry import Line, Plane
@@ -177,7 +177,7 @@ def auto_dimension(
     target_left = target_matrix
     known = np.zeros((0, len(columns)))
     if len(known_rows):
-        _, values, basis = np.linalg.svd(known_matrix, full_matrices=False)
+        _, values, basis = rank_svd(known_matrix)
         known = basis[values > tolerance]
         target_left = target_matrix - target_matrix @ known.T @ known
 
@@ -193,7 +193,7 @@ def auto_dimension(
         return span is None or float(np.linalg.norm(target_left[span])) < tolerance
 
     def unsolved_basis() -> np.ndarray:
-        _, values, directions = np.linalg.svd(target_left, full_matrices=False)
+        _, values, directions = rank_svd(target_left)
         return directions[values > tolerance]
 
     def helpful_direction(candidate: DimensionCandidate, unsolved: np.ndarray) -> Optional[np.ndarray]:

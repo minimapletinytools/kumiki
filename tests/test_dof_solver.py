@@ -1,8 +1,9 @@
 """The rank test over hand-built rows."""
 
+import numpy as np
 import pytest
 
-from kumiki.csg.dof_solver import remaining
+from kumiki.csg.dof_solver import rank_svd, remaining
 
 
 def _unit(*names):
@@ -75,3 +76,11 @@ def test_a_free_dof_reads_back_as_a_quantity_and_a_motion():
 def test_nothing_free_reads_back_as_nothing():
     result = remaining(_unit("a", "b"), _unit("a"))
     assert result.count == 0 and result.free_quantities == () and result.free_motions == ()
+
+
+def test_projection_dust_is_dropped_before_the_svd():
+    # Subtracting one projection from another leaves entries that should be zero many orders
+    # below the tolerance. LAPACK's divide-and-conquer SVD can fail to converge on those, so
+    # rank_svd zeroes them first; the rank is read far above this anyway.
+    _, values, _ = rank_svd(np.array([[1.0, 0.0], [0.0, 1e-35]]))
+    assert values == pytest.approx([1.0, 0.0], abs=1e-12)
