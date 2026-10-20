@@ -33,7 +33,7 @@ from .drawing import ViewAxes
 from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, sheet_shape
 
 Geometry = Union[Point, Line, Plane]
-from ..csg.feature_extent import extents_of
+from ..csg.feature_extent import extents_of, timber_reach
 
 #: Material nearer the place than this is the surface it lies on, not something in front of it.
 NUDGE = 1e-5
@@ -232,8 +232,7 @@ def visible_by_view(
     """
     occluders = [(cut.render_timber_with_cuts_csg_local(), cut.timber.transform) for cut in drawn]
     roots = {id(cut.timber): cut.render_timber_with_cuts_csg_local() for cut in drawn}
-    reach = 4 * max((float(cut.timber.length) + float(max(cut.timber.size[0], cut.timber.size[1]))
-                     for cut in drawn), default=1.0)
+    reach = max((timber_reach(cut.timber) for cut in drawn), default=4.0)
     visible: Dict[str, List[FeatureHandle]] = {}
     for view, axes in views.items():
         look = as_ndarray(axes.look)

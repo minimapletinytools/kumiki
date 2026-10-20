@@ -1643,7 +1643,13 @@ def drawing_candidates(
     found = [found[index]._replace(candidate=found[index].candidate._replace(group=group_of[index])) for index in ordered]
 
     look = direction
-    world = lambda one: world_geometry(FeatureHandle(timber=one.timber, hit=one.candidate.hit))
+    worlds: Dict[int, Any] = {}
+
+    def world(one: MemberCandidate) -> Any:
+        if id(one) not in worlds:
+            worlds[id(one)] = world_geometry(FeatureHandle(timber=one.timber, hit=one.candidate.hit))
+        return worlds[id(one)]
+
     visible: List[MemberCandidate] = []
     hidden: List[MemberCandidate] = []
     for one in found:
