@@ -7,7 +7,7 @@ A FeatureHandle is a reference to a feature. Serializable into FeaturePath for u
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Sequence, Tuple, Union
 
 from .cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, DerivedPointFeature, Difference, F_co,
                      OwnedFeatureHit, SolidUnion, csg_children, shared_ancestor)
@@ -15,7 +15,7 @@ from ..identity import (DerivedFeaturePath, FeaturePath, FeatureRef, ResolvedJoi
                        ResolvedTimberPath, SingleFeaturePath)
 
 if TYPE_CHECKING:
-    from ..timber import CutTimber, Frame, PerfectTimberWithin
+    from ..timber import CutTimber, Cutting, Frame, PerfectTimberWithin
 
 
 def hit_identity(feature: CSGFeature, owner: CutCSG) -> Tuple:
@@ -62,12 +62,9 @@ class FeatureHandle(Generic[F_co]):
         return hash((id(self.timber), hit_identity(self.hit.feature, self.hit.owner)))
 
 
-def label_name(labeled: Any) -> Optional[str]:
-    """The name on a CSG node's or a Cutting's label, or None.
-
-    Both hold a CutCSGLabel, never a bare string, so the name lives one level in.
-    """
-    return getattr(getattr(labeled, "label", None), "name", None)
+def label_name(labeled: Union[CutCSG, 'Cutting']) -> Optional[str]:
+    """The name on a CSG node's or a Cutting's label, or None."""
+    return labeled.label.name
 
 
 def _labelled_children(node: CutCSG) -> List[CutCSG]:
