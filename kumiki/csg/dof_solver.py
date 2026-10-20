@@ -51,7 +51,7 @@ def rank_svd(matrix: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     return np.linalg.svd(cleaned, full_matrices=False)
 
 
-def _matrix(rows: Sequence[Mapping[Unknown, float]], columns: List[Unknown]) -> np.ndarray:
+def rows_matrix(rows: Sequence[Mapping[Unknown, float]], columns: List[Unknown]) -> np.ndarray:
     index = {column: i for i, column in enumerate(columns)}
     out = np.zeros((len(rows), len(columns)))
     for r, row in enumerate(rows):
@@ -69,8 +69,8 @@ def remaining(
     columns = list(dict.fromkeys(column for row in (*known, *target) for column in row))
     if not target or not columns:
         return Remaining(count=0, free=())
-    known_matrix = _matrix(known, columns)
-    target_matrix = _matrix(target, columns)
+    known_matrix = rows_matrix(known, columns)
+    target_matrix = rows_matrix(target, columns)
 
     stacked = np.vstack([known_matrix, target_matrix])
     tolerance = relative_tolerance * max(float(np.linalg.norm(stacked, 2)), 1.0)

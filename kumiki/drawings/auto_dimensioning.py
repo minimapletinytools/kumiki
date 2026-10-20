@@ -15,7 +15,7 @@ import numpy as np
 
 from ..csg.assumptions import Assumption
 from ..csg.carriers import Row
-from ..csg.dof_solver import rank_svd, remaining
+from ..csg.dof_solver import rank_svd, remaining, rows_matrix
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
 from ..geometry import Line, Plane
@@ -141,15 +141,6 @@ class AutoDimensioning:
     left_after: int
 
 
-def _matrix(rows: Sequence[Row], columns: list) -> np.ndarray:
-    index = {column: i for i, column in enumerate(columns)}
-    out = np.zeros((len(rows), len(columns)))
-    for r, row in enumerate(rows):
-        for column, value in row.items():
-            out[r, index[column]] = value
-    return out
-
-
 def _key(handle: FeatureHandle) -> Tuple:
     return hit_identity(handle.feature, handle.owner)
 
@@ -168,7 +159,7 @@ def auto_dimension(
     target_rows = [row for handle in targets for row in solve.dof_rows(handle)]
     columns = list(dict.fromkeys(column for row in (*known_rows, *target_rows) for column in row))
     index = {column: i for i, column in enumerate(columns)}
-    known_matrix, target_matrix = _matrix(known_rows, columns), _matrix(target_rows, columns)
+    known_matrix, target_matrix = rows_matrix(known_rows, columns), rows_matrix(target_rows, columns)
     tolerance = 1e-9 * max(float(np.linalg.norm(np.vstack([known_matrix, target_matrix]), 2)), 1.0)
 
     # Everything works on rows with what is known projected out; a pick removes its direction

@@ -35,6 +35,11 @@ Segment3 = Tuple[np.ndarray, np.ndarray]
 Interval = Tuple[float, float]
 
 
+def timber_reach(timber: 'PerfectTimberWithin') -> float:
+    """How far to follow a line or a plane to be sure it is past the whole timber."""
+    return 4 * (float(timber.length) + float(max(timber.size[0], timber.size[1])))
+
+
 def _station(located: Line, point) -> float:
     return float(((point - located.point).T * located.direction)[0, 0])
 
@@ -144,7 +149,7 @@ class FeatureExtents:
         length = float(timber.length)
         # Everything that matters is within reach of the timber's middle.
         self.near = create_v3(0, 0, length / 2)
-        self.reach = 4 * (length + float(max(timber.size[0], timber.size[1])))
+        self.reach = timber_reach(timber)
         self._extent_memo: Dict[Tuple[int, str], Optional[FeatureExtent]] = {}
 
     def of(self, feature: CSGFeature, owner: CutCSG) -> Optional[FeatureExtent]:

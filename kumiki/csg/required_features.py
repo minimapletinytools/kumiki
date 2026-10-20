@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Callable, Iterator, List
 from .cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
                      OwnedFeatureHit, csg_children, measured_by_default)
 from .feature_paths import FeatureHandle
-from .feature_extent import extents_of
+from .feature_extent import extents_of, timber_reach
 from ..rule import V3, create_v3
 
 if TYPE_CHECKING:
@@ -62,7 +62,7 @@ def required_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished
     root = cut_timber.render_timber_with_cuts_csg_local()
     timber = cut_timber.timber
     near = create_v3(0, 0, float(timber.length) / 2)
-    reach = 4 * float(timber.length) + float(max(timber.size[0], timber.size[1]))
+    reach = timber_reach(timber)
 
     required: List[RequiredFeature] = []
     for node in _nodes(root):
