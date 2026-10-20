@@ -13,7 +13,7 @@ nearer one is hidden too, so a click takes what is on top; a view keeps it, sinc
 in line are dimensioned at the one line both draw.
 
 Analytic, over the whole CSG, not sampled: a place's line of sight is clipped exactly to the solid
-(cropcsg), and a feature drawn as a line is decided in the one plane holding all its lines of sight,
+(edges_on_csg), and a feature drawn as a line is decided in the one plane holding all its lines of sight,
 cut exactly by each solid (cross_sections).
 """
 
@@ -21,7 +21,7 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from ..csg.cropcsg import crop_line_to_crease_segments_on_csg, crop_line_to_interior_segments_on_csg
+from ..csg.edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to_interior_segments_on_csg
 from ..csg.cutcsg import CSGFeature, CutCSG
 from ..csg.feature_paths import FeatureHandle
 from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, SightFrame, area, material_crossing,

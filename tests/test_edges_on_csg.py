@@ -1,4 +1,4 @@
-"""Tests for where a feature actually is (kumiki/csg/cropcsg.py).
+"""Tests for where a feature actually is (kumiki/csg/edges_on_csg.py).
 
 The declared extent of a feature is the extent of the primitive it was declared
 on, and primitives are deliberately not the finished piece. These pin the
@@ -13,7 +13,7 @@ from kumiki.csg.cutcsg import AxisAlignedBoundingBox, CutCSG, HalfSpace, Rectang
 from kumiki.geometry import (
     ConvexPlanarRegion, Line, LineSegment, Plane,
 )
-from kumiki.csg.cropcsg import (
+from kumiki.csg.edges_on_csg import (
     BoundsKind,
     solid_bounds,
     convex_hull_2d,
@@ -506,7 +506,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         """
         import math
 
-        from kumiki.csg.cropcsg import _spans_within_primitive, solid_bounds
+        from kumiki.csg.edges_on_csg import _spans_within_primitive, solid_bounds
 
         offset, angle = 0.99, math.radians(30)
         along = _v(math.cos(angle), math.sin(angle), 0)
@@ -676,7 +676,7 @@ class TestWhatIsSolvedAndWhatIsBounded:
         return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
 
     def _solved(self, csg):
-        from kumiki.csg.cropcsg import _exact_spans
+        from kumiki.csg.edges_on_csg import _exact_spans
 
         return _exact_spans(csg, self._line(), (-10.0, 10.0), 0.0, False) is not None
 
@@ -986,7 +986,7 @@ class TestCurvedAndPointyPrimitives:
         assert len(solid_bounds(self._cylinder(start=None, end=None)).require_faces()) == 6
 
     def test_the_hexagon_contains_the_cylinder(self):
-        # Outwards, per the rule at the top of cropcsg: one direction, consistently, so that what
+        # Outwards, per the rule at the top of edges_on_csg: one direction, consistently, so that what
         # a bound excludes really is excluded. Tangent sides: each exactly the radius out.
         faces = solid_bounds(self._cylinder(radius=0.05)).require_faces()
         sides = [(normal, point) for normal, point in faces if abs(float(normal[2, 0])) < 1e-9]
