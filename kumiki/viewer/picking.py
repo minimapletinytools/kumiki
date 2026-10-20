@@ -1261,8 +1261,7 @@ def extract_highlight_mesh(
     # and compares names; when the name is a declared feature we can ask that
     # one feature directly, which is the same answer without the search.
     #
-    # test_point_unbounded is only meaningful for a point already known to be on
-    # owner's boundary -- which the loop below establishes before it gets here.
+    # test_point_unbounded alone means nothing off the boundary; the loop asks both.
     wanted_feature = None
     if feature_label is not None and edge_feature is None:
         wanted_feature = next(
@@ -1283,6 +1282,9 @@ def extract_highlight_mesh(
         # Convert centroid to timber-local
         local_c = inv_transform_point(timber_rot, timber_pos, [cx, cy, cz])
         if inside_box is not None and not inside_box(local_c):
+            continue
+        # The feature's own plane first: far cheaper than the tree's boundary, and most triangles fail it.
+        if wanted_feature is not None and not wanted_feature.test_point_unbounded(target_csg, to_v3(local_c), eps):
             continue
         if csg_point_on_boundary(target_csg, local_c, eps):
             if owner_path is not None and root_csg is not None:
@@ -1313,10 +1315,7 @@ def extract_highlight_mesh(
                         on_edge += 1
                 if on_edge < 2:
                     continue
-            elif wanted_feature is not None:
-                if not wanted_feature.test_point_unbounded(target_csg, to_v3(local_c), eps):
-                    continue
-            elif feature_label is not None:
+            elif feature_label is not None and wanted_feature is None:
                 # A generic name -- "left", "cylindrical_surface" -- which no
                 # declared feature answers to, so it has to be worked out.
                 tri_face_label = describe_leaf_csg(target_csg, local_c, eps)
