@@ -119,9 +119,12 @@ class TestEachTimber:
                 for end in (pick.candidate.measure.anchor_a, pick.candidate.measure.anchor_b)]
         assert "peg_hole_axis" in ends
 
-    def test_the_frame_has_a_drawing_per_timber_and_the_plan(self, pattern):
+    def test_the_frame_has_the_plan_and_a_drawing_per_distinct_piece(self, pattern):
         frame = pattern["build_frame_with_drawing"]()
         names = [drawing.name for drawing in frame.drawings]
+        ids = [str(drawing.drawing_id) for drawing in frame.drawings]
         assert "Cute frame plan (generated)" in names
-        for cut in frame.cut_timbers:
-            assert f"{cut.timber.ticket.path} (generated)" in names
+        # The crosses are one piece turned, and so are the sides: one drawing each, of two.
+        assert "Back Cross ×2 (generated)" in names and "Left Side ×2 (generated)" in names
+        assert "Back Cross (generated)" in ids and "Left Side (generated)" in ids
+        assert len(frame.drawings) == 3

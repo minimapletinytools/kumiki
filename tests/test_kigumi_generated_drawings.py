@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from tests.module_isolation import restore_modules
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -39,14 +40,13 @@ def loaded():
         state = runner.RunnerState(slots={"main": slot}, active_slot="main")
         runner.build_real_geometry(state, slot)
     yield slot, state
-    sys.modules.clear()
-    sys.modules.update(saved_modules)
+    restore_modules(saved_modules)
 
 
 def test_every_generated_measurement_resolves_and_settles(loaded):
     slot, _ = loaded
     drawings = runner.collect_drawings(slot.frame, None)
-    assert len(drawings) == 5
+    assert len(drawings) == 3  # the plan, and one per distinct piece
     for drawing in drawings:
         measures = [measure for viewport in drawing["viewports"] for measure in viewport.get("measurements", [])]
         assert measures, drawing["name"]

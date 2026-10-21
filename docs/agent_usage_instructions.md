@@ -159,6 +159,28 @@ A file may mark any number of frames. Kigumi builds them all and shows them toge
 
 Older files name their one frame `example` or `build_frame` instead of marking it. Kigumi still picks those up, with a warning; that will be removed, so write `@frame` in new files.
 
+## Generating drawings
+
+A frame can carry drawings: `Frame(..., drawings=[...])`, or `dataclasses.replace(frame, drawings=[...])` on one built by `Frame.from_joints`. Kigumi lists them and the user can add or move dimensions there; those edits are saved in `.kigumi/drawings/` and kept across rebuilds.
+
+```python
+from kumiki.csg.feature_paths import find_feature
+
+post = frame.cut_timber_of(post_timber)
+shoulder = find_feature(post, ["tenon_joint"], "shoulder")   # CSG labels down to the node, then the feature name
+bottom = find_feature(post, [], "rptw.bottom")                # a timber's own faces: rptw.* (ptw.* inside rough stock)
+shop = Drawing(
+    name="post (generated)",
+    timbers=[post.timber],
+    viewports=shop_drawing_viewports(),   # the piece's four long faces and a preview; elevation_viewports() for a whole frame
+    measurements={SHOP_DRAWING_IDS["front"]: [Measure(bottom, shoulder)]},
+)
+```
+
+- A drawing with no measurements is fine: it shows the views, and the user dimensions it in Kigumi.
+- Draw each distinct piece once: `match_timbers(frame.cut_timbers)` groups timbers that are the same piece, turned (ROTATION) or mirrored (REFLECTION, a "handed" piece). Draw the group's `representative` and put the count in the drawing's name.
+- The `my_cute_frame_drawing_test.py` pattern (in the installed kumiki package, under `kumiki/patterns/structures/`) dimensions drawings automatically with `kumiki.drawings.auto_dimensioning`; start from it rather than placing every measurement by hand.
+
 ## Parameterizing with Kiwari
 
 kumiki is a *programmatic CAD* tool hence all designs can be parameterized by code. To make this even easier, `kiwari` allows you to expose some parameters in one of the kigumi panels.
