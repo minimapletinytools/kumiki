@@ -6,8 +6,9 @@ planes -- is solved by auto dimensioning (kumiki.drawings.auto_dimensioning) in 
 elevations, top and front. Square and sheet-axis assumptions start known, so only positions are
 left to dimension.
 
-Each timber also gets a shop drawing of its own, solving every required feature -- joints and
-peg holes too, not just its prism -- from its reference faces and its bottom end.
+Each distinct piece also gets a shop drawing, solving every required feature -- joints and peg holes
+too, not just its prism -- from its reference faces and its bottom end. Timbers that are the same piece,
+turned or mirrored (match_timbers), share one drawing, named with how many to make.
 
 Run directly to print what it picked; load in Kigumi to see the drawings.
 """
@@ -24,7 +25,7 @@ from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
 from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, Policy, auto_dimension, coincidence_assumptions, is_reference,
                                               sheet_candidates)
-from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, elevation_viewports,
+from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, DrawingId, elevation_viewports,
                                      shop_drawing_viewports)
 from kumiki.drawings.measure import ViewAxes
 from kumiki.geometry import Plane
@@ -198,18 +199,33 @@ def build_frame_with_drawing() -> Frame:
         measurements[ELEVATION_IDS[candidate.view]].append(candidate.measure)
     drawing = Drawing(name="Cute frame plan (generated)", timbers=[cut.timber for cut in frame.cut_timbers],
                       viewports=elevation_viewports(), measurements=measurements)
-    return replace(frame, drawings=[*frame.drawings, drawing, *(_timber_drawing(cut, frame) for cut in frame.cut_timbers)])
+    shop = [_piece_drawing(group) for group in match_timbers(frame.cut_timbers)]
+    return replace(frame, drawings=[*frame.drawings, drawing, *shop])
 
 
-def _timber_drawing(cut: CutTimber, frame: Frame) -> Drawing:
-    """One timber's shop drawing, dimensioned by solve_timber."""
+def _piece_drawing(group: SymmetricTimberGroup) -> Drawing:
+    """One shop drawing for a group of matching timbers (match_timbers), dimensioned on its representative.
+
+    Named with how many to make and how many of those are mirrored; its id stays the representative's
+    path, so the drawings file's edits keep finding it.
+    """
+    cut = group.representative
     result, _ = solve_timber(cut)
     measurements: Dict = {SHOP_DRAWING_IDS[view]: [] for view in SHOP_VIEWS}
     for pick in result.picks:
         candidate = pick.candidate
         measurements[SHOP_DRAWING_IDS[candidate.view]].append(candidate.measure)
-    return Drawing(name=f"{cut.timber.ticket.path} (generated)", timbers=[cut.timber],
-                   viewports=shop_drawing_viewports(), measurements=measurements)
+    path = cut.timber.ticket.path
+    return Drawing(name=f"{path}{_count(group)} (generated)", drawing_id=DrawingId(f"{path} (generated)"),
+                   timbers=[cut.timber], viewports=shop_drawing_viewports(), measurements=measurements)
+
+
+def _count(group: SymmetricTimberGroup) -> str:
+    """Return " ×N" for a group of N > 1, with ", M mirrored" when M of them are reflections."""
+    if not group.matches:
+        return ""
+    mirrored = sum(1 for match in group.matches if match.kind is SymmetryKind.REFLECTION)
+    return f" ×{1 + len(group.matches)}" + (f", {mirrored} mirrored" if mirrored else "")
 
 
 example = build_frame_with_drawing
@@ -220,6 +236,6 @@ if __name__ == "__main__":
     started = time.time()
     frame, _, lines = solve_cute_frame()
     print("\n".join(lines))
-    for cut in frame.cut_timbers:
-        print("\n".join(solve_timber(cut)[1]))
+    for group in match_timbers(frame.cut_timbers):
+        print("\n".join(solve_timber(group.representative)[1]))
     print(f"took {time.time() - started:.1f}s")

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from tests.module_isolation import restore_modules
 
 REPO = Path(__file__).resolve().parent.parent
 TOLERANCES = {"face": 5e-4, "edge": 0.012, "point": 0.020}
@@ -31,8 +32,7 @@ def frame():
         slot = runner.load_slot_state(str(REPO / "patterns" / "structures" / "my_cute_frame_drawing_test.py"))
         runner.build_real_geometry(None, slot)
     yield runner, slot
-    sys.modules.clear()
-    sys.modules.update(saved_modules)
+    restore_modules(saved_modules)
 
 
 def _first_hit(slot, origin, look):

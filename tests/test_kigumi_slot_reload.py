@@ -11,6 +11,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+from tests.module_isolation import restore_modules
 
 REPO = Path(__file__).resolve().parent.parent
 SAWHORSE = REPO / "patterns" / "structures" / "dovetailed_sawhorse.py"
@@ -28,8 +29,7 @@ def runner(monkeypatch):
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "_project_root", REPO)
     yield module
-    sys.modules.clear()
-    sys.modules.update(saved_modules)
+    restore_modules(saved_modules)
 
 
 def _pick(runner, state, slot):
