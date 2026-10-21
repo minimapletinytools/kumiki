@@ -1,6 +1,7 @@
 # Caches with owners: no more global memos
 
-Status: plan, nothing done yet (2026-10-20).
+Status: done (2026-10-21), branch cache-plumbing. One commit per step below; drawings and picks are
+byte-identical. Step 1 costs construction time (tinyhouse120 load 0.46 -> 0.56 s); see the PR.
 
 ## The problem
 

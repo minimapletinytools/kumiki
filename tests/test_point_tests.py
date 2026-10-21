@@ -2,7 +2,6 @@
 
 from kumiki.csg.cutcsg import Difference, PointTests, RectangularPrism
 from kumiki.csg.edges_on_csg import convex_hull
-from kumiki.csg.identity_memo import memo_by_identity
 from kumiki.rule import Matrix, Transform, create_v3, scalar
 
 
@@ -14,25 +13,7 @@ def _notched_block() -> Difference:
     return Difference(base, [notch])
 
 
-def test_memo_by_identity_works_out_once_per_object():
-    calls = []
-
-    @memo_by_identity
-    def work(obj, scale):
-        calls.append(obj)
-        return [scale]
-
-    class Thing:
-        pass
-
-    one, other = Thing(), Thing()
-    assert work(one, 2) is work(one, 2)
-    assert work(other, 2) == [2]
-    assert work(one, 3) == [3]
-    assert calls == [one, other, one]
-
-
-def test_solid_bounds_and_declared_features_are_kept():
+def test_convex_hull_and_declared_features_are_kept():
     block = _notched_block()
     assert convex_hull(block.base) is convex_hull(block.base)
     first, second = block.base.get_declared_features(), block.base.get_declared_features()

@@ -25,7 +25,6 @@ import numpy as np
 if TYPE_CHECKING:
     from .cross_sections import PolygonRegions, Sides, PlaneFrame
     from .edges_on_csg import AngleSpans, ConvexHull, Span
-from .identity_memo import memo_by_identity
 from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Midplane, Recipe,
                        merge_coincident_planes)
 
