@@ -6,7 +6,7 @@ produce it (`CSGFeature.solve_recipe`). Rows over the unknowns are in csg/solve_
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Dict, List, Sequence, Tuple, Type, Union
+from typing import Any, TYPE_CHECKING, ClassVar, Dict, List, Sequence, Tuple, Type, Union
 
 from ..geometry import Line, Plane, planes_are_coincident
 from ..rule import Numeric, V3
@@ -133,6 +133,8 @@ class CarrierMap:
     def __init__(self, carriers: Dict[CarrierRef, Carrier], canonical: Dict[CarrierRef, CarrierRef]):
         self._carriers = carriers
         self._canonical = canonical
+        #: Each feature handle's direction and its change over these carriers (assumptions._directed).
+        self.directions: Dict[Any, Any] = {}
 
     @staticmethod
     def union(maps: Sequence['CarrierMap']) -> 'CarrierMap':

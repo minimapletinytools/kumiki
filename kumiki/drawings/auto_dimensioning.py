@@ -17,7 +17,6 @@ from ..csg.carriers import Row
 from ..csg.dof_solver import rank_svd, remaining, rows_matrix
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
-from ..csg.identity_memo import memo_by_identity
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
 from ..rule import as_ndarray, create_v3, unit_ndarray
@@ -73,7 +72,6 @@ def is_reference(handle: FeatureHandle) -> bool:
     return handle.feature.name.split(".", 1)[-1] in _reference_names(handle.timber)
 
 
-@memo_by_identity
 def _reference_names(timber) -> FrozenSet[str]:
     """Return the unprefixed names of a timber's reference faces and centerplanes."""
     names = set()
@@ -150,7 +148,6 @@ class AutoDimensioning:
     left_after: int
 
 
-@memo_by_identity
 def _key(handle: FeatureHandle) -> Tuple:
     return hit_identity(handle.feature, handle.owner)
 

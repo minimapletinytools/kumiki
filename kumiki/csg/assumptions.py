@@ -10,7 +10,6 @@ import numpy as np
 
 from .carriers import CarrierMap, Row
 from .feature_paths import FeatureHandle
-from .identity_memo import memo_by_identity
 from ..rule import Transform
 from .solve_recipe import VectorRow, combine, direction_motion, dot_vector_row, transform_vector_row
 
@@ -34,7 +33,7 @@ class _Directed:
 
 def _directed(handles: Sequence[FeatureHandle], carriers: CarrierMap) -> List[_Directed]:
     """Return the handles that have a direction (a plane's normal or a line's direction), in world space."""
-    known = _directed_memo(carriers)
+    known = carriers.directions
     directed = []
     for handle in handles:
         if handle not in known:
@@ -42,12 +41,6 @@ def _directed(handles: Sequence[FeatureHandle], carriers: CarrierMap) -> List[_D
         if known[handle] is not None:
             directed.append(known[handle])
     return directed
-
-
-@memo_by_identity
-def _directed_memo(carriers: CarrierMap) -> Dict[FeatureHandle, Optional[_Directed]]:
-    """Per-`carriers` cache of each handle's `_Directed` (None if it has no direction)."""
-    return {}
 
 
 def _direct(handle: FeatureHandle, carriers: CarrierMap) -> Optional[_Directed]:
