@@ -123,6 +123,8 @@ function describeAnchor(anchor) {
 
 // How strongly a selection shows in a drawing's views other than its own.
 const SELECTION_ECHO_OPACITY = 0.3;
+// How long a dropped dimension is held where it was dropped if the drawings never come back with it.
+const MEASUREMENT_SETTLE_MS = 3000;
 
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
@@ -2169,6 +2171,10 @@ class KigumiViewerApp extends LitElement {
 
         if (message.type === 'scenes') {
             const payload = message.payload || {};
+            // A dropped dimension was held until now: what came back has it where it was dropped.
+            if (this._draggingMeasurement && this._draggingMeasurement.settling) {
+                this._draggingMeasurement = null;
+            }
             const ids = this.sceneStore.setScenes(payload.scenes);
             // Every drawing command answers with the whole set, so this is also
             // how the list refreshes -- entering is asked for separately, since
@@ -3725,11 +3731,13 @@ class KigumiViewerApp extends LitElement {
 
         const onUp = () => {
             const dragged = this._draggingMeasurement;
-            this._draggingMeasurement = null;
             if (!moved || !dragged) {
+                this._draggingMeasurement = null;
                 return;
             }
-            this.renderMeasurements();
+            // Held where it was dropped until the runner's answer redraws it there: let go at once,
+            // it drew at the old place for the round trip -- a flicker on every drag.
+            this._settleMeasurementDrag(dragged);
             const placement = typeof dragged.along === 'number'
                 ? { offset: 0, along: dragged.along }
                 : { offset: dragged.offset };
@@ -3737,6 +3745,21 @@ class KigumiViewerApp extends LitElement {
         };
 
         this._beginPointerGesture('measurement-drag', { onMove, onEnd: onUp });
+    }
+
+    /**
+     * Keep a dropped dimension where it was dropped until the drawings come back with it there
+     * (the 'scenes' answer clears it), or for a moment if they never do.
+     */
+    _settleMeasurementDrag(dragged) {
+        const settling = { ...dragged, settling: true };
+        this._draggingMeasurement = settling;
+        setTimeout(() => {
+            if (this._draggingMeasurement === settling) {
+                this._draggingMeasurement = null;
+                this.renderMeasurements();
+            }
+        }, MEASUREMENT_SETTLE_MS);
     }
 
     /** Write where a dimension now sits, and what would put it back. */

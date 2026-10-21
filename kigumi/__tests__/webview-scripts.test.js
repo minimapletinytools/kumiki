@@ -611,3 +611,18 @@ describe('a measurement offers its menu where it is drawn', () => {
         expect(body).toContain('this.deleteMeasurement(');
     });
 });
+
+describe('a dropped dimension stays where it was dropped', () => {
+    // Let go of at once, it drew at its old place until the runner answered -- a flicker on every
+    // drag, worst on a dimension the code declares, whose move goes through the runner as an override.
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+    test('the drop holds it rather than letting go', () => {
+        expect(app).toContain('this._settleMeasurementDrag(dragged);');
+    });
+
+    test('and the drawings coming back let go of it', () => {
+        const scenes = app.slice(app.indexOf("if (message.type === 'scenes') {"));
+        expect(scenes.slice(0, 400)).toContain('this._draggingMeasurement.settling');
+    });
+});
