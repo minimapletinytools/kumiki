@@ -1,9 +1,6 @@
-"""
+"""FeatureHandle, a reference to a feature on a timber, and its wire form FeaturePath.
 
 TODO rename this file to "FeatureHandle"
-
-A FeatureHandle is a reference to a feature. Serializable into FeaturePath for use over the wire.
-
 """
 
 from dataclasses import dataclass
@@ -19,9 +16,7 @@ if TYPE_CHECKING:
 
 
 def hit_identity(feature: CSGFeature, owner: CutCSG) -> Tuple:
-    """Which feature this is, hashably, for keying a memo: its owner node and its name, or for a
-    derived feature its parents'. Two derived features can share an owner and a name -- the same
-    joint at each end of a timber gives one shoulder corner per end, both named alike."""
+    """Return a hashable key for a feature: `(id(owner), name)`, or for a derived feature its parents' keys."""
     if isinstance(feature, (DerivedEdgeFeature, DerivedPointFeature)):
         return (type(feature).__name__,
                 tuple(hit_identity(parent.feature, parent.owner) for parent in feature.parents if parent is not None))
@@ -29,7 +24,7 @@ def hit_identity(feature: CSGFeature, owner: CutCSG) -> Tuple:
 
 
 def _same_hit(one: OwnedFeatureHit, other: OwnedFeatureHit) -> bool:
-    """Same owner node, and the same feature on it: by name, or by parents for a derived one."""
+    """Return whether two hits are the same feature: same owner and name, or same parents if derived."""
     if one.owner is not other.owner or type(one.feature) is not type(other.feature):
         return False
     if isinstance(one.feature, (DerivedEdgeFeature, DerivedPointFeature)):
@@ -40,8 +35,9 @@ def _same_hit(one: OwnedFeatureHit, other: OwnedFeatureHit) -> bool:
 
 @dataclass(frozen=True, eq=False)
 class FeatureHandle(Generic[F_co]):
-    """A feature of one timber: the timber, and the feature with the node that owns it. Generic in the feature's type. 
-    Equal when it is the same timber and node, compared by reference.
+    """A feature on one timber: the timber and the hit (feature plus owning node).
+
+    Equal when the timber and owner node are the same objects and the feature matches (see `_same_hit`).
     """
     timber: 'PerfectTimberWithin'
     hit: OwnedFeatureHit[F_co]
@@ -63,14 +59,14 @@ class FeatureHandle(Generic[F_co]):
 
 
 def label_name(labeled: Union[CutCSG, 'Cutting']) -> Optional[str]:
-    """The name on a CSG node's or a Cutting's label, or None."""
+    """Return the label name of a CSG node or Cutting, or None."""
     return labeled.label.name
 
 
 def _labelled_children(node: CutCSG) -> List[CutCSG]:
-    """The nodes a path step under `node` can name, in document order.
+    """Return the labelled nodes a path step under `node` can name, in document order.
 
-    Unlabelled unions and differences are stepped through; a path names only labelled nodes.
+    Looks through unlabelled unions and differences.
     """
     found: List[CutCSG] = []
 
@@ -87,12 +83,12 @@ def _labelled_children(node: CutCSG) -> List[CutCSG]:
 
 
 def labelled_candidates(node: CutCSG, label: str) -> List[CutCSG]:
-    """Every node a path step naming `label` could mean, in document order."""
+    """Return the nodes under `node` labelled `label`, in document order."""
     return [child for child in _labelled_children(node) if label_name(child) == label]
 
 
 def candidate_segments(node: CutCSG) -> Dict[int, str]:
-    """The path segment for every node a step under `node` can name, keyed by id: `label`, then `label#n`."""
+    """Return each nameable node's path segment (`label`, then `label#1`, ...), keyed by id."""
     seen: Dict[str, int] = {}
     segments: Dict[int, str] = {}
     for child in _labelled_children(node):
@@ -105,9 +101,10 @@ def candidate_segments(node: CutCSG) -> Dict[int, str]:
 
 
 def walk_labels(csg: CutCSG, labels: Sequence[str]) -> Tuple[CutCSG, int]:
-    """Down from `csg` by path steps, as far as they lead: the node reached and how many steps
-    were taken. A step names a label and which of the siblings carrying it (`label#n`; bare is the
-    first), numbered as candidate_segments numbers them."""
+    """Follow path steps (`label` or `label#n`) down from `csg` as far as they go.
+
+    Returns the node reached and how many steps were taken.
+    """
     node = csg
     for taken, segment in enumerate(labels):
         wanted = ResolvedJointPath.parse(segment)
@@ -119,8 +116,7 @@ def walk_labels(csg: CutCSG, labels: Sequence[str]) -> Tuple[CutCSG, int]:
 
 
 def find_csg_by_labels(csg: CutCSG, labels: Sequence[str]) -> Optional[CutCSG]:
-    """Walk down from `csg` by labels, or None if they lead nowhere. A labelled `csg` consumes the
-    first step itself."""
+    """Return the node `labels` lead to from `csg`, or None. If `csg` is labelled, it matches the first step."""
     remaining = tuple(labels)
     label = label_name(csg)
     if label is not None:
@@ -134,7 +130,7 @@ def find_csg_by_labels(csg: CutCSG, labels: Sequence[str]) -> Optional[CutCSG]:
 
 
 def node_positions(root: CutCSG) -> Dict[int, Tuple[int, int, List[str]]]:
-    """Every node under `root`, keyed by id, as (depth, document order, label path)."""
+    """Return every node under `root`, keyed by id, as (depth, document order, label path)."""
     positions: Dict[int, Tuple[int, int, List[str]]] = {}
     order = 0
 
@@ -153,16 +149,15 @@ def node_positions(root: CutCSG) -> Dict[int, Tuple[int, int, List[str]]]:
 
 
 def timber_body_csg(cut_timber: 'CutTimber') -> CutCSG:
-    """The uncut body the cuts are taken out of."""
+    """Return the uncut body of the cut timber's drawn tree."""
     rendered = cut_timber.render_timber_with_cuts_csg_local()
     return rendered.base if isinstance(rendered, Difference) else rendered
 
 
 def roots_for_path(cut_timber: 'CutTimber', labels: Sequence[str]) -> Tuple[List[CutCSG], Tuple[str, ...]]:
-    """Which trees a path could be in, and what is left of the path to walk.
+    """Return the trees a path may start in, and the rest of the path.
 
-    A first step naming one of the timber's cuts picks that cut by occurrence. Otherwise
-    every cut and the timber's body are searched.
+    If the first step names one of the timber's cuts, that cut alone; otherwise every cut and the body.
     """
     labels = tuple(labels)
     cuts = list(cut_timber.cuts)
@@ -180,7 +175,7 @@ def roots_for_path(cut_timber: 'CutTimber', labels: Sequence[str]) -> Tuple[List
 
 
 def find_declared_feature(cut_timber: 'CutTimber', ref: FeatureRef) -> Optional[OwnedFeatureHit]:
-    """The declared feature a FeatureRef names on this timber, with its node."""
+    """Return the declared feature `ref` names on the timber, with its node, or None."""
     roots, labels = roots_for_path(cut_timber, ref.csg_path)
     for root in roots:
         node = find_csg_by_labels(root, labels)
@@ -193,13 +188,13 @@ def find_declared_feature(cut_timber: 'CutTimber', ref: FeatureRef) -> Optional[
 
 
 def find_feature(cut_timber: 'CutTimber', csg_path: Sequence[str], feature: str) -> Optional[FeatureHandle]:
-    """A handle to a declared feature, found by CSG labels and name. For authoring by hand."""
+    """Return a handle to the declared feature at `csg_path` named `feature`, or None."""
     hit = find_declared_feature(cut_timber, FeatureRef(csg_path=tuple(csg_path), feature=feature))
     return None if hit is None else FeatureHandle(timber=cut_timber.timber, hit=hit)
 
 
 def serialize_feature_path(path: FeaturePath) -> Dict[str, Any]:
-    """A FeaturePath as the viewer and the drawings file hold it."""
+    """Return the JSON form of a FeaturePath."""
     if isinstance(path, DerivedFeaturePath):
         return {
             "kind": "point" if path.feature_type == "POINT" else "edge",
@@ -218,7 +213,7 @@ def serialize_feature_path(path: FeaturePath) -> Dict[str, Any]:
 
 
 def deserialize_feature_path(source: Any) -> Optional[FeaturePath]:
-    """The FeaturePath a wire form names, or None if it names nothing usable."""
+    """Parse a FeaturePath from its JSON form, or None if malformed."""
     if not isinstance(source, dict):
         return None
     timber = ResolvedTimberPath.parse(str(source.get("timber") or ""))
@@ -244,7 +239,7 @@ def deserialize_feature_path(source: Any) -> Optional[FeaturePath]:
 
 
 def to_feature_path(handle: FeatureHandle, frame: 'Frame') -> Optional[FeaturePath]:
-    """The wire reference for a handle, or None if its timber or node isn't in `frame`."""
+    """Return the FeaturePath of a handle, or None if its timber or node isn't in `frame`."""
     cut_timber = frame.cut_timber_of(handle.timber)
     timber_path = frame.resolved_timber_path_of(handle.timber)
     if cut_timber is None or timber_path is None:
@@ -269,10 +264,7 @@ def to_feature_path(handle: FeatureHandle, frame: 'Frame') -> Optional[FeaturePa
 
 
 def resolve_feature_path(path: FeaturePath, frame: 'Frame') -> Optional[FeatureHandle]:
-    """The feature a wire reference names in `frame`, or None if it no longer exists there.
-
-    A derived feature is derived again from its two resolved parents.
-    """
+    """Return the handle `path` names in `frame`, or None. Derived features are re-derived from their parents."""
     cut_timber = frame.cut_timber_at(path.timber)
     if cut_timber is None:
         return None

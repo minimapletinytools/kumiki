@@ -19,6 +19,11 @@ This is the canonical instruction entry point for AI coding agents in this repos
 
 Use relevant instruction files based on the files you are editing.
 
+## Comments
+
+- A function's docstring plainly says what it does, and where useful what it is for, what it assumes, its arguments and what it returns. Less is more: leave out anything obvious from the name and signature.
+- Say what the code does, not why it was built that way or what went wrong before; that belongs in the commit message or PR.
+
 # Concepts
 
 please see docs/concepts.md

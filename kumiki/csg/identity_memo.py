@@ -9,7 +9,7 @@ Result = TypeVar("Result")
 
 
 def memo_by_identity(compute: Callable[..., Result]) -> Callable[..., Result]:
-    """`compute(obj, *args)` worked out once per live `obj` and hashable `args`."""
+    """Memoize `compute(obj, *args)` per live `obj` (by identity) and hashable `args`."""
     memo: Dict[Tuple[int, Tuple[Hashable, ...]], Tuple[Any, Result]] = {}
 
     @functools.wraps(compute)

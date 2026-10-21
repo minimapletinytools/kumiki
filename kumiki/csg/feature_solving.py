@@ -1,10 +1,7 @@
-"""Measurements on cut timbers, as rows over their solving carriers, and what they leave unsolved.
+"""Measurements on cut timbers as rows over their solving carriers, and the DOFs they leave free.
 
-The interface layer of docs/internal/featuresolving-plan.md, Part 2 D: FeatureHandles and
-measurements in, rows and remaining DOFs out. A measurement here is only what the solver needs --
-which features, and where and along what it is read, in world space. Turning a drawing's Measure
-into one (spans, sheets, views) is drawings/measure_solving.py. Each anchor's row is taken in its
-own timber's local space, where its carriers are.
+FeatureHandles and world-space measurements in, rows and remaining DOFs out. Converting a drawing's
+Measure into a SolveMeasurement is in drawings/measure_solving.py.
 """
 
 from dataclasses import dataclass
@@ -48,10 +45,7 @@ SolveMeasurement = Union[SolveDistance, SolveAngle]
 
 
 def carrier_map_of(cut_timber: 'CutTimber', *more: 'CutTimber') -> CarrierMap:
-    """The solving carriers of cut timbers' drawn trees, the trees their handles point into.
-
-    Coincident planes are merged within a timber, never across timbers.
-    """
+    """Return the carrier map of the cut timbers' drawn trees; coincident planes merge only within a timber."""
     return CarrierMap.union([carrier_map(timber.render_timber_with_cuts_csg_local())
                              for timber in (cut_timber, *more)])
 
@@ -64,7 +58,7 @@ def _recipe(handle: FeatureHandle) -> Recipe:
 
 
 def _distance_row(measure: SolveDistance, carriers: CarrierMap) -> Row:
-    """How the distance from `at_a` to `at_b`, read along `along`, changes."""
+    """Return the row for the distance measurement."""
     rows = []
     for handle, at in ((measure.a, measure.at_a), (measure.b, measure.at_b)):
         transform = handle.timber.transform
@@ -80,10 +74,7 @@ def _direction_in_world(handle: FeatureHandle, carriers: CarrierMap) -> Tuple[np
 
 
 def _angle_row(measure: SolveAngle, carriers: CarrierMap) -> Row:
-    """How the cosine of the angle between the two features changes.
-
-    In 3D, between their normals or directions. On a sheet, between the lines they draw as.
-    """
+    """Return the row for the cosine of the angle: in 3D, or between the lines drawn on a sheet."""
     look = None if measure.look is None else as_ndarray(measure.look)
     sides = []
     for handle in (measure.a, measure.b):
@@ -112,23 +103,19 @@ def _angle_row(measure: SolveAngle, carriers: CarrierMap) -> Row:
 
 
 def feature_handle_dof_rows(handle: FeatureHandle, carriers: CarrierMap) -> List[Row]:
-    """The feature's own DOFs as rows. See solve_recipe.feature_dof_rows."""
+    """Return the feature's own DOFs as rows (solve_recipe.feature_dof_rows)."""
     return feature_dof_rows(_recipe(handle), carriers)
 
 
 def measure_row(measure: SolveMeasurement, carriers: CarrierMap) -> Row:
-    """How a measurement's value changes with the solving carriers' unknowns.
-
-    `carriers` must cover every timber the measurement touches.
-    """
+    """Return the measurement's row over the unknowns; `carriers` must cover both its timbers."""
     if isinstance(measure, SolveAngle):
         return _angle_row(measure, carriers)
     return _distance_row(measure, carriers)
 
 
 class Solve:
-    """What one solve over some cut timbers works out once and asks for again: their carriers, and
-    each feature's own DOF rows. Lasts as long as the solve; the timbers must not change under it."""
+    """Carriers and cached DOF rows for one solve over some cut timbers."""
 
     def __init__(self, cut_timbers: Sequence['CutTimber']):
         self.cut_timbers: Tuple['CutTimber', ...] = tuple(cut_timbers)
@@ -136,7 +123,7 @@ class Solve:
         self._dof_rows_memo: Dict[FeatureHandle, List[Row]] = {}
 
     def dof_rows(self, handle: FeatureHandle) -> List[Row]:
-        """The feature's own DOFs as rows (feature_handle_dof_rows)."""
+        """Return the feature's own DOFs as rows, cached."""
         if handle not in self._dof_rows_memo:
             self._dof_rows_memo[handle] = feature_handle_dof_rows(handle, self.carriers)
         return self._dof_rows_memo[handle]
@@ -146,7 +133,7 @@ class Solve:
 
 
 def _carriers_for(handles: Sequence[FeatureHandle], cut_timbers: Sequence['CutTimber']) -> CarrierMap:
-    """Carriers of every timber the handles are on, each found among `cut_timbers`."""
+    """Return the carrier map of the timbers the handles are on, looked up in `cut_timbers`."""
     touched: List['CutTimber'] = []
     for handle in handles:
         if any(cut.timber is handle.timber for cut in touched):
@@ -175,7 +162,7 @@ def remaining_dofs(
     known: Sequence[FeatureHandle],
     cut_timbers: Sequence['CutTimber'],
 ) -> Remaining:
-    """What of `target` the measurements leave unsolved, given the `known` features.
+    """Return the DOFs of `target` left free by the measurements and `known` features.
 
     `cut_timbers` must hold every timber the target, measurements and known features are on.
     """
@@ -203,7 +190,7 @@ def solve_report(
     known: Sequence[FeatureHandle],
     cut_timbers: Sequence['CutTimber'],
 ) -> SolveReport:
-    """Remaining DOFs of each target, and of all of them together, given the `known` features.
+    """Return the free DOFs of each target, and of all together, given the measurements and `known` features.
 
     Targets may be on any number of timbers. `cut_timbers` must hold every timber the targets,
     measurements and known features are on; a frame's `cut_timbers` will do.
@@ -224,5 +211,5 @@ def solve_report(
 
 
 def required_targets(cut_timber: 'CutTimber', face_test: FaceTest = on_finished_surface) -> List[FeatureHandle]:
-    """The features `required_features` finds on `cut_timber`, as targets for `solve_report`."""
+    """Return the handles of `required_features(cut_timber)`, as targets for `solve_report`."""
     return [required.handle for required in required_features(cut_timber, face_test)]

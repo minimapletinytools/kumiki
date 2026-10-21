@@ -1,17 +1,8 @@
-"""
-Path-based CSG: a closed 2D boundary built from a sequence of segments (lines,
-circular arcs, and room for more curve types later), plus PathExtrusion, the
-CutCSG primitive that extrudes a Path along its local Z axis.
+"""Path-based CSG: FancyPath, a closed 2D boundary of straight and arc segments, and PathExtrusion,
+which extrudes one along its local Z.
 
-Path generalizes ConvexPolygonExtrusion's plain point list to boundaries that
-aren't convex -- a cabriole leg's silhouette, for instance, is concave at the
-ankle -- at the cost of a more expensive containment test (general ray-casting
-instead of a half-plane scan) and a more expensive cap-triangulation path (see
-decompose_path_into_convex_pieces). Side faces that come from a non-planar
-segment (e.g. ArcSegment) never register a CSGFeature -- PathExtrusion.
-find_all_features simply has nothing to emit for them, the same graceful-
-omission behavior Cylinder's lateral surface and ConvexPolygonSimpleLoft's
-tapered side faces already have today.
+Unlike ConvexPolygonExtrusion the boundary may be concave. Curved sides carry no plane, so they
+are never measurable.
 """
 
 import math
@@ -51,11 +42,7 @@ from .carriers import Carrier
 
 @dataclass(frozen=True)
 class PathSegment(ABC):
-    """
-    One piece of a closed Path, living in some local 2D plane. A Path is a
-    list of these, connected end-to-start; PathSegment itself doesn't know
-    about neighbors or CSG at all -- Path and PathExtrusion own that.
-    """
+    """One segment of a closed FancyPath, in the path's local 2D plane."""
 
     @property
     @abstractmethod
@@ -67,122 +54,62 @@ class PathSegment(ABC):
 
     @abstractmethod
     def is_planar(self) -> bool:
-        """
-        True if extruding this segment produces a flat side face -- i.e. it's
-        eligible to ever carry a plane/feature. False (ArcSegment) means
-        PathExtrusion.find_all_features simply has nothing to emit for it when
-        it's named -- not a special case that needs handling, just an absence.
-        """
+        """Return whether extruding this segment gives a flat side."""
 
     @abstractmethod
     def ray_crossings(self, y: Numeric, inclusive: bool = False, eps: Optional[Numeric] = None) -> List[Numeric]:
-        """
-        x-coordinates where this segment crosses height y.
+        """Return the x values where this segment crosses height y.
 
-        inclusive=False (the default) uses a half-open [lower_y, upper_y)
-        convention on each of this segment's own monotonic branches, so a ray
-        through a vertex shared by two segments is counted by exactly one of
-        them -- this mode is for Path.contains_point_2d's parity test.
-
-        inclusive=True uses closed intervals instead, so it reliably returns
-        the true crossing(s) even exactly at a segment's own endpoint -- this
-        mode is for decompose_path_into_convex_pieces, which needs the actual
-        geometric position at a band edge, not parity-test ownership.
+        `inclusive=False` counts each crossing at a shared vertex once (for parity tests);
+        `inclusive=True` includes the segment's own endpoints (for convex decomposition).
         """
 
     @abstractmethod
     def v_extrema(self) -> List[Numeric]:
-        """
-        Extra y-values, strictly between this segment's own endpoints' y
-        values, where its x(y) relation has a local turning point (e.g. an
-        arc passing through its circle's own north/south pole) and so isn't
-        single-valued across its full span. Empty for segments whose x(y) is
-        already monotonic (e.g. any StraightSegment). Used as extra band-boundary
-        breakpoints by decompose_path_into_convex_pieces.
-        """
+        """Return the y values strictly between the endpoints where x(y) turns (e.g. an arc's pole)."""
 
     @abstractmethod
     def closest_point(self, point: V2, eps: Optional[Numeric] = None) -> V2:
-        """Nearest point on this segment to `point`."""
+        """Return the nearest point on this segment to `point`."""
 
     @abstractmethod
     def outward_local_normal(self, point: V2, eps: Optional[Numeric] = None) -> V2:
-        """
-        2D outward normal at `point`, assumed to lie on this segment and
-        assumed the Path is CCW-wound (Path.is_valid() checks this).
-        """
+        """Return the 2D outward normal at `point` on this segment, assuming a CCW path."""
 
     @abstractmethod
     def bounds(self) -> Tuple[V2, V2]:
-        """(min_corner, max_corner) of this segment alone."""
+        """Return this segment's (min_corner, max_corner)."""
 
     @abstractmethod
     def signed_area_contribution(self) -> Numeric:
-        """This segment's term in the shoelace-with-arcs sum, for Path.signed_area()."""
+        """Return this segment's term in FancyPath.signed_area."""
 
     @abstractmethod
     def tessellate(self, tolerance: float) -> List[V2]:
-        """
-        Points approximating this segment for MESHING ONLY -- never used by
-        the analytic methods above. Excludes `start` (shared with the
-        previous segment's `end`), includes `end`.
-        """
+        """Return points approximating this segment for meshing, excluding `start` and including `end`."""
 
     @abstractmethod
     def tessellate_with_extra_breaks(self, other_breaks: List[Numeric], tolerance: float) -> List[V2]:
-        """
-        Like tessellate(), but also forces a vertex at every y-value in
-        `other_breaks` that falls strictly inside this segment's own y-range
-        -- even for a StraightSegment, which tessellate() alone never subdivides.
+        """Like tessellate(), plus a vertex at each y in `other_breaks` within this segment's y range.
 
-        This exists because decompose_path_into_convex_pieces's band sweep
-        can cut a v-band boundary through the MIDDLE of some other segment's
-        y-range too (e.g. one segment's own extremum still splits a plain
-        straight wall segment that happens to span that same height) -- so a
-        cap piece can end up with a seam vertex that the wall ring, built
-        from plain tessellate(), never placed. Path.tessellate_for_mesh uses
-        this (with every OTHER segment's own breakpoints passed in) so the
-        wall ring and the cap pieces agree on every seam, not just curved
-        ones -- without it, a straight wall edge crossing a foreign
-        breakpoint is a T-junction against the cap, same failure mode
-        sample_interior's grid-sharing fixes for curved edges specifically.
+        Keeps the wall mesh's vertices matching the cap pieces' seams.
         """
 
     @abstractmethod
     def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: float) -> List[V2]:
-        """
-        Points approximating this segment strictly BETWEEN point_lo and
-        point_hi (both assumed to already lie on this segment), excluding
-        both endpoints, ordered starting near point_lo and ending near
-        point_hi, for meshing only. Used by decompose_path_into_convex_pieces
-        to keep a curved band-edge curved in the output piece instead of
-        flattening it to a chord. Empty for a StraightSegment (a chord between
-        two of its own points IS the segment).
+        """Return mesh points strictly between `point_lo` and `point_hi` on this segment, in that order.
 
-        Must draw from the exact same per-tolerance sample grid tessellate()
-        uses (see ArcSegment._angle_grid), not independently re-subdivide
-        [point_lo, point_hi] -- otherwise a cap piece's curved edge and the
-        wall mesh's tessellation of that same physical arc land on different
-        points, which is a T-junction merge_vertices() can't repair.
+        Uses the same sample grid as tessellate() so cap and wall meshes share vertices. Empty for a
+        straight segment.
         """
 
     @abstractmethod
     def reverse(self) -> 'PathSegment':
-        """This same segment, geometrically identical, but traversed from
-        `end` to `start` instead of `start` to `end`. Used by FancyPath.reversed()
-        to flip a whole loop's winding direction (e.g. to satisfy is_valid()'s
-        CCW requirement when a loop was naturally built CW by construction)."""
+        """Return this segment traversed from `end` to `start`."""
 
 
 def _right_perpendicular(v: V2) -> V2:
-    """Rotate a 2D vector -90 degrees (clockwise): (dx,dy) -> (dy,-dx).
-
-    For a CCW-wound boundary, "outward" at any point is always this rotation
-    applied to the local direction of travel (tangent) -- true for a straight
-    edge (constant tangent) and equally true for an arc traveled CCW (tangent
-    (-sin(t),cos(t)) rotates to (cos(t),sin(t)), i.e. the plain radial-outward
-    direction) -- so both segment types reduce to the same one-line rule.
-    """
+    """Return a 2D vector rotated 90 degrees clockwise: the outward normal of a CCW tangent."""
     return create_v2(v[1], -v[0])
 
 
@@ -192,12 +119,7 @@ def _right_perpendicular(v: V2) -> V2:
 
 @dataclass(frozen=True)
 class StraightSegment(PathSegment):
-    """A straight run of a path, between two points in the path's 2D plane.
-
-    Straight rather than Line, so it pairs with ArcSegment by what the segment
-    DOES, and so it does not collide with geometry.LineSegment -- which is a
-    different thing entirely: a bounded stretch of an infinite 3D line.
-    """
+    """A straight segment of a path, between two 2D points."""
 
     line_start: V2
     line_end: V2
@@ -300,7 +222,7 @@ class StraightSegment(PathSegment):
 # ============================================================================
 
 def _normalize_angle_to_range(angle: float, lo: float, hi: float) -> float:
-    """Adjust `angle` by whole turns until it falls in [lo, hi] (lo <= hi)."""
+    """Return `angle` shifted by whole turns into [lo, hi]."""
     while angle < lo - 1e-9:
         angle += 2.0 * math.pi
     while angle > hi + 1e-9:
@@ -310,18 +232,9 @@ def _normalize_angle_to_range(angle: float, lo: float, hi: float) -> float:
 
 @dataclass(frozen=True)
 class ArcSegment(PathSegment):
-    """
-    Circular arc from start_angle, sweeping by sweep_angle: CCW (increasing
-    angle) if sweep_angle is positive, CW (decreasing angle) if negative --
-    abs(sweep_angle) must be in (0, 2*pi]. The sign is NOT optional styling:
-    for a fixed (start, end) point pair -- which a Path's connectivity
-    dictates, there's no freedom to swap them -- going CCW vs CW traces two
-    different arcs (one bulging to each side of the start->end chord), and
-    which one is a convex bulge vs a concave bite depends on that sign, not
-    on where `center` sits. (An earlier version of this docstring claimed the
-    bulge direction "falls out from center position alone, no sign needed" --
-    that's wrong; picking a concave arc from a fixed start to a fixed end
-    requires a CW sweep, which needs the sign.)
+    """A circular arc from `start_angle`, sweeping `sweep_angle`: CCW if positive, CW if negative.
+
+    abs(sweep_angle) is in (0, 2*pi]. The sign picks which of the two arcs between the endpoints.
     """
     center: V2
     radius: Numeric
@@ -346,17 +259,9 @@ class ArcSegment(PathSegment):
         return False
 
     def _monotonic_subranges(self, eps: Optional[Numeric] = None) -> List[Tuple[Numeric, Numeric, int]]:
-        """
-        Split this arc at any interior pole (pi/2 or 3*pi/2 mod 2*pi, where
-        dy/dtheta == 0) into pieces where y(theta) is monotonic -- and
-        therefore invertible -- returning (angle_a, angle_b, cos_sign) per
-        piece IN TRAVERSAL ORDER (angle_a nearer start_angle, angle_b nearer
-        end_angle -- so for a CW/negative-sweep arc, angle_a > angle_b).
-        cos_sign is the constant sign of cos(theta) (hence of dx/dy) across
-        that piece; ray_crossings/v_extrema only care about the piece's y
-        extent, not which end is "a" vs "b", so traversal order here only
-        matters to callers (sample_interior) that need points in a
-        particular direction.
+        """Split the arc at its poles into pieces where y(theta) is monotonic.
+
+        Returns (angle_a, angle_b, cos_sign) per piece in traversal order; cos_sign is the sign of cos(theta).
         """
         clockwise = safe_compare(self.sweep_angle, 0, Comparison.LT, eps=eps)
         angle_lo = self.end_angle if clockwise else self.start_angle
@@ -428,7 +333,7 @@ class ArcSegment(PathSegment):
         return extrema
 
     def _angle_extent_float(self) -> Tuple[float, float]:
-        """(lo, hi) float angle bounds, lo <= hi, regardless of sweep sign."""
+        """Return the arc's (lo, hi) angles as floats, lo <= hi."""
         start_a, end_a = float(self.start_angle), float(self.end_angle)
         return (start_a, end_a) if start_a <= end_a else (end_a, start_a)
 
@@ -493,20 +398,9 @@ class ArcSegment(PathSegment):
         return chord_term + arc_term
 
     def _angle_grid(self, tolerance: float) -> List[float]:
-        """
-        Interior sample angles (strictly between start_angle and end_angle),
-        anchored at start_angle and spaced by a fixed step derived from
-        `tolerance` (max chord sagitta).
+        """Return sample angles strictly inside the arc, stepped from `start_angle` for chord sagitta `tolerance`.
 
-        Anchoring matters: it's what makes tessellate() (the whole segment,
-        for the wall mesh) and sample_interior() (an arbitrary sub-range, for
-        a cap piece's curved edge) agree exactly on where points fall
-        whenever their ranges overlap, instead of each independently
-        subdividing its own range and landing on different points along the
-        same physical curve. Without that agreement the wall and a cap piece
-        trace the same arc with different vertices -- a T-junction that
-        merge_vertices() can't fix (it only welds exactly coincident points,
-        not points that lie ON each other's edges).
+        Anchored at `start_angle` so tessellate() and sample_interior() land on the same points.
         """
         radius = float(self.radius)
         sweep = float(self.sweep_angle)
@@ -576,25 +470,16 @@ class ArcSegment(PathSegment):
 
 @dataclass(frozen=True)
 class FancyPath:
-    """
-    A closed loop: segments[i].end must equal segments[i+1].start, and
-    segments[-1].end must equal segments[0].start. NOT validated at
-    construction -- same trust-the-caller convention ConvexPolygonSimpleLoft
-    already uses for its own non-convex-taper risk. is_valid() is opt-in.
+    """A closed loop of segments, each ending where the next starts.
+
+    Not validated on construction; call is_valid().
     """
     segments: List[PathSegment]
 
     def is_valid(self) -> bool:
-        """
-        Checks: >=1 segment, each segment connects end-to-start with the next
-        (loop closes), signed_area() > 0 (CCW).
+        """Return whether the loop has a segment, closes, and winds CCW.
 
-        Does NOT check for self-intersection. A self-intersecting Path is
-        undefined behavior for PathExtrusion (contains_point_2d's parity test
-        and decompose_path_into_convex_pieces both assume a simple polygon),
-        same as ConvexPolygonSimpleLoft's existing disclaimer for non-convex
-        intermediate cross-sections -- avoiding self-intersection is the
-        caller's responsibility, not something validated here.
+        Self-intersection isn't checked; a self-intersecting path is undefined behaviour.
         """
         if not self.segments:
             return False
@@ -614,11 +499,7 @@ class FancyPath:
         return total
 
     def reversed(self) -> 'FancyPath':
-        """This same closed loop, traversed in the opposite direction --
-        flips CW<->CCW (negates signed_area()). Handy for a loop that's
-        naturally built in a fixed geometric order that comes out CW (e.g.
-        one auto-generated end of it is dictated by construction rather than
-        free to choose) but needs to satisfy is_valid()'s CCW requirement."""
+        """Return this loop traversed the other way (flips CW and CCW)."""
         return FancyPath([seg.reverse() for seg in reversed(self.segments)])
 
     def bounds(self) -> Tuple[V2, V2]:
@@ -634,11 +515,7 @@ class FancyPath:
         return create_v2(min_x, min_y), create_v2(max_x, max_y)
 
     def locate_boundary_segment(self, point: V2, eps: Optional[Numeric] = None) -> Optional[Tuple[int, PathSegment]]:
-        """First segment (in order) whose closest point to `point` is ~point,
-        i.e. the segment `point` lies on -- or None if point isn't on the
-        boundary at all. At a shared vertex between two segments this is an
-        arbitrary but consistent choice, same ambiguity RectangularPrism's
-        get_outward_normal already accepts at its own edges/corners."""
+        """Return the first segment `point` lies on, or None if it isn't on the boundary."""
         for index, seg in enumerate(self.segments):
             closest = seg.closest_point(point, eps=eps)
             if safe_zero_test_sq((closest[0] - point[0]) ** 2 + (closest[1] - point[1]) ** 2, eps):
@@ -660,30 +537,14 @@ class FancyPath:
         return count % 2 == 1
 
     def tessellate(self, tolerance: float) -> Profile:
-        """
-        Path -> plain point list (Profile), for meshing only.
-
-        Does NOT account for decompose_path_into_convex_pieces's band seams
-        (see tessellate_with_extra_breaks) -- a wall built from this alone
-        can T-junction against that function's cap pieces. Use
-        tessellate_for_mesh for an actual PathExtrusion's wall ring; this
-        plain version is for anyone who wants a Path's outline on its own,
-        with no cap to stay consistent with.
-        """
+        """Return the path as a point list, for an outline. Use tessellate_for_mesh for a PathExtrusion's wall."""
         points: List[V2] = []
         for seg in self.segments:
             points.extend(seg.tessellate(tolerance))
         return points
 
     def tessellate_for_mesh(self, tolerance: float) -> Profile:
-        """
-        Like tessellate(), but forces a vertex at every band-seam
-        decompose_path_into_convex_pieces will introduce -- including on a
-        straight segment that a foreign extremum cuts through the middle of
-        -- so a PathExtrusion's wall ring and cap pieces always agree on
-        every seam. Use this (not tessellate()) to build a PathExtrusion's
-        wall mesh.
-        """
+        """Return the path as a point list with a vertex at every seam decompose_path_into_convex_pieces makes."""
         breakpoints = _path_breakpoints(self)
         points: List[V2] = []
         for seg in self.segments:
@@ -700,10 +561,7 @@ Path = FancyPath
 
 
 def _path_breakpoints(path: FancyPath) -> List[Numeric]:
-    """Sorted, deduped y-values decompose_path_into_convex_pieces sweeps
-    between: every segment's own start y, plus every segment's v_extrema.
-    Shared with FancyPath.tessellate_for_mesh so the wall ring and the cap pieces
-    agree on where every seam falls."""
+    """Return the sorted y values decompose_path_into_convex_pieces cuts bands at: segment start y's and v_extrema."""
     breakpoints: List[Numeric] = []
     for seg in path.segments:
         breakpoints.append(seg.start[1])
@@ -721,26 +579,9 @@ def _path_breakpoints(path: FancyPath) -> List[Numeric]:
 # ============================================================================
 
 def decompose_path_into_convex_pieces(path: FancyPath, tolerance: float) -> List[Profile]:
-    """
-    Like cutcsg.decompose_simple_polygon_into_convex_pieces, but sweeps
-    directly over a FancyPath's small number of segments instead of a
-    pre-tessellated point list -- the expensive exact-arithmetic part (which
-    v-bands exist, which segments are active in each, pairing crossings) runs
-    over O(segment count), not O(tessellated point count). A leg profile with
-    a handful of arcs tessellated finely might be 200-400 points; this runs
-    the symbolic sweep over more like 5-15 segments instead, since arcs are
-    only numerically sampled (at `tolerance`) AFTER the sweep has decided
-    which pieces exist -- not before.
+    """Split a FancyPath into convex polygons (point lists), sweeping horizontal bands over its segments.
 
-    Returns convex pieces as plain Profiles (points only): once a piece is
-    isolated, any curved edge within it has already been sampled to straight
-    sub-segments at `tolerance`, so pieces are ordinary polygons suitable for
-    a plain fan triangulation, exactly like ConvexPolygonExtrusion's cap
-    pieces. The corner points of each piece are still exact (computed via
-    ray_crossings(inclusive=True)); only the extra interior points along a
-    curved band-edge are float approximations -- consistent with this being
-    the analytic/mesh boundary, same role triangles.py plays for the rest of
-    CutCSG.
+    Band corners are exact; curved band edges are sampled at `tolerance`.
     """
     deduped = _path_breakpoints(path)
 
@@ -844,49 +685,29 @@ def decompose_path_into_convex_pieces(path: FancyPath, tolerance: float) -> List
 
 @dataclass(frozen=True)
 class FlatSide:
-    """The side extruded from a straight segment. A plane, so measurable."""
+    """Key of the side extruded from a straight segment."""
 
     index: int
 
 
 @dataclass(frozen=True)
 class CurvedSide:
-    """The side extruded from an arc. Lies on no plane.
-
-    Worth naming and pointing at; never measurable, and never a parent of a
-    derived edge -- see CSGFeatureType.CURVED_FACE.
-    """
+    """Key of the side extruded from an arc. Has no plane, so is never measurable."""
 
     index: int
 
 
-#: Where a PathExtrusion feature sits, AND what kind of face that makes it.
-#:
-#: A path's own key type rather than the shared ExtrusionFeatureKey, because a
-#: path is the only extrusion whose sides are not all flat: a
-#: ConvexPolygonExtrusion or a loft has a straight edge under every side, and a
-#: bare int says everything there is to say. Here it does not.
-#:
-#: The two used to be separate -- a bare index plus a declared_type beside it --
-#: which let an author name an ArcSegment and call it FACE, claiming a plane the
-#: geometry has not got. Naming the side as flat or curved is the same
-#: information with no way to write it down wrong.
+#: Key of a PathExtrusion feature: a cap, or a side marked flat or curved.
 PathExtrusionFeatureKey = Union[ExtrusionCap, FlatSide, CurvedSide]
 
 
 def is_cap(key: PathExtrusionFeatureKey) -> bool:
-    """Whether a key names one of the flat ends rather than a side."""
+    """Return whether a key names an end cap rather than a side."""
     return isinstance(key, ExtrusionCap)
 
 
 def side_index(key: PathExtrusionFeatureKey) -> int:
-    """Which segment a key names. Ask only a side.
-
-    Insists rather than answering None, so the rules below can index the path
-    with it. Every one of them has already established it is not looking at a
-    cap, and carrying an optional through them would be an optionality that
-    cannot happen.
-    """
+    """Return the segment index a side key names. Raises for a cap."""
     if isinstance(key, (FlatSide, CurvedSide)):
         return key.index
     raise ValueError(f"{key!r} names a cap, not a side, so it indexes no segment")
@@ -894,11 +715,11 @@ def side_index(key: PathExtrusionFeatureKey) -> int:
 
 @dataclass(frozen=True)
 class _PathExtrusionFeature(CSGFeature):
-    """What the flat and curved PathExtrusion features share: a key, a footprint, an extent."""
+    """Shared base of PathExtrusion's flat and curved features."""
     key: PathExtrusionFeatureKey = ExtrusionCap.TOP
 
     def _midpoint_2d(self, owner: 'PathExtrusion') -> Optional[V2]:
-        """Centre of this face's footprint in the path's own 2D plane."""
+        """Return the centre of this face's footprint in the path's 2D plane."""
         if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
             low, high = owner.path.bounds()
             return (low + high) / scalar(2)
@@ -984,7 +805,7 @@ class SimplePathExtrusionFeature(_PathExtrusionFeature, FaceFeature):
 
 @dataclass(frozen=True)
 class SimplePathExtrusionCurvedFeature(_PathExtrusionFeature, CurvedFaceFeature):
-    """A curved side (CurvedSide key) of a PathExtrusion. Matches no point: there is no plane to name."""
+    """A curved side of a PathExtrusion. Has no plane."""
 
     def __post_init__(self):
         if not isinstance(self.key, CurvedSide):
@@ -996,15 +817,10 @@ class SimplePathExtrusionCurvedFeature(_PathExtrusionFeature, CurvedFaceFeature)
 
 @dataclass(frozen=True)
 class PathExtrusion(HasFeatures, CutCSG):
-    """
-    Generalizes ConvexPolygonExtrusion to an arbitrary closed FancyPath (lines and
-    arcs today, more segment types later) -- convexity is NOT required.
-    Trades ConvexPolygonExtrusion's cheap half-plane containment test for
-    FancyPath's general ray-casting one.
+    """Extrusion of a closed FancyPath (may be concave) along local Z.
 
-    The path lives in the local XY plane at `transform`'s position, extruded
-    out in -z by start_distance and +z by end_distance, matching
-    ConvexPolygonExtrusion's conventions exactly.
+    The path is in the local XY plane at `transform`; it extends -z by `start_distance` and +z by
+    `end_distance`, as ConvexPolygonExtrusion.
     """
     path: FancyPath
     transform: Transform = field(default_factory=Transform.identity)
@@ -1017,27 +833,13 @@ class PathExtrusion(HasFeatures, CutCSG):
                 f"transform={self.transform}, start={self.start_distance}, end={self.end_distance})")
 
     def side(self, index: int) -> PathExtrusionFeatureKey:
-        """The key for side *index*, flat or curved as the path actually is.
-
-        The path is the only thing that knows -- a side is curved exactly when
-        the segment it is extruded from is not planar -- and the key is what
-        carries that to the feature, which gets no owner to ask.
-
-        Use this rather than writing FlatSide or CurvedSide by hand. Naming an
-        ArcSegment FlatSide claims a plane the geometry has not got, and nothing
-        checks.
-        """
+        """Return the key for side `index`: FlatSide or CurvedSide as the segment is."""
         segment = self.path.segments[index]
         return FlatSide(index) if segment.is_planar() else CurvedSide(index)
 
     def feature(self, name: str, key: PathExtrusionFeatureKey,
                 **rest) -> '_PathExtrusionFeature':
-        """A feature on this extrusion. Pass `extrusion.side(n)` for a side.
-
-        Both caps are flat whatever the path does -- they are its own footprint,
-        and a footprint is a closed region however curved its boundary -- so
-        ExtrusionCap.TOP and BOTTOM need nothing worked out.
-        """
+        """Return a feature of this extrusion; pass `extrusion.side(n)` for a side."""
         if isinstance(key, CurvedSide):
             return SimplePathExtrusionCurvedFeature(name, key=key, **rest)
         return SimplePathExtrusionFeature(name, key=key, **rest)

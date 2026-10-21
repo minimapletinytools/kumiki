@@ -32,19 +32,14 @@ def _by_column(values: np.ndarray, columns: List[Unknown]) -> Dict[Unknown, floa
     return {column: float(value) for column, value in zip(columns, values) if abs(value) > 1e-12}
 
 
-#: Below this a row entry is the leftovers of a projection, not data: the same floor
-#: `_by_column` uses when it drops a motion's weights.
+#: Row entries below this are treated as zero.
 _DUST = 1e-12
 
 
 def rank_svd(matrix: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """SVD of a rows-of-unknowns matrix, with numerical dust rounded away first.
+    """Return the SVD of `matrix` after zeroing entries below `_DUST`.
 
-    The rank tests subtract one projection from another, which leaves entries that should
-    be zero as tiny non-zero values. LAPACK's divide-and-conquer SVD can fail to converge
-    on those (seen at ~1e-35 against a matrix scaled to 1), so entries below `_DUST` are
-    zeroed first. That is far below the tolerance the rank is read at, so the answer does
-    not change.
+    Assumes `matrix` is scaled near 1; LAPACK can fail to converge on tiny leftover entries.
     """
     cleaned = np.array(matrix, dtype=float, copy=True)
     cleaned[np.abs(cleaned) < _DUST] = 0.0
@@ -65,7 +60,7 @@ def remaining(
     target: Sequence[Mapping[Unknown, float]],
     relative_tolerance: float = 1e-9,
 ) -> Remaining:
-    """The degrees of freedom of `target` not fixed by `known`."""
+    """Return the degrees of freedom of the `target` rows that the `known` rows leave free."""
     columns = list(dict.fromkeys(column for row in (*known, *target) for column in row))
     if not target or not columns:
         return Remaining(count=0, free=())
