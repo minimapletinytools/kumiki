@@ -222,30 +222,72 @@ def features_at_point(
     root: 'CutCSG', local_pt: Float3, eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
     local_ray: Optional[LocalRay] = None,
 ) -> List['OwnedFeatureHit']:
-    """Return every feature the whole tree sees at `local_pt`, best first.
+    """Return every feature at `local_pt` for a 3D pick, best first (features_near_ray, without a ray: at the point)."""
+    from kumiki.csg.cutcsg import FeatureTestTolerances
 
-    With a ray, slack is in screen pixels: edges and corners within their slack of the ray, reference
-    planes whose line across the face is near the ray, and features in a void found along the ray.
+    resolved = tolerances or FeatureTestTolerances(face=eps)
+    if local_ray is None or Float3.of(local_ray[1]).unit() is None:
+        return _only_creases(root, root.find_all_features(to_v3(local_pt), resolved), local_pt)
+    return [candidate.hit for candidate in features_near_ray(root, Float3.of(local_pt), resolved, local_ray)]
+
+
+def features_near_ray(
+    root: 'CutCSG', local_pt: Optional[Float3], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
+    timber: Optional['PerfectTimberWithin'] = None,
+) -> List['PointerCandidate']:
+    """Return the features under the pointer on one tree, in the library's order, each with where it
+    was found along the ray. Shared by the 3D and drawing picks; slack is in screen pixels.
+
+    - Features at the surface point `local_pt` (None if the ray misses), kept within their slack of
+      the ray; edges and corners are placed nearest the ray.
+    - Non-real lines (a bore's axis) the ray passes near.
+    - In 3D (no `timber`): the gather is SLANT_REACH wider, and non-real planes whose line across the
+      face passes near the ray are added.
+    - In a drawing (`timber` given): non-real planes seen edge-on along the ray are added.
+
+    `group` is left 0; order_along_ray sets it.
     """
     from dataclasses import replace
 
-    from kumiki.csg.cutcsg import FeatureTestTolerances, _sort_feature_hits
+    from kumiki.csg.cutcsg import _sort_feature_hits
 
-    resolved = tolerances or FeatureTestTolerances(face=eps)
-    if local_ray is None:
-        return _only_creases(root, root.find_all_features(to_v3(local_pt), resolved), local_pt)
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
-    if direction is None:
-        return _only_creases(root, root.find_all_features(to_v3(local_pt), resolved), local_pt)
-    wide = replace(resolved, edge=float(resolved.edge) * SLANT_REACH,
-                   point=float(resolved.point or resolved.edge) * SLANT_REACH)
-    gathered = _only_creases(root, root.find_all_features(to_v3(local_pt), wide), local_pt)
-    hits = [hit for hit in gathered if _within_slack(hit, origin, direction, resolved)]
-    known = {_hit_key(hit) for hit in hits}
-    planes = [hit for hit in _reference_planes_near(root, Float3.of(local_pt), origin, direction, float(resolved.edge))
-              if _hit_key(hit) not in known]
-    hits = _sort_feature_hits(hits + planes) if planes else hits
-    return merge_ray_hits(root, hits, local_ray, resolved)
+    assert direction is not None
+    in_3d = timber is None
+    gather = (replace(tolerances, edge=float(tolerances.edge) * SLANT_REACH,
+                      point=float(tolerances.point or tolerances.edge) * SLANT_REACH) if in_3d else tolerances)
+    hits: List['OwnedFeatureHit'] = []
+    if local_pt is not None:
+        gathered = _only_creases(root, root.find_all_features(local_pt.v3(), gather), local_pt)
+        hits = [hit for hit in gathered if _within_slack(hit, origin, direction, tolerances)]
+        if in_3d:
+            known = {_hit_key(hit) for hit in hits}
+            hits += [hit for hit in _reference_planes_near(root, local_pt, origin, direction, float(tolerances.edge))
+                     if _hit_key(hit) not in known]
+    at_surface = {_hit_key(hit) for hit in hits}
+    hits += [hit for hit in non_real_features_along_ray(root, local_ray, tolerances, timber)
+             if _hit_key(hit) not in at_surface]
+
+    candidates = []
+    for hit in _sort_feature_hits(hits):
+        place = _nearest_on(hit, origin, direction)
+        if place is None:
+            place = (local_pt if _hit_key(hit) in at_surface
+                     else _place_off_surface(hit, root, timber, origin, direction))
+        depth = _along_ray(origin, direction, place) if place is not None else math.inf
+        candidates.append(PointerCandidate(hit, place, depth, 0.0))
+    return candidates
+
+
+def _place_off_surface(hit: 'OwnedFeatureHit', root: 'CutCSG', timber: Optional['PerfectTimberWithin'],
+                       origin: Float3, direction: Float3) -> Optional[Float3]:
+    """Return where a non-real feature sits along the ray: a line's nearest approach, or an edge-on plane's crossing."""
+    ends = hit.feature.declared_ends(hit.owner)
+    if ends is not None:
+        return ray_nears_segment(origin, direction, (Float3.of(ends[0]), Float3.of(ends[1])), math.inf)
+    if timber is not None:
+        return _plane_on_ray(hit, root, timber, origin, direction, math.inf)
+    return None
 
 
 #: How much further than its slack a 3D pick looks for an edge or a corner along the face it struck,
@@ -347,61 +389,23 @@ class PointerCandidate(NamedTuple):
 
 def candidates_under_pointer(
     root: 'CutCSG', local_pt: Optional[Float3], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
-    timber: Optional['PerfectTimberWithin'] = None,
+    timber: 'PerfectTimberWithin',
 ) -> List[PointerCandidate]:
-    """Return the features under the pointer for a drawing view, nearest first, filtered by measurable_in_view.
-
-    The features at the surface point `local_pt` (None if the ray misses), plus non-real features the
-    ray passes near. With `timber`, non-real planes seen edge-on are found along the ray too.
-    """
+    """Return the features under the pointer for a drawing view (features_near_ray), filtered by
+    measurable_in_view, nearest depth group first."""
     local_pt = Float3.of(local_pt) if local_pt is not None else None
-    hits = _only_creases(root, root.find_all_features(local_pt.v3(), tolerances), local_pt) if local_pt is not None else []
-    origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
+    direction = Float3.of(local_ray[1]).unit()
     if direction is None:
+        hits = _only_creases(root, root.find_all_features(local_pt.v3(), tolerances), local_pt) if local_pt else []
         return [PointerCandidate(hit, local_pt, 0.0, 0.0) for hit in hits]
-    found: Dict[Tuple, Tuple[float, Float3]] = {}
-
-    def found_at(at_place: List['OwnedFeatureHit'], place: Float3) -> None:
-        along = _along_ray(origin, direction, place)
-        for hit in at_place:
-            key = _hit_key(hit)
-            if key not in found or along < found[key][0]:
-                found[key] = (along, place)
-
-    if local_pt is not None:
-        found_at(hits, local_pt)
-    hits = merge_ray_hits(root, hits, local_ray, tolerances, timber)
-    for hit in hits:
-        if _hit_key(hit) not in found:
-            # Non-real, in a void: as deep as its nearest approach to the ray.
-            ends = hit.feature.declared_ends(hit.owner)
-            if ends is not None:
-                nearest = ray_nears_segment(origin, direction, (Float3.of(ends[0]), Float3.of(ends[1])), math.inf)
-                if nearest is not None:
-                    found_at([hit], nearest)
-            elif timber is not None:
-                on_ray = _plane_on_ray(hit, root, timber, origin, direction, math.inf)
-                if on_ray is not None:
-                    found_at([hit], on_ray)
-    # Edges and corners are placed where they come nearest the pointer, and kept only within their
-    # screen slack of it.
-    within: List['OwnedFeatureHit'] = []
-    for hit in hits:
-        key = _hit_key(hit)
-        if not _within_slack(hit, origin, direction, tolerances):
-            continue
-        exact = _nearest_on(hit, origin, direction)
-        if exact is not None:
-            found[key] = (_along_ray(origin, direction, exact), exact)
-        within.append(hit)
-    hits = within
+    found = {_hit_key(candidate.hit): candidate
+             for candidate in features_near_ray(root, local_pt, tolerances, local_ray, timber)}
     separation = float(tolerances.edge)
-    ordered = order_along_ray(measurable_in_view(hits, direction, separation),
-                              {key: along for key, (along, _place) in found.items()}, separation)
-    groups = _depth_groups(ordered, {key: along for key, (along, _place) in found.items()}, separation)
-    return [PointerCandidate(hit, found.get(_hit_key(hit), (math.inf, None))[1],
-                      found.get(_hit_key(hit), (math.inf, None))[0], groups[_hit_key(hit)])
-            for hit in ordered]
+    depths = {key: candidate.depth for key, candidate in found.items()}
+    ordered = order_along_ray(measurable_in_view([candidate.hit for candidate in found.values()], direction, separation),
+                              depths, separation)
+    groups = _depth_groups(ordered, depths, separation)
+    return [found[_hit_key(hit)]._replace(group=groups[_hit_key(hit)]) for hit in ordered]
 
 
 def _nearest_on(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3) -> Optional[Float3]:
@@ -488,108 +492,6 @@ def _depth_groups(
             start = depth(hit)
         starts[_hit_key(hit)] = start
     return starts
-
-
-# NOT USED. Kept for reference. A drawing's pick swept the whole ray with this, to offer
-# everything drawn under the pointer at any depth: the back edge of a flank behind the front one,
-# features on members the ray never hit. Hidden features can no longer be picked, and every member
-# near the ray is now asked at the ray's one surface hit (candidates_under_pointer), so the surface
-# finds what can be picked. It cost ~40ms per member, against ~6ms for the surface lookup.
-# To make it cheap again: test each plane crossing against the face's own primitive (or the
-# member's box) before the whole-tree is_point_on_boundary and find_all_features -- most crossings
-# land far from their face -- and keep the last answer per member and ray for the click that
-# follows a hover.
-def real_features_along_ray(
-    root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
-) -> List[Tuple[List['OwnedFeatureHit'], Float3]]:
-    """Return every feature on the boundary anywhere along the ray, with where it was found.
-
-    For orthographic views, where everything along the ray is drawn at one place. Checks where the ray
-    meets each declared face's plane, and where it passes within the edge tolerance of each declared
-    edge or corner.
-    """
-    from kumiki.csg.cutcsg import FeatureTestTolerances, csg_children
-    from kumiki.geometry import Line, Plane, Point
-
-    origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
-    if direction is None:
-        return []
-    near = float(tolerances.edge)
-    places: List[Float3] = []
-
-    def consider(feature: 'CSGFeature', owner: 'CutCSG') -> None:
-        located = feature.locate_simple_unbounded(owner)
-        if isinstance(located, Plane):
-            at = _ray_meets_plane(origin, direction, located)
-        elif isinstance(located, Line):
-            ends = feature.declared_ends(owner)
-            at = (ray_nears_segment(origin, direction, (Float3.of(ends[0]), Float3.of(ends[1])), near)
-                  if ends is not None else None)
-        elif isinstance(located, Point):
-            position = Float3.of(located.position)
-            at = position if (position - origin).across(direction).length() <= near else None
-        else:
-            at = None
-        if at is not None:
-            places.append(at)
-
-    def walk(node: 'CutCSG') -> None:
-        for feature in node.get_declared_features():
-            if feature.real:
-                consider(feature, node)
-        for child in csg_children(node):
-            walk(child)
-
-    walk(root)
-    # Many planes meet the ray at one place -- rough stock's reliefs lie on its faces -- and each
-    # place costs a walk of the whole tree, so each is asked about once. Only the same place: two
-    # a pixel apart can differ in whether they are on the boundary at all.
-    distinct: List[Float3] = []
-    for place in places:
-        if all(place.dist(kept) > 1e-9 for kept in distinct):
-            distinct.append(place)
-    snap = FeatureTestTolerances(face=near, edge=near, point=max(near, float(tolerances.point)))
-    return [(root.find_all_features(place.v3(), snap), place)
-            for place in distinct if root.is_point_on_boundary(place.v3(), eps=near)]
-
-
-def _ray_meets_plane(origin: Float3, direction: Float3, plane: Any) -> Optional[Float3]:
-    """Return where the ray crosses `plane`, or None if parallel or behind."""
-    normal, at = Float3.of(plane.normal), Float3.of(plane.point)
-    facing = direction.dot(normal)
-    if abs(facing) < 1e-9:
-        return None
-    along = (at - origin).dot(normal) / facing
-    return None if along < 0 else origin + direction * along
-
-
-def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
-    """Return `hits` and `more`, each feature once, in the library's order."""
-    from kumiki.csg.cutcsg import _sort_feature_hits
-
-    seen = {_hit_key(hit) for hit in hits}
-    extra = []
-    for hit in more:
-        key = _hit_key(hit)
-        if key not in seen:
-            seen.add(key)
-            extra.append(hit)
-    return _sort_feature_hits(hits + extra) if extra else hits
-
-
-def merge_ray_hits(
-    root: 'CutCSG', hits: List['OwnedFeatureHit'], local_ray: LocalRay,
-    tolerances: 'FeatureTestTolerances', timber: Optional['PerfectTimberWithin'] = None,
-) -> List['OwnedFeatureHit']:
-    """Return `hits` plus the non-real features the ray passes near, re-sorted."""
-    from kumiki.csg.cutcsg import _sort_feature_hits
-
-    along_ray = non_real_features_along_ray(root, local_ray, tolerances, timber)
-    if not along_ray:
-        return hits
-    already = {(id(hit.feature), id(hit.owner)) for hit in hits}
-    extra = [hit for hit in along_ray if (id(hit.feature), id(hit.owner)) not in already]
-    return _sort_feature_hits(hits + extra) if extra else hits
 
 
 def non_real_features_along_ray(
