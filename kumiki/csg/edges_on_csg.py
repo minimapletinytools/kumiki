@@ -22,7 +22,7 @@ from ..geometry import (
     LineSegment,
     unit_vector,
 )
-from ..rule import V3, Matrix, Numeric, safe_magnitude, scalar
+from ..rule import V2, V3, Matrix, Numeric, safe_magnitude, scalar
 from .identity_memo import memo_by_identity
 
 if TYPE_CHECKING:
@@ -124,11 +124,11 @@ def _axes(transform: 'Transform') -> Tuple[V3, V3, V3, V3]:
     return across, up, axis, transform.position
 
 
-def _lifter(transform: 'Transform') -> Callable[[Sequence[Numeric], Numeric], V3]:
+def _lifter(transform: 'Transform') -> Callable[[V2, Numeric], V3]:
     """Return `lift(point, distance)`: a 2D profile point at `distance` along local z, in the transform's parent space."""
     across, up, axis, origin = _axes(transform)
 
-    def lift(point: Sequence[Numeric], distance: Numeric) -> V3:
+    def lift(point: V2, distance: Numeric) -> V3:
         return origin + axis * distance + across * scalar(float(point[0])) + up * scalar(float(point[1]))
 
     return lift
