@@ -3936,9 +3936,14 @@ class KigumiViewerApp extends LitElement {
      * The outline, the measurement preview, and the record of what is drawn --
      * one thing between them, so they go together. Called where the hover has
      * actually gone away, never from the teardown inside a redraw.
+     *
+     * There may be no hover yet: it is made on the first pointer move, and a scene can change
+     * before one (the viewer opening straight into a drawing).
      */
     _forgetHover() {
-        this._hover.markDrawn(null);
+        if (this._hover) {
+            this._hover.markDrawn(null);
+        }
         this._updateMeasurePreview(null);
     }
 

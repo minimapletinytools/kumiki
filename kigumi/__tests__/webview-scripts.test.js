@@ -239,6 +239,13 @@ describe('the hover machine has one home', () => {
         expect(app).not.toContain('kinds.length === 0');
     });
 
+    test('forgetting a hover works before there has been one', () => {
+        // The hover is made on the first pointer move. Switching scenes first -- the viewer opening
+        // straight into a drawing -- threw here, and the throw left setActiveScene half done: no
+        // hover, and no pan in the drawing, until a reload.
+        expect(methodBody(app, '_forgetHover')).toContain('if (this._hover)');
+    });
+
     test('and one place knows which feature is being asked for', () => {
         // Null, never undefined: zero is a choice, and the runner has to tell
         // it from "choose for me".
