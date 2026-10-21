@@ -67,3 +67,28 @@ class Float3(NamedTuple):
 
 #: A rotation as three rows, for turning world vectors into a timber's local space and back.
 Rows3 = Tuple[Float3, Float3, Float3]
+
+
+class LocalFrame(NamedTuple):
+    """A transform's inverse as floats, for the picking hot path: maps global points and directions into
+    its local space. `rows` are the rotation matrix's rows; local = R^T (global - position)."""
+    rows: Rows3
+    position: Float3
+
+    @staticmethod
+    def of(transform) -> 'LocalFrame':
+        """Return the LocalFrame of a rule.Transform."""
+        m = transform.orientation.matrix
+        rows = tuple(Float3(float(m[r, 0]), float(m[r, 1]), float(m[r, 2])) for r in range(3))
+        return LocalFrame(rows, Float3.of(transform.position))  # type: ignore[arg-type]
+
+    def point(self, global_point) -> Float3:
+        """Return a global point in local space."""
+        return self.direction(Float3.of(global_point) - self.position)
+
+    def direction(self, global_direction) -> Float3:
+        """Return a global direction in local space (no translation)."""
+        d, r = Float3.of(global_direction), self.rows
+        return Float3(r[0][0] * d.x + r[1][0] * d.y + r[2][0] * d.z,
+                      r[0][1] * d.x + r[1][1] * d.y + r[2][1] * d.z,
+                      r[0][2] * d.x + r[1][2] * d.y + r[2][2] * d.z)

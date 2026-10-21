@@ -1658,28 +1658,28 @@ class TestTheRayFromThePayload:
 
     def _identity(self):
         from kumiki.rule import Transform
-        return picking.build_inv_transform_float(Transform.identity())
+        return picking.LocalFrame.of(Transform.identity())
 
     def test_no_ray_is_not_a_fault(self):
         """A pick can be made without one -- everything on a surface still works."""
-        rot, pos = self._identity()
-        assert runner._local_ray_from_payload({}, rot, pos) is None
-        assert runner._local_ray_from_payload({"ray": None}, rot, pos) is None
+        rot = self._identity()
+        assert runner._local_ray_from_payload({}, rot) is None
+        assert runner._local_ray_from_payload({"ray": None}, rot) is None
 
     def test_a_malformed_ray_is_declined_rather_than_guessed_at(self):
-        rot, pos = self._identity()
+        rot = self._identity()
         for ray in ({"origin": [0, 0, 0]}, {"origin": [0, 0], "direction": [0, 0, 1]},
                     {"origin": "nope", "direction": [0, 0, 1]}):
-            assert runner._local_ray_from_payload({"ray": ray}, rot, pos) is None
+            assert runner._local_ray_from_payload({"ray": ray}, rot) is None
 
     def test_the_direction_is_rotated_but_not_moved(self):
         """A direction has no position; offsetting it would tilt the ray."""
         from kumiki.rule import Transform, create_v3, Orientation
         transform = Transform(position=create_v3(10, 20, 30),
                               orientation=Orientation.identity())
-        rot, pos = picking.build_inv_transform_float(transform)
+        rot = picking.LocalFrame.of(transform)
         origin, direction = runner._local_ray_from_payload(
-            {"ray": {"origin": [10, 20, 35], "direction": [0, 0, 1]}}, rot, pos)
+            {"ray": {"origin": [10, 20, 35], "direction": [0, 0, 1]}}, rot)
 
         assert [round(c, 6) for c in origin] == [0, 0, 5]
         assert [round(c, 6) for c in direction] == [0, 0, 1]
@@ -2385,7 +2385,7 @@ class TestTheBroadphase:
         from kumiki.csg.cutcsg import EmptyCSG
 
         verts, idx, matched, total = picking.extract_highlight_mesh(
-            [0.0] * 9, [0, 1, 2], EmptyCSG(), (Float3(1.0, 0, 0), Float3(0, 1.0, 0), Float3(0, 0, 1.0)), Float3(0.0, 0, 0), 5e-4,
+            [0.0] * 9, [0, 1, 2], EmptyCSG(), picking.LocalFrame((Float3(1.0, 0, 0), Float3(0, 1.0, 0), Float3(0, 0, 1.0)), Float3(0.0, 0, 0)), 5e-4,
             feature_label="a\u00d7b", feature_type="EDGE")
 
         assert verts == [] and idx == [] and matched == 0
@@ -2443,17 +2443,17 @@ class TestTheBroadphase:
                     picking.to_v3([float(vertex[i]) for i in range(3)]))
                 verts.extend([float(world[i, 0]) for i in range(3)])
         indices = list(range(len(verts) // 3))
-        rot, pos = picking.build_inv_transform_float(timber.transform)
+        rot = picking.LocalFrame.of(timber.transform)
         node = find_csg_by_labels(
             roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
         assert node is not None
 
         with_filter = picking.extract_highlight_mesh(
-            verts, indices, node, rot, pos, 5e-4, root_csg=local)
+            verts, indices, node, rot, 5e-4, root_csg=local)
 
         monkeypatch.setattr(picking, "aabb_filter", lambda csg, eps: None)
         without = picking.extract_highlight_mesh(
-            verts, indices, node, rot, pos, 5e-4, root_csg=local)
+            verts, indices, node, rot, 5e-4, root_csg=local)
 
         assert with_filter[0] == without[0]
         assert with_filter[2] == without[2]
@@ -2615,8 +2615,8 @@ class TestChoosingAmongTheFeaturesAtAPoint:
         cut_timber = _cut_timber_by_name(frame, member)
         timber = cut_timber.timber
         local = cut_timber.render_timber_with_cuts_csg_local()
-        rot, pos = picking.build_inv_transform_float(timber.transform)
-        local_pt = picking.inv_transform_point(rot, pos, [float(p) for p in point])
+        rot = picking.LocalFrame.of(timber.transform)
+        local_pt = rot.point([float(p) for p in point])
         return picking.features_at_point(
             local, local_pt, 5e-4, FeatureTestTolerances(face=5e-4))
 

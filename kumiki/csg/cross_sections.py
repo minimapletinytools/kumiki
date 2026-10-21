@@ -11,6 +11,7 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 
 from .cutcsg import CutCSG, Cylinder, Difference, FaceFeature, Intersection, SolidUnion
+from .edges_on_csg import convex_hull_2d
 from .feature_paths import FeatureHandle
 from ..geometry import Plane, perpendicular_axes
 from ..rule import Matrix, V3, as_ndarray, unit_ndarray
@@ -30,7 +31,7 @@ class _CannotCrossSection(Exception):
     """A primitive this module can't cut by a plane."""
 
 
-class _Frame:
+class PlaneFrame:
     """A plane's 2D frame: origin, two in-plane axes, and its unit normal (the front side)."""
 
     def __init__(self, plane: Plane, near: V3):
@@ -45,7 +46,7 @@ class _Frame:
         return float(offset @ self.u), float(offset @ self.v)
 
     @classmethod
-    def with_axes(cls, origin: np.ndarray, u: np.ndarray, v: np.ndarray, normal: np.ndarray) -> '_Frame':
+    def with_axes(cls, origin: np.ndarray, u: np.ndarray, v: np.ndarray, normal: np.ndarray) -> 'PlaneFrame':
         """Return a frame with the given origin, axes and normal."""
         frame = cls.__new__(cls)
         frame.origin, frame.u, frame.v, frame.normal = origin, u, v, normal
@@ -162,7 +163,7 @@ Sides = Tuple[PolygonRegions, PolygonRegions]
 
 
 def _half_space_cross_section(
-    faces: Sequence[Tuple[V3, V3]], frame: _Frame, start: PolygonRegions,
+    faces: Sequence[Tuple[V3, V3]], frame: PlaneFrame, start: PolygonRegions,
 ) -> Sides:
     """Return (front, back) regions of the intersection of half spaces dot(normal, p - point) <= 0, clipped to `start`."""
     region, front, back = start, True, True
@@ -185,7 +186,7 @@ def _half_space_cross_section(
     return (region if front else []), (region if back else [])
 
 
-def _cylinder_cross_section(csg: Cylinder, frame: _Frame, seed: PolygonRegions) -> Sides:
+def _cylinder_cross_section(csg: Cylinder, frame: PlaneFrame, seed: PolygonRegions) -> Sides:
     axis = as_ndarray(csg.axis_direction) / np.linalg.norm(as_ndarray(csg.axis_direction))
     centre, radius = as_ndarray(csg.position), float(csg.radius)
     across = float(axis @ frame.normal)
@@ -215,7 +216,7 @@ def _cylinder_cross_section(csg: Cylinder, frame: _Frame, seed: PolygonRegions) 
     return _half_space_cross_section(caps, frame, region)
 
 
-def _sides(csg: CutCSG, frame: _Frame, seed: PolygonRegions) -> Sides:
+def _sides(csg: CutCSG, frame: PlaneFrame, seed: PolygonRegions) -> Sides:
     """Return (front, back) for `csg` within `seed`: the regions of the frame's plane where it has
     material just on the normal's side of the plane (front), and just on the other side (back).
 
@@ -246,36 +247,13 @@ def _sides(csg: CutCSG, frame: _Frame, seed: PolygonRegions) -> Sides:
     return csg.plane_sides(frame, seed)
 
 
-def face_reaches_surface(face: FeatureHandle[FaceFeature], root: CutCSG, near: V3, reach: float) -> bool:
-    """Return whether some area of `face` is on the finished surface of `root`.
-
-    Everything must lie within `reach` of `near`. True if the tree can't be cut by the face's plane.
-    """
-    plane = face.feature.locate_simple_unbounded(face.owner)
-    if plane is None:
-        raise ValueError(f"{face.feature.name!r} has no plane")
-    frame = _Frame(plane, near)
-    seed = [_square(reach)]
-    try:
-        own_front, own_back = _sides(face.owner, frame, seed)
-        own = own_front or own_back
-        if not own:
-            return False
-        front, back = _sides(root, frame, own)
-    except _CannotCrossSection:
-        return True
-    surface = _xor(front, back)
-    return sum(_area(polygon) for polygon in _intersect(own, surface)) > SLIVER_AREA
-
-
 # --- lines of sight ---------------------------------------------------------------------------
 
 CannotCrossSection = _CannotCrossSection
 # A plane's 2D frame, given as (origin, u, v, normal) in a CSG's own space.
-SightFrame = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 
 
-def material_crossing(root: CutCSG, frame: SightFrame, reach: float,
+def material_crossing(root: CutCSG, frame: PlaneFrame, reach: float,
                       across: Optional[Tuple[float, float]] = None) -> PolygonRegions:
     """Return where `root` has material on both sides of the frame's plane: what blocks a line of
     sight lying in it.
@@ -285,7 +263,7 @@ def material_crossing(root: CutCSG, frame: SightFrame, reach: float,
     """
     seed = _square(reach) if across is None else [(across[0], -reach), (across[1], -reach),
                                                   (across[1], reach), (across[0], reach)]
-    front, back = _sides(root, _Frame.with_axes(*frame), [seed])
+    front, back = _sides(root, frame, [seed])
     return _intersect(front, back)
 
 
@@ -294,7 +272,7 @@ def shadow(region: PolygonRegions, reach: float) -> PolygonRegions:
     swept: PolygonRegions = []
     for polygon in region:
         far = [(x, y + reach) for x, y in polygon]
-        swept.append(_convex_hull(polygon + far))
+        swept.append(convex_hull_2d(polygon + far))
     return _clean(swept)
 
 
@@ -344,32 +322,14 @@ def segments_outside(segments: Sequence[Segment2D], region: PolygonRegions) -> L
     return pieces
 
 
-def _convex_hull(points: Polygon) -> Polygon:
-    ordered = sorted(set(points))
-    if len(ordered) < 3:
-        return ordered
-
-    def half(sequence: Sequence[Tuple[float, float]]) -> Polygon:
-        out: Polygon = []
-        for point in sequence:
-            while len(out) >= 2 and ((out[-1][0] - out[-2][0]) * (point[1] - out[-2][1])
-                                     - (out[-1][1] - out[-2][1]) * (point[0] - out[-2][0])) <= 0:
-                out.pop()
-            out.append(point)
-        return out
-
-    lower, upper = half(ordered), half(list(reversed(ordered)))
-    return lower[:-1] + upper[:-1]
-
-
 # --- a plane cropped to a solid ----------------------------------------------------------------
 
-CrossSection = Tuple[_Frame, PolygonRegions]
+CrossSection = Tuple[PlaneFrame, PolygonRegions]
 
 
 def plane_cross_section(plane: Plane, root: CutCSG, near: V3, reach: float) -> Optional[CrossSection]:
     """Return `plane` cropped to the solid `root` (interior included), or None if it can't be cut."""
-    frame = _Frame(plane, near)
+    frame = PlaneFrame(plane, near)
     try:
         front, back = _sides(root, frame, [_square(reach)])
     except _CannotCrossSection:
@@ -387,7 +347,7 @@ def face_cross_section(
     plane = face.locate_simple_unbounded(owner)
     if plane is None:
         return None
-    frame = _Frame(plane, near)
+    frame = PlaneFrame(plane, near)
     try:
         own_front, own_back = _sides(owner, frame, [_square(reach)])
         own = own_front or own_back
@@ -405,7 +365,7 @@ def cross_section_polygons(cross_section: CrossSection) -> List[List[np.ndarray]
     return [[_to_3d(frame, point) for point in polygon] for polygon in region]
 
 
-def _to_3d(frame: _Frame, point: Tuple[float, float]) -> np.ndarray:
+def _to_3d(frame: PlaneFrame, point: Tuple[float, float]) -> np.ndarray:
     return frame.origin + frame.u * point[0] + frame.v * point[1]
 
 

@@ -15,7 +15,7 @@ from ..csg.feature_extent import Interval
 from ..geometry import Line
 from ..rule import Transform, V3, scalar
 from ..timber import PerfectTimberWithin
-from .rule_at_home import Float3, Rows3
+from .rule_at_home import Float3, LocalFrame
 
 #: A pointer's ray in timber-local space: origin, direction.
 LocalRay = Tuple[Float3, Float3]
@@ -27,26 +27,6 @@ class WorldSegment(TypedDict):
 
 
 
-
-
-def build_inv_transform_float(transform: 'Transform') -> Tuple[Rows3, Float3]:
-    """Return (rot_rows, position) as floats for global-to-local transforms: local = R^T (global - pos)."""
-    M = transform.orientation.matrix
-    rot = tuple(Float3(float(M[r, 0]), float(M[r, 1]), float(M[r, 2])) for r in range(3))
-    return rot, Float3.of(transform.position)  # type: ignore[return-value]
-
-
-def inv_transform_point(rot: Rows3, pos: Float3, global_pt) -> Float3:
-    """Return `global_pt` in local space: R^T (global_pt - pos)."""
-    return inv_transform_direction(rot, Float3.of(global_pt) - pos)
-
-
-def inv_transform_direction(rot: Rows3, global_dir) -> Float3:
-    """Return direction `d` in local space: R^T d."""
-    d = Float3.of(global_dir)
-    return Float3(rot[0][0]*d.x + rot[1][0]*d.y + rot[2][0]*d.z,
-                  rot[0][1]*d.x + rot[1][1]*d.y + rot[2][1]*d.z,
-                  rot[0][2]*d.x + rot[1][2]*d.y + rot[2][2]*d.z)
 
 
 def subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
@@ -759,8 +739,7 @@ def extract_highlight_mesh(
     mesh_vertices: List[float],
     mesh_indices: List[int],
     target_csg: 'CutCSG',
-    timber_rot: Rows3,
-    timber_pos: Float3,
+    frame: LocalFrame,
     eps: float = 1e-4,
     root_csg: Optional['CutCSG'] = None,
     selected_path: Optional[List[str]] = None,
@@ -809,7 +788,7 @@ def extract_highlight_mesh(
         cy = (mesh_vertices[i0*3+1] + mesh_vertices[i1*3+1] + mesh_vertices[i2*3+1]) / 3.0
         cz = (mesh_vertices[i0*3+2] + mesh_vertices[i1*3+2] + mesh_vertices[i2*3+2]) / 3.0
         # Convert centroid to timber-local
-        local_c = inv_transform_point(timber_rot, timber_pos, [cx, cy, cz])
+        local_c = frame.point([cx, cy, cz])
         if inside_box is not None and not inside_box(local_c):
             continue
         # The feature's own plane first: far cheaper than the tree's boundary, and most triangles fail it.
@@ -821,7 +800,7 @@ def extract_highlight_mesh(
                 # vertices on the edge's (unbounded) line.
                 on_edge = 0
                 for corner in (i0, i1, i2):
-                    corner_local = inv_transform_point(timber_rot, timber_pos, [
+                    corner_local = frame.point([
                         mesh_vertices[corner * 3],
                         mesh_vertices[corner * 3 + 1],
                         mesh_vertices[corner * 3 + 2],
@@ -1104,8 +1083,8 @@ def drawing_candidates(
         return [], 0
     found: List[MemberCandidate] = []
     for member in members:
-        rotation, position = build_inv_transform_float(member.timber.transform)
-        local_ray = (inv_transform_point(rotation, position, origin), inv_transform_direction(rotation, direction))
+        rotation = LocalFrame.of(member.timber.transform)
+        local_ray = (rotation.point(origin), rotation.direction(direction))
         for candidate in candidates_under_pointer(member.root, member.surface_point, tolerances, local_ray,
                                                   member.timber):
             found.append(MemberCandidate(member.key, member.timber, candidate))

@@ -115,21 +115,31 @@ def _hull_or_unknown(faces: Optional[BoundingHalfSpaces]) -> ConvexHull:
     return UNKNOWN_HULL if faces is None else ConvexHull.of(faces)
 
 
+def _axes(transform: 'Transform') -> Tuple[V3, V3, V3, V3]:
+    """Return a transform's local x, y and z axes and its origin."""
+    matrix = transform.orientation.matrix
+    across = Matrix([matrix[0, 0], matrix[1, 0], matrix[2, 0]])
+    up = Matrix([matrix[0, 1], matrix[1, 1], matrix[2, 1]])
+    axis = Matrix([matrix[0, 2], matrix[1, 2], matrix[2, 2]])
+    return across, up, axis, transform.position
+
+
+def _lifter(transform: 'Transform') -> Callable[[Sequence[Numeric], Numeric], V3]:
+    """Return `lift(point, distance)`: a 2D profile point at `distance` along local z, in the transform's parent space."""
+    across, up, axis, origin = _axes(transform)
+
+    def lift(point: Sequence[Numeric], distance: Numeric) -> V3:
+        return origin + axis * distance + across * scalar(float(point[0])) + up * scalar(float(point[1]))
+
+    return lift
+
+
 def _loft_half_spaces(csg: 'ConvexPolygonSimpleLoft') -> Optional[BoundingHalfSpaces]:
     """Return the half spaces bounding a loft between two convex profiles, or None if malformed.
 
     Exact when each side is planar; otherwise each side's plane is pushed out to the furthest corner.
     """
-    matrix = csg.transform.orientation.matrix
-    across = Matrix([matrix[0, 0], matrix[1, 0], matrix[2, 0]])
-    up = Matrix([matrix[0, 1], matrix[1, 1], matrix[2, 1]])
-    axis = Matrix([matrix[0, 2], matrix[1, 2], matrix[2, 2]])
-    origin = csg.transform.position
-
-    def lift(point, distance) -> V3:
-        return (origin + axis * distance
-                + across * scalar(float(point[0]))
-                + up * scalar(float(point[1])))
+    lift = _lifter(csg.transform)
 
     bottom = [lift(point, csg.bottom_points_z_pos) for point in csg.bottom_points]
     top = [lift(point, csg.top_points_z_pos) for point in csg.top_points]
@@ -142,8 +152,8 @@ def _loft_half_spaces(csg: 'ConvexPolygonSimpleLoft') -> Optional[BoundingHalfSp
         middle = middle + corner
     middle = middle / scalar(len(corners))
 
-    faces: BoundingHalfSpaces = _extrusion_caps(
-        axis, origin, csg.bottom_points_z_pos, csg.top_points_z_pos)
+    _, _, axis, origin = _axes(csg.transform)
+    faces: BoundingHalfSpaces = _extrusion_caps(axis, origin, csg.bottom_points_z_pos, csg.top_points_z_pos)
 
     for index in range(len(bottom)):
         following = (index + 1) % len(bottom)
@@ -194,11 +204,7 @@ def _extruded_hull_half_spaces(
     if len(hull) < 3:
         return None
 
-    matrix = transform.orientation.matrix
-    across = Matrix([matrix[0, 0], matrix[1, 0], matrix[2, 0]])
-    up = Matrix([matrix[0, 1], matrix[1, 1], matrix[2, 1]])
-    axis = Matrix([matrix[0, 2], matrix[1, 2], matrix[2, 2]])
-    origin = transform.position
+    across, up, axis, origin = _axes(transform)
 
     middle = (
         sum(corner[0] for corner in hull) / len(hull),
@@ -364,16 +370,7 @@ def _loft_sides_are_planar(csg: 'ConvexPolygonSimpleLoft') -> bool:
     if len(bottom) < 3 or len(bottom) != len(top):
         return False
 
-    matrix = csg.transform.orientation.matrix
-    across = Matrix([matrix[0, 0], matrix[1, 0], matrix[2, 0]])
-    up = Matrix([matrix[0, 1], matrix[1, 1], matrix[2, 1]])
-    axis = Matrix([matrix[0, 2], matrix[1, 2], matrix[2, 2]])
-    origin = csg.transform.position
-
-    def lift(point, distance) -> V3:
-        return (origin + axis * distance
-                + across * scalar(float(point[0]))
-                + up * scalar(float(point[1])))
+    lift = _lifter(csg.transform)
 
     for index in range(len(bottom)):
         following = (index + 1) % len(bottom)

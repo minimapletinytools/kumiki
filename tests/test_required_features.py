@@ -10,7 +10,7 @@ from kumiki.csg.cutcsg import (CutCSGLabel, Cylinder, Difference, FeatureMarking
                            prism_face_key)
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.pathcsg import FancyPath, PathExtrusion, StraightSegment
-from kumiki.csg.cross_sections import face_reaches_surface
+from kumiki.csg.cross_sections import SLIVER_AREA, area, face_cross_section
 from kumiki.csg.feature_solving import carrier_map_of, feature_handle_dof_rows
 from kumiki.csg.required_features import Reason, planning_features, required_features
 from kumiki.joints.workshop.shavings.shavings import chop_timber_end_with_half_plane, chop_timber_end_with_prism
@@ -34,7 +34,8 @@ def _box(x, y, z, **features):
 def _on_surface(owner, face, root):
     feature = next(f for f in owner.get_declared_features() if f.feature_key() == prism_face_key(face))
     handle = FeatureHandle(timber=TIMBER, hit=OwnedFeatureHit(feature=feature, owner=owner))
-    return face_reaches_surface(handle, root, create_v3(0, 0, 2), 20.0)
+    found = face_cross_section(handle.feature, handle.owner, root, create_v3(0, 0, 2), 20.0)
+    return found is None or area(found[1]) > SLIVER_AREA
 
 
 ALL_FACES = list(PrismFace)
