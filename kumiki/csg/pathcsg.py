@@ -36,7 +36,7 @@ from .carriers import Carrier
 
 if TYPE_CHECKING:
     from .cross_sections import Sides
-    from .edges_on_csg import SolidBounds
+    from .edges_on_csg import ConvexHull
 
 
 # ============================================================================
@@ -899,19 +899,19 @@ class PathExtrusion(HasFeatures, CutCSG):
         return AxisAlignedBoundingBox(_min(*xs), _min(*ys), _min(*zs), _max(*xs), _max(*ys), _max(*zs))
 
 
-    def bounding_half_spaces(self) -> 'SolidBounds':
-        """Return the hull of the path's segment start points.
+    def get_convex_hull(self) -> 'ConvexHull':
+        """Return the convex hull of the path's segment start points, extruded.
 
         KNOWN BUG: an arc bulging outward lies outside this hull, so the bound is too small.
         """
-        from .edges_on_csg import _bounds_or_unknown, _extruded_hull_half_spaces
+        from .edges_on_csg import _hull_or_unknown, _extruded_hull_half_spaces
         points = [seg.start for seg in self.path.segments]
-        return _bounds_or_unknown(_extruded_hull_half_spaces(
+        return _hull_or_unknown(_extruded_hull_half_spaces(
             [(float(point[0, 0]), float(point[1, 0])) for point in points],
             self.transform, self.start_distance, self.end_distance))
 
     def plane_sides(self, frame, seed) -> 'Sides':
-        """Return the union of its convex pieces' sides."""
+        """Return the union of its convex pieces' plane_sides."""
         from .cross_sections import _union
         front: list = []
         back: list = []

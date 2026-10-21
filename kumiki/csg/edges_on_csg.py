@@ -1,11 +1,11 @@
-"""Cropping unbounded lines to a CSG solid, and the half spaces that bound each primitive.
+"""Cropping unbounded lines to a CSG solid, and each primitive's convex hull.
 
-- `solid_bounds`: a primitive as the intersection of half spaces. Approximations (a cylinder's
-  hexagon, a twisted loft, a path extrusion's point hull) always err outward, so a region always
-  contains the true solid.
+- `convex_hull`: a primitive's convex hull as half spaces (CutCSG.get_convex_hull). For a curved or
+  twisted primitive it is a polyhedron containing it, so a region found from it always contains
+  the true solid.
 - `crop_line_to_*_segments_on_csg`: the pieces of a line on a solid, its surface, its interior, or
-  where its surface creases (an arris). Exact for cylinders and for primitives that are exactly
-  their half spaces; others use their bounds.
+  where its surface creases (an arris). Exact where each primitive's exact_line_spans is; others
+  use their convex hull.
 
 Faces are cropped by plane in cross_sections.py.
 """
@@ -51,64 +51,63 @@ def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, f
 BoundingHalfSpaces = List[Tuple[V3, V3]]
 
 
-class BoundsKind(Enum):
-    """Which kind of answer solid_bounds gave."""
+class ConvexHullKind(Enum):
+    """Which kind of answer convex_hull gave."""
 
     HALF_SPACES = 0
     EMPTY = 1
     UNKNOWN = 2
 
 
-# TODO this is Convex right? can we rename this to 3dConvexHull or something?
 @dataclass(frozen=True)
-class SolidBounds:
-    """What solid_bounds knows about a solid:
+class ConvexHull:
+    """A primitive's convex hull as half spaces (see CutCSG.get_convex_hull):
 
-    - HALF_SPACES: the solid is the intersection of `faces`.
+    - HALF_SPACES: the intersection of `faces`, each (outward normal, point on its plane).
     - EMPTY: the solid contains nothing.
     - UNKNOWN: a solid it can't describe; callers must give up.
 
     `faces` is None unless HALF_SPACES.
     """
 
-    kind: BoundsKind
+    kind: ConvexHullKind
     faces: Optional[BoundingHalfSpaces] = None
 
     @staticmethod
-    def of(faces: BoundingHalfSpaces) -> 'SolidBounds':
-        return SolidBounds(kind=BoundsKind.HALF_SPACES, faces=faces)
+    def of(faces: BoundingHalfSpaces) -> 'ConvexHull':
+        return ConvexHull(kind=ConvexHullKind.HALF_SPACES, faces=faces)
 
     def require_faces(self) -> BoundingHalfSpaces:
         """Return `faces`; raises TypeError unless the kind is HALF_SPACES."""
         if self.faces is None:
             raise TypeError(
-                f"bounds of kind {self.kind.name} have no half spaces -- check kind, "
+                f"a convex hull of kind {self.kind.name} has no half spaces -- check kind, "
                 f"or is_empty / is_unknown, before asking for them"
             )
         return self.faces
 
     @property
     def is_empty(self) -> bool:
-        return self.kind is BoundsKind.EMPTY
+        return self.kind is ConvexHullKind.EMPTY
 
     @property
     def is_unknown(self) -> bool:
-        return self.kind is BoundsKind.UNKNOWN
+        return self.kind is ConvexHullKind.UNKNOWN
 
 
-EMPTY_BOUNDS = SolidBounds(kind=BoundsKind.EMPTY)
-UNKNOWN_BOUNDS = SolidBounds(kind=BoundsKind.UNKNOWN)
+EMPTY_HULL = ConvexHull(kind=ConvexHullKind.EMPTY)
+UNKNOWN_HULL = ConvexHull(kind=ConvexHullKind.UNKNOWN)
 
 
 @memo_by_identity
-def solid_bounds(csg) -> SolidBounds:
-    """Return `csg.bounding_half_spaces()`, cached per node."""
-    return csg.bounding_half_spaces()
+def convex_hull(csg) -> ConvexHull:
+    """Return `csg.get_convex_hull()`, cached per node."""
+    return csg.get_convex_hull()
 
 
-def _bounds_or_unknown(faces: Optional[BoundingHalfSpaces]) -> SolidBounds:
-    """Wrap `faces` as SolidBounds, or UNKNOWN if None."""
-    return UNKNOWN_BOUNDS if faces is None else SolidBounds.of(faces)
+def _hull_or_unknown(faces: Optional[BoundingHalfSpaces]) -> ConvexHull:
+    """Wrap `faces` as ConvexHull, or UNKNOWN if None."""
+    return UNKNOWN_HULL if faces is None else ConvexHull.of(faces)
 
 
 def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
@@ -462,12 +461,12 @@ def _spans_on_csg(
     if exact is not None:
         return exact
 
-    bounds = solid_bounds(csg)
-    if bounds.is_unknown:
+    hull = convex_hull(csg)
+    if hull.is_unknown:
         return None
-    if bounds.is_empty:
+    if hull.is_empty:
         return []
-    return _spans_within_primitive(bounds.require_faces(), line, seed, tolerance, removing)
+    return _spans_within_primitive(hull.require_faces(), line, seed, tolerance, removing)
 
 
 def crop_line_to_segments_on_csg(
