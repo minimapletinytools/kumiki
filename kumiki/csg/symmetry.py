@@ -1,29 +1,21 @@
-"""Which cut timbers are the same piece: identical, turned (a rotation), or mirrored (a reflection).
+"""Find which cut timbers are the same piece: identical, rotated, or mirrored (a reflection).
 
-For frame authors who want to solve or draw a piece once for all its copies. Nothing here decides
-that; it only says which timbers match, how, and what differs between them that the geometry
-doesn't settle (labels, reference features, tags).
+For frame authors who want to solve or draw a piece once for all its copies. It reports matches
+and what differs between them (labels, reference features, tags); what to do with them is the
+caller's choice.
 
-How two timbers are compared, in their own local frames (x across the width, y across the height,
-z along the length):
+Two timbers are compared in their own local frames (x width, y height, z length):
 
-- Their CSG trees must have the same shape: the same node types, in the same order.
-- A symmetry is one of the 16 ways of flipping the three axes and swapping width with height. For
-  each, walk both trees in step, mapping the second's primitives through it:
-  - what doesn't depend on where the piece sits -- directions, sizes, radii, profile shapes -- must
-    agree outright;
-  - where it sits gives equations linear in one unknown shift (a half space's offset, a prism's
-    axis line and its ends, ...), solved together at the end.
-- It fits when every equation holds. Its determinant says which kind: +1 a rotation (the piece can
-  simply be turned over), -1 a reflection (a mirror image, a "handed" piece).
+- Their CSG trees must have the same shape (node types and children, in order).
+- Each of 16 symmetries (flips of the three axes, and swapping width with height) is tried by
+  walking both trees in step, mapping the second's primitives through it. Directions, sizes, radii
+  and profile shapes must agree; positions give equations linear in one unknown shift, solved at
+  the end.
+- A symmetry fits when every equation holds. Determinant +1 is a rotation, -1 a reflection.
 
-No mirrored trees are built: a reflected prism would have a left-handed frame, which nothing else
-expects.
-
-Trees are compared, not solids, so it never claims a match that isn't there. The other way round,
-two pieces built differently -- a cutter placed otherwise inside material removed anyway -- match
-only under the symmetries their trees agree on: oscarshed's side girts are identical, and come out
-a reflection, because their peg-hole cutters run from opposite faces.
+Trees are compared, not solids, so a match is never claimed falsely, but two pieces built
+differently may match under fewer symmetries than their shapes would (e.g. peg-hole cutters
+running from opposite faces).
 """
 
 import itertools
@@ -43,7 +35,7 @@ from ..rule import as_ndarray
 if TYPE_CHECKING:
     from ..timber import CutTimber
 
-__all__ = ["SymmetryKind", "Symmetry", "TimberMatch", "TimberGroup", "csg_symmetries", "timber_symmetries",
+__all__ = ["SymmetryKind", "Symmetry", "TimberMatch", "SymmetricTimberGroup", "csg_symmetries", "timber_symmetries",
            "match_timbers"]
 
 #: How far apart, in metres, two things may be and still be the same place.
@@ -58,8 +50,7 @@ class SymmetryKind(Enum):
 
 @dataclass(frozen=True, eq=False)
 class Symmetry:
-    """A way one piece maps onto another, in their local frames: a point `p` of the second is at
-    `matrix @ p + shift` on the first."""
+    """A map from one piece onto another in their local frames: point `p` of the second is at `matrix @ p + shift` on the first."""
     matrix: np.ndarray
     shift: np.ndarray
     kind: SymmetryKind
@@ -73,7 +64,7 @@ _AXIS_NAMES = ("width", "height", "length")
 
 
 def _candidates() -> List[np.ndarray]:
-    """The 16 axis flips and width/height swaps, the identity first, then rotations, then reflections."""
+    """Return the 16 axis flips and width/height swaps: identity first, then rotations, then reflections."""
     found = []
     for swap in (False, True):
         for signs in itertools.product((1.0, -1.0), repeat=3):
@@ -110,7 +101,7 @@ Equation = Tuple[np.ndarray, float]
 
 
 class _Mismatch(Exception):
-    """The trees differ under this symmetry, whatever the shift."""
+    """Raised when two trees differ under a symmetry, whatever the shift."""
 
 
 def _unit(vector) -> np.ndarray:
@@ -119,7 +110,7 @@ def _unit(vector) -> np.ndarray:
 
 
 def _parallel(one: np.ndarray, other: np.ndarray, tolerance: float) -> float:
-    """+1 or -1 as unit `one` runs with or against unit `other`; a mismatch if they aren't parallel."""
+    """Return +1 or -1 as unit `one` runs with or against unit `other`. Raises _Mismatch if they aren't parallel."""
     if np.linalg.norm(np.cross(one, other)) > tolerance:
         raise _Mismatch
     return 1.0 if float(one @ other) > 0 else -1.0
@@ -131,22 +122,21 @@ def _same(one: float, other: float, tolerance: float) -> None:
 
 
 def _frame(transform) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """A transform's local x, y and z axes and its origin, as floats."""
+    """Return a transform's local x, y, z axes and origin as floats."""
     matrix = np.array(transform.orientation.matrix.tolist(), dtype=float)
     return matrix[:, 0], matrix[:, 1], matrix[:, 2], as_ndarray(transform.position)
 
 
 def _extent(axis_dot_origin: float, start, end) -> Tuple[Optional[float], Optional[float]]:
-    """Where a solid runs along its axis, absolutely: None for a side that runs to infinity."""
+    """Return a solid's (start, end) along its axis in absolute terms, None for an infinite end."""
     return (None if start is None else axis_dot_origin + float(start),
             None if end is None else axis_dot_origin + float(end))
 
 
 def _extent_equations(axis: np.ndarray, extent_a, extent_b, sense: float, tolerance: float) -> List[Equation]:
-    """Each finite end of the first solid's extent along `axis` is the second's, carried over.
+    """Return equations on the shift saying each finite end of the first solid along `axis` equals the second's.
 
-    A point q of the second is at m q + shift; along the first's axis that reads
-    sense * (its own axis . q) + axis . shift. Running the other way, its ends swap.
+    `sense` is +1 if the second's axis maps onto the first's, -1 if reversed (then the ends swap).
     """
     low_b, high_b = extent_b
     mapped = ((None if low_b is None else sense * low_b), (None if high_b is None else sense * high_b))
@@ -162,7 +152,7 @@ def _extent_equations(axis: np.ndarray, extent_a, extent_b, sense: float, tolera
 
 
 def _across_equations(axis: np.ndarray, point_a: np.ndarray, mapped_b: np.ndarray) -> List[Equation]:
-    """The first point is the second (already mapped by the matrix) plus the shift, across `axis`."""
+    """Return equations on the shift saying `first` equals `second` (already mapped by the matrix) plus the shift, across `axis`."""
     helper = np.eye(3)[int(np.argmin(np.abs(axis)))]
     first = np.cross(axis, helper)
     first /= np.linalg.norm(first)
@@ -171,7 +161,7 @@ def _across_equations(axis: np.ndarray, point_a: np.ndarray, mapped_b: np.ndarra
 
 
 def _same_profile(points_a: np.ndarray, points_b: np.ndarray, tolerance: float) -> None:
-    """Two point sets the same shape and place relative to their centroids."""
+    """Return whether two point sets have the same shape and placement relative to their centroids."""
     if len(points_a) != len(points_b):
         raise _Mismatch
     relative_a = points_a - points_a.mean(axis=0)
@@ -224,7 +214,7 @@ def _cylinder(a: Cylinder, b: Cylinder, matrix: np.ndarray, tolerance: float) ->
 
 
 def _profile_points(transform, points: Sequence, z: float = 0.0) -> np.ndarray:
-    """A profile's corners (its convex hull) lifted into the node's space at `z` along its axis."""
+    """Return a profile's convex hull corners at `z` along the node's axis, in the node's space."""
     across, up, axis, origin = _frame(transform)
     hull = convex_hull_2d([(float(point[0]), float(point[1])) for point in points])
     return np.array([origin + axis * z + across * x + up * y for x, y in hull])
@@ -269,8 +259,7 @@ def _loft(a: ConvexPolygonSimpleLoft, b: ConvexPolygonSimpleLoft, matrix: np.nda
 
 
 def _path_extrusion(a: PathExtrusion, b: PathExtrusion, matrix: np.ndarray, tolerance: float) -> List[Equation]:
-    """As the convex extrusions it is cut into, matched in any order: a mirrored path's pieces come
-    out in another order."""
+    """Return the equations matching two path extrusions as their convex pieces, in any order."""
     def pieces(path_extrusion: PathExtrusion) -> List[ConvexPolygonExtrusion]:
         return [ConvexPolygonExtrusion(points=piece, transform=path_extrusion.transform,
                                        start_distance=path_extrusion.start_distance,
@@ -295,11 +284,10 @@ def _path_extrusion(a: PathExtrusion, b: PathExtrusion, matrix: np.ndarray, tole
 
 def _walk(a: CutCSG, b: CutCSG, matrix: np.ndarray, tolerance: float,
           known: Sequence[Equation] = ()) -> List[Equation]:
-    """Both trees in step under `matrix`: every equation on the shift, or a mismatch.
+    """Return every equation on the shift for tree `b` mapped by `matrix` onto tree `a`. Raises _Mismatch.
 
-    A difference's cuts and a union's children are matched in any order: turned end for end, one
-    end's joint is the other end's. Each child takes the first same-shaped partner whose equations
-    agree with everything matched so far (`known`).
+    A difference's cuts and a union's children match in any order; each takes the first same-shaped
+    partner consistent with the equations so far (`known`).
     """
     if type(a) is not type(b):
         raise _Mismatch
@@ -332,7 +320,7 @@ def _walk(a: CutCSG, b: CutCSG, matrix: np.ndarray, tolerance: float,
 
 def _unordered(children_a: Sequence[CutCSG], children_b: Sequence[CutCSG], matrix: np.ndarray,
                tolerance: float, known: List[Equation]) -> List[Equation]:
-    """Children matched one to one in any order, each to the first that agrees with what is known."""
+    """Return the equations matching children one to one in any order, each to the first consistent with `known`. Raises _Mismatch."""
     if len(children_a) != len(children_b):
         raise _Mismatch
     unused = list(children_b)
@@ -357,7 +345,7 @@ def _unordered(children_a: Sequence[CutCSG], children_b: Sequence[CutCSG], matri
 
 
 def _shift(equations: Sequence[Equation], tolerance: float) -> Optional[np.ndarray]:
-    """The one shift every equation agrees on, or None. Directions nothing pins down are left at 0."""
+    """Return the one shift every equation agrees on, or None. Unconstrained directions are 0."""
     if not equations:
         return np.zeros(3)
     rows = np.array([row for row, _ in equations])
@@ -367,8 +355,7 @@ def _shift(equations: Sequence[Equation], tolerance: float) -> Optional[np.ndarr
 
 
 def csg_symmetries(a: CutCSG, b: CutCSG, tolerance: float = DEFAULT_TOLERANCE) -> List[Symmetry]:
-    """Every way tree `b` maps onto tree `a`, each in its own local frame (x width, y height, z
-    length): the identity first, then rotations, then reflections. Empty if none does."""
+    """Return every Symmetry mapping tree `b` onto tree `a` (each in its own local frame): identity first, then rotations, then reflections."""
     found = []
     for matrix in _CANDIDATES:
         try:
@@ -381,8 +368,7 @@ def csg_symmetries(a: CutCSG, b: CutCSG, tolerance: float = DEFAULT_TOLERANCE) -
 
 
 def timber_symmetries(a: 'CutTimber', b: 'CutTimber', tolerance: float = DEFAULT_TOLERANCE) -> List[Symmetry]:
-    """Every way cut timber `b` is cut timber `a`, rough stock and cuts and all. `a` with itself
-    gives the piece's own symmetries (a stretcher the same at both ends is its own mirror)."""
+    """Return every Symmetry mapping cut timber `b` onto `a`. With `a` twice, the piece's own symmetries."""
     return csg_symmetries(a.render_timber_with_cuts_csg_local(), b.render_timber_with_cuts_csg_local(), tolerance)
 
 
@@ -390,12 +376,11 @@ def timber_symmetries(a: 'CutTimber', b: 'CutTimber', tolerance: float = DEFAULT
 
 @dataclass(frozen=True, eq=False)
 class TimberMatch:
-    """A timber that is its group's representative over again.
+    """A timber matching its group's representative.
 
-    `kind` is the best that fits: IDENTICAL if the identity does, else ROTATION if any rotation does
-    (it can be turned into the representative, even when a mirror fits too), else REFLECTION (only a
-    mirror fits: a handed piece). `symmetries` are all that fit. `differences` are what the geometry
-    doesn't settle and the caller may care about; they never stop a match.
+    `kind` is IDENTICAL if the identity fits, else ROTATION if any rotation does, else REFLECTION (a
+    handed piece). `symmetries` lists all that fit. `differences` are what the geometry doesn't settle
+    (labels, reference features, tags); they never prevent a match.
     """
     cut: 'CutTimber'
     kind: SymmetryKind
@@ -404,14 +389,14 @@ class TimberMatch:
 
 
 @dataclass(frozen=True, eq=False)
-class TimberGroup:
-    """One piece: the first timber found of it, and every other that matches it."""
+class SymmetricTimberGroup:
+    """One distinct piece: the first timber found of it, and every timber that matches it."""
     representative: 'CutTimber'
     matches: Tuple[TimberMatch, ...]
 
 
 def _shape(node: CutCSG) -> Tuple:
-    """A tree's shape: node types and children, in order."""
+    """Return a tree's shape: node types and children, in order."""
     return (type(node).__name__, tuple(_shape(child) for child in csg_children(node)))
 
 
@@ -420,7 +405,7 @@ def _labels(node: CutCSG) -> Tuple:
 
 
 def _authored_features(node: CutCSG) -> List[Tuple]:
-    """What an author named or changed on the tree's nodes: overrides and extras, with properties."""
+    """Return the overrides and extra features authored on the tree's nodes, with their properties."""
     found = []
     if isinstance(node, HasFeatures):
         found += [("override", repr(override)) for override in node.feature_overrides]
@@ -446,11 +431,11 @@ def _differences(a: 'CutTimber', b: 'CutTimber') -> Tuple[str, ...]:
     return tuple(differences)
 
 
-def match_timbers(cut_timbers: Sequence['CutTimber'], tolerance: float = DEFAULT_TOLERANCE) -> List[TimberGroup]:
-    """The distinct pieces among `cut_timbers`, in the order first met.
+def match_timbers(cut_timbers: Sequence['CutTimber'], tolerance: float = DEFAULT_TOLERANCE) -> List[SymmetricTimberGroup]:
+    """Return the distinct pieces among `cut_timbers`, in the order first met.
 
-    Each timber joins the first group whose representative it matches (timber_symmetries), else
-    starts its own. Only timbers whose trees have the same shape are compared.
+    Each timber joins the first group whose representative it matches (timber_symmetries), else starts
+    its own. Only timbers with the same tree shape are compared.
     """
     groups: List[Tuple['CutTimber', Tuple, List[TimberMatch]]] = []
     for cut in cut_timbers:
@@ -468,5 +453,5 @@ def match_timbers(cut_timbers: Sequence['CutTimber'], tolerance: float = DEFAULT
             break
         else:
             groups.append((cut, shape, []))
-    return [TimberGroup(representative=representative, matches=tuple(matches))
+    return [SymmetricTimberGroup(representative=representative, matches=tuple(matches))
             for representative, _shape_of, matches in groups]
