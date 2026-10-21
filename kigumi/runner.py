@@ -670,13 +670,7 @@ class AccessoryEntry(TypedDict):
 
 if TYPE_CHECKING:
     import numpy as np
-    # Annotations only. kumiki must NOT be imported at module scope for
-    # anything used at runtime: _purge_project_modules drops modules under the
-    # project root that are not in a venv, which in a dev checkout includes
-    # kumiki itself. A module-level class reference would then leave isinstance
-    # comparing against a stale class object after a reload. Under
-    # TYPE_CHECKING there is no runtime import at all, so annotations can be
-    # concrete while every isinstance check still imports inside its function.
+    # Annotations only: import kumiki inside functions at runtime, since a reload purges it.
     from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
     from kumiki.drawings.drawing import Viewport, ViewportId
     from kumiki.drawings.measure import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement,
@@ -699,13 +693,9 @@ if TYPE_CHECKING:
 
 
 def _find_project_root_from_argv() -> "Tuple[Path | None, bool]":
-    """Resolve project root and mode.
+    """Return (project_root, is_local_dev), or (None, False).
 
-    Priority:
-    1) argv[2] explicit project root from extension (if provided)
-    2) walk up from argv[1] target file path
-
-    Returns (root_path, is_local_dev) or (None, False).
+    Uses argv[2] if given, else walks up from argv[1].
     """
     explicit_root: Path | None = None
     if len(sys.argv) >= 3 and sys.argv[2]:
@@ -768,16 +758,13 @@ TARGET_MODULE_NAME = "_kigumi_viewer_target"
 
 @dataclass(frozen=True)
 class KiwariGroup:
-    """One set of parameters, and the frames built from it.
-
-    Frames share one when their kiwari were resolved from the same declared kiwari.
-    """
+    """One set of parameters and the frames built from it (frames whose kiwari came from the same declaration)."""
     frames: Tuple[str, ...]
     kiwari: Any
 
     @property
     def id(self) -> str:
-        """What the viewer calls it: its frames, which stay the same from one build to the next."""
+        """Return the group's viewer id: its frames."""
         return ",".join(self.frames)
 
 
@@ -846,12 +833,7 @@ def log_stderr(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
-# stdout carries the newline-delimited JSON protocol and is written from both
-# the main request/response loop and the background assembly-solve thread
-# (see the `get_assembly` handler below). A write of more than PIPE_BUF bytes
-# is not atomic, so unsynchronized concurrent prints can interleave their
-# bytes on the pipe and corrupt the line-based protocol -- serialize all
-# stdout writes through this lock.
+# Serializes stdout writes from the main loop and the assembly-solve thread, so lines don't interleave.
 _stdout_lock = threading.Lock()
 
 
@@ -881,7 +863,7 @@ def serialize_vector(vec: Any) -> Any:
 
 
 def _vector3_to_floats(vec: Any) -> list:
-    """Exact float triple from a 3x1 sympy Matrix, for numeric (non-display) use."""
+    """Return a 3x1 Matrix as a float triple."""
     return [float(vec[i, 0]) for i in range(3)]
 
 
@@ -950,12 +932,9 @@ def serialize_cut_timber(cut_timber: 'CutTimber') -> TimberSummaryWire:
 
 
 def prism_to_mesh(prism: Any) -> MeshWire:
-    """Convert a RectangularPrism to a flat vertex list + index list triangle mesh.
+    """Return a RectangularPrism as flat vertex and index lists.
 
-    Vertex layout (8 corners, indices 0-7):
-        0: -hw, -hh, z0    1: +hw, -hh, z0    2: +hw, +hh, z0    3: -hw, +hh, z0
-        4: -hw, -hh, z1    5: +hw, -hh, z1    6: +hw, +hh, z1    7: -hw, +hh, z1
-    where z0 = start_distance (bottom) and z1 = end_distance (top) in local Z.
+    Corners 0-3 are at start_distance and 4-7 at end_distance, each going (-,-), (+,-), (+,+), (-,+).
     """
     hw = float(prism.size[0]) / 2.0
     hh = float(prism.size[1]) / 2.0
@@ -1005,7 +984,7 @@ def prism_to_mesh(prism: Any) -> MeshWire:
 
 
 def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> TriangulatedMesh:
-    """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
+    """Return a timber-local CSG triangulated, as flat vertex and index lists."""
     from kumiki.csg.cutcsg import adopt_csg
     from kumiki.rule import Transform
     from kumiki.csg.triangles import triangulate_cutcsg
@@ -1030,7 +1009,7 @@ def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> Tria
 def _perfect_reference_outlines(
     timber: 'PerfectTimberWithin', root: 'CutCSG', centerplanes: bool,
 ) -> List[PlaneOutlineWire]:
-    """What a drawing draws dotted, edge-on (picking.perfect_reference_outlines), as the wire has it."""
+    """Return picking.perfect_reference_outlines as wire forms."""
     from kumiki.viewer.picking import perfect_reference_outlines
 
     return [{"normal": outline.normal, "positions": outline.positions}
@@ -1054,11 +1033,7 @@ def _base_member_payload(
     nominal_width: Any,
     nominal_height: Any,
 ) -> MemberMeshWire:
-    """Common member-mesh payload shared by every geometry serializer.
-
-    Callers add type-specific extras (csg counts, timber class, fallback
-    markers, perfect-within meshes) to the returned dict.
-    """
+    """Return the member-mesh payload fields every serializer shares; callers add their own extras."""
     return {
         "name": name,
         "memberName": name,
@@ -1080,13 +1055,7 @@ def _base_member_payload(
 
 
 def _cut_length(cut_timber: 'CutTimber') -> Optional[float]:
-    """How long the timber is once its end cuts are made.
-
-    A timber with an end joint is not cut to length first -- the joint decides
-    where its end lands, so `timber.length` is the stock it was cut from rather
-    than the piece that comes out. The bounding prism is already cropped to the
-    end cuts, so its extent along the length axis is the finished piece.
-    """
+    """Return the timber's length after its end cuts (from its cropped bounding prism)."""
     try:
         prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
         if prism.start_distance is None or prism.end_distance is None:
@@ -1115,11 +1084,7 @@ def _cut_timber_to_triangle_mesh_payload(
     timber_kumiki_id = int(timber.ticket.kumiki_id)
     timber_class = type(timber).__name__
     is_perfect = bool(timber.is_perfect_timber())
-    # is_perfect_timber() only checks nominal half-sizes vs perfect size; it
-    # does not detect actual non-rectangular geometry (e.g. RoundTimber has
-    # is_perfect_timber()==True when diameter==size, but its actual CSG is a
-    # cylinder, not a rectangular prism). Use class identity to determine
-    # whether the actual geometry differs from the perfect timber within.
+    # By class, since is_perfect_timber() is true for a RoundTimber whose diameter equals its size.
     non_rectangular_classes = ('RoundTimber', 'MeshTimber', 'RegularPolygonTimber')
     has_non_rectangular_actual = timber_class in non_rectangular_classes
 
@@ -1169,11 +1134,7 @@ def _cut_timber_to_triangle_mesh_payload(
     payload["centerplanes"] = _perfect_reference_outlines(timber, local_csg, centerplanes=True)
     payload["perfectFaces"] = _perfect_reference_outlines(timber, local_csg, centerplanes=False)
 
-    # No-joints box geometry: plain rectangular boxes with no CSG cuts applied at
-    # all (no joint cuts, no mortise holes), cropped in length only by this
-    # timber's aggregated end-cut trims. Built unconditionally (not gated behind
-    # has_non_rectangular_actual) since a joint cut changes what a no-joints box
-    # looks like for every timber shape, not just non-rectangular ones.
+    # No-joints box: the plain box cropped only by end-cut trims, for every timber shape.
     try:
         perfect_box_mesh = prism_to_mesh(cut_timber.get_perfect_timber_within_bounding_box_prism())
         payload["perfectBoxNoJointsVertices"] = perfect_box_mesh["vertices"]
@@ -1244,12 +1205,8 @@ def _accessory_to_triangle_mesh_payload(
         nominal_height=dims[1],
     )
 
-    # Round accessories (pegs, dowels, ...) mesh as a faceted polygon
-    # approximation, so EdgesGeometry's fixed angle threshold never catches
-    # the curved barrel -- only the flat end caps get outlined. Ship the
-    # exact cylinder primitive so the viewer can draw the two true,
-    # camera-facing silhouette lines each frame instead (see
-    # updateCylinderSilhouettes() in viewer-app.js).
+    # Round accessories: send the cylinder so the viewer can draw its silhouette lines
+    # (updateCylinderSilhouettes in viewer-app.js).
     if (
         isinstance(global_csg, Cylinder)
         and global_csg.start_distance is not None
@@ -1274,12 +1231,9 @@ def _cut_timber_to_bbox_mesh_payload(
     cut_timber: 'CutTimber',
     timber_key: str,
 ) -> MemberMeshWire:
-    """Fallback mesh payload based on a cut timber's oriented bounding prism.
+    """Return a fallback mesh payload from a cut timber's bounding prism, without boolean triangulation.
 
-    This path avoids trimesh boolean triangulation and keeps rendering usable
-    when optional backend dependencies are unavailable.
-
-    haven't tried this, not sure how well it works, I guess the bbox might not be oriented correctly in this version...
+    Untested; the box may not be oriented correctly.
     """
     timber = cut_timber.timber
     timber_tags = _serialize_timber_tags(getattr(timber, "ticket", None))
@@ -1321,7 +1275,7 @@ def _cut_timber_to_bbox_mesh_payload(
 
 
 def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = None) -> FrameGeometryWire:
-    """Build triangle mesh geometry for every cut timber."""
+    """Return triangle mesh payloads for every cut timber and accessory."""
     ss = slot_state if slot_state is not None else state._active
     frame = ss.frame
     meshes: List[MemberMeshWire] = []
@@ -1500,12 +1454,7 @@ def serialize_frame(frame: 'Frame') -> FrameSummaryWire:
 
 
 def _assign_member_keys(frame: 'Frame') -> Tuple[List[TimberEntry], List[AccessoryEntry]]:
-    """Compute the same memberKey scheme used by build_real_geometry.
-
-    Returns (timber_entries, accessory_entries) with stable ordering.
-    Each timber entry: {memberKey, kumikiEphemeralId, timber, cutTimber, displayName}.
-    Each accessory entry: {memberKey, kumikiEphemeralId, accessory, displayName, type}.
-    """
+    """Return (timber_entries, accessory_entries) with the memberKeys build_real_geometry uses, in stable order."""
     timber_entries: List[TimberEntry] = []
     accessory_entries: List[AccessoryEntry] = []
     key_counts: Dict[str, int] = {}
@@ -1574,25 +1523,14 @@ def _serialize_cutting_summary(cut_timber: 'CutTimber') -> List[CuttingSummaryWi
 
 
 def _timber_tag_kinds() -> List[Tuple[type, str]]:
-    """The kumiki tag classes paired with their wire names, most specific first.
-
-    Imported per call rather than at module scope: a reload purges and
-    re-imports kumiki, which would leave a module-level class object matching
-    nothing an isinstance check is ever handed.
-    """
+    """Return the tag classes with their wire names, most specific first. Imported per call so reloads match."""
     from kumiki.ticket import GenericTag, MemberTag, SliceTag
 
     return [(SliceTag, "slice"), (MemberTag, "member"), (GenericTag, "generic")]
 
 
 def _serialize_timber_tags(ticket: Optional['Ticket']) -> List[TagWire]:
-    """Typed tags off a timber ticket, as {"kind", "name"} sorted by both.
-
-    Only TimberTicket carries tags. A tag class with no wire name is skipped
-    with a warning rather than raised on: this runs inside the per-timber
-    geometry build, where an exception costs the whole timber's mesh. The
-    kumiki-side test that every tag class is listed here is the loud half.
-    """
+    """Return a ticket's tags as {"kind", "name"}, sorted. Unknown tag classes are skipped with a warning."""
     raw_tags = getattr(ticket, "tags", ())
     if not isinstance(raw_tags, (list, tuple)):
         return []
@@ -1646,14 +1584,7 @@ _DEBUG_DRAWING_PAGE: PageWire = {"width": 0.420, "height": 0.297}
 def _placed_by_role(
     viewports: Sequence['Viewport'], ids: Mapping[str, 'ViewportId'], page: PageWire,
 ) -> Dict[str, 'PlacedViewport']:
-    """Resolve a drawing's viewports against a page, keyed by what each is for.
-
-    By role rather than by id, because the code below knows which view it is
-    pointing and not where the tree put it -- which is the whole point of ids
-    being positional. `ids` is the role-to-id map kumiki publishes beside each
-    default layout, so moving a view within one changes that map and nothing
-    here.
-    """
+    """Return a drawing's viewports laid out on `page`, keyed by role via `ids`."""
     from kumiki.drawings.drawing import Page
     from kumiki.drawings.layout import resolve_viewports
 
@@ -1666,11 +1597,7 @@ def _viewport_spec(
     placed: 'PlacedViewport', *, locked: bool, projection: str, camera: CameraWire,
     orbit: Optional[OrbitWire] = None,
 ) -> ViewportWire:
-    """The wire form of one placed viewport.
-
-    The id is the tree's -- a position, "0.1.2" -- and the name is a label that
-    nothing looks anything up by. See kumiki/drawings/drawing.py.
-    """
+    """Return the wire form of a placed viewport."""
     spec: ViewportWire = {"id": str(placed.id), "name": placed.label, "rect": list(placed.rect),
                           "locked": locked, "projection": projection, "camera": camera}
     if orbit is not None:
@@ -1679,7 +1606,7 @@ def _viewport_spec(
 
 
 def _viewport_aspect(rect: List[float], page: PageWire) -> float:
-    """A viewport's aspect: its share of the sheet, times the sheet's own."""
+    """Return a viewport's aspect: its share of the sheet times the sheet's aspect."""
     height = rect[3] * page["height"]
     return (rect[2] * page["width"]) / height if height > 0 else 1.0
 
@@ -1689,13 +1616,7 @@ def _dot(a: List[float], b: List[float]) -> float:
 
 
 def build_default_drawing_for_debugging(frame: 'Frame') -> DrawingWire:
-    """A four-viewport scene over the whole frame: three elevations and a preview.
-
-    Testing scaffolding -- see the note at the top of this section. The three
-    orthographic viewports are locked, so the viewer holds their angle and only
-    lets pan/zoom deltas ride on top; the perspective one is left free and is
-    the same kind of viewport the default 3D scene uses.
-    """
+    """Return a four-viewport debug scene over the whole frame: three locked elevations and a free preview."""
     from kumiki.drawings.kigumi_drawing_view_helpers import orient_by_search, view_extent, world_bounds, world_box
     from kumiki.drawings.drawing import ELEVATION_IDS, elevation_viewports
 
@@ -1743,13 +1664,8 @@ _SELECTION_DRAWING_PAGE: PageWire = {"width": 0.420, "height": 0.297}
 
 SELECTION_DRAWING_ID = "selection-drawing"
 
-#: The one reserved drawing that holds the 3D view's measurements.
-#:
-#: A drawing like any other, so the file merge, overrides, identity, saving and
-#: the panel all apply to it without a second implementation. Reserved so that
-#: nothing in python declares one. Its single viewport carries no camera: the 3D
-#: view's belongs to the viewer and changes constantly, so there is nothing to
-#: declare, and every measurement on it carries its own plane instead.
+#: The reserved drawing holding the 3D view's measurements. Its one viewport has no camera; each
+#: measurement carries its own plane.
 THREE_D_MEASUREMENTS_ID = "three-d-measurements"
 THREE_D_MEASUREMENTS_VIEWPORT = "main"
 
@@ -1778,13 +1694,7 @@ def _preview_viewport(
     orbit: OrbitWire,
     orient: Callable[['OrientedBox', float], 'CameraFrame'],
 ) -> ViewportWire:
-    """The live 3D view beside the elevations, pointed at what is being drawn.
-
-    Left to itself the viewer builds a camera at the origin looking at nothing
-    in particular, which for a piece standing away from the origin means an
-    empty preview. `orient` is the strategy that picks the angle and `orbit`
-    says how far it may be turned afterwards.
-    """
+    """Return the 3D preview viewport aimed at what is drawn, angled by `orient` and limited by `orbit`."""
     from kumiki.drawings.kigumi_drawing_view_helpers import preview_extent
 
     rect = list(placed.rect)
@@ -1806,7 +1716,7 @@ def _preview_viewport(
 
 def _long_face_viewports(entry: TimberEntry, page: PageWire,
                          placed_by_role: Dict[str, 'PlacedViewport']) -> List[ViewportWire]:
-    """The four long sides of one timber, stacked, each square-on to its face."""
+    """Return four viewports, each square-on to one long face of a timber."""
     timber = entry["timber"]
     along = _vector3_to_floats(timber.get_length_direction_global())
     axes = {
@@ -1839,7 +1749,7 @@ def _long_face_viewports(entry: TimberEntry, page: PageWire,
 def _world_elevation_viewports(
     entries: List[TimberEntry], page: PageWire, placed_by_role: Dict[str, 'PlacedViewport'],
 ) -> List[ViewportWire]:
-    """Front, top and right elevations in world axes, for a group of members."""
+    """Return front, top and right world elevations of a group of members."""
     from kumiki.drawings.kigumi_drawing_view_helpers import view_extent, world_bounds
 
     centre, half_size = world_bounds([entry["cutTimber"] for entry in entries])
@@ -1863,7 +1773,7 @@ def _world_elevation_viewports(
 
 
 def _unique_drawing_id(base: str, taken: set) -> str:
-    """A drawing id nothing else is using. Drawing the same piece twice is fine."""
+    """Return a drawing id not already in use."""
     candidate = base
     suffix = 2
     while candidate in taken:
@@ -1873,11 +1783,7 @@ def _unique_drawing_id(base: str, taken: set) -> str:
 
 
 def _selection_drawing_name(entries: List[TimberEntry], total: int) -> str:
-    """What to call a drawing nobody has named.
-
-    One piece is called after the piece, which is what anyone would call it.
-    Several are counted, since listing them would not fit and would not help.
-    """
+    """Return a default drawing name: the piece's name, or a count of members."""
     if len(entries) == 1:
         return entries[0]["displayName"]
     if not entries:
@@ -1886,16 +1792,10 @@ def _selection_drawing_name(entries: List[TimberEntry], total: int) -> str:
 
 
 def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> DrawingWire:
-    """A drawing of the selected members, on a sheet.
+    """Return a drawing of the selected members.
 
-    One timber is drawn the way a piece is drawn for the shop: its four long
-    faces rolled out down the sheet with a live preview beside them, each view
-    square-on to a face and with the length running across the page. Several
-    members have no single piece whose faces the drawing could be about, so they
-    get world elevations instead.
-
-    The drawing names its members. The scene still holds every timber -- the
-    rest are ghosted, present for context and not part of what is drawn.
+    One timber gets a shop drawing (four long faces and a preview); several get world elevations.
+    Other timbers stay in the scene, ghosted.
     """
     from kumiki.drawings.kigumi_drawing_view_helpers import orient_by_search, orient_from_box, timber_box, world_bounds, world_box
 
@@ -1954,10 +1854,8 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dra
 
 # --- where drawings come from ------------------------------------------------
 #
-# Two sources. The frame asks for drawings in code (Frame.drawings), and a
-# drawings file may override those and add its own. Which of the two a drawing
-# came from is carried on it, because it is the first thing you want to know
-# when one looks wrong: whether to edit the python or the file.
+# Code (Frame.drawings) and the drawings file, which may override those and add its own.
+# Each drawing carries which it came from.
 
 ORIGIN_CODE = "code"
 ORIGIN_OVERRIDDEN = "overridden"
@@ -1968,10 +1866,7 @@ ORIGIN_DELETED = "deleted"
 
 # --- measurements -----------------------------------------------------------
 #
-# Two tiers: from the file, and not. A file measurement overrides the one
-# beneath it with the same identity, which is the whole rule. It still produces
-# the three states worth marking -- untouched code, code the file has overridden,
-# and one the file introduced.
+# A file measurement overrides a code one with the same identity.
 
 MEASURE_SUPPRESSED: Final = "suppressed"
 
@@ -1981,11 +1876,7 @@ _duplicate_warning_given = False
 
 
 def _feature_path_identity(anchor: Optional[AnchorWire]) -> Tuple[str, Tuple[str, ...], str, str]:
-    """A comparable form of a feature reference as it travels on the wire.
-
-    A tuple rather than a joined string, since a ticket path may itself contain
-    a separator and two different references must never collapse into one.
-    """
+    """Return a wire feature reference as a comparable tuple."""
     # Imported per call: a reload purges kumiki's modules, so a reference held
     # from before would be to a class that no longer exists.
     from kumiki.identity import ResolvedTimberPath
@@ -2001,35 +1892,21 @@ def _feature_path_identity(anchor: Optional[AnchorWire]) -> Tuple[str, Tuple[str
 
 
 def _anchor_sort_key(anchor: Optional[AnchorWire]) -> Tuple[str, ...]:
-    """Where one anchor falls in the order a pair is written in.
-
-    On the path, not on its identity: identity nests differently per shape and
-    will not order against itself. A missing anchor sorts before any real one.
-    """
+    """Return an anchor's sort key within a pair; a missing anchor sorts first."""
     path = deserialize_feature_path(anchor)
     return ("",) if path is None else path.sort_key
 
 
 def _measure_pair_identity(measure: MeasureWire) -> Tuple[Any, Any]:
-    """Just the two features of a measurement, without what is measured between."""
+    """Return a measurement's two features' identities, unordered."""
     first, second = sorted((measure.get("a"), measure.get("b")), key=_anchor_sort_key)
     return (_feature_path_identity(first), _feature_path_identity(second))
 
 
 def _measure_identity(measure: MeasureWire) -> Tuple[Any, Any, Any, str]:
-    """What makes a measurement itself, within the viewport it is drawn in.
+    """Return a measurement's identity within its viewport: anchors (unordered), kind, and id.
 
-    The anchors unordered, since measuring A to B is measuring B to A. Then the
-    kind, because two kinds between one pair are two dimensions and both should
-    show. Then an id, for the same pair measured twice the same way. Scoped to
-    the viewport because that is where a measurement lives: the same anchors in
-    the plan view are a different dimension with a different number, not this
-    one seen from elsewhere.
-
-    The same tuple Measure.identity builds, because the two are compared
-    against each other -- a file measurement overrides a code one by matching
-    it. A kind is normalized through MeasurementKind first, so one written
-    under an older name matches the same kind written under the new one.
+    Matches Measure.identity, so file measurements can override code ones.
     """
     from kumiki.drawings.measure import Measure, MeasurementKind
 
@@ -2043,28 +1920,25 @@ def _measure_identity(measure: MeasureWire) -> Tuple[Any, Any, Any, str]:
 
 
 def serialize_feature_path(path: 'FeaturePath') -> AnchorWire:
-    """A feature reference as the viewer and the file hold it. See kumiki.csg.feature_paths."""
+    """Return a FeaturePath's wire form (kumiki.csg.feature_paths)."""
     from kumiki.csg.feature_paths import serialize_feature_path as serialize
     return cast(AnchorWire, serialize(path))
 
 
 def deserialize_feature_path(source: Any) -> Optional['FeaturePath']:
-    """The reference a wire form names, or None. See kumiki.csg.feature_paths."""
+    """Parse a FeaturePath from its wire form, or None."""
     from kumiki.csg.feature_paths import deserialize_feature_path as deserialize
     return deserialize(source)
 
 
 # --- the plane a measurement is taken on -------------------------------------
 #
-# A measurement's own, not the viewport's. See .claude/plans/measurement-spec.md: a
-# drawing viewport is locked so either would do, but the 3D view's camera
-# orbits, and a measurement evaluated against it would read a different number
-# from one moment to the next.
+# Each measurement's own, not the viewport camera's (which orbits in 3D).
 
 def _derivation_wire(
     local_csg: 'CutCSG', feature_hits: List['OwnedFeatureHit'], feature: Optional['CSGFeature'],
 ) -> Optional[DerivationWire]:
-    """For a derived feature (picking.derivation): the path to the node owning it, and each parent's."""
+    """Return a derived feature's owner path and parents as wire forms."""
     from kumiki.viewer.picking import derivation
 
     found = derivation(local_csg, feature_hits, feature)
@@ -2077,9 +1951,10 @@ def _derivation_wire(
 def _sight_blocker(
     ss: 'SlotState', own: 'CutTimber', own_root: 'CutCSG', payload: PickRequest, direction: 'Float3',
 ) -> Callable[['Float3'], bool]:
-    """`blocked(place)` (picking.sight_blocker): whether a drawn member's material hides *place*, in
-    *own*'s local space, from the camera. The members that can be in the way are the request's
-    `drawnMembers` (every member when it is None), *own* among them."""
+    """Return `blocked(place)`: whether a drawn member hides `place` (in `own`'s local space) from the camera.
+
+    The members considered are the request's `drawnMembers` (all if None), including `own`.
+    """
     from kumiki.viewer.picking import sight_blocker
 
     drawn = payload.get("drawnMembers")
@@ -2095,25 +1970,10 @@ def _pick_verdict(
     state: RunnerState, located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin',
     payload: PickRequest, slot_state: Optional[SlotState],
 ) -> Optional[VerdictWire]:
-    """What a measurement to this pick would be, as one object.
+    """Return what a measurement to this pick would be, or None if nothing is held.
 
-    None when no measurement is being made -- an ordinary hover, which is a
-    different thing from a pair that admits nothing, and both are read.
-
-    Otherwise:
-
-      kinds    what the pair admits, best first. Empty means the click refuses,
-               and the hover paints it red. A kind that would come to nothing
-               is not admitted.
-      plane    the plane it would be taken on.
-      anchors  where it would attach, at both ends, through the same rules that
-               place a written measurement -- so what is drawn while deciding is
-               where it lands once decided.
-      reason   why there is nothing, when there is nothing.
-
-    Asked once here rather than three times in the viewer. A colour, a preview
-    and a refusal derived separately will eventually disagree, and the
-    disagreement is invisible until someone clicks.
+    Gives the kinds the pair admits (empty: refused), the plane, the anchors (placed as a saved
+    measurement would be), and a reason when there are no kinds.
     """
     from kumiki.drawings.measure import ViewAxes
     from kumiki.drawings.kigumi_measuring_helpers import pick_verdict, world_geometry
@@ -2148,13 +2008,7 @@ def _pick_verdict(
 
 
 def _pick_space(payload: PickRequest) -> 'MeasurementSpace':
-    """Which space a pick is judged in: the sheet's, or the model's.
-
-    The viewer says, because it is the one that knows which view the pointer is
-    in. A drawing's viewport has a declared camera and projects onto its sheet;
-    the 3D view projects nothing, its camera being the reader's. Not said is the
-    model's: only a drawing's view projects.
-    """
+    """Return the space a pick is judged in: projected for a drawing view, else 3D."""
     from kumiki.drawings.measure import MeasurementSpace
 
     named = (payload or {}).get("space")
@@ -2167,18 +2021,9 @@ def _pick_placement(
     state: RunnerState, located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: PickRequest,
     slot_state: Optional[SlotState],
 ) -> PickPlacementWire:
-    """Where a measurement to this pick would sit: its anchors, or its corner.
+    """Return where a measurement to this pick would be drawn: anchors for a distance, a corner for an angle.
 
-    Both from the same pair of spans and the same rules that place a written
-    measurement, so what is drawn while deciding is where it lands once decided.
-    A distance gets anchors and an angle gets a vertex and two rays; neither
-    gets the other, and a pair that admits nothing gets nothing.
-
-    The held end is resolved from its REFERENCE rather than sent along as
-    geometry, so this goes through exactly the code a written measurement goes
-    through -- the alternative is a second way of working out the same answer,
-    and the two drifted: a half-made measurement was drawn at each feature's own
-    middle while the finished one went to the middle of their overlap.
+    Resolves the held end from its reference, so it is placed exactly as a saved measurement is.
     """
     from kumiki.drawings.measure import MeasurementSpace, ViewAxes
     from kumiki.drawings.feature_span import feature_span
@@ -2227,11 +2072,7 @@ def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']
 def _plane_for_pick(
     located_pick: Optional['LocatedPick'], timber: 'PerfectTimberWithin', payload: PickRequest,
 ) -> Optional['MeasurementPlane']:
-    """The plane a measurement to this pick would be taken on (kigumi_measuring_helpers.measurement_plane), or None.
-
-    None unless something is held and the viewer said which way it is looking:
-    a plane needs both ends and a camera, and a first pick has neither.
-    """
+    """Return the plane a measurement to this pick would be taken on, or None without a held end and a camera."""
     from kumiki.drawings.measure import MeasurementSpace
     from kumiki.drawings.kigumi_measuring_helpers import feature_anchor, measurement_plane, world_geometry
 
@@ -2268,13 +2109,7 @@ def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWir
         "a": serialize_feature_path(first),
         "b": serialize_feature_path(second),
         "measureId": str(measure.measure_id) if measure.measure_id else None,
-        # Neither is part of identity: asking for a different kind, or moving
-        # the line, is not measuring something else. They travel so that
-        # overriding one in the file starts from what the code asked for.
-        #
-        # Structured rather than named: `angle` composes for a 3D angle and
-        # is also what every measurement written before spaces called a
-        # projected one, so a bare name cannot carry both.
+        # Not identity; sent so a file override starts from what the code asked for.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
         "placement": _placement_wire(placement) if placement is not None else None,
         # Likewise not identity. Absent on the wire means "take the viewport's
@@ -2289,19 +2124,10 @@ def merge_measurements(
     code_measures: List[MeasureWire],
     file_measures: List[MeasureWire],
 ) -> List[MeasureWire]:
-    """The measurements of one drawing, from both tiers.
+    """Return one drawing's measurements merged from code and file.
 
-    A file entry with the same identity as a code one replaces it and is marked
-    as overriding; one with an identity nothing else has is the file's own. An
-    entry marked suppressed deletes the code measurement instead of replacing
-    it, which is how a measurement the code asks for and nobody wants goes
-    away without the code being changed. It is kept, marked deleted, so it can
-    be listed and put back.
-
-    A repeated identity within a tier is a mistake rather than a case to
-    resolve, so the later one wins. Refusing the file outright would cost
-    someone their drawings over a stray duplicate, which is the same trade the
-    file parser already makes.
+    A file entry with a code entry's identity replaces it (marked overriding); a suppressed one marks
+    it deleted; others are the file's own. Within a tier, a repeated identity: the later wins.
     """
     global _duplicate_warning_given
     from_file: Dict[Tuple[Any, Any, Any, str], MeasureWire] = {}
@@ -2353,7 +2179,7 @@ def merge_measurements(
 
 
 def _file_measurements_by_viewport(entry: Optional[DrawingWire]) -> Dict[str, List[MeasureWire]]:
-    """A file drawing's measurements, off the viewports they hang from."""
+    """Return a file drawing's measurements by viewport id."""
     by_viewport: Dict[str, List[MeasureWire]] = {}
     for viewport in (entry or {}).get("viewports") or []:
         if isinstance(viewport, dict) and isinstance(viewport.get("id"), str):
@@ -2366,12 +2192,7 @@ def _measurements_by_viewport(
     override: Optional[DrawingWire],
     frame: 'Frame',
 ) -> Dict[str, List[MeasureWire]]:
-    """A drawing's measurements, merged tier over tier, under each viewport.
-
-    Both tiers hang them off viewports, and the merge happens within one: the
-    same anchors in another viewport are a different dimension, not this one
-    again.
-    """
+    """Return a drawing's measurements merged across tiers, by viewport id (merged within each viewport)."""
     # Through measurements_by_viewport, so a measurement written ON a viewport
     # and one keyed by id both reach the merge the same way.
     code_by_viewport = declared.measurements_by_viewport() if declared is not None else {}
@@ -2387,12 +2208,7 @@ def _measurements_by_viewport(
 
 
 def _drawings_file_path(example_path: Path) -> Path:
-    """Where a frame's drawings file lives.
-
-    Under .kigumi rather than beside the source: writes there are already known
-    not to wake the file watcher, since refresh stats land there on every
-    refresh.
-    """
+    """Return the path of a frame's drawings file (under .kigumi, which the file watcher ignores)."""
     return example_path.parent / ".kigumi" / "drawings" / f"{example_path.stem}.json"
 
 
@@ -2404,11 +2220,7 @@ OVERRIDES_KEY: Final = "overridesPythonDrawing"
 
 
 def _read_drawings_file(path: Path) -> List[DrawingWire]:
-    """The drawings file, in order, or nothing. A broken file is reported, not fatal.
-
-    Losing a viewer because a hand-edited file has a comma out of place would be
-    a poor trade for strictness, and the file is meant to be hand-edited.
-    """
+    """Return the drawings file's entries in order, or [] if missing. A malformed file is reported, not raised."""
     if not path.exists():
         return []
     try:
@@ -2428,7 +2240,7 @@ def _read_drawings_file(path: Path) -> List[DrawingWire]:
 
 
 def _member_keys_for_timbers(frame: 'Frame', timbers: List[Any]) -> List[str]:
-    """The member keys of the timbers a code drawing holds. Frame has checked they are its own."""
+    """Return the member keys of a code drawing's timbers."""
     keys: List[str] = []
     for timber in timbers or []:
         path = frame.resolved_timber_path_of(timber)
@@ -2438,7 +2250,7 @@ def _member_keys_for_timbers(frame: 'Frame', timbers: List[Any]) -> List[str]:
 
 
 def _drawing_from_code(frame: 'Frame', declared: Any) -> DrawingWire:
-    """Turn what the frame asked for into a scene the viewer can render."""
+    """Return a code Drawing as a viewer scene."""
     member_keys = _member_keys_for_timbers(frame, list(declared.timbers))
     scene = create_drawing_from_selection(frame, member_keys)
     scene["id"] = str(declared.drawing_id)
@@ -2455,17 +2267,10 @@ def add_measurement(
     viewport_id: str,
     measure: MeasureWire,
 ) -> DrawingWire:
-    """Put a measurement on a viewport, and say which entry now holds it.
+    """Add a measurement to a viewport, in the drawings file; return the entry that holds it.
 
-    The file is where a measurement made in the viewer lives, even when the
-    drawing it is on came from code: an override contributes measurements to a
-    drawing the code still lays out. So this finds or makes that override rather
-    than touching the code drawing, which it could not change anyway.
-
-    A pair already measured in this viewport is replaced rather than added
-    beside. Two dimensions between the same two features, drawn on top of each
-    other, is not something anyone means to ask for -- and the second click of a
-    measurement is often a correction of the first.
+    For a code drawing it goes in that drawing's override. An existing measurement of the same pair
+    in the viewport is replaced.
     """
     holder, measures = _measurement_slot(
         frame, example_path, pending, drawing_id, viewport_id)
@@ -2477,13 +2282,7 @@ def add_measurement(
 def _check_plane_matches_view(
     scenes: Sequence[DrawingWire], drawing_id: str, viewport_id: str, plane: Any,
 ) -> None:
-    """Refuse to write a measurement whose plane an orthographic viewport cannot show.
-
-    Ours to get right, not the reader's: a measurement is made in one view, on that view's plane
-    (see _measurement_plane), so a mismatch here is a bug -- and written, it would only come back
-    refused as "plane does not match this view". A file saying so is another matter; the viewer
-    refuses that when it reads it.
-    """
+    """Raise if a measurement's plane doesn't match its orthographic viewport (a bug in how it was made)."""
     normal = (plane or {}).get("normal") if isinstance(plane, Mapping) else None
     if not normal or len(normal) != 3:
         return
@@ -2501,7 +2300,7 @@ def _check_plane_matches_view(
 
 
 def _requested_measure(payload: Dict[str, Any], *, whole: bool = False) -> MeasureWire:
-    """The measurement a viewer request names: its ends and id, and with `whole` the rest."""
+    """Return the measurement a viewer request names: ends and id, plus the rest with `whole`."""
     request = cast(MeasurementRequest, payload)
     a, b = request.get("a"), request.get("b")
     if a is None or b is None:
@@ -2513,12 +2312,7 @@ def _requested_measure(payload: Dict[str, Any], *, whole: bool = False) -> Measu
 
 
 def _viewer_measure_identity(measure: MeasureWire) -> Tuple[Any, str]:
-    """Which measurement an edit from the viewer means.
-
-    The two features, plus the id that lets one pair be measured twice. NOT the
-    kind: changing what a dimension measures between the same two features is
-    editing that dimension, not putting another one there.
-    """
+    """Return the identity of the measurement a viewer edit refers to: its two features and id, not the kind."""
     return (_measure_pair_identity(measure), str(measure.get("measureId") or ""))
 
 
@@ -2529,21 +2323,11 @@ def _measurement_slot(
     drawing_id: str,
     viewport_id: str,
 ) -> Tuple[DrawingWire, List[MeasureWire]]:
-    """The file entry that holds a viewport's measurements, and that list.
-
-    The list is returned to be edited in place, and the holder is on `pending`
-    by the time this returns, so every caller writes the same way and none of
-    them has to remember the second half.
-    """
+    """Return the file entry holding a viewport's measurements and that list (to edit in place). Marks the entry pending."""
     existing = collect_drawings(frame, example_path, pending)
     target = next((d for d in existing if d["id"] == drawing_id), None)
     if target is None and drawing_id == THREE_D_MEASUREMENTS_ID:
-        # The reserved drawing is made when the first measurement needs it
-        # rather than always being there: an empty one in every listing is a
-        # drawing nobody asked for. It is not laid out on a sheet and is never
-        # entered -- what it holds are measurements that belong to the model
-        # rather than to any drawing of it, so its viewport declares no camera
-        # and each measurement carries its own plane.
+        # The reserved 3D drawing is created on its first measurement.
         target = DrawingWire(
             id=THREE_D_MEASUREMENTS_ID,
             name=THREE_D_MEASUREMENTS_ID,
@@ -2577,19 +2361,9 @@ def update_measurement(
     measure: MeasureWire,
     changes: MeasureWire,
 ) -> DrawingWire:
-    """Change a measurement without replacing it: its kind, its plane, where it sits.
+    """Change a measurement's kind, plane or placement in place (not a replace, so undo sees an edit).
 
-    Not add_measurement with different fields. An add replaces whatever measured
-    that pair, so a viewer that changed a kind by adding could not tell the undo
-    stack whether a dimension had been edited or made -- and dragging one would
-    push a create.
-
-    A measurement the code declares has no entry here to change, so one is made
-    carrying the anchors, its kind and the change. That is what an override is for:
-    the code keeps asking for the measurement, and the file says what to do with it.
-    The kind is what makes it an override -- one matches on kind too -- so without
-    it, moving a code measurement that names its kind left the code's in place and
-    drew the moved one beside it.
+    A code measurement gets a file override carrying its anchors, kind and the change.
     """
     holder, measures = _measurement_slot(
         frame, example_path, pending, drawing_id, viewport_id)
@@ -2608,7 +2382,7 @@ def _merged_measurement(
     frame: 'Frame', example_path: Optional[Path], pending: List[DrawingWire],
     drawing_id: str, viewport_id: str, measure: MeasureWire,
 ) -> Optional[MeasureWire]:
-    """The measurement as the viewer sees it, tiers merged, or None if it is not there."""
+    """Return the measurement as the viewer sees it (tiers merged), or None."""
     identity = _viewer_measure_identity(measure)
     return next((
         m
@@ -2629,17 +2403,11 @@ def delete_measurement(
     viewport_id: str,
     measure: MeasureWire,
 ) -> Optional[DrawingWire]:
-    """Take a measurement off a viewport, according to where it comes from.
+    """Remove a measurement from a viewport; return the file entry that now holds it, or None if unchanged.
 
-    - One the file owns is removed.
-    - One the code asks for and the file has changed loses the change: the
-      code's own comes back.
-    - One the code asks for, untouched, is marked deleted in the file. The code
-      still asks for it, so it is listed greyed and can be put back
-      (restore_measurement).
-    - One already deleted is left as it is.
-
-    Returns the file entry that now holds it, or None if nothing changed.
+    - File-owned: removed.
+    - Code-owned and changed in the file: the change is dropped.
+    - Code-owned and untouched: marked deleted in the file (listed greyed, restorable).
     """
     current = _merged_measurement(frame, example_path, pending, drawing_id, viewport_id, measure)
     if current is None or current.get("origin") == ORIGIN_DELETED:
@@ -2663,7 +2431,7 @@ def restore_measurement(
     viewport_id: str,
     measure: MeasureWire,
 ) -> Optional[DrawingWire]:
-    """Put back a code measurement the file deleted. Returns None if it was not deleted."""
+    """Restore a code measurement the file deleted; None if it wasn't deleted."""
     current = _merged_measurement(frame, example_path, pending, drawing_id, viewport_id, measure)
     if current is None or current.get("origin") != ORIGIN_DELETED:
         return None
@@ -2680,13 +2448,7 @@ def _measurement_holder(
     pending: List[DrawingWire],
     target: DrawingWire,
 ) -> DrawingWire:
-    """The file entry a measurement on *target* belongs in, made if need be.
-
-    A drawing of the file's own holds its own measurements. One from the code
-    cannot, so it gets an override -- named after the drawing it overrides, so
-    that deleting the code drawing leaves something plainly dangling rather than
-    something that has quietly become a drawing in its own right.
-    """
+    """Return the file entry for measurements on `target`, creating it (an override named after a code drawing) if needed."""
     if target.get("origin") == ORIGIN_FILE:
         held = next((d for d in pending if d["id"] == target["id"]), None)
         return held if held is not None else _savable_drawing(target)
@@ -2713,24 +2475,13 @@ def collect_drawings(
     example_path: Optional[Path],
     pending: Optional[List[DrawingWire]] = None,
 ) -> List[DrawingWire]:
-    """Every drawing for a frame: from the code, from the file, and unsaved.
+    """Return every drawing for a frame: from code, from the file, and unsaved.
 
-    The file mirrors the code -- drawings holding viewports holding measurements
-    -- and a file drawing says outright which code drawing it overrides, if any.
-    So an override contributes measurements to a drawing the code still lays out,
-    a file drawing that overrides nothing is a drawing in its own right, and one
-    naming a code drawing that has gone is plainly a dangling override rather
-    than something that has quietly become its own.
-
-    `dirty` says a drawing is not in the file yet. It is worked out here rather
-    than left for the viewer to infer, so there is one answer to it.
+    A file drawing either overrides a code drawing (adding measurements), stands alone, or dangles if
+    its code drawing is gone. `dirty` marks a drawing not yet in the file.
     """
     saved = _read_drawings_file(_drawings_file_path(example_path)) if example_path else []
-    # Unsaved entries stand in for saved ones of the same id, and are merged in
-    # here rather than appended at the end. An override contributes measurements
-    # to a drawing the code lays out, so a pending override has to go through
-    # the same merge -- appended, it would replace the code drawing instead and
-    # take the layout with it.
+    # Unsaved entries replace saved ones of the same id, through the same merge.
     pending_by_id = {entry["id"]: DrawingWire(**entry) for entry in (pending or []) if entry.get("id")}
     from_file = [pending_by_id.pop(entry["id"], entry) for entry in saved]
     from_file.extend(pending_by_id.values())
@@ -2790,19 +2541,9 @@ def collect_drawings(
 def _resolve_measurement(
     frame: 'Frame', measure: MeasureWire, view: Optional['ViewAxes'] = None,
 ) -> MeasureWire:
-    """A measurement with its anchors found, or marked as not findable.
+    """Return a measurement with its anchors resolved to world geometry, or marked unresolved.
 
-    Resolved here rather than in the viewer because finding a feature means
-    walking the CSG, which is python's. What the viewer gets is geometry in
-    world space, which it can project into whichever viewport the measurement
-    belongs to.
-
-    The two ends are resolved TOGETHER. Where a dimension attaches is a property
-    of the pair and of the plane it is drawn on, not of either feature alone: an
-    anchor chosen per feature cannot know where the two face each other, and two
-    parallel edges each taking their own midpoint gave a dimension that leaned.
-    Only when the pair cannot be placed together does each fall back to a point
-    of its own, which is what a feature that resolves to nothing else can offer.
+    Both ends are placed together (place_pair); only if that fails does each fall back to its own anchor.
     """
     from kumiki.drawings.measure import MeasurementKind, MeasurementOperation, MeasurementSpace, ViewAxes
     from kumiki.drawings.kigumi_measuring_helpers import place_pair
@@ -2871,24 +2612,8 @@ def _resolve_measurement(
 def _unplaceable_measurement(
     measure: MeasureWire, spans: Dict[str, Optional['MeasureSpan']], plane: Optional['VectorLike'],
 ) -> SettledWire:
-    """A measurement that resolved but cannot be worked out, and why.
-
-    Both ends were found -- an end that was not is `unresolved`, handled above
-    and shown differently -- and something else is missing, so there is no
-    number to send and the viewer is told not to draw it.
-
-    Said here rather than left to the viewer because the viewer cannot work it
-    out either, and its predecessor tried: with nothing sent, it fell back to
-    judging the pair against whatever camera happened to be showing. For a
-    measurement with no plane that is the drift MeasurementPlane exists to stop
-    -- the same two points read as their separation from one angle and their
-    diagonal from another -- so the honest answer is to refuse rather than to
-    show a number that changes when the reader turns.
-
-    Warned about because none of these should happen. A planeless measurement
-    predates planes (nothing written since carries none), and the other two mean
-    the timber's CSG would not render or a face would not crop -- all worth
-    seeing in the log rather than silently not drawing.
+    """Return a resolved measurement that can't be worked out (no plane, or an end with no extent), with the
+    reason, and warn.
     """
     from kumiki.drawings.kigumi_measuring_helpers import unplaceable
 
@@ -2911,13 +2636,13 @@ def _unplaceable_measurement(
 
 
 def _measure_end_name(measure: MeasureWire, key: str) -> str:
-    """One end of a measurement, named the way a person would look for it."""
+    """Return a readable name for one end of a measurement."""
     end = measure.get(key) or {}
     return str(end.get("feature") or end.get("timber") or "?")
 
 
 def _viewport_axes(scene: DrawingWire, viewport_id: str) -> Optional['ViewAxes']:
-    """A viewport's camera frame, as the measurement code wants it."""
+    """Return a viewport's camera frame as ViewAxes."""
     from kumiki.drawings.measure import ViewAxes
 
     for viewport in scene.get("viewports") or []:
@@ -2936,21 +2661,9 @@ def _attach_measurements(
     drawing_name: str,
     frame: 'Frame',
 ) -> None:
-    """Put each viewport's measurements on the viewport they belong to.
+    """Attach each viewport's measurements to it, resolved against `frame`.
 
-    A measurement is drawn in a viewport and means nothing outside it, so it
-    travels with the viewport rather than with the drawing.
-
-    Measurements naming a viewport this layout does not produce cannot be drawn,
-    so they are not shown and the mismatch is warned about. They are kept all the
-    same: a viewport can come back when the code changes, and dropping them here
-    would mean the next save deleted them from the file for good.
-
-    The frame is not optional. Without it the anchors go out unresolved -- no
-    position, no geometry -- which the viewer can only read as a broken
-    reference, so every measurement on the drawing is refused and silently never
-    drawn. That is what a drawing made from a selection did: it is a file
-    drawing, and the file loop was the caller that left it out.
+    Measurements for viewports the layout lacks are warned about and kept, not drawn.
     """
     # Each viewport's own camera frame goes with its measurements: the sheet's
     # across and up are what a horizontal or vertical distance is measured
@@ -2976,13 +2689,7 @@ def _attach_measurements(
 
 
 def _savable_override(scene: DrawingWire) -> DrawingWire:
-    """A code drawing the file overrides, as the file holds it: the override, not the drawing.
-
-    The scene here is the merge -- the code's layout with the file's measurements -- so
-    saving it as it is wrote a copy of the whole drawing that no longer said what it
-    overrides. Read back, that was a second drawing of the same name, and the code one
-    had lost every change.
-    """
+    """Return the file override for a code drawing: its measurements only, not the merged scene."""
     saved = _savable_drawing({**scene, OVERRIDES_KEY: scene["id"]})
     return {
         "id": scene.get("overriddenBy") or f"{scene['id']}-measurements",
@@ -2993,13 +2700,7 @@ def _savable_override(scene: DrawingWire) -> DrawingWire:
 
 
 def _savable_drawing(drawing: DrawingWire) -> DrawingWire:
-    """One drawing as the file should hold it.
-
-    Measurements the code produced are left out. Writing them would freeze what
-    an algorithm generates into the file, and it would stop following the
-    algorithm the moment the frame changed -- the same reason an untouched code
-    drawing is not written out either.
-    """
+    """Return a drawing as the file stores it, without code-generated measurements."""
     saved = DrawingWire(**drawing)
     for transient in ("origin", "dirty", "unplaceableMeasurements", "overriddenBy", "dangling"):
         saved.pop(transient, None)
@@ -3041,12 +2742,7 @@ def _savable_drawing(drawing: DrawingWire) -> DrawingWire:
 
 
 def write_drawings_file(example_path: Path, drawings: List[DrawingWire]) -> str:
-    """Save the drawings that are the file's to keep.
-
-    Only the ones the file is responsible for: a drawing that came from code and
-    was never touched has nothing to save, and writing it out would freeze a
-    copy that stops following the code it was asked for by.
-    """
+    """Save the drawings the file is responsible for (not untouched code drawings)."""
     path = _drawings_file_path(example_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     keep = [_savable_override(drawing) if drawing.get("origin") == ORIGIN_OVERRIDDEN
@@ -3059,10 +2755,7 @@ def write_drawings_file(example_path: Path, drawings: List[DrawingWire]) -> str:
 
 # --- resolving a measurement's anchors --------------------------------------
 #
-# A FeaturePath says which feature; this finds it and works out where it is. The
-# CSG tree is timber-local, so everything located in it is lifted through the
-# timber's transform before it leaves here -- a measurement between two timbers
-# compares nothing meaningful otherwise.
+# Finds the feature a FeaturePath names and returns its geometry in world space.
 
 
 def _candidate_segments(node: 'CutCSG') -> Dict[int, str]:
@@ -3078,7 +2771,7 @@ def _handle_of(feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWith
 
 
 def _anchor_floats(handle: 'FeatureHandle', root: Optional['CutCSG'] = None) -> Optional[List[float]]:
-    """Where a dimension attaches to the feature (kigumi_measuring_helpers.feature_anchor), as the wire has it."""
+    """Return a feature's dimension anchor (feature_anchor) as floats."""
     from kumiki.drawings.kigumi_measuring_helpers import feature_anchor
 
     at = feature_anchor(handle, root)
@@ -3086,14 +2779,14 @@ def _anchor_floats(handle: 'FeatureHandle', root: Optional['CutCSG'] = None) -> 
 
 
 def _world_geometry_payload(handle: 'FeatureHandle') -> Optional[GeometryWire]:
-    """A feature's unbounded geometry, in world space, as the viewer wants it."""
+    """Return a feature's world geometry as its wire form."""
     from kumiki.drawings.kigumi_measuring_helpers import world_geometry
 
     return _geometry_payload(world_geometry(handle))
 
 
 def _extents_wire(placement: 'PairPlacement') -> ExtentsWire:
-    """Each end's line as far as its feature goes (PairPlacement.extents), as the wire has it."""
+    """Return PairPlacement.extents as wire forms."""
     def ends(extent) -> Optional[List[Vec3]]:
         return None if extent is None else [list(extent[0]), list(extent[1])]
 
@@ -3101,7 +2794,7 @@ def _extents_wire(placement: 'PairPlacement') -> ExtentsWire:
 
 
 def _settled_wire(settled: 'Settled') -> SettledWire:
-    """What a measurement comes to (kigumi_measuring_helpers.Settled), as the viewer reads it."""
+    """Return a Settled as its wire form."""
     def end(form: Optional['EndForm']) -> Optional[SettledEndWire]:
         if form is None:
             return None
@@ -3120,12 +2813,7 @@ def _settled_wire(settled: 'Settled') -> SettledWire:
 
 
 def _geometry_payload(geometry: Optional['Located']) -> Optional[GeometryWire]:
-    """One of those, in the shape the viewer reads.
-
-    The wire keeps the mapping form -- a "kind" and two lists -- because that is
-    what crosses to JavaScript. Python stopped taking it: kumiki.drawings.drawing works
-    in the primitives, and this is where the one becomes the other.
-    """
+    """Return a Point, Line or Plane as its wire mapping."""
     from kumiki.geometry import Line, Plane, Point
 
     if isinstance(geometry, Point):
@@ -3140,11 +2828,7 @@ def _geometry_payload(geometry: Optional['Located']) -> Optional[GeometryWire]:
 
 
 def _geometry_from_wire(value: Optional[GeometryWire]) -> Optional['Located']:
-    """The other direction: what the viewer sent, as the primitive it describes.
-
-    The held end of a half-made measurement comes back this way -- the viewer
-    keeps the geometry it was given and hands it back with the next pick.
-    """
+    """Return the Point, Line or Plane a wire mapping describes, or None."""
     from kumiki.geometry import Line, Plane, Point
     from kumiki.rule import create_v3
 
@@ -3169,10 +2853,7 @@ def _resolve_anchor_placed(
     frame: 'Frame', anchor: Optional[AnchorWire], plane: Optional['VectorLike'],
     solid_space: bool = False,
 ) -> Optional[Tuple[AnchorWire, Optional['MeasureSpan']]]:
-    """Where the feature an anchor names actually is, in world space.
-
-    None when it cannot be found, so the caller shows the measurement as broken.
-    """
+    """Return where the feature an anchor names is, in world space, or None if not found."""
     from kumiki.csg.feature_paths import resolve_feature_path
 
     path = deserialize_feature_path(anchor)
@@ -3193,12 +2874,7 @@ def _anchor_payload(
     feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
     root_csg: 'CutCSG', plane: Optional['VectorLike'], solid_space: bool = False,
 ) -> Tuple[AnchorWire, Optional['MeasureSpan']]:
-    """What one end of a measurement is: where it is, what it lies on, its extent.
-
-    The span is what the pairwise rules need and the anchor is what they fall
-    back to. Both come from one lookup so they cannot end up describing
-    different features.
-    """
+    """Return one end of a measurement as a wire form: its anchor, geometry and span."""
     from kumiki.drawings.feature_span import feature_span
 
     handle = _handle_of(feature, node, timber)
@@ -3209,12 +2885,10 @@ def _anchor_payload(
 
 
 def _reference_features_payload(timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None) -> List[ReferenceLineWire]:
-    """A timber's reference features, as world-space lines for the viewer to light.
+    """Return a timber's reference features as world-space segments to highlight, primary first.
 
-    Of the perfect timber: a line runs the timber's length, and a face or center plane
-    is its outline. With *root_csg* -- the cut timber, in its local space -- each line is
-    cropped to it the way a selected edge is, so it stops where a cut took the wood.
-    The first is the primary reference, which a drawing marks.
+    Lines run the perfect timber's length; faces and centerplanes are outlines. With `root_csg`, each
+    is cropped to the cut timber.
     """
     from kumiki.measuring import (locate_center_plane, locate_edge, locate_face,
                                   locate_long_face_centerline)
@@ -3271,11 +2945,7 @@ def _reference_features_payload(timber: 'PerfectTimberWithin', root_csg: Optiona
 def _cropped_reference_segments(
     timber: 'PerfectTimberWithin', root_csg: 'CutCSG', segments: List[Any], through_material: bool,
 ) -> List[Any]:
-    """*segments* (world space) cut down to where the cut timber still has them.
-
-    On its surface, or -- *through_material* -- inside it. Exact first, then at float
-    noise, as a declared edge is (see cropped_edge_segments).
-    """
+    """Return `segments` (world space) cropped to the cut timber's surface, or with `through_material` its inside. Exact, then at float noise."""
     from kumiki.viewer.picking import DECLARED_EDGE_FLOAT_NOISE
     from kumiki.csg.edges_on_csg import (crop_line_to_boundary_segments_on_csg,
                                     crop_line_to_segments_on_csg)
@@ -3309,11 +2979,7 @@ def _cropped_reference_segments(
 
 
 def feature_highlights(slot_state: SlotState, references: Sequence[AnchorWire]) -> List[HighlightWire]:
-    """What to light for each feature reference, in the shape a pick answer has.
-
-    For features nobody is pointing at -- a measurement's ends. A reference that no
-    longer finds its feature gets an empty highlight rather than an error.
-    """
+    """Return what to highlight for each feature reference; an unresolvable one gets an empty highlight."""
     return [_feature_highlight(slot_state, reference) for reference in references]
 
 
@@ -3350,14 +3016,10 @@ def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> Highligh
 
 
 def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()) -> LayersWire:
-    """Build the data payload consumed by the viewer's Layers panel.
+    """Return the Layers panel payload.
 
-    With several *frame_parts* -- a file's @frame functions shown as one -- it also says
-    which timbers and joints are each frame's, so the panel can list them frame by frame.
-
-    Stable identities use ``ticket.kumiki_id`` for tickets-bearing entities
-    (timbers, joints, accessories). Cuts have no ticket and are referenced as
-    ``"<timber_kumiki_id>/cut/<cut_index>"`` on the JS side.
+    Ids are `ticket.kumiki_id` for timbers, joints and accessories; cuts are
+    "<timber_kumiki_id>/cut/<cut_index>". With several `frame_parts`, also each frame's timbers and joints.
     """
     timber_entries, accessory_entries = _assign_member_keys(frame)
 
@@ -3476,7 +3138,7 @@ def _serialize_frame_parts(
     frame_parts: Sequence[Tuple[str, Any]],
     timber_to_kumiki_and_cut: Dict[int, Any],
 ) -> Optional[List[FramePartWire]]:
-    """Which timbers and joints are each frame's, or None when there is only the one frame."""
+    """Return each frame's timbers and joints, or None for a single frame."""
     if len(frame_parts) < 2:
         return None
     parts = []
@@ -3493,8 +3155,7 @@ def _serialize_frame_parts(
 
 
 def _frame_has_assembly_freedoms(frame: 'Frame') -> bool:
-    """Cheap gate mirroring solve_frame_assembly's: does any joint member
-    declare an assembly freedom? (No solving involved.)"""
+    """Return whether any joint member declares an assembly freedom."""
     source_joints = list(getattr(frame, "source_joints", ()) or ())
     for joint in source_joints:
         for cutting in joint.cuttings.values():
@@ -3507,7 +3168,7 @@ def _frame_has_assembly_freedoms(frame: 'Frame') -> bool:
 
 
 def _assembly_float(value: Any) -> float:
-    """Strict numeric conversion for assembly payloads (no string fallback)."""
+    """Return `value` as a float, raising rather than falling back to a string."""
     try:
         return float(value)
     except TypeError:
@@ -3611,7 +3272,7 @@ def _build_assembly_payload(
 
 
 def _serialize_feature(feature: 'CSGFeature') -> FeatureWire:
-    """One declared feature, with the metadata the tree view wants to show."""
+    """Return one declared feature with the metadata the tree view shows."""
     return {
         "name": feature.name,
         "type": feature.feature_type().name,
@@ -3630,14 +3291,7 @@ def _serialize_csg_node(
     path_label: Optional[str] = None,
     segments: Optional[Dict[int, str]] = None,
 ) -> CSGNodeWire:
-    """One CSG node and everything beneath it.
-
-    Nested rather than flattened, and every node rather than only labelled
-    ones. This is a debugging surface: the shape of the tree, and the untagged
-    intermediates in it, are exactly what you need when the shape is what has
-    gone wrong. `path` still carries labels only, since that is what
-    find_csg_by_path navigates by.
-    """
+    """Return a CSG node and its whole subtree, every node included. `path` carries labels only."""
     from kumiki.csg.feature_paths import label_name
     from kumiki.csg.cutcsg import (
         Difference, Intersection, SolidUnion, csg_children, csg_children_with_parity,
@@ -3707,12 +3361,7 @@ def _serialize_csg_node(
 
 
 def serialize_cut_csg_tree(cut_timber: 'CutTimber') -> CSGTreeWire:
-    """The whole rendered CSG of a timber, as a nested tree.
-
-    Deliberately the rendered tree -- what picking actually runs against --
-    rather than one cutting's negative CSG, which is a piece of the input and
-    not the thing on screen.
-    """
+    """Return a timber's rendered CSG tree (what picking runs on), nested."""
     from kumiki.csg.cutcsg import CSGParity
 
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
@@ -3747,7 +3396,7 @@ _project_generation = 0
 
 
 def _project_modules(project_root: Path, keep_paths: set[Path]) -> List[Tuple[str, Path]]:
-    """The modules a purge would drop: under the project root, outside a venv, not kept."""
+    """Return the modules a purge would drop: under the project root, outside a venv, not kept."""
     found = []
     for module_name, module in list(sys.modules.items()):
         module_path = _module_file_path(module)
@@ -3760,7 +3409,7 @@ def _project_modules(project_root: Path, keep_paths: set[Path]) -> List[Tuple[st
 
 
 def _project_modules_changed(project_root: Path, keep_paths: set[Path]) -> bool:
-    """Whether any project module's file was written after it was imported."""
+    """Return whether any project module's file changed after it was imported."""
     for module_name, module_path in _project_modules(project_root, keep_paths):
         try:
             written = module_path.stat().st_mtime
@@ -3772,11 +3421,7 @@ def _project_modules_changed(project_root: Path, keep_paths: set[Path]) -> bool:
 
 
 def _purge_project_modules(project_root: Path, keep_paths: set[Path], verbose: bool = False) -> None:
-    """Aggressively purge all project modules from sys.modules to force clean reloads.
-    
-    This ensures that modified code is actually reflected when reloading, preventing
-    stale cached implementations from being used due to import chain caching.
-    """
+    """Remove all project modules from sys.modules so they reload fresh."""
     removable: list[str] = []
     removed_count = 0
 
@@ -3853,13 +3498,7 @@ def _module_name_for_path(file_path: Path) -> str:
 
 
 def load_module_from_path(file_path: Path, verbose: bool = False) -> ModuleType:
-    """Load a Python module from file path with aggressive cache invalidation.
-    
-    This function ensures that:
-    1. Python's import cache is invalidated
-    2. All project modules are purged from sys.modules
-    3. The target module and its dependencies are loaded fresh
-    """
+    """Load a module from `file_path` fresh: invalidate import caches and purge project modules first."""
     global _last_project_load_at, _project_generation
     started = time.time()
 
@@ -3913,12 +3552,10 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> ModuleType:
 
 
 def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
-    """Render pattern(s) from a List[Pattern] as a single frame.
+    """Return one frame from a list of Patterns.
 
-    Single pattern: raises the first 'main'-tagged pattern at origin.
-    Multiple patterns: delegates to librarian.build_pattern_grid_frame which renders
-    all patterns at origin, computes a square-ish grid layout by translating timbers
-    and accessories, and returns one merged Frame.
+    One pattern: the first 'main'-tagged one at the origin. Several: laid out in a grid by
+    librarian.build_pattern_grid_frame.
     """
     from kumiki.rule import create_v3, scalar
 
@@ -3937,12 +3574,7 @@ def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
 
 
 def _accepts_an_argument(entry: Any) -> bool:
-    """Whether *entry* takes a kiwari.
-
-    One narrow question about arity, not a schema derived from a signature --
-    what a parameter is and what it may be comes from the kiwari the builder
-    declares, and nothing here reads annotations or defaults to find that out.
-    """
+    """Return whether `entry` takes an argument (a kiwari)."""
     try:
         signature = inspect.signature(entry)
     except (TypeError, ValueError):
@@ -3954,7 +3586,7 @@ def _accepts_an_argument(entry: Any) -> bool:
 
 
 def _call_frame_entry(callable_entry: Any, kiwari: Optional['Kiwari'] = None) -> Any:
-    """Build a frame, handing it *kiwari* if it is willing to take one."""
+    """Build a frame from `entry`, passing `kiwari` if it takes one."""
     with contextlib.redirect_stdout(sys.stderr):
         if _accepts_an_argument(callable_entry):
             return callable_entry(kiwari)
@@ -3969,10 +3601,7 @@ def _call_frame_entry(callable_entry: Any, kiwari: Optional['Kiwari'] = None) ->
 
 # --- parameters saved beside the source -------------------------------------
 #
-# myframe.py -> myframe.parameters.json. Beside the source rather than under
-# .kigumi/ (where drawings go) because a parameter choice is something you
-# want to commit. The file watcher only watches the example file's own
-# basename, so writing a sibling does not set off a reload.
+# myframe.py -> myframe.parameters.json, next to the source so it can be committed.
 
 
 def _parameters_file_path(example_path: Path) -> Path:
@@ -3980,13 +3609,7 @@ def _parameters_file_path(example_path: Path) -> Path:
 
 
 def _can_save_parameters(slot_state: SlotState) -> bool:
-    """Whether this slot may write its parameters beside its source.
-
-    Not for a pattern: those live in library folders we have no business
-    writing to, and a pattern's values belong to whoever raised it. Not for a
-    file outside the workspace either, which is the same library case reached
-    by a different road.
-    """
+    """Return whether this slot may save its parameters next to its source (not for patterns or files outside the workspace)."""
     if slot_state.single_pattern_name is not None:
         return False
     workspace = _workspace_root()
@@ -4007,10 +3630,7 @@ def _workspace_root() -> Optional[Path]:
 def _read_parameters_file(
     example_path: Path,
 ) -> "tuple[List[tuple[Optional[List[str]], Dict[str, Any]]], Optional[Path]]":
-    """The saved values for *example_path*, as (frames, values) per group, and where they came from.
-
-    A file from before groups has one set of values naming no frames.
-    """
+    """Return the saved (frames, values) per group for `example_path`, and the file's path. Pre-group files have one unnamed group."""
     path = _parameters_file_path(example_path)
     if not path.exists():
         return [], None
@@ -4033,11 +3653,7 @@ def _read_parameters_file(
 
 
 def _write_parameters_file(slot_state: SlotState) -> str:
-    """Save only what differs from what the code says.
-
-    Writing every value out would mean changing a default in the source did
-    nothing for anyone holding one of these files.
-    """
+    """Save the parameter values that differ from the code's defaults."""
     if not slot_state.kiwari_groups:
         raise ValueError("This frame takes no parameters, so there is nothing to save")
     if not _can_save_parameters(slot_state):
@@ -4066,7 +3682,7 @@ def _write_parameters_file(slot_state: SlotState) -> str:
 
 
 def _bind_kiwari_values(kiwari: Optional['Kiwari'], values: Optional[Mapping[str, Any]]) -> Optional['Kiwari']:
-    """*kiwari* with *values* laid over it, or None if there is no kiwari yet."""
+    """Return `kiwari` with `values` applied, or None if there is no kiwari."""
     if kiwari is None:
         return None
     if not values:
@@ -4075,7 +3691,7 @@ def _bind_kiwari_values(kiwari: Optional['Kiwari'], values: Optional[Mapping[str
 
 
 def _serialize_kiwari_for_slot(slot_state: SlotState, *, stale: bool = False) -> Optional[List[KiwariSectionWire]]:
-    """What the panel is built from, one section per kiwari, or None when nothing takes parameters."""
+    """Return the parameter panel's sections, one per kiwari, or None if nothing takes parameters."""
     if slot_state is None or not slot_state.kiwari_groups:
         return None
     can_save = _can_save_parameters(slot_state)
@@ -4134,7 +3750,7 @@ def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
 
 
 def _frame_decorators() -> Optional[ModuleType]:
-    """kumiki.frame_decorators, or None on a kumiki from before @frame (0.8.0), where no file can use it."""
+    """Return kumiki.frame_decorators, or None on kumiki before 0.8.0."""
     try:
         import kumiki.frame_decorators as frame_decorators
     except ImportError:
@@ -4143,7 +3759,7 @@ def _frame_decorators() -> Optional[ModuleType]:
 
 
 def _build_frame_entry(function: Any, name: str, kiwari: Optional['Kiwari']) -> Any:
-    """One @frame, built with the values for its own kiwari, or None on a first build."""
+    """Build one @frame with its own kiwari's values, or None on a first build."""
     with contextlib.redirect_stdout(sys.stderr):
         result = function(kiwari)
     return _coerce_viewable_frame(result, name)
@@ -4155,7 +3771,7 @@ def _origin_of(kiwari: 'Kiwari') -> Any:
 
 
 def _group_kiwaris(built: List["tuple[str, Any]"]) -> Tuple[KiwariGroup, ...]:
-    """The frames' kiwari, one group per declared kiwari, in the order they were first built."""
+    """Return the frames' kiwari grouped by declaration, in first-built order."""
     groups: List["tuple[Any, List[str], Any]"] = []
     for name, kiwari in built:
         if kiwari is None:
@@ -4171,14 +3787,11 @@ def _group_kiwaris(built: List["tuple[str, Any]"]) -> Tuple[KiwariGroup, ...]:
 def resolve_frame_from_module(
     module: ModuleType, incoming: Optional[Mapping[str, Any]] = None,
 ) -> "tuple[Any, Optional[Any], Tuple[KiwariGroup, ...], Tuple[tuple[str, Any], ...]]":
-    """Resolve a frame from a loaded module, each of its frames built with *incoming*'s kiwari.
+    """Build the frame from a loaded module, each frame with its kiwari from `incoming` (by frame name).
 
-    In order: the file's `@pattern` functions (a pattern book), its `@frame` functions (each
-    built with the values for its own kiwari and shown together), or the deprecated `build_frame` /
-    `example`. *incoming* maps a frame's name to the kiwari to build it with.
-
-    Returns (frame, patternbook_or_None, kiwari_groups, frame_parts): frame_parts is each
-    @frame's name and its own frame, when there are several shown as one.
+    Uses the file's @pattern functions, else its @frame functions (shown together), else the
+    deprecated `build_frame` / `example`. Returns (frame, patternbook_or_None, kiwari_groups,
+    frame_parts); frame_parts lists each @frame's name and frame when there are several.
     """
     incoming = incoming or {}
     decorators = _frame_decorators()
@@ -4244,7 +3857,7 @@ def _warn_legacy_entry(name: str) -> None:
 def _incoming_from_groups(
     groups: Sequence[KiwariGroup], values_by_group: Optional[Mapping[str, Any]],
 ) -> Dict[str, Optional['Kiwari']]:
-    """Each frame's kiwari to build with: its group's last one, with the viewer's values laid over it."""
+    """Return each frame's kiwari: its group's last one, with the viewer's values applied."""
     incoming: Dict[str, Optional['Kiwari']] = {}
     for group in groups:
         values = (values_by_group or {}).get(group.id)
@@ -4255,11 +3868,7 @@ def _incoming_from_groups(
 
 
 def _incoming_from_saved(groups: Sequence[KiwariGroup], saved: List["tuple[Optional[List[str]], Dict[str, Any]]"]) -> Dict[str, Optional['Kiwari']]:
-    """Each frame's kiwari with its group's saved values laid over it.
-
-    A saved group is matched by the frames it names. A file from before groups names none, and
-    is every group's -- each taking only the keys it declares, when there are several.
-    """
+    """Return each frame's kiwari with its group's saved values applied. A pre-group file applies to every group."""
     incoming: Dict[str, Optional['Kiwari']] = {}
     for group in groups:
         bound = group.kiwari
@@ -4281,11 +3890,9 @@ def load_slot_state(
     kiwari_values: Optional[Mapping[str, Any]] = None,
     previous_groups: Sequence[KiwariGroup] = (),
 ) -> SlotState:
-    """Load *file_path* into a slot.
+    """Load `file_path` into a slot.
 
-    *kiwari_values* maps a group's id to the values the viewer wants for it, laid over what the
-    last good build of that group declared. On a first load there is nothing to lay them over
-    yet, and each frame's own declaration is all there is.
+    `kiwari_values` maps a group id to viewer values, applied over that group's last declared kiwari.
     """
     resolved_path = Path(file_path).resolve()
     if not resolved_path.exists():
@@ -4349,7 +3956,7 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
 
 
 def _serialize_tools(slot_state: SlotState) -> ToolsWire:
-    """The slot's @tool functions, and the @frame / @tool functions rejected for their signature."""
+    """Return the slot's @tool functions, and the @frame / @tool functions rejected for their signature."""
     return {
         "tools": [{"name": entry.name} for entry in slot_state.tools],
         "rejectedEntries": [{"name": r.name, "kind": r.kind, "reason": r.reason} for r in slot_state.rejected_entries],
@@ -4357,7 +3964,7 @@ def _serialize_tools(slot_state: SlotState) -> ToolsWire:
 
 
 def run_tool(slot_state: SlotState, name: str) -> ToolRunWire:
-    """Run one of the slot's @tool functions on its frame; its text is the result."""
+    """Run a @tool function on the slot's frame and return its text."""
     entry = next((entry for entry in slot_state.tools if entry.name == name), None)
     if entry is None:
         available = [entry.name for entry in slot_state.tools]
@@ -4399,12 +4006,7 @@ def make_error_response(request_id: Any, command: str, exc: Exception) -> Respon
 def _local_ray_from_payload(
     payload: PickRequest, rot: 'Rows3', pos: 'Float3',
 ) -> Optional[LocalRay]:
-    """The pointer's ray in timber-local space, or None if it did not send one.
-
-    None is ordinary rather than a fault: a pick can be made without a ray (the
-    tests do, and so does any caller that has only a point), and everything on
-    a surface is found from the point alone.
-    """
+    """Return the pointer's ray in timber-local space, or None if none was sent."""
     from kumiki.viewer.picking import inv_transform_direction, inv_transform_point
     ray = payload.get("ray")
     if not isinstance(ray, dict):
@@ -4421,16 +4023,7 @@ def _local_ray_from_payload(
 
 
 def _joint_by_cutting_id(cut_timber: 'CutTimber') -> Dict[int, 'Joint']:
-    """{id(cutting): joint} for the joints that cut this timber.
-
-    A Joint already owns its cuttings, so the reverse link is derived here.
-
-    Reads CutTimber.joints rather than Frame.source_joints, which keeps this
-    local to the timber being picked: no frame has to be threaded through, and
-    a Frame assembled by some route other than from_joints does not silently
-    lose the ability to name joints. Empty for a CutTimber built by hand,
-    where attribution is unavailable rather than wrong.
-    """
+    """Return {id(cutting): joint} for the joints that cut this timber (empty for a hand-built CutTimber)."""
     lookup: Dict[int, 'Joint'] = {}
     for joint in getattr(cut_timber, "joints", None) or ():
         for cutting in (getattr(joint, "cuttings", None) or {}).values():
@@ -4443,14 +4036,7 @@ def _cutting_for_node(
     cut_timber: 'CutTimber',
     target: 'CutCSG',
 ) -> Optional['Cutting']:
-    """Which Cutting produced *target*, or None if it is the timber body.
-
-    render_timber_with_cuts_csg_local() builds
-    ``Difference(body, [cut.get_negative_csg_local() for cut in cuts])`` -- one
-    subtract child per cutting, in order. That correspondence is created in a
-    single function, so this reads it in a single function; everything else
-    here is identity-based.
-    """
+    """Return the Cutting that produced `target` (via the root Difference's subtract children), or None for the body."""
     from kumiki.viewer.picking import subtree_contains
     from kumiki.csg.cutcsg import Difference
 
@@ -4466,19 +4052,7 @@ def _cutting_for_node(
 
 
 def _joint_display_name(joint: 'Joint') -> str:
-    """How to show *joint* wherever a joint is named.
-
-    The one implementation of that rule, in name-then-type-then-id order:
-    the name its ticket was given, else the kind of joint it is, else its
-    kumiki id. The id rather than a shared placeholder because several
-    unnamed joints can touch one timber, and "which of these did I just
-    click?" is the question the display exists to answer. It is runtime-only,
-    which is fine here -- this string is shown, never stored.
-
-    The layers payload and the CSG tree both call this. They used to derive
-    it separately and disagree: a joint with a type but no name showed as its
-    type in the joint list and as an id everywhere else.
-    """
+    """Return a joint's display name: its ticket name, else its type, else its kumiki id."""
     from kumiki.ticket import UNNAMED_TICKET_PATH
 
     ticket = getattr(joint, "ticket", None)
@@ -4494,25 +4068,20 @@ def _joint_display_name(joint: 'Joint') -> str:
 
 
 def _joint_for_cutting(cut_timber: 'CutTimber', cutting: 'Cutting') -> Optional['Joint']:
-    """The joint that owns *cutting*, or None if none does."""
+    """Return the joint that owns `cutting`, or None."""
     return _joint_by_cutting_id(cut_timber).get(id(cutting))
 
 
 def _joint_name_for_cutting(cut_timber: 'CutTimber', cutting: 'Cutting') -> Optional[str]:
-    """Display name of the joint that owns *cutting*, or None if it owns none."""
+    """Return the display name of the joint that owns `cutting`, or None."""
     joint = _joint_for_cutting(cut_timber, cutting)
     return None if joint is None else _joint_display_name(joint)
 
 
 class _CutAttribution(NamedTuple):
-    """Which cutting -- and which joint -- a CSG node belongs to.
+    """The cutting and joint a CSG node came from, inherited by the cutting's whole subtree. All None for the body.
 
-    Inherited by the whole subtree under a cutting's negative CSG, so the
-    viewer can read attribution off any node instead of walking back up to the
-    top tier to find it. All three fields are None for the timber body.
-
-    joint_id is the joint ticket's kumiki_id as a string, matching the id the
-    layers payload uses, so the joint list can join against it directly.
+    joint_id matches the layers payload's joint ids.
     """
 
     joint_name: Optional[str] = None
@@ -4528,7 +4097,7 @@ def _cut_attribution(
     cutting: 'Cutting',
     cut_index: int,
 ) -> _CutAttribution:
-    """Attribution for one top-tier cutting, given a prebuilt joint lookup."""
+    """Return the attribution for one top-level cutting."""
     joint = joints_by_cutting.get(id(cutting))
     if joint is None:
         # The cut is real and indexable even when no joint claims it.
@@ -4543,7 +4112,7 @@ def _joint_name_for_node(
     cut_timber: 'CutTimber',
     target: 'CutCSG',
 ) -> Optional[str]:
-    """Display name of the joint that produced *target*, if any."""
+    """Return the display name of the joint that produced `target`, or None."""
     cutting = _cutting_for_node(local_csg, cut_timber, target)
     if cutting is None:
         return None
@@ -4551,7 +4120,7 @@ def _joint_name_for_node(
 
 
 def _declared_feature_names(csg: 'CutCSG') -> List[str]:
-    """Names of the features *csg* declares, in declaration order."""
+    """Return the names of the features `csg` declares, in order."""
     names: List[str] = []
     for declared in csg.get_declared_features():
         if declared.name not in names:
@@ -4568,47 +4137,19 @@ def _describe_pick(
     feature_label: Optional[str],
     feature_type: Optional[str] = None,
 ) -> NodeDescriptionWire:
-    """Everything the selection display wants to say about one click.
-
-    Kept separate from describe_leaf_csg, which runs per triangle during
-    highlight extraction and must stay a cheap string lookup. This runs once.
-
-    The three CSG-ish arguments are all about one timber and are easy to
-    confuse, so, concretely:
+    """Return what the selection panel shows for one click.
 
     Args:
-        target: the node the click resolved to. An ordinary click drills
-            straight to a leaf primitive; a ctrl-click descends one level at a
-            time, so under ctrl this is often a compound -- a SolidUnion or a
-            Difference selected whole.
-        local_csg: the ROOT of the tree `target` sits in, i.e.
-            ``cut_timber.render_timber_with_cuts_csg_local()``. Needed because
-            two of the four answers are about where `target` sits in the tree
-            rather than about `target` itself: which joint produced it, and how
-            many Difference.subtract edges lie above it (which decides whether
-            its outward normal points the way the visible surface does).
-        cut_timber: the timber that owns that tree. Supplies `cuts`, which line
-            up with the root Difference's subtract children, and `joints`,
-            which map a cutting back to the joint that made it.
-        local_pt: the clicked point in TIMBER-LOCAL coordinates -- the same space as
-            `local_csg` and `target`, not global. The caller converts.
-        eps: surface tolerance for the hit, covering the gap between the
-            analytic face and the triangulated mesh the ray struck.
-        feature_label: the feature navigation actually resolved to, or None when
-            the click selected `target` as a whole. Passed in rather than
-            re-derived: asking `target` what lies under the point finds a face
-            on a descendant even when no feature was selected, which made the
-            display name a face while the highlight lit a whole union.
-        feature_type: the type of that feature, when the caller already knows
-            it. A derived edge has to be passed this way for the same reason
-            its label does -- it belongs to two primitives, so `target` alone
-            answers FACE for it. None means re-derive from `target`.
+        target: the node the click resolved to (a leaf, or under ctrl a compound).
+        local_csg: the root of `target`'s tree (render_timber_with_cuts_csg_local).
+        cut_timber: the timber owning that tree.
+        local_pt: the click, in timber-local coordinates.
+        eps: surface tolerance.
+        feature_label: the feature navigation resolved to, or None if `target` was selected whole.
+        feature_type: that feature's type, if known (needed for a derived edge); None re-derives it.
 
-    Returns:
-        nodeKind and nodeLabel, which always describe `target` itself;
-        featureLabel, featureType and facesToward, which are None unless a
-        feature was selected; and jointName, which is None for the timber's own
-        body, since no joint produced that.
+    Returns nodeKind and nodeLabel (about `target`); featureLabel, featureType and facesToward (None
+    without a feature); and jointName (None for the body).
     """
     from kumiki.csg.feature_paths import label_name
     from kumiki.viewer.picking import outward_normal_and_face, to_v3
@@ -4657,12 +4198,7 @@ def _pick_reference(
     feature_type: Optional[str],
     edge: Optional['CSGFeature'] = None,
 ) -> Optional[AnchorWire]:
-    """The reference a measurement would hold for what was just picked.
-
-    None while a click is still drilling down through compounds and has not
-    reached a feature, and None for a derived feature whose parents cannot both
-    be placed in the tree -- neither is something to measure to yet.
-    """
+    """Return the reference a measurement would hold for the pick, or None (no feature yet, or a derived one that can't be placed)."""
     from kumiki.viewer.picking import node_positions
     from kumiki.identity import (DerivedFeaturePath, FeatureRef, ResolvedTimberPath,
                                  SingleFeaturePath)
@@ -4692,37 +4228,12 @@ def _pick_reference(
 def _handle_hover_feature_at_point(
     state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None,
 ) -> PickResultWire:
-    """What the pointer is over: the answer a click would give, without clicking.
-
-    Deliberately the same code, not a cheaper likeness of it. An outline drawn
-    from the CSG was cheaper and was wrong in a way that showed: a face comes
-    back convex, so a timber face with mortises through it outlined as a whole
-    rectangle over the openings, and a face half cut away outlined at full size.
-    Hover exists to say what a click would take, so it has to be what a click
-    would take -- the same mesh, the same feature, the same drilling.
-
-    The viewer draws it in another colour and under the selection. That is the
-    entire difference.
-
-    Affordable because of when it is asked rather than how much it costs: the
-    pointer has to settle first, so this runs once per rest, not once per move.
-    """
+    """Return what a click at this point would pick, without selecting it. Same code as a click."""
     return _handle_find_csg_at_point(state, payload, slot_state)
 
 
 def _pick_tolerances(payload: PickRequest, eps: float) -> 'FeatureTestTolerances':
-    """How close a click has to be, given what the viewer says a pixel is worth.
-
-    A face is clicked directly, so its slack is the gap between the analytic
-    surface and the triangulated mesh the ray hit -- a fixed distance, and eps
-    is it. An edge or a vertex cannot be clicked exactly at all: selecting one
-    means snapping, and how much slack that wants depends on how big the timber
-    looks, not on how big it is. The viewer sends those two already converted
-    from pixels to world units; without them the built-in defaults stand.
-
-    Clamped at the bottom by eps, since no amount of zooming in makes a snap
-    tighter than the mesh it is snapping on.
-    """
+    """Return the pick tolerances: `eps` for faces, and the viewer's pixel-derived edge and point tolerances (at least `eps`)."""
     from kumiki.csg.cutcsg import FeatureTestTolerances
 
     sent = payload.get("tolerances")
@@ -4749,12 +4260,10 @@ ACCESSORY_KEY_PREFIX = "accessory:"
 def _drawing_candidates(
     ss: SlotState, payload: PickRequest, tolerances: 'FeatureTestTolerances',
 ) -> Tuple[List['MemberCandidate'], int]:
-    """What is under the pointer in a drawing, on every drawn member near the ray
-    (picking.drawing_candidates).
+    """Return what is under the pointer in a drawing, across every drawn member near the ray.
 
-    - A member the ray passes through is asked at the surface point the viewer's ray hit.
-    - A member the ray just misses is asked at its mesh point nearest the ray, so an edge is
-      picked from outside its silhouette too.
+    A member the ray hits is asked at that surface point; one it just misses, at its mesh point
+    nearest the ray.
     """
     from kumiki.viewer.picking import (DrawnMember, build_inv_transform_float, drawing_candidates,
                                        inv_transform_direction, inv_transform_point)
@@ -4798,7 +4307,7 @@ def _drawing_candidates(
 
 
 def _member_world_box(entry: MeshCacheEntry) -> Tuple[List[float], List[float]]:
-    """The world box around a member's mesh, kept on its entry."""
+    """Return a member's world bounding box, cached on its entry."""
     if "world_box" not in entry:
         vertices = entry["mesh"]["vertices"]
         entry["world_box"] = ([min(vertices[axis::3]) for axis in range(3)],
@@ -4807,7 +4316,7 @@ def _member_world_box(entry: MeshCacheEntry) -> Tuple[List[float], List[float]]:
 
 
 def _world_triangles(entry: MeshCacheEntry) -> WorldTriangles:
-    """A member's mesh triangles, world space, kept on its entry."""
+    """Return a member's world-space triangles, cached on its entry."""
     import numpy as np
 
     if "world_triangles" not in entry:
@@ -4818,7 +4327,7 @@ def _world_triangles(entry: MeshCacheEntry) -> WorldTriangles:
 
 
 def _ray_meets_mesh(entry: MeshCacheEntry, origin: 'Float3', direction: 'Float3') -> bool:
-    """Whether the ray passes through any of a member's mesh triangles."""
+    """Return whether the ray passes through any of a member's triangles."""
     import numpy as np
 
     a, b, c = _world_triangles(entry)
@@ -4838,8 +4347,7 @@ def _ray_meets_mesh(entry: MeshCacheEntry, origin: 'Float3', direction: 'Float3'
 
 def _mesh_point_near_ray(entry: MeshCacheEntry, origin: 'Float3', direction: 'Float3',
                          reach: float) -> Optional[List[float]]:
-    """The point of a member's mesh edges nearest the ray across the view, the nearest the camera
-    among equals, if within `reach` of it; None otherwise."""
+    """Return the point on a member's mesh edges nearest the ray (nearest the camera among equals), if within `reach`, else None."""
     import numpy as np
 
     a, b, c = _world_triangles(entry)
@@ -4862,7 +4370,7 @@ def _mesh_point_near_ray(entry: MeshCacheEntry, origin: 'Float3', direction: 'Fl
 
 def _ray_nears_box(origin: 'Float3', direction: 'Float3', box: Tuple[List[float], List[float]],
                    reach: float) -> bool:
-    """Whether a ray passes within `reach` of a world box (lows, highs)."""
+    """Return whether a ray passes within `reach` of a box (lows, highs)."""
     lows = [low - reach for low in box[0]]
     highs = [high + reach for high in box[1]]
     near, far = 0.0, math.inf
@@ -4880,7 +4388,7 @@ def _ray_nears_box(origin: 'Float3', direction: 'Float3', box: Tuple[List[float]
 
 
 def _member_candidates_wire(ss: SlotState, merged: List['MemberCandidate'], visible_count: int) -> List[CandidateWire]:
-    """_candidates_wire, for candidates on several members: each says which."""
+    """_candidates_wire for candidates on several members, each tagged with its member."""
     wires: List[CandidateWire] = []
     for index, one in enumerate(merged):
         wire = _candidates_wire(cast('CutCSG', ss.mesh_cache[one.member]["local_csg"]), [one.candidate.hit],
@@ -4893,12 +4401,7 @@ def _member_candidates_wire(ss: SlotState, merged: List['MemberCandidate'], visi
 def _candidates_wire(
     local_csg: 'CutCSG', feature_hits: List['OwnedFeatureHit'], visible_count: int,
 ) -> List[CandidateWire]:
-    """The candidates under the pointer, for the viewer; those from *visible_count* on are hidden.
-
-    Enough per candidate to answer "why that one" and "why not mine" from the viewer's own log,
-    without turning the runner's pick log on: the ordering is (real, kind, declared, group,
-    priority), and all of it is here.
-    """
+    """Return the candidates as wire forms with their sort fields; those from `visible_count` on are hidden."""
     from kumiki.viewer.picking import node_positions
 
     positions = node_positions(local_csg)
@@ -4920,11 +4423,7 @@ def _candidates_wire(
 
 
 def _nothing_at_point(member_key: str) -> PickResultWire:
-    """A pick that found nothing, in the shape every pick answer takes.
-
-    Every key the viewer reads, so nothing it displays is left holding what the
-    last answer said.
-    """
+    """Return an empty pick answer with every key the viewer reads."""
     return {
         "memberKey": member_key,
         "path": [],
@@ -4948,7 +4447,7 @@ def _nothing_at_point(member_key: str) -> PickResultWire:
 
 
 def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
-    """Process a find_csg_at_point request and return the result dict."""
+    """Handle a find_csg_at_point request."""
     from kumiki.csg.cutcsg import point_tests_memo
 
     # One pick asks the same trees the same point questions many times over.
@@ -4957,7 +4456,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_sta
 
 
 class _PickAsk(NamedTuple):
-    """What a pick request asks, read once."""
+    """A pick request's fields, read once."""
     eps: float
     tolerances: 'FeatureTestTolerances'
     in_drawing: bool
@@ -4968,8 +4467,7 @@ class _PickAsk(NamedTuple):
     held_wire: Optional[GeometryWire]
 
     def held(self) -> Optional['Located']:
-        """The end of a measurement in hand. Read only where it is used: a pick on an accessory
-        returns before, and need not be able to."""
+        """Return the held end of a measurement in progress, or None."""
         return _geometry_from_wire(self.held_wire) if self.held_wire else None
 
 
@@ -5004,9 +4502,7 @@ def _find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Opt
 
 
 def _pick_in_drawing(state: RunnerState, ss: 'SlotState', payload: PickRequest, ask: _PickAsk) -> PickResultWire:
-    """A pick in a drawing: every member drawn under the pointer, not only the one its ray meets
-    first -- the corner aimed at is often the neighbour's, and off a silhouette the ray meets nothing
-    at all. The pick is then made on the chosen candidate's member, as any pick is."""
+    """Pick in a drawing: gather candidates on every member drawn under the pointer, then pick on the chosen one's member."""
     from kumiki.csg.feature_paths import FeatureHandle
     from kumiki.viewer.picking import best_matching_handle
 
@@ -5038,8 +4534,9 @@ def _pick_on_member(
     state: RunnerState, ss: 'SlotState', payload: PickRequest, ask: _PickAsk, member_key: Any, point: Any,
     across: Optional[_AcrossMembers],
 ) -> PickResultWire:
-    """A pick on one member at one world point. `across`, in a drawing, is what is under the pointer
-    on every member and which of it was taken; otherwise the candidates are this member's own."""
+    """Pick on one member at a world point. `across` (in a drawing) gives the candidates on every
+    member and which was taken; otherwise this member's own are used.
+    """
     from kumiki.viewer.picking import (Candidates, best_matching_candidate, build_inv_transform_float, choose,
                                        find_candidates, inv_transform_point, navigate)
 
@@ -5049,16 +4546,7 @@ def _pick_on_member(
         raise ValueError("point must be [x, y, z]")
 
     if member_key.startswith(ACCESSORY_KEY_PREFIX):
-        # A wedge or a peg. It is drawn, so a ray hits it, and it is cached with
-        # a mesh and nothing else -- no CSG, no declared features, nothing
-        # inside one to pick. So: nothing here, rather than an error.
-        #
-        # It has to be an answer and not a raise because the HOVER asks about
-        # whatever the pointer crosses. A raise there is reported once and then
-        # suppressed, which left hover silently dead for the rest of the session
-        # after the pointer passed over a single wedge. Reaching one got easier
-        # when a click began drilling straight in while measuring, since it no
-        # longer has to be selected first.
+        # An accessory (wedge, peg) has no CSG to pick: answer nothing rather than raise.
         return _nothing_at_point(member_key)
 
     cached = ss.mesh_cache[member_key]
@@ -5123,14 +4611,7 @@ def _pick_on_member(
         # Only those that can be taken: Tab steps through these.
         "candidateCount": visible_count,
         "candidates": _candidates_wire(local_csg, feature_hits, visible_count),
-        # And WHICH of them this answer is, so the viewer can mark the one it is
-        # showing -- the right-click menu lights the row the view is lighting,
-        # rather than keeping a second opinion about which that is.
-        #
-        # Matched by name at the end rather than recorded on the way: the choice
-        # can come from a named index, from the preference when none was named,
-        # or from one of the fallbacks, and all of them have to be reported the
-        # same way.
+        # Which candidate was chosen, matched by name, so the menu can mark it.
         "candidateIndex": next(
             (index for index, hit in enumerate(feature_hits) if hit is pick.hit), None),
         # Where the feature is, unbounded, in world space. What decides whether
@@ -5177,8 +4658,7 @@ def _pick_on_member(
 
 
 class _PickHighlights(NamedTuple):
-    """What lights a pick: its triangles (vertices, indices, matched, total), its parent node's
-    triangles to draw dimmer, and the line segments of an edge or a non-real plane's outline."""
+    """What lights a pick: its triangles, its parent node's triangles (dimmer), and line segments."""
     mesh: Tuple[List[float], List[int], int, int]
     parent: Optional[MeshWire]
     edge_segments: Optional[Any]
@@ -5186,7 +4666,7 @@ class _PickHighlights(NamedTuple):
 
 def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', timber: 'PerfectTimberWithin', timber_rot: Any,
                      timber_pos: Any, eps: float, pick: 'Pick') -> _PickHighlights:
-    """The mesh and lines that light `pick` on its member."""
+    """Return the mesh and lines that light `pick` on its member."""
     from kumiki.viewer.picking import (edge_highlight_segments, extract_highlight_mesh, non_real_plane_outline,
                                        resolve_csg_at_path)
 
@@ -5249,17 +4729,7 @@ def _log_pick(
     member_key: str, local_pt: 'Float3', tolerances: 'FeatureTestTolerances',
     feature_hits: List['OwnedFeatureHit'], result: PickResultWire,
 ) -> None:
-    """One line per pick saying what was under the pointer, when asked for.
-
-    Off unless KIGUMI_PICK_LOG is set, because hover asks this on every rest of
-    the pointer and the output channel is shared with everything else.
-
-    It reports every candidate rather than the chosen one, and marks the choice,
-    because the question it exists to answer is usually "why did it pick THAT"
-    or "why is the thing I want not in the list at all" -- and neither is
-    answerable from the winner alone. The tolerances go out with it since what
-    is in the list depends on them.
-    """
+    """Log every candidate under the pointer, marking the choice, when KIGUMI_PICK_LOG is set."""
     if not os.environ.get("KIGUMI_PICK_LOG"):
         return
 
@@ -5292,7 +4762,7 @@ def _log_pick(
 
 
 def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
-    """Resolve a CSG at a known path and return highlight mesh for the viewer."""
+    """Resolve the CSG at a path and return its highlight."""
     from kumiki.csg.feature_paths import label_name
     from kumiki.viewer.picking import (build_inv_transform_float, extract_highlight_mesh,
                                        non_real_plane_outline, resolve_csg_at_path)
@@ -5386,8 +4856,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
 
 
 def _resolve_slot(state: RunnerState, payload: Dict[str, Any]) -> SlotState:
-    """Return the SlotState targeted by the request payload (defaults to active_slot),
-    rebuilt first if the project's modules were re-imported since it was built."""
+    """Return the slot a request targets (default: the active one), rebuilt first if its modules were reloaded."""
     slot_name = payload.get("slot", state.active_slot)
     slot = state.get_slot(slot_name)
     if slot.generation != _project_generation:
@@ -5399,11 +4868,7 @@ def _resolve_slot(state: RunnerState, payload: Dict[str, Any]) -> SlotState:
 
 
 def _rebuild_stale_slot(slot: SlotState) -> SlotState:
-    """*slot* built again with the current modules, keeping its parameter values.
-
-    The values go over as plain data: the old Kiwari, and any vector in it, are instances of
-    the replaced classes. The mesh cache is not kept either, for the same reason.
-    """
+    """Return `slot` rebuilt with the current modules, keeping its parameter values as plain data."""
     log_stderr(f"[reload] Rebuilding {slot.file_path.name}: the project's modules were re-imported since it was built")
     values = {
         group.id: {key: group.kiwari.value_payload(key) for key in group.kiwari.declarations}
@@ -5430,11 +4895,7 @@ _patterns_cache: Optional[PatternListWire] = None
 
 
 def _list_available_patterns(force_rescan: bool = False) -> PatternListWire:
-    """Scan shipped and local pattern folders and return pattern metadata.
-
-    Results are cached after the first scan. Pass *force_rescan=True* (or
-    send ``"rescan": true`` in the command payload) to re-import everything.
-    """
+    """Return metadata for the shipped and local patterns. Cached unless `force_rescan`."""
     global _patterns_cache
     if _patterns_cache is not None and not force_rescan:
         return _patterns_cache
@@ -5500,7 +4961,7 @@ def _list_available_patterns(force_rescan: bool = False) -> PatternListWire:
 
 
 def _find_pattern_in_list(pattern_list: List[Any], pattern_name: str) -> Optional[Any]:
-    """Find a Pattern in a List[Pattern] by path or name."""
+    """Return the Pattern in `patterns` matching `path` or `name`."""
     for p in pattern_list:
         path = getattr(p, "path", "")
         if path == pattern_name or path.split("/")[-1] == pattern_name:
@@ -5513,7 +4974,7 @@ def _raise_specific_pattern(
     pattern_name: str,
     kiwari_values: Optional[Mapping[str, Any]] = None,
 ) -> Tuple[SlotState, SlotLoadedWire]:
-    """Load a specific pattern from a source file and return (SlotState, result_dict)."""
+    """Load one pattern from a source file; return (SlotState, result_dict)."""
     resolved = Path(source_file).resolve()
     if not resolved.exists():
         raise FileNotFoundError(f"Pattern source file not found: {resolved}")
