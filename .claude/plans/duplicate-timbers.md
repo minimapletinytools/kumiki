@@ -64,7 +64,7 @@ box.
 ## Proposed routine
 
 ```python
-def match_timbers(cut_timbers, *, rotations=True, reflections=True) -> List[TimberGroup]
+def match_timbers(cut_timbers, *, rotations=True, reflections=True) -> List[SymmetricTimberGroup]
 
 @dataclass(frozen=True)
 class TimberMatch:
@@ -74,7 +74,7 @@ class TimberMatch:
     differences: Tuple[str, ...]   # what differs that the geometry doesn't: see below
 
 @dataclass(frozen=True)
-class TimberGroup:
+class SymmetricTimberGroup:
     representative: CutTimber
     matches: Tuple[TimberMatch, ...]
 ```
