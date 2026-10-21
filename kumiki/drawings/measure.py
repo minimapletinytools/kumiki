@@ -1,15 +1,8 @@
-"""Measuring: what a pair of features can be measured as, where a dimension between them attaches,
-and what it comes to.
+"""Measuring: which kinds a pair of features can be measured as, where a dimension between them
+attaches, and its value.
 
-The viewer keeps a copy of some of it in kigumi/webview/measurements.js; the docstrings below say
-which, and a test runs the two against each other.
-
-Vectors here are rule.py's V3, as everywhere else in the library. The types a measurement arrives
-as off the wire -- lists and tuples out of JSON -- are taken at the edge and converted once; see
-VectorLike.
-
-See .claude/plans/measurement-spec.md, and .claude/plans/archive/drawing-rule-migration.md for what is
-still to do. Where a sheet's viewports sit, and the Drawing that holds them, are drawing.py.
+Parts are mirrored in kigumi/webview/measurements.js, checked by a test. Wire values (lists from
+JSON) are converted at the edge; see VectorLike. Viewports and Drawing are in drawing.py.
 """
 
 import math
@@ -30,8 +23,7 @@ from .sheet_shape import SheetPoint, sheet_shape
 
 
 class MeasurementSpace(Enum):
-    """Whether a measurement is taken in the projected viewport or in 3d space
-    """
+    """Whether a measurement is taken projected onto a viewport or in 3D."""
     PROJECTED = "projected"
     THREE_D = "3d"
 
@@ -54,8 +46,7 @@ class MeasurementDirection(Enum):
 
 
 class MeasurementFeature(Enum):
-    """What a feature behaves as (after projection), for the purpose of measuring it.
-    """
+    """What a feature acts as, after any projection, for measuring."""
 
     POINT = "point"
     LINE = "line"
@@ -67,8 +58,7 @@ class MeasurementFeature(Enum):
 
 @dataclass(frozen=True)
 class MeasurementKind:
-    """What a dimension is measuring.
-    """
+    """What a dimension measures: operation, space and (for a distance) direction."""
 
     operation: MeasurementOperation
     space: MeasurementSpace
@@ -91,7 +81,7 @@ class MeasurementKind:
 
     @property
     def name(self) -> str:
-        """The composed name, e.g. `projected_horizontal_distance`."""
+        """Return the composed name, e.g. `projected_horizontal_distance`."""
         parts = []
         if self.space is MeasurementSpace.PROJECTED:
             parts.append("projected")
@@ -128,7 +118,7 @@ class MeasurementKind:
 
     @classmethod
     def parse(cls, text: str) -> 'MeasurementKind':
-        """Read a kind back from its composed name."""
+        """Parse a kind from its composed name."""
         parts = str(text).split("_")
         space = MeasurementSpace.PROJECTED if parts[:1] == ["projected"] else MeasurementSpace.THREE_D
         if space is MeasurementSpace.PROJECTED:
@@ -150,26 +140,12 @@ def _three_d(operation) -> MeasurementKind:
 
 # TODO refine these 3 epsilons below? alginment and parallel seem especially big?
 
-#: Below this, in world units, two features are in the same place and there is
-#: nothing between them to dimension. A measurement that comes to zero draws as
-#: nothing, which reads as a measurement that failed rather than one that was
-#: never worth making -- so a pair this close is refused at the pick instead.
+#: Below this distance, in world units, a pair has nothing to dimension and is refused at the pick.
 DEGENERATE_SEPARATION = 1e-6
 
-#: Two projected directions within this of parallel are treated as parallel: the
-#: angle between them would be a number nobody wrote down deliberately, and
-#: their separation is what was meant.
-#:
-#: It is read two ways, and the difference matters. `kinds_for` asks it of a
-#: COSINE, through are_vectors_parallel, and so calls a pair parallel below
-#: about 8.1 degrees -- that is the drafting rule, and it decides whether a pair
-#: is offered an angle at all. The three rules that place a corner ask it of a
-#: SINE, and refuse below about 0.57 degrees -- that is a conditioning guard,
-#: standing behind the first for a pair that somehow reaches them anyway.
-#:
-#: The order is what keeps them from arguing: the corner guards must refuse a
-#: NARROWER band than the drafting rule, or a pair could be offered an angle and
-#: then be unable to say where its vertex is. A test pins that.
+#: Directions within this of parallel are treated as parallel. `kinds_for` applies it to a cosine
+#: (about 8.1 degrees: no angle is offered); placing a corner applies it to a sine (about 0.57
+#: degrees). The second must stay narrower; a test checks it.
 PARALLEL_EPSILON = 1e-2
 
 
@@ -179,25 +155,17 @@ DEFAULT_RIGHT = create_v3(1, 0, 0)
 DEFAULT_UP = create_v3(0, 0, 1)
 
 
-#: Anything that stands for a vector in here: a V3 already, or the lists and
-#: tuples a measurement arrives as off the wire. The helpers below take this so
-#: that a caller holding either does not have to say which.
+#: A V3, or a list or tuple from the wire.
 VectorLike = Union[V3, Sequence[float]]
 
 
 def _v3(vector: VectorLike) -> V3:
-    """Whatever arrived off the wire, as a vector. Lists, tuples and V3 alike."""
+    """Return a wire vector (list, tuple or V3) as a V3."""
     return vector if isinstance(vector, Matrix) else create_v3(*(float(p) for p in vector))
 
 
 def _unit(vector: VectorLike) -> V3:
-    """A unit vector, or a ZERO one where there is no direction to find.
-
-    Zero rather than the input, which is what safe_normalize_vector gives back:
-    four callers here test the result for zero to mean "no direction", and the
-    viewer's `normalized` returns [0, 0, 0] too (measurements.js). Returning the
-    input unchanged would make a zero direction look like a unit one.
-    """
+    """Return `vector` normalized, or zero if it has no length."""
     found = _v3(vector)
     size = safe_norm(found)
     return found / size if size else create_v3(0, 0, 0)
@@ -207,24 +175,12 @@ def _dot(a: VectorLike, b: VectorLike) -> float:
     return safe_dot_product(_v3(a), _v3(b))
 
 
-#: What a feature IS: unbounded, in world space, and one of three shapes. The
-#: same primitives the CSG layer locates features as -- see kumiki.geometry --
-#: rather than a mapping with a "kind" string, which was a sum type spelled out
-#: by hand and left every function here unable to say what it took.
-#:
-#: The wire still carries the mapping form, because the viewer reads it; turning
-#: one into the other happens once, at that edge, in kigumi/runner.py.
+#: A feature's unbounded geometry in world space. The wire form is converted in kigumi/runner.py.
 Geometry = Union[Point, Line, Plane]
 
 
 def _anchor_of(geometry: Optional[Geometry]) -> Optional[V3]:
-    """Where a feature sits.
-
-    A point IS its position. A line and a plane pass through many points and
-    carry one of them, which is as good as any for measuring the gap to
-    something else: what a distance comes to is squared up to whichever of the
-    pair constrains it, so which point was kept does not change the answer.
-    """
+    """Return a point on the feature (its position, or the point a line or plane carries)."""
     if isinstance(geometry, Point):
         return geometry.position
     if isinstance(geometry, (Line, Plane)):
@@ -235,15 +191,9 @@ def _anchor_of(geometry: Optional[Geometry]) -> Optional[V3]:
 def project_geometry_for_measuring(
     geometry: Optional[Geometry], normal: VectorLike,
 ) -> Optional[Geometry]:
-    """A feature as it is seen on the sheet that *normal* faces out of.
+    """Return the feature as seen on a sheet facing `normal`, or None if it projects to an area.
 
-    A point stays a point. An edge seen end-on becomes one, and otherwise stays
-    a line, flattened onto the sheet. A face is a line edge-on. The rule is
-    sheet_shape's; this answers it as geometry.
-
-    None if it does not project to a line -- a face seen at any other angle
-    projects to an area -- or if it is not a recognized piece of projectable
-    geometry.
+    A point stays a point; an edge becomes a line (or a point end-on); a face seen edge-on becomes a line.
     """
     if isinstance(geometry, Point):
         return geometry
@@ -261,12 +211,7 @@ def project_geometry_for_measuring(
 
 
 def form_of(geometry: Optional[Geometry]) -> Optional[MeasurementFeature]:
-    """Which of the three shapes a feature is, for asking the table.
-
-    Nothing is projected away: in the 3D view the camera belongs to the reader
-    and turns as they look around, so a face is a plane whatever angle it is
-    seen from. Project first to ask the same question of a sheet.
-    """
+    """Return whether a feature is a point, line or plane, unprojected (as in the 3D view)."""
     if isinstance(geometry, Point):
         return MeasurementFeature.POINT
     if isinstance(geometry, Line):
@@ -279,12 +224,7 @@ def form_of(geometry: Optional[Geometry]) -> Optional[MeasurementFeature]:
 def _are_parallel(
     one: Optional[Geometry], other: Optional[Geometry],
 ) -> Optional[bool]:
-    """Whether two features run together. None when either has no way to run.
-
-    A plane is parallel to a plane when their normals are, and to a line when
-    the line is SQUARE to its normal -- which is why this asks the geometry
-    rather than being handed one vector per side.
-    """
+    """Return whether two features are parallel (a line and a plane: the line square to the normal), or None if either has no direction."""
     if isinstance(one, Plane) and isinstance(other, Plane):
         return are_vectors_parallel(_unit(one.normal), _unit(other.normal),
                                     eps=PARALLEL_EPSILON)
@@ -299,17 +239,12 @@ def _are_parallel(
 
 
 def _raw_cross(a: VectorLike, b: VectorLike) -> V3:
-    """The cross product at its own length, which is what magnitude tests want."""
+    """Return the unnormalized cross product."""
     return cross_product(_v3(a), _v3(b))
 
 
 def _cross(a: VectorLike, b: VectorLike) -> V3:
-    """The cross product as a DIRECTION, so length is thrown away.
-
-    Only for callers that want an axis. Anything dividing by the length, or
-    testing it for degeneracy, wants _raw_cross: this one answers a unit vector
-    for two barely-crossing inputs just as readily as for two square ones.
-    """
+    """Return the cross product normalized. Use _raw_cross to test its length."""
     return _unit(_raw_cross(a, b))
 
 
@@ -353,17 +288,17 @@ class LineSpan:
 
     @property
     def along(self) -> V3:
-        """Which way this line runs, unit length."""
+        """Return the unit direction."""
         return _unit(self.direction)
 
     def ends_global(self) -> Tuple[V3, ...]:
-        """The two extremities."""
+        """Return the two endpoints."""
         return tuple(self.at + self.along * station for station in (self.interval or (0.0, 0.0)))
 
 
 @dataclass(frozen=True)
 class PlaneSpan:
-    """A plane being measured to, through `at` with `normal`. In 3D only: on a sheet a face is a line."""
+    """A plane being measured to, through `at` with `normal` (3D only). `region` is the face's polygons, if known."""
 
     at: V3
     normal: V3
@@ -382,7 +317,7 @@ class PlaneSpan:
 
     @property
     def facing(self) -> V3:
-        """Which way this plane faces, unit length."""
+        """Return the unit normal."""
         return _unit(self.normal)
 
     def ends_global(self) -> Tuple[V3, ...]:
@@ -394,18 +329,13 @@ MeasureSpan = Union[PointSpan, LineSpan, PlaneSpan]
 
 
 def _stations_global(span: MeasureSpan, along: VectorLike) -> Tuple[float, float]:
-    """How far a span reaches along a direction, as absolute stations.
-
-    Absolute -- measured from the world origin rather than from the span's own
-    point -- because two features have two different points, and overlap is a
-    question about one shared ruler.
-    """
+    """Return how far a span reaches along `along`, as stations from the world origin."""
     reach = [_dot(end, along) for end in span.ends_global()]
     return (min(reach), max(reach))
 
 
 def _at_station(span: Union[PointSpan, LineSpan], along: VectorLike, station: float) -> V3:
-    """The point on a span that sits at a given station along `along`."""
+    """Return the point on a span at a station along `along`."""
     if isinstance(span, PointSpan):
         return span.at
     unit = span.along
@@ -417,7 +347,7 @@ def _at_station(span: Union[PointSpan, LineSpan], along: VectorLike, station: fl
 
 
 def _foot_on(span: LineSpan, point: VectorLike) -> V3:
-    """Where a perpendicular from `point` meets a span, kept on the span."""
+    """Return the foot of the perpendicular from `point` on a span, clamped to the span."""
     at, unit = span.at, span.along
     station = _dot(_v3(point) - at, unit)
     low, high = span.interval or (station, station)
@@ -428,11 +358,7 @@ def _foot_on(span: LineSpan, point: VectorLike) -> V3:
 
 
 def _representative_point(span: MeasureSpan) -> V3:
-    """The one point that stands for a span when something must be dropped onto it.
-
-    A point is itself. A line offers the middle of its surviving extent, which is
-    where a reader would put a finger on it.
-    """
+    """Return a point standing for a span: a point itself, or the middle of a line's extent."""
     if not isinstance(span, LineSpan):
         return span.at
     low, high = span.interval or (0.0, 0.0)
@@ -442,56 +368,28 @@ def _representative_point(span: MeasureSpan) -> V3:
 
 
 def _foot_on_plane(span: PlaneSpan, point: VectorLike) -> V3:
-    """Where a perpendicular from `point` meets a plane.
-
-    NOT clamped to the face, unlike the foot on a line: a span carries a plane's
-    normal and a point on it, not its outline, so there is nothing here to clamp
-    against. For a pair that admits a distance the two features face each other,
-    which is when the foot lands on the face anyway. Clamping properly wants the
-    face's corners -- see the note in cutcsg about extents being an AABB.
-    """
+    """Return the foot of the perpendicular from `point` on a plane (not clamped to the face)."""
     point, unit = _v3(point), span.facing
     gap = _dot(point - span.at, unit)
     return point - unit * gap
 
 
 def _closest_on_line(point: VectorLike, at: VectorLike, direction: VectorLike) -> V3:
-    """Where a line comes nearest a point."""
+    """Return the point on a line nearest `point`."""
     at, unit = _v3(at), _unit(direction)
     step = _dot(_v3(point) - at, unit)
     return at + unit * step
 
 
 def _plane_crossing(first: PlaneSpan, second: PlaneSpan) -> Optional[Line]:
-    """The line two planes share, or None when they are too near parallel.
-
-    Too near parallel has no corner to stand in -- and admits a distance rather
-    than an angle anyway.
-    """
-    # BOTH UNIT, since they come from `facing`. That is what lets the length of
-    # their cross stand for the sine between the two planes, which is the only
-    # reason the raw cross is wanted below: nothing here is scale-dependent,
-    # because nothing here has a scale.
+    """Return the line two planes share, or None if they are near parallel."""
+    # Both unit, so the raw cross's length is the sine between the planes.
     one, other = first.facing, second.facing
-    # The cross at its own length, then. Asking _cross instead normalised it, so
-    # the length was always exactly one: the refusal below could only fire on
-    # two EXACTLY parallel planes, and intersect_planes divided by one rather
-    # than by that sine -- putting the corner a factor of it toward the world
-    # origin, which is right only where the two happen to meet square.
-    #
-    # safe_zero_test_sq because that length is SQUARED: it squares the tolerance
-    # itself, so PARALLEL_EPSILON means here what it means everywhere else in
-    # this file -- a plain sine. Compared raw it read as a tolerance on the
-    # square and refused anything under 5.7 degrees instead of 0.57.
+    # Squared length, so safe_zero_test_sq.
     along = _raw_cross(one, other)
     if safe_zero_test_sq(_dot(along, along), eps=PARALLEL_EPSILON):
         return None
 
-    # The refusal above is this file's, not geometry's: how near parallel is too
-    # near to stand a dimension in is a question about drafting. intersect_planes
-    # refuses only what it cannot compute, at EPSILON_GENERIC, and takes no eps
-    # of its own -- giving it one would put a drafting rule in the geometry
-    # layer, where the next caller would inherit a tolerance meant for this one.
     crossing = intersect_planes(Plane(normal=one, point=first.at),
                                 Plane(normal=other, point=second.at))
     if crossing is None:
@@ -503,8 +401,7 @@ def _ray_toward(
     ray: VectorLike, vertex: VectorLike, span: MeasureSpan,
     other: Optional[MeasureSpan] = None,
 ) -> Optional[V3]:
-    """A unit ray from `vertex`, turned to point at where the feature is. Used for determing how to draw an angle measurement
-    """
+    """Return a unit ray from `vertex` along `direction`, flipped to point toward the feature."""
     unit = _unit(ray)
     if not any(abs(part) > 1e-9 for part in unit):
         return None
@@ -525,11 +422,7 @@ def _ray_toward(
 
 @dataclass(frozen=True)
 class ViewAxes:
-    """Which way a sheet is seen, and which way is across it and up it.
-
-    A camera frame. `right` and `up` are only consulted by a horizontal or
-    vertical distance, so a 3D pick passes neither and gets the defaults.
-    """
+    """A camera frame: look direction, and the sheet's right and up (used only by horizontal and vertical distances)."""
 
     # A factory, since Python 3.11+ refuses an unhashable Matrix as a default.
     look: V3 = field(default_factory=lambda: DEFAULT_LOOK)
@@ -544,7 +437,7 @@ class ViewAxes:
 
     @classmethod
     def from_wire(cls, value) -> 'ViewAxes':
-        """A camera frame as the viewer sends it, or one already built."""
+        """Return a ViewAxes from its wire form (or one already built)."""
         if value is None:
             return DEFAULT_VIEW
         if isinstance(value, cls):
@@ -563,13 +456,7 @@ def pair_separation(
     one: Optional[Geometry], other: Optional[Geometry],
     kind: MeasurementKind, view: Optional[ViewAxes] = None,
 ) -> Optional[float]:
-    """What a distance between these two comes to, FROM THE FEATURES ALONE.
-
-    No anchors. Where a dimension anchors attaches to is a separate question.
-
-    None when the pair measures no length -- an angle, or a pair that admits
-    nothing.
-    """
+    """Return the distance between two features, from the features alone; None for an angle or a pair with no distance."""
     if kind.operation is not MeasurementOperation.DISTANCE:
         return None
     at_one, at_other = _anchor_of(one), _anchor_of(other)
@@ -622,30 +509,17 @@ def measures_nothing(
     one: Optional[Geometry], other: Optional[Geometry],
     kind: MeasurementKind, view: Optional[ViewAxes] = None,
 ) -> bool:
-    """Whether this pair has nothing between them to dimension.
-
-    From the features, not from placed ends: what a distance comes to does not
-    depend on where it is drawn. An arris lying ON a face is the ordinary way
-    to reach this.
-    """
+    """Return whether the pair has nothing between them to dimension (e.g. an arris lying on a face)."""
     gap = pair_separation(one, other, kind, view)
     return gap is not None and gap < DEGENERATE_SEPARATION
 
 
 @dataclass(frozen=True)
 class AngleRays:
-    """Where an angle is, and which two ways it opens.
+    """Where an angle is drawn: a vertex, two unit rays and their plane's normal, in world space.
 
-    A corner, two unit rays from it, and the plane they span, in world space.
-    The viewer sweeps the arc in that plane and projects it, so the arc lies on
-    the work and foreshortens with it -- drawn flat on the screen instead it
-    shows the PROJECTED angle and agrees with its own label from one direction
-    only.
-
-    THE RAYS DECIDE THE VALUE. The angle a reader wants is the one the two
-    features actually subtend -- the corner they make, not its supplement -- so
-    it is read off these rather than off the features' normals, which give the
-    same absolute dot for 45 degrees and 135.
+    The angle's value is read from the rays. `phantoms` are dashed segments extending each feature
+    to the vertex.
     """
 
     vertex: V3
@@ -667,19 +541,14 @@ class AngleRays:
 
 
 def angle_rays(first: MeasureSpan, second: MeasureSpan, flip: bool = False) -> Optional[AngleRays]:
-    """Where an angle between two features is, and which two ways it opens.
+    """Return where an angle between two features is drawn, or None if they make no corner.
 
-    A vertex, two unit rays from it, and the plane they span, in world space -- or None when the
-    pair makes no corner.
-
-    - Two faces: the corner is on the line their planes share, in the middle of where both faces
-      reach along it (the middle of the gap between them where they don't).
-    - A line and a face, or two lines: where they meet, wherever that is. Two lines that never meet
-      (skew) are measured at the first's nearest approach, the second carried over to it.
-    - Each ray opens toward where most of its feature is: a face's area, a line's length.
-    - `flip` measures the other way round the second feature: the supplement.
-
-    Where the corner is off a feature, `phantoms` draw the feature on to it.
+    - Two faces: the vertex is on their planes' crossing line, in the middle of where both reach
+      along it (or of the gap between them).
+    - A line and a face, or two lines: where they meet. Skew lines are measured at the first's
+      nearest approach, with the second carried over.
+    - Each ray points toward the larger part of its feature (a face's area, a line's length).
+    - `flip` reverses the second ray, measuring the supplement.
     """
     if first is None or second is None:
         return None
@@ -724,18 +593,7 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan, flip: bool = False) -> O
         phantoms += ((carried[0], carried[1]),)
     if flip:
         ray_to = -ray_to
-    # The plane the angle is IN: the one both rays lie in, which for two faces
-    # is the plane they are each perpendicular to -- its normal is the corner
-    # they share. Carried so the arc can be swept in it rather than drawn flat
-    # on the screen, where it shows the projected angle and agrees with the
-    # number it labels only from the one direction.
-    # RAW, because what is being asked is how long it is: two rays that barely
-    # cross span no plane worth sweeping an arc in. Normalising first answered a
-    # unit vector made of rounding noise for exactly those, so the test below
-    # could only ever catch two rays that were bit-for-bit parallel. Nothing
-    # reaches it today -- every shape above refuses a near-parallel pair first,
-    # the closest at 0.57 degrees -- so this is the guard behind those, doing
-    # what it says rather than what it did.
+    # The plane both rays lie in. Raw cross, so near-parallel rays are refused.
     upright = _raw_cross(ray_from, ray_to)
     if not any(abs(part) > 1e-9 for part in upright):
         return None
@@ -803,7 +661,7 @@ def _polygon_area(points) -> float:
 
 
 def _clip_ahead(points):
-    """The part of a 2D polygon where x >= 0."""
+    """Return the part of a 2D polygon where x >= 0."""
     kept = []
     for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1]):
         if x0 >= 0:
@@ -884,11 +742,9 @@ def _clamp_to(station: float, interval: Optional[Tuple[float, float]]) -> float:
 
 
 def _line_meets_plane(line: LineSpan, plane: PlaneSpan, keep_on_line: bool = True) -> Optional[V3]:
-    """Where a line crosses a plane: kept within the line's interval, or (not `keep_on_line`) where
-    it really does.
+    """Return where a line crosses a plane, or None if parallel.
 
-    None when it runs flat along the face and so never crosses -- the same
-    contract as geometry.intersect_line_plane.
+    With `keep_on_line`, the crossing is clamped to the line's interval.
     """
     unit, normal = line.along, plane.facing
     if are_vectors_perpendicular(unit, normal, eps=PARALLEL_EPSILON):
@@ -901,7 +757,7 @@ def _line_meets_plane(line: LineSpan, plane: PlaneSpan, keep_on_line: bool = Tru
 
 
 def _flatten_onto(direction: VectorLike, normal: VectorLike) -> Optional[V3]:
-    """The part of a direction that lies in a plane."""
+    """Return the component of `direction` in the plane with normal `normal`."""
     unit, up = _unit(direction), _unit(normal)
     flat = unit - up * _dot(unit, up)
     if not any(abs(part) > 1e-9 for part in flat):
@@ -910,7 +766,7 @@ def _flatten_onto(direction: VectorLike, normal: VectorLike) -> Optional[V3]:
 
 
 def angle_between(rays: Optional[AngleRays]) -> Optional[float]:
-    """The angle the rays open, in degrees. The value a reader sees."""
+    """Return the angle between the rays in degrees."""
     if rays is None:
         return None
     facing = max(-1.0, min(1.0, _dot(_unit(rays.opens_from), _unit(rays.opens_to))))
@@ -918,8 +774,7 @@ def angle_between(rays: Optional[AngleRays]) -> Optional[float]:
 
 
 def slide_axis(line: LineSpan) -> V3:
-    """Which way a dimension between two lines slides: along the lines, the same way whichever end
-    is first -- the first of x, y, z it has any of is positive."""
+    """Return the direction a dimension between two lines slides along, signed so its first non-zero component is positive."""
     run = line.along
     for part in run:
         if abs(float(part)) > 1e-9:
@@ -934,40 +789,13 @@ def distance_anchors(
     view: Optional[ViewAxes] = None,
     along: Optional[float] = None,
 ) -> Tuple[V3, V3]:
-    """Where a distance between these two features attaches, at both ends.
+    """Return the two points where a distance between the features attaches.
 
-    A property of the PAIR and the plane, not of either feature alone. An anchor
-    chosen per feature cannot know where the sensible attachment point is for a
-    given pair -- two parallel edges each anchoring at their own midpoint gave a
-    dimension that leaned if the midpoints were offset along their length.
-
-    PERPENDICULAR, between two parallel lines: both ends sit at one station
-    along the shared direction, which is what makes the line between them square
-    to both. The station is the middle of the overlap of their extents, so the
-    dimension lands where the two features actually face each other. Where they
-    do not overlap there is no such place, so it goes to the end of the FIRST
-    nearest the second, and the other end is projected across from there.
-    `along` (MeasurementPlacement.along) slides that station, along slide_axis;
-    past the end of a line, the viewer draws the line on to its anchor.
-
-    PERPENDICULAR, a point and a line: the point does not move -- it is the
-    whole of what is being measured from -- and the other end is the foot of the
-    perpendicular dropped onto the line.
-
-    PERPENDICULAR, anything and a PLANE: the same rule one step further. The
-    anchor is chosen on whichever feature has less freedom -- a point has none,
-    a line one direction, a plane two -- and dropped onto the other square to
-    it. A face only IS a plane in 3D; on a sheet it is a line seen
-    edge-on and takes the rules above.
-
-    PERPENDICULAR, two points: themselves. With no line to be square to, the
-    distance between them is the distance.
-
-    HORIZONTAL or VERTICAL: the first end stays put and the second is projected
-    onto the axis through it, so the dimension runs along the sheet's own
-    direction and reads the separation in it. Offered only between two points
-    today -- kinds_for lists no other pair for them -- so the two closest points
-    on the two features are the two points.
+    - Perpendicular, two parallel lines: both at one station along them, the middle of their
+      overlap (or the end of the first nearest the second), shifted by `along`.
+    - Perpendicular, otherwise: the end on the feature with less freedom (point, then line, then
+      plane) stays, and the other is its foot on the other feature. Two points are themselves.
+    - Horizontal or vertical: the first end stays and the second is projected onto the axis through it.
 
     TODO I think you can improve the logic a bit here in some cases but it's fine for now.
     """
@@ -980,15 +808,7 @@ def distance_anchors(
         offset = _dot(second.at - at, axis)
         return (first.at, at + axis * offset)
 
-    # A PLANE is measured to by dropping a perpendicular onto it. The anchor is
-    # chosen on whichever feature has less freedom -- a point has none, a line
-    # one direction, a plane two -- and carried to the other square to it. That
-    # is what makes the dimension perpendicular to the face rather than merely
-    # touching it: an edge and the face it runs parallel to were both treated as
-    # lines and put through the shared-station rule, which shares ONE direction,
-    # and the dimension leaned by however far the two were offset in the other.
-    #
-    # Only in 3D: on a sheet a face is a line and never gets here.
+    # To a plane (3D only): anchor on the feature with less freedom, dropped square onto the other.
     if isinstance(first, PlaneSpan) and isinstance(second, PlaneSpan):
         # Parallel faces. Either centroid will do, and the first is the one
         # the reader chose first.
@@ -1026,12 +846,7 @@ def distance_anchors(
 def projected_kinds(
     one: Optional[Geometry], other: Optional[Geometry], look: VectorLike,
 ) -> Tuple[MeasurementKind, ...]:
-    """Which kinds this pair admits, seen from `look`. Empty when none.
-
-    The two halves put together: project both, then ask the table. This is the
-    question "could these two be measured against each other from here", which
-    is what decides whether a feature is worth preferring under the pointer.
-    """
+    """Return the kinds the pair admits when projected along `look`, best first."""
     return _kinds_admitted(project_geometry_for_measuring(one, look),
                            project_geometry_for_measuring(other, look),
                            MeasurementSpace.PROJECTED)
@@ -1040,18 +855,14 @@ def projected_kinds(
 def three_d_kinds(
     one: Optional[Geometry], other: Optional[Geometry],
 ) -> Tuple[MeasurementKind, ...]:
-    """Which kinds this pair admits in the 3D view. Empty when none.
-
-    Nothing is projected first, which is the whole difference: the 3D camera
-    belongs to the reader, so a face there is a plane however it is being seen.
-    """
+    """Return the kinds the pair admits in 3D, best first."""
     return _kinds_admitted(one, other, MeasurementSpace.THREE_D)
 
 
 def _kinds_admitted(
     one: Optional[Geometry], other: Optional[Geometry], space: MeasurementSpace,
 ) -> Tuple[MeasurementKind, ...]:
-    """The table, asked about a pair that is already in the space it is asked in."""
+    """Return the kinds a pair already in the asked space admits."""
     form_one, form_other = form_of(one), form_of(other)
     if form_one is None or form_other is None:
         return ()
@@ -1065,8 +876,7 @@ def kinds_for(
     space: MeasurementSpace,
     parallel: Optional[bool] = None,
 ) -> Tuple[MeasurementKind, ...]:
-    """Which kinds a pair admits, best first. Empty when it admits none. Features are already projected if space is projected
-    """
+    """Return the kinds a pair admits, best first. Projected-space features must already be projected."""
     pair = {feature_a, feature_b}
 
     if MeasurementFeature.AREA in pair:
@@ -1096,18 +906,13 @@ def kinds_for(
             _projected(MeasurementOperation.DISTANCE, MeasurementDirection.HORIZONTAL),
             _projected(MeasurementOperation.DISTANCE, MeasurementDirection.VERTICAL),
         )
-    # Point to line, or two parallel lines. A horizontal or vertical component
-    # is technically available here too and is not offered: it is not what
-    # anyone means by the distance to a line.
+    # Point to line, or two parallel lines.
     return (perpendicular,)
 
 
 @dataclass(frozen=True)
 class MeasurementPlane:
-    """The flat surface a measurement is taken and drawn on.
-
-    The measurement's own property, not the viewport's. If this is a projected measurement in a 2d drawing, the plane is expected to match the drawing viewport's plane (pretty sure we assert or warn on this) 
-    """
+    """The plane a measurement is taken and drawn on. In a drawing viewport it should match the viewport's plane."""
 
     #: A point on the plane, in world space.
     at: V3
@@ -1126,16 +931,7 @@ class MeasurementPlane:
 
     @classmethod
     def from_wire(cls, value) -> 'MeasurementPlaneSpec':
-        """A plane as read from a file, or one already built.
-
-        The same shape as MeasurementKind.from_wire and MeasurementPlacement's,
-        and for the same reason: the field holds a plane, and saying so is only
-        true if the conversion from the file's form happens somewhere that takes
-        the file's form as its argument type.
-
-        Absent on the wire reads as FROM_VIEWPORT, which is what every
-        measurement written without one means.
-        """
+        """Return a plane from its wire form; absent means FROM_VIEWPORT."""
         if value is None:
             return FROM_VIEWPORT
         if isinstance(value, (cls, FromViewport)):
@@ -1150,22 +946,13 @@ class MeasurementPlane:
 
 @dataclass(frozen=True)
 class FromViewport:
-    """Take the plane from the viewport this measurement is drawn in.
+    """Take the plane from the viewport the measurement is drawn in.
 
-    The other half of what a measurement's plane can be, and a named one. It was
-    None, which made the field Optional and left the reader to know that a
-    missing plane means something specific rather than nothing -- a drawing
-    viewport has a locked camera, and a measurement in one is entitled to be
-    read against it.
-
-    Whether a measurement should be ALLOWED to say this is a separate question.
-    A drawing viewport can always answer; the 3D view cannot, because its camera
-    belongs to the reader and turns. The runner refuses a measurement that
-    reaches it with neither -- see `no-plane` in _unplaceable_measurement.
+    Valid only in drawing viewports (locked camera); the runner refuses it in 3D.
     """
 
     def as_wire(self) -> None:
-        """Absent on the wire, which is what the viewer already reads as this."""
+        """Return None (absent on the wire)."""
         return None
 
 
@@ -1179,28 +966,13 @@ MeasurementPlaneSpec = Union[MeasurementPlane, FromViewport]
 
 @dataclass(frozen=True)
 class MeasurementPlacement:
-    """Where the measurement graphic (like the label with the #s on it betwene the 2 lines) is placed
-    """
+    """Where a dimension is drawn: `offset` from the features, `along` them, and `flip` for an angle's supplement."""
 
-    #: How far the dimension line sits from the features, in WORLD units,
-    #: measured along the in-plane perpendicular to the run.
-    #:
-    #: World rather than page or screen, so that where somebody put a dimension
-    #: does not depend on how far they were zoomed in at the time, and so that
-    #: it means the same thing in a drawing viewport and in the 3D view. What
-    #: zoom changes is how big the drawing is, not where on it a dimension was
-    #: placed. Only the drawn SIZE of things -- line weights, text -- is in
-    #: pixels, so that it stays legible at any scale.
-    #:
-    #: None asks the viewport for its own default, which IS a pixel distance:
-    #: there is nothing in the world to derive one from, and an untouched
-    #: dimension sitting a readable distance away at any zoom is the better
-    #: default.
+    #: How far the dimension line sits from the features, in world units, square to the run.
+    #: None uses the viewport's default (in pixels).
     offset: Optional[float] = None
-    #: How far the anchors have been slid along the two features, in WORLD units, from where they
-    #: sit by default (the middle of where the features overlap). Only a distance between two lines
-    #: can slide -- anywhere else the anchors are fixed by the features -- and it reads along
-    #: slide_axis, so it does not depend on which end is which. None is the default.
+    #: How far the anchors are slid along slide_axis from their default, in world units. Only for a
+    #: distance between two lines; None is the default.
     along: Optional[float] = None
     #: An angle measured the other way round its second feature: the supplement of the one it
     #: opens by default (angle_rays). Only an angle has one.
@@ -1208,7 +980,7 @@ class MeasurementPlacement:
 
     @classmethod
     def from_wire(cls, value) -> Optional['MeasurementPlacement']:
-        """A placement as a file or the viewer has it: {"offset", "along", "flip"}, each optional."""
+        """Return a placement from {"offset", "along", "flip"}, each optional."""
         if value is None or isinstance(value, cls):
             return value
         if isinstance(value, Mapping):
@@ -1221,28 +993,15 @@ class MeasurementPlacement:
 
 @dataclass(frozen=True)
 class Measure:
-    """A dimension between two features, drawn in one viewport.
+    """A dimension between two features in one viewport.
 
-    The kind IS part of identity, so the horizontal and the vertical between one
-    pair are two dimensions and both show. The cost, which the editing flow has
-    to know: changing a kind changes identity, so an override cannot edit a code
-    measurement's kind in place -- say it as suppressing the original and adding
-    the new one.
-
-    Identity is the anchors, plus `measure_id` when the same pair is measured
-    more than once in the same viewport -- deliberately not a position in a
-    list, so that a measurement generated by an algorithm keeps whatever the
-    drawings file has said about it when the algorithm next runs and emits a
-    different number of them. It is scoped to the viewport, since that is where
-    a measurement lives.
+    Identity is the two anchors, the kind, and `measure_id` (for the same pair measured more than
+    once). Changing a kind changes identity.
     """
 
     anchor_a: 'FeatureHandle'
     anchor_b: 'FeatureHandle'
-    #: The kind to use, or None for the default. A file's form -- a name, or
-    #: the structured mapping -- goes through MeasurementKind.from_wire first:
-    #: parsing is its own step, and doing it here as well left the declared
-    #: type unable to say which of the two this is.
+    #: The kind, or None for the default. Parse a file's form with MeasurementKind.from_wire.
     kind: Optional[MeasurementKind] = None
     # the measurementId which allows multiple measurements with the same anchors and kind
     measure_id: Optional[MeasurementId] = None
@@ -1250,23 +1009,14 @@ class Measure:
     #: dimension line is not measuring something else.
     placement: Optional[MeasurementPlacement] = None
 
-    #: The plane this is taken and drawn on. Never None: taking the viewport's
-    #: is FROM_VIEWPORT, a case with a name, which is also the default because
-    #: an author writing a measurement has no plane to hand -- the anchors are
-    #: not resolved yet and the normal is the viewport's camera.
-    #:
-    #: Not part of identity: the same two features measured on a different plane
-    #: is the same measurement seen from elsewhere, and giving it a second
-    #: identity would let a file hold both and draw them twice.
+    #: The plane it is taken and drawn on; FROM_VIEWPORT by default. Not part of identity.
     plane: MeasurementPlaneSpec = FROM_VIEWPORT
 
     def wire_anchors(
         self, frame: 'Frame',
     ) -> Optional[Tuple[FeaturePath, FeaturePath, Optional[MeasurementPlacement]]]:
-        """Both anchors as wire paths, in one order, with the placement to match.
-
-        Measuring A to B is measuring B to A, so the pair is sorted and the offset
-        negated if that swapped them. None if either anchor isn't in `frame`.
+        """Return both anchors as wire paths in sorted order, with the placement to match (offset negated if
+        swapped), or None if either isn't in `frame`.
 
         NOTE Some day we may support asymmetric measurements.
         """
@@ -1284,22 +1034,20 @@ class Measure:
 
     @staticmethod
     def kind_identity(kind: Optional['MeasurementKind']) -> Tuple:
-        """
-        """
         if kind is None:
             return ()
         wire = kind.as_wire()
         return (wire["operation"], wire["space"], wire["direction"])
 
     def pair_identity(self, frame: 'Frame') -> Optional[Tuple[Tuple, Tuple]]:
-        """The two anchors' identities, in wire order. None if either isn't in `frame`."""
+        """Return the two anchors' identities in wire order, or None if either isn't in `frame`."""
         anchors = self.wire_anchors(frame)
         if anchors is None:
             return None
         return (anchors[0].identity(), anchors[1].identity())
 
     def identity(self, frame: 'Frame') -> Optional[Tuple[Tuple, Tuple, Tuple, str]]:
-        """The pair, the kind and the id. None if either anchor isn't in `frame`."""
+        """Return (pair, kind, measure_id), or None if either anchor isn't in `frame`."""
         pair = self.pair_identity(frame)
         if pair is None:
             return None
@@ -1307,8 +1055,7 @@ class Measure:
 
 
 class MeasurementSource(Enum):
-    """Where a measurement came from, ordered by what replaces what
-    """
+    """Where a measurement came from; later tiers replace earlier ones."""
 
     #: An algorithm produced it. Replaceable by anything.
     PYTHON_GENERATED = "python_generated"
@@ -1332,25 +1079,10 @@ def does_override(
     existing_source: MeasurementSource,
     frame: 'Frame',
 ) -> bool:
-    """Whether *candidate* replaces *existing*, rather than sitting beside it.
+    """Return whether `candidate` replaces `existing`.
 
-    A tier only replaces one below it: two measurements from the same tier are
-    two measurements, however alike, and a lower tier never displaces a higher.
-
-    What counts as the same measurement depends on which tier is asking, and
-    the difference is the kind:
-
-    - A FILE_OVERRIDE matches on everything, kind included. It was written
-      against a particular measurement -- the horizontal one, say -- and the
-      vertical between the same two features is a different dimension it was
-      never about. Changing a kind is therefore not an edit but a different
-      measurement, said as suppressing one and adding another.
-
-    - Anything else matches on the two features alone. A person writing a
-      measurement in code is overruling what an algorithm proposed for that
-      pair, and would have to guess the generated kind to say so otherwise --
-      which is exactly the sort of thing that stops working when the algorithm
-      is next changed.
+    Only a higher tier replaces. A FILE_OVERRIDE matches on everything including the kind; other
+    tiers match on the two features alone.
     """
     candidate_identity, candidate_pair = candidate.identity(frame), candidate.pair_identity(frame)
     existing_identity, existing_pair = existing.identity(frame), existing.pair_identity(frame)
@@ -1371,11 +1103,7 @@ def does_override_identities(
     existing_pair: Tuple,
     existing_source: MeasurementSource,
 ) -> bool:
-    """does_override, for a caller holding identities rather than Measures.
-
-    The viewer reads measurements out of a file as plain dictionaries and never
-    builds a Measure from them, so the rule lives here where both can reach it.
-    """
+    """does_override, for identities rather than Measures (the viewer reads plain dicts)."""
     if _SOURCE_RANK[candidate_source] <= _SOURCE_RANK[existing_source]:
         return False
     if candidate_source is MeasurementSource.FILE_OVERRIDE:

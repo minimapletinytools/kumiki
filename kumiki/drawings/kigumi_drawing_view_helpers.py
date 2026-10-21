@@ -1,6 +1,4 @@
-"""Camera helpers for kigumi's drawing views: which way each view looks, and how much of the model
-it shows. World space, as lists of floats; the runner turns these into viewports.
-"""
+"""Camera helpers for kigumi's drawing views: which way each view looks and how much of the model it shows. World space, as float lists."""
 
 import math
 import warnings
@@ -27,8 +25,7 @@ _PIECE_LOOK_IN_BOX = (0.38, 0.86, -0.55)
 
 @dataclass(frozen=True)
 class CameraFrame:
-    """Which way a camera looks, and which way is across and up its screen. right x up == -look,
-    the frame of a camera looking down its own -Z, which keeps the view from coming out mirrored."""
+    """A camera's look direction and screen right and up, with right x up == -look (not mirrored)."""
     right: FloatList3
     up: FloatList3
     look: FloatList3
@@ -42,20 +39,18 @@ def _cross(a: FloatList3, b: FloatList3) -> FloatList3:
 
 
 def normalize(vec: FloatList3) -> FloatList3:
-    """At length one; a zero vector is taken as up."""
+    """Return `vector` at unit length; a zero vector becomes up."""
     length = math.sqrt(sum(component * component for component in vec))
     return [component / length for component in vec] if length > 0 else [0.0, 0.0, 1.0]
 
 
 def camera_looking_at_face(normal: FloatList3, along: FloatList3) -> CameraFrame:
-    """Square-on to a face, with `along` (a timber's length) across the screen. The camera sits
-    outside the face along its outward normal and looks back at it."""
+    """Return a camera square-on to a face from outside it, with `along` across the screen."""
     return CameraFrame(right=list(along), up=_cross(normal, along), look=[-component for component in normal])
 
 
 def camera_frame_looking(look: FloatList3) -> CameraFrame:
-    """Looking along `look`, kept upright: `up` is world Z with the part along the view taken out,
-    which stops a three-quarter view arriving on its side."""
+    """Return a camera looking along `look` with world Z as up (minus its part along the view)."""
     forward = normalize(look)
     world_up = [0.0, 0.0, 1.0]
     along = sum(world_up[i] * forward[i] for i in range(3))
@@ -64,8 +59,7 @@ def camera_frame_looking(look: FloatList3) -> CameraFrame:
 
 
 def frame_from_look_and_up(look: FloatList3, up_hint: FloatList3) -> CameraFrame:
-    """Looking along `look`, as close to `up_hint` as it can; upright when the hint is along the
-    view, where it says nothing about which way is up."""
+    """Return a camera looking along `look`, up as close to `up_hint` as possible."""
     forward = normalize(look)
     along = sum(up_hint[i] * forward[i] for i in range(3))
     up = [up_hint[i] - along * forward[i] for i in range(3)]
@@ -78,11 +72,7 @@ def frame_from_look_and_up(look: FloatList3, up_hint: FloatList3) -> CameraFrame
 # --- what a view is fitted to -----------------------------------------------------------------
 
 def cut_extent(cut_timber: 'CutTimber', stock_length: float) -> Tuple[float, float]:
-    """Where the finished piece starts and ends along its own length.
-
-    A timber with an end joint is not cut to length first, so its stock is not the piece that gets
-    drawn: framing a view on the stock leaves the piece off centre by whatever the joint took off.
-    """
+    """Return where the finished piece starts and ends along the timber's length (not its stock)."""
     try:
         prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
         start = float(prism.start_distance) if prism.start_distance is not None else 0.0
@@ -98,7 +88,7 @@ def _floats(vec) -> FloatList3:
 
 
 def timber_world_corners(cut_timber: 'CutTimber') -> List[FloatList3]:
-    """The 8 corners of a timber's finished piece, in world space."""
+    """Return the 8 world corners of a timber's finished piece."""
     timber = cut_timber.timber
     origin = _floats(timber.get_bottom_position_global())
     along = _floats(timber.get_length_direction_global())
@@ -112,7 +102,7 @@ def timber_world_corners(cut_timber: 'CutTimber') -> List[FloatList3]:
 
 
 def world_bounds(cut_timbers: Sequence['CutTimber']) -> Tuple[FloatList3, FloatList3]:
-    """(centre, half_size) of the finished pieces, world-aligned; a unit box if there are none."""
+    """Return (centre, half_size) of the finished pieces' world-aligned box; a unit box if there are none."""
     lows = [float("inf")] * 3
     highs = [float("-inf")] * 3
     for cut_timber in cut_timbers:
@@ -127,11 +117,7 @@ def world_bounds(cut_timbers: Sequence['CutTimber']) -> Tuple[FloatList3, FloatL
 
 
 def view_extent(half_size: FloatList3, right: FloatList3, up: FloatList3, aspect: float = 1.0) -> float:
-    """Half-height that fits a world-aligned box in a view with these screen axes.
-
-    The viewer widens the frustum from the half-height by the viewport's aspect, so the width the
-    box needs is divided by that aspect before the two are compared.
-    """
+    """Return the half-height that fits a world-aligned box in a view with these screen axes and aspect."""
     def projected(axis: FloatList3) -> float:
         return sum(abs(axis[i]) * half_size[i] for i in range(3))
 
@@ -141,25 +127,19 @@ def view_extent(half_size: FloatList3, right: FloatList3, up: FloatList3, aspect
 
 
 class OrientedBox(NamedTuple):
-    """A box in the world: where it is, which way it lies, and how big it is.
-
-    Not an axis-aligned bounding box. A single timber has its own axes and is usually not square to
-    the world; orienting a view around its true box is the difference between seeing the piece and
-    seeing the space it takes up.
-    """
+    """A box with its own axes: centre, axes and half sizes."""
 
     centre: FloatList3
     axes: Tuple[FloatList3, FloatList3, FloatList3]
     half_sizes: Tuple[float, float, float]
 
     def reach(self, direction: FloatList3) -> float:
-        """How far the box extends along a direction, from its centre."""
+        """Return how far the box extends along `direction` from its centre."""
         return sum(abs(sum(direction[i] * self.axes[axis][i] for i in range(3))) * self.half_sizes[axis]
                    for axis in range(3))
 
     def silhouette_area(self, look: FloatList3) -> float:
-        """How much of the box a viewer sees looking along `look`: each face pair's area, scaled by
-        how squarely it faces the camera."""
+        """Return the box's projected area looking along `look`."""
         a, b, c = self.half_sizes
         areas = (4 * b * c, 4 * a * c, 4 * a * b)
         return sum(abs(sum(look[i] * self.axes[axis][i] for i in range(3))) * areas[axis] for axis in range(3))
@@ -170,13 +150,13 @@ class OrientedBox(NamedTuple):
 
 
 def world_box(centre: FloatList3, half_size: FloatList3) -> OrientedBox:
-    """The world-aligned box a group of members occupies."""
+    """Return the world-aligned box of a group of members."""
     return OrientedBox(centre=centre, axes=([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]),
                        half_sizes=(half_size[0], half_size[1], half_size[2]))
 
 
 def timber_box(cut_timber: 'CutTimber') -> OrientedBox:
-    """One timber's own box: its axes, its section, and its cut extent (not its stock)."""
+    """Return a timber's own box: its axes, section and cut extent."""
     timber = cut_timber.timber
     along = _floats(timber.get_length_direction_global())
     across = _floats(timber.get_width_direction_global())
@@ -189,7 +169,7 @@ def timber_box(cut_timber: 'CutTimber') -> OrientedBox:
 
 
 def preview_extent(box: OrientedBox, frame: CameraFrame, aspect: float) -> float:
-    """How much of the world the preview has to hold, at this angle."""
+    """Return the half-height the preview needs at this camera."""
     needed = max(box.reach(frame.up), box.reach(frame.right) / aspect)
     return max(0.001, needed * PREVIEW_EXTENT_PADDING)
 
@@ -213,18 +193,10 @@ def _preview_look_candidates() -> List[FloatList3]:
 
 
 def orient_by_search(box: OrientedBox, aspect: float, preserve_up: bool = True) -> CameraFrame:
-    """Try a few dozen angles and keep the one that shows the piece best.
+    """Return the camera, among a few dozen candidates, that shows the box best.
 
-    What is maximized is how long the box's longest axis appears once the view is sized to fit it.
-    How much of the viewport the silhouette fills would always be won by looking down the length of
-    the piece, which fits beautifully and shows nothing. Two angles that show it equally long are
-    told apart by which shows more of it, so a square-on view loses to a three-quarter one.
-
-    With `preserve_up` the candidates are upright, so world +Z stays up the screen: a frame read at
-    a tilt is harder to follow than one drawn slightly smaller.
-
-    There is very likely a closed form. Guessing and checking is fine: a few dozen candidates against
-    one box, once per drawing, and the scoring can be changed by reading it.
+    Maximizes the apparent length of the box's longest axis once fitted, then the silhouette area.
+    With `preserve_up`, candidates keep world +Z up.
     """
     longest = box.half_sizes[box.longest_axis]
     axis = box.axes[box.longest_axis]
@@ -253,12 +225,7 @@ def orient_by_search(box: OrientedBox, aspect: float, preserve_up: bool = True) 
 
 
 def orient_from_box(box: OrientedBox, aspect: float) -> CameraFrame:
-    """Look at a box from a fixed three-quarter angle in its own frame.
-
-    For a single piece the box is the timber, so the angle that shows it well is the same every
-    time in its own axes: a post and a brace at forty degrees get the same view of themselves. The
-    piece is laid along whichever way the viewport is longer.
-    """
+    """Return a fixed three-quarter view in the box's own frame, laying the piece along the viewport's longer side."""
     length, across, up = box.axes
     look = normalize([length[i] * _PIECE_LOOK_IN_BOX[0] + across[i] * _PIECE_LOOK_IN_BOX[1]
                       + up[i] * _PIECE_LOOK_IN_BOX[2] for i in range(3)])

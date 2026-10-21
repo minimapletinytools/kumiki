@@ -1,8 +1,7 @@
-"""Auto dimensioning: pick measurements one at a time until the target features are solved.
+"""Auto dimensioning: add measurements one at a time until the target features are solved.
 
-Every pick is one measurement, so it removes one unknown at most and the count can't choose
-between candidates. A Policy does: ordered preferences, compared one after another, and rules
-that are kept unless nothing would be left to pick.
+Each pick removes at most one unknown, so a Policy chooses between candidates: ordered
+preferences, and rules that hold unless no candidate would pass them.
 
 Temporary, and expected to be renamed.
 """
@@ -35,11 +34,7 @@ COINCIDENT = 1e-9
 
 @dataclass(frozen=True)
 class DimensionCandidate:
-    """A measurement that could be added, in the view named `view`, with its length.
-
-    Its row is worked out only when asked for, and kept by the solve: that is the dear part, and most
-    candidates are never looked at closely enough to need one.
-    """
+    """A measurement that could be added, in view `view`, with its length. Its row is computed lazily."""
     view: str
     measure: Measure
     length: float
@@ -49,7 +44,7 @@ class DimensionCandidate:
 
     @property
     def row(self) -> Optional[Row]:
-        """What the measurement fixes (measure_row), or None where it cannot be written as a row."""
+        """Return the measurement's row (cached by the solve), or None if it can't be written as one."""
         try:
             return self.solve.row(self.measure, self.axes)
         except ValueError:
@@ -58,7 +53,7 @@ class DimensionCandidate:
 
 @dataclass(frozen=True)
 class PickContext:
-    """What a criterion may ask about while choosing."""
+    """What a criterion can read while choosing."""
     solved: Callable[[FeatureHandle], bool]
     picks: Sequence['Pick']
 
@@ -68,20 +63,19 @@ Criterion = Callable[[DimensionCandidate, PickContext], float]
 
 
 def fixed(criterion: Criterion) -> Criterion:
-    """Mark a criterion whose score never changes as picks are made (it reads nothing of the
-    context), so auto_dimension scores each candidate by it once."""
+    """Mark a criterion as independent of the context, so auto_dimension scores it once per candidate."""
     setattr(criterion, "fixed", True)
     return criterion
 
 
 def is_reference(handle: FeatureHandle) -> bool:
-    """Whether the feature is one of its timber's reference features, or a face of a reference edge."""
+    """Return whether the feature is one of its timber's reference features, or a face of a reference edge."""
     return handle.feature.name.split(".", 1)[-1] in _reference_names(handle.timber)
 
 
 @memo_by_identity
 def _reference_names(timber) -> FrozenSet[str]:
-    """The names of a timber's reference features' faces and centerplanes, without their prefix."""
+    """Return the unprefixed names of a timber's reference faces and centerplanes."""
     names = set()
     for reference in getattr(timber.ticket, "reference_features", ()) or ():
         names |= {face.name.lower() for face in reference.long_faces_it_rests_on()}
@@ -102,18 +96,18 @@ def _ends(candidate: DimensionCandidate) -> Tuple[FeatureHandle, FeatureHandle]:
 
 @fixed
 def from_reference(candidate: DimensionCandidate, context: PickContext) -> float:
-    """Measured from a reference feature of its own timber."""
+    """Criterion: measured from a reference feature of its own timber."""
     return 0.0 if any(is_reference(end) for end in _ends(candidate)) else 1.0
 
 
 def from_solved(candidate: DimensionCandidate, context: PickContext) -> float:
-    """Measured from something already solved, so dimensions chain."""
+    """Criterion: measured from an already solved feature."""
     return 0.0 if any(context.solved(end) for end in _ends(candidate)) else 1.0
 
 
 @fixed
 def perfect_over_rough(candidate: DimensionCandidate, context: PickContext) -> float:
-    """How many ends are rough faces."""
+    """Criterion: how many ends are rough faces."""
     return float(sum(end.feature.name.startswith("rough.") for end in _ends(candidate)))
 
 
@@ -124,11 +118,10 @@ def shortest(candidate: DimensionCandidate, context: PickContext) -> float:
 
 @dataclass(frozen=True)
 class Policy:
-    """How to choose among the measurements that would help.
+    """How to choose among helpful candidates.
 
-    `prefer` is compared in order: the first criterion that tells two candidates apart decides.
-    `rules` must score 0 to be picked, unless no helpful candidate would pass them, in which case
-    that one pick ignores them and says so.
+    `prefer` criteria are compared in order until one separates two candidates. `rules` must score
+    0, unless no helpful candidate passes them; then one pick ignores them and warns.
     """
     prefer: Sequence[Criterion] = (from_reference, perfect_over_rough, from_solved, shortest)
     rules: Sequence[Criterion] = ()
@@ -145,7 +138,7 @@ class Pick:
 
 
 class UnsolvedFeaturesWarning(UserWarning):
-    """auto_dimension left features unsolved: nothing its candidates measure fixes them."""
+    """auto_dimension left features unsolved: no candidate fixes them."""
 
 
 @dataclass(frozen=True)
@@ -171,7 +164,7 @@ def auto_dimension(
 ) -> AutoDimensioning:
     """Pick from `candidates` until `targets` are solved or nothing more helps.
 
-    `known_rows` is what is already known: fixed features' rows, assumptions.
+    `known_rows` are rows already known (fixed features, assumptions).
     """
     target_rows = [row for handle in targets for row in solve.dof_rows(handle)]
     columns = list(dict.fromkeys(column for row in (*known_rows, *target_rows) for column in row))
@@ -294,9 +287,9 @@ def auto_dimension(
 
 
 def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[SheetShape]:
-    """How a feature draws, looking along `look`, in world space (sheet_shape): a line for a face
-    seen edge-on or a line lying along the sheet, a point for a line seen end-on, None for anything
-    else. A line slanting into the sheet draws foreshortened, so nothing is measured along it.
+    """Return how a feature draws looking along `look` (sheet_shape), or None.
+
+    A line for an edge-on face or a line in the sheet's plane; a point for a line end-on.
     """
     located = handle.feature.locate_simple_unbounded(handle.owner)
     if not isinstance(located, (Line, Plane)):
@@ -317,26 +310,24 @@ def _on_sheet(handle: FeatureHandle, look: np.ndarray) -> Optional[SheetShape]:
 
 
 def _separation(one: SheetShape, other: SheetShape, look: np.ndarray) -> Optional[float]:
-    """Perpendicular distance on the sheet between two drawn features, or None if there is none to
-    take: two points have none (a horizontal or vertical one is a different kind)."""
+    """Return the perpendicular distance on the sheet between two drawn features, or None (e.g. two points)."""
     if isinstance(one, SheetPoint) and isinstance(other, SheetPoint):
         return None
     return sheet_gap(one, other, look)
 
 
 def _across(line: SheetLine, look: np.ndarray) -> np.ndarray:
-    """The direction across a line on the sheet."""
+    """Return the in-sheet direction square to a drawn line."""
     return unit_ndarray(np.cross(line.run, look))
 
 
 def sheet_candidates(
     anchors: Mapping[str, Sequence[FeatureHandle]], views: Mapping[str, ViewAxes], solve: DrawingSolve,
 ) -> List[DimensionCandidate]:
-    """Every perpendicular dimension a view can draw between two of the anchors it can see.
+    """Return every perpendicular dimension a view can draw between anchors it can see.
 
-    Between two parallel lines on the sheet (a face seen edge-on, a line lying along the sheet), or
-    from a point (a line seen end-on) to a line. `anchors` are each view's own: what it can see of
-    them (visibility.visible_by_view), so nothing is measured in a view that hides it.
+    Between two parallel drawn lines, or from a drawn point to a line. `anchors` are per view
+    (visibility.visible_by_view).
     """
     candidates = []
     for view, axes in views.items():
@@ -357,13 +348,10 @@ def sheet_candidates(
 def coincidence_assumptions(
     anchors: Mapping[str, Sequence[FeatureHandle]], views: Mapping[str, ViewAxes], solve: DrawingSolve,
 ) -> List[Assumption]:
-    """What a view shows without a dimension: features it draws one on top of the other.
+    """Return assumptions for features a view draws on top of each other (flush faces, a point on a line).
 
-    Two lines on one line of the sheet (faces seen edge-on, flush), a point on a line, two points on
-    one spot: a reader sees they line up, so the distance between them across the sheet is known --
-    the row a zero dimension would add. Only what each view can see (`anchors`, as for
-    sheet_candidates): a hidden feature draws nothing to line up with. Features on one line or spot
-    are chained to the first of them rather than paired with each other.
+    Their distance across the sheet is known without a dimension. Features on one line or spot are
+    chained to the first.
     """
     assumptions: List[Assumption] = []
 

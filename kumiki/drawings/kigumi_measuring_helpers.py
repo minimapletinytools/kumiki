@@ -1,6 +1,5 @@
-"""Measuring helpers for kigumi: for two features, the plane a measurement is taken on, which
-kinds it can be, where it attaches and its value. The runner uses these for both a pick's preview
-and a saved measurement.
+"""Measuring helpers for the kigumi runner: for two features, the plane a measurement is taken on,
+its possible kinds, where it attaches and its value. Used for pick previews and saved measurements.
 """
 
 from dataclasses import dataclass, replace
@@ -22,12 +21,7 @@ Located = Union[Point, Line, Plane]
 
 
 def world_geometry(handle: FeatureHandle) -> Optional[Located]:
-    """A feature's unbounded geometry, carried out of its timber's frame into the world's.
-
-    A plane keeps its normal and a line its direction, since those decide whether two features are
-    parallel once projected. Plane, not whatever subclass it was located as: an UnsignedPlane is a
-    fact about the cut that declared it, not about what is measured to.
-    """
+    """Return a feature's unbounded geometry in world space (a plain Plane, Line or Point)."""
     located = handle.feature.locate_simple_unbounded(handle.owner)
     transform = handle.timber.transform
     if isinstance(located, Point):
@@ -42,9 +36,7 @@ def world_geometry(handle: FeatureHandle) -> Optional[Located]:
 
 
 def feature_anchor(handle: FeatureHandle, root: Optional[CutCSG] = None) -> Optional[V3]:
-    """Where to attach a dimension to a feature, in world space: its extent's anchor, cropped to
-    the cut timber `root` when given. Falls back to the declared extent where the feature cannot be
-    placed (a curved primitive): somewhere approximate beats nowhere."""
+    """Return where a dimension attaches to a feature, in world space: its extent's anchor on `root`, else its declared extent's."""
     timber = handle.timber
     extents = extents_of(root, timber) if root is not None else FeatureExtents(None, timber)
     extent = extents.of(handle.feature, handle.owner)
@@ -57,8 +49,7 @@ def feature_anchor(handle: FeatureHandle, root: Optional[CutCSG] = None) -> Opti
 
 def kinds_for_pair(one: Optional[Located], other: Optional[Located], look, space: MeasurementSpace,
                    ) -> Tuple[MeasurementKind, ...]:
-    """What a pair admits, in the space the view is in. In 3D a face is a plane, whatever it looks
-    like from here: two faces meeting at a corner admit an angle, two parallel ones a distance."""
+    """Return the kinds a pair admits in the view's space (in 3D a face is a plane)."""
     if space is MeasurementSpace.THREE_D:
         return three_d_kinds(one, other)
     return projected_kinds(one, other, look)
@@ -73,9 +64,9 @@ def _unit(vector) -> np.ndarray:
 
 
 def _plane_constraints(one: Optional[Located], other: Optional[Located]) -> list:
-    """Directions the plane's normal has to be square to, in the spec's priority order: square to a
-    measured face's normal, to a measured edge's run, and -- only when both ends are points, since
-    one point says where the plane sits and not which way it faces -- to the line between them."""
+    """Return directions the measurement plane's normal must be square to, in priority order:
+    a measured face's normal, a measured edge's direction, and (only for two points) the line between them.
+    """
     constraints = []
     for geometry in (one, other):
         if isinstance(geometry, Plane):
@@ -88,12 +79,8 @@ def _plane_constraints(one: Optional[Located], other: Optional[Located]) -> list
 
 
 def _plane_normal(constraints: list, look) -> Optional[np.ndarray]:
-    """A normal square to every constraint, and otherwise as close to `look` as it can be, so the
-    dimension is drawn as nearly face-on as its constraints allow.
-
-    Two constraints can always be met (their cross product, or the one-constraint case when they
-    are parallel); None only when there is no direction left to choose, the cue to fall back to the
-    camera's own plane.
+    """Return a normal square to every constraint and otherwise closest to `look`, or None if
+    the constraints leave no direction (use the camera's plane).
     """
     gaze = _unit(look)
     distinct: list = []
@@ -122,13 +109,10 @@ def _plane_normal(constraints: list, look) -> Optional[np.ndarray]:
 
 def measurement_plane(one: Optional[Located], other: Optional[Located], at_one, at_other, look,
                       in_view_plane: bool = False) -> MeasurementPlane:
-    """Where a measurement between these two features is taken and drawn.
+    """Return the plane a measurement between two features is taken on.
 
-    `look` is the camera's direction when it was made, which settles whatever the features leave
-    free. Through a measured point if there is one, since the plane has to contain it; otherwise
-    midway between the anchors, among what it measures. `in_view_plane` for a drawing's view: the
-    view's own plane, whatever the features -- held to them, an edge running into the sheet tilted
-    it, and the measurement refused the view it was made in.
+    `look` settles what the features leave free. Through a measured point if there is one, else
+    midway between the anchors. With `in_view_plane`, the view's own plane.
     """
     normal = None if in_view_plane else _plane_normal(_plane_constraints(one, other), look)
     if normal is None:
@@ -145,8 +129,7 @@ def measurement_plane(one: Optional[Located], other: Optional[Located], at_one, 
 
 @dataclass(frozen=True)
 class EndForm:
-    """What one end behaves as: "plane", "line", "point", or "area" / "none" for nothing to measure
-    to. A plane carries its unit normal, a line its unit direction."""
+    """What one end acts as: "plane", "line", "point", or "area" / "none". Planes carry a unit normal, lines a unit direction."""
     form: str
     normal: Optional[V3] = None
     direction: Optional[V3] = None
@@ -154,11 +137,7 @@ class EndForm:
 
 @dataclass(frozen=True)
 class Settled:
-    """What a measurement comes to, decided once and sent with it.
-
-    `reason` is why there is nothing to draw, in the words and order the viewer uses: a row that
-    says why and a dimension that is missing cannot disagree.
-    """
+    """A measurement's value, or `reason` (in the viewer's words) why there is nothing to draw."""
     kind: Optional[MeasurementKind]
     available: Tuple[str, ...]
     space: Optional[str]
@@ -171,7 +150,7 @@ class Settled:
 
 
 def end_form(geometry: Optional[Located], in_three_d: bool, plane) -> EndForm:
-    """What one end behaves as, judged on the measurement's plane."""
+    """Return what one end acts as on the measurement's plane."""
     if not in_three_d:
         seen = project_geometry_for_measuring(geometry, plane)
         if seen is None:
@@ -189,8 +168,7 @@ def end_form(geometry: Optional[Located], in_three_d: bool, plane) -> EndForm:
 def settle(one: Optional[Located], other: Optional[Located], rays: Optional[AngleRays],
            declared: Optional[MeasurementKind], kind: Optional[MeasurementKind],
            admitted: Sequence[MeasurementKind], in_three_d: bool, plane, view: Optional[ViewAxes]) -> Settled:
-    """What a measurement comes to, against its own plane -- not the camera, so it does not change
-    when the reader turns. Whether the view drawing it IS that plane is the viewer's to say."""
+    """Return a measurement's value judged on its own plane (not the camera's)."""
     names = tuple(one_kind.name for one_kind in admitted)
     settled = Settled(kind=kind, available=names, space="3d" if in_three_d else "projected",
                       a=end_form(one, in_three_d, plane), b=end_form(other, in_three_d, plane))
@@ -213,20 +191,17 @@ def settle(one: Optional[Located], other: Optional[Located], rays: Optional[Angl
 
 
 def unplaceable(has_plane: bool) -> Settled:
-    """A measurement both of whose ends were found that still cannot be worked out: no plane to
-    judge it on, or an end with no extent."""
+    """Return a Settled for a measurement whose ends exist but can't be worked out (no plane, or an end with no extent)."""
     return Settled(kind=None, available=(), space=None, reason="no-span" if has_plane else "no-plane")
 
 
 @dataclass(frozen=True)
 class PairPlacement:
-    """Where a measurement between two features sits, and what it comes to: anchors for a distance,
-    a corner for an angle, neither when the pair admits nothing.
+    """Where a measurement between two features is drawn, and its value: anchors for a distance, a corner
+    for an angle, neither if the pair admits nothing.
 
-    `extents`, for a distance, are each end's line as far as the feature goes, (start, end) in world
-    space, or None for a point or a plane: where an anchor is past them, the viewer draws the line
-    on to it. `slide` is the direction the anchors slide in (MeasurementPlacement.along), for a
-    distance between two lines; None where they cannot slide.
+    `extents` are each end's line segment (or None), so the viewer can extend a line to an anchor past
+    it. `slide` is the direction a distance between two lines slides in, else None.
     """
     kind: Optional[MeasurementKind]
     admitted: Tuple[MeasurementKind, ...]
@@ -247,13 +222,7 @@ def _extent(span: MeasureSpan) -> Optional[Tuple[V3, V3]]:
 def place_pair(one: Optional[Located], other: Optional[Located], one_span: MeasureSpan, other_span: MeasureSpan,
                declared: Optional[MeasurementKind], plane, view: Optional[ViewAxes], in_three_d: bool,
                along: Optional[float] = None, flip: bool = False) -> PairPlacement:
-    """Where a measurement between two features attaches, and what it comes to.
-
-    The two ends together: where a dimension attaches is a property of the pair and its plane, and
-    two parallel edges each taking their own middle gave a dimension that leaned. Its kind is the
-    one declared, or the best the pair admits from here -- placed for the measurement that will be
-    drawn, since two crossing faces admit an angle and nothing else.
-    """
+    """Return where a measurement between two features attaches and its value, using the declared kind or the best the pair admits."""
     admitted = (three_d_kinds(one, other) if in_three_d else projected_kinds(one, other, plane))
     kind = declared or (admitted[0] if admitted else None)
     anchors, rays, slide, extents = None, None, None, (None, None)
@@ -272,8 +241,7 @@ def place_pair(one: Optional[Located], other: Optional[Located], one_span: Measu
 
 @dataclass(frozen=True)
 class Verdict:
-    """What a measurement to a pick would be: the kinds the pair admits, best first, and the plane
-    it would be taken on -- or, with no kinds, why not (`reason`)."""
+    """Whether a measurement to a pick could be made: its kinds best first and its plane, or `reason` why not."""
     kinds: Tuple[MeasurementKind, ...]
     plane: Optional[MeasurementPlane]
     reason: Optional[str]
@@ -281,11 +249,10 @@ class Verdict:
 
 def pick_verdict(held: Optional[Located], picked: Optional[Located], plane: Optional[MeasurementPlane],
                  look, space: MeasurementSpace, view: ViewAxes) -> Verdict:
-    """Whether a measurement from the held feature to the picked one could be made, and as what.
+    """Return whether a measurement from the held feature to `picked` could be made, and as what.
 
-    `picked` is None for a pick that is not measurable (a cylinder's barrel). A kind that would come
-    to nothing is not admitted, asked of the features rather than placed ends, and per kind: two
-    points one above the other have a vertical distance and no horizontal one.
+    `picked` is None for an unmeasurable pick (a cylinder's barrel). Kinds that would measure zero
+    are excluded per kind.
     """
     if picked is None:
         return Verdict((), None, "not-measurable")
