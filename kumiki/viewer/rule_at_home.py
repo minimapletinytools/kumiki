@@ -1,11 +1,6 @@
-"""Plain-float math for the live viewer's hot path, standing in for rule.py there and only there.
+"""Plain-float math for the viewer's picking hot path, in place of rule.py's V3.
 
-The math types here exist only to be used over rule.py's on the hot path inside live viewer code:
-picking runs on every hover, over every feature of a timber, and rule.py's V3 -- a Matrix -- costs
-far more per operation than floats in a tuple. Everywhere else, use rule.py. Convert at the edges:
-Float3.of(a V3 or a list from the wire), and .v3() back.
-
-A Float3 is a tuple, so it goes to the viewer as a JSON array as it is.
+Use rule.py everywhere else. Convert at the edges: Float3.of(V3 or list), and .v3().
 """
 
 import math
@@ -18,14 +13,14 @@ FloatList3 = List[float]
 
 
 class Float3(NamedTuple):
-    """A point or direction as three floats."""
+    """A point or direction as three floats (a tuple, so JSON-serializable)."""
     x: float
     y: float
     z: float
 
     @staticmethod
     def of(vector) -> 'Float3':
-        """From a V3 (a 3x1 Matrix) or any three numbers, such as a list off the wire."""
+        """Return a Float3 from a V3 or any three numbers."""
         try:
             return Float3(float(vector[0, 0]), float(vector[1, 0]), float(vector[2, 0]))
         except (TypeError, IndexError, KeyError):
@@ -61,12 +56,12 @@ class Float3(NamedTuple):
         return (self - other).length()
 
     def unit(self) -> Optional['Float3']:
-        """This direction at length one, or None when it has no length."""
+        """Return this direction normalized, or None if zero."""
         length = self.length()
         return None if length < 1e-12 else self * (1.0 / length)
 
     def across(self, direction: 'Float3') -> 'Float3':
-        """The part of this square to a unit *direction*: what it is once flattened along it."""
+        """Return the component square to unit `direction`."""
         return self - direction * self.dot(direction)
 
 

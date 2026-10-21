@@ -1,11 +1,8 @@
-"""Picking: what a point or a ray on a cut timber lands on, and what to light for it.
+"""Picking: what a point or ray on a cut timber lands on, and what to highlight for it.
 
-Navigating a timber's CSG tree to the node under a click, the features there, the edges and
-features a ray passes near, and the triangles of the rendered mesh that belong to a picked
-node or feature. Geometry only: kigumi's runner turns the answers into wire forms.
-
-Moved out of kigumi/runner.py, where it was written. Points and directions are Float3
-(rule_at_home.py) rather than rule.py's V3 on the hot paths, since these run on every hover.
+Finds the node and features under a click, the features a ray passes near, and the rendered
+triangles or segments to light for a picked node or feature. Geometry only; kigumi's runner builds
+the wire forms. Hot paths use Float3 (rule_at_home.py) rather than V3.
 """
 
 import math
@@ -33,24 +30,19 @@ class WorldSegment(TypedDict):
 
 
 def build_inv_transform_float(transform: 'Transform') -> Tuple[Rows3, Float3]:
-    """Pre-compute float data for global→local.  Returns (rot_rows, position).
-    local = R^T * (global - pos) where rot_rows is the FORWARD rotation matrix."""
+    """Return (rot_rows, position) as floats for global-to-local transforms: local = R^T (global - pos)."""
     M = transform.orientation.matrix
     rot = tuple(Float3(float(M[r, 0]), float(M[r, 1]), float(M[r, 2])) for r in range(3))
     return rot, Float3.of(transform.position)  # type: ignore[return-value]
 
 
 def inv_transform_point(rot: Rows3, pos: Float3, global_pt) -> Float3:
-    """Apply inverse transform: local = R^T * (global_pt - pos)."""
+    """Return `global_pt` in local space: R^T (global_pt - pos)."""
     return inv_transform_direction(rot, Float3.of(global_pt) - pos)
 
 
 def inv_transform_direction(rot: Rows3, global_dir) -> Float3:
-    """Apply inverse transform to a DIRECTION: local = R^T * d, no translation.
-
-    A direction has no position, so the offset that inv_transform_point applies
-    would tilt it. Kept beside that one so the pair is read together.
-    """
+    """Return direction `d` in local space: R^T d."""
     d = Float3.of(global_dir)
     return Float3(rot[0][0]*d.x + rot[1][0]*d.y + rot[2][0]*d.z,
                   rot[0][1]*d.x + rot[1][1]*d.y + rot[2][1]*d.z,
@@ -58,9 +50,7 @@ def inv_transform_direction(rot: Rows3, global_dir) -> Float3:
 
 
 def subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
-    """Whether *target* is *root* or somewhere beneath it.
-
-    """
+    """Return whether `target` is `root` or below it."""
     from kumiki.csg.cutcsg import csg_children
 
     # note this is identity comparison, not quality as 2 CutCSGs can be `==` equivalent but not the same
@@ -70,27 +60,17 @@ def subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
 
 
 def to_v3(pt) -> 'V3':
-    """Wrap a plain [x, y, z] in the V3 kumiki's CSG API expects."""
+    """Return a plain [x, y, z] as a V3."""
     return Float3.of(pt).v3()
 
 
 def csg_contains_point(csg: 'CutCSG', local_pt: Float3, eps: float = 1e-4) -> bool:
-    """True if *local_pt* (timber-local floats) is inside *csg*, within *eps*."""
+    """Return whether timber-local `local_pt` is inside `csg`, within `eps`."""
     return csg.contains_point(to_v3(local_pt), eps)
 
 
 def csg_point_on_boundary(csg: 'CutCSG', local_pt: Float3, eps: float = 1e-4) -> bool:
-    """True if *local_pt* (timber-local floats) lies on the boundary of *csg*, within *eps*.
-
-    These two are thin adapters over kumiki's own CutCSG methods. kigumi used to
-    carry a parallel float reimplementation of both, from when kumiki was
-    sympy-backed and a symbolic point test was too slow to run per raycast.
-    kumiki is plain floats now, so the shadow copy bought nothing but drift --
-    it covered only HalfSpace, RectangularPrism and Cylinder, which silently
-    made every ConvexPolygonExtrusion, PathExtrusion, ConvexPolygonSimpleLoft
-    and Intersection surface unselectable (the click fell through to the timber
-    body and reported a bare "face").
-    """
+    """Return whether timber-local `local_pt` is on the boundary of `csg`, within `eps`."""
     return csg.is_point_on_boundary(to_v3(local_pt), eps)
 
 
@@ -104,16 +84,7 @@ TIMBER_LOCAL_FACE_NORMALS = (
 
 
 def nearest_timber_local_face_name(normal: Any) -> str:
-    """Name an outward *normal* (in timber-local space) by the timber face it
-    most closely points along.
-
-    A CSG primitive often lives in its own local frame, unrelated to the
-    timber's length axis -- a tenon's marking_space local Z points along
-    whichever way the tenon protrudes, not the timber's own top/bottom. Someone
-    browsing a timber's faces only ever wants an answer relative to THAT
-    timber, so the answer is always reported in the timber's own six
-    directions.
-    """
+    """Return the name of the timber face whose direction a timber-local `normal` is nearest."""
     n = [float(normal[0]), float(normal[1]), float(normal[2])]
     best_name, best_dot = "face", -2.0
     for name, direction in TIMBER_LOCAL_FACE_NORMALS:
@@ -124,17 +95,9 @@ def nearest_timber_local_face_name(normal: Any) -> str:
 
 
 def feature_at(csg: 'CutCSG', point: Any, eps: float) -> Optional['CSGFeature']:
-    """The best feature at a point, preferring one somebody named.
+    """Return the best real feature at a point, preferring an authored one over a default.
 
-    Two passes over the same hit list rather than find_first_feature, because the
-    ranking wanted here is not the one find_first_feature applies: it sorts by how
-    specific a feature is, and an anonymous default sits at the same
-    specificity as the authored feature covering the same surface. Asking for
-    the authored layer first says which of those two a person would rather
-    read.
-
-    Only real features: this names the surface at a point, and a non-real one (a centerplane
-    passing through) is no surface. Named instead, it lit whatever triangles it crossed.
+    Non-real features (e.g. a centerplane) are skipped: this names the surface.
     """
     from kumiki.csg.cutcsg import FeatureSource, FeatureTestTolerances
 
@@ -154,57 +117,22 @@ def feature_at(csg: 'CutCSG', point: Any, eps: float) -> Optional['CSGFeature']:
 
 
 def describe_leaf_csg(csg: 'CutCSG', local_pt: Float3, eps: float = 1e-4) -> str:
-    """What to call the part of primitive *csg* that *local_pt* lies on.
+    """Return a label for the part of primitive `csg` at `local_pt`.
 
-    A leaf's own account of itself: one primitive, one point, one string, and
-    no tree. _describe_pick is the other half -- it walks from the root to say
-    which joint made this node and which way the surface really faces, neither
-    of which a primitive can know about itself. This one runs per triangle
-    during highlight extraction, so it stays a lookup.
-
-    Whatever names the point, preferring the name someone chose. An AUTHORED
-    feature wins outright -- a prism built in its own local frame (a tenon's
-    marking_space, say) has a "top" that is not the timber's top, so a name
-    written on purpose beats anything worked out from geometry. Failing that,
-    the primitive's own default: "side.0" says where the face is on the shape
-    that has it, which is a true answer even if it is not a friendly one.
-
-    Everything after that is a fallback for a shape that names nothing, and
-    warns, because there should not be one. They are kept rather than removed
-    so a gap shows up as a poor label rather than as a crash.
-
-    WHAT THE FALLBACKS KNEW THAT THE DEFAULTS DO NOT. Each of them answered in
-    terms of something outside the primitive: "cut_plane" says what a half
-    space is FOR, "cylindrical_surface" says what shape the surface is, and the
-    timber-local direction says where the face is on the TIMBER rather than on
-    the little prism that happens to carry it. A default cannot say any of
-    that -- "side.0" is true, and about the wrong frame of reference.
-
-    Which is an argument for composing, not for choosing. The name says which
-    surface; the outward normal, read in the timber's frame, says which way it
-    faces. "side.0 (facing timber top)" carries both, and neither the feature
-    nor the primitive is the right place to work that out -- only here is the
-    timber in scope. Left undone deliberately; the shape of that string is a
-    decision, not a detail.
+    An authored feature's name, else the primitive's default name; failing those, a fallback (with a
+    warning) from the shape or the timber-local facing.
     """
     from kumiki.csg.cutcsg import Cylinder, HalfSpace
     from kumiki.rule import are_vectors_perpendicular
 
     point = to_v3(local_pt)
 
-    # The raycast tolerance is a surface tolerance: it covers the gap between
-    # the analytic face and the triangulated mesh the ray actually hit. Edges
-    # and points keep their (wider) defaults, since hitting one is a snap
-    # rather than a direct hit.
+    # `eps` is the face tolerance; edges and points keep their wider defaults.
     feature = feature_at(csg, point, eps)
     if feature is not None:
         return feature.name
 
-    # Everything past here is a fallback, and every primitive names its own
-    # boundary now, so reaching one means a shape whose default_features() is
-    # still empty -- PathExtrusion, today. They are kept rather than deleted
-    # because a gap should show up as a poor label rather than as a crash, and
-    # they warn because a poor label is otherwise invisible.
+    # Fallbacks for a shape with no default features (PathExtrusion); they warn.
     warnings.warn(
         f"No feature named the point on {type(csg).__name__}, so its label is "
         "being guessed. Every primitive should name its own boundary through "
@@ -233,20 +161,7 @@ def node_positions(root: 'CutCSG') -> Dict[int, Tuple[int, int, List[str]]]:
 
 
 def derived_feature_owner(root: 'CutCSG', derived: 'CSGFeature') -> Optional[Tuple[Any, List[str]]]:
-    """Which node a derived edge or point is shown under, and its path.
-
-    A plane-plane edge belongs to two CSGs at once -- the shoulder half-space
-    and the timber body, say -- and a tree can only show it in one place. The
-    rule is the deeper of its two parents, with document order breaking a tie.
-    A derived point is the same shape of problem, an arris and a plane rather
-    than two planes, and takes the same rule.
-
-    That is sufficient for now: the features worth marking are the ones where
-    joint geometry meets a timber face, and the timber body sits at the top of
-    every tree, so the joint side is always deeper and always wins. One between
-    two nodes at the same depth is not something the joint library produces
-    today; when it does, this is the rule to revisit.
-    """
+    """Return the node a derived edge or point is shown under, and its path: the deeper parent's owner, ties broken by document order."""
     parents = [hit for hit in getattr(derived, "parents", ())
                if hit is not None]
     if len(parents) != 2:
@@ -266,11 +181,7 @@ def derived_feature_owner(root: 'CutCSG', derived: 'CSGFeature') -> Optional[Tup
 
 
 def edge_tolerance() -> float:
-    """How close a vertex must be to an edge to count as on it.
-
-    The same tolerance the edge was found with -- an edge is selected by
-    snapping to it, so the highlight has to be as forgiving as the pick was.
-    """
+    """Return how close a vertex must be to an edge to count as on it: the edge's pick tolerance."""
     from kumiki.csg.cutcsg import FEATURE_EDGE_TOLERANCE
 
     return FEATURE_EDGE_TOLERANCE
@@ -287,50 +198,17 @@ def cropped_edge_segments(
     root_csg: 'CutCSG',
     owner: Optional['CutCSG'] = None,
 ) -> Tuple[Optional[List[WorldSegment]], bool]:
-    """The edge's line, clipped to where the edge actually exists.
+    """Return (segments, absent): the edge's line cropped to where the edge exists, in world space.
 
-    Returns (segments, absent). Each segment is a {"start", "end"} pair in world
-    space, in order along the line; there is more than one when a cut crosses
-    the middle of the edge and leaves a piece either side of it.
-
-    `absent` says the line was cropped away to nothing, which is a real answer:
-    the two planes cross somewhere that is not on either face. A mortise
-    floor's plane run sideways meets the timber's side a foot away from the
-    mortise, and that is not an edge of anything.
-
-    Three conditions, all necessary, so all three are intersected:
-
-      - the SURFACE is there. Not merely the material: an arris runs along the
-        face of the piece and is never buried in the middle of it, so asking
-        where there is wood keeps every stretch the line is swallowed by. A
-        tenon's arris is the case -- the cutter that shaped it is extended back
-        past the shoulder on purpose, and the shank is solid around it there,
-        so a material test drew the arris carrying on down the timber.
-      - both parent faces are there. A derived edge is where two faces MEET,
-        and a face is bounded by the solid that declared it. Without this the
-        line runs the length of the timber, since a mortise wall's plane
-        carries on long after the mortise stops. Surface alone does not cover
-        it: a mortise floor's plane meets the timber's own side a foot away,
-        and that line is on the surface without being an edge of anything.
-      - the feature says so itself. Exact, and free -- a prism's arris is a
-        pair of its own corners and a derived edge reaches as far as both its
-        faces do. _measure_span has asked this all along; an edge highlight
-        did not, and so had nothing to hold the ends but a tolerant clip.
-
-    The bounds are intersected as intervals rather than written as one CSG
-    Intersection, because the first condition is about the surface of ONE solid
-    and an intersection's surface includes the other's. Intersecting root with
-    a parent made the parent's own face count as boundary, which is the whole
-    length of the arris.
+    Intersects where the line is on the timber's surface, where both parent faces exist, and the
+    feature's own declared ends. `absent` is True when nothing is left. Segments are
+    {"start", "end"} dicts in order along the line.
     """
     from kumiki.csg.feature_extent import declared_line_span, intersected_intervals
     from kumiki.csg.edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to_segments_on_csg
     from kumiki.geometry import Line, unit_vector
 
-    # Normalised first, because everything below measures along it in metres:
-    # stations are compared against the edge tolerance and against what the
-    # feature declares, and edges_on_csg parameterises by its own unit direction. A
-    # Line does not promise that its direction is one.
+    # Unit direction, so stations are in metres.
     line = Line(direction=unit_vector(line.direction), point=line.point)
 
     near = timber.get_perfect_timber_within_csg_local().transform.position
@@ -377,29 +255,8 @@ def cropped_edge_segments(
             found = intersected_intervals(found, bound)
         return found
 
-    # Two questions, one number, and only one of them wants it.
-    #
-    # WHETHER the edge is there needs the tolerance it was found by: two faces
-    # count as meeting within that distance, so a real edge's line can sit a
-    # fraction outside the solids that formed it and clip away to nothing.
-    #
-    # HOW FAR it runs does not. Widening the bounds to answer the first question
-    # also pushed both ends out by that tolerance, so every edge was drawn long
-    # at each end -- a fifth again on a 19mm arris.
-    #
-    # So take the exact spans where there are any, and fall back to the tolerant
-    # ones only for the edge that exact clipping loses entirely.
-    #
-    # Only a DERIVED edge, though. The tolerance belongs to how that edge was
-    # found -- two faces counted as meeting because they came within it -- and a
-    # declared arris was not found that way at all: its line is the primitive's
-    # own corners and sits exactly where it says. Widening for one anyway
-    # resurrected stretches the exact reading had correctly called absent, which
-    # is how a bore's end arris came back as a 6mm stub floating off the piece.
-    #
-    # The declared-edge retry is for FLOATING POINT ERROR only, not tolerance: off
-    # axis, an arris lying exactly on the cut surface (a cross lap's inside edge on
-    # a pitched rafter) computes a few nanometres off it and clips away entirely.
+    # Exact spans first. If that loses the edge entirely, retry at the edge tolerance for a derived
+    # edge, or at float noise for a declared one.
     # TODO consider one clip at DECLARED_EDGE_FLOAT_NOISE for declared edges instead
     # of exact-then-retry: simpler, at the cost of padding every end by a micron.
     cropped = clipped(0.0)
@@ -428,26 +285,10 @@ def edge_highlight_segments(
     timber: 'PerfectTimberWithin',
     root_csg: 'CutCSG',
 ) -> Tuple[Optional[List[WorldSegment]], bool]:
-    """Where a selected edge runs, in world space, and whether it is there at all.
+    """Return (segments, absent) to draw a selected edge, in world space.
 
-    An edge is a line, and a highlight built out of triangles can only ever
-    approximate one -- it lights the strip beside it, which reads as a stray
-    wedge rather than as the edge. The viewer draws lines instead, and this says
-    where they run.
-
-    Cropped from the CSG, because asking the edge where it is does not bound
-    it: a face feature's test_point_unbounded checks the face's PLANE and nothing
-    so an edge made of two of them answers yes all the way along its line --
-    a metre past the joint that formed it. Picking never noticed, since a
-    click is one point that is on the timber anyway.
-
-    A list, because a cut through the middle of an edge leaves a piece either
-    side of it. None when the tree holds a primitive edges_on_csg cannot
-    describe, and the caller falls back to lighting triangles.
-
-    The second return says the edge was cropped away entirely. The caller wants
-    that separately: with no line to draw it would otherwise light the triangles
-    beside the edge instead, and those are found by the same unbounded test.
+    segments is None when the tree has a primitive edges_on_csg can't describe (the caller then lights
+    triangles); `absent` says the edge was cropped away entirely.
     """
     from kumiki.geometry import Line
 
@@ -462,22 +303,11 @@ def edge_highlight_segments(
 def non_real_highlight_segments(
     feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None,
 ) -> Optional[List[WorldSegment]]:
-    """Where a non-real feature is drawn: its own extent, in world space.
+    """Return the segments to draw a non-real feature, in world space: its own extent, not cropped to the
+    cut solid (a bore's axis lies in the void).
 
-    NOT cropped to the cut solid the way a real edge is. A bore's axis lies in
-    the void the bore made, so clipping it to what the cuts left finds no
-    boundary anywhere along it and reports the whole feature absent -- which is
-    a selected peg hole axis with no line to draw.
-
-    Its own extent is the right bound and an exact one: a cylinder's axis runs
-    between the cylinder's own two ends, which are the depth that was drilled.
-    The uncut body would bound it as well (see D5 in the feature-selection plan)
-    and is the fallback if something ever declares a non-real feature that
-    reaches past the piece; nothing does, and the clip is not free on a hover.
-
-    Where it can't bound itself -- a shoulder's half space crossing a perfect face of rough stock, two
-    planes with no corners between them -- its extent on the cut timber (`root_csg`): the line where
-    there is timber.
+    Falls back to its extent on the cut timber `root_csg` when it can't bound itself (e.g. a shoulder
+    plane crossing a perfect face).
     """
     from kumiki.csg.feature_extent import extents_of
     from kumiki.rule import create_v3
@@ -498,14 +328,10 @@ def features_at_point(
     root: 'CutCSG', local_pt: Float3, eps: float, tolerances: Optional['FeatureTestTolerances'] = None,
     local_ray: Optional[LocalRay] = None,
 ) -> List['OwnedFeatureHit']:
-    """Every feature the whole tree sees at the click, best first. The whole tree, since a derived
-    edge needs both its faces in scope.
+    """Return every feature the whole tree sees at `local_pt`, best first.
 
-    With a ray, the slack is in screen pixels across the view:
-    - edges and corners are gathered from further along the face (SLANT_REACH), then kept only
-      within their slack of the ray;
-    - a reference plane is taken where its line across the face is within the edge slack;
-    - features in a void, like a bore's axis, are found along the ray (non_real_features_along_ray).
+    With a ray, slack is in screen pixels: edges and corners within their slack of the ray, reference
+    planes whose line across the face is near the ray, and features in a void found along the ray.
     """
     from dataclasses import replace
 
@@ -535,8 +361,7 @@ SLANT_REACH = 3.0
 
 def _within_slack(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3,
                   tolerances: 'FeatureTestTolerances') -> bool:
-    """Whether an edge or corner comes within its slack of the ray, across the view; anything else,
-    and a line along the ray, is not asked."""
+    """Return whether an edge or corner comes within its slack of the ray; other hits, and a line along the ray, pass."""
     from kumiki.csg.cutcsg import CSGFeatureType
 
     exact = _nearest_on(hit, origin, direction)
@@ -550,8 +375,7 @@ def _within_slack(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3,
 
 def _reference_planes_near(root: 'CutCSG', point: Float3, origin: Float3, direction: Float3,
                            tolerance: float) -> List['OwnedFeatureHit']:
-    """The non-real planes declared in `root` whose line across the surface at `point` -- where each
-    crosses the face struck there -- comes within `tolerance` of the ray, across the view."""
+    """Return the non-real planes in `root` whose line across the face at `point` comes within `tolerance` of the ray."""
     from kumiki.csg.cutcsg import OwnedFeatureHit, csg_children
     from kumiki.geometry import Plane
 
@@ -598,9 +422,7 @@ def _reference_planes_near(root: 'CutCSG', point: Float3, origin: Float3, direct
 
 
 def _only_creases(root: 'CutCSG', hits: List['OwnedFeatureHit'], point: Any) -> List['OwnedFeatureHit']:
-    """`hits` without a real edge whose line, where the pointer is, only runs through a flat face:
-    a line on the surface that is no edge of it (edges_on_csg.is_crease_at) -- a relief's copy of another
-    timber's arris, flush in this one's face."""
+    """Return `hits` without real edges that, at the pointer, lie within one flat face (edges_on_csg.is_crease_at)."""
     from kumiki.csg.cutcsg import CSGFeatureType
     from kumiki.csg.edges_on_csg import is_crease_at
     from kumiki.geometry import Line, unit_vector
@@ -622,8 +444,7 @@ def _only_creases(root: 'CutCSG', hits: List['OwnedFeatureHit'], point: Any) -> 
 
 
 class PointerCandidate(NamedTuple):
-    """A feature under the pointer in a drawing's view: where along the ray it was found, and
-    the depth group it is in (see order_along_ray), named by the depth the group starts at."""
+    """A feature under the pointer in a drawing view: its depth along the ray, and its depth group (order_along_ray)."""
     hit: 'OwnedFeatureHit'
     place: Optional[Float3]
     depth: float
@@ -634,16 +455,11 @@ def candidates_under_pointer(
     root: 'CutCSG', local_pt: Optional[Float3], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
     timber: Optional['PerfectTimberWithin'] = None,
 ) -> List[PointerCandidate]:
-    """What is under the pointer, for a drawing's view: the features at the surface the ray meets
-    (`local_pt`, None where it meets none of this solid), and those on no surface the ray passes near
-    (a bore's axis) -- only what the view can measure (measurable_in_view), nearest first
-    (order_along_ray).
+    """Return the features under the pointer for a drawing view, nearest first, filtered by measurable_in_view.
 
-    Nothing deeper than the surface: what is behind it is hidden, and is not offered. An edge on a
-    silhouette is found from the side its own surface is on; a point on a surface flush with
-    another member's is found from either, each member being asked at the one surface point. With
-    `timber`, a non-real plane seen edge-on is found along the ray too, whatever surface the ray meets
-    (non_real_features_along_ray)."""
+    The features at the surface point `local_pt` (None if the ray misses), plus non-real features the
+    ray passes near. With `timber`, non-real planes seen edge-on are found along the ray too.
+    """
     local_pt = Float3.of(local_pt) if local_pt is not None else None
     hits = _only_creases(root, root.find_all_features(local_pt.v3(), tolerances), local_pt) if local_pt is not None else []
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
@@ -674,10 +490,8 @@ def candidates_under_pointer(
                 on_ray = _plane_on_ray(hit, root, timber, origin, direction, math.inf)
                 if on_ray is not None:
                     found_at([hit], on_ray)
-    # An edge or corner is placed on itself, where it comes nearest the pointer: it was found
-    # where the ray crossed some face, which can be a pixel off it. And it is offered only within
-    # its slack of the pointer ACROSS the view -- screen pixels, the viewer's tolerances -- however
-    # near the point it was found at.
+    # Edges and corners are placed where they come nearest the pointer, and kept only within their
+    # screen slack of it.
     within: List['OwnedFeatureHit'] = []
     for hit in hits:
         key = _hit_key(hit)
@@ -698,7 +512,7 @@ def candidates_under_pointer(
 
 
 def _nearest_on(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3) -> Optional[Float3]:
-    """The point of an edge (its line) or corner nearest the ray; None for anything else."""
+    """Return the point of an edge's line or corner nearest the ray, or None for other hits."""
     from kumiki.geometry import Line, Point
 
     located = hit.feature.locate_simple_unbounded(hit.owner)
@@ -720,18 +534,10 @@ def _nearest_on(hit: 'OwnedFeatureHit', origin: Float3, direction: Float3) -> Op
 def measurable_in_view(
     hits: List['OwnedFeatureHit'], direction: Float3, tolerance: float,
 ) -> List['OwnedFeatureHit']:
-    """*hits* without the faces a drawing's view has no use for.
+    """Return `hits` without the faces a drawing view can't use.
 
-    A 2D view measures lines and points, so a face is only of use where it is a line -- seen
-    edge-on -- and even then nearly always lies on the same line as one of its straight edges,
-    declared or derived, which measures the same. So a real face stays only when it is edge-on and
-    no real straight line among *hits* draws along it: a cylinder's cap, rimmed by a circle, is the
-    one thing naming its line, and stays. A line seen end-on draws a point, not the line.
-
-    A non-real face (a centerplane, a perfect-timber face) is never one of these: it names a
-    reference, not the surface, and measuring to it is not measuring to the edge that happens to
-    draw on it -- a peg's axis through a centerplane, a rough arris flush with a perfect face. Seen
-    at any other angle a face is an area, and goes.
+    A real face stays only if seen edge-on and no real line in `hits` draws along it (e.g. a cylinder's
+    cap). Non-real faces, and faces seen at an angle, are dropped.
     """
     from kumiki.csg.cutcsg import CSGFeatureType
     from kumiki.drawings.sheet_shape import SheetLine, sheet_gap, sheet_shape
@@ -757,8 +563,7 @@ def measurable_in_view(
 
 
 def _hit_key(hit: 'OwnedFeatureHit') -> Tuple:
-    """One feature, however many times it was found: a derived one found at two places is two
-    objects, so by what it is (feature_paths.hit_identity) and not by object."""
+    """Return a hashable key for a hit by what it is (feature_paths.hit_identity), not by object."""
     from kumiki.csg.feature_paths import hit_identity
 
     return hit_identity(hit.feature, hit.owner)
@@ -771,13 +576,7 @@ def _along_ray(origin: Float3, direction: Float3, point) -> float:
 def order_along_ray(
     hits: List['OwnedFeatureHit'], depth_of: Dict[Tuple[str, int], float], separation: float,
 ) -> List['OwnedFeatureHit']:
-    """Nearest the viewer first, then the library's order (_sort_feature_hits).
-
-    Depth leads only where there is some: hits are grouped along the ray, a group starting at
-    the first hit more than `separation` past the start of the last, and ranked by group. So a
-    face and the edges on it, found within a few pixels' worth of each other, are still ordered
-    as they always were, while an edge in front comes before one behind it.
-    """
+    """Return `hits` sorted by depth group along the ray, then by the library's order. Groups start `separation` apart."""
     from kumiki.csg.cutcsg import feature_hit_sort_key
 
     starts = _depth_groups(hits, depth_of, separation)
@@ -787,7 +586,7 @@ def order_along_ray(
 def _depth_groups(
     hits: List['OwnedFeatureHit'], depth_of: Dict[Tuple[str, int], float], separation: float,
 ) -> Dict[Tuple[str, int], float]:
-    """Each hit's depth group (see order_along_ray), named by the depth the group starts at."""
+    """Return each hit's depth group, named by the depth the group starts at."""
     depth = lambda hit: depth_of.get(_hit_key(hit), math.inf)
     starts: Dict[Tuple[str, int], float] = {}
     start: Optional[float] = None
@@ -810,18 +609,11 @@ def _depth_groups(
 def real_features_along_ray(
     root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
 ) -> List[Tuple[List['OwnedFeatureHit'], Float3]]:
-    """Every feature on the boundary anywhere under the pointer, at any depth: the features at
-    each place found, and the place.
+    """Return every feature on the boundary anywhere along the ray, with where it was found.
 
-    For an orthographic view, where everything along the ray is drawn at one place on the
-    sheet: there, a flank seen edge-on has its front edge and its back edge on one line, and
-    which of them the ray's first hit lands nearer to is chance -- so whichever it was, the
-    other was no candidate at all.
-
-    Found where the ray meets each declared face's plane, and where it passes within the edge
-    tolerance of each declared edge or corner -- kept where that is on the boundary -- and then
-    everything at those places, derived features included. At the edge tolerance throughout,
-    since this is a screen-space question: what is within a few pixels of the pointer.
+    For orthographic views, where everything along the ray is drawn at one place. Checks where the ray
+    meets each declared face's plane, and where it passes within the edge tolerance of each declared
+    edge or corner.
     """
     from kumiki.csg.cutcsg import FeatureTestTolerances, csg_children
     from kumiki.geometry import Line, Plane, Point
@@ -869,7 +661,7 @@ def real_features_along_ray(
 
 
 def _ray_meets_plane(origin: Float3, direction: Float3, plane: Any) -> Optional[Float3]:
-    """Where the ray crosses *plane*, or None if it runs along it or the plane is behind it."""
+    """Return where the ray crosses `plane`, or None if parallel or behind."""
     normal, at = Float3.of(plane.normal), Float3.of(plane.point)
     facing = direction.dot(normal)
     if abs(facing) < 1e-9:
@@ -879,7 +671,7 @@ def _ray_meets_plane(origin: Float3, direction: Float3, plane: Any) -> Optional[
 
 
 def _merge_hits(hits: List['OwnedFeatureHit'], more: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
-    """*hits* and *more*, each feature once (see _hit_key), in the library's order."""
+    """Return `hits` and `more`, each feature once, in the library's order."""
     from kumiki.csg.cutcsg import _sort_feature_hits
 
     seen = {_hit_key(hit) for hit in hits}
@@ -896,12 +688,7 @@ def merge_ray_hits(
     root: 'CutCSG', hits: List['OwnedFeatureHit'], local_ray: LocalRay,
     tolerances: 'FeatureTestTolerances', timber: Optional['PerfectTimberWithin'] = None,
 ) -> List['OwnedFeatureHit']:
-    """*hits*, plus the void-dwelling features the ray passes through, re-sorted.
-
-    Kept apart from find_all_features because it is not a geometric question
-    about a point -- it is what the POINTER was aiming at, which only the picking
-    layer knows. The ordering is the library's, applied once over both lots.
-    """
+    """Return `hits` plus the non-real features the ray passes near, re-sorted."""
     from kumiki.csg.cutcsg import _sort_feature_hits
 
     along_ray = non_real_features_along_ray(root, local_ray, tolerances, timber)
@@ -916,25 +703,9 @@ def non_real_features_along_ray(
     root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
     timber: Optional['PerfectTimberWithin'] = None,
 ) -> List['OwnedFeatureHit']:
-    """Non-real features the ray passes close to, in timber-local space.
+    """Return non-real features within the edge tolerance of the ray, in timber-local space.
 
-    ONLY non-real ones. A real feature is on the boundary, so in the 3D view the
-    ray's own hit point already found it, and sweeping the whole ray would light
-    everything behind what was clicked. A drawing's view does sweep for them --
-    see real_features_along_ray -- since there everything under the pointer is
-    drawn in one place.
-
-    Bounded by the feature's own extent rather than the infinite line it locates
-    to: a bore's axis is an endless line, and without this a peg hole could be
-    selected from a metre past the end of the timber.
-
-    The tolerance is the edge one, which the viewer derives from what a pixel is
-    worth -- so this is a screen-space snap, the way any CAD package snaps to a
-    centre line.
-
-    With `timber` (a drawing's view), a plane too: a centerplane or a perfect-timber
-    face seen edge-on draws as a line, and is snapped to as one (_plane_on_ray).
-    Without it the surface point is what finds one.
+    Bounded by each feature's own extent. With `timber` (a drawing view), planes seen edge-on too.
     """
     from kumiki.csg.cutcsg import OwnedFeatureHit, csg_children
     from kumiki.geometry import Line, Plane
@@ -979,9 +750,7 @@ def non_real_features_along_ray(
 
 def _plane_on_ray(hit: 'OwnedFeatureHit', root: 'CutCSG', timber: 'PerfectTimberWithin', origin: Float3,
                   direction: Float3, tolerance: float) -> Optional[Float3]:
-    """Where the ray runs through a plane feature seen edge-on, within `tolerance` of it and across
-    its extent on the cut timber (FeatureExtent); None if it does not. The place is the ray's point
-    nearest the middle of that extent."""
+    """Return where the ray runs through a plane feature seen edge-on, within `tolerance` and its extent, or None."""
     from kumiki.csg.feature_extent import extents_of
     from kumiki.drawings.sheet_shape import SQUARE_TO_VIEW
     from kumiki.geometry import Plane
@@ -1011,23 +780,14 @@ def _plane_on_ray(hit: 'OwnedFeatureHit', root: 'CutCSG', timber: 'PerfectTimber
 
 
 def ray_reaches_segment(origin, direction, ends, tolerance: float) -> bool:
-    """Whether the ray passes within *tolerance* of the segment between *ends*."""
+    """Return whether the ray passes within `tolerance` of the segment `ends`."""
     return ray_nears_segment(origin, direction, ends, tolerance) is not None
 
 
 def ray_nears_segment(origin, direction, ends, tolerance: float) -> Optional[Float3]:
-    """The point of the segment between *ends* nearest the ray, if within *tolerance* of it.
+    """Return the point of segment `ends` nearest the ray, if within `tolerance`, else None.
 
-    A screen-space snap run on every hover: it decides whether something is close enough to
-    click, not where anything is cut.
-
-    The closest approach of two lines, with the segment parameter clamped to the
-    segment and the ray parameter to what is in front of the origin, since
-    behind it is behind the camera. Parallel lines take the segment's midpoint,
-    which is all the answer that case needs.
-
-    `direction` is expected normalised, which is what makes D.D drop out of the
-    usual pair of equations and leaves a single division.
+    `direction` must be unit. Only points in front of the ray origin count.
     """
     origin, direction = Float3.of(origin), Float3.of(direction)
     start, end = Float3.of(ends[0]), Float3.of(ends[1])
@@ -1051,14 +811,7 @@ def ray_nears_segment(origin, direction, ends, tolerance: float) -> Optional[Flo
 
 
 def resolve_derived_feature(hits: List['OwnedFeatureHit']) -> Optional['CSGFeature']:
-    """The DERIVED edge or point under the click, if one is the best answer there.
-
-    Only derived. A timber's own arris is an edge as well, and a declared
-    feature -- it has a name, an owner and a place in the tree, so it is
-    referred to the way any declared feature is. Only one that exists nowhere
-    but as the product of two parents needs the roundabout treatment of being
-    named by them.
-    """
+    """Return the derived edge or point at the click, if one is the best hit there."""
     from kumiki.csg.cutcsg import CSGFeatureType
 
     if not hits:
@@ -1077,41 +830,9 @@ def outward_normal_and_face(
     local_pt: Float3,
     eps: float,
 ) -> Tuple[Optional[Float3], Optional[str]]:
-    """The outward normal at the pick, and which of the timber's own six faces
-    it points most nearly along.
+    """Return the outward normal at the pick and the nearest of the timber's six faces, in timber-local space.
 
-    The tree is already in the timber's local frame, so the normal is matched
-    against the six local directions directly -- going via
-    get_closest_oriented_face_from_global_direction would convert to global and
-    straight back.
-
-    The primitive supplies the direction and its parity supplies the sign. A
-    primitive's own normal points out of that primitive, which is not always
-    out of the finished timber: a mortise prism's points out of the hole and
-    into the material, so the wall you clicked faces the other way. A
-    SUBTRACTIVE node bounds a void, so its surface faces the opposite way to
-    the solid.
-
-    Parity rather than the root's own normal at the point, which is what this
-    used to ask. That is a local geometric answer and it assumes the point is
-    on the composed boundary without rechecking: Difference returns the base's
-    normal without asking whether a subtract removed that point, and SolidUnion
-    averages whichever children contain it without asking whether the result is
-    on the union's surface. Both answer confidently for points that are not on
-    the boundary at all, and averaging at an edge gives a bisector rather than
-    a normal. Parity never consults the point, so none of that applies.
-
-    Args:
-        target: the leaf primitive that was hit, for the face direction.
-        local_csg: the root of the tree it sits in, for the parity.
-        local_pt: the clicked point, in that tree's (timber-local) space.
-        eps: surface tolerance for the normal lookup.
-
-    Returns:
-        (normal, face name) in timber-local space, or (None, None) if no normal
-        is available. The normal is the exact answer and the face name is the
-        nearest of six, so the display can show both rather than rounding
-        silently.
+    The normal is `target`'s, flipped if `target` is subtractive in `local_csg`. (None, None) if unknown.
     """
     from kumiki.csg.cutcsg import CSGParity, walk_csg_with_parity
 
@@ -1132,8 +853,7 @@ def outward_normal_and_face(
 
 
 def resolve_csg_at_path(csg: 'CutCSG', path: List[str]) -> 'CutCSG':
-    """The node a navigation path names under *csg*, or the deepest one it leads to when a step no
-    longer matches (feature_paths.walk_labels)."""
+    """Return the node `path` names under `csg`, or the deepest it reaches (feature_paths.walk_labels)."""
     return walk_labels(csg, path)[0]
 
 
@@ -1144,15 +864,10 @@ def navigate_csg_one_level(
     eps: float = 1e-4,
     segments: Optional[Dict[int, str]] = None,
 ) -> Tuple[List[str], Any, Optional[str]]:
-    """Navigate one level deeper into *node* based on click point.
+    """Step one level into `node` toward the click.
 
-    Returns (new_path, target_csg_to_highlight, feature_label_or_None).
-
-    Every step carries the occurrence numbering its label among the siblings it
-    shares one with, from the same _candidate_segments the resolvers index into.
-    *segments* is that scope, passed down when drilling through an unlabelled
-    compound so its children stay numbered against the labelled ancestor a path
-    actually names.
+    Returns (new_path, target_csg, feature_label_or_None). `segments` numbers the children when
+    drilling through an unlabelled compound.
     """
     from kumiki.csg.cutcsg import SolidUnion, Difference
 
@@ -1191,7 +906,7 @@ def navigate_csg_to_leaf(
     local_pt: Float3,
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
-    """A plain click: traverse from root to deepest labeled node, then report face."""
+    """Walk from the root to the deepest labelled node at the click, and name the face there."""
 
     path: List[str] = []
     node = csg
@@ -1208,15 +923,7 @@ def navigate_csg_to_leaf(
 
 
 def aabb_filter(csg: 'CutCSG', eps: float) -> Optional[Callable[[Float3], bool]]:
-    """A cheap "could this point be on *csg*" test, or None if it cannot help.
-
-    None when the box says nothing useful -- a solid unbounded in every
-    direction, or one whose bounds cannot be read. An empty solid rejects
-    everything, which is a real answer rather than an unhelpful one.
-
-    The bounds are the CSG's own, so points must be in the same space it is:
-    timber-local, the same as the centroids the caller computes.
-    """
+    """Return a cheap could-this-point-be-on-`csg` test from its bounding box, or None if the box can't help."""
     try:
         with warnings.catch_warnings():
             # Asking speculatively, and "unbounded" is a perfectly good answer:
@@ -1271,10 +978,9 @@ def extract_highlight_mesh(
     edge_feature: Optional['CSGFeature'] = None,
     feature_type: Optional[str] = None,
 ) -> Tuple[List[float], List[int], int, int]:
-    """Extract triangles belonging to *target_csg* from the rendered mesh.
+    """Return the rendered triangles belonging to `target_csg`.
 
-    *mesh_vertices* / *mesh_indices* are in global coords (flat lists).
-    Returns (highlight_vertices, highlight_indices, matched_tris, total_tris).
+    Vertices and indices are flat global-space lists. Returns (vertices, indices, matched_tris, total_tris).
     """
     total_tris = len(mesh_indices) // 3
     out_verts: List[float] = []
@@ -1287,26 +993,13 @@ def extract_highlight_mesh(
             and resolve_csg_at_path(root_csg, selected_path) is not selected_ref):
         return [], [], 0, len(mesh_indices) // 3
 
-    # Broadphase: a triangle whose centroid is outside the target's own box
-    # cannot be on its boundary, and a box test is far cheaper than asking the
-    # CSG. It matters because the target is usually small and the mesh is the
-    # whole timber -- a mortise on a beam keeps 10 triangles out of 376, and the
-    # walk drops from 2.8ms to 0.1ms.
-    # An edge whose line has already been worked out has no triangles to light:
-    # the line IS its highlight. Without this the walk still runs, comparing
-    # every triangle against an edge's name that no face can ever answer to, and
-    # spends a fifth of a second arriving at nothing.
+    # Broadphase on the target's box. An edge with a known line has no triangles to light.
     if feature_type in ("EDGE", "POINT") and edge_feature is None:
         return [], [], 0, len(mesh_indices) // 3
 
     inside_box = aabb_filter(target_csg, eps)
 
-    # The feature we are matching against, looked up once instead of once per
-    # triangle. describe_leaf_csg asks the node for EVERY feature at the point
-    # and compares names; when the name is a declared feature we can ask that
-    # one feature directly, which is the same answer without the search.
-    #
-    # test_point_unbounded alone means nothing off the boundary; the loop asks both.
+    # The declared feature to match, looked up once; the loop also checks the boundary.
     wanted_feature = None
     if feature_label is not None and edge_feature is None:
         wanted_feature = next(
@@ -1333,16 +1026,8 @@ def extract_highlight_mesh(
             continue
         if csg_point_on_boundary(target_csg, local_c, eps):
             if edge_feature is not None:
-                # The last fallback, and a poor one: it asks test_point_unbounded
-                # vertex without the boundary check, so it lights the strip
-                # along the whole line rather than along the edge. Only reached
-                # when crop_line_to_segments_on_csg met a primitive it could not
-                # describe as half spaces, and it should go once that is total.
-                #
-                # An edge is a line, and no triangle's centroid sits on one --
-                # matching the way a face does would light nothing at all. The
-                # mesher puts vertices on edges, so the strip along an edge is
-                # the triangles with two vertices on it.
+                # Last fallback, when the edge couldn't be cropped: light triangles with two
+                # vertices on the edge's (unbounded) line.
                 on_edge = 0
                 for corner in (i0, i1, i2):
                     corner_local = inv_transform_point(timber_rot, timber_pos, [
@@ -1380,8 +1065,7 @@ Navigated = Tuple[List[str], 'CutCSG', Optional[str]]
 
 
 def navigate(root: 'CutCSG', local_pt: Float3, eps: float, ctrl_click: bool, current_path: List[str]) -> Navigated:
-    """Where a click lands in the tree. A plain click goes straight to the feature; Ctrl holds it to
-    one level per click, from `current_path` while the point is still on that node."""
+    """Return where a click lands in the tree: straight to the feature, or with Ctrl one level per click from `current_path`."""
     if not ctrl_click:
         return navigate_csg_to_leaf(root, local_pt, eps)
     node = root
@@ -1393,8 +1077,7 @@ def navigate(root: 'CutCSG', local_pt: Float3, eps: float, ctrl_click: bool, cur
 
 
 class Candidates(NamedTuple):
-    """Every feature under the pointer, visible ones first: `hits[:visible_count]` can be taken,
-    the rest are listed greyed."""
+    """Features under the pointer: `hits[:visible_count]` can be taken; the rest are hidden."""
     hits: List['OwnedFeatureHit']
     visible_count: int
 
@@ -1403,16 +1086,14 @@ def find_candidates(
     root: 'CutCSG', local_pt: Float3, eps: float, tolerances: 'FeatureTestTolerances',
     local_ray: Optional[LocalRay],
 ) -> Candidates:
-    """What is under the pointer on one member: the features at the point, all of them takeable. A
-    drawing's view asks every member drawn there instead (drawing_candidates)."""
+    """Return the features at the point on one member, all takeable. Drawing views use drawing_candidates."""
     hits = features_at_point(root, local_pt, eps, tolerances, local_ray=local_ray)
     return Candidates(hits, len(hits))
 
 
 def sight_blocker(transform: Transform, occluders: List[Tuple['CutCSG', Transform]],
                   direction: Float3) -> Callable[[Float3], bool]:
-    """`blocked(place)`: whether an occluder's material hides a place (local to `transform`) from
-    a camera looking along `direction` (also local). visibility.hidden_at, per place."""
+    """Return `blocked(place)`: whether an occluder hides a place (local to `transform`) looking along `direction`."""
     from kumiki.drawings.visibility import hidden_at
     from kumiki.rule import as_ndarray
 
@@ -1422,13 +1103,9 @@ def sight_blocker(transform: Transform, occluders: List[Tuple['CutCSG', Transfor
 
 def best_matching_candidate(hits: List['OwnedFeatureHit'], timber: 'PerfectTimberWithin', held: Any, look: Any,
                             space: Any) -> Optional[int]:
-    """Which feature under the pointer best finishes the measurement in hand.
+    """Return the candidate that best completes the measurement being made, or None.
 
-    The most specific feature is the right answer to "what is this thing here", and the wrong one
-    while measuring: holding a face and being handed the arris beside it means most hovers refuse.
-    So a candidate that admits a measurement with the held end beats one that does not, and among
-    those, one of the held end's type breaks the tie (earlier, more specific, wins among equals).
-    None when nothing is held, there is no camera, or no candidate admits anything.
+    Prefers one that admits a measurement with the held feature, then one of the held feature's type.
     """
     from kumiki.csg.feature_paths import FeatureHandle
 
@@ -1436,7 +1113,7 @@ def best_matching_candidate(hits: List['OwnedFeatureHit'], timber: 'PerfectTimbe
 
 
 def best_matching_handle(handles: List[Any], held: Any, look: Any, space: Any) -> Optional[int]:
-    """best_matching_candidate, over features that may be on different timbers (FeatureHandles)."""
+    """best_matching_candidate over FeatureHandles that may be on different timbers."""
     from kumiki.drawings.kigumi_measuring_helpers import kinds_for_pair, world_geometry
 
     if held is None or not look or not handles:
@@ -1453,9 +1130,7 @@ def best_matching_handle(handles: List[Any], held: Any, look: Any, space: Any) -
 
 
 class Pick(NamedTuple):
-    """What a pick chose: the node it selects (`path`, `node`), the feature named in it (`label`,
-    `kind`, its feature type's name), an edge or point to draw (`edge` derived, or
-    `declared_edge`), and the candidate it is (`hit`)."""
+    """What a pick chose: the node (`path`, `node`), the feature (`label`, `kind`), an edge or point to draw, and the candidate `hit`."""
     path: List[str]
     node: 'CutCSG'
     label: Optional[str]
@@ -1469,8 +1144,7 @@ class Pick(NamedTuple):
         return self.edge if self.edge is not None else self.declared_edge
 
     def located(self) -> Optional[Tuple['CSGFeature', 'CutCSG', Any]]:
-        """The chosen feature, the node it is shown under, and what it lies on: an edge or point
-        under the node navigation placed it at, anything else under its own owner."""
+        """Return the chosen feature, the node it is shown under, and its owner."""
         if self.hit is None:
             return None
         owner = self.node if self.edge_feature is not None else self.hit.owner
@@ -1478,11 +1152,7 @@ class Pick(NamedTuple):
 
 
 def pick_from_candidate(root: 'CutCSG', hit: 'OwnedFeatureHit') -> Optional[Pick]:
-    """The pick one chosen feature makes, or None when its owner cannot be placed in the tree.
-
-    A derived edge or point is placed by the deeper of the two parents that form it; a declared one
-    belongs to whoever declared it. Trying derived first tells them apart.
-    """
+    """Return the Pick for a chosen feature, or None if its owner isn't in the tree."""
     from kumiki.csg.cutcsg import CSGFeatureType
 
     feature = hit.feature
@@ -1499,14 +1169,10 @@ def pick_from_candidate(root: 'CutCSG', hit: 'OwnedFeatureHit') -> Optional[Pick
 
 def choose(root: 'CutCSG', navigated: Navigated, found: Candidates, candidate_index: Optional[int],
            preferred: Callable[[List['OwnedFeatureHit']], Optional[int]], in_drawing: bool, ctrl_click: bool) -> Pick:
-    """Which of the features under the pointer is wanted, as a Pick.
+    """Return which feature under the pointer is wanted, as a Pick.
 
-    In order: the one the caller names (Tab, the menu) -- final, since the rules below only guess
-    what was meant -- or else `preferred` (best_matching_candidate while measuring), or else in a
-    drawing the first, the candidates being in the order a click should take them. Failing those:
-    a derived edge or point under the click, then a declared one (a timber's own arris), then the
-    face navigation landed on. Zero is a choice: stepping round to the first feature is the caller
-    naming one.
+    In order: the one the caller names (Tab, the menu); `preferred`; in a drawing the first
+    candidate; then a derived edge or point at the click, a declared one, or the navigated face.
     """
     from kumiki.csg.cutcsg import CSGFeatureType
 
@@ -1546,7 +1212,7 @@ def choose(root: 'CutCSG', navigated: Navigated, found: Candidates, candidate_in
 
 
 class Derivation(NamedTuple):
-    """For a derived feature: the path to the node owning it, and each parent's (path, name)."""
+    """A derived feature's owner path and each parent's (path, name)."""
     owner_path: Optional[List[str]]
     parents: List[Tuple[List[str], str]]
 
@@ -1568,9 +1234,7 @@ def derivation(root: 'CutCSG', hits: List['OwnedFeatureHit'], feature: Optional[
 
 def non_real_plane_outline(feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
                            root: 'CutCSG') -> Optional[List[WorldSegment]]:
-    """A non-real plane's outline -- a perfect face in rough stock, a centerplane -- which has no
-    surface to light: its extent's outline, in world space, which a drawing shows edge-on as the
-    line it draws dotted. None for anything else."""
+    """Return a non-real plane's outline in world space (its extent's outline), or None for anything else."""
     from kumiki.csg.feature_extent import extents_of
     from kumiki.geometry import Plane
     from kumiki.rule import create_v3
@@ -1585,16 +1249,15 @@ def non_real_plane_outline(feature: 'CSGFeature', owner: 'CutCSG', timber: 'Perf
 
 
 class PlaneOutline(NamedTuple):
-    """A plane's outline, in world space: its normal, and its segments' ends, flat."""
+    """A plane's outline in world space: its normal and flat segment ends."""
     normal: List[float]
     positions: List[float]
 
 
 def perfect_reference_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG', centerplanes: bool) -> List[PlaneOutline]:
-    """The rough body's perfect references, each outlined as cropped to the cut timber `root`, in
-    world space: what a drawing draws dotted, edge-on. Its centerplanes, or its perfect faces --
-    those the rough body has no face for (ptw.*); a face it has (rptw.*) is drawn as the timber
-    already, and a joint's faces are not these."""
+    """Return the rough body's perfect references cropped to `root`, in world space: centerplanes, and perfect
+    faces the rough body has no face for (ptw.*).
+    """
     from kumiki.csg.cutcsg import Difference, FeatureNature, MidplaneFeature, PlaneFeature
     from kumiki.csg.feature_extent import extents_of
     from kumiki.geometry import Plane
@@ -1621,8 +1284,7 @@ def perfect_reference_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG', ce
 # --- a drawing's pick: every member drawn under the pointer -------------------------------------
 
 class DrawnMember(NamedTuple):
-    """A member a drawing's pick may land on: its key, its cut timber's tree (local space), where it
-    is, and where the pointer's ray met its surface (local), if it did."""
+    """A member a drawing pick may land on: key, tree (local), placement, and where the ray met its surface."""
     key: str
     root: 'CutCSG'
     timber: 'PerfectTimberWithin'
@@ -1630,7 +1292,7 @@ class DrawnMember(NamedTuple):
 
 
 class MemberCandidate(NamedTuple):
-    """A feature under the pointer, and the member it is on. `candidate` is in that member's space."""
+    """A feature under the pointer and the member it is on."""
     member: str
     timber: 'PerfectTimberWithin'
     candidate: PointerCandidate
@@ -1640,15 +1302,10 @@ def drawing_candidates(
     members: List[DrawnMember], world_ray: LocalRay, tolerances: 'FeatureTestTolerances',
     blocked_for: Callable[[str], Optional[Callable[[Float3], bool]]],
 ) -> Tuple[List[MemberCandidate], int]:
-    """Everything under the pointer in a drawing's view, on every member drawn there: (candidates,
-    how many are visible). Visible first, then hidden, each nearest first.
+    """Return every feature under the pointer in a drawing view, across all members drawn there, and how many are visible.
 
-    A sheet draws every member flat, so what the pointer is near need not be on the member its ray
-    meets first -- where two members meet, the corner aimed at is often the other one's, and off a
-    silhouette the ray meets none at all. Each member is searched along the ray in its own space;
-    depth along the ray is the same in every space, so they are ordered as one (order_along_ray),
-    and what is hidden is decided across them (visibility: drawn_over, and `blocked_for` a member's
-    places).
+    Each member is searched along the ray in its own space; results are ordered together by depth.
+    Visible first, then hidden (drawn_over, `blocked_for`), each nearest first.
     """
     from kumiki.csg.cutcsg import feature_hit_sort_key
     from kumiki.csg.feature_paths import FeatureHandle
