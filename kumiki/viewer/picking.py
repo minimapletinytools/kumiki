@@ -187,141 +187,35 @@ def edge_tolerance() -> float:
     return FEATURE_EDGE_TOLERANCE
 
 
-#: Floating point error: how far off the cut surface a declared edge may compute.
-DECLARED_EDGE_FLOAT_NOISE = 1e-6
-
-
-def cropped_edge_segments(
-    edge_feature: 'CSGFeature',
-    line: 'Line',
-    timber: 'PerfectTimberWithin',
-    root_csg: 'CutCSG',
-    owner: Optional['CutCSG'] = None,
-) -> Tuple[Optional[List[WorldSegment]], bool]:
-    """Return (segments, absent): the edge's line cropped to where the edge exists, in world space.
-
-    Intersects where the line is on the timber's surface, where both parent faces exist, and the
-    feature's own declared ends. `absent` is True when nothing is left. Segments are
-    {"start", "end"} dicts in order along the line.
-    """
-    from kumiki.csg.feature_extent import declared_line_span, intersected_intervals
-    from kumiki.csg.edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to_segments_on_csg
-    from kumiki.geometry import Line, unit_vector
-
-    # Unit direction, so stations are in metres.
-    line = Line(direction=unit_vector(line.direction), point=line.point)
-
-    near = timber.get_perfect_timber_within_csg_local().transform.position
-    reach = float(timber.length) * 4
-    station = lambda point: float(((point - line.point).T * line.direction)[0, 0])
-    spans = lambda pieces: None if pieces is None else [
-        tuple(sorted((station(piece.start), station(piece.end))))
-        for piece in pieces
-    ]
-
-    # A derived edge is bounded by the two solids its parent faces belong to.
-    # A declared one -- a timber's own arris -- belongs to a single primitive,
-    # which is the owner it was found on.
-    hits = list(getattr(edge_feature, "parents", (None, None)))
-    parents = [
-        hit.owner for hit in hits
-        if hit is not None and getattr(hit, "owner", None) is not None
-    ]
-    derived = bool(parents)
-    if not parents:
-        parents = [owner] if owner is not None else []
-
-    declared = declared_line_span(edge_feature, owner, line) if owner is not None else None
-
-    def clipped(tolerance: float) -> Optional[List[Interval]]:
-        # Where the surface creases along it: on the surface, and not a line through a flat face.
-        found = spans(crop_line_to_crease_segments_on_csg(
-            line, root_csg, seed_reach=reach, near=near, tolerance=tolerance))
-        if found is None:
-            return None
-        bounds = []
-        if declared is not None:
-            # Widened with everything else: a derived edge found by a tolerant
-            # test has parents whose corners are that far from its line, so an
-            # unwidened declared span would undo the fallback it is part of.
-            bounds.append([(declared[0] - tolerance, declared[1] + tolerance)])
-        for parent in parents:
-            within = spans(crop_line_to_segments_on_csg(
-                line, parent, seed_reach=reach, near=near, tolerance=tolerance))
-            if within is None:
-                return None
-            bounds.append(within)
-        for bound in bounds:
-            found = intersected_intervals(found, bound)
-        return found
-
-    # Exact spans first. If that loses the edge entirely, retry at the edge tolerance for a derived
-    # edge, or at float noise for a declared one.
-    # TODO consider one clip at DECLARED_EDGE_FLOAT_NOISE for declared edges instead
-    # of exact-then-retry: simpler, at the cost of padding every end by a micron.
-    cropped = clipped(0.0)
-    if not cropped:
-        cropped = clipped(float(edge_tolerance()) if derived else DECLARED_EDGE_FLOAT_NOISE)
-    if cropped is None:
-        # A solid it cannot describe: no answer, rather than a wrong one.
-        return (None, False)
-    if not cropped:
-        return (None, True)
-
-    at = lambda reached: timber.transform.local_to_global(
-        line.point + line.direction * float(reached))
-    return ([
-        {
-            "start": Float3.of(at(low)),
-            "end": Float3.of(at(high)),
-        }
-        for low, high in cropped
-    ], False)
-
-
 def edge_highlight_segments(
     edge_feature: 'CSGFeature',
     owner: 'CutCSG',
     timber: 'PerfectTimberWithin',
     root_csg: 'CutCSG',
 ) -> Tuple[Optional[List[WorldSegment]], bool]:
-    """Return (segments, absent) to draw a selected edge, in world space.
+    """Return (segments, absent) to draw a selected line feature, in world space: its FeatureExtent on `root_csg`.
 
-    segments is None when the tree has a primitive edges_on_csg can't describe (the caller then lights
-    triangles); `absent` says the edge was cropped away entirely.
-    """
-    from kumiki.geometry import Line
-
-    line = edge_feature.locate_simple_unbounded(owner)
-    if timber is None or root_csg is None or not isinstance(line, Line):
-        return (None, False)
-    if not edge_feature.real:
-        return (non_real_highlight_segments(edge_feature, owner, timber, root_csg), False)
-    return cropped_edge_segments(edge_feature, line, timber, root_csg, owner)
-
-
-def non_real_highlight_segments(
-    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None,
-) -> Optional[List[WorldSegment]]:
-    """Return the segments to draw a non-real feature, in world space: its own extent, not cropped to the
-    cut solid (a bore's axis lies in the void).
-
-    Falls back to its extent on the cut timber `root_csg` when it can't bound itself (e.g. a shoulder
-    plane crossing a perfect face).
+    segments is None when the extent can't be computed (the caller then lights triangles); `absent`
+    says the line was cropped away entirely.
     """
     from kumiki.csg.feature_extent import extents_of
+    from kumiki.geometry import Line
+
+    if timber is None or root_csg is None or not isinstance(edge_feature.locate_simple_unbounded(owner), Line):
+        return (None, False)
+    extent = extents_of(root_csg, timber).of(edge_feature, owner)
+    if extent is None:
+        return (None, False)
+    if extent.is_empty:
+        return (None, True)
+    return (_world_segments(extent.outline(), timber), False)
+
+
+def _world_segments(segments, timber: 'PerfectTimberWithin') -> List[WorldSegment]:
     from kumiki.rule import create_v3
 
-    to_world = lambda point: Float3.of(timber.transform.local_to_global(point))
-    extent = feature.get_extent(owner)
-    if extent is not None and extent.ends is not None:
-        return [{"start": to_world(extent.ends[0]), "end": to_world(extent.ends[1])}]
-    if root_csg is None:
-        return None
-    on_timber = extents_of(root_csg, timber).of(feature, owner)
-    if on_timber is None or on_timber.is_empty:
-        return None
-    return [{"start": to_world(create_v3(*start)), "end": to_world(create_v3(*end))} for start, end in on_timber.outline()]
+    to_world = lambda point: Float3.of(timber.transform.local_to_global(create_v3(*point)))  # noqa: E731
+    return [{"start": to_world(start), "end": to_world(end)} for start, end in segments]
 
 
 def features_at_point(
@@ -480,10 +374,9 @@ def candidates_under_pointer(
     for hit in hits:
         if _hit_key(hit) not in found:
             # Non-real, in a void: as deep as its nearest approach to the ray.
-            extent = hit.feature.get_extent(hit.owner)
-            if extent is not None and extent.ends is not None:
-                nearest = ray_nears_segment(
-                    origin, direction, (Float3.of(extent.ends[0]), Float3.of(extent.ends[1])), math.inf)
+            ends = hit.feature.declared_ends(hit.owner)
+            if ends is not None:
+                nearest = ray_nears_segment(origin, direction, (Float3.of(ends[0]), Float3.of(ends[1])), math.inf)
                 if nearest is not None:
                     found_at([hit], nearest)
             elif timber is not None:
@@ -629,9 +522,9 @@ def real_features_along_ray(
         if isinstance(located, Plane):
             at = _ray_meets_plane(origin, direction, located)
         elif isinstance(located, Line):
-            extent = feature.get_extent(owner)
-            at = (ray_nears_segment(origin, direction, (Float3.of(extent.ends[0]), Float3.of(extent.ends[1])), near)
-                  if extent is not None and extent.ends is not None else None)
+            ends = feature.declared_ends(owner)
+            at = (ray_nears_segment(origin, direction, (Float3.of(ends[0]), Float3.of(ends[1])), near)
+                  if ends is not None else None)
         elif isinstance(located, Point):
             position = Float3.of(located.position)
             at = position if (position - origin).across(direction).length() <= near else None
@@ -727,11 +620,10 @@ def non_real_features_along_ray(
             return
         if not isinstance(located, Line):
             return
-        extent = feature.get_extent(owner)
-        if extent is None or extent.ends is None:
+        declared = feature.declared_ends(owner)
+        if declared is None:
             return
-        ends = (Float3.of(extent.ends[0]), Float3.of(extent.ends[1]))
-        if ray_reaches_segment(origin, direction, ends, tolerance):
+        if ray_reaches_segment(origin, direction, (Float3.of(declared[0]), Float3.of(declared[1])), tolerance):
             found.append(OwnedFeatureHit(feature=feature, owner=owner))
 
     def walk(node: 'CutCSG') -> None:
@@ -1237,15 +1129,11 @@ def non_real_plane_outline(feature: 'CSGFeature', owner: 'CutCSG', timber: 'Perf
     """Return a non-real plane's outline in world space (its extent's outline), or None for anything else."""
     from kumiki.csg.feature_extent import extents_of
     from kumiki.geometry import Plane
-    from kumiki.rule import create_v3
 
     if feature.real or not isinstance(feature.locate_simple_unbounded(owner), Plane):
         return None
     extent = extents_of(root, timber).of(feature, owner)
-    if extent is None:
-        return None
-    to_world = lambda point: Float3.of(timber.transform.local_to_global(create_v3(*point)))
-    return [{"start": to_world(start), "end": to_world(end)} for start, end in extent.outline()]
+    return None if extent is None else _world_segments(extent.outline(), timber)
 
 
 class PlaneOutline(NamedTuple):

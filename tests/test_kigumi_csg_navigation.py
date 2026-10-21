@@ -1739,7 +1739,7 @@ class TestPickingAlongTheRay:
 
     def _aim(self, axis, owner, timber, sideways):
         """A ray down the bore, *sideways* metres off its centre line."""
-        ends = axis.get_extent(owner).ends
+        ends = axis.declared_ends(owner)
         start = timber.transform.local_to_global(ends[0])
         end = timber.transform.local_to_global(ends[1])
         direction = [float(end[i, 0] - start[i, 0]) for i in range(3)]

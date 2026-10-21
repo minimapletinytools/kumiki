@@ -1226,9 +1226,9 @@ class TestMortiseAndTenonFeatures:
             assert arris is not None
             owner = shared_ancestor(rendered, declared["shoulder"].owner, declared[cheek].owner)
             assert owner is not None
-            extent = arris.get_extent(owner)
-            assert extent is not None
-            middle = extent.anchor
+            ends = arris.declared_ends(owner)
+            assert ends is not None
+            middle = (ends[0] + ends[1]) / 2
 
             hits = rendered.find_all_features(middle)
             assert hits and hits[0].feature.feature_type() is CSGFeatureType.EDGE, cheek
@@ -1338,16 +1338,18 @@ class TestThePegHoleCentreline:
         from kumiki.geometry import Line
 
         axis, bore = self._axes(self._rendered(simple_T_configuration)["tenon_timber"])[0]
-        located, extent = axis.locate_simple_unbounded(bore), axis.get_extent(bore)
+        located, ends = axis.locate_simple_unbounded(bore), axis.declared_ends(bore)
 
         assert isinstance(located, Line)
-        assert extent is not None and extent.ends is not None
+        assert ends is not None
 
     def test_it_is_selectable_inside_the_hole(self, simple_T_configuration):
         """Where there is no material at all, which is what a bore's axis is for."""
         rendered = self._rendered(simple_T_configuration)["tenon_timber"]
         axis, bore = self._axes(rendered)[0]
-        midpoint = axis.get_extent(bore).anchor
+        ends = axis.declared_ends(bore)
+        assert ends is not None
+        midpoint = (ends[0] + ends[1]) / 2
 
         assert not rendered.is_point_on_boundary(midpoint, scalar("5e-4"))
         # The timber's centerplane runs through it too; the axis, a line, comes first.
@@ -1368,7 +1370,9 @@ class TestThePegHoleCentreline:
         for name in ("tenon_timber", "mortise_timber"):
             rendered = self._rendered(simple_T_configuration)[name]
             axis, bore = self._axes(rendered)[0]
-            for end in axis.get_extent(bore).ends:
+            ends = axis.declared_ends(bore)
+            assert ends is not None
+            for end in ends:
                 assert not any(hit.feature_type() == CSGFeatureType.POINT
                                for hit in rendered.find_all_features(end)), (
                     f"{name} derived a point where the peg hole axis leaves it")

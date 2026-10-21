@@ -2909,9 +2909,8 @@ def _cropped_reference_segments(
     timber: 'PerfectTimberWithin', root_csg: 'CutCSG', segments: List[Any], through_material: bool,
 ) -> List[Any]:
     """Return `segments` (world space) cropped to the cut timber's surface, or with `through_material` its inside. Exact, then at float noise."""
-    from kumiki.viewer.picking import DECLARED_EDGE_FLOAT_NOISE
-    from kumiki.csg.edges_on_csg import (crop_line_to_boundary_segments_on_csg,
-                                    crop_line_to_segments_on_csg)
+    from kumiki.csg.edges_on_csg import crop_line_to_boundary_segments_on_csg, crop_line_to_segments_on_csg
+    from kumiki.csg.feature_extent import DECLARED_EDGE_FLOAT_NOISE, cropped_intervals
     from kumiki.geometry import Line, unit_vector
     from kumiki.rule import create_v3
 
@@ -2926,12 +2925,7 @@ def _cropped_reference_segments(
         if span <= 0:
             continue
         line = Line(direction=unit_vector(b - a), point=a)
-        station = lambda point: float(((point - a).T * line.direction)[0, 0])  # noqa: E731
-        pieces = crop(line, root_csg, seed_reach=reach, near=near, tolerance=0.0)
-        if not pieces:
-            pieces = crop(line, root_csg, seed_reach=reach, near=near, tolerance=DECLARED_EDGE_FLOAT_NOISE)
-        for piece in pieces or []:
-            low, high = sorted((station(piece.start), station(piece.end)))
+        for low, high in cropped_intervals(line, crop, root_csg, reach, near, DECLARED_EDGE_FLOAT_NOISE) or []:
             low, high = max(low, 0.0), min(high, span)
             if high - low <= 1e-9:
                 continue

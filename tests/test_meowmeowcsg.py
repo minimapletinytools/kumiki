@@ -38,7 +38,6 @@ from kumiki.csg.cutcsg import (
     DerivedEdgeFeature,
     DerivedPointFeature,
     OwnedFeatureHit,
-    CSGFeatureExtent,
     safe_zero_test_sq,
     CSGFeatureType,
     FeatureTestTolerances,
@@ -1668,7 +1667,7 @@ class TestConvexProfileEdges:
         assert edges[(FeatureCategory.ARRIS, 0)].test_point_unbounded(box, create_v3(4, 0, 5))
         assert not edges[(FeatureCategory.ARRIS, 0)].test_point_unbounded(box, create_v3(2, 0, 5))
         # Side 0 against the end cap: from (0,0,10) to (4,0,10).
-        ends = edges[arris_against_cap(0, 4, end=True)].get_extent(box).ends
+        ends = edges[arris_against_cap(0, 4, end=True)].declared_ends(box)
         assert [[float(v) for v in end] for end in ends] == [[0, 0, 10], [4, 0, 10]]
 
     def test_an_open_extrusion_keeps_its_long_edges_and_has_none_at_the_open_end(self):
@@ -1687,7 +1686,7 @@ class TestConvexProfileEdges:
                                        bottom_points_z_pos=scalar(0), top_points_z_pos=scalar(10))
         edge = self._edges(loft)[(FeatureCategory.ARRIS, 0)]
 
-        assert [[float(v) for v in end] for end in edge.get_extent(loft).ends] == [[4, 0, 0], [3, 1, 10]]
+        assert [[float(v) for v in end] for end in edge.declared_ends(loft)] == [[4, 0, 0], [3, 1, 10]]
         assert edge.test_point_unbounded(loft, create_v3(3.5, 0.5, 5))
 
     def test_an_edge_is_named_like_a_face(self):
@@ -3815,45 +3814,6 @@ class TestFeatureLocate:
         assert SimpleCylinderCapFeature("w", part=CylinderPart.TOP).locate_simple_unbounded(prism) is None
 
 
-class TestFeatureExtent:
-    """get_extent() says where to draw an annotation, not what to measure."""
-
-    def _prism(self):
-        return RectangularPrism(
-            size=Matrix([scalar(4), scalar(6)]),
-            transform=Transform.identity(),
-            start_distance=scalar(0),
-            end_distance=scalar(10),
-        )
-
-    def test_a_prism_face_anchors_at_its_centre(self):
-        prism = self._prism()
-        extent = SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT).get_extent(prism)
-        assert extent is not None
-        assert float(extent.anchor[0]) == pytest.approx(2.0)
-        assert float(extent.anchor[1]) == pytest.approx(0.0)
-        assert float(extent.anchor[2]) == pytest.approx(5.0)
-        assert extent.region is not None
-
-    def test_a_half_space_has_no_extent(self):
-        """Its plane is unbounded, so there is no honest box or midpoint."""
-        hs = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(5))
-        assert HalfSpaceFeature("shoulder").get_extent(hs) is None
-
-    def test_a_cylinder_barrel_still_has_an_anchor(self):
-        """No plane to locate, but a dimension line still needs somewhere to attach."""
-        bore = Cylinder(
-            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
-            radius=scalar(2),
-            position=create_v3(scalar(0), scalar(0), scalar(0)),
-            start_distance=scalar(0),
-            end_distance=scalar(10),
-        )
-        extent = SimpleCylinderBarrelFeature("wall").get_extent(bore)
-        assert extent is not None
-        assert float(extent.anchor[2]) == pytest.approx(5.0)
-
-
 class TestNonRealFeatures:
     """nature=FeatureNature.AUXILIARY features name nothing the CSG tree could have cut away."""
 
@@ -4664,22 +4624,16 @@ class TestACylindersAxis:
             direction=create_v3(scalar(0), scalar(0), scalar(1)),
             point=create_v3(scalar(2), scalar(3), scalar(0))))
 
-    def test_its_extent_is_the_bores_own_span(self):
-        """It knows its ends outright, where a derived edge has to ask its parents."""
+    def test_its_ends_are_the_bores_own(self):
         bore = self._bore()
-        extent = self._axis(bore).get_extent(bore)
-        assert extent is not None and extent.ends is not None
-        assert points_are_coincident(
-            Point(extent.anchor), Point(create_v3(scalar(2), scalar(3), scalar(5))))
-        assert points_are_coincident(
-            Point(extent.ends[0]), Point(create_v3(scalar(2), scalar(3), scalar(0))))
-        assert points_are_coincident(
-            Point(extent.ends[1]), Point(create_v3(scalar(2), scalar(3), scalar(10))))
+        ends = self._axis(bore).declared_ends(bore)
+        assert ends is not None
+        assert points_are_coincident(Point(ends[0]), Point(create_v3(scalar(2), scalar(3), scalar(0))))
+        assert points_are_coincident(Point(ends[1]), Point(create_v3(scalar(2), scalar(3), scalar(10))))
 
-    def test_an_endless_bore_has_an_anchor_and_no_ends(self):
+    def test_an_endless_bore_has_no_ends(self):
         bore = self._bore(end=None)
-        extent = self._axis(bore).get_extent(bore)
-        assert extent is not None and extent.ends is None
+        assert self._axis(bore).declared_ends(bore) is None
 
     def test_an_axis_on_a_shape_with_no_axis_says_so(self):
         """It used to cast the owner to a Cylinder and trust the caller."""
@@ -4691,7 +4645,7 @@ class TestACylindersAxis:
         with pytest.warns(UserWarning, match="which has no axis"):
             assert axis.locate_simple_unbounded(prism) is None
         with pytest.warns(UserWarning, match="which has no axis"):
-            assert axis.get_extent(prism) is None
+            assert axis.declared_ends(prism) is None
 
     def test_the_point_test_is_unbounded_like_every_other(self):
         bore = self._bore()
@@ -4857,12 +4811,10 @@ class TestDerivedPoints:
         point = DerivedPointFeature.derive(
             self._arris(), self._plane(create_v3(0, 0, 1), scalar(5)))
         assert point is not None
-        extent = point.get_extent(self._body())
+        located = point.locate_simple_unbounded(self._body())
 
-        assert extent is not None
-        assert extent.ends is None and extent.region is None
-        assert points_are_coincident(
-            Point(extent.anchor), Point(create_v3(scalar(2), scalar(3), scalar(5))))
+        assert isinstance(located, Point)
+        assert points_are_coincident(located, Point(create_v3(scalar(2), scalar(3), scalar(5))))
 
     def test_a_point_is_real_only_where_both_parents_are(self):
         ghost = self._plane(create_v3(0, 0, 1), scalar(5))
@@ -5712,10 +5664,10 @@ class TestANamedArris:
         # On the right face, not on the front one.
         assert not arris.test_point_unbounded(prism, create_v3(scalar(2), scalar(0), scalar(5)))
 
-    def test_it_has_an_extent_to_hang_an_annotation_from(self):
+    def test_it_has_declared_ends(self):
         arris = self._arris()
 
-        assert arris.get_extent(self._prism()) is not None
+        assert arris.declared_ends(self._prism()) is not None
 
     def test_it_is_found_by_a_point_query_like_any_other_feature(self):
         # The difference from a derived edge: it is simply there, and does not
@@ -5762,11 +5714,10 @@ class TestANamedCorner:
     def test_its_extent_is_the_point_itself(self):
         corner = self._corner()
 
-        extent = corner.get_extent(self._prism())
+        located = corner.locate_simple_unbounded(self._prism())
 
-        assert extent is not None and extent.ends is None
-        assert points_are_coincident(
-            Point(extent.anchor), Point(create_v3(scalar(2), scalar(3), scalar(0))))
+        assert isinstance(located, Point)
+        assert points_are_coincident(located, Point(create_v3(scalar(2), scalar(3), scalar(0))))
 
     def test_an_end_that_runs_to_infinity_has_no_corner_there(self):
         endless = RectangularPrism(
@@ -5968,7 +5919,7 @@ class TestADerivedFeatureIsOwnedByWhatMadeIt:
     was called on and stamped that node onto everything it made, so the owner
     changed with the question.
 
-    Nothing read it, which is why this went unnoticed -- locate, get_extent and
+    Nothing read it, which is why this went unnoticed -- locate, declared_ends and
     test_point_unbounded all ignore the owner they are handed and reach through
     to each parent's own, and the runner serialises a derived reference from the
     parents too. The field was simply untrue.

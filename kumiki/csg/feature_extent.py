@@ -2,7 +2,8 @@
 
 Computed in the timber's local space from the cut timber's tree (`root`), by FeatureNature:
 
-- REAL: a face's part on the finished surface; a line's pieces where there is timber.
+- REAL: a face's part on the finished surface; a line's pieces where the surface creases along it
+  (a real edge), within its parent faces' solids and its declared ends.
 - PERFECT_REFERENCE: a plane or line cropped to the solid.
 - AUXILIARY (e.g. a bore's axis): its own declared extent, not cropped.
 
@@ -15,12 +16,12 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from .edges_on_csg import crop_line_to_segments_on_csg
+from .edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to_segments_on_csg
 from .cross_sections import (CrossSection, cross_section_centroid, cross_section_outline, cross_section_polygons,
                              face_cross_section, plane_cross_section)
-from .cutcsg import CSGFeature, CutCSG, FaceFeature, FeatureNature
+from .cutcsg import FEATURE_EDGE_TOLERANCE, CSGFeature, CutCSG, FaceFeature, FeatureNature
 from .feature_paths import hit_identity
-from ..geometry import Line, Plane, Point
+from ..geometry import Line, Plane, Point, unit_vector
 from ..rule import as_ndarray, create_v3
 
 if TYPE_CHECKING:
@@ -29,6 +30,9 @@ if TYPE_CHECKING:
 Segment3 = Tuple[np.ndarray, np.ndarray]
 #: Stations along a line, low then high.
 Interval = Tuple[float, float]
+
+#: Float error: how far off the cut surface a declared edge may compute.
+DECLARED_EDGE_FLOAT_NOISE = 1e-6
 
 
 def timber_reach(timber: 'PerfectTimberWithin') -> float:
@@ -47,21 +51,34 @@ def intersected_intervals(one: Sequence[Interval], other: Sequence[Interval]) ->
 
 def declared_line_span(feature: CSGFeature, owner: CutCSG, located: Line) -> Optional[Interval]:
     """Return the interval along `located` between the feature's declared ends, or None if it has none."""
-    extent = feature.get_extent(owner)
-    ends = getattr(extent, "ends", None) if extent is not None else None
-    if not ends:
+    ends = feature.declared_ends(owner)
+    if ends is None:
         return None
     reach = sorted(_station(located, end) for end in ends)
     return (reach[0], reach[-1])
 
 
-def line_intervals(located: Line, csg: CutCSG, reach: float, near) -> Optional[List[Interval]]:
-    """Return the intervals along `located` where it lies on `csg`, or None if that can't be computed."""
-    pieces = crop_line_to_segments_on_csg(located, csg, seed_reach=reach, near=near)
+def _intervals(located: Line, pieces) -> Optional[List[Interval]]:
     if pieces is None:
         return None
     return [(min(a, b), max(a, b))
             for a, b in ((_station(located, piece.start), _station(located, piece.end)) for piece in pieces)]
+
+
+def cropped_intervals(located: Line, crop, solid: CutCSG, reach: float, near, retry: float) -> Optional[List[Interval]]:
+    """Return the intervals along `located` that `crop` (an edges_on_csg crop function) keeps on `solid`.
+
+    Exact, or at tolerance `retry` if exact keeps nothing. None if it can't be computed.
+    """
+    found = _intervals(located, crop(located, solid, seed_reach=reach, near=near, tolerance=0.0))
+    if found == []:
+        found = _intervals(located, crop(located, solid, seed_reach=reach, near=near, tolerance=retry))
+    return found
+
+
+def line_intervals(located: Line, csg: CutCSG, reach: float, near) -> Optional[List[Interval]]:
+    """Return the intervals along `located` where it lies on `csg`, or None if that can't be computed."""
+    return _intervals(located, crop_line_to_segments_on_csg(located, csg, seed_reach=reach, near=near))
 
 
 def line_pieces(
@@ -157,10 +174,17 @@ class FeatureExtents:
         if isinstance(located, Point):
             return FeatureExtent(located)
         if isinstance(located, Line):
+            located = Line(direction=unit_vector(located.direction), point=located.point)
+            declared = declared_line_span(feature, owner, located)
+            if feature.real and self.root is not None:
+                edge = self._edge_pieces(feature, owner, located, declared)
+                if edge is None:
+                    if declared is None:
+                        return None
+                    edge = [declared]
+                return FeatureExtent(located, pieces=tuple(edge))
             solids: Sequence[Optional[CutCSG]] = [] if auxiliary or self.root is None else [self.root]
-            pieces = line_pieces(located, solids, self.reach, self.near,
-                                 declared=declared_line_span(feature, owner, located))
-            return FeatureExtent(located, pieces=tuple(pieces))
+            return FeatureExtent(located, pieces=tuple(line_pieces(located, solids, self.reach, self.near, declared)))
         if isinstance(located, Plane):
             if feature.nature is FeatureNature.PERFECT_REFERENCE and self.root is not None:
                 cross_section = plane_cross_section(located, self.root, self.near, self.reach)
@@ -171,6 +195,37 @@ class FeatureExtents:
                 return None
             return None if cross_section is None else FeatureExtent(located, cross_section=cross_section)
         return None
+
+
+    def _edge_pieces(self, feature: CSGFeature, owner: CutCSG, located: Line,
+                     declared: Optional[Interval]) -> Optional[List[Interval]]:
+        """Return where a real edge is: where the surface creases along it, within its parent faces'
+        solids (or its owner) and its declared ends. None if a solid can't be computed.
+
+        Exact first; if that leaves nothing, retried at the edge tolerance (derived) or float noise (declared).
+        """
+        assert self.root is not None
+        parents = [hit.owner for hit in getattr(feature, "parents", ()) if hit is not None] or [owner]
+
+        def clipped(tolerance: float) -> Optional[List[Interval]]:
+            found = _intervals(located, crop_line_to_crease_segments_on_csg(
+                located, self.root, seed_reach=self.reach, near=self.near, tolerance=tolerance))
+            if found is None:
+                return None
+            if declared is not None:
+                found = intersected_intervals(found, [(declared[0] - tolerance, declared[1] + tolerance)])
+            for parent in parents:
+                within = _intervals(located, crop_line_to_segments_on_csg(
+                    located, parent, seed_reach=self.reach, near=self.near, tolerance=tolerance))
+                if within is None:
+                    return None
+                found = intersected_intervals(found, within)
+            return found
+
+        cropped = clipped(0.0)
+        if cropped == []:
+            cropped = clipped(float(FEATURE_EDGE_TOLERANCE) if feature.is_derived() else DECLARED_EDGE_FLOAT_NOISE)
+        return cropped
 
 
 # One FeatureExtents per live tree, keyed by id.

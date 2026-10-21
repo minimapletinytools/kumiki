@@ -498,19 +498,9 @@ class TestAFeatureKnowsItsOwnEnds:
         arris = SimpleRectangularPrismEdgeFeature(
             name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT))
 
-        extent = present(arris.get_extent(self._box()), "an extent")
+        first, second = present(arris.declared_ends(self._box()), "its ends")
 
-        assert extent.ends is not None
-        first, second = extent.ends
         assert abs(float(second[2, 0]) - float(first[2, 0])) == pytest.approx(0.4)
-
-    def test_and_its_anchor_is_between_them(self):
-        from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
-
-        extent = present(SimpleRectangularPrismEdgeFeature(
-            name="a", faces=(PrismFace.FRONT, PrismFace.RIGHT)).get_extent(self._box()), "an extent")
-
-        assert float(extent.anchor[2, 0]) == pytest.approx(0.2)
 
     def test_opposite_faces_form_no_arris_and_are_not_invented(self):
         from kumiki.csg.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
@@ -533,10 +523,7 @@ class TestAFeatureKnowsItsOwnEnds:
             OwnedFeatureHit(feature=face(PrismFace.FRONT, FeatureGroup.ROUGH), owner=box))
         assert edge is not None, "adjacent faces in meeting groups form an edge"
 
-        extent = present(edge.get_extent(box), "an extent")
-
-        assert extent.ends is not None
-        first, second = extent.ends
+        first, second = present(edge.declared_ends(box), "its ends")
         assert abs(float(second[2, 0]) - float(first[2, 0])) == pytest.approx(0.4)
 
     def test_the_runner_reads_those_ends_as_an_interval(self):

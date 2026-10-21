@@ -36,15 +36,18 @@ def world_geometry(handle: FeatureHandle) -> Optional[Located]:
 
 
 def feature_anchor(handle: FeatureHandle, root: Optional[CutCSG] = None) -> Optional[V3]:
-    """Return where a dimension attaches to a feature, in world space: its extent's anchor on `root`, else its declared extent's."""
+    """Return where a dimension attaches to a feature, in world space, or None for a curved face.
+
+    Its extent's anchor on `root`; failing that, uncropped (FeatureExtents with no root).
+    """
     timber = handle.timber
-    extents = extents_of(root, timber) if root is not None else FeatureExtents(None, timber)
-    extent = extents.of(handle.feature, handle.owner)
-    anchor = None if extent is None else extent.anchor()
-    if anchor is not None:
-        return timber.transform.local_to_global(create_v3(*anchor))
-    declared = handle.feature.get_extent(handle.owner)
-    return None if declared is None else timber.transform.local_to_global(declared.anchor)
+    tries = ([extents_of(root, timber)] if root is not None else []) + [FeatureExtents(None, timber)]
+    for extents in tries:
+        extent = extents.of(handle.feature, handle.owner)
+        anchor = None if extent is None else extent.anchor()
+        if anchor is not None:
+            return timber.transform.local_to_global(create_v3(*anchor))
+    return None
 
 
 def kinds_for_pair(one: Optional[Located], other: Optional[Located], look, space: MeasurementSpace,

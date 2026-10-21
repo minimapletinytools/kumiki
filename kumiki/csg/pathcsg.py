@@ -18,7 +18,6 @@ from ..geometry import Plane
 from .cutcsg import (
     AxisAlignedBoundingBox,
     CSGFeature,
-    CSGFeatureExtent,
     CSGFeatureType,
     CurvedFaceFeature,
     CutCSG,
@@ -27,7 +26,6 @@ from .cutcsg import (
     HasFeatures,
     LocatedFeatureGeometry,
     _finite_midpoint,
-    _side_region,
     ExtrusionCap,
     ExtrusionFeatureKey,
     OwnedFeatureHit,
@@ -752,32 +750,6 @@ class _PathExtrusionFeature(CSGFeature):
         local = Matrix([midpoint_2d[0], midpoint_2d[1], mid_length])
         return Plane(normal=normal, point=owner.transform.position + safe_transform_vector(orientation, local))
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        if not isinstance(owner, PathExtrusion):
-            return None
-        midpoint_2d = self._midpoint_2d(owner)
-        if midpoint_2d is None:
-            return None
-        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
-            distance = owner.end_distance if self.key == ExtrusionCap.TOP else owner.start_distance
-            if distance is None:
-                return None
-        else:
-            distance = _finite_midpoint(owner.start_distance, owner.end_distance)
-        local = Matrix([midpoint_2d[0], midpoint_2d[1], distance])
-        orientation = owner.transform.orientation.matrix
-        # A straight side is a rectangle. A cap follows the path, which may be concave or curved,
-        # and a curved side is not flat, so neither has a convex outline to give.
-        region = None
-        plane = self.locate_simple_unbounded(owner)
-        if plane is not None and self.key not in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
-            segment = owner.path.segments[side_index(self.key)]
-            region = _side_region(owner, plane.normal, segment.start, segment.end,
-                                  owner.start_distance, owner.end_distance)
-        return CSGFeatureExtent(
-            anchor=owner.transform.position + safe_transform_vector(orientation, local),
-            region=region,
-        )
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, PathExtrusion):
