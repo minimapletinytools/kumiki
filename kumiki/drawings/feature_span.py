@@ -1,8 +1,4 @@
-"""Where a feature is, for measuring: its span, cropped to where it exists.
-
-One answer for the viewer (kigumi's runner) and the feature solver, so the length one draws
-is the length the other solves with.
-"""
+"""A feature's span for measuring, cropped to where it exists. Shared by the runner and the solver."""
 
 import math
 from typing import Optional
@@ -23,15 +19,11 @@ _UP = np.array([0.0, 0.0, 1.0])
 
 
 def _unit_or_up(vector: np.ndarray) -> np.ndarray:
-    """At length one; a zero vector is taken as up, so a degenerate span still has a direction."""
+    """Return `vector` at unit length; a zero vector becomes up."""
     return unit_ndarray(vector, _UP)
 
 def edge_outward_normal(feature: CSGFeature, owner: CutCSG, timber: PerfectTimberWithin) -> Optional[np.ndarray]:
-    """Which way is out of the material across an edge, in world space, or None.
-
-    The average of the two faces' outward normals. Only decides which of two supplementary angles
-    is meant, so None is a fair answer.
-    """
+    """Return the average of an edge's two faces' outward normals in world space, or None."""
     located = []
     if isinstance(feature, DerivedEdgeFeature):
         located = [parent.locate_simple_unbounded() for parent in feature.parents if parent is not None]
@@ -54,17 +46,11 @@ def feature_span(
     plane_normal: Optional[VectorLike] = None,
     in_three_d: bool = False,
 ) -> Optional[MeasureSpan]:
-    """What a feature is, where the measurement is being taken, in world space.
+    """Return the feature's MeasureSpan in world space, or None if it can't be placed.
 
-    The extent is the feature's FeatureExtent: what it occupies once cropped to the timber
-    (`root_csg`, the cut timber's tree the handle points into). With no `root_csg`, or for a line
-    not on any timber (a bore's axis), it is what declared the feature.
-
-    ON A SHEET (`plane_normal`, the view direction) a face is measurable only seen edge-on, where it
-    draws as a line along itself; at an angle it falls back to a point. A line seen end-on is a point.
-    IN THE SOLID nothing is projected away: a face is a PlaneSpan, an edge stays an edge.
-
-    None when the feature cannot be placed.
+    Its extent is cropped to `root_csg` (the cut timber's tree); without it, or for an auxiliary line,
+    the declared extent. With `plane_normal` (a sheet's view direction), a face seen edge-on is a line
+    and otherwise a point, and a line seen end-on is a point. Without it, a face is a PlaneSpan.
     """
     feature, owner, timber = handle.feature, handle.owner, handle.timber
     located = feature.locate_simple_unbounded(owner)

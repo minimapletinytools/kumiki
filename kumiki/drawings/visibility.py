@@ -1,16 +1,11 @@
-"""What a drawing's 2D view can see: whether a place, or any of a feature, is hidden behind material, computed analytically.
+"""What a drawing's 2D view can see, computed analytically.
 
-Two questions, one set of rules:
+- `hidden_at` / `drawn_over`: is what is under the pointer hidden (picking.drawing_candidates)?
+- `nearest_visible_depth` / `visible_by_view`: can any of a feature be seen in a view?
 
-- PER PLACE, for a pointer: is what is under it hidden? `hidden_at` a place, and a feature
-  `drawn_over` by a nearer one there (picking.drawing_candidates).
-- PER FEATURE, for a view: can any of it be seen? `nearest_visible_depth` (visible_by_view).
-
-The rules both keep: a feature that is not real (a bore's axis, a centerplane) is `never_hidden`;
-only a solid's inside hides, and a line of sight along its surface does not; unsure -- a solid that
-cannot be cut exactly -- means seen. The one difference: under a pointer, a feature drawn over by a
-nearer one is hidden too, so a click takes what is on top; a view keeps it, since two timbers' tops
-in line are dimensioned at the one line both draw.
+Non-real features are never hidden. Only a solid's inside hides; a sight line along its surface
+doesn't. A solid that can't be cut exactly counts as not hiding. Under the pointer, a feature drawn
+over by a nearer one is also hidden; in a view it is kept.
 """
 
 import warnings
@@ -41,14 +36,9 @@ REACH = 1e3
 
 
 def sight_is_blocked(root: CutCSG, place: V3, toward_camera: V3) -> bool:
-    """Whether the inside of *root* lies between *place* and the camera.
+    """Return whether the inside of `root` lies between `place` and the camera, all in `root`'s local space.
 
-    Args:
-        root: the solid that may be in the way, in its own local space.
-        place: where the feature is, in that same space.
-        toward_camera: the direction from *place* to the camera, in that same space.
-
-    False when *root* cannot be clipped exactly (a curved primitive other than a cylinder).
+    False if `root` can't be clipped exactly.
     """
     direction = safe_normalize_vector(toward_camera)
     inside = crop_line_to_interior_segments_on_csg(Line(direction=direction, point=place), root, seed_reach=REACH,
@@ -62,14 +52,12 @@ Occluder = Tuple[CutCSG, Transform]
 
 
 def never_hidden(feature: CSGFeature) -> bool:
-    """Whether nothing can hide `feature`: one that is not real names no material, so it is drawn
-    wherever it is."""
+    """Return whether `feature` can't be hidden (it isn't real)."""
     return not feature.real
 
 
 def hidden_at(place: np.ndarray, look: np.ndarray, occluders: Sequence[Occluder]) -> bool:
-    """Whether any occluder's material lies between `place` and the camera, looking along `look`
-    (both world space)."""
+    """Return whether any occluder's material is between world `place` and the camera along `look`."""
     toward = create_v3(*(-np.asarray(look, dtype=float)))
     at = create_v3(*place)
     return any(sight_is_blocked(solid, placed.global_to_local(at), placed.global_to_local_direction(toward))
@@ -77,11 +65,10 @@ def hidden_at(place: np.ndarray, look: np.ndarray, occluders: Sequence[Occluder]
 
 
 def drawn_over(front: Optional[Geometry], behind: Optional[Geometry], look, tolerance: float) -> bool:
-    """Whether `front` is drawn where `behind` is on the sheet, both under one pointer (sheet_shape).
+    """Return whether `front` is drawn where `behind` is, under one pointer (sheet_shape).
 
-    Two lines under one pointer cross it, so parallel is on top of each other; two points, within
-    `tolerance`; a point under a line, within `tolerance` of it. A line behind a point is seen
-    either side of it. All in one frame.
+    Two lines: parallel. Two points: within `tolerance`. A point over a line: within `tolerance` of it.
+    A line behind a point is still seen.
     """
     near, far = sheet_shape(front, look), sheet_shape(behind, look)
     if near is None or far is None or (isinstance(near, SheetPoint) and isinstance(far, SheetLine)):
@@ -94,31 +81,24 @@ def drawn_over(front: Optional[Geometry], behind: Optional[Geometry], look, tole
 
 def _frame_in(transform: Transform, origin: np.ndarray, u: np.ndarray, v: np.ndarray,
               normal: np.ndarray) -> SightFrame:
-    """A world-space plane frame, in the local space of something placed by `transform`."""
+    """Return a world plane frame in the local space of `transform`."""
     rotation, position = _placement(transform)
     return ((origin - position) @ rotation, u @ rotation, v @ rotation, normal @ rotation)
 
 
 @memo_by_identity
 def _placement(transform: Transform) -> Tuple[np.ndarray, np.ndarray]:
-    """A transform's rotation and position as floats: world = rotation @ local + position."""
+    """Return a transform's rotation and position as float arrays."""
     return np.array(transform.orientation.matrix.tolist(), dtype=float), as_ndarray(transform.position)
 
 
 def nearest_visible_depth(
     handle: FeatureHandle, root: CutCSG, look: np.ndarray, occluders: Sequence[Occluder], reach: float,
 ) -> Optional[float]:
-    """How near the camera any of `handle`'s feature can be seen, looking along unit `look`; None if
-    none of it can.
+    """Return the depth along `look` of the nearest visible part of the feature, or None if none of it is.
 
-    Depth is distance along `look`, in world space. `root` is the feature's own timber's tree, which
-    says where the feature is on the finished surface; `occluders` are every solid that may be in
-    the way, that tree included. Only a face seen edge-on or a line lying along or across the sheet
-    is asked about, as only those draw as a line or a point. Not real (a bore's axis, a centerplane):
-    never hidden. Unsure -- a solid that cannot be cut exactly -- means seen.
-
-    Only the strip of the plane the feature spans across the sheet is cut: nothing beside it can
-    stand between it and the camera.
+    `root` is the feature's own timber's tree; `occluders` include it. Only features drawn as a line
+    or point are asked about. Non-real features are never hidden.
     """
     transform = handle.timber.transform
     located = handle.feature.locate_simple_unbounded(handle.owner)
@@ -177,13 +157,12 @@ def nearest_visible_depth(
 
 
 def _across_sheet(points: Sequence[Tuple[float, float]]) -> Tuple[float, float]:
-    """How far `points` reach across the sheet (u), a little widened so an edge on its border counts."""
+    """Return the (low, high) u range of `points`, slightly widened."""
     return min(p[0] for p in points) - 1e-6, max(p[0] for p in points) + 1e-6
 
 
 def _overlapping(region: PolygonRegions, points: Sequence[Tuple[float, float]]) -> PolygonRegions:
-    """The pieces of `region` whose bounding box meets that of `points`: the only ones that can
-    hide any of them. Most shadows in a plane are nowhere near the feature asked about."""
+    """Return the pieces of `region` whose bounding box overlaps that of `points`."""
     if not points:
         return []
     low_x, high_x = min(p[0] for p in points), max(p[0] for p in points)
@@ -195,8 +174,7 @@ def _overlapping(region: PolygonRegions, points: Sequence[Tuple[float, float]]) 
 
 def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reach: float,
               across: Tuple[float, float]) -> PolygonRegions:
-    """What the occluders hide in the world frame's plane, within the `across` strip of it: their
-    material across it, swept away from the camera."""
+    """Return what the occluders hide in the frame's plane within the `across` strip: their material swept away from the camera."""
     origin, u, _v, normal = world
     hidden: PolygonRegions = []
     for solid, transform in occluders:
@@ -220,8 +198,7 @@ _CLEAR = 1e-6
 
 
 def _world_corners(solid: CutCSG, transform: Transform) -> Optional[np.ndarray]:
-    """The eight corners of `solid`'s box, world space, or None if it has no finite box. Kept per
-    solid and placement."""
+    """Return the eight world corners of `solid`'s bounding box, or None if infinite. Cached."""
     memo = _corners_memo(solid)
     if id(transform) not in memo:
         memo[id(transform)] = (transform, _work_out_corners(solid, transform))
@@ -251,7 +228,7 @@ def _work_out_corners(solid: CutCSG, transform: Transform) -> Optional[np.ndarra
 
 def _end_on_depth(line: Line, root: CutCSG, transform: Transform, look: np.ndarray,
                   occluders: Sequence[Occluder], reach: float) -> Optional[float]:
-    """A line seen end-on draws as a point: seen if the sight line from its nearest end is clear."""
+    """Return the depth of a line seen end-on, if the sight line from its nearest end is clear."""
     pieces = crop_line_to_crease_segments_on_csg(line, root, seed_reach=reach, near=line.point)
     if not pieces:
         return None if pieces is not None else float(as_ndarray(transform.local_to_global(line.point)) @ look)
@@ -263,11 +240,9 @@ def _end_on_depth(line: Line, root: CutCSG, transform: Transform, look: np.ndarr
 def visible_by_view(
     anchors: Sequence[FeatureHandle], views: Mapping[str, ViewAxes], drawn: Sequence[CutTimber],
 ) -> Dict[str, List[FeatureHandle]]:
-    """For each view, the anchors it can see some of: what a measurement in it may be taken to.
+    """Return, per view, the anchors it can see some of.
 
-    `drawn` are the timbers the views draw, every one of which may hide the others. Only material
-    hides: an anchor drawn on the same line as a nearer one is still drawn there, so it is kept --
-    two timbers' tops in line are dimensioned at the one line both draw.
+    Every timber in `drawn` may hide the others. An anchor drawn on the same line as a nearer one is kept.
     """
     occluders = [(cut.render_timber_with_cuts_csg_local(), cut.timber.transform) for cut in drawn]
     roots = {id(cut.timber): cut.render_timber_with_cuts_csg_local() for cut in drawn}

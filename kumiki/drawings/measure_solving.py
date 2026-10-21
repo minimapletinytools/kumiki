@@ -1,8 +1,5 @@
-"""A drawing's Measure as the feature solver takes it (csg/feature_solving.py).
-
-The solver only wants which features, and where and along what the measurement is read. Working
-that out is drawing's: each feature's span, what it draws as on the sheet, and where a dimension
-between the two attaches (distance_anchors).
+"""Converts a drawing's Measure into a SolveMeasurement for csg/feature_solving.py: which features,
+and where and along what it is read.
 """
 
 from typing import TYPE_CHECKING, Dict, Hashable, Optional, Sequence, Union
@@ -30,7 +27,7 @@ SpanMemo = Dict[Hashable, MeasureSpan]
 
 def _measured_span(handle: FeatureHandle, cut_timbers: Sequence['CutTimber'],
                    spans_memo: Optional[SpanMemo]) -> MeasureSpan:
-    """The feature in world space, on its cut timber, as the viewer measures it (feature_span)."""
+    """Return the feature's span in world space, cropped to its cut timber (feature_span)."""
     key = (id(handle.timber), hit_identity(handle.feature, handle.owner))
     if spans_memo is not None and key in spans_memo:
         return spans_memo[key]
@@ -46,8 +43,7 @@ def _measured_span(handle: FeatureHandle, cut_timbers: Sequence['CutTimber'],
 
 
 def _projected(span: MeasureSpan, look: np.ndarray) -> MeasureSpan:
-    """A span as it is seen on a sheet looking along `look` (sheet_shape): a point stays a point, a
-    line seen end-on is one, an edge-on face is a line."""
+    """Return a span as seen on a sheet looking along `look` (sheet_shape), or None."""
     if isinstance(span, PointSpan):
         return span
     if isinstance(span, LineSpan):
@@ -65,7 +61,7 @@ def _projected(span: MeasureSpan, look: np.ndarray) -> MeasureSpan:
 
 
 def _on_feature(span: MeasureSpan, anchor: np.ndarray, look: np.ndarray) -> np.ndarray:
-    """The point of the 3D feature that a sheet anchor stands for."""
+    """Return the point on the 3D feature that a sheet anchor stands for."""
     if isinstance(span, LineSpan):
         direction = as_ndarray(span.along)
         flat = direction - look * float(direction @ look)
@@ -87,15 +83,10 @@ def _gap_direction(at_a: np.ndarray, at_b: np.ndarray, look: Optional[np.ndarray
 def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view: Optional[ViewAxes] = None,
                       spans_memo: Optional[SpanMemo] = None, across: Optional[np.ndarray] = None,
                       ) -> SolveMeasurement:
-    """What `measure`, seen through `view` (world space), measures, for the solver.
+    """Return what `measure`, seen through `view`, measures, for the solver.
 
-    Each feature is measured where it is on its cut timber, found among `cut_timbers` -- as the
-    viewer measures it.
-
-    Distances and angles, in 3D or on a sheet, between features on one timber or two. Raises
-    ValueError for one that measures nothing: a face seen at an angle, two features in one place.
-    `across` (world space) is the direction a perpendicular distance is read along, for two
-    features in one place, where the gap between them gives none.
+    Raises ValueError if it measures nothing (a face seen at an angle, two features in one place).
+    `across` is the direction to read a perpendicular distance along when the features coincide.
     """
     kind = measure.kind or THREE_D_DISTANCE
     view = view or ViewAxes()
@@ -123,8 +114,7 @@ def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view
 
 
 class DrawingSolve(Solve):
-    """A Solve that takes a drawing's Measures, keeping each feature's span and each measure's row
-    for the solve."""
+    """A Solve over a drawing's Measures, caching each feature's span and each measure's row."""
 
     def __init__(self, cut_timbers: Sequence['CutTimber']):
         super().__init__(cut_timbers)
@@ -133,8 +123,7 @@ class DrawingSolve(Solve):
         self.rows_memo: Dict[Hashable, Union[Row, ValueError]] = {}
 
     def row(self, measure: Measure, view: Optional[ViewAxes] = None, across: Optional[np.ndarray] = None) -> Row:
-        """How `measure`, seen through `view`, changes with the carriers' unknowns. Raises ValueError
-        for one that measures nothing (solve_measurement, which `across` is passed on to)."""
+        """Return the row of `measure` seen through `view`. Raises ValueError if it measures nothing."""
         view = view or ViewAxes()
         key = (measure, *(float(part) for axis in (view.look, view.right, view.up) for part in axis),
                None if across is None else tuple(float(part) for part in across))

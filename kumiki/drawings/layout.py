@@ -1,17 +1,4 @@
-"""Where a drawing's viewports land on the page.
-
-The shapes are drawing.py's -- Viewport, Subdivision, Portion, Share, Length --
-because they are what a drawing ASKS FOR. This is the other half: given a page,
-where each of them actually goes.
-
-The split is the same one identity.py and measuring.py keep. Naming a thing and
-locating it are different jobs, and a drawing is written once and laid out on
-whatever sheet it is printed on.
-
-What comes out is a rect per viewport as a fraction of the page, which is the
-form the viewer has always taken -- so resolving a tree is the whole of the
-difference between what an author writes and what goes on the wire.
-"""
+"""Lays out a drawing's viewports on a page: a rect per leaf viewport, as fractions of the page."""
 
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -25,11 +12,7 @@ from ..rule import Numeric
 
 @dataclass(frozen=True)
 class PlacedViewport:
-    """One viewport, once the tree has said where it goes.
-
-    What becomes a viewport on the wire: an id, a rect on the page, and the
-    viewport that asked for it.
-    """
+    """A leaf viewport with its id and its rect on the page."""
 
     id: ViewportId
     viewport: Viewport
@@ -42,12 +25,12 @@ class PlacedViewport:
 
 
 def _length_fraction(size: Length, page_extent: float) -> float:
-    """A length in page units, as a fraction of the axis being divided."""
+    """Return a page-unit length as a fraction of the axis being divided."""
     return float(size.value) / page_extent
 
 
 def _inset(rect: Rect, padding: Numeric, page: Page) -> Rect:
-    """A rect shrunk by `padding` page units on every side."""
+    """Return `rect` shrunk by `padding` page units on every side."""
     if not padding:
         return rect
     x, y, width, height = rect
@@ -62,11 +45,7 @@ def _inset(rect: Rect, padding: Numeric, page: Page) -> Rect:
 
 
 def _divide(subdivision: Subdivision, rect: Rect, page: Page) -> List[Rect]:
-    """Each portion's rect, in order along the subdivision's direction.
-
-    Lengths are taken out first and the shares divide what is left, which is
-    the only order in which "40mm, and then the rest" means what it says.
-    """
+    """Return each portion's rect in order. Lengths are taken first; shares divide the rest."""
     x, y, width, height = rect
     along_columns = subdivision.direction is SplitDirection.COLUMNS
     # Lengths are in page units and rects are fractions of the page, so
@@ -112,7 +91,7 @@ def _divide(subdivision: Subdivision, rect: Rect, page: Page) -> List[Rect]:
 
 def _place(viewport: Viewport, rect: Rect, path: Tuple[int, ...], z: int, page: Page,
            into: List[PlacedViewport]) -> None:
-    """Walk one viewport, adding every leaf beneath it to *into*."""
+    """Add every leaf under `viewport` to `into`."""
     cell = _inset(rect, viewport.padding, page)
     if viewport.subdivision is None:
         into.append(PlacedViewport(
@@ -127,16 +106,7 @@ def _place(viewport: Viewport, rect: Rect, path: Tuple[int, ...], z: int, page: 
 
 
 def resolve_viewports(viewports: Sequence[Viewport], page: Page) -> Tuple[PlacedViewport, ...]:
-    """Every viewport that gets a camera, with the rect it lands on, back to front.
-
-    Containers are not returned. A viewport holding others draws nothing itself
-    -- the views inside it fill its cell -- so what comes back is what renders,
-    which is what the wire wants.
-
-    Ordered by z and then by position, which is the order the viewer draws in
-    and the reverse of the order it picks in, so a viewport with a higher z is
-    drawn over its neighbours and is the one a click finds.
-    """
+    """Return every leaf viewport with its rect, ordered by z then position (draw order)."""
     placed: List[PlacedViewport] = []
     for index, root in enumerate(viewports):
         if root.rect is None:
@@ -151,7 +121,7 @@ def resolve_viewports(viewports: Sequence[Viewport], page: Page) -> Tuple[Placed
 
 
 def resolve_drawing(drawing) -> Tuple[PlacedViewport, ...]:
-    """Every viewport of a drawing, on the drawing's own page."""
+    """Return a drawing's leaf viewports laid out on its own page."""
     if drawing.page is None:
         raise ValueError(
             f"Drawing {drawing.drawing_id} has no page, so there is nothing for its "

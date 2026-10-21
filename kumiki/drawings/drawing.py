@@ -1,6 +1,4 @@
-"""Drawings: what a sheet shows -- Drawing, Viewport, Subdivision and the sizes, about where things
-sit on a page. The dimensions on it are measure.py.
-"""
+"""Drawings: Drawing, Viewport, Subdivision and page sizes. The dimensions on a drawing are in measure.py."""
 
 from dataclasses import dataclass, field, replace
 from enum import Enum
@@ -62,7 +60,7 @@ from .measure import (  # noqa: F401
 
 
 class SplitDirection(Enum):
-    """Which way a subdivision divides, and so which way its portions run."""
+    """Which way a subdivision divides."""
 
     #: Portions stacked top to bottom, each the full width.
     ROWS = "rows"
@@ -72,12 +70,7 @@ class SplitDirection(Enum):
 
 @dataclass(frozen=True)
 class Share:
-    """A share of whatever the fixed-size siblings leave over.
-
-    Two shares of 1 split what is left in half; a 2 and a 1 split it two to
-    one. What a drawing means by "these four rows are equal", without caring
-    how tall the sheet is.
-    """
+    """A share of the room left by fixed-size siblings: Share(1), Share(1) split it in half."""
 
     value: Numeric = 1
 
@@ -88,12 +81,7 @@ class Share:
 
 @dataclass(frozen=True)
 class Length:
-    """A size in page units. What a title block wants: 40mm, whatever the sheet.
-
-    Wrapped rather than left as a bare number so that it cannot be mistaken for
-    a Share. `Portion(view, 0.5)` reading as half a metre when half the room was
-    meant is the kind of thing a unit only catches once it is on paper.
-    """
+    """A size in page units, e.g. a 40mm title block."""
 
     value: Numeric
 
@@ -112,7 +100,7 @@ Rect = Tuple[float, float, float, float]
 
 @dataclass(frozen=True)
 class Page:
-    """The sheet, in real units. What a Length is measured against."""
+    """The sheet's size in real units."""
 
     width: Numeric
     height: Numeric
@@ -124,19 +112,7 @@ class Page:
 
 @dataclass(frozen=True)
 class Portion:
-    """One child of a subdivision, and how much of the cell it takes.
-
-    The size lives here rather than on the Viewport because it is a fact about
-    the ARRANGEMENT, not about the view. "Half of this row" means nothing until
-    there is a row, and a viewport does not know it is in one -- see Viewport.
-    Keeping it here is also what lets a viewport be moved without carrying a
-    proportion that belonged somewhere else.
-
-    Held as its own type rather than a second tuple of sizes beside the
-    children: two lists that must stay the same length and the same order are
-    two lists that come apart, and at four children you are counting positions
-    across both to see which size goes with which view.
-    """
+    """One child of a subdivision, with the size it takes."""
 
     viewport: 'Viewport'
     size: Size = field(default_factory=Share)
@@ -144,17 +120,11 @@ class Portion:
 
 @dataclass(frozen=True)
 class Subdivision:
-    """How one viewport divides itself between the viewports inside it.
-
-    Rows run top to bottom and columns left to right, which is both the order
-    the portions are written in and the order their ids are numbered in.
-    """
+    """How a viewport divides between its children: rows top to bottom, or columns left to right."""
 
     direction: SplitDirection
     portions: Sequence[Portion]
-    #: Space between portions, in page units. Not before the first or after the
-    #: last -- that is what a viewport's own padding is for, and the two
-    #: compose.
+    #: Space between portions, in page units (not before the first or after the last).
     gap: Numeric = 0
 
     def __post_init__(self):
@@ -163,12 +133,7 @@ class Subdivision:
             raise ValueError("A subdivision divides a cell between portions, and has none")
 
     def taking(self, size: 'Size') -> 'Portion':
-        """This subdivision, in a viewport of its own, as a portion of that size.
-
-        The counterpart of Viewport.taking, so that a nested division can say
-        how much room it takes without the wrapper having to be written out:
-        `columns(rows(a, b).taking(Share(2)), c)`.
-        """
+        """Return this subdivision wrapped in a viewport, as a portion of `size`: `columns(rows(a, b).taking(Share(2)), c)`."""
         return Portion(viewport=Viewport(subdivision=self), size=size)
 
 
@@ -181,42 +146,16 @@ ViewportList = Tuple['Viewport', ...]
 class Viewport:
     """One view on a sheet, and the views inside it.
 
-    Knows what it is called, how much room it leaves inside itself, and what it
-    contains. Does NOT know where it sits: not its rect, not its id, not its
-    parent. Those are facts about the tree rather than about the viewport, and
-    they are the drawing's to answer -- see Drawing.walk and Drawing.get_viewport_id.
-
-    `subdivision` is None for a leaf, which is the only kind that gets a camera
-    and becomes a viewport on screen; one with portions is a container, and the
-    views inside it fill its cell. The three things a division needs --
-    direction, portions, gap -- are grouped into Subdivision rather than sitting
-    here as three optionals, so that "a direction but nothing to divide" cannot
-    be written down.
-
-    `rect` and `z` place a FLOATING viewport on the page and are meaningless on
-    one inside a subdivision, which is placed by its portion's size instead.
-    Which of the two this is, is again not something a viewport knows, so
-    Drawing checks it.
-
-    COMPARED BY IDENTITY, not by value. Two viewports with the same label are
-    different viewports -- the whole point of ids being positional is that what
-    a view IS, to a drawing, is the cell it occupies. Value equality would make
-    get_viewport_id ambiguous between them, and comparing viewports by value is not a
-    thing anyone wants: it would be asking whether two cells of a sheet happen
-    to be described alike.
+    A leaf (no `subdivision`) gets a camera; a container's children fill its cell. `rect` and `z`
+    place a floating root viewport and are ignored inside a subdivision. A viewport doesn't know its
+    id or position; Drawing does. Compared by identity.
     """
 
     label: Optional[str] = None
-    #: Blank space inside this viewport's own cell, in page units, on every
-    #: side. On the Viewport rather than the Portion because it is true of the
-    #: viewport alone -- "leave a margin inside me" needs no siblings to mean
-    #: something.
+    #: Margin inside this viewport's cell, in page units, on every side.
     padding: Numeric = 0
     subdivision: Optional[Subdivision] = None
-    #: The dimensions drawn in this viewport. On the viewport rather than
-    #: keyed by id somewhere else, so that writing one takes no counting: a
-    #: measurement belongs to the view it is drawn in, and here it can say so
-    #: by being there. Only a leaf renders, so only a leaf's are drawn.
+    #: The dimensions drawn in this viewport. Only a leaf's are drawn.
     measurements: Sequence['Measure'] = ()
     #: Floating placement. Roots have these; the views inside a subdivision
     #: must not.
@@ -234,10 +173,6 @@ class Viewport:
             x, y, width, height = rect
             if width <= 0 or height <= 0:
                 raise ValueError(f"A floating viewport has a positive size, got {width} x {height}")
-            # Checked rather than clamped. The viewer clamps a rect into [0, 1]
-            # without a word, so one placed half off the sheet quietly became a
-            # different rect; saying so here is the difference between a layout
-            # being wrong and being wrong in silence.
             if x < 0 or y < 0 or x + width > 1 or y + height > 1:
                 raise ValueError(
                     f"A floating viewport sits on the page: {rect} runs off it. A rect is "
@@ -247,50 +182,35 @@ class Viewport:
 
     @property
     def is_leaf(self) -> bool:
-        """True if this is a view rather than a container: it gets a camera."""
+        """Return whether this is a view (gets a camera) rather than a container."""
         return self.subdivision is None
 
     @property
     def children(self) -> ViewportList:
-        """The viewports inside this one, in order. Empty for a leaf."""
+        """Return the viewports inside this one, in order."""
         if self.subdivision is None:
             return ()
         return tuple(portion.viewport for portion in self.subdivision.portions)
 
     def taking(self, size: Size) -> Portion:
-        """This viewport, as a portion of that size. `plan.taking(Share(2))`.
-
-        Sugar for Portion(self, size). It stores nothing here -- a viewport
-        still does not know how big it is in an arrangement it is not aware of
-        -- it is a shorter way to write the pair down.
-        """
+        """Return Portion(self, size): `plan.taking(Share(2))`."""
         return Portion(viewport=self, size=size)
 
 
 def rows(*children: Union[Viewport, 'Subdivision', Portion], gap: Numeric = 0) -> Subdivision:
-    """A subdivision stacking its children top to bottom.
-
-    A bare Viewport takes an equal share, which is the common case and should
-    read as one; a Portion says how much it takes instead.
-    """
+    """Return a subdivision stacking `children` top to bottom. A bare Viewport takes Share(1)."""
     return Subdivision(direction=SplitDirection.ROWS, gap=gap,
                        portions=tuple(_as_portion(child) for child in children))
 
 
 def columns(*children: Union[Viewport, 'Subdivision', Portion], gap: Numeric = 0) -> Subdivision:
-    """A subdivision setting its children side by side, left to right."""
+    """Return a subdivision setting `children` left to right. A bare Viewport takes Share(1)."""
     return Subdivision(direction=SplitDirection.COLUMNS, gap=gap,
                        portions=tuple(_as_portion(child) for child in children))
 
 
 def _as_portion(child: Union[Viewport, 'Subdivision', Portion]) -> Portion:
-    """Whatever was written in a row or column, as the portion it means.
-
-    A Subdivision is wrapped in a Viewport of its own, so that `columns(rows(a,
-    b), c)` reads like the shape it makes. That wrapper is a real node with a
-    real id -- a container is a viewport that happens to hold others -- it just
-    has nothing to say about itself, so it carries no label.
-    """
+    """Return a row or column entry as a Portion, wrapping a Subdivision in an unlabelled Viewport."""
     if isinstance(child, Portion):
         return child
     if isinstance(child, Subdivision):
@@ -300,7 +220,7 @@ def _as_portion(child: Union[Viewport, 'Subdivision', Portion]) -> Portion:
 
 def covering_page(subdivision_or_viewport: Union[Viewport, Subdivision],
                   **options) -> Viewport:
-    """A floating viewport over the whole sheet. The common case by far."""
+    """Return a floating viewport covering the whole sheet."""
     if isinstance(subdivision_or_viewport, Subdivision):
         return Viewport(rect=(0.0, 0.0, 1.0, 1.0), subdivision=subdivision_or_viewport,
                         **options)
@@ -313,11 +233,7 @@ def covering_page(subdivision_or_viewport: Union[Viewport, Subdivision],
 
 # aso what's th e difference between this and Sequence[Viewport]? oh I guess tuple has at least one?
 def shop_drawing_viewports() -> ViewportList:
-    """One piece's four long faces down the left, a preview beside them.
-
-    How a piece is drawn for the shop: every long side rolled out, square on,
-    with a live view of the whole thing to read them against.
-    """
+    """Return a shop drawing layout: a piece's four long faces down the left, a preview beside them."""
     return (covering_page(columns(
         rows(Viewport(label="Front"), Viewport(label="Right"),
              Viewport(label="Back"), Viewport(label="Left")),
@@ -335,12 +251,7 @@ SHOP_DRAWING_IDS: Mapping[str, ViewportId] = {
 
 
 def elevation_viewports() -> ViewportList:
-    """Three world elevations and a preview, a quadrant each.
-
-    For several pieces at once, which have no single piece whose faces the
-    sheet could be about. Two rows of two columns rather than four rects: the
-    rows are what make the elevations line up across the sheet.
-    """
+    """Return three world elevations and a preview, two rows of two."""
     return (covering_page(rows(
         columns(Viewport(label="Front"), Viewport(label="Top")),
         columns(Viewport(label="Right"), Viewport(label="Preview")),
@@ -356,18 +267,13 @@ ELEVATION_IDS: Mapping[str, ViewportId] = {
 
 
 def default_viewports_for(timber_count: int) -> ViewportList:
-    """The viewports a drawing gets when it names timbers and no layout.
-
-    One piece is drawn as a shop drawing of that piece. Several have no single
-    piece whose faces the sheet could be about, so they get world elevations.
-    """
+    """Return the default layout: a shop drawing for one timber, elevations for several."""
     return shop_drawing_viewports() if timber_count == 1 else elevation_viewports()
 
 
 @dataclass(frozen=True)
 class Drawing:
-    """A drawing the frame asks for: a name, and which timbers it is of.
-    """
+    """A drawing: a name, the timbers it draws, and its viewports."""
 
     name: str
 
@@ -375,33 +281,15 @@ class Drawing:
     #: timber objects, not copies. Frame checks this when it is built.
     timbers: Sequence['PerfectTimberWithin'] = ()
 
-    #: What an override in the drawings file names, so it has to survive editing
-    #: the code around it. Optional only at CONSTRUCTION: leave it out and it
-    #: becomes DrawingId(name), which is stable as long as the name is, and it
-    #: is never None on a built Drawing.
-    #:
-    #: A classmethod taking the optional id would let this field be declared
-    #: non-optional, which is what the note asked for. Not done: it costs all 49
-    #: Drawing(...) sites a rename to buy one annotation, and the coercion below
-    #: would still have to exist for the string form.
+    #: The id the drawings file refers to it by. Defaults to DrawingId(name); never None once built.
     drawing_id: Optional[DrawingId] = None
 
-    #: The floating viewports of this sheet, in the order they were written.
-    #: That order is what numbers them -- see walk -- so it is part of what the
-    #: drawing means. It is not the drawing order; z is.
-    #:
-    #: None asks for the default layout for what this draws. It was (), which
-    #: could not tell "I did not say" from "I said none": an explicitly empty
-    #: tuple was silently replaced by the defaults.
+    #: The floating viewports, in order (which numbers them; z sets draw order).
+    #: None means the default layout; () means none.
     viewports: Optional[Sequence[Viewport]] = None
 
-    #: The sheet these sit on, when this drawing lays itself out. A Length
-    #: anywhere in the tree is measured against it.
-    #:
-    #: None is the common case -- 31 of the drawings built in this repo -- and
-    #: means the sheet is not this drawing's to choose: the viewer lays it out
-    #: and supplies its own page. Only kumiki.drawings.layout.resolve_drawing needs one,
-    #: and it says so rather than inventing a size.
+    #: The sheet, which Lengths are measured against. None (usual) lets the viewer choose; only
+    #: layout.resolve_drawing needs one.
     page: Optional[Page] = None
 
     measurements: Mapping[ViewportId, Sequence[Measure]] = field(default_factory=dict)
@@ -417,11 +305,7 @@ class Drawing:
             for viewport, measures in dict(self.measurements or {}).items()
         })
 
-        # A drawing always ends up with viewports. One that says nothing gets
-        # the default layout for what it draws, made here and held like any
-        # other -- so there is no second kind of drawing whose views exist only
-        # once something else has laid it out. Saying () means none, and is
-        # kept.
+        # None gets the default layout; () is kept.
         viewports = (default_viewports_for(len(self.timbers))
                      if self.viewports is None else tuple(self.viewports))
         object.__setattr__(self, 'viewports', viewports)
@@ -432,21 +316,11 @@ class Drawing:
 
     @property
     def roots(self) -> ViewportList:
-        """The floating viewports, settled. Never None.
-
-        `viewports` is Optional because the CONSTRUCTOR takes None to mean "give
-        me the default layout for what this draws"; __post_init__ resolves that
-        and always leaves a tuple. This is that guarantee, said once, so the
-        rules below do not each carry an optionality that cannot happen.
-        """
+        """Return the root (floating) viewports."""
         return tuple(self.viewports or ())
 
     def walk(self) -> Iterator[Tuple[ViewportId, 'Viewport']]:
-        """Every viewport of this drawing, with the id its position gives it.
-
-        Depth first and in written order, so a parent comes before the views
-        inside it.
-        """
+        """Yield every viewport with its id, depth first, parents before children."""
         def descend(viewport: 'Viewport', path: Tuple[int, ...]):
             yield (ViewportId(".".join(str(step) for step in path)), viewport)
             for index, child in enumerate(viewport.children):
@@ -456,8 +330,7 @@ class Drawing:
             yield from descend(root, (index,))
 
     def measurements_by_viewport(self) -> Dict[str, Tuple[Measure, ...]]:
-        """Every dimension of this drawing, under the id of the view it is in.
-        """
+        """Return the drawing's measurements, keyed by viewport id."""
         collected: Dict[str, Tuple[Measure, ...]] = {}
         for viewport_id, viewport in self.walk():
             if viewport.measurements:
@@ -468,19 +341,18 @@ class Drawing:
         return collected
 
     def leaves(self) -> Iterator[Tuple[ViewportId, 'Viewport']]:
-        """Every viewport that gets a camera, with its id. What renders."""
+        """Return every leaf viewport (one with a camera) with its id."""
         return ((id, viewport) for id, viewport in self.walk() if viewport.is_leaf)
 
     def get_viewport_id(self, viewport: 'Viewport') -> ViewportId:
-        """Where this viewport sits, which is what identifies it.
-        """
+        """Return the id of `viewport` (its position in the tree)."""
         for found, candidate in self.walk():
             if candidate is viewport:
                 return found
         raise KeyError(f"{viewport!r} is not a viewport of drawing {self.drawing_id}")
 
     def viewport_at(self, viewport_id: ViewportId) -> Optional['Viewport']:
-        """The viewport at an id, or None. The other direction from get_viewport_id."""
+        """Return the viewport with id `viewport_id`, or None."""
         wanted = str(viewport_id)
         for found, viewport in self.walk():
             if str(found) == wanted:
@@ -490,11 +362,7 @@ class Drawing:
     # ------------------------------------------------------------- the checks
 
     def _check_placement(self) -> None:
-        """A root floats; a view inside a subdivision does not.
-
-        Checked here because a viewport cannot check it: which of the two it is
-        depends on where it sits, and not knowing that is the whole design.
-        """
+        """Raise unless every root has a rect and no subdivided viewport does."""
         for index, root in enumerate(self.roots):
             if root.rect is None:
                 raise ValueError(
@@ -511,13 +379,7 @@ class Drawing:
                 )
 
     def _check_each_viewport_appears_once(self) -> None:
-        """No viewport twice in one drawing.
-
-        A viewport is identified by where it is, so one object in two places has
-        two ids and get_viewport_id could only guess. Reusing an object is the easy way to
-        write that by accident -- `v = Viewport(...)` then `rows(v, v)` -- so it
-        is refused rather than resolved arbitrarily.
-        """
+        """Raise if a viewport object appears twice (it would have two ids)."""
         seen = {}
         for viewport_id, viewport in self.walk():
             if id(viewport) in seen:
