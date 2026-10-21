@@ -748,8 +748,11 @@ CORNER_TOLERANCE = 1e-6
 
 
 def _corner_on(crossing: Line, first: 'PlaneSpan', second: 'PlaneSpan') -> V3:
-    """Where on two faces' shared line the corner goes: the middle of where both reach along it, or
-    of the gap between them. Without both regions, nearest the middle of the two faces' anchors."""
+    """Return the angle's vertex on `crossing`, the line where two faces' planes meet.
+
+    It is the midpoint of the stretch of the line both faces' regions cover, or of the gap between
+    them if they don't overlap. A face without a region falls back to the point on the line nearest
+    the midpoint of the two anchors."""
     along, through = crossing.direction, crossing.point
     reach_a, reach_b = (_reach_along(span.region, through, along) for span in (first, second))
     if reach_a is None or reach_b is None:
@@ -762,13 +765,14 @@ def _corner_on(crossing: Line, first: 'PlaneSpan', second: 'PlaneSpan') -> V3:
 
 
 def _reach_along(region, through, along) -> Optional[Tuple[float, float]]:
-    """How far a region's corners reach along a line, from its point."""
+    """Return the `(min, max)` station of a region's corners along a line, or None if empty."""
     stations = [_dot(corner - _v3(through), along) for polygon in region for corner in polygon]
     return (min(stations), max(stations)) if stations else None
 
 
 def _face_ray(direction: VectorLike, vertex: VectorLike, plane: 'PlaneSpan') -> Optional[V3]:
-    """A ray in a face's plane from the corner, turned toward the side holding most of the face."""
+    """Return `direction` as a unit ray from `vertex`, flipped to point toward the larger part of
+    the face, or None if `direction` is zero."""
     unit = _unit(direction)
     if not any(abs(part) > 1e-9 for part in unit):
         return None
@@ -781,8 +785,8 @@ def _face_ray(direction: VectorLike, vertex: VectorLike, plane: 'PlaneSpan') -> 
 
 
 def _area_either_side(region, vertex: V3, direction: V3, normal: V3) -> Tuple[float, float]:
-    """A planar region's area ahead of the line through `vertex` square to `direction` (in its plane),
-    and behind it."""
+    """Return a planar region's area `(ahead, behind)` of the line through `vertex` square to
+    `direction`."""
     across = _unit(_cross(normal, direction))
     ahead = behind = 0.0
     for polygon in region:
@@ -811,8 +815,10 @@ def _clip_ahead(points):
 
 
 def _lines_meet(first: 'LineSpan', second: 'LineSpan') -> Optional[Tuple[V3, Optional[Tuple[V3, V3]]]]:
-    """Where two lines meet, wherever along them; for two that never do (skew), the first's point of
-    nearest approach, with the stretch from the second's to it -- what carries the second over."""
+    """Return `(vertex, carried)` for two lines, or None if parallel.
+
+    `vertex` is the point on `first` nearest `second` (where they cross, if they do). `carried` is
+    None when they cross; for skew lines it is the segment from `second`'s nearest point to `vertex`."""
     stations = closest_stations(Line(direction=first.along, point=first.at),
                                 Line(direction=second.along, point=second.at), eps=PARALLEL_EPSILON)
     if stations is None:
@@ -826,7 +832,7 @@ def _lines_meet(first: 'LineSpan', second: 'LineSpan') -> Optional[Tuple[V3, Opt
 
 
 def _phantoms(span: MeasureSpan, vertex: VectorLike, ray: V3) -> Tuple[Tuple[V3, V3], ...]:
-    """A feature drawn on to the corner, where the corner is off it."""
+    """Return dashed segments extending `span` to `vertex`, or none if the vertex is on it."""
     vertex = _v3(vertex)
     if isinstance(span, LineSpan) and span.interval is not None:
         low, high = sorted(_dot(end - span.at, span.along) for end in span.ends_global())
@@ -842,9 +848,12 @@ def _phantoms(span: MeasureSpan, vertex: VectorLike, ray: V3) -> Tuple[Tuple[V3,
 
 
 def _face_phantoms(span: 'PlaneSpan', vertex: V3, ray: V3) -> Tuple[Tuple[V3, V3], ...]:
-    """A face swept on to its corner, in its own plane: from its two ends along the corner line,
-    straight across to that line, and along it as far as the corner -- the part of the plane between
-    the face and the corner, outlined. Nothing where the face already reaches the corner."""
+    """Return dashed segments, in the face's plane, linking the face to the angle's vertex.
+
+    `ray` is the face's angle ray from `vertex`; the corner line runs through `vertex` square to it.
+    A face short of the corner line gets lines from its two outermost corners across to the line,
+    plus the stretch of the line out to the vertex. A face touching the line gets only that stretch,
+    and nothing if the vertex is already within the face."""
     corner_line = _unit(_cross(span.facing, ray))
     corners = [corner for polygon in span.region for corner in polygon]
     across = [_dot(corner - vertex, ray) for corner in corners]
