@@ -14,8 +14,8 @@ from kumiki.geometry import (
     ConvexPlanarRegion, Line, LineSegment, Plane,
 )
 from kumiki.csg.edges_on_csg import (
-    BoundsKind,
-    solid_bounds,
+    ConvexHullKind,
+    convex_hull,
     convex_hull_2d,
     crop_line_to_segments_on_csg,
 )
@@ -75,7 +75,7 @@ def _reach(area, direction):
 
 class TestBoundingHalfSpaces:
     def test_a_half_space_bounds_with_one_plane(self):
-        faces = solid_bounds(HalfSpace(normal=_v(0, 0, 1), offset=scalar(2))).require_faces()
+        faces = convex_hull(HalfSpace(normal=_v(0, 0, 1), offset=scalar(2))).require_faces()
 
         assert len(faces) == 1
         normal, point = faces[0]
@@ -84,27 +84,27 @@ class TestBoundingHalfSpaces:
         assert float(point[2, 0]) == pytest.approx(2, abs=1e-9)
 
     def test_a_closed_prism_bounds_with_six(self):
-        assert len(solid_bounds(_box()).require_faces()) == 6
+        assert len(convex_hull(_box()).require_faces()) == 6
 
     def test_an_end_that_runs_to_infinity_bounds_nothing(self):
         # The case that started all of this: a cutter extended so the cut comes
         # out clean has no face out there to bound anything.
-        assert len(solid_bounds(_box(start=None)).require_faces()) == 5
-        assert len(solid_bounds(_box(start=None, end=None)).require_faces()) == 4
+        assert len(convex_hull(_box(start=None)).require_faces()) == 5
+        assert len(convex_hull(_box(start=None, end=None)).require_faces()) == 4
 
     def test_a_shape_it_cannot_describe_says_so(self):
         # None rather than an empty list: "does not bound" and "cannot say"
         # are different answers, and only the second should stop a caller.
         from kumiki.csg.cutcsg import EmptyCSG
 
-        assert solid_bounds(EmptyCSG()).is_empty
+        assert convex_hull(EmptyCSG()).is_empty
 
     def test_the_three_answers_are_told_apart(self):
         from kumiki.csg.cutcsg import EmptyCSG
 
-        assert solid_bounds(_box()).kind is BoundsKind.HALF_SPACES
-        assert solid_bounds(EmptyCSG()).kind is BoundsKind.EMPTY
-        assert solid_bounds(_undescribable()).kind is BoundsKind.UNKNOWN
+        assert convex_hull(_box()).kind is ConvexHullKind.HALF_SPACES
+        assert convex_hull(EmptyCSG()).kind is ConvexHullKind.EMPTY
+        assert convex_hull(_undescribable()).kind is ConvexHullKind.UNKNOWN
 
     def test_ignoring_the_answer_fails_loudly_rather_than_quietly(self):
         """faces is None unless there are faces, on purpose.
@@ -117,11 +117,11 @@ class TestBoundingHalfSpaces:
 
         for csg in (EmptyCSG(), _undescribable()):
             with pytest.raises(TypeError):
-                list(solid_bounds(csg).require_faces())
+                list(convex_hull(csg).require_faces())
 
 
 class TestPlaneCrossSection:
-    """plane_cross_section, through the half spaces solid_bounds gives each primitive."""
+    """plane_cross_section, through the half spaces convex_hull gives each primitive."""
 
     def test_a_plane_through_a_box_is_the_box_cross_section(self):
         box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
@@ -234,7 +234,7 @@ class TestLoftedSolids:
         )
 
     def test_a_taper_is_bounded_by_four_sides_and_two_ends(self):
-        assert len(solid_bounds(self._loft(self._square(0.1), self._square(0.05))).require_faces()) == 6
+        assert len(convex_hull(self._loft(self._square(0.1), self._square(0.05))).require_faces()) == 6
 
     def test_a_twisted_loft_is_bounded_loosely_rather_than_refused(self):
         # Its sides are ruled surfaces with no plane of their own, so each
@@ -242,7 +242,7 @@ class TestLoftedSolids:
         # hull, which contains the loft -- loose, but the right direction.
         twisted = self._loft(self._square(0.1), self._turned(0.1, 30))
 
-        faces = solid_bounds(twisted).require_faces()
+        faces = convex_hull(twisted).require_faces()
 
         assert faces is not None and len(faces) == 6
         # Every corner of both profiles inside every face.
@@ -263,7 +263,7 @@ class TestLoftedSolids:
 
 @dataclass(frozen=True)
 class _UnknownShape(CutCSG):
-    """A solid solid_bounds has never been taught.
+    """A solid convex_hull has never been taught.
 
     Every primitive kumiki ships IS describable, and the compound nodes are
     walked rather than described, so nothing in the library reaches the
@@ -506,7 +506,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         """
         import math
 
-        from kumiki.csg.edges_on_csg import _spans_within_primitive, solid_bounds
+        from kumiki.csg.edges_on_csg import _spans_within_primitive, convex_hull
 
         offset, angle = 0.99, math.radians(30)
         along = _v(math.cos(angle), math.sin(angle), 0)
@@ -515,7 +515,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         cylinder = self._cylinder(radius=1.0)
 
         bounded = _spans_within_primitive(
-            solid_bounds(cylinder).require_faces(), line, (-50.0, 50.0), 0.0, False)
+            convex_hull(cylinder).require_faces(), line, (-50.0, 50.0), 0.0, False)
         solved = _span(crop_line_to_segments_on_csg(
             line, cylinder, seed_reach=50, near=_v(0, 0, 5)), along)
 
@@ -978,15 +978,15 @@ class TestCurvedAndPointyPrimitives:
         )
 
     def test_a_cylinder_becomes_a_hexagonal_prism(self):
-        assert len(solid_bounds(self._cylinder()).require_faces()) == 8  # six sides, two ends
+        assert len(convex_hull(self._cylinder()).require_faces()) == 8  # six sides, two ends
 
     def test_a_cylinder_running_to_infinity_has_no_ends(self):
-        assert len(solid_bounds(self._cylinder(start=None, end=None)).require_faces()) == 6
+        assert len(convex_hull(self._cylinder(start=None, end=None)).require_faces()) == 6
 
     def test_the_hexagon_contains_the_cylinder(self):
         # Outwards, per the rule at the top of edges_on_csg: one direction, consistently, so that what
         # a bound excludes really is excluded. Tangent sides: each exactly the radius out.
-        faces = solid_bounds(self._cylinder(radius=0.05)).require_faces()
+        faces = convex_hull(self._cylinder(radius=0.05)).require_faces()
         sides = [(normal, point) for normal, point in faces if abs(float(normal[2, 0])) < 1e-9]
 
         assert len(sides) == 6
@@ -1005,13 +1005,13 @@ class TestCurvedAndPointyPrimitives:
     def test_an_extrusion_bounds_with_a_plane_per_edge_and_its_ends(self):
         square = self._extrusion([(0, 0), (1, 0), (1, 1), (0, 1)])
 
-        assert len(solid_bounds(square).require_faces()) == 6
+        assert len(convex_hull(square).require_faces()) == 6
 
     def test_its_planes_come_from_the_hull_not_the_points_as_given(self):
         # A point inside the outline contributes no face of its own.
         with_inner = self._extrusion([(0, 0), (1, 0), (1, 1), (0, 1), (0.5, 0.5)])
 
-        assert len(solid_bounds(with_inner).require_faces()) == 6
+        assert len(convex_hull(with_inner).require_faces()) == 6
 
     def test_an_extrusion_sections_to_its_cross_section(self):
         square = self._extrusion([(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)])

@@ -26,7 +26,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from .cross_sections import Sides
-    from .edges_on_csg import AngleSpans, SolidBounds, Span
+    from .edges_on_csg import AngleSpans, ConvexHull, Span
 from .identity_memo import memo_by_identity
 from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Midplane, Recipe,
                        merge_coincident_planes)
@@ -2092,61 +2092,95 @@ class CutCSG(ABC):
 
 
     # --- geometry the CSG walkers ask of a primitive (edges_on_csg, cross_sections) -----------------
-    # Defaults work from bounding_half_spaces; a primitive overrides what it answers differently.
+    # The defaults below answer from the primitive's convex hull. A primitive whose hull is not exactly
+    # itself (Cylinder, a twisted ConvexPolygonSimpleLoft, PathExtrusion) overrides them. Compound
+    # nodes (SolidUnion, Intersection, Difference) are never asked: the walkers combine their children.
 
-    def bounding_half_spaces(self) -> 'SolidBounds':
-        """Return the half spaces whose intersection contains this primitive (an outward approximation),
-        EMPTY, or UNKNOWN. Use edges_on_csg.solid_bounds, which caches it."""
-        from .edges_on_csg import UNKNOWN_BOUNDS
-        return UNKNOWN_BOUNDS
+    def get_convex_hull(self) -> 'ConvexHull':
+        """Return this primitive's convex hull as half spaces, or EMPTY, or UNKNOWN if it can't say.
 
-    def is_exactly_its_bounds(self) -> bool:
-        """Return whether bounding_half_spaces describes this primitive exactly."""
+        Exact for primitives that are convex polyhedra; for a curved primitive, a polyhedron containing
+        it (a Cylinder's circumscribing hexagonal prism). Callers use edges_on_csg.convex_hull, which caches it.
+        """
+        from .edges_on_csg import UNKNOWN_HULL
+        return UNKNOWN_HULL
+
+    def is_exactly_convex_hull(self) -> bool:
+        """Return whether this primitive is exactly its get_convex_hull (no curved or twisted faces)."""
         return False
 
     def exact_line_spans(self, line: Line, seed: 'Span', tolerance: float, removing: bool) -> Optional[List['Span']]:
-        """Return the spans of `seed` along `line` inside this primitive, exactly, or None if not solved.
+        """Return where `line` runs inside this primitive, or None if it can't be computed exactly.
 
-        A line on the boundary is kept; `removing` flips the comparison for a subtracted solid.
+        Args:
+            line: the line, in this primitive's space.
+            seed: the (low, high) stretch of the line to search, as parameters along its unit direction.
+            tolerance: how far outside the surface still counts as inside.
+            removing: True when this primitive is being subtracted. A line lying on the surface counts
+                as inside either way; this flips the comparison so that holds for a cut too.
+
+        Returns the parameter spans within `seed` that are inside. Default: clip `seed` by the convex
+        hull, when the primitive is exactly its hull.
         """
-        from .edges_on_csg import _spans_within_primitive, solid_bounds
-        if not self.is_exactly_its_bounds():
+        from .edges_on_csg import _spans_within_primitive, convex_hull
+        if not self.is_exactly_convex_hull():
             return None
-        bounds = solid_bounds(self)
-        if bounds.is_unknown:
+        hull = convex_hull(self)
+        if hull.is_unknown:
             return None
-        return [] if bounds.is_empty else _spans_within_primitive(bounds.require_faces(), line, seed, tolerance, removing)
+        return [] if hull.is_empty else _spans_within_primitive(hull.require_faces(), line, seed, tolerance, removing)
 
     def angles_around_line(self, at, direction, basis, tolerance: float) -> Optional['AngleSpans']:
-        """Return the angles around the line through `at` this primitive occupies, or None if not solved."""
-        from .edges_on_csg import _plane_angles, solid_bounds
-        if not self.is_exactly_its_bounds():
+        """Return the directions around a line, at one point on it, in which this primitive has material.
+
+        Looking along the line at `at`, the primitive fills some angles around it; they say whether the
+        line runs inside it (all), off it (none), along a flat face (half a turn) or along an edge.
+
+        Args:
+            at: the point on the line (numpy, this primitive's space).
+            direction: the line's unit direction (numpy).
+            basis: two unit vectors square to `direction` and each other; angle 0 is the first.
+            tolerance: how far off a face still counts as on it.
+
+        Returns (low, high) angle spans in radians within [0, 2pi], or None if it can't be computed
+        exactly. Default: from the convex hull's faces, when the primitive is exactly its hull.
+        """
+        from .edges_on_csg import _plane_angles, convex_hull
+        if not self.is_exactly_convex_hull():
             return None
-        bounds = solid_bounds(self)
-        if bounds.is_unknown:
+        hull = convex_hull(self)
+        if hull.is_unknown:
             return None
-        return [] if bounds.is_empty else _plane_angles(bounds.require_faces(), at, direction, basis, tolerance)
+        return [] if hull.is_empty else _plane_angles(hull.require_faces(), at, direction, basis, tolerance)
 
     def line_crossings(self, origin, direction) -> List[float]:
-        """Return the stations along the line (numpy `origin`, unit `direction`) where it crosses this
-        primitive's surfaces, so where the solid around it can change."""
-        from .edges_on_csg import _plane_stations, solid_bounds
-        bounds = solid_bounds(self)
-        if bounds.is_unknown or bounds.is_empty:
+        """Return the parameters along the line `origin + t * direction` where it crosses this primitive's
+        surfaces: the places the material around the line can change.
+
+        `origin` and unit `direction` are numpy, in this primitive's space. Default: where the line
+        crosses each face plane of the convex hull.
+        """
+        from .edges_on_csg import _plane_stations, convex_hull
+        hull = convex_hull(self)
+        if hull.is_unknown or hull.is_empty:
             return []
-        return _plane_stations(bounds.require_faces(), origin, direction)
+        return _plane_stations(hull.require_faces(), origin, direction)
 
     def plane_sides(self, frame, seed) -> 'Sides':
-        """Return (front, back): where this primitive has material just in front of `frame`'s plane and
-        just behind, within `seed`. Raises cross_sections.CannotCrossSection if it can't be cut."""
+        """Return where this primitive cuts the plane of `frame`, as (front, back) regions within `seed`.
+
+        front is where it has material just on the side the plane's normal points to, back just on the
+        other side (see cross_sections.Sides). Default: from the convex hull. Raises
+        cross_sections.CannotCrossSection if the primitive can't be cut.
+        """
         from .cross_sections import _CannotCrossSection, _half_space_cross_section
-        from .edges_on_csg import solid_bounds
-        bounds = solid_bounds(self)
-        if bounds.is_empty:
+        from .edges_on_csg import convex_hull
+        hull = convex_hull(self)
+        if hull.is_empty:
             return [], []
-        if bounds.is_unknown:
+        if hull.is_unknown:
             raise _CannotCrossSection(type(self).__name__)
-        return _half_space_cross_section(bounds.require_faces(), frame, seed)
+        return _half_space_cross_section(hull.require_faces(), frame, seed)
 
 
 def csg_children(csg: CutCSG) -> List[CutCSG]:
@@ -2276,11 +2310,11 @@ class EmptyCSG(CutCSG):
         )
 
 
-    def bounding_half_spaces(self) -> 'SolidBounds':
-        from .edges_on_csg import EMPTY_BOUNDS
-        return EMPTY_BOUNDS
+    def get_convex_hull(self) -> 'ConvexHull':
+        from .edges_on_csg import EMPTY_HULL
+        return EMPTY_HULL
 
-    def is_exactly_its_bounds(self) -> bool:
+    def is_exactly_convex_hull(self) -> bool:
         return True
 
 
@@ -2337,13 +2371,13 @@ class HalfSpace(HasFeatures, CutCSG):
         return AxisAlignedBoundingBox(None, None, None, None, None, None)
 
 
-    def bounding_half_spaces(self) -> 'SolidBounds':
-        from .edges_on_csg import SolidBounds
+    def get_convex_hull(self) -> 'ConvexHull':
+        from .edges_on_csg import ConvexHull
         # Inside is p . normal >= offset, so the outward normal is the other way.
         normal = unit_vector(self.normal)
-        return SolidBounds.of([(-normal, normal * self.offset)])
+        return ConvexHull.of([(-normal, normal * self.offset)])
 
-    def is_exactly_its_bounds(self) -> bool:
+    def is_exactly_convex_hull(self) -> bool:
         return True
 
     
@@ -2603,12 +2637,12 @@ class RectangularPrism(HasFeatures, CutCSG):
         )
 
 
-    def bounding_half_spaces(self) -> 'SolidBounds':
-        from .edges_on_csg import SolidBounds, _extrusion_caps
+    def get_convex_hull(self) -> 'ConvexHull':
+        from .edges_on_csg import ConvexHull, _extrusion_caps
         width_dir, height_dir, length_dir = self._local_axes()
         centre = self.transform.position
         half_width, half_height = self.size[0] / scalar(2), self.size[1] / scalar(2)
-        return SolidBounds.of([
+        return ConvexHull.of([
             (width_dir, centre + width_dir * half_width),
             (-width_dir, centre - width_dir * half_width),
             (height_dir, centre + height_dir * half_height),
@@ -2616,7 +2650,7 @@ class RectangularPrism(HasFeatures, CutCSG):
             *_extrusion_caps(length_dir, centre, self.start_distance, self.end_distance),
         ])
 
-    def is_exactly_its_bounds(self) -> bool:
+    def is_exactly_convex_hull(self) -> bool:
         return True
 
 
@@ -2833,9 +2867,9 @@ class Cylinder(HasFeatures, CutCSG):
         )
 
 
-    def bounding_half_spaces(self) -> 'SolidBounds':
-        """Return a circumscribing hexagon and the finite caps."""
-        from .edges_on_csg import SolidBounds, _extrusion_caps
+    def get_convex_hull(self) -> 'ConvexHull':
+        """Return a hexagonal prism circumscribing the cylinder, capped at its finite ends. It contains the cylinder."""
+        from .edges_on_csg import ConvexHull, _extrusion_caps
         axis = unit_vector(self.axis_direction)
         across, up = perpendicular_axes(axis)
         faces = []
@@ -2843,13 +2877,15 @@ class Cylinder(HasFeatures, CutCSG):
             angle = math.pi * step / 3
             normal = across * scalar(math.cos(angle)) + up * scalar(math.sin(angle))
             faces.append((normal, self.position + normal * self.radius))
-        return SolidBounds.of(faces + _extrusion_caps(axis, self.position, self.start_distance, self.end_distance))
+        return ConvexHull.of(faces + _extrusion_caps(axis, self.position, self.start_distance, self.end_distance))
 
     def exact_line_spans(self, line: Line, seed: 'Span', tolerance: float, removing: bool) -> Optional[List['Span']]:
+        """Solved exactly: the barrel as a quadratic along the line, the caps as planes."""
         from .edges_on_csg import _cylinder_spans
         return _cylinder_spans(self, line, seed, tolerance, removing)
 
     def angles_around_line(self, at, direction, basis, tolerance: float) -> Optional['AngleSpans']:
+        """Solved exactly: the caps, and half a turn about the barrel's tangent plane where `at` is on it."""
         from .edges_on_csg import _IN_PLANE_EPS, _angles_intersection, _extrusion_caps, _half_turn, _plane_angles
         axis = np.array([float(v) for v in unit_vector(self.axis_direction)])
         offset = at - np.array([float(self.position[i, 0]) for i in range(3)])
@@ -2866,7 +2902,7 @@ class Cylinder(HasFeatures, CutCSG):
         return angles
 
     def line_crossings(self, origin, direction) -> List[float]:
-        """Return where the line crosses the barrel and the finite caps."""
+        """Return the parameters along the line where it crosses the barrel and the finite caps."""
         from .edges_on_csg import _extrusion_caps, _plane_stations
         axis = np.array([float(v) for v in unit_vector(self.axis_direction)])
         start = origin - np.array([float(self.position[i, 0]) for i in range(3)])
@@ -2881,6 +2917,7 @@ class Cylinder(HasFeatures, CutCSG):
         return found + _plane_stations(caps, origin, direction)
 
     def plane_sides(self, frame, seed) -> 'Sides':
+        """Cut exactly: an ellipse (or a strip, for a plane along the axis), then the caps."""
         from .cross_sections import _cylinder_cross_section
         return _cylinder_cross_section(self, frame, seed)
 
@@ -3550,12 +3587,12 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         )
 
 
-    def bounding_half_spaces(self) -> 'SolidBounds':
-        from .edges_on_csg import _bounds_or_unknown, _extruded_hull_half_spaces
-        return _bounds_or_unknown(_extruded_hull_half_spaces(
+    def get_convex_hull(self) -> 'ConvexHull':
+        from .edges_on_csg import _hull_or_unknown, _extruded_hull_half_spaces
+        return _hull_or_unknown(_extruded_hull_half_spaces(
             [(float(x), float(y)) for x, y in self.points], self.transform, self.start_distance, self.end_distance))
 
-    def is_exactly_its_bounds(self) -> bool:
+    def is_exactly_convex_hull(self) -> bool:
         return True
 
 
@@ -3863,17 +3900,17 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         )
 
 
-    def bounding_half_spaces(self) -> 'SolidBounds':
-        from .edges_on_csg import _bounds_or_unknown, _loft_half_spaces
-        return _bounds_or_unknown(_loft_half_spaces(self))
+    def get_convex_hull(self) -> 'ConvexHull':
+        from .edges_on_csg import _hull_or_unknown, _loft_half_spaces
+        return _hull_or_unknown(_loft_half_spaces(self))
 
-    def is_exactly_its_bounds(self) -> bool:
+    def is_exactly_convex_hull(self) -> bool:
         from .edges_on_csg import _loft_sides_are_planar
         return _loft_sides_are_planar(self)
 
     def plane_sides(self, frame, seed) -> 'Sides':
         from .cross_sections import _CannotCrossSection
-        if not self.is_exactly_its_bounds():
+        if not self.is_exactly_convex_hull():
             raise _CannotCrossSection("a loft with twisted sides")
         return super().plane_sides(frame, seed)
 

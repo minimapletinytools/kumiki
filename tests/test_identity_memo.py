@@ -1,7 +1,7 @@
 """The memos picking leans on give the answers they would without them."""
 
 from kumiki.csg.cutcsg import Difference, RectangularPrism, point_tests_memo
-from kumiki.csg.edges_on_csg import solid_bounds
+from kumiki.csg.edges_on_csg import convex_hull
 from kumiki.csg.identity_memo import memo_by_identity
 from kumiki.rule import Matrix, Transform, create_v3, scalar
 
@@ -34,7 +34,7 @@ def test_memo_by_identity_works_out_once_per_object():
 
 def test_solid_bounds_and_declared_features_are_kept():
     block = _notched_block()
-    assert solid_bounds(block.base) is solid_bounds(block.base)
+    assert convex_hull(block.base) is convex_hull(block.base)
     first, second = block.base.get_declared_features(), block.base.get_declared_features()
     assert first == second and first is not second
     assert all(a is b for a, b in zip(first, second))
