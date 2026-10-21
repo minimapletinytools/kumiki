@@ -1,52 +1,13 @@
-"""Cropping unbounded geometry to a CSG solid: where a feature actually is.
+"""Cropping unbounded lines to a CSG solid, and the half spaces that bound each primitive.
 
-A feature's declared extent is the extent of the primitive it was declared on,
-and primitives are deliberately not the finished piece: a half space is unbounded
-by definition, and a cutter is extended past the timber on purpose so the cut
-comes out clean. Asking such a primitive where its face is gives an answer that
-is nowhere near the timber.
+- `solid_bounds`: a primitive as the intersection of half spaces. Approximations (a cylinder's
+  hexagon, a twisted loft, a path extrusion's point hull) always err outward, so a region always
+  contains the true solid.
+- `crop_line_to_*_segments_on_csg`: the pieces of a line on a solid, its surface, its interior, or
+  where its surface creases (an arris). Exact for cylinders and for primitives that are exactly
+  their half spaces; others use their bounds.
 
-What a dimension wants instead is the part of the feature that survives cropping
-by what encloses it: a segment along its own line for an edge, computed here,
-and a region in its own plane for a face, which cross_sections.py cuts exactly
-from the half spaces solid_bounds gives here. Both are tractable for one reason:
-every primitive kumiki has is convex, so a section of one is convex and clipping
-one against another is half-space intersection rather than general boolean work.
-
-Deliberately not oriented to any viewport. Bounds along any axes -- a viewport's
-included -- fall out of projecting the polygon's corners, so a polygon answers
-the question for every viewport at once, where a baked-in orientation answers it
-for one.
-
-Some primitives are described approximately -- see solid_bounds -- a loft by
-planes pushed out to its corners, a path extrusion by the hull of the points
-its segments start at. Those approximations are deliberately made *outwards*,
-so a region always CONTAINS the truth.
-
-A line does better than that where a shape has been solved for outright rather
-than bounded: a cylinder is a quadratic along a line, and the answer is the
-chord that is really there rather than the hexagon's. The rest still go through
-the bound, which is why solving one more shape can only tighten the answer and
-never invalidate anything built on it.
-
-One direction, consistently, is the point. Erring inwards on some primitives
-and outwards on others would leave a region that is neither a subset nor a
-superset of the truth -- no guarantee at all. Erring outwards everywhere keeps one:
-whatever the region says is not there, really is not there. What it costs is
-that a point inside a region is not certainly on the feature, so an anchor on a
-curved primitive can sit slightly off it.
-
-A LINE is done here: clipping one by a convex solid gives an interval, and
-intervals union, intersect and subtract exactly, so crop_line_to_segments_on_csg
-walks the whole tree and returns as many pieces as the cuts leave.
-
-Exactness along a line buys one more thing: the difference between being ON a
-solid and being INSIDE it. Both readings of the walk already exist, so
-crop_line_to_boundary_segments_on_csg subtracts one from the other and hands
-back the stretches that lie on the surface. That is what an ARRIS is, and the
-reason to ask for it rather than for material is that a cutter is extended past
-the piece on purpose -- so its arrises run on into wood that is still there,
-where there is no edge to draw.
+Faces are cropped by plane in cross_sections.py.
 """
 
 import math
@@ -66,11 +27,7 @@ from .identity_memo import memo_by_identity
 
 
 def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:
-    """The convex hull of some points, counter-clockwise.
-
-    Monotone chain. Used where a shape is described by points rather than by
-    planes, so that its bounding planes can be derived from the hull of them.
-    """
+    """Return the convex hull of 2D points, counter-clockwise (monotone chain)."""
     unique = sorted(set(points))
     if len(unique) < 3:
         return unique
@@ -97,7 +54,7 @@ BoundingHalfSpaces = List[Tuple[V3, V3]]
 
 
 class BoundsKind(Enum):
-    """Which of the three answers solid_bounds gave."""
+    """Which kind of answer solid_bounds gave."""
 
     HALF_SPACES = 0
     EMPTY = 1
@@ -107,22 +64,13 @@ class BoundsKind(Enum):
 # TODO this is Convex right? can we rename this to 3dConvexHull or something?
 @dataclass(frozen=True)
 class SolidBounds:
-    """What can be said about a solid in half spaces. Three answers, not two.
+    """What solid_bounds knows about a solid:
 
-    Conflating any two of them has already cost something, so they are tagged
-    rather than encoded:
+    - HALF_SPACES: the solid is the intersection of `faces`.
+    - EMPTY: the solid contains nothing.
+    - UNKNOWN: a solid it can't describe; callers must give up.
 
-      HALF_SPACES  the solid is the intersection of `faces`. An EMPTY list of
-                   them would mean no bounds at all, which is EVERYTHING.
-      EMPTY        describable, and contains nothing. The opposite of the line
-                   above, which is exactly why it cannot be said in faces.
-      UNKNOWN      not a solid this can describe. A caller must give up rather
-                   than carry on with a partial answer, which would be wrong in
-                   a direction nothing downstream can see.
-
-    `faces` is None unless the answer is HALF_SPACES, so a caller that forgets
-    to look at `kind` fails loudly instead of reading an empty list as
-    "unbounded" and quietly returning too much.
+    `faces` is None unless HALF_SPACES.
     """
 
     kind: BoundsKind
@@ -133,15 +81,7 @@ class SolidBounds:
         return SolidBounds(kind=BoundsKind.HALF_SPACES, faces=faces)
 
     def require_faces(self) -> BoundingHalfSpaces:
-        """The half spaces, for a caller that has ruled out the other two answers.
-
-        `faces` is None unless the answer is HALF_SPACES, which is what makes a
-        caller look at `kind` -- and then leaves it holding an Optional it has
-        already established is not one. This says that out loud: every caller
-        reaches it having returned early on EMPTY and UNKNOWN, and one that has
-        not is asking a question with no answer and is told so here rather than
-        iterating None somewhere further in.
-        """
+        """Return `faces`; raises TypeError unless the kind is HALF_SPACES."""
         if self.faces is None:
             raise TypeError(
                 f"bounds of kind {self.kind.name} have no half spaces -- check kind, "
@@ -164,10 +104,7 @@ UNKNOWN_BOUNDS = SolidBounds(kind=BoundsKind.UNKNOWN)
 
 @memo_by_identity
 def solid_bounds(csg) -> SolidBounds:
-    """How a solid is bounded: half spaces, nothing at all, or no idea.
-
-    See SolidBounds for what the three answers mean and why there are three.
-    """
+    """Return a primitive's bounding half spaces (outward approximations), EMPTY, or UNKNOWN."""
     from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
                          EmptyCSG, HalfSpace, RectangularPrism)
     from .pathcsg import PathExtrusion
@@ -199,10 +136,7 @@ def solid_bounds(csg) -> SolidBounds:
         return SolidBounds.of(faces)
 
     if isinstance(csg, Cylinder):
-        # A hexagon circumscribing the circle: its faces are tangent to it, so
-        # the hexagon contains the cylinder. Outwards, per the rule at the top
-        # of this file -- a region that contains the truth is one that can be
-        # trusted to say a feature is NOT somewhere.
+        # A circumscribing hexagon.
         axis = unit_vector(csg.axis_direction)
         across, up = perpendicular_axes(axis)
         faces = []
@@ -220,23 +154,8 @@ def solid_bounds(csg) -> SolidBounds:
         ))
 
     if isinstance(csg, PathExtrusion):
-        # The hull of the points the path is built from.
-        #
-        # KNOWN BUG: a segment that curves outwards -- an arc bulging away from
-        # the chord between its ends -- lies outside this hull, so the bound is
-        # too small. That is the wrong direction for this file, which errs
-        # outwards everywhere else. Fixing it means bounding the arc rather
-        # than its endpoints. Left for later; it only bites on a curved path.
-        #
-        # Which way it is wrong now depends on what the solid is doing. Added,
-        # too small crops a feature shorter than it really is. SUBTRACTED, too
-        # small removes less than it should, which is the safe direction -- so
-        # a curved cutter is the milder half of this bug and a curved body the
-        # sharper one.
-        #
-        # For analytic purposes, treat a path extrusion as if it was created
-        # from all straight line extrusions. Proper support for curves is
-        # unlikely to be added anytime soon.
+        # The hull of the path's segment start points.
+        # KNOWN BUG: an arc bulging outward lies outside this hull, so the bound is too small.
         points = [seg.start for seg in csg.path.segments]
         return _bounds_or_unknown(_extruded_hull_half_spaces(
             [(float(point[0, 0]), float(point[1, 0])) for point in points],
@@ -250,26 +169,14 @@ def solid_bounds(csg) -> SolidBounds:
 
 
 def _bounds_or_unknown(faces: Optional[BoundingHalfSpaces]) -> SolidBounds:
-    """For the helpers that still answer None when they cannot describe a shape."""
+    """Wrap `faces` as SolidBounds, or UNKNOWN if None."""
     return UNKNOWN_BOUNDS if faces is None else SolidBounds.of(faces)
 
 
 def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
-    """The planes bounding a loft between two convex profiles.
+    """Return the half spaces bounding a loft between two convex profiles, or None if malformed.
 
-    A loft's side faces are ruled surfaces, and planar only when each pair of
-    matching edges happens to come out parallel. A pure per-axis scale does
-    that for a profile whose edges RUN ALONG the axes being scaled -- a
-    rectangle, which is the case the primitive is actually for -- and a uniform
-    scale does it for any profile. Scale a hexagon per axis and its sides bend.
-    _loft_sides_are_planar tests the quads rather than trusting the taper,
-    because that is the property, and the two part company more easily than
-    they look like they should.
-
-    Twist the correspondence and a side stops being planar. Each plane is then
-    pushed out to the furthest corner, which bounds the corners' hull -- larger
-    than the loft, and containing it. The primitive already calls a twisted loft
-    undefined behaviour, so a loose bound there is the honest answer.
+    Exact when each side is planar; otherwise each side's plane is pushed out to the furthest corner.
     """
     matrix = csg.transform.orientation.matrix
     across = Matrix([matrix[0, 0], matrix[1, 0], matrix[2, 0]])
@@ -284,10 +191,6 @@ def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
 
     bottom = [lift(point, csg.bottom_points_z_pos) for point in csg.bottom_points]
     top = [lift(point, csg.top_points_z_pos) for point in csg.top_points]
-    # Profiles of different lengths are not a loft. The primitive says so and
-    # is_valid() checks it, but nothing in the TYPE does -- both are just
-    # profiles -- so this stays where a check against a state the dataclass
-    # already forbids would not.
     if len(bottom) < 3 or len(bottom) != len(top):
         return None
 
@@ -311,12 +214,7 @@ def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         # Outward, whichever way the profiles were wound.
         if float(((middle - bottom[index]).T * normal)[0, 0]) > 0:
             normal = -normal
-        # Pushed out to whichever corner reaches furthest along the normal. For
-        # a pure taper every side is planar and nothing moves, so the bound is
-        # exact. Twist the correspondence and the side becomes a ruled surface
-        # with no plane of its own -- this then bounds the corners' hull, which
-        # contains the loft. Loose rather than wrong, which is the direction
-        # this file errs in.
+        # Pushed out to the furthest corner.
         reach = max(float(((corner - bottom[index]).T * normal)[0, 0])
                     for corner in corners)
         faces.append((normal, bottom[index] + normal * scalar(reach)))
@@ -333,7 +231,7 @@ def _cross(a: V3, b: V3) -> V3:
 
 
 def _extrusion_caps(axis: V3, position: V3, start_distance, end_distance) -> BoundingHalfSpaces:
-    """The two ends of an extrusion, skipping any that runs to infinity."""
+    """Return the two end caps of an extrusion as half spaces, skipping an end at infinity."""
     caps: BoundingHalfSpaces = []
     if end_distance is not None:
         caps.append((axis, position + axis * end_distance))
@@ -348,12 +246,7 @@ def _extruded_hull_half_spaces(
     start_distance,
     end_distance,
 ) -> Optional[BoundingHalfSpaces]:
-    """The planes bounding a shape extruded from a cross-section of points.
-
-    The hull of the points rather than the points in order, so a cross-section
-    that is not convex, or has a point inside its own outline, still gives a
-    convex solid to clip against.
-    """
+    """Return the half spaces bounding the extrusion of the convex hull of `points`, or None if degenerate."""
     hull = convex_hull_2d(points)
     if len(hull) < 3:
         return None
@@ -391,21 +284,11 @@ def _extruded_hull_half_spaces(
 # A stretch of the line, as the two parameter values bounding it.
 Span = Tuple[float, float]
 
-# How close to the surface a verification point may be and still count as on
-# the solid. Small: the midpoint of a doubtful stretch is nowhere near an end,
-# so the only nearness that matters is to the surface the line lies in.
+# How close to the surface a checked midpoint may be and still count as on it.
 _VERIFY_EPS = 1e-9
 
 
-# Slack for the one comparison that decides whether a line lying IN a face
-# plane counts as on the solid. A line that lies exactly in a plane should
-# measure an offset of 0 from it, and measures 4e-18 instead -- an arris is
-# built from the very corners of the prism whose faces it lies in, so the
-# rounding is unavoidable and always present. Everywhere else in this file a
-# comparison decides which side of a plane something is on, and noise that
-# small does not change the side; here the two readings are SUPPOSED to differ
-# at exactly zero, so without slack the reading is chosen by rounding noise.
-# Nanometres, so nothing a timber is dimensioned in reaches it.
+# Slack for deciding whether a line lying in a face plane is on the solid.
 _IN_PLANE_EPS = 1e-9
 
 
@@ -416,16 +299,10 @@ def _spans_within_primitive(
     tolerance: float,
     removing: bool = False,
 ) -> List[Span]:
-    """Clip `seed` by one convex solid's half spaces. One span, or none.
+    """Clip `seed` by one convex solid's half spaces; returns one span or none.
 
-    A LINE ON A BOUNDARY IS ALWAYS KEPT, whichever role the solid has. That is
-    the rule; `removing` is how it is enforced, and it needs the opposite
-    comparison to reach the same answer. Added, "on the face" means on the
-    solid, so only a line strictly outside is dropped. Removed, "on the wall"
-    means on the surface of the void rather than inside it, so a line merely
-    touching it must not be taken away -- which is what an arris shared with a
-    mortise wall is. Getting this backwards eats every edge a cut passes
-    through the plane of.
+    A line lying on a boundary is kept: `removing` flips the comparison so that holds for a
+    subtracted solid too.
     """
     direction = unit_vector(line.direction)
     origin = line.point
@@ -435,10 +312,7 @@ def _spans_within_primitive(
         along = float((normal.T * direction)[0, 0])
         offset = float((normal.T * (origin - point))[0, 0])
         if abs(along) < 1e-12:
-            # Parallel to the line: it either keeps all of it or none. The
-            # slack is _IN_PLANE_EPS's whole reason to exist -- a line lying IN
-            # this face is the case the two readings disagree about, and it is
-            # the case that does not compute a clean zero.
+            # Parallel to the line: keeps all of it or none.
             if (offset >= tolerance - _IN_PLANE_EPS if removing
                     else offset > tolerance + _IN_PLANE_EPS):
                 return []
@@ -454,7 +328,7 @@ def _spans_within_primitive(
 
 
 def _merged_spans(spans: Sequence[Span]) -> List[Span]:
-    """Overlapping and touching spans joined, in order along the line."""
+    """Return `spans` with overlapping and touching ones joined, in order."""
     ordered = sorted(span for span in spans if span[1] > span[0])
     merged: List[Span] = []
     for low, high in ordered:
@@ -467,7 +341,7 @@ def _merged_spans(spans: Sequence[Span]) -> List[Span]:
 
 
 def _intersected_spans(left: Sequence[Span], right: Sequence[Span]) -> List[Span]:
-    """The stretches covered by both sets."""
+    """Return the stretches covered by both span lists."""
     out: List[Span] = []
     for a_low, a_high in left:
         for b_low, b_high in right:
@@ -478,7 +352,7 @@ def _intersected_spans(left: Sequence[Span], right: Sequence[Span]) -> List[Span
 
 
 def _subtracted_spans(keep: Sequence[Span], remove: Sequence[Span]) -> List[Span]:
-    """`keep` with `remove` taken out of it. This is what splits an edge in two."""
+    """Return `keep` with `remove` taken out."""
     out = list(keep)
     for cut_low, cut_high in _merged_spans(remove):
         next_out: List[Span] = []
@@ -497,17 +371,7 @@ def _subtracted_spans(keep: Sequence[Span], remove: Sequence[Span]) -> List[Span
 def _cylinder_spans(
     csg, line: Line, seed: Span, tolerance: float, removing: bool,
 ) -> List[Span]:
-    """Where a line runs inside a cylinder, solved rather than approximated.
-
-    The barrel is a quadratic: the distance from the axis, measured in the
-    plane perpendicular to it, is |w_perp + t d_perp| and the line is inside
-    where that is at most the radius. The caps are two planes, so they go
-    through the same linear clipping every other primitive uses -- including
-    its handling of a line that runs parallel to them.
-
-    Beats the hexagon solid_bounds describes a cylinder with, which
-    circumscribes it and so reports a chord longer than the one that is there.
-    """
+    """Return where a line runs inside a cylinder (solved exactly), clipped to `seed`."""
     axis = unit_vector(csg.axis_direction)
     direction = unit_vector(line.direction)
     offset = line.point - csg.position
@@ -528,10 +392,7 @@ def _cylinder_spans(
 
     low, high = seed
     if a < 1e-18:
-        # Parallel to the axis: either wholly within the barrel or wholly
-        # outside it, and a line lying exactly ON the barrel is kept when the
-        # cylinder is being added and left alone when it is being removed --
-        # the same rule the flat faces follow.
+        # Parallel to the axis: wholly in or out; a line on the barrel is kept.
         outside = c >= 0.0 if removing else c > 0.0
         if outside:
             return []
@@ -553,19 +414,7 @@ def _cylinder_spans(
 
 
 def _loft_sides_are_planar(csg) -> bool:
-    """Whether a loft's sides are flat, so its half spaces describe it exactly.
-
-    A side is the quad between one edge of the bottom profile and the matching
-    edge of the top, and it is a ruled surface in general -- flat only when
-    those two edges happen to be parallel. Which is a property of the shape, not
-    a promise the primitive makes: a rectangle scaled per axis keeps its sides
-    flat because its edges run along the axes being scaled, and the same scaling
-    applied to any other polygon does not.
-
-    So the quads are tested rather than the taper inferred. Relative, because
-    the check is an angle: the same rounding noise is huge on a 5mm loft and
-    invisible on a 5m one.
-    """
+    """Return whether every side quad of a loft is planar, so its half spaces describe it exactly."""
     bottom, top = csg.bottom_points, csg.top_points
     if csg.bottom_points_z_pos is None or csg.top_points_z_pos is None:
         return False
@@ -597,40 +446,24 @@ def _loft_sides_are_planar(csg) -> bool:
         normal = _cross(first, second)
         scale = safe_magnitude(normal) * safe_magnitude(third)
         if scale == 0.0:
-            # A degenerate side -- a repeated corner, or a profile collapsed to
-            # a point. Nothing to be non-planar about.
+            # Degenerate side.
             continue
         if abs(float((third.T * normal)[0, 0])) / scale > _PLANAR_ENOUGH:
             return False
     return True
 
 
-# The sine of the angle by which a quad's fourth corner may miss the plane of
-# the other three and still count as flat. Dimensionless, so it means the same
-# on a loft of any size.
+# Sine of the angle a quad's fourth corner may miss the plane of the other three by and count as flat.
 _PLANAR_ENOUGH = 1e-9
 
 
 def _exact_spans(
     csg, line: Line, seed: Span, tolerance: float, removing: bool,
 ) -> Optional[List[Span]]:
-    """Where a line runs inside a primitive, worked out exactly.
+    """Return where a line runs inside a primitive, exactly, or None if the shape isn't solved.
 
-    None when this shape cannot be solved yet, and the caller falls back to
-    clipping by the half spaces that BOUND it. That fallback errs outwards, so a
-    tree with some shapes solved and others bounded still keeps the guarantee
-    the whole file rests on: what the answer says is not there, really is not
-    there. Solving one more shape only ever tightens it.
-
-    Most shapes are solved BY their half spaces rather than despite them. A
-    prism, a half space and a convex polygon extrusion are each exactly the
-    intersection of their bounding planes, so clipping by those planes is not an
-    approximation of the answer, it IS the answer -- and saying so here is worth
-    a line of code, because otherwise they reach the fallback and read as shapes
-    nobody has got round to.
-
-    Not solved: PathExtrusion, which needs the line intersected with the path in
-    2D with angles included, and a loft whose sides are not flat.
+    Prisms, half spaces, convex extrusions and planar-sided lofts are exactly their half spaces;
+    cylinders are solved directly. Path extrusions and twisted lofts return None.
     """
     from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
                          HalfSpace, RectangularPrism)
@@ -638,9 +471,6 @@ def _exact_spans(
     if isinstance(csg, Cylinder):
         return _cylinder_spans(csg, line, seed, tolerance, removing)
 
-    # Exactly its own half spaces. The extrusion counts because its points are
-    # a convex polygon by the primitive's own contract, so the hull taken of
-    # them is the polygon itself rather than something larger.
     exactly_bounded = isinstance(csg, (HalfSpace, RectangularPrism, ConvexPolygonExtrusion))
     if isinstance(csg, ConvexPolygonSimpleLoft):
         exactly_bounded = _loft_sides_are_planar(csg)
@@ -650,7 +480,6 @@ def _exact_spans(
 
     bounds = solid_bounds(csg)
     if bounds.is_unknown:
-        # A shape that says it is exactly its half spaces, and then has none.
         return None
     if bounds.is_empty:
         return []
@@ -661,21 +490,11 @@ def _spans_on_csg(
     csg, line: Line, seed: Span, tolerance: float, removing: bool = False,
     flush_removes: bool = True,
 ) -> Optional[List[Span]]:
-    """Where a line runs inside a whole CSG tree, as spans of its parameter.
+    """Return where a line runs inside a CSG tree, as parameter spans, or None if any primitive is UNKNOWN.
 
-    None if any primitive in the tree cannot be described as half spaces --
-    a partial answer would be silently wrong in an unknown direction.
-
-    The tolerance flips sign on the way into a subtraction. Everywhere else in
-    this file the approximation is made outwards, so that whatever the answer
-    says is NOT there really is not there; for a solid being removed, erring
-    outwards means removing LESS, not more. Widening a subtractor instead would
-    eat the very edge it forms -- a mortise wall flush with the face it opens
-    onto would delete the arris it shares with it. Nesting takes care of itself:
-    a difference inside a subtraction flips back and is additive again.
-
-    `removing` flips with it, and enforces the rule that a line lying ON a
-    boundary is kept whichever role the solid has. See _spans_within_primitive.
+    `tolerance` and `removing` flip on the way into a subtracted solid, so a cut removes less rather
+    than more and a line on a cut's wall is kept. With `flush_removes`, a line on a cut's wall is
+    removed where it is also on the base's surface (a face planed away flush).
     """
     from .cutcsg import Difference, Intersection, SolidUnion
 
@@ -707,9 +526,7 @@ def _spans_on_csg(
             # Nothing to cut from, whatever the cuts are.
             return []
 
-        # Where the line lies ON the base's own surface rather than inside it:
-        # what the closed reading keeps and the strict one does not. An arris is
-        # this everywhere, which is what makes the distinction matter.
+        # Where the line lies on the base's surface rather than inside it.
         inside = _spans_on_csg(csg.base, line, seed, tolerance, not removing, flush_removes)
         if inside is None:
             return None
@@ -722,12 +539,7 @@ def _spans_on_csg(
                 return None
             removed.extend(strictly_in)
 
-            # A line ON a cut's wall is taken away only where it is also on the
-            # base's surface. Inside the base it is the arris the cut just made
-            # -- a mortise wall meeting the material it was cut from -- and must
-            # stay. On the base's surface it is a face being planed away flush,
-            # and keeping it drew the arris straight through the notch.
-            #
+            # A line on a cut's wall is removed only where it is also on the base's surface.
             if not flush_removes:
                 continue
             touching = _spans_on_csg(solid, line, seed, -tolerance, removing, flush_removes)
@@ -745,9 +557,6 @@ def _spans_on_csg(
     if bounds.is_unknown:
         return None
     if bounds.is_empty:
-        # Contains nothing, so the line is nowhere on it. An answer, not a
-        # failure -- and not the same as no bounding planes, which would mean
-        # the line is everywhere on it.
         return []
     return _spans_within_primitive(bounds.require_faces(), line, seed, tolerance, removing)
 
@@ -762,42 +571,11 @@ def crop_line_to_segments_on_csg(
     near: Optional[V3] = None,
     tolerance: float = 0.0,
 ) -> Optional[List[LineSegment]]:
-    """The parts of a line that lie on a CSG solid.
+    """Return the pieces of `line` on the solid `csg`, surface included.
 
-    The one-dimensional counterpart to cross_sections.plane_cross_section,
-    and exact where that one is not: clipping a line by a convex solid gives an
-    interval, and intervals can be unioned, intersected and subtracted, so the
-    whole tree is walked rather than only the solids that bound it. A cut that
-    removes part of an edge shortens it, and a cut through the middle of one
-    splits it in two -- which is why this returns a list.
-
-    Three different answers, so three return values:
-
-        None   a primitive in the tree cannot be described as half spaces, so
-               there is no answer -- the caller should not treat it as one.
-        []     the line is not on this solid at all. Worth knowing: two planes
-               can meet somewhere that is on neither face.
-        [...]  one segment per surviving piece, in order along the line.
-
-    `near` is where the edge is expected to be. A line's own point may be
-    nowhere near the timber -- it is wherever the primitive that declared it put
-    it -- so the starting interval is centred on `near` instead. `seed_reach` is
-    how far that interval runs each way, and only has to outreach the solid.
-
-    `tolerance` widens every bound, and a caller that found this line by a
-    tolerant test must pass the same one. A derived edge is the case that
-    matters: two faces count as meeting when they come within the edge
-    tolerance, so the line through them can sit a fraction outside the very
-    solids that formed it -- a third of a millimetre, in the case that turned
-    this up. Clipped exactly, a real edge comes back empty and reads as not
-    being on the piece at all.
-
-    A line lying exactly IN a subtracted solid's face is the one case the line
-    cannot answer on its own. It is either the arris that cut just made -- a
-    mortise wall meeting the face it opens onto -- or an arris the cut planed
-    away, and along one dimension those are the same fact. So it is not decided
-    on the line: both readings are computed, and where they disagree the SOLID
-    is asked, at the midpoint of each doubtful stretch. See _closed_spans.
+    Returns None if the tree has a primitive it can't describe, [] if the line misses the solid.
+    The search starts from an interval `seed_reach` either side of `near` (or of the line's point).
+    Pass the same `tolerance` used to find the line (e.g. a derived edge's meeting tolerance).
     """
     seed = _seed_span(line, seed_reach, near)
     spans = _closed_spans(line, csg, seed, tolerance)
@@ -812,8 +590,7 @@ def crop_line_to_interior_segments_on_csg(
     seed_reach: Numeric,
     near: Optional[V3] = None,
 ) -> Optional[List[LineSegment]]:
-    """The parts of a line strictly INSIDE a solid, not on its surface: what a line of sight
-    cannot pass. The same three return values as crop_line_to_segments_on_csg."""
+    """Return the pieces of `line` strictly inside `csg` (not on its surface). Same returns as crop_line_to_segments_on_csg."""
     interior = _interior_spans(line, csg, _seed_span(line, seed_reach, near), 0.0)
     return None if interior is None else _segments(line, interior)
 
@@ -825,27 +602,9 @@ def crop_line_to_boundary_segments_on_csg(
     near: Optional[V3] = None,
     tolerance: float = 0.0,
 ) -> Optional[List[LineSegment]]:
-    """The parts of a line that lie on a solid's SURFACE rather than inside it.
+    """Return the pieces of `line` on the surface of `csg` (not inside it). Same returns as crop_line_to_segments_on_csg.
 
-    The same three return values as crop_line_to_segments_on_csg, and the same
-    walk; what differs is the question. That one asks whether there is material
-    along the line, which an edge buried in the middle of a solid answers yes
-    to just as loudly as one running along its face. An ARRIS is the second and
-    never the first, so asking for material draws it carrying on into whatever
-    the piece is still made of -- a tenon's arris continuing past the shoulder
-    and down the shank, because the cutter that shaped the tenon was extended
-    back there and the shank is solid around it.
-
-    Boundary is closure minus interior, and both readings already exist: the
-    closed one is what crop_line_to_segments_on_csg returns, and the open one
-    is the same walk read the other way (see _interior_spans). Subtracting them
-    leaves exactly the stretches where the line is on the surface.
-
-    The interior is taken at MINUS `tolerance`, for the reason the whole file
-    errs outwards: a set being taken away is erred on by removing less of it.
-    A widened interior would eat `tolerance` off the real edge at the very
-    place it emerges from the material; a narrowed one leaves `tolerance` of
-    overhang instead, which is the harmless direction.
+    The closed pieces less the interior, taken at minus `tolerance`.
     """
     spans = _boundary_spans(line, csg, _seed_span(line, seed_reach, near), tolerance)
     return None if spans is None else _segments(line, spans)
@@ -868,12 +627,10 @@ def crop_line_to_crease_segments_on_csg(
     near: Optional[V3] = None,
     tolerance: float = 0.0,
 ) -> Optional[List[LineSegment]]:
-    """The parts of a line where the solid's surface creases along it: i.e. where it is a real edge on the surface.
+    """Return the pieces of `line` where the surface of `csg` creases along it: a real edge.
 
-    The boundary crop, less where the surface runs straight on across the line -- one flat face
-    either side, as where another timber's arris, copied into this one's tree by a relief, lies
-    flush in its face. Worked out exactly (_directions_at), between the places the arrangement of
-    the solid around the line can change. Same three return values as crop_line_to_segments_on_csg.
+    The boundary pieces less where the line lies within one flat face. Same returns as
+    crop_line_to_segments_on_csg.
     """
     seed = _seed_span(line, seed_reach, near)
     spans = _boundary_spans(line, csg, seed, tolerance)
@@ -883,8 +640,7 @@ def crop_line_to_crease_segments_on_csg(
 
 
 def is_crease_at(line: Line, csg, point: V3, tolerance: float = 0.0) -> bool:
-    """Whether the solid's surface creases along `line` at `point` (on it): an edge there, and not
-    a line through a flat face. Unsure -- a primitive only bounded, not solved -- says yes."""
+    """Return whether the surface of `csg` creases along `line` at `point`. True when unsure."""
     direction = unit_vector(line.direction)
     station = float(((point - line.point).T * direction)[0, 0])
     return _directions_at(csg, line, station, tolerance) is not _FLAT
@@ -892,12 +648,8 @@ def is_crease_at(line: Line, csg, point: V3, tolerance: float = 0.0) -> bool:
 
 # --- which way the solid lies around a line ---------------------------------------------------
 #
-# Looking along a line at one place on it, the solid occupies some directions around it: spans of
-# angle, in the plane square to the line -- intervals, as a Span is along the line, not curved
-# geometry. None of the angles, or all: the line is off the solid, or inside it. Exactly half, in
-# one piece: it lies in one flat face. Anything else: the surface creases along it. Each primitive
-# gives its angles exactly (half a turn for each plane the line lies in), and the tree combines
-# them as it combines solids.
+# At a point on a line, the solid occupies spans of angle around it. None or all: off the solid or
+# inside it. One half turn: the line lies in a flat face. Anything else: the surface creases there.
 
 # How close, in radians, two angles may be and count as one.
 _ANGLE_EPS = 1e-6
@@ -932,7 +684,7 @@ def _angles_less(one: AngleSpans, other: AngleSpans) -> AngleSpans:
 
 
 def _half_turn(normal, basis) -> AngleSpans:
-    """The angles square to the line on a plane's solid side: within a quarter turn of -normal."""
+    """Return the angles around the line on a plane's solid side: within a quarter turn of -normal."""
     u, v = basis
     centre = math.atan2(-float(normal @ v), -float(normal @ u)) % _TAU
     low, high = centre - math.pi / 2, centre + math.pi / 2
@@ -944,7 +696,7 @@ def _half_turn(normal, basis) -> AngleSpans:
 
 
 def _plane_angles(faces, at, direction, basis, tolerance) -> AngleSpans:
-    """The angles of a convex solid, given as half spaces (normal, point) keeping dot(n, p - point) <= 0."""
+    """Return the angles around the line occupied by a convex solid given as half spaces."""
     import numpy as np
 
     angles: AngleSpans = [(0.0, _TAU)]
@@ -964,7 +716,7 @@ def _plane_angles(faces, at, direction, basis, tolerance) -> AngleSpans:
 
 
 def _primitive_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
-    """A primitive's angles at `at`, or None where it is only bounded, not solved (see _exact_spans)."""
+    """Return the angles around the line a primitive occupies at `at`, or None if the shape isn't solved."""
     import numpy as np
     from .cutcsg import ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder, HalfSpace, RectangularPrism
 
@@ -1024,8 +776,7 @@ def _tree_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
 
 
 def _directions_at(csg, line: Line, station: float, tolerance: float):
-    """At `station` along `line`: _FLAT where the solid lies in one flat face there, else its angles
-    (or None, unsure)."""
+    """Return _FLAT if the solid lies in one flat face at `station` along `line`, else its angles (None if unsure)."""
     import numpy as np
 
     direction = np.array([float(v) for v in unit_vector(line.direction)])
@@ -1046,8 +797,7 @@ def _directions_at(csg, line: Line, station: float, tolerance: float):
 
 
 def _stations(csg, line: Line, seed: Span) -> List[float]:
-    """Where along the line the solid's arrangement around it can change: where it crosses a
-    primitive's plane, or a cylinder's barrel."""
+    """Return where along the line, within `seed`, it crosses a primitive's plane or a cylinder's barrel."""
     import numpy as np
     from .cutcsg import Cylinder, csg_children
 
@@ -1089,7 +839,7 @@ def _stations(csg, line: Line, seed: Span) -> List[float]:
 
 
 def _crease_spans(line: Line, csg, spans: Sequence[Span], seed: Span, tolerance: float) -> List[Span]:
-    """`spans` (on the surface) less where the surface is one flat face across the line."""
+    """Return `spans` less where the surface is one flat face across the line."""
     stations = _stations(csg, line, seed)
     kept: List[Span] = []
     for low, high in spans:
@@ -1101,7 +851,7 @@ def _crease_spans(line: Line, csg, spans: Sequence[Span], seed: Span, tolerance:
 
 
 def _seed_span(line: Line, seed_reach: Numeric, near: Optional[V3]) -> Span:
-    """The interval to start clipping from, centred where the feature is."""
+    """Return the starting parameter interval: `seed_reach` either side of `near`."""
     direction = unit_vector(line.direction)
     reach = float(seed_reach)
     centre = (0.0 if near is None
@@ -1110,7 +860,7 @@ def _seed_span(line: Line, seed_reach: Numeric, near: Optional[V3]) -> Span:
 
 
 def _segments(line: Line, spans: Sequence[Span]) -> List[LineSegment]:
-    """Spans of a line's parameter as the pieces of line they stand for."""
+    """Return parameter spans as LineSegments."""
     direction = unit_vector(line.direction)
     origin = line.point
     return [
@@ -1126,18 +876,10 @@ def _segments(line: Line, spans: Sequence[Span]) -> List[LineSegment]:
 def _closed_spans(
     line: Line, csg, seed: Span, tolerance: float,
 ) -> Optional[List[Span]]:
-    """Where a line lies on a solid, counting its surface as on it.
+    """Return where a line lies on a solid, surface included, or None.
 
-    Two readings of the one ambiguous case, and the solid itself to settle it.
-
-    A line lying IN a cut's wall is either an arris that cut just made, or an
-    arris it planed away -- and along one dimension those look identical. So
-    both answers are computed: the permissive one keeps every such line, the
-    strict one lets a flush cut take it. Where they differ is exactly the set
-    of doubtful stretches, and each is put to is_point_on_boundary at its
-    midpoint -- "is this still on the surface of the piece", which is what an
-    edge highlight means, asked of the solid rather than guessed from the
-    line. A handful of point tests per edge, only where there is doubt.
+    A line in a cut's wall is ambiguous: an arris the cut made, or one it planed away. Computes both
+    readings and checks each disputed stretch's midpoint with is_point_on_boundary.
     """
     direction = unit_vector(line.direction)
     origin = line.point
@@ -1161,15 +903,5 @@ def _closed_spans(
 def _interior_spans(
     line: Line, csg, seed: Span, tolerance: float,
 ) -> Optional[List[Span]]:
-    """Where a line is strictly INSIDE a solid -- swallowed, not on its face.
-
-    The same walk read open instead of closed, and `removing` is the switch
-    that does it. Within a primitive it picks which comparison decides a line
-    lying in a face plane (see _spans_within_primitive), and a Difference flips
-    it on the way into each solid it subtracts, so that a line on a cut's wall
-    survives the cut. Handing it in at the TOP inverts that everywhere at once:
-    the body no longer keeps a line lying in its own face, and a cut now takes
-    one lying in its wall. What is left is the material with its whole surface
-    peeled off, which is the interior.
-    """
+    """Return where a line is strictly inside a solid: `_spans_on_csg` with `removing` inverted."""
     return _spans_on_csg(csg, line, seed, tolerance, removing=True)

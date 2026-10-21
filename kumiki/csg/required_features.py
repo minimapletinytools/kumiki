@@ -17,8 +17,8 @@ FaceTest = Callable[[FeatureHandle[FaceFeature], CutCSG], bool]
 
 
 def on_finished_surface(face: FeatureHandle[FaceFeature], root: CutCSG) -> bool:
-    """cross_sections.face_reaches_surface, read off the tree's FeatureExtents: the face is cut once,
-    and kept for whatever else asks where it is. A tree that can't be cut counts as on the surface."""
+    """Return whether a flat face shows on the finished surface of `root` (True if its extent
+    can't be computed)."""
     extent = extents_of(root, face.timber).of(face.feature, face.owner)
     return extent is None or not extent.is_empty
 
@@ -45,7 +45,7 @@ def _nodes(root: CutCSG) -> Iterator[CutCSG]:
 
 def required_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished_surface,
                       include_unmeasured: bool = False) -> List[RequiredFeature]:
-    """The features of `cut_timber` that need solving, each with why.
+    """Return the features of `cut_timber` that a drawing must solve for, each with a reason.
 
     - rough stock's own faces and relief (measured_by_default): never, unless `include_unmeasured`.
     - marked NEVER_MARK: never; marked ALWAYS_MARK: always.
@@ -55,8 +55,7 @@ def required_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished
     - curved faces: always.
     - edges and points: only extras, since a primitive's own are solved through its faces.
 
-    Over the drawn tree -- the rough body carrying every perfect plane, with the cuts -- which is
-    what the solver works on.
+    Walks the drawn tree (`render_timber_with_cuts_csg_local`).
     """
     root = cut_timber.render_timber_with_cuts_csg_local()
     timber = cut_timber.timber
@@ -88,7 +87,7 @@ def required_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished
 
 
 def planning_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished_surface) -> List[RequiredFeature]:
-    """The required features a planning drawing solves for: the perfect timber within and its joints' shoulder planes."""
+    """Return the required features of a planning drawing: the perfect timber's and the shoulder planes."""
     # TODO figure out what do here, we probably want to return centerplanes as well?
     body = cut_timber.get_extended_rough_csg_with_perfect_features_local()
     return [required for required in required_features(cut_timber, face_test)

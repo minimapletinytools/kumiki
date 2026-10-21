@@ -1,9 +1,6 @@
-"""
-Handles assumptions about what fetaures are already "known" in the list of timbers you're trying to auto-dimension.
+"""Assumptions: rows a drawing takes as already known, each with a reason.
 
-e.g. the position/orientation of the bottom point of a timber is given as known, measurements can be added to every other feature to solve with this assumption.
-
-Stored as rows in the solver's matrix together with the reason its known.
+e.g. that a timber's faces stay square to each other, so a drawing needn't dimension it.
 """
 
 from dataclasses import dataclass
@@ -36,7 +33,7 @@ class _Directed:
 
 
 def _directed(handles: Sequence[FeatureHandle], carriers: CarrierMap) -> List[_Directed]:
-    """The handles that have a direction (a plane's normal, a line's direction), in world space."""
+    """Return the handles that have a direction (a plane's normal or a line's direction), in world space."""
     known = _directed_memo(carriers)
     directed = []
     for handle in handles:
@@ -49,7 +46,7 @@ def _directed(handles: Sequence[FeatureHandle], carriers: CarrierMap) -> List[_D
 
 @memo_by_identity
 def _directed_memo(carriers: CarrierMap) -> Dict[FeatureHandle, Optional[_Directed]]:
-    """Each handle's direction, kept for as long as the carriers are: every view's assumptions ask."""
+    """Per-`carriers` cache of each handle's `_Directed` (None if it has no direction)."""
     return {}
 
 
@@ -74,14 +71,14 @@ def _across(direction: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def _parallel_rows(a: _Directed, b: _Directed) -> Tuple[Row, ...]:
-    """`b` stays parallel to `a`: b's change across a matches a's, up to their sign."""
+    """Return rows holding `b` parallel to `a`."""
     sign = 1.0 if float(a.direction @ b.direction) > 0 else -1.0
     return tuple(combine(dot_vector_row(b.change, axis), dot_vector_row(a.change, axis), -sign)
                  for axis in _across(a.direction))
 
 
 def _square_row(a: _Directed, b: _Directed) -> Row:
-    """`a` stays square to `b`: d(a · b) = 0."""
+    """Return the row holding `a` square to `b`: d(a · b) = 0."""
     return combine(dot_vector_row(a.change, b.direction), dot_vector_row(b.change, a.direction))
 
 
@@ -90,7 +87,7 @@ def _name(item: _Directed) -> str:
 
 
 def square_assumptions(handles: Sequence[FeatureHandle], carriers: CarrierMap) -> List[Assumption]:
-    """Features that are parallel or square (perpendicular) to each other stay that way.
+    """Return assumptions that features now parallel or square to each other stay so.
 
     The handles' planes and lines are grouped, in the order given, into aligned sets: features
     whose directions all lie along one set of three square axes. Within a set, the features along
@@ -128,7 +125,7 @@ def square_assumptions(handles: Sequence[FeatureHandle], carriers: CarrierMap) -
 
 def sheet_axis_assumptions(handles: Sequence[FeatureHandle], carriers: CarrierMap,
                            sheet: Transform) -> List[Assumption]:
-    """Features along the sheet's right or up axis stay along it.
+    """Return assumptions that features along the sheet's right or up axis stay along it.
 
     `sheet`'s local x and y axes are the sheet's right and up, in world space. A plane whose normal,
     or a line whose direction, lies along one of them gets its direction fixed; where it sits

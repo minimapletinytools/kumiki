@@ -22,7 +22,7 @@ def _axes(direction: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 @functools.lru_cache(maxsize=4096)
 def _axes_of(direction: Tuple[float, ...]) -> Tuple[np.ndarray, np.ndarray]:
-    """perpendicular_axes, kept per direction: a solve asks the same few again and again."""
+    """Return `perpendicular_axes(direction)` as read-only arrays, cached."""
     first, second = perpendicular_axes(Matrix(np.array(direction)))
     first, second = as_ndarray(first), as_ndarray(second)
     first.setflags(write=False)
@@ -79,7 +79,7 @@ def _carrier_constraints(ref: CarrierRef, carriers: CarrierMap, at: np.ndarray) 
 
 
 def _midplane_normal(part: Midplane, carriers: CarrierMap) -> Tuple[np.ndarray, float]:
-    """The midplane's unit normal and |n_front - n_back|. It is (n_front - n_back) . x = d_front - d_back."""
+    """Return the midplane's unit normal and |n_front - n_back|."""
     normals = []
     for ref in (part.front, part.back):
         carrier = carriers.carrier(ref)
@@ -104,10 +104,9 @@ def _part_constraints(part: RecipePart, carriers: CarrierMap, at: np.ndarray) ->
 
 
 def motion_along(recipe: Recipe, carriers: CarrierMap, at: V3, along: V3) -> Row:
-    """The first-order motion of the feature at `at`, read along `along`, as a row over solving carrier unknowns.
+    """Return the feature's first-order motion at `at`, along `along`, as a row over the unknowns.
 
-    The motion is the smallest one that keeps `at` on the moved feature, so sliding along
-    the feature doesn't count.
+    Motion within the feature (sliding along it) doesn't count.
     """
     constraints = [c for part in recipe for c in _part_constraints(part, carriers, as_ndarray(at))]
     normals = np.array([normal for normal, _ in constraints])
@@ -202,10 +201,7 @@ def _part_direction(part: RecipePart, carriers: CarrierMap) -> Tuple[np.ndarray,
 
 
 def direction_motion(recipe: Recipe, carriers: CarrierMap) -> Tuple[np.ndarray, VectorRow]:
-    """The feature's unit direction (a plane's normal, a line's direction) and its first-order change.
-
-    For a line where two planes meet, the direction is n1 × n2 normalised.
-    """
+    """Return the feature's unit direction (a plane's normal or a line's direction) and its first-order change."""
     if len(recipe) == 1:
         return _part_direction(recipe[0], carriers)
     if len(recipe) == 2:
@@ -223,11 +219,7 @@ def direction_motion(recipe: Recipe, carriers: CarrierMap) -> Tuple[np.ndarray, 
 
 
 def feature_dof_rows(recipe: Recipe, carriers: CarrierMap) -> List[Row]:
-    """The feature's own DOFs as rows over the solving carriers' unknowns.
-
-    A single carrier's DOFs are its unknowns. A point's are its motion along x, y and z; a line's
-    its motion across it at two points.
-    """
+    """Return the feature's own degrees of freedom as rows over the solving carriers' unknowns."""
     if len(recipe) == 1 and isinstance(recipe[0], Midplane):
         plane = locate_recipe(recipe, carriers.carrier)
         assert isinstance(plane, Plane)
@@ -284,7 +276,7 @@ def locate_recipe(
     recipe: Recipe,
     carrier_of: Callable[[CarrierRef], Carrier] = CarrierRef.carrier,
 ) -> Optional[Union[Plane, Line, Point]]:
-    """The geometry the recipe builds: its one part, or where its parts meet."""
+    """Return the recipe's geometry: its one part, or where its parts meet (None if they don't)."""
     located = [_part_geometry(part, carrier_of) for part in recipe]
     if len(located) == 1:
         return located[0]
@@ -300,7 +292,7 @@ def locate_recipe(
 
 
 def moved_by(carrier: Carrier, changes: Mapping[Coord, float]) -> Carrier:
-    """The carrier with each of its unknowns changed by the given amount, all in its own frame."""
+    """Return `carrier` with its unknowns changed by `changes`."""
     def amount(coord: Coord) -> float:
         return float(changes.get(coord, 0.0))
 
@@ -326,5 +318,5 @@ def moved_by(carrier: Carrier, changes: Mapping[Coord, float]) -> Carrier:
 
 
 def perturbed(carrier: Carrier, coord: Coord, step: float) -> Carrier:
-    """The carrier with one unknown moved by `step`, for finite-difference checks."""
+    """Return `carrier` with one unknown moved by `step` (for finite-difference checks)."""
     return moved_by(carrier, {coord: step})

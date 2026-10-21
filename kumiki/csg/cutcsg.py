@@ -1,21 +1,11 @@
-"""
-CutCSG - Constructive Solid Geometry operations for Kumiki
+"""CutCSG: CSG primitives and operations for timbers and their cuts, and the features they declare.
 
-This module provides CSG primitives and operations for representing timber cuts
-and geometry operations. All operations use plain Python floats (see rule.py);
-comparisons go through the safe_* helpers so they carry a tolerance rather than
-testing for bit-exact equality.
+Values are plain floats compared through the safe_* helpers (see rule.py).
 
-The low-level point tests -- contains_point, is_point_on_boundary,
-get_outward_normal -- take an optional ``eps`` that widens that tolerance for
-the duration of the call.
-
-The feature queries -- find_all_features, find_first_feature, and CSGFeature.
-test_point_unbounded -- take a *test tolerance* instead, which is a different
-wearing similar clothes. An epsilon absorbs float error; a test tolerance
-absorbs the gap between a raycast hit on the triangulated mesh and the
-analytic surface it stands for, and how far a click lands from an edge or a
-point it cannot hit exactly. See FeatureTestTolerances.
+- Point tests (contains_point, is_point_on_boundary, get_outward_normal) take an optional `eps`
+  for float error.
+- Feature queries (find_all_features, find_first_feature, CSGFeature.test_point_unbounded) take a
+  FeatureTestTolerances instead: slack for mesh-vs-analytic error and click imprecision.
 """
 
 from contextlib import contextmanager
@@ -41,7 +31,7 @@ from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierP
 # ============================================================================
 
 def _numeric_min(*vals):
-    """Return the minimum of given SymPy numeric values using safe comparison."""
+    """Return the minimum of `values` using safe comparison."""
     result = vals[0]
     for v in vals[1:]:
         if safe_compare(v - result, 0, Comparison.LT):
@@ -50,7 +40,7 @@ def _numeric_min(*vals):
 
 
 def _numeric_max(*vals):
-    """Return the maximum of given SymPy numeric values using safe comparison."""
+    """Return the maximum of `values` using safe comparison."""
     result = vals[0]
     for v in vals[1:]:
         if safe_compare(v - result, 0, Comparison.GT):
@@ -60,15 +50,9 @@ def _numeric_max(*vals):
 
 @dataclass(frozen=True)
 class AxisAlignedBoundingBox:
-    """
-    Axis-aligned bounding box (AABB) for a CSG object.
+    """Axis-aligned bounding box of a CSG. A None bound is unbounded that way.
 
-    Each bound is Optional[Numeric] where None means unbounded in that direction.
-
-    When is_empty is True, the CSG object contains no points at all (e.g. EmptyCSG,
-    or a union/intersection that reduces to nothing). The bound fields are meaningless
-    in this case (by convention all set to 0) and must not be treated as a real
-    zero-size box at the origin — check is_empty first.
+    When `is_empty`, the solid has no points and the bounds are meaningless; check it first.
     """
     min_x: Optional[Numeric]
     min_y: Optional[Numeric]
@@ -79,11 +63,9 @@ class AxisAlignedBoundingBox:
     is_empty: bool = False
 
 class FeatureCategory(Enum):
-    """What kind of place on a primitive's boundary a default feature names.
+    """Kind of place on a primitive's boundary a default feature names, shared by every primitive.
 
-    One vocabulary across every primitive for simplicity. OK to add primitive specific keys here rather than reuse.
-
-    Some will be paired with an index, others may be one offs (index 0)
+    Paired with an index where a primitive has several (index 0 for one-offs).
     """
 
     CAP = 0     # 0 = the start end, 1 = the end end
@@ -123,35 +105,23 @@ _DEFAULT_FEATURE_PROPERTIES: 'FeatureProperties'
 
 
 def arris_against_cap(side: int, sides: int, end: bool) -> FeatureKey:
-    """The arris where a side meets one of the caps.
-
-    One of the two places that know how the ARRIS run is laid out; see
-    FeatureCategory. Reading "arris.5" back needs the side count, which nothing
-    in the code has to do -- a key is matched and named, never decoded -- so
-    that cost falls on a person rather than on a caller.
-    """
+    """Return the key of the arris where side `side` meets cap `cap`."""
     return (FeatureCategory.ARRIS, sides * (2 if end else 1) + side)
 
 
 def corner_on_cap(vertex: int, vertices: int, end: bool) -> FeatureKey:
-    """Vertex n of the start or end profile, in the one CORNER run."""
+    """Return the key of vertex `index` of the start or end profile."""
     return (FeatureCategory.CORNER, (vertices if end else 0) + vertex)
 
 
 def default_feature_name(key: FeatureKey) -> str:
-    """What a default feature is called when nobody has named it.
-
-    Deterministic, so a default is referenceable -- from a drawing, a
-    measurement, an override -- without anyone having authored a name for it.
-    Lower case and dotted to sit alongside the authored names already in use,
-    which look like "ptw.front", "rptw.front" and "rough.back_right".
-    """
+    """Return the deterministic name of a default feature, e.g. "arris.5"."""
     category, index = key
     return f"{category.name.lower()}.{index}"
 
 
 def side_key(index: int) -> FeatureKey:
-    """Side n of an extrusion-like primitive: see ExtrusionFeatureKey."""
+    """Return the key of side `index` of an extrusion-like primitive."""
     return (FeatureCategory.SIDE, index)
 
 
@@ -161,22 +131,13 @@ CYLINDER_BARREL: FeatureKey = side_key(0)
 CYLINDER_AXIS: FeatureKey = (FeatureCategory.AXIS, 0)
 
 
-# A prism's four sides in order around it -- +x, +y, -x, -y -- which is what
-# fixes the meaning of SIDE n, and with it ARRIS n as the join between side n
-# and side n+1.
-#
-# Not just any consistent cycle: this is timber.TimberFeature's order, so that
-# side n and arris n pick out the same things RIGHT_FACE..BACK_FACE and
-# RIGHT_FRONT_EDGE..TOP_BACK_EDGE do, in the same sequence. Anything mapping
-# between the two vocabularies can then do it by position. Only the caps
-# differ, because CAP 0 has to mean the START end -- see
-# TestDefaultOrderFollowsTimberFeature, which pins all of this from the test
-# side, since timber imports cutcsg and so cutcsg cannot say it here.
+# A prism's four sides in order: +x, +y, -x, -y. Side n and arris n (side n against n+1) follow
+# timber.TimberFeature's order; see TestDefaultOrderFollowsTimberFeature.
 _PRISM_SIDE_ORDER: Tuple['PrismFace', ...] = ()  # filled in below, once PrismFace exists
 
 
 class PrismFace(Enum):
-    """Face of a RectangularPrism, indices match TimberFace."""
+    """Face of a RectangularPrism; indices match TimberFace."""
     TOP = 1
     BOTTOM = 2
     RIGHT = 3
@@ -190,42 +151,27 @@ _PRISM_CAP_KEYS = {PrismFace.BOTTOM: START_CAP, PrismFace.TOP: END_CAP}
 
 
 class ExtrusionCap(Enum):
-    """Which flat end of an extrusion-like primitive a feature is on."""
+    """Which flat end of an extrusion-like primitive."""
     TOP = 1
     BOTTOM = 2
 
 
-# Key identifying one named feature on an extrusion-like primitive
-# (ConvexPolygonExtrusion, pathcsg.PathExtrusion): an int n means the side face
-# running from vertex n to vertex n+1 -- from points[n] to
-# points[(n+1) % len(points)] for ConvexPolygonExtrusion, or from
-# path.segments[n].start to path.segments[n].end for PathExtrusion. Same
-# "n to n+1" meaning in both, so referencing side n means the same thing
-# regardless of which of the two primitives it is.
+# Key of a feature on an extrusion-like primitive: int n is the side from vertex n to vertex n+1
+# (points[n] for ConvexPolygonExtrusion, path.segments[n] for PathExtrusion).
 ExtrusionFeatureKey = Union[int, ExtrusionCap]
 
 
 class CylinderPart(Enum):
-    """Which surface of a Cylinder a feature is on.
-
-    BARREL is the curved lateral surface. Unlike a prism's four sides it is a
-    single feature, not four -- there is no non-arbitrary way to cut it up, and
-    nothing in joinery wants to reference "a quarter of a peg hole wall".
-    """
+    """Which surface of a Cylinder; BARREL is the whole curved side as one feature."""
     TOP = 1
     BOTTOM = 2
     BARREL = 3
 
 
 class CSGFeatureType(Enum):
-    """What kind of geometry a feature names.
+    """Kind of geometry a feature names: face, curved face, edge or point.
 
-    The cases measurement cares about: measuring between two features
-    dispatches on this pair (two parallel faces measure like two parallel
-    planes, a point and a face measure a projected distance, and so on).
-
-    EDGE arrives with features derived from intersecting face pairs; POINT with
-    their vertices.
+    Measurements dispatch on the pair of types.
 
     TODO consider adding DERIVED_POINT and DERIVED_FACE here
     """
@@ -235,16 +181,7 @@ class CSGFeatureType(Enum):
     CURVED_FACE = 4
 
 
-# Default tolerances for deciding whether a point is on a feature. Units are
-# model units (metres), so these are 0.5mm / 2mm / 4mm.
-#
-# These are tolerances rather than epsilons, and the distinction is the point
-# of the name: an epsilon absorbs float error, and EPSILON_GENERIC (1e-8) is
-# sized for that. These absorb something far larger -- the gap between a
-# raycast hit on the triangulated mesh and the analytic surface it stands for,
-# plus, for edges and points, however far a human click lands from a target it
-# cannot hit exactly. Code doing exact analytic work wants
-# FeatureTestTolerances.exact() instead.
+# Default feature test tolerances in metres (0.5mm / 2mm / 4mm). See FeatureTestTolerances.
 FEATURE_FACE_TOLERANCE = scalar('5e-4')
 FEATURE_EDGE_TOLERANCE = scalar('2e-3')
 FEATURE_POINT_TOLERANCE = scalar('4e-3')
@@ -254,32 +191,15 @@ FEATURE_POINT_TOLERANCE = scalar('4e-3')
 class FeatureTestTolerances:
     """How close a point must be to count as on a feature, per feature type.
 
-    Not epsilons: an epsilon absorbs float error, while these absorb the gap
-    between meshed and analytic geometry and the imprecision of a human click.
-    They are several orders of magnitude larger than EPSILON_GENERIC and are
-    chosen, not derived.
-
-    One tolerance does not fit all three, and the reason is about how features
-    get selected rather than about the geometry:
-
-    - a FACE you click directly, so the only slack needed is the gap between
-      the analytic surface and the triangulated mesh a raycast actually hits;
-    - an EDGE or a POINT you cannot click exactly at all. Selecting one means
-      snapping to it, the way any CAD package works, so they want considerably
-      more room -- and a caller driving this from a viewport usually wants to
-      derive theirs from screen space, or a line is unhittable zoomed out and
-      greedy zoomed in.
-
-    This replaces the earlier pair of `eps` / `snap_eps` parameters, which
-    keyed the wider tolerance off `real` instead. Type is the better key: a
-    real derived edge is just as unclickable as a non-real centre axis.
+    Faces need only the mesh-vs-analytic gap; edges and points need more, since they are snapped to.
+    A viewport usually scales these by world units per pixel.
     """
     face: Numeric = FEATURE_FACE_TOLERANCE
     edge: Numeric = FEATURE_EDGE_TOLERANCE
     point: Numeric = FEATURE_POINT_TOLERANCE
 
     def for_type(self, feature_type: 'CSGFeatureType') -> Numeric:
-        """The test tolerance for a feature of *feature_type*."""
+        """Return the tolerance for `feature_type`."""
         if feature_type == CSGFeatureType.EDGE:
             return self.edge
         if feature_type == CSGFeatureType.POINT:
@@ -287,14 +207,7 @@ class FeatureTestTolerances:
         return self.face
 
     def __mul__(self, factor: Numeric) -> 'FeatureTestTolerances':
-        """Scale every tolerance by *factor*.
-
-        The reason this exists is camera zoom. Selecting an edge or a point is
-        a snap, and how much slack a snap needs is a screen-space question: a
-        fixed 2mm is a comfortable target zoomed in and an invisible one zoomed
-        out. A viewport can hold one FeatureTestTolerances describing the tolerances
-        at some reference zoom and scale it by world-units-per-pixel per query.
-        """
+        """Return these tolerances scaled by `factor` (e.g. world units per pixel)."""
         if safe_compare(factor, 0, Comparison.LE):
             raise ValueError(f"feature test tolerances must scale by a positive factor, got {factor}")
         return FeatureTestTolerances(
@@ -313,12 +226,12 @@ class FeatureTestTolerances:
 
     @staticmethod
     def uniform(eps: Numeric) -> 'FeatureTestTolerances':
-        """The same tolerance for every feature type."""
+        """Return the same tolerance for every feature type."""
         return FeatureTestTolerances(face=eps, edge=eps, point=eps)
 
     @staticmethod
     def exact() -> 'FeatureTestTolerances':
-        """Analytic tolerance, for geometry that was never triangulated."""
+        """Return analytic tolerances, for geometry that was never triangulated."""
         return FeatureTestTolerances.uniform(EPSILON_GENERIC)
 
 
@@ -337,54 +250,23 @@ _FEATURE_TYPE_SPECIFICITY = {
 
 
 class FeatureGroup(Enum):
-    """Which other features a feature is allowed to form an edge with.
+    """Which features a feature may derive an edge with:
 
-    Deriving edges from every pair of faces in a CSG tree produces mostly
-    nonsense -- a tenon cheek and the far end of the timber do not meet. Groups
-    make the useful pairs declarable instead of searched for:
+        SHOULDER_PLANE with PERFECT, ROUGH and TENON
+        PERFECT        with SHOULDER_PLANE and CROSSING
+        ROUGH          with SHOULDER_PLANE and CROSSING
+        TENON          with SHOULDER_PLANE
+        CROSSING       with PERFECT and ROUGH
+        NONE           with nothing
 
-        SHOULDER_PLANE intersects with PERFECT, ROUGH and TENON
-        PERFECT        intersects with SHOULDER_PLANE and CROSSING
-        ROUGH          intersects with SHOULDER_PLANE and CROSSING
-        TENON          intersects with SHOULDER_PLANE only
-        CROSSING       intersects with PERFECT and ROUGH
+    - PERFECT: the perfect timber within's faces, arrises, corners and centerplanes, and rough faces
+      lying on it (rptw.*).
+    - ROUGH: the rough body's faces.
+    - SHOULDER_PLANE: a joint's shoulder plane. TENON: a joint's tenon faces.
+    - CROSSING: the faces a cross lap removes.
 
-    NONE is the exception to the scheme: it meets nothing, not even itself, and
-    is how a feature says it forms no edges at all. Some geometry is worth
-    naming and pointing at without every face of it turning into an arris.
-
-    What carries what today: a timber's perfect-timber-within faces, arrises,
-    corners and centerplanes are PERFECT, and its rough body's are ROUGH --
-    except where the rough body lies on the perfect timber within (rptw.*, see
-    timber.RPTW_FACE_PREFIX), which is PERFECT too, as is every face of a
-    timber with no rough allowance. A
-    joint's shoulder plane is SHOULDER_PLANE, so a joint outlines itself against
-    both bodies. TENON is a joint's tenon faces, and the one thing they meet is
-    that shoulder plane -- where a tenon cheek leaves the timber at the shoulder
-    is the tenon's base arris, which is nowhere else, so it has to be derived.
-    Nothing else pairs with a tenon: a tenon cheek against the MATING timber's
-    body was an edge nobody wanted (see the coffee table note in TODO.txt), and
-    the cheeks against each other are the tenon prism's own arrises, already
-    declared.
-
-    CROSSING is the faces of what a cross lap removes: the crossing timber's
-    sides and the lap's depth plane. They are not shoulders, but they meet the
-    timber's bodies all the same, and where they do is the lap's outline.
-
-    The two bodies do NOT meet themselves, which is why PERFECT and ROUGH pair
-    with joint features and nothing else: a timber's own arrises and corners
-    are declared outright (timber._long_arris_tags and friends), so letting the
-    faces pair as well would reach the same line two ways and offer it twice.
-    The rough body is where that would bite hardest, since relief geometry embeds
-    the MATING timber's rough body to scribe against and its faces carry the same
-    reserved rough.* names (see timber.ROUGH_FACE_PREFIX): two timbers' faces
-    would pair into an edge reading as one timber's -- rough.back x rough.back --
-    because the name says nothing about whose body it is.
-
-    The ranks are a preference order for picking, best first: a shoulder plane
-    is the feature a joint is about, then the perfect body a drawing measures
-    from, then the rough stock, then tenon faces, then a cross lap's faces, then
-    anything forming no edges.
+    PERFECT and ROUGH don't pair with themselves: a timber's own arrises and corners are declared.
+    The order is the pick preference, best first.
     """
     SHOULDER_PLANE = 1
     PERFECT = 2
@@ -409,20 +291,13 @@ FEATURE_GROUP_PAIRS: dict = {
 
 
 def feature_groups_intersect(a: FeatureGroup, b: FeatureGroup) -> bool:
-    """Whether features in groups *a* and *b* may form an edge together."""
+    """Return whether features in groups `a` and `b` may form an edge."""
     return b in FEATURE_GROUP_PAIRS[a]
 
 
 
 class FeatureMarkingStatus(Enum):
-    """Whether a feature has to appear on a drawing.
-
-    DECLARED INTENT, NOT YET HONOURED. Every feature carries one and nothing
-    reads it: the drawing generator does not consult it when deciding what to
-    mark. Kept because the vocabulary is the part worth settling early -- a
-    joint that wants a face always dimensioned has somewhere to say so the day
-    the generator learns to ask.
-    """
+    """Whether a feature must appear on a drawing. Not yet read by the drawing generator."""
 
     OPTIONAL = 0
     ALWAYS_MARK = 1
@@ -431,14 +306,9 @@ class FeatureMarkingStatus(Enum):
 
 @dataclass(frozen=True)
 class FeatureMarkingSpec:
-    """How a feature should be marked, when that differs from the default.
+    """How to mark a feature on a drawing, when not the default.
 
-    mark_relative_to names the feature a dimension should be measured from,
-    which is how a drawing says "38mm from the shoulder" rather than giving an
-    absolute position. None leaves that to whatever generates the drawing.
-
-    DECLARED INTENT, NOT YET HONOURED. Nothing sets marking_override and
-    nothing reads it, so a joint cannot yet say how it wants to be dimensioned.
+    `mark_relative_to` names the feature to dimension it from. Not yet read.
     """
 
     mark: FeatureMarkingStatus = FeatureMarkingStatus.OPTIONAL
@@ -446,7 +316,7 @@ class FeatureMarkingSpec:
 
 
 class FeaturePurpose(Enum):
-    """What purpose the feature serves."""
+    """What a feature is for."""
 
     NOT_SPECIFIED = 0
     # Relief cut into rough stock (shavings/relief.py marks every feature of it).
@@ -459,21 +329,16 @@ class FeaturePurpose(Enum):
 
 
 def measured_by_default(purpose: FeaturePurpose) -> bool:
-    """Whether a feature serving *purpose* is measured (solved for) unless someone asks otherwise.
-
-    Not rough stock: neither its own faces nor the relief cut into it. Picking does not ask yet.
-    """
+    """Return whether features serving `purpose` are solved for by default (not rough stock or its relief)."""
     return purpose not in (FeaturePurpose.ROUGH_FACE, FeaturePurpose.ROUGH_RELIEF)
 
 
 class FeatureNature(Enum):
-    """Where a feature lives, which says how far it reaches.
+    """Where a feature lives, which sets how far it reaches:
 
-    REAL: on the solid's surface -- a face, an arris -- and cropped away with it by the cuts.
-    AUXILIARY: in a void, standing for something no surface is -- a bore's axis. Bounded by its own
-        extent, never by the solid, which has nothing there to bound it with.
-    PERFECT_REFERENCE: inside the material -- the perfect timber within's faces and centerplanes,
-        carried by rough stock. Extended, then cropped to the cut timber's solid.
+    - REAL: on the surface (a face, an arris); cropped by the cuts.
+    - AUXILIARY: in a void (a bore's axis); bounded by its own extent.
+    - PERFECT_REFERENCE: inside the material (the perfect timber within); cropped to the solid.
     """
 
     REAL = 0
@@ -483,27 +348,14 @@ class FeatureNature(Enum):
 
 @dataclass(frozen=True)
 class FeatureProperties:
-    """Metadata every feature carries, independent of how it is identified.
+    """Metadata every feature carries.
 
     Args:
-        group: which other features this one may form an edge with. NONE by
-            default, so a feature pairs with nothing unless someone says it
-            should. Deriving an edge is the expensive, noisy thing the feature
-            system does -- every pairing is a line that has to be worth
-            selecting -- so it is opted into rather than out of. Today the only
-            pairing anyone wants is a shoulder plane against the timber's own
-            prism.
-        priority: lower wins when several features claim the same point.
-        nature: where the feature lives (FeatureNature). Only a REAL one names an actual surface:
-            those can be cropped away by the CSG tree and so are tested against the triangulated
-            result first; the others are unaffected by boolean operations.
-        marking_override: how to mark this feature on a drawing, when the
-            default for its kind is not what is wanted. None means the default.
-            Declared intent: carried, not yet read -- see FeatureMarkingSpec.
-        purpose: what the feature is for, where that is worth recording --
-            relief geometry is not a feature of the joint the way a tenon
-            cheek is. Declared intent: carried, not yet read -- see
-            FeaturePurpose.
+        group: which features this one may derive edges with (FeatureGroup). NONE by default.
+        priority: lower wins when several features claim a point.
+        nature: FeatureNature. Only REAL features are tested against the triangulated result.
+        marking_override: how to mark it on a drawing (not yet read).
+        purpose: what it is for (FeaturePurpose).
     """
 
     group: FeatureGroup = FeatureGroup.NONE
@@ -531,34 +383,33 @@ def _within_tolerance(
     point: V3,
     tolerances: 'FeatureTestTolerances',
 ) -> List['OwnedFeatureHit']:
-    """Those hits the point is actually on, each judged at its own type's tolerance."""
+    """Return the hits `point` is on, each at its type's tolerance."""
     return [hit for hit in hits
             if hit.feature.test_point_unbounded(
                 hit.owner, point, tolerances.for_type(hit.feature.feature_type()))]
 
 
 def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
-    """Best answer first, ordered by each of these in turn (see docs/internal/picking.md):
+    """Return hits sorted best first (see docs/internal/picking.md), by:
 
-    1. Non-real lines and points (a bore's axis), then real features, then non-real planes
-       (a centerplane, a perfect face inside rough stock).
-    2. Kind: point, then edge, then face.
+    1. Non-real lines and points, then real features, then non-real planes.
+    2. Point, then edge, then face.
     3. Declared before derived.
-    4. Group rank, best first.
-    5. Author-set priority, lowest first.
+    4. Group rank.
+    5. Priority, lowest first.
     6. Name.
-    7. The order they were found in.
+    7. Order found.
     """
     return sorted(hits, key=feature_hit_sort_key)
 
 
 def _derived_nature(one: 'CSGFeature', other: 'CSGFeature') -> FeatureNature:
-    """A derived feature's nature: real only where both parents are, else whichever is not."""
+    """Return a derived feature's nature: REAL if both parents are, else the non-real one's."""
     return next((parent.nature for parent in (one, other) if not parent.real), FeatureNature.REAL)
 
 
 def feature_hit_sort_key(hit: 'OwnedFeatureHit') -> Tuple:
-    """Where a hit sorts: see _sort_feature_hits."""
+    """Return a hit's sort key (see _sort_feature_hits)."""
     face = hit.feature.feature_type() is CSGFeatureType.FACE
     return (
         1 if hit.feature.real else (2 if face else 0),
@@ -571,12 +422,7 @@ def feature_hit_sort_key(hit: 'OwnedFeatureHit') -> Tuple:
 
 
 def _names_same_geometry(one: 'OwnedFeatureHit', other: 'OwnedFeatureHit') -> bool:
-    """Whether two hits name the same point, line or plane.
-
-    Different kinds are never the same geometry, and a feature that declines to
-    locate never matches anything -- a cylinder's barrel is not comparable to
-    another, so it is never dropped as a duplicate of one.
-    """
+    """Return whether two hits locate to the same point, line or plane. Unlocatable features match nothing."""
     here, there = one.locate_simple_unbounded(), other.locate_simple_unbounded()
     if isinstance(here, Point) and isinstance(there, Point):
         return points_are_coincident(here, there)
@@ -588,13 +434,7 @@ def _names_same_geometry(one: 'OwnedFeatureHit', other: 'OwnedFeatureHit') -> bo
 
 
 def owner_label_trails(root: 'CutCSG') -> Dict[int, Tuple[str, ...]]:
-    """Every node under *root*, keyed by id, with the trail of labels that reaches it.
-
-    The same trail a FeatureRef is written with, and numbered the same way when one
-    step names several nodes (`shoulder`, `shoulder#1`, ...), so two trails compare
-    as strings and never collide by accident. Used to order two hits that are the
-    same geometry: see _drop_duplicate_derived.
-    """
+    """Return every node under `root`, keyed by id, with its label path (`shoulder`, `shoulder#1`, ...)."""
     trails: Dict[int, Tuple[str, ...]] = {}
     stack: List[Tuple['CutCSG', Tuple[str, ...]]] = [(root, ())]
     while stack:
@@ -617,27 +457,14 @@ def _drop_duplicate_derived(
     hits: List['OwnedFeatureHit'],
     root: Optional['CutCSG'] = None,
 ) -> List['OwnedFeatureHit']:
-    """removes derived features that coincide with non derived features, expects _sort_feature_hits order.
+    """Drop derived hits that locate to the same geometry as an earlier hit. Expects _sort_feature_hits order.
 
-    Two *derived* hits can name the same geometry as well -- a tree holding one
-    surface twice derives its edge from either copy -- and then there is no declared
-    original to prefer. That is reported and resolved rather than refused: the
-    duplication is worth fixing, and fixing it is not a pick's job. The winner is the
-    one whose owner's label trail sorts first, then its name, so the same tree always
-    answers the same way. Pass *root* for that ordering; without it the first of the
-    two is kept.
+    Between two derived duplicates, keeps the one whose owner's label trail (then name) sorts first,
+    using `root`; without it, the first. Logs duplicates.
     """
     kept: List['OwnedFeatureHit'] = []
     trails = owner_label_trails(root) if root is not None else {}
-    # It is NOT true in general that declared features come first: _sort_feature_hits
-    # ranks specificity above declaredness on purpose, so a derived EDGE sorts ahead
-    # of the declared FACE it was made from.
-    #
-    # What makes the drop correct is narrower. _names_same_geometry only ever matches
-    # a pair of the same kind -- Point to Point, Line to Line, Plane to Plane -- and
-    # within one kind the specificity key ties, so declaredness is what decides. So
-    # where a declared twin exists, it is already in `kept` and the derived hit goes.
-    # Where none exists, the twin is another derived hit: see the docstring.
+    # Duplicates are always the same kind, and within a kind declared sorts before derived.
     for hit in hits:
         twin_index = next((index for index, other in enumerate(kept)
                            if _names_same_geometry(hit, other)), None)
@@ -673,8 +500,7 @@ def shared_ancestor(
     first: 'CutCSG',
     second: 'CutCSG',
 ) -> Optional['CutCSG']:
-    """The deepest node under *some_common_ancestor* holding both *first* and *second*, or None if there is none.
-    """
+    """Return the deepest node under `some_common_ancestor` containing both `first` and `second`, or None."""
     here, there = _trail_within(some_common_ancestor, first), _trail_within(some_common_ancestor, second)
     if here is None or there is None:
         return None
@@ -687,7 +513,7 @@ def shared_ancestor(
 
 
 def _trail_within(node: 'CutCSG', target: 'CutCSG') -> Optional[List['CutCSG']]:
-    """The chain of nodes from *node* down to *target*, or None if it is not there."""
+    """Return the nodes from `node` down to `target`, or None if it isn't below."""
     if node is target:
         return [node]
     for child in csg_children(node):
@@ -701,11 +527,9 @@ def derive_edge_hits(
     some_common_ancestor: 'CutCSG',
     face_hits: List['OwnedFeatureHit'],
 ) -> List['OwnedFeatureHit']:
-    """Every edge formed by a pair of *face_hits*.
+    """Return the edges formed by pairs of `face_hits`, each owned by the pair's shared ancestor.
 
-    The resultant hits are owned by the first shared ancestor of the 2 features forming the derived edge.
-
-    Careful, O(len(face_hits)^2), expected to be bounded by the fact that `len(face_hits)` should be reasonably bounded in well behaved cases.
+    O(n^2) in the number of hits.
     """
     hits: List['OwnedFeatureHit'] = []
     for i in range(len(face_hits)):
@@ -715,10 +539,7 @@ def derive_edge_hits(
                 continue
             owner = shared_ancestor(some_common_ancestor, face_hits[i].owner, face_hits[j].owner)
             if owner is None:
-                # Both parents came out of one gather, so both are
-                # under it and this cannot happen. Said out loud rather than
-                # guessed at: an edge owned by the wrong node is worse than one
-                # that is missing and complained about.
+                # Can't happen: both parents came from one gather.
                 warnings.warn(
                     f"Skipping the derived edge {edge.name}: its parents are not "
                     f"both under the node being searched, so there is no node to "
@@ -733,13 +554,9 @@ def derive_point_hits(
     edge_hits: List['OwnedFeatureHit'],
     face_hits: List['OwnedFeatureHit'],
 ) -> List['OwnedFeatureHit']:
-    """Every point where one of *edge_hits* crosses one of *face_hits*. If edge lies in the face plane, nothing is returned (even if its acutally just 1 point of intersection due to line ending at the face boundary)
+    """Return the points where an edge in `edge_hits` crosses a face in `face_hits`, each owned by the pair's shared ancestor.
 
-    The resultant hits are owned by the first shared ancestor of the 2 features forming the derived point
-
-    An edge lies IN both faces that formed it, and those pairs cost a rejection
-    each rather than needing filtering: intersect_line_plane declines a line in
-    its plane.
+    An edge lying in the face's plane gives nothing.
     """
     hits: List['OwnedFeatureHit'] = []
     for edge_hit in edge_hits:
@@ -764,10 +581,7 @@ def _drop_real_hits_if_not_on_boundary(
     point: V3,
     tolerances: 'FeatureTestTolerances',
 ) -> List['OwnedFeatureHit']:
-    """checks if the test `point` (from `collect_feature_hits` call) is on the boundary. If it is, return all feature hits. If it's not, return only the non real ones (e.g. cylinder centerline is not on the boundary usually)
-
-    NOTE parts of the dropped features may still be on the boundary, but we don't count those as a "hit" if the test point was off the boundary.
-    """
+    """Return `hits`, minus the real ones if `point` isn't on the boundary of `csg`."""
     if not hits:
         return hits
 
@@ -784,12 +598,12 @@ def _drop_real_hits_if_not_on_boundary(
 
 
 def _face_region(normal: V3, corners: Sequence[V3]) -> ConvexPlanarRegion:
-    """A flat face's outline: its plane, and its corners in order around it."""
+    """Return a flat face's plane and its corners in order."""
     return ConvexPlanarRegion(plane=Plane(normal=normal, point=corners[0]), boundary=tuple(corners))
 
 
 def _profile_at(owner: 'CutCSG', profile: Sequence[V2], z: Numeric) -> List[V3]:
-    """Points of a 2D profile at height `z` along a shape's own axis, in the owner's space."""
+    """Return a 2D profile's points at height `z` along a shape's axis, in the owner's space."""
     orientation = owner.transform.orientation.matrix  # type: ignore[attr-defined]
     return [owner.transform.position + safe_transform_vector(orientation, Matrix([p[0], p[1], z]))  # type: ignore[attr-defined]
             for p in profile]
@@ -797,7 +611,7 @@ def _profile_at(owner: 'CutCSG', profile: Sequence[V2], z: Numeric) -> List[V3]:
 
 def _side_region(owner: 'CutCSG', normal: V3, start: V2, end: V2,
                  low: Optional[Numeric], high: Optional[Numeric]) -> Optional[ConvexPlanarRegion]:
-    """The outline of an extruded side from `start` to `end`, or None if it runs to infinity."""
+    """Return the outline of an extruded side from `start` to `end`, or None if either is infinite."""
     if low is None or high is None:
         return None
     bottom = _profile_at(owner, [start, end], low)
@@ -806,11 +620,7 @@ def _side_region(owner: 'CutCSG', normal: V3, start: V2, end: V2,
 
 
 def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeric:
-    """Midpoint of a possibly-infinite extent along an axis.
-
-    An anchor point only has to be somewhere sensible on the feature, so an
-    end that runs to infinity contributes the finite one instead of NaN.
-    """
+    """Return the midpoint of an extent along an axis, using the finite end if one is infinite."""
     if start is None:
         return scalar(0) if end is None else end
     if end is None:
@@ -834,14 +644,12 @@ LocatedFeatureGeometry = Union[Point, Line, Plane]
 # 2. measurement anchor position should have its own function
 @dataclass(frozen=True)
 class CSGFeatureExtent:
-    """Roughly where a feature is, for placing annotations against it.
+    """Roughly where a feature is, for placing annotations.
 
     Args:
-        anchor: a representative point -- a face's centre, an edge's midpoint,
-            or the point itself.
-        ends: for an edge, its two endpoints.
-        region: for a flat face, its outline -- its plane and its corners in
-            order. None where the face is unbounded, not flat, or not convex.
+        anchor: a representative point (a face's centre, an edge's midpoint, the point).
+        ends: an edge's two endpoints.
+        region: a flat face's plane and corners in order; None if unbounded, curved or not convex.
     """
     anchor: V3
     ends: Optional[Tuple[V3, V3]] = None
@@ -850,50 +658,31 @@ class CSGFeatureExtent:
 
 @dataclass(frozen=True)
 class CSGFeature(ABC):
-    """An ABC representing a feature on the CutCSG's boundary or a non-real feature of the CutCSG (e.g. the axis of a cylinder)
-    
-    This feature class itself need not be aware of its owner CSG or sibling features
-    Instead ,this information is obtained by calling `locate` with its owner CSG to convert it into its owner's space
+    """A feature on a CutCSG's boundary, or a non-real one (e.g. a cylinder's axis).
+
+    Doesn't know its owner; methods take the owner node to place it in the owner's space.
     """
     name: str
     properties: FeatureProperties = field(default_factory=FeatureProperties)
 
     def feature_key(self) -> Optional['FeatureKey']:
-        """Which default slot this feature occupies, or None if it has none.
-
-        This is what lets an authored feature REPLACE the default at the same
-        place rather than sit alongside it. None is the honest answer for
-        anything with no fixed place on a primitive -- a programmable feature
-        matching a formula, or a derived edge, which exists only as the product
-        of two hits and never occupies a slot of its own.
-        """
+        """Return the default slot this feature fills (so it replaces that default), or None."""
         return None
 
     @abstractmethod
     def feature_type(self) -> CSGFeatureType:
-        """What kind of geometry this feature names.
-        """
+        """Return the kind of geometry this feature names."""
         ...
 
     def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[LocatedFeatureGeometry]:
-        """The unbounded geometry this feature lies on, in the owner's space.
+        """Return the feature's unbounded Plane, Line or Point in `owner`'s space.
 
-        A Plane for a planar face, a Line for an edge, a Point for a vertex.
-
-        `None` when the feature names a surface that is not one of those -- a
-        cylinder's barrel, a lofted side, an extrusion side that follows a
-        curved path segment.
-        
-        The returned geometry is "global" in the space of `owner` which is likely local in some Timber's space.
+        None for a curved surface (a barrel, a lofted side, a curved path side).
         """
         return None
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Roughly where this feature sits, for placing annotations.
-
-        None when the feature has no bounded extent at all (a half-space's
-        plane), or when it is not worked out for this shape yet.
-        """
+        """Return roughly where the feature is, for annotations, or None if unbounded or not supported."""
         return None
 
     @property
@@ -901,22 +690,18 @@ class CSGFeature(ABC):
         return self.properties.group
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
-        """The carriers in `owner.carriers()` that produce this feature, or None if there are none."""
+        """Return the carriers of `owner` that produce this feature, or None."""
         key = self.feature_key()
         if key is not None and key in owner.carriers():
             return (CarrierRef(owner, key),)
         return None
 
     def is_derived(self) -> bool:
-        """Whether this feature was derived from others rather than declared.
-        """
+        """Return whether this feature was derived from others rather than declared."""
         return False
 
     def group_rank(self) -> int:
-        """Where this feature's collision group sits in the preference order. Used only for sorting features.
-
-        A derived feature will override this to take the better rank of its 2 parents.
-        """
+        """Return this feature's group's pick preference rank (derived features take their better parent's)."""
         return self.group.value
 
     @property
@@ -933,16 +718,9 @@ class CSGFeature(ABC):
 
     @abstractmethod
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        """Whether *point* lies on this feature's surface ignoring any boundaries it may or may not have.
+        """Return whether `point` is on this feature's surface, ignoring its bounds.
 
-        NOTE we still need `owner` here for its local transform. We don't use it for its boundaries.
-
-        To convert into bounded features, use something like `collect_fetaure_hits` which gates every real feature on
-        is_point_on_boundary of top node we call into.
-
-        FOR CONSIDERATION: two more optional arguments, a surface normal and a
-        line, so a caller that knows more about the point can say so. Worth revisiting if a picker ever hands back the analytic surface it hit
-        rather than the triangle, since then both arguments mean what they say.
+        `owner` places the feature. collect_feature_hits gates real features on the boundary.
         """
         ...
 
@@ -998,10 +776,7 @@ K = TypeVar("K", bound=CSGFeature)
 
 @dataclass(frozen=True)
 class _ProgrammableFeature(CSGFeature):
-    """A feature identified by an arbitrary predicate rather than an enum member.
-
-    The escape hatch for anything the simple per-primitive classes cannot name. Currently unused.
-    """
+    """A feature matched by an arbitrary predicate. Currently unused."""
     predicate: Optional[Callable[['CutCSG', V3, Optional[Numeric]], bool]] = None
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
@@ -1026,22 +801,18 @@ class ProgrammablePointFeature(_ProgrammableFeature, PointFeature):
 
 
 def _as_plane(geometry: Optional['LocatedFeatureGeometry']) -> Optional[Plane]:
-    """Narrow a located geometry to a Plane, or None if it is not one.
-
-    locate() can hand back a Point or a Line as well, and a face that declines
-    to locate hands back nothing. Only planes intersect into edges.
-    """
+    """Return `located` if it is a Plane, else None."""
     return geometry if isinstance(geometry, Plane) else None
 
 
 def _point_is_near(point: V3, other: V3, tolerance: Optional[Numeric] = None) -> bool:
-    """Whether two points are within *tolerance* of each other."""
+    """Return whether two points are within `tolerance`."""
     gap = point - other
     return safe_zero_test_sq(safe_dot_product(gap, gap), eps=tolerance)
 
 
 def _point_is_on_line(point: V3, line: Line, tolerance: Optional[Numeric] = None) -> bool:
-    """Whether *point* lies within *tolerance* of an infinite line."""
+    """Return whether `point` is within `tolerance` of an infinite line."""
     along = safe_normalize_vector(line.direction)
     from_start = point - line.point
     across = from_start - along * safe_dot_product(from_start, along)
@@ -1049,7 +820,7 @@ def _point_is_on_line(point: V3, line: Line, tolerance: Optional[Numeric] = None
 
 
 def _meet_of_parents(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional[Recipe]:
-    """Where two parent features meet, or None if either has no recipe."""
+    """Return the recipe where two parent features meet, or None if either has none."""
     first, second = a.feature.solve_recipe(a.owner), b.feature.solve_recipe(b.owner)
     if first is None or second is None:
         return None
@@ -1058,11 +829,7 @@ def _meet_of_parents(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional[Rec
 
 @dataclass(frozen=True)
 class DerivedEdgeFeature(EdgeFeature):
-    """The edge where two planar FACE features meet.
-
-    The `owner` of the edge itself is the deepest node holding both of them --
-    see shared_ancestor. 
-    """
+    """The edge where two planar face features meet. Owned by their shared_ancestor."""
 
     #: The two faces forming this edge
     a: 'OwnedFeatureHit[FaceFeature]' = field(kw_only=True)
@@ -1073,9 +840,7 @@ class DerivedEdgeFeature(EdgeFeature):
         return (self.a, self.b)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        """Test the point against the analytic edge itself. Testing against both
-        faces alone will return bad results when the two faces are almost parallel.
-        """
+        """Return whether `point` is on the edge's line (tested directly, since near-parallel faces make face tests unreliable)."""
         line = self.locate_simple_unbounded(owner)
         if isinstance(line, Line):
             return _point_is_on_line(point, line, test_tolerance)
@@ -1090,20 +855,12 @@ class DerivedEdgeFeature(EdgeFeature):
                                 self.b.feature.locate_simple_unbounded(self.b.owner))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Where this edge sits, and where it ends when its parents can say.
+        """Return the edge's extent, with ends bounded by its parent faces where they can.
 
-        bounds the edge based on the boundaries of the 2 parent faces
-        
-        Exact when the line runs along one of a face's own directions, which is
-        every arris of a box. For an oblique line across a rectangle it is the
-        bounding interval rather than the true crossing: an over-estimate, never
-        an under-estimate, so an edge is never reported shorter than it is.
+        Exact along a face's own axes (every arris of a box); otherwise an over-estimate.
+        Without ends, `anchor` is the infinite line's point nearest the origin.
 
-        TODO/NOTE ^ we could make it exact, but it's not necessary right now, consider doing so in the future
-
-        `ends` stays None when neither parent can bound it, and `anchor` is then
-        the point on the INFINITE line closest to the origin, which need not be
-        anywhere near the stretch that exists.
+        TODO make it exact for oblique lines
         """
         line = self.locate_simple_unbounded(owner)
         if not isinstance(line, Line):
@@ -1140,13 +897,10 @@ class DerivedEdgeFeature(EdgeFeature):
 
     @staticmethod
     def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedEdgeFeature']:
-        """The edge where *a* and *b* meet, or None if they form none.
+        """Return the edge where `a` and `b` meet, or None.
 
-        None when: 
-        - either is not a face; 
-        - their groups are not allowed to meet;
-        - either names a face that is not THERE (e.g. the top of an infinite prism)
-        - or their planes are parallel (which includes being the same plane -- coincident faces share a whole plane, not a line).
+        None if either isn't a face, their groups can't meet, either face isn't there (e.g. an infinite
+        prism's cap), or their planes are parallel.
         """
         face_a, face_b = hit_of_kind(a, FaceFeature), hit_of_kind(b, FaceFeature)
         if face_a is None or face_b is None:
@@ -1154,11 +908,7 @@ class DerivedEdgeFeature(EdgeFeature):
         if not feature_groups_intersect(a.feature.group, b.feature.group):
             return None
 
-        # A face that is not there forms no edge. The top of a prism extended
-        # to infinity is the case that turns this up -- a timber's rough stock
-        # is exactly that -- and without the check the pair was accepted and
-        # the edge then located to nothing, which reads downstream as "cannot
-        # say" rather than "not an edge".
+        # A face that isn't there (an infinite prism's cap) forms no edge.
         for hit in (a, b):
             if (hit.feature.locate_simple_unbounded(hit.owner) is None
                     and hit.feature.get_extent(hit.owner) is None):
@@ -1188,16 +938,14 @@ class DerivedEdgeFeature(EdgeFeature):
         return True
 
     def group_rank(self) -> int:
-        """The better rank of the two faces that formed it."""
+        """Return the better rank of its two faces."""
         ranks = [hit.feature.group.value for hit in self.parents]
         return min(ranks) if ranks else FeatureGroup.NONE.value
 
 
 @dataclass(frozen=True)
 class DerivedPointFeature(PointFeature):
-    """The point where an edge feature crosses a face feature.
-
-    """
+    """The point where an edge feature crosses a face feature."""
     edge: 'OwnedFeatureHit[EdgeFeature]' = field(kw_only=True)
     face: 'OwnedFeatureHit[FaceFeature]' = field(kw_only=True)
 
@@ -1209,14 +957,12 @@ class DerivedPointFeature(PointFeature):
         return True
 
     def group_rank(self) -> int:
-        """The better rank of the edge and the face that formed it."""
+        """Return the better rank of its edge and face."""
         ranks = [hit.feature.group.value for hit in self.parents]
         return min(ranks) if ranks else FeatureGroup.NONE.value
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        """Whether *point* is on the vertex itself, not merely on the edge and
-        the face that cross there.
-        """
+        """Return whether `point` is on the vertex itself."""
         vertex = self.locate_simple_unbounded(owner)
         if isinstance(vertex, Point):
             return _point_is_near(point, vertex.position, test_tolerance)
@@ -1241,13 +987,10 @@ class DerivedPointFeature(PointFeature):
 
     @staticmethod
     def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedPointFeature']:
-        """The point where *a* and *b* cross, or None if they cross in none.
+        """Return the point where `a` and `b` cross, or None.
 
-        None when: 
-        - they are not one EDGE and one FACE; 
-        - their groups may not meet; 
-        - either names something that is not THERE (e.g. top end of an infinite prism); 
-        - or the line does not pierce the plane in a single point -- which includes the line LYING in the plane
+        None unless they are one edge and one face whose groups can meet, both are there, and the line
+        pierces the plane at one point (not lying in it).
         """
         edge = hit_of_kind(a, EdgeFeature) or hit_of_kind(b, EdgeFeature)
         face = hit_of_kind(a, FaceFeature) or hit_of_kind(b, FaceFeature)
@@ -1286,8 +1029,7 @@ class DerivedPointFeature(PointFeature):
 
 @dataclass(frozen=True)
 class HalfSpaceFeature(FaceFeature):
-    """The entire boundary plane of a HalfSpace.
-    """
+    """The boundary plane of a HalfSpace."""
 
     def feature_key(self) -> Optional[FeatureKey]:
         # Its only surface. Not a cap: a half space has no ends to be an end of.
@@ -1320,7 +1062,7 @@ class SimpleRectangularPrismFeature(FaceFeature):
         return prism_face_key(self.face)
 
     def _face_frame(self, owner: 'RectangularPrism') -> Optional[Tuple[Direction3D, V3]]:
-        """(outward normal, centre point) of this face, in the owner's space."""
+        """Return the face's (outward normal, centre) in the owner's space."""
         width_dir, height_dir, length_dir = owner._local_axes()
         half_width = owner.size[0] / 2
         half_height = owner.size[1] / 2
@@ -1355,13 +1097,7 @@ class SimpleRectangularPrismFeature(FaceFeature):
     def _face_axes(
         self, owner: 'RectangularPrism',
     ) -> Optional[Tuple[Tuple[Direction3D, Numeric], Tuple[Direction3D, Numeric]]]:
-        """The face's two in-plane directions and half-sizes, or None if unbounded.
-
-        A prism fully determines its own faces: two of the three local axes span
-        each one, and how far it reaches along them is the size and the length.
-        None when the end it would reach to runs to infinity, which is an honest
-        answer rather than a guess -- an unbounded face has no corners.
-        """
+        """Return the face's two in-plane directions and half-sizes, or None if unbounded."""
         width_dir, height_dir, length_dir = owner._local_axes()
         half_width = owner.size[0] / 2
         half_height = owner.size[1] / 2
@@ -1377,8 +1113,7 @@ class SimpleRectangularPrismFeature(FaceFeature):
         return None
 
     def corners(self, owner: 'CutCSG') -> Optional[Tuple[V3, V3, V3, V3]]:
-        """The face's four corners, exactly, or None when it is unbounded.
-        """
+        """Return the face's four corners, or None if unbounded."""
         if not isinstance(owner, RectangularPrism):
             return None
         frame = self._face_frame(owner)
@@ -1425,7 +1160,7 @@ class SimpleRectangularPrismFeature(FaceFeature):
 
 
 def _plane_extent(owner: 'CutCSG', plane: Optional[Plane]) -> Optional[CSGFeatureExtent]:
-    """Where *plane* crosses a RectangularPrism *owner*, for one that runs along its length."""
+    """Return where `plane` crosses the prism `owner`, for a plane running along its length."""
     if plane is None or not isinstance(owner, RectangularPrism):
         return None
     width_dir, height_dir, length_dir = owner._local_axes()
@@ -1444,11 +1179,9 @@ def _plane_extent(owner: 'CutCSG', plane: Optional[Plane]) -> Optional[CSGFeatur
 
 @dataclass(frozen=True)
 class PlaneFeature(FaceFeature):
-    """A plane of its own on a primitive, and its own carrier: an unknown the solver measures to.
+    """An extra plane on a primitive, with its own solver carrier. Not real by default.
 
-    `normal` . x = `offset`, in the owner's own frame (before its transform), so it moves with the
-    owner wherever the owner is adopted. An extra feature only: its carrier is keyed by its place in
-    the owner's extra_features (FeatureCategory.EXTRA). Not real by default.
+    `normal` . x = `offset` in the owner's frame (before its transform).
     """
     normal: Tuple[Numeric, Numeric, Numeric] = (scalar(1), scalar(0), scalar(0))
     offset: Numeric = scalar(0)
@@ -1479,13 +1212,10 @@ class PlaneFeature(FaceFeature):
 
 @dataclass(frozen=True)
 class MidplaneFeature(FaceFeature):
-    """The plane midway between two parallel planes of its owner, given in `between`. Not real by
-    default.
+    """The plane midway between two parallel planes of its owner. Not real by default.
 
-    Each of `between` is a feature's name, or the FeatureKey of one of the owner's defaults -- a
-    prism's face is a key whether or not anyone named it. Solved as the midplane of theirs, so
-    knowing both solves it: it is no unknown of its own. Two planes that are not parallel have no
-    midplane, and it locates nowhere.
+    Each of `between` is a feature name or a default FeatureKey. Solved from those two planes; locates
+    to None if they aren't parallel.
     """
     between: Tuple[Union[str, FeatureKey], Union[str, FeatureKey]] = ("", "")
     properties: FeatureProperties = field(default_factory=lambda: FeatureProperties(nature=FeatureNature.AUXILIARY))
@@ -1531,14 +1261,9 @@ class MidplaneFeature(FaceFeature):
 def _canonical_ordering_arris_faces(
     first: 'PrismFace', second: 'PrismFace',
 ) -> Optional[Tuple['PrismFace', 'PrismFace']]:
-    """The one order an arris between these two faces is named in.
+    """Return two prism faces in arris-naming order (as timber.py names them), or None if they share no arris.
 
-    timber.py is the authority, since it names the arrises of every timber:
-    a cap first, then the side (bottom_right); otherwise FRONT or BACK first,
-    then RIGHT or LEFT (front_right, back_left).
-
-    None for a pair that meets in no arris: one face twice, two caps, or two
-    opposite sides.
+    A cap first, then the side; otherwise FRONT/BACK first, then RIGHT/LEFT.
     """
     if not isinstance(first, PrismFace) or not isinstance(second, PrismFace):
         return None
@@ -1560,8 +1285,7 @@ def _canonical_ordering_arris_faces(
 
 @dataclass(frozen=True)
 class SimpleRectangularPrismEdgeFeature(EdgeFeature):
-    """An arris of a RectangularPrism, named by the two faces it lies between.
-    """
+    """An arris of a RectangularPrism, named by its two faces."""
 
     faces: Tuple[PrismFace, PrismFace] = (PrismFace.FRONT, PrismFace.RIGHT)
 
@@ -1578,7 +1302,7 @@ class SimpleRectangularPrismEdgeFeature(EdgeFeature):
     @classmethod
     def of(cls, name: str, first: PrismFace, second: PrismFace,
            properties: Optional[FeatureProperties] = None) -> 'SimpleRectangularPrismEdgeFeature':
-        """The arris between two faces, given in either order."""
+        """Return the arris between two faces, given in either order."""
         ordered = _canonical_ordering_arris_faces(first, second)
         if ordered is None:
             raise ValueError(f"{name!r}: {first} and {second} meet in no arris")
@@ -1593,7 +1317,7 @@ class SimpleRectangularPrismEdgeFeature(EdgeFeature):
         return _meet_of_prism_faces(owner, self.faces)
 
     def _sides(self) -> Tuple['SimpleRectangularPrismFeature', 'SimpleRectangularPrismFeature']:
-        """The two faces as features, so their geometry is worked out once, there."""
+        """Return the two faces as features."""
         return (
             SimpleRectangularPrismFeature(name=self.name, face=self.faces[0]),
             SimpleRectangularPrismFeature(name=self.name, face=self.faces[1]),
@@ -1606,13 +1330,11 @@ class SimpleRectangularPrismEdgeFeature(EdgeFeature):
                 and second.test_point_unbounded(owner, point, test_tolerance))
 
     def locate_simple_unbounded(self, owner: 'CutCSG') -> Optional[Line]:
-        """The line the two faces meet in, or None if they never do."""
+        """Return the line the two faces meet in, or None."""
         first, second = self._sides()
         return intersect_planes(_as_plane(first.locate_simple_unbounded(owner)), _as_plane(second.locate_simple_unbounded(owner)))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """
-        """
         line = self.locate_simple_unbounded(owner)
         if not isinstance(line, Line):
             return None
@@ -1631,15 +1353,7 @@ class SimpleRectangularPrismEdgeFeature(EdgeFeature):
 def _canonical_ordering_corner_faces(
     faces: Sequence['PrismFace'],
 ) -> Optional[Tuple['PrismFace', 'PrismFace', 'PrismFace']]:
-    """The one order a corner between these three faces is named in.
-
-    timber.py is the authority, as it is for the arrises: the cap first, then
-    the two sides in the order they come round the prism -- bot_right_front,
-    top_back_right. TimberCorner is that list.
-
-    None for three faces that meet at no corner: a repeat, no cap or two, or
-    two opposite sides.
-    """
+    """Return three prism faces in corner-naming order (as TimberCorner), or None if they share no corner."""
     if len(faces) != 3 or not all(isinstance(face, PrismFace) for face in faces):
         return None
     if len(set(faces)) != 3:
@@ -1661,7 +1375,7 @@ def _canonical_ordering_corner_faces(
 
 
 def _meet_of_prism_faces(owner: 'CutCSG', faces: Sequence[PrismFace]) -> Optional[Recipe]:
-    """Where these faces of a prism meet, or None if one of them isn't there."""
+    """Return where these prism faces meet, or None if one isn't there."""
     carriers = owner.carriers()
     keys = [prism_face_key(face) for face in faces]
     if not all(key in carriers for key in keys):
@@ -1670,14 +1384,14 @@ def _meet_of_prism_faces(owner: 'CutCSG', faces: Sequence[PrismFace]) -> Optiona
 
 
 def prism_face_key(face: PrismFace) -> FeatureKey:
-    """The default slot of one of a RectangularPrism's faces."""
+    """Return the default key of a RectangularPrism face."""
     if face in _PRISM_CAP_KEYS:
         return _PRISM_CAP_KEYS[face]
     return side_key(_PRISM_SIDE_ORDER.index(face))
 
 
 def _prism_arris_key(first: PrismFace, second: PrismFace) -> Optional[FeatureKey]:
-    """The default slot of the arris between two faces, or None if they meet in none."""
+    """Return the default key of the arris between two faces in canonical order, or None."""
     if first in _PRISM_CAP_KEYS or second in _PRISM_CAP_KEYS:
         cap, side = (first, second) if first in _PRISM_CAP_KEYS else (second, first)
         if side in _PRISM_CAP_KEYS:
@@ -1697,7 +1411,7 @@ def _prism_arris_key(first: PrismFace, second: PrismFace) -> Optional[FeatureKey
 def _prism_corner_key(
     canonical_ordering: Optional[Tuple[PrismFace, PrismFace, PrismFace]],
 ) -> Optional[FeatureKey]:
-    """The default slot of a corner, given its faces in canonical order."""
+    """Return the default key of a corner, given its faces in canonical order."""
     if canonical_ordering is None:
         return None
     cap, first, _ = canonical_ordering
@@ -1706,7 +1420,7 @@ def _prism_corner_key(
 
 
 def prism_arris_key(first: PrismFace, second: PrismFace) -> FeatureKey:
-    """The default slot of the arris between two faces, in either order."""
+    """Return the default key of the arris between two faces, in either order."""
     key = _prism_arris_key(first, second)
     if key is None:
         raise ValueError(f"{first} and {second} meet in no arris")
@@ -1714,7 +1428,7 @@ def prism_arris_key(first: PrismFace, second: PrismFace) -> FeatureKey:
 
 
 def prism_corner_key(*faces: PrismFace) -> FeatureKey:
-    """The default slot of the corner where three faces meet, in any order."""
+    """Return the default key of the corner of three faces, in any order."""
     key = _prism_corner_key(_canonical_ordering_corner_faces(faces))
     if key is None:
         raise ValueError(f"{', '.join(face.name for face in faces)} meet at no corner")
@@ -1723,12 +1437,7 @@ def prism_corner_key(*faces: PrismFace) -> FeatureKey:
 
 @dataclass(frozen=True)
 class SimpleRectangularPrismVertexFeature(PointFeature):
-    """A corner of a RectangularPrism, named by the three faces meeting there.
-
-    The counterpart of TimberCorner, and numbered to match it: see
-    FeatureCategory.CORNER for the run, and TestDefaultOrderFollowsTimberFeature
-    for the correspondence stated from the test side.
-    """
+    """A corner of a RectangularPrism, named by its three faces; numbered to match TimberCorner."""
 
     faces: Tuple[PrismFace, PrismFace, PrismFace] = (
         PrismFace.BOTTOM, PrismFace.RIGHT, PrismFace.FRONT)
@@ -1746,7 +1455,7 @@ class SimpleRectangularPrismVertexFeature(PointFeature):
     @classmethod
     def of(cls, name: str, *faces: PrismFace,
            properties: Optional[FeatureProperties] = None) -> 'SimpleRectangularPrismVertexFeature':
-        """The corner where three faces meet, given in any order."""
+        """Return the corner of three faces, given in any order."""
         ordered = _canonical_ordering_corner_faces(faces)
         if ordered is None:
             raise ValueError(f"{name!r}: {', '.join(face.name for face in faces)} meet at no corner")
@@ -1761,11 +1470,7 @@ class SimpleRectangularPrismVertexFeature(PointFeature):
         return _meet_of_prism_faces(owner, self.faces)
 
     def _position(self, owner: 'CutCSG') -> Optional[V3]:
-        """Where the corner is, in the owner's space.
-
-        Out to the cap, then out along each side's own half size -- the same
-        walk timber.get_corner_position_global makes over its three faces.
-        """
+        """Return the corner's position in the owner's space."""
         if not isinstance(owner, RectangularPrism):
             return None
         cap, first, second = self.faces
@@ -1796,8 +1501,7 @@ class SimpleRectangularPrismVertexFeature(PointFeature):
 
 @dataclass(frozen=True)
 class CylinderAxisFeature(EdgeFeature):
-    """The centre line of a Cylinder, down the middle of the void it cuts.
-    """
+    """The centre line of a Cylinder."""
 
     @property
     def nature(self) -> FeatureNature:
@@ -1809,11 +1513,7 @@ class CylinderAxisFeature(EdgeFeature):
         return (CarrierRef(owner, CYLINDER_AXIS),)
 
     def _cylinder(self, owner: 'CutCSG') -> Optional['Cylinder']:
-        """The owner, as the Cylinder this feature is the axis of.
-
-        None, with a warning, for anything else: an axis feature on a shape
-        with no axis is a mistake in whatever named it.
-        """
+        """Return the owner as a Cylinder, or None (with a warning) if it isn't one."""
         if isinstance(owner, Cylinder):
             return owner
         warnings.warn(
@@ -1829,8 +1529,6 @@ class CylinderAxisFeature(EdgeFeature):
                     point=cylinder.position)
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """
-        """
         cylinder = self._cylinder(owner)
         if cylinder is None:
             return None
@@ -1845,8 +1543,7 @@ class CylinderAxisFeature(EdgeFeature):
         )
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        """On the axis if it is on the LINE -- the ends are not checked here
-        """
+        """Return whether `point` is on the axis line (ends not checked)."""
         if not isinstance(owner, Cylinder):
             return False
         tolerance = DEFAULT_FEATURE_TEST_TOLERANCES.edge if test_tolerance is None else test_tolerance
@@ -1856,7 +1553,7 @@ class CylinderAxisFeature(EdgeFeature):
 
 @dataclass(frozen=True)
 class SimpleCylinderCapFeature(FaceFeature):
-    """One end cap of a Cylinder. `part` is TOP or BOTTOM."""
+    """An end cap of a Cylinder; `part` is TOP or BOTTOM."""
     part: CylinderPart = CylinderPart.TOP
 
     def feature_key(self) -> Optional[FeatureKey]:
@@ -1913,8 +1610,7 @@ class SimpleCylinderBarrelFeature(CurvedFaceFeature):
 
 @dataclass(frozen=True)
 class SimpleConvexPolygonExtrusionFeature(FaceFeature):
-    """One side face (points[key] -> points[key+1 mod n]) or end cap of a
-    ConvexPolygonExtrusion."""
+    """A side (points[key] to points[key+1]) or end cap of a ConvexPolygonExtrusion."""
     key: ExtrusionFeatureKey = ExtrusionCap.TOP
 
     def feature_key(self) -> Optional[FeatureKey]:
@@ -1925,7 +1621,7 @@ class SimpleConvexPolygonExtrusionFeature(FaceFeature):
         return (FeatureCategory.SIDE, int(self.key))
 
     def _frame(self, owner: 'ConvexPolygonExtrusion') -> Optional[Tuple[Direction3D, V3]]:
-        """(outward normal, centre point) of this face, in the owner's space."""
+        """Return the face's (outward normal, centre) in the owner's space."""
         orientation = owner.transform.orientation.matrix
         length_dir = safe_transform_vector(orientation, Matrix([scalar(0), scalar(0), scalar(1)]))
         if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
@@ -1994,12 +1690,7 @@ class SimpleConvexPolygonExtrusionFeature(FaceFeature):
 
 @dataclass(frozen=True)
 class SimpleLoftFeature(FaceFeature):
-    """One side face or end cap of a ConvexPolygonSimpleLoft.
-
-    Side faces are ruled surfaces and are only planar in the special case of a
-    pure per-axis taper, so a named side is a surface, not necessarily a plane.
-    Edge derivation (which assumes planes) has to account for that.
-    """
+    """A side or end cap of a ConvexPolygonSimpleLoft. Sides are planar only for a pure taper."""
     key: ExtrusionFeatureKey = ExtrusionCap.TOP
 
     def feature_key(self) -> Optional[FeatureKey]:
@@ -2022,10 +1713,7 @@ class SimpleLoftFeature(FaceFeature):
             return Plane(normal=length_dir * sign,
                          point=owner.transform.position + length_dir * distance)
 
-        # A side, which is planar because is_valid refuses a twisted loft -- see
-        # ConvexPolygonSimpleLoft._sides_are_planar. It used to decline here
-        # whatever the shape, since a twist COULD make it a ruled surface, and
-        # that cost every tapered cheek the ability to be measured to.
+        # A side; planar, since is_valid refuses a twisted loft.
         index = int(self.key)
         count = len(owner.bottom_points)
         if index >= count:
@@ -2093,8 +1781,7 @@ class SimpleLoftFeature(FaceFeature):
 
 
 def _profile_corner(owner: 'CutCSG', index: int, end: bool) -> Optional[V3]:
-    """Vertex `index` of a convex extrusion's or loft's profile at its start or end, in the
-    owner's space, or None where that end is infinite."""
+    """Return vertex `index` of a convex extrusion's or loft's profile at one end, in the owner's space, or None if that end is infinite."""
     if not isinstance(owner, (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)):
         return None
     if isinstance(owner, ConvexPolygonExtrusion):
@@ -2111,11 +1798,9 @@ def _profile_corner(owner: 'CutCSG', index: int, end: bool) -> Optional[V3]:
 
 @dataclass(frozen=True)
 class ConvexProfileEdgeFeature(EdgeFeature):
-    """An edge of a ConvexPolygonExtrusion or ConvexPolygonSimpleLoft, where two of its faces meet.
+    """An edge of a ConvexPolygonExtrusion or ConvexPolygonSimpleLoft.
 
-    `faces` is a side and the side after it -- the long edge through the vertex they share -- or
-    a side and a cap -- that side's edge of the profile at that end. `key` is its slot in the
-    ARRIS run; see FeatureCategory and convex_profile_edge_features.
+    `faces` is a side and the next side (a long edge), or a side and a cap (a profile edge).
     """
     key: FeatureKey = (FeatureCategory.ARRIS, 0)
     faces: Tuple[int, ExtrusionFeatureKey] = (0, 1)
@@ -2142,7 +1827,7 @@ class ConvexProfileEdgeFeature(EdgeFeature):
                    for face in self._face_features(owner))
 
     def _ends(self, owner: 'CutCSG') -> Tuple[Optional[V3], Optional[V3]]:
-        """The edge's two endpoints, either None where it runs to an infinite end."""
+        """Return the edge's two endpoints, None for one at an infinite end."""
         side, other = self.faces
         if isinstance(other, ExtrusionCap):
             end = other is ExtrusionCap.TOP
@@ -2180,8 +1865,9 @@ class ConvexProfileEdgeFeature(EdgeFeature):
 
 
 def convex_profile_edge_features(sides: int) -> Dict[FeatureKey, CSGFeature]:
-    """The default edges of a convex extrusion or loft with `sides` sides, in the ARRIS run:
-    side n against side n+1, then each side against the start cap, then against the end cap."""
+    """Return the default edges of a convex extrusion or loft with `sides` sides, in key order:
+    side n against side n+1, then each side against the start cap, then the end cap.
+    """
     features: Dict[FeatureKey, CSGFeature] = {}
     for side in range(sides):
         for key, faces in (
@@ -2196,14 +1882,7 @@ def convex_profile_edge_features(sides: int) -> Dict[FeatureKey, CSGFeature]:
 
 
 class FeatureSource(Flag):
-    """Which features a query is asking for.
-
-    DEFAULTS are what a primitive names on its own, in FeatureKey slots.
-    OVERRIDES are what an author added: defaults renamed or re-propertied by a
-    FeatureOverride, and extra features with geometry of their own. BOTH is the
-    answer to "what does this shape name", which is what nearly every caller
-    wants.
-    """
+    """Which features a query wants: DEFAULTS, OVERRIDES (authored), or BOTH."""
 
     DEFAULTS = 1
     OVERRIDES = 2
@@ -2212,20 +1891,19 @@ class FeatureSource(Flag):
 
 @dataclass(frozen=True)
 class FeatureOverride:
-    """Allows overriding the name and `FeatureProperties` of default features.
+    """Overrides the name and properties of a default feature.
 
     Args:
-        key: the default being overridden, e.g. prism_face_key(PrismFace.RIGHT).
-        name: its new name; None keeps the default's ("side.0").
-        properties: its new properties, replacing the default's wholesale; None
-            keeps them.
+        key: the default, e.g. prism_face_key(PrismFace.RIGHT).
+        name: new name; None keeps the default's.
+        properties: replaces the default's properties; None keeps them.
     """
     key: FeatureKey
     name: Optional[str] = None
     properties: Optional[FeatureProperties] = None
 
     def apply(self, default: 'CSGFeature') -> 'CSGFeature':
-        """The default at this key, renamed and re-propertied."""
+        """Return the default feature at `key` with this override applied."""
         return replace(
             default,
             name=default.name if self.name is None else self.name,
@@ -2235,33 +1913,20 @@ class FeatureOverride:
 
 def shoulder_override(key: FeatureKey, name: Optional[str] = None,
                       group: FeatureGroup = FeatureGroup.NONE) -> FeatureOverride:
-    """Marks the default feature at `key` as a joint's shoulder plane.
-
-    The group is the caller's to pass: SHOULDER_PLANE is what makes the shoulder
-    outline itself where it meets the timber's perfect and rough bodies, and the
-    default of NONE is a shoulder that is named and measurable but derives
-    nothing. Only the mortise and tenon passes SHOULDER_PLANE so far.
-    """
+    """Return an override marking the default at `key` as a shoulder plane, in group `group`."""
     return FeatureOverride(key, name, FeatureProperties(group=group, purpose=FeaturePurpose.SHOULDER))
 
 
 #TODO this should an ABC? or is that not allowed for dual inheritance or osemtihng?
 @dataclass(frozen=True)
 class HasFeatures:
-    """Storage for the features a primitive names on its own boundary.
-
-    inherited Mixin for CutCSG deriving classes that name their own features
+    """Mixin for primitives that declare their own features.
 
     Args:
-        feature_overrides: renames/re-properties of this shape's defaults, one
-            per default at most. Every key must be one of default_features().
-        extra_features: features with geometry of their own, which no default
-            already names -- a bore's axis, a reference plane. Keyless: a
-            feature that reports a FeatureKey is naming a default, and belongs
-            in feature_overrides.
+        feature_overrides: overrides of this shape's defaults, at most one per key.
+        extra_features: keyless features with their own geometry (a bore's axis, a reference plane).
 
-    Both are checked when the shape is built, so a bad key fails where it was
-    written rather than when someone later picks the shape in the viewer.
+    Both are validated on construction.
     """
 
     feature_overrides: Sequence[FeatureOverride] = field(default=(), kw_only=True)
@@ -2273,16 +1938,11 @@ class HasFeatures:
 
     # TODO should probably make this an abstract method, or... this overrides the CutCSG one or osemthing? plesae update the comment explaniing if that's the case
     def default_features(self) -> Dict['FeatureKey', 'CSGFeature']:
-        """What this primitive names on its own, keyed by where it sits.
-
-        Empty here: a shape opts in by overriding this. Whatever it returns
-        must be in FeatureGroup.NONE -- see the note on default_features in
-        RectangularPrism for why that matters more than it looks.
-        """
+        """Return this primitive's default features by key. Must all be in FeatureGroup.NONE."""
         return {}
 
     def _check_authored_features(self) -> None:
-        """Refuse overrides of missing or repeated slots, keyed extras, and repeated names."""
+        """Raise for overrides of missing or repeated keys, keyed extras, or repeated names."""
         defaults = self.default_features()
         shape = type(self).__name__
 
@@ -2319,12 +1979,7 @@ class HasFeatures:
     def get_declared_features(
         self, source: 'FeatureSource' = FeatureSource.BOTH,
     ) -> List['CSGFeature']:
-        """Features this node names on its own boundary, whether or not any
-        point lies on them. Worked out once per node.
-
-        Tell authored from default by name (unique per primitive) rather than
-        by identity: an overridden default is a different object.
-        """
+        """Return the features this node declares (defaults with overrides applied, plus extras), cached per node."""
         return list(_declared_features(self, source))
 
     def _work_out_declared_features(self, source: 'FeatureSource') -> List['CSGFeature']:
@@ -2345,9 +2000,10 @@ def _declared_features(csg: 'HasFeatures', source: 'FeatureSource') -> List['CSG
 
 
 def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
-    """A plane for each default face of `csg` that has one, keyed like the face; and one for each
-    extra PlaneFeature, keyed by its place among the extras (FeatureCategory.EXTRA). Worked out once
-    per node; the dict is the caller's to add to."""
+    """Return a CarrierPlane per default face of `csg` with a plane, and per extra PlaneFeature, by key.
+
+    Cached per node; the returned dict is a copy.
+    """
     return dict(_face_plane_carriers(csg))
 
 
@@ -2371,8 +2027,7 @@ def _face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
 # TODO consider making this typed, you could do this by adding... an optional owner field to FeatureHit and removing this class all together. Or making several OwnedFeatureHit classes is fine too I guess.
 @dataclass(frozen=True)
 class OwnedFeatureHit(Generic[F_co]):
-    """A feature, paired with the primitive it belongs to. Generic in the feature's type.
-    """
+    """A feature with the node that owns it."""
     feature: F_co
     owner: 'CutCSG'
 
@@ -2395,24 +2050,23 @@ class OwnedFeatureHit(Generic[F_co]):
 
 
 def hit_of_kind(hit: OwnedFeatureHit[CSGFeature], kind: Type[K]) -> Optional[OwnedFeatureHit[K]]:
-    """The hit, typed by its feature's kind, or None if its feature isn't that kind."""
+    """Return the hit typed as `kind`, or None if its feature isn't one."""
     return cast(OwnedFeatureHit[K], hit) if isinstance(hit.feature, kind) else None
 
 
 @dataclass(frozen=True)
 class CutCSGLabel:
-    """The name a CSG node carries, if anyone gave it one.
-    """
+    """A CSG node's optional name."""
 
     name: Optional[str] = None
 
     @staticmethod
     def NoLabel() -> 'CutCSGLabel':
-        """The label of a node nobody named. The default for CutCSG.label."""
+        """Return the label of an unnamed node."""
         return CutCSGLabel()
 
     def is_labeled(self) -> bool:
-        """True if this node was given a name."""
+        """Return whether the node has a name."""
         return self.name is not None
 
     def __bool__(self) -> bool:
@@ -2446,7 +2100,7 @@ _point_tests_memo: ContextVar[Optional[Dict[Tuple, Tuple['CutCSG', object]]]] = 
 
 @contextmanager
 def point_tests_memo() -> Iterator[None]:
-    """Remember point tests (_POINT_TESTS) until the block ends."""
+    """Context manager caching point tests (_POINT_TESTS) until the block ends."""
     if _point_tests_memo.get() is not None:
         yield
         return
@@ -2474,7 +2128,7 @@ def _memoized_point_test(test: Callable) -> Callable:
 
 @dataclass(frozen=True)
 class CutCSG(ABC):
-    """Base class for all CSG operations."""
+    """Base class of CSG nodes."""
     label: CutCSGLabel = field(default_factory=CutCSGLabel.NoLabel, kw_only=True)
 
     def __init_subclass__(cls, **kwargs) -> None:
@@ -2485,33 +2139,24 @@ class CutCSG(ABC):
 
     @abstractmethod
     def __repr__(self) -> str:
-        """String representation for debugging."""
         pass
 
     @classmethod
     def display_name(cls) -> str:
-        """
-        """
         return re.sub(r"(?<!^)(?=[A-Z])", " ", cls.__name__).lower()
 
     # TODO rename to get_self_declared_features or something    
     def get_declared_features(
         self, source: 'FeatureSource' = FeatureSource.BOTH,
     ) -> List[CSGFeature]:
-        """Features this node names on its own boundary, whether or not any
-        point lies on them.
-
-        Empty by default, and it stays empty for the compound nodes: a
-        SolidUnion, Difference or Intersection has no surface of its own to
-        name, only the surfaces its children contribute.
-        """
+        """Return the features this node declares. Empty for compound nodes."""
         return []
 
     @abstractmethod
     def carriers(self) -> Dict[FeatureKey, Carrier]:
-        """return all carriers needed to determine this feature
+        """Return this node's solver carriers by key.
 
-        TODO when we add FeatureMarkingStatus decide if we want to filter out NEVER_MARK here and if returned carriers should be tagged if their underlying features are marked OPTIONAL
+        TODO decide whether to drop NEVER_MARK features' carriers, or tag OPTIONAL ones
         """
         ...
 
@@ -2522,17 +2167,9 @@ class CutCSG(ABC):
         point: V3,
         tolerances: FeatureTestTolerances,
     ) -> List['OwnedFeatureHit']:
-        """collects every declared feature in this subtree that *point* lies on.
+        """Return every declared feature in this subtree that `point` is on, each at its type's tolerance.
 
-        Each feature is tested at the tolerance its own type calls for.
-
-        Real and non-real features are gated differently:
-
-        - A real feature names actual surface, so the point has to be on the
-          boundary of THIS node.
-        - A non-real feature (a bore's centre axis, a reference plane) names
-          nothing the CSG tree ever cut, so boolean operations cannot have
-          removed it and the gate does not apply.
+        Real features also require `point` on this node's boundary; non-real ones don't.
         """
         hits: List['OwnedFeatureHit'] = [
             OwnedFeatureHit(feature=feature, owner=self)
@@ -2551,34 +2188,12 @@ class CutCSG(ABC):
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> List['OwnedFeatureHit']:
-        """Every feature at *point*: those declared in this subtree, plus the
-        edges and points they form with each other.
+        """Return every feature at `point`, best first: declared ones in this subtree plus derived edges
+        and points.
 
-        
-        
-        Three gathers, because "near enough to count" means a different distance
-        depending on what is being asked. The first collects features at the
-        tolerance each one's type calls for. The second collects faces at the
-        EDGE tolerance and pairs them, which is what makes an edge selectable
-        from further away than either of its faces -- a face 1.5mm off cannot
-        claim the point itself, but it can still form an edge that is
-        selectable there, because you cannot click exactly on a line. The third
-        does the same again at the POINT tolerance, which is wider still, and
-        crosses the declared edges there with the faces.
-
-        DECLARED edges only, in that last stage. A derived edge is in
-        FeatureGroup.NONE and would be rejected anyway, but the reason it is not
-        offered is the stronger one: a derived point is named by its two
-        parents, and a parent that is itself derived has no name to be found
-        again by, so the reference could never resolve.
-
-        Derivation happens here rather than inside collect_feature_hits, and so runs
-        once, at whichever node the caller asked about. Putting it in the
-        recursive gather would either recurse into itself or have every nested
-        compound re-derive what its parent derives.
-
-        Derived duplicates come off at the end, once the ordering has settled
-        which of them was the preferred way of naming the geometry.
+        Faces are paired into edges at the EDGE tolerance, and declared edges crossed with faces at the
+        POINT tolerance, so edges and points can be picked from further away than their faces. Derived
+        duplicates are dropped at the end.
         """
         with point_tests_memo():
             return self._find_all_features(point, test_tolerances)
@@ -2592,17 +2207,10 @@ class CutCSG(ABC):
         def of_type(gathered, feature_type):
             return [hit for hit in gathered if hit.feature.feature_type() == feature_type]
 
-        # One gather for both derivations, at the widest tolerance either of
-        # them could want, since derived features are then asked directly
-        # whether the point is on IT. Gathering narrower would only rule out
-        # parents whose child is about to be asked a stricter question anyway.
+        # One gather for both derivations, at the widest tolerance; derived features then test the point themselves.
         #
-        # TODO two walks of the tree rather than one, because the gather above
-        # also applies the boundary gate at `tolerances.face`, and widening the
-        # tolerances here widens that with it. Separating "near the feature"
-        # from "on the boundary" would let both derivations and the direct hits
-        # come out of a single walk. Worth doing for the pick path, which runs
-        # this per pointer move; not worth doing blind.
+        # TODO two walks of the tree rather than one, because the gather above also applies the boundary
+        # gate at `tolerances.face`. Separating "near the feature" from "on the boundary" would allow one walk.
         candidates = self.collect_feature_hits(
             point, FeatureTestTolerances.uniform(tolerances.point))
 
@@ -2626,19 +2234,7 @@ class CutCSG(ABC):
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> Optional['OwnedFeatureHit']:
-        """The best feature at *point*, or None. Best is, in order:
-
-        - a non-real feature before a real one;
-        - the more specific kind: a point, then an edge, then a face;
-        - a declared feature before a derived one;
-        - the pairing group, best rank first;
-        - author-set priority;
-        - the name;
-        - and last, the order they were gathered in.
-
-        _sort_feature_hits holds the order and says why each step is where it
-        is -- in particular why specificity sits above declaredness.
-        """
+        """Return the best feature at `point` (see _sort_feature_hits), or None."""
         hits = self.find_all_features(point, test_tolerances=test_tolerances)
         if not hits:
             return None
@@ -2647,73 +2243,35 @@ class CutCSG(ABC):
 
     @abstractmethod
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is contained within the CSG object.
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is inside or on the boundary of the CSG object, False otherwise
-        """
+        """Return whether `point` is inside or on the boundary."""
         pass
 
     @abstractmethod
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is on the boundary of the CSG object.
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is on the boundary of the CSG object, False otherwise
-        """
+        """Return whether `point` is on the boundary."""
         pass
     
     @abstractmethod
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
-        """
-        Get the outward normal vector at a boundary point.
-        
-        This method should only be called if is_point_on_boundary(point) is True.
-        For points not on the boundary, behavior is undefined.
-        
-        Args:
-            point: A point on the boundary (3x1 Matrix)
-            
-        Returns:
-            The outward normal vector at the point, or None if cannot be determined
-        """
+        """Return the outward normal at boundary point `point`, or None. Undefined off the boundary."""
         pass
 
     def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
-        """The outward normal of every face meeting at a boundary point: one
-        on a smooth patch, more on an edge or a corner. Empty when none can be had.
+        """Return the outward normal of every face meeting at boundary point `point` (several on an edge or corner).
 
-        get_outward_normal picks ONE of these, which is not enough to tell an
-        edge from the face beside it -- see _cut_is_flush_with_the_base. A shape
-        that cannot tell them apart answers with that one.
+        Shapes that can't tell return get_outward_normal's one.
         """
         normal = self.get_outward_normal(point, eps=eps)
         return [] if normal is None else [normal]
 
     @abstractmethod
     def get_aabb(self) -> 'AxisAlignedBoundingBox':
-        """
-        Return the axis-aligned bounding box (AABB) of this CSG object.
-
-        Each bound is Optional[Numeric] — None means unbounded in that direction.
-
-        Primitives with infinite extent (HalfSpace, or prisms/cylinders with
-        start_distance or end_distance set to None) cannot produce a finite AABB.
-        They emit a UserWarning and return a AxisAlignedBoundingBox with all fields set to None.
-        """
+        """Return the bounding box. An infinite primitive warns and returns all-None bounds."""
         pass
 
 
 def csg_children(csg: CutCSG) -> List[CutCSG]:
-    """The nodes directly beneath *csg*; empty for a primitive."""
+    """Return the direct children of `csg`; empty for a primitive."""
     if isinstance(csg, SolidUnion):
         return list(csg.children)
     if isinstance(csg, Intersection):
@@ -2724,7 +2282,7 @@ def csg_children(csg: CutCSG) -> List[CutCSG]:
 
 
 def map_primitives(csg: CutCSG, change: Callable[['HasFeatures'], CutCSG]) -> CutCSG:
-    """*csg* with *change* applied to every primitive that names features, all the way down."""
+    """Return `csg` with `change` applied to every feature-declaring primitive."""
     if isinstance(csg, SolidUnion):
         return replace(csg, children=[map_primitives(child, change) for child in csg.children])
     if isinstance(csg, Intersection):
@@ -2738,18 +2296,16 @@ def map_primitives(csg: CutCSG, change: Callable[['HasFeatures'], CutCSG]) -> Cu
 
 
 def strip_features(csg: CutCSG) -> CutCSG:
-    """*csg* with every feature anyone added taken off, all the way down: each primitive's
-    overrides (names, groups, properties) and extra features. Only its own defaults remain.
+    """Return `csg` with every override and extra feature removed, all the way down; only defaults remain.
 
-    For a copy of geometry that is already in a tree elsewhere -- a relief built from another
-    timber's body and cuts -- which would otherwise declare those features a second time.
+    For copies of geometry already in another tree (e.g. a relief built from another timber).
     """
     return map_primitives(csg, lambda primitive: replace(primitive, feature_overrides=(), extra_features=())
                           if primitive.feature_overrides or primitive.extra_features else cast(CutCSG, primitive))
 
 
 def with_purpose(csg: CutCSG, purpose: 'FeaturePurpose') -> CutCSG:
-    """*csg* with every feature it names, all the way down, serving *purpose*; nothing else changes."""
+    """Return `csg` with every feature, all the way down, given purpose `purpose`."""
     def change(primitive: 'HasFeatures') -> CutCSG:
         authored = {override.key: override for override in primitive.feature_overrides}
         overrides = []
@@ -2765,11 +2321,7 @@ def with_purpose(csg: CutCSG, purpose: 'FeaturePurpose') -> CutCSG:
 
 
 class CSGParity(Enum):
-    """Whether a node adds material to the finished solid or takes it away.
-
-    ADDITIVE means growing that node grows the result; SUBTRACTIVE means
-    growing it shrinks the result.
-    """
+    """Whether a node adds material to the result (ADDITIVE) or removes it (SUBTRACTIVE)."""
 
     ADDITIVE = 0
     SUBTRACTIVE = 1
@@ -2782,13 +2334,7 @@ def csg_children_with_parity(
     csg: CutCSG,
     parity: CSGParity = CSGParity.ADDITIVE,
 ) -> List[Tuple[CutCSG, CSGParity]]:
-    """The nodes directly beneath *csg*, each with its own parity.
-
-    The one statement of the rule: a Difference's subtract children invert,
-    and nothing else does.
-
-    Children come back in csg_children order.
-    """
+    """Return the children of `csg` with their parity, in csg_children order. Only a Difference's subtract children invert."""
     if isinstance(csg, Difference):
         flipped = parity.flipped()
         return [(csg.base, parity), *((sub, flipped) for sub in csg.subtract)]
@@ -2799,15 +2345,14 @@ def walk_csg_with_parity(
     root: CutCSG,
     parity: CSGParity = CSGParity.ADDITIVE,
 ) -> Iterator[Tuple[CutCSG, CSGParity]]:
-    """Every node beneath *root*, including *root*, with its parity.
-    """
+    """Yield every node under `root`, including it, with its parity."""
     yield root, parity
     for child, child_parity in csg_children_with_parity(root, parity):
         yield from walk_csg_with_parity(child, child_parity)
 
 
 def carrier_map(root: CutCSG) -> CarrierMap:
-    """Every primitive carrier in the tree, coincident planes merged."""
+    """Return the CarrierMap of every primitive carrier in the tree, coincident planes merged."""
     def walk(node: CutCSG) -> Iterator[CutCSG]:
         yield node
         for child in csg_children(node):
@@ -2819,7 +2364,7 @@ def carrier_map(root: CutCSG) -> CarrierMap:
 
 @dataclass(frozen=True)
 class EmptyCSG(CutCSG):
-    """Represents an empty solid (contains no points)."""
+    """A solid with no points."""
 
     @classmethod
     def display_name(cls) -> str:
@@ -2854,20 +2399,15 @@ class EmptyCSG(CutCSG):
 
 @dataclass(frozen=True)
 class HalfSpace(HasFeatures, CutCSG):
-    """
-    An infinite half-plane defined by a normal vector and offset from origin.
-    
-    The half-plane includes all points P such that: P · normal >= offset    
-    The offset represents the signed distance from the origin along the normal direction
-    where the plane is located. Positive offset moves the plane in the direction of the normal.
-    
+    """An infinite half space: all points P with P · normal >= offset.
+
     Args:
-        normal: Normal vector pointing into the half-space (3x1 Matrix)
-        offset: Distance from origin along normal direction where plane is located (default: 0)
+        normal: points into the half space.
+        offset: the plane's signed distance from the origin along `normal`.
     """
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Its one surface. See RectangularPrism.default_features for the group."""
+        """Return its one face."""
         key = (FeatureCategory.SIDE, 0)
         return {key: HalfSpaceFeature(name=default_feature_name(key),
                                       properties=_DEFAULT_FEATURE_PROPERTIES)}
@@ -2885,50 +2425,20 @@ class HalfSpace(HasFeatures, CutCSG):
         return face_plane_carriers(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is contained within the half-plane.
-        
-        A point P is in the half-plane if (P · normal) >= offset
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is in the half-plane (including boundary), False otherwise
-        """
+        """Return whether P · normal >= offset."""
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
         return safe_compare(dot_product, self.offset, Comparison.GE, eps=eps)
     
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is on the boundary of the half-plane.
-        
-        A point P is on the boundary if (P · normal) == offset
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is on the boundary plane, False otherwise
-        """
+        """Return whether P · normal == offset."""
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
         # Use safe_zero_test to handle Float vs Integer comparison with tolerance
         return safe_zero_test(dot_product - self.offset, eps=eps)
     
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
-        """
-        Get the outward normal vector at a boundary point.
-        
-        For a HalfSpace, the outward normal is always the opposite of thenormal vector itself.
-        
-        Args:
-            point: A point on the boundary
-            
-        Returns:
-            The outward normal vector (the HalfSpace's normal)
-        """
+        """Return -normal."""
         return -self.normal
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
@@ -2942,30 +2452,11 @@ class HalfSpace(HasFeatures, CutCSG):
     
 @dataclass(frozen=True)
 class RectangularPrism(HasFeatures, CutCSG):
-    """
-    A prism with rectangular cross-section, optionally infinite in one or both ends.
-    Note,they are parameterized similar to the Timber class which is atypical for such a primitive.
-    
-    The prism is defined by:
-    - A transform (position and orientation in global coordinates)
-    - A cross-section size (width (x-axis)) x height (y-axis)) in the local XY plane
-    - Start and end distances along the local Z-axis from the position
+    """A prism with rectangular cross-section, optionally infinite at either end. Parameterized like a Timber.
 
-    So the center point of the size cross section is at position and the timber extends out in -z by start_distance and +z by end_distance.
-    
-    Use None for start_distance or end_distance to make the prism infinite in that direction.
-    
-    The orientation matrix defines the local coordinate system where:
-    - X-axis (first column) is the width direction (size[0])
-    - Y-axis (second column) is the height direction (size[1])
-    - Z-axis (third column) is the length/axis direction
-    
-    Args:
-        size: Cross-section dimensions [width, height] (2x1 Matrix)
-        transform: Transform (position and orientation) in global coordinates (default: identity)
-        start_distance: Distance from position along Z-axis to start of prism (None = 
-        -infinite)
-        end_distance: Distance from position along Z-axis to end of prism (None = infinite)
+    The cross-section (`size` = width along local X, height along local Y) is centred at the
+    transform's position; the prism runs from `start_distance` to `end_distance` along local Z.
+    None for either distance makes that end infinite.
     """
 
     # Every prism has the same defaults (they locate against their owner), so
@@ -3027,31 +2518,13 @@ class RectangularPrism(HasFeatures, CutCSG):
 
     # Features this primitive names on its own boundary. Private: read it
     def get_bottom_position(self) -> V3:
-        """
-        Get the position of the bottom of the prism (at start_distance).
-        Only valid for prisms with finite start_distance.
-        
-        Returns:
-            The 3D position at the bottom of the prism
-            
-        Raises:
-            ValueError: If start_distance is None (infinite prism)
-        """
+        """Return the centre of the start end. Raises ValueError if it is infinite."""
         if self.start_distance is None:
             raise ValueError("Cannot get bottom position of infinite prism (start_distance is None)")
         return self.transform.position - safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.start_distance]))
     
     def get_top_position(self) -> V3:
-        """
-        Get the position of the top of the prism (at end_distance).
-        Only valid for prisms with finite end_distance.
-        
-        Returns:
-            The 3D position at the top of the prism
-            
-        Raises:
-            ValueError: If end_distance is None (infinite prism)
-        """
+        """Return the centre of the far end. Raises ValueError if it is infinite."""
         if self.end_distance is None:
             raise ValueError("Cannot get top position of infinite prism (end_distance is None)")
         return self.transform.position + safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.end_distance]))
@@ -3061,17 +2534,7 @@ class RectangularPrism(HasFeatures, CutCSG):
                 f"start={self.start_distance}, end={self.end_distance})")
     
     def equals_prism(self, other: 'RectangularPrism') -> bool:
-        """
-        Check if this prism equals another prism.
-        
-        Uses SymPy's equals() method for numeric comparisons to handle symbolic values.
-        
-        Args:
-            other: Another RectangularPrism to compare with
-            
-        Returns:
-            True if all components are equal, False otherwise
-        """
+        """Return whether every parameter equals `other`'s."""
         # Check size components
         if not safe_equality_test(self.size[0], other.size[0]) or not safe_equality_test(self.size[1], other.size[1]):
             return False
@@ -3107,11 +2570,11 @@ class RectangularPrism(HasFeatures, CutCSG):
         return True
     
     def _local_axes(self) -> Tuple[Direction3D, Direction3D, Direction3D]:
-        """Return (width_dir, height_dir, length_dir) unit vectors in global coordinates."""
+        """Return the (width, height, length) unit axes in global coordinates."""
         return self._axes_precomputed
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
-        """Project a global point onto this prism's local (width, height, length) axes."""
+        """Return a global point's coordinates along the prism's (width, height, length) axes."""
         local_point = point - self.transform.position
         width_dir, height_dir, length_dir = self._local_axes()
         x_coord = safe_dot_product(local_point, width_dir)
@@ -3123,15 +2586,7 @@ class RectangularPrism(HasFeatures, CutCSG):
         return face_plane_carriers(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is contained within the prism.
-
-        Args:
-            point: Point to test (3x1 Matrix)
-
-        Returns:
-            True if the point is inside or on the boundary of the prism, False otherwise
-        """
+        """Return whether `point` is inside or on the boundary."""
         x_coord, y_coord, z_coord = self._local_coords(point)
 
         # Check bounds in each dimension
@@ -3151,15 +2606,7 @@ class RectangularPrism(HasFeatures, CutCSG):
         return True
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is on the boundary of the prism.
-
-        Args:
-            point: Point to test (3x1 Matrix)
-
-        Returns:
-            True if the point is on the boundary of the prism, False otherwise
-        """
+        """Return whether `point` is on the boundary."""
         # First check if point is contained
         if not self.contains_point(point, eps=eps):
             return False
@@ -3187,18 +2634,7 @@ class RectangularPrism(HasFeatures, CutCSG):
         return False
 
     def _each_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Iterator[Direction3D]:
-        """
-        Get the outward normal vector at a boundary point.
-
-        Yields the normalized outward normal of each face that contains this point:
-        one on a face, two on an edge, three at a corner.
-
-        Args:
-            point: A point on the boundary
-
-        Returns:
-            The outward normal vector at the point, or None if cannot be determined
-        """
+        """Yield the outward normal of each face `point` is on: one on a face, two on an edge, three at a corner."""
         x_coord, y_coord, z_coord = self._local_coords(point)
         width_dir, height_dir, length_dir = self._local_axes()
 
@@ -3272,17 +2708,10 @@ class RectangularPrism(HasFeatures, CutCSG):
 
 # UNUSED, but seems like a nice to have so keep it around
 def make_finite_rectangular_prism_from_half_space(half_space: HalfSpace, size_of_space: Numeric, depth_of_space: Numeric) -> RectangularPrism:
-    """
-    Build a finite RectangularPrism that approximates ``half_space`` near its boundary.
+    """Return a finite prism standing in for `half_space` near its boundary.
 
-    The returned prism:
-    - has its "bottom" face (at start_distance = 0) lying on the half-space boundary plane,
-    - extends ``depth_of_space`` into the half-space (in the +normal direction, i.e. the
-      direction in which the half-space extends),
-    - has a square cross-section of ``size_of_space`` × ``size_of_space`` centered on the
-      point where the line through the origin along ``normal`` meets the boundary plane.
-
-    The cross-section orientation perpendicular to the normal is chosen arbitrarily.
+    Its start face lies on the boundary plane, it runs `depth_of_space` into the half space, and its
+    square `size_of_space` cross-section is centred where the normal through the origin meets the plane.
     """
     # Unit normal pointing into the half-space (HalfSpace contains points where P·normal >= offset)
     unit_normal = safe_normalize_vector(half_space.normal)
@@ -3316,25 +2745,10 @@ def make_finite_rectangular_prism_from_half_space(half_space: HalfSpace, size_of
 
 @dataclass(frozen=True)
 class Cylinder(HasFeatures, CutCSG):
-    """
-    A cylinder with circular cross-section, optionally infinite in one or both ends.
-    
-    The cylinder is defined by:
-    - A position (translation from origin)
-    - An axis direction
-    - A radius
-    - Start and end distances along the axis from the position
-    
-    So the center point of the radius cross section is at position and the cylinder extends out in -z by start_distance and +z by end_distance.
+    """A cylinder, optionally infinite at either end.
 
-    Use None for start_distance or end_distance to make the cylinder infinite in that direction.
-    
-    Args:
-        axis_direction: Direction of the cylinder's axis (3x1 Matrix)
-        radius: Radius of the cylinder
-        position: Position of the cylinder origin in global coordinates (3x1 Matrix, default: origin)
-        start_distance: Distance from position to start of cylinder (None = -infinite)
-        end_distance: Distance from position to end of cylinder (None = infinite)
+    The axis runs through `position` along `axis_direction`, from `start_distance` to `end_distance`;
+    None for either makes that end infinite.
     """
     # TODO consider just making this a Transform object, even though we don't care about one of the DOFs
     axis_direction: Direction3D  # direction of the cylinder's axis, which is the +Z local axis
@@ -3345,8 +2759,7 @@ class Cylinder(HasFeatures, CutCSG):
 
     # Features this primitive names on its own boundary. Private: read it
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Two caps and the barrel
-        """
+        """Return its two caps and the barrel."""
         features: Dict[FeatureKey, CSGFeature] = {
             key: SimpleCylinderCapFeature(name=default_feature_name(key), part=part,
                                           properties=_DEFAULT_FEATURE_PROPERTIES)
@@ -3357,7 +2770,7 @@ class Cylinder(HasFeatures, CutCSG):
         return features
 
     def carriers(self) -> Dict[FeatureKey, Carrier]:
-        """The axis, the barrel around it, and a plane for each finite cap."""
+        """Return the axis, the barrel around it, and a plane for each finite cap."""
         carriers = face_plane_carriers(self)
         carriers[CYLINDER_AXIS] = CarrierLine(
             Line(direction=safe_normalize_vector(self.axis_direction), point=self.position))
@@ -3365,7 +2778,7 @@ class Cylinder(HasFeatures, CutCSG):
         return carriers
 
     def _axial_and_radial(self, point: V3) -> Tuple[Numeric, Numeric]:
-        """Distance along the axis from `position`, and distance from the axis."""
+        """Return `point`'s distance along the axis from `position`, and from the axis."""
         local_point = point - self.position
         axis = self.axis_direction / safe_norm(self.axis_direction)
         axial = safe_dot_product(local_point, axis)
@@ -3379,15 +2792,7 @@ class Cylinder(HasFeatures, CutCSG):
                 f"start={self.start_distance}, end={self.end_distance})")
     
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is contained within the cylinder.
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is inside or on the boundary of the cylinder, False otherwise
-        """
+        """Return whether `point` is inside or on the boundary."""
         # Transform point to local coordinates
         local_point = point - self.position
         
@@ -3412,19 +2817,7 @@ class Cylinder(HasFeatures, CutCSG):
         return safe_compare(radial_distance, self.radius, Comparison.LE, eps=eps)
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is on the boundary of the cylinder.
-        
-        A point is on the boundary if it's either:
-        1. On the cylindrical surface (at radius distance from axis)
-        2. On one of the end caps (if finite)
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is on the boundary of the cylinder, False otherwise
-        """
+        """Return whether `point` is on the barrel or a finite cap."""
         # First check if point is contained
         if not self.contains_point(point, eps=eps):
             return False
@@ -3456,17 +2849,7 @@ class Cylinder(HasFeatures, CutCSG):
         return False
     
     def _each_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Iterator[Direction3D]:
-        """
-        Get the outward normal vector at a boundary point.
-        
-        For a cylinder, the normal depends on which surface the point is on.
-        
-        Args:
-            point: A point on the boundary
-            
-        Returns:
-            The outward normal vector at the point
-        """
+        """Yield the outward normal of each surface `point` is on."""
         # Transform point to local coordinates
         local_point = point - self.position
         
@@ -3538,20 +2921,10 @@ class Cylinder(HasFeatures, CutCSG):
 
 # TODO rename to PointOnCSGInfo
 class SolidsAtPoint:
-    """cached info about a point against a sequence of CSGs, the point asks of each CSG
+    """Caches contains_point and is_point_on_boundary of one point against several solids.
 
-
-    - contains_point
-    - is_point_on_boundary
-
-    thus we can answer the questions:
-
-    - `any_holds`: does any of them hold the point at all?
-    - `any_encloses`: does any hold it strictly inside, off its surface?
-    - `any_on_surface`: does any have it on its surface?
-    - `outward_normals`: which way does each of those surfaces face?
-    - `average_outward_normal`: which way do they face together?
-    - `close_around_it`: do they leave the point no way out?
+    Answers: any_holds, any_encloses, any_on_surface, outward_normals, average_outward_normal,
+    close_around_it.
     """
 
     def __init__(
@@ -3574,40 +2947,29 @@ class SolidsAtPoint:
         self.holding = [*self.on_surface, *self.enclosing]
 
     def any_holds(self) -> bool:
-        """Whether any of them has the point, on its surface or within."""
+        """Return whether any solid contains the point."""
         return bool(self.holding)
 
     def any_encloses(self) -> bool:
-        """Whether any holds the point strictly inside, off its surface."""
+        """Return whether any solid has the point strictly inside."""
         return bool(self.enclosing)
 
     def any_on_surface(self) -> bool:
         return bool(self.on_surface)
 
     def outward_normals(self) -> List[Optional[Direction3D]]:
-        """Each surface's outward normal at the point, in on_surface order."""
+        """Return each on-surface solid's outward normal at the point."""
         return [solid.get_outward_normal(self.point, eps=self.eps)
                 for solid in self.on_surface]
 
     def every_outward_normal(self) -> Optional[List[Direction3D]]:
-        """The faces of the ONE surface at the point, each with its own normal;
-        None when several solids meet there, or none does.
-
-        Several solids meeting is a different question -- which of their faces
-        still bound what they make together -- and average_outward_normal is
-        the answer on offer for it.
-        """
+        """Return each face normal of the single solid the point is on the surface of; None if several or none."""
         if len(self.on_surface) != 1:
             return None
         return self.on_surface[0].get_outward_normals(self.point, eps=self.eps)
 
     def average_outward_normal(self, negated: bool = False) -> Optional[Direction3D]:
-        """The mean of those normals, or None when they cancel or none can say.
-
-        A mean rather than the first: this feeds the boundary tests through
-        Difference, where averaging behaves better on non-convex corners.
-        *negated* for the wall of a hole, whose outward faces into the material.
-        """
+        """Return the mean outward normal (negated if `negated`), or None if they cancel or are unknown."""
         normals = [normal for normal in self.outward_normals() if normal is not None]
         if negated:
             normals = [-normal for normal in normals]
@@ -3622,21 +2984,10 @@ class SolidsAtPoint:
         return total / size
 
     def close_around_it(self) -> bool:
-        """Whether the surfaces meeting at the point leave no way out.
+        """Return whether the surfaces at the point enclose it, so it is inside their union.
 
-        A point can be on the boundary of every solid holding it and still be
-        contained within what they make together: two prisms side by side share
-        a face, and a point on that face is on the boundary of both solids but
-        contained within the union. Asking each solid in turn never sees that.
-
-        Analytic, not a step into space. Leaving every surface at once means a
-        direction d with d . n > 0 for each outward normal n, so they close
-        around the point exactly when no such direction exists. Exact for one
-        surface and for two -- two close only when they face opposite ways --
-        and a good-faith answer for more.
-
-        False when any surface cannot say which way it faces: calling a real
-        wall interior is the more damaging way to be wrong.
+        E.g. a point on the shared face of two touching prisms. True when no direction leaves every
+        surface. Exact for one or two surfaces; False if any normal is unknown.
         """
         normals = [normal for normal in self.outward_normals() if normal is not None]
         if len(normals) < 2 or len(normals) != len(self.on_surface):
@@ -3660,7 +3011,7 @@ class SolidsAtPoint:
 
 
 def assert_distinct_children(kind: str, children: Sequence[CutCSG]) -> None:
-    """Refuse the same CSG object twice in one operand list: two operands are two objects."""
+    """Raise if the same CSG object appears twice among `children`."""
     seen = set()
     for child in children:
         assert id(child) not in seen, (
@@ -3672,14 +3023,7 @@ def assert_distinct_children(kind: str, children: Sequence[CutCSG]) -> None:
 
 @dataclass(frozen=True)
 class SolidUnion(CutCSG):
-    """
-    CSG union operation - combines multiple CSG objects.
-    
-    The union represents the set of all points that are in ANY of the child CSG objects.
-    
-    Args:
-        children: List of CSG objects to union together
-    """
+    """Union of `children`: points in any child."""
 
     @classmethod
     def display_name(cls) -> str:
@@ -3696,32 +3040,11 @@ class SolidUnion(CutCSG):
         return {}
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is contained within the union.
-        
-        A point is in the union if it's in ANY of the children.
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is in any of the children, False otherwise
-        """
+        """Return whether any child contains `point`."""
         return any(child.contains_point(point, eps=eps) for child in self.children)
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is on the boundary of the union.
-        
-        A point is on the boundary if it's on the boundary of at least one child
-        and not in the interior of any other child.
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is on the boundary of the union, False otherwise
-        """
+        """Return whether `point` is on some child's boundary and not enclosed by the union."""
         at = SolidsAtPoint(self.children, point, eps=eps)
         if not at.any_holds() or at.any_encloses():
             return False
@@ -3730,22 +3053,7 @@ class SolidUnion(CutCSG):
         return at.any_on_surface() and not at.close_around_it()
     
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
-        """
-        Get the outward normal vector at a boundary point.
-        
-        For a union, we check all children that have the point on their boundary
-        and return the average of their outward normals. The reason we do this is because this method is used to check if a point is on the boundary through Differences and using an average normal here tends to behave better on weird non-convex geometry.
-
-        AVERAGED, so where several children meet at the point the answer
-        bisects them and is perpendicular to none of them. Anything reading it
-        as one surface's own normal is reading it wrong.
-
-        Args:
-            point: A point on the boundary
-
-        Returns:
-            The average outward normal vector, or None if cannot be determined
-        """
+        """Return the average outward normal of the children `point` is on the boundary of, or None."""
         return SolidsAtPoint(self.children, point, eps=eps).average_outward_normal()
 
     def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
@@ -3782,13 +3090,7 @@ class SolidUnion(CutCSG):
 
 @dataclass(frozen=True)
 class Intersection(CutCSG):
-    """
-    CSG intersection operation - keeps only points common to both child CSG objects.
-
-    Args:
-        left: First CSG object
-        right: Second CSG object
-    """
+    """Intersection of `left` and `right`: points in both."""
     left: CutCSG
     right: CutCSG
 
@@ -3811,13 +3113,7 @@ class Intersection(CutCSG):
         return self.left.is_point_on_boundary(point, eps=eps) or self.right.is_point_on_boundary(point, eps=eps)
 
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
-        """The outward normal at a boundary point.
-
-        AVERAGED where both sides meet at the point, as in SolidUnion and
-        Difference: the answer then bisects them and is perpendicular to
-        neither. Anything reading it as one surface's own normal is reading it
-        wrong.
-        """
+        """Return the outward normal at `point`, averaged where both sides' surfaces meet."""
         at = SolidsAtPoint([self.left, self.right], point, eps=eps)
         average = at.average_outward_normal()
         if average is not None:
@@ -3867,16 +3163,7 @@ class Intersection(CutCSG):
 
 @dataclass(frozen=True)
 class Difference(CutCSG):
-    """
-    CSG difference operation - subtracts multiple CSG objects from a base object.
-    
-    The difference represents: base - subtract[0] - subtract[1] - ...
-    All points in base that are NOT in any of the subtract objects.
-    
-    Args:
-        base: The base CSG object to subtract from
-        subtract: List of CSG objects to subtract from the base
-    """
+    """`base` minus every solid in `subtract`."""
     base: CutCSG
     subtract: List[CutCSG]
 
@@ -3890,18 +3177,7 @@ class Difference(CutCSG):
         return {}
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is contained within the difference.
-        
-        A point is in the difference if it's in the base and NOT strictly inside any subtract object.
-        Special case: if a point is on the boundary of both base and subtract, it's excluded.
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is in base but not in any subtract objects, False otherwise
-        """
+        """Return whether `point` is in `base` and not strictly inside any subtracted solid (nor on a flush cut)."""
         if not self.base.contains_point(point, eps=eps):
             return False
 
@@ -3921,12 +3197,7 @@ class Difference(CutCSG):
     def _cut_is_flush_with_the_base(
         self, removed: 'SolidsAtPoint', point: V3, eps: Optional[Numeric] = None,
     ) -> bool:
-        """Whether a subtract's surface lies along the base's own, facing the
-        same way, so the cut takes the very material that face was.
-
-        True when a normal cannot be had, which excludes the point: the same
-        conservative answer this has always given.
-        """
+        """Return whether a subtracted solid's surface at `point` lies along the base's, facing the same way. True if a normal is unknown."""
         # Flush only where every face the cut has at the point lies along one
         # of the base's: at the cut's edge, that needs the base to turn the same
         # corner there.
@@ -3946,12 +3217,7 @@ class Difference(CutCSG):
         return False
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is on the boundary of the difference.
-
-        A point is on the boundary if it is in the difference at all and some
-        surface passes through it: the base's own, or the wall of a hole.
-        """
+        """Return whether `point` is in the difference and on the base's surface or a cut's wall."""
         if not self.contains_point(point, eps=eps):
             return False
         if self.base.is_point_on_boundary(point, eps=eps):
@@ -3959,22 +3225,7 @@ class Difference(CutCSG):
         return SolidsAtPoint(self.subtract, point, eps=eps).any_on_surface()
 
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
-        """
-        Get the outward normal vector at a boundary point.
-        
-        For a difference, if the point is on the boundary of the base CSG, return that normal.
-        Otherwise, go through the subtract CSGs and return the average of their normals (negated).
-
-        AVERAGED, so where several subtracts meet at the point the answer
-        bisects them and is perpendicular to none of them. Anything reading it
-        as one surface's own normal is reading it wrong.
-
-        Args:
-            point: A point on the boundary
-
-        Returns:
-            The outward normal vector, or None if cannot be determined
-        """
+        """Return the base's normal at `point`, else the average negated normal of the cuts there; None if unknown."""
         # If point is on base boundary, return base's normal
         if self.base.is_point_on_boundary(point, eps=eps):
             return self.base.get_outward_normal(point, eps=eps)
@@ -3985,8 +3236,7 @@ class Difference(CutCSG):
         return SolidsAtPoint(self.subtract, point, eps=eps).average_outward_normal(negated=True)
 
     def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
-        """On the base's boundary: the base's normals, plus the negated normals of the subtracts
-        whose surface passes through the point, except those parallel to a base normal."""
+        """Return the base's normals at `point`, plus the negated normals of cuts through it not parallel to one."""
         if not self.base.is_point_on_boundary(point, eps=eps):
             return super().get_outward_normals(point, eps=eps)
         base_normals = list(self.base.get_outward_normals(point, eps=eps))
@@ -4015,29 +3265,16 @@ Profile = List[V2]
 Profiles = List[Profile]
 
 def translate_profile(profile: Profile, translation: V2) -> Profile:
-    """
-    Translate a profile by a given translation vector.
-    """
+    """Return `profile` translated by `translation`."""
     return [point + translation for point in profile]
 
 def translate_profiles(profiles: Profiles, translation: V2) -> Profiles:
-    """
-    Translate a list of profiles by a given translation vector.
-    """
+    """Return each profile translated by `translation`."""
     return [translate_profile(profile, translation) for profile in profiles]
 
 
 def point_in_convex_profile(points: Sequence[V2], point_2d: V2, eps: Optional[Numeric] = None) -> bool:
-    """Whether a 2D point is inside a convex profile, whichever way it is wound.
-
-    Inside means "on the same side of every edge", and which side that is depends on
-    the winding -- so the winding is read off the profile rather than assumed. Assuming
-    counter-clockwise answered "no" for points inside a profile a caller had written
-    the other way round, which is not a small thing: a solid whose own contains_point
-    says no has no boundary either, so none of its faces can be picked, and the mesher
-    (which normalises winding) and the point tests disagree about the same solid.
-    build_a_butt's tenon, mortise, wedge and wedge-slot profiles were all like that.
-    """
+    """Return whether a 2D point is inside a convex profile, wound either way."""
     signed_area = 0.0
     for index, current in enumerate(points):
         following = points[(index + 1) % len(points)]
@@ -4049,10 +3286,7 @@ def point_in_convex_profile(points: Sequence[V2], point_2d: V2, eps: Optional[Nu
         p2 = points[(index + 1) % len(points)]
         edge = p2 - p1
         to_point = point_2d - p1
-        # Over the edge's length, so it is the point's distance from the edge and `eps` a length.
-        # The bare cross product is that distance times the edge's length: compared with eps, it
-        # made the tolerance eps / length -- 20mm for 2mm on a 100mm edge -- and a socket "held"
-        # points well outside it, wiping out every feature near where it met another cut.
+        # Divided by the edge's length, giving the point's distance from the edge.
         edge_length = safe_norm(Matrix([edge[0], edge[1]]))
         if safe_zero_test(edge_length):
             continue
@@ -4065,28 +3299,16 @@ def point_in_convex_profile(points: Sequence[V2], point_2d: V2, eps: Optional[Nu
 
 @dataclass(frozen=True)
 class ConvexPolygonExtrusion(HasFeatures, CutCSG):
-    """
-    An extruded Convex Polygon shape, optionally infinite in one or both ends.
-    
-    The extrusion is defined by:
-    - A list of ordered (x,y) points in the polygon (must be convex!)
-    - A transform (position and orientation in global coordinates)
-    - Start and end distances along the local Z-axis from the position
-    
-    The polygon is in the local XY plane at the position, and the extrusion extends
-    out in -z by start_distance and +z by end_distance.
-    
-    Use None for start_distance or end_distance to make the extrusion infinite in that direction.
-    
+    """A convex polygon in the local XY plane extruded along local Z, optionally infinite at either end.
+
     Args:
-        points: List of ordered (x,y) points in the polygon (last connects to first, must be convex)
-        transform: Transform (position and orientation) in global coordinates (default: identity)
-        start_distance: Distance from position along Z-axis to start of extrusion (None = -infinite)
-        end_distance: Distance from position along Z-axis to end of extrusion (None = infinite)
+        points: the polygon's (x, y) points in order; must be convex.
+        transform: the polygon's position and orientation.
+        start_distance, end_distance: extent along local Z; None for infinite.
     """
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Two caps, a side per edge of the profile, and the edges where they meet."""
+        """Return its two caps, a side per profile edge, and their edges."""
         features: Dict[FeatureKey, CSGFeature] = {}
         for key, cap in ((START_CAP, ExtrusionCap.BOTTOM), (END_CAP, ExtrusionCap.TOP)):
             features[key] = SimpleConvexPolygonExtrusionFeature(
@@ -4110,31 +3332,13 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
 
     # Features this primitive names on its own boundary. Private: read it
     def get_bottom_position(self) -> V3:
-        """
-        Get the position of the bottom of the extrusion (at start_distance).
-        Only valid for extrusions with finite start_distance.
-        
-        Returns:
-            The 3D position at the bottom of the extrusion
-            
-        Raises:
-            ValueError: If start_distance is None (infinite extrusion)
-        """
+        """Return the profile origin at `start_distance`. Raises ValueError if infinite."""
         if self.start_distance is None:
             raise ValueError("Cannot get bottom position of infinite extrusion (start_distance is None)")
         return self.transform.position - safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.start_distance]))
     
     def get_top_position(self) -> V3:
-        """
-        Get the position of the top of the extrusion (at end_distance).
-        Only valid for extrusions with finite end_distance.
-        
-        Returns:
-            The 3D position at the top of the extrusion
-            
-        Raises:
-            ValueError: If end_distance is None (infinite extrusion)
-        """
+        """Return the profile origin at `end_distance`. Raises ValueError if infinite."""
         if self.end_distance is None:
             raise ValueError("Cannot get top position of infinite extrusion (end_distance is None)")
         return self.transform.position + safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.end_distance]))
@@ -4144,17 +3348,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
                 f"transform={self.transform}, start={self.start_distance}, end={self.end_distance})")
     
     def is_valid(self) -> bool:
-        """
-        Check if the ConvexPolygonExtrusion is valid
-        
-        Checks:
-        1. At least 3 points
-        2. Valid distance configuration (if both finite, end > start)
-        3. Polygon is convex (all turns go the same direction)
-        
-        Returns:
-            True if valid, False otherwise
-        """
+        """Return whether it has at least 3 points, a convex polygon, and end > start when both are finite."""
         if len(self.points) < 3:
             return False
         
@@ -4186,19 +3380,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         return face_plane_carriers(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is contained within the extruded polygon.
-        
-        A point is inside if:
-        1. Its Z coordinate (in local space) is between start_distance and end_distance
-        2. Its XY coordinates (in local space) are inside the convex polygon
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is inside or on the boundary, False otherwise
-        """
+        """Return whether `point` is inside or on the boundary."""
         # Transform point to local coordinates
         local_point = point - self.transform.position
         local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
@@ -4218,19 +3400,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         return point_in_convex_profile(self.points, Matrix([x_coord, y_coord]), eps)
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is on the boundary of the extruded polygon.
-        
-        A point is on the boundary if it's contained and either:
-        1. On the top or bottom face (z = start_distance or z = end_distance, if finite)
-        2. On one of the side faces (on an edge of the polygon)
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is on the boundary, False otherwise
-        """
+        """Return whether `point` is on a cap or a side."""
         # First check if point is contained
         if not self.contains_point(point, eps=eps):
             return False
@@ -4288,17 +3458,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         return False
     
     def _each_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Iterator[Direction3D]:
-        """
-        Get the outward normal vector at a boundary point.
-        
-        For a convex polygon extrusion, the normal depends on which surface.
-        
-        Args:
-            point: A point on the boundary
-            
-        Returns:
-            The outward normal vector at the point
-        """
+        """Yield the outward normal of each surface `point` is on."""
         # Transform point to local coordinates
         local_point = point - self.transform.position
         local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
@@ -4383,8 +3543,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         return local_coords[0], local_coords[1], local_coords[2]
 
     def _point_on_side(self, index: int, x: Numeric, y: Numeric, eps: Optional[Numeric] = None) -> bool:
-        """Whether local (x, y) lies on the side face running from points[index]
-        to points[(index+1) % len(points)]."""
+        """Return whether local (x, y) lies on side `index` (points[index] to points[index + 1])."""
         p1 = self.points[index]
         p2 = self.points[(index + 1) % len(self.points)]
         edge = p2 - p1
@@ -4433,38 +3592,15 @@ _SIDE_PLANARITY_EPSILON = scalar('1e-6')
 
 @dataclass(frozen=True)
 class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
-    """
-    A solid formed by straight-line lofting between two convex polygons in parallel
-    planes, connected index-to-index (vertex i of bottom_points connects by a
-    straight line to vertex i of top_points). Generalizes ConvexPolygonExtrusion
-    to the case where the cross-section changes shape/size/offset along the length
-    instead of staying constant -- ConvexPolygonExtrusion can be expressed where bottom_points == top_points (could probably be combined with this class but it doesn't relaly matter)
+    """A solid lofted between two convex polygons in parallel planes, vertex i to vertex i.
 
-
-    bottom_points and top_points must each independently be a valid convex polygon
-    (same rules as ConvexPolygonExtrusion.is_valid()) with the SAME number of points
-    wound in the SAME direction.
-
-    NO TWISTS. The correspondence between the two profiles must leave every side
-    planar, which is_valid checks -- see _sides_are_planar. 
-
-    The polygons live in the local XY plane, with bottom_points at bottom_points_z_pos
-    and top_points at top_points_z_pos along the local Z-axis, matching the
-    position/orientation conventions of RectangularPrism and ConvexPolygonExtrusion.
-    Unlike those two, bottom_points_z_pos/top_points_z_pos must both be finite -- an
-    infinite loft has no meaningful cross-section to loft towards.
-
-    Args:
-        bottom_points: convex polygon at bottom_points_z_pos (local XY plane)
-        top_points: convex polygon at top_points_z_pos (local XY plane), same point
-            count and winding direction as bottom_points
-        bottom_points_z_pos: distance from position along Z-axis to bottom_points
-        top_points_z_pos: distance from position along Z-axis to top_points
-        transform: Transform (position and orientation) in global coordinates (default: identity)
+    Both profiles must be convex, with the same point count and winding, and every side planar (no
+    twist; see is_valid). Profiles lie in the local XY plane at `bottom_points_z_pos` and
+    `top_points_z_pos` along local Z; both must be finite.
     """
 
     def default_features(self) -> Dict[FeatureKey, CSGFeature]:
-        """Two caps, a side per edge of the profile, and the edges where they meet, as an extrusion has."""
+        """Return its two caps, a side per profile edge, and their edges."""
         features: Dict[FeatureKey, CSGFeature] = {}
         for key, cap in ((START_CAP, ExtrusionCap.BOTTOM), (END_CAP, ExtrusionCap.TOP)):
             features[key] = SimpleLoftFeature(
@@ -4492,11 +3628,11 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
     # Features this primitive names on its own boundary. Private: read it
     def get_bottom_position(self) -> V3:
-        """Get the position of the bottom of the loft (at bottom_points_z_pos)."""
+        """Return the profile origin at `bottom_points_z_pos`."""
         return self.transform.position - safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.bottom_points_z_pos]))
 
     def get_top_position(self) -> V3:
-        """Get the position of the top of the loft (at top_points_z_pos)."""
+        """Return the profile origin at `top_points_z_pos`."""
         return self.transform.position + safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.top_points_z_pos]))
 
     def __repr__(self) -> str:
@@ -4504,16 +3640,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
                 f"transform={self.transform}, start={self.bottom_points_z_pos}, end={self.top_points_z_pos})")
 
     def is_valid(self) -> bool:
-        """
-        Check if the ConvexPolygonSimpleLoft is valid.
-
-        Checks:
-        1. bottom_points and top_points each have at least 3 points
-        2. bottom_points and top_points have the same number of points
-        3. top_points_z_pos > bottom_points_z_pos
-        4. bottom_points and top_points are each individually convex
-        5. every side comes out PLANAR -- see _sides_are_planar
-        """
+        """Return whether both profiles are convex with 3+ matching points, top is above bottom, and every side is planar."""
         if len(self.bottom_points) < 3 or len(self.top_points) < 3:
             return False
         if len(self.bottom_points) != len(self.top_points):
@@ -4550,12 +3677,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         return self._sides_are_planar()
 
     def _sides_are_planar(self) -> bool:
-        """Whether every side comes out flat, rather than twisted into a saddle.
-
-        A side joins bottom[i]-bottom[i+1] to top[i]-top[i+1] with straight
-        lines, so it is a quadrilateral in space, and a quadrilateral is planar
-        only when its four corners are coplanar.
-        """
+        """Return whether every side quad's four corners are coplanar."""
         bottom, top = self.bottom_points, self.top_points
         count = len(bottom)
         low, high = self.bottom_points_z_pos, self.top_points_z_pos
@@ -4583,27 +3705,22 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         return True
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
-        """Project a global point onto this loft's local (x, y, z) axes."""
+        """Return a global point in the loft's local (x, y, z)."""
         local_point = point - self.transform.position
         local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
         return local_coords[0], local_coords[1], local_coords[2]
 
     def _height_fraction(self, z_coord: Numeric) -> Numeric:
-        """Fraction along the loft (0 at bottom_points_z_pos, 1 at top_points_z_pos) for a local Z coordinate."""
+        """Return the fraction along the loft (0 at bottom, 1 at top) of local `z`."""
         return (z_coord - self.bottom_points_z_pos) / (self.top_points_z_pos - self.bottom_points_z_pos)
 
     def _cross_section_at(self, t: Numeric) -> Profile:
-        """The (index-matched, linearly interpolated) polygon at height-fraction t."""
+        """Return the interpolated profile at height fraction `t`."""
         return [bottom + (top - bottom) * t for bottom, top in zip(self.bottom_points, self.top_points)]
 
     def _point_on_side(self, index: int, x: Numeric, y: Numeric, z: Numeric,
                        eps: Optional[Numeric] = None) -> bool:
-        """Whether local (x, y, z) lies on the ruled side face running from vertex
-        *index* to vertex *index+1*.
-
-        The side is a ruled surface, so this tests against the cross-section at
-        the point's own height rather than against a fixed plane.
-        """
+        """Return whether local (x, y, z) lies on side `index`, tested against the cross-section at its height."""
         cross_section = self._cross_section_at(self._height_fraction(z))
         p1 = cross_section[index]
         p2 = cross_section[(index + 1) % len(cross_section)]
@@ -4625,15 +3742,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         return face_plane_carriers(self)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is contained within the loft.
-
-        Args:
-            point: Point to test (3x1 Matrix)
-
-        Returns:
-            True if the point is inside or on the boundary, False otherwise
-        """
+        """Return whether `point` is inside or on the boundary."""
         x_coord, y_coord, z_coord = self._local_coords(point)
 
         if safe_compare(z_coord - self.bottom_points_z_pos, 0, Comparison.LT, eps=eps):
@@ -4646,15 +3755,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         return point_in_convex_profile(cross_section, Matrix([x_coord, y_coord]), eps)
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        """
-        Check if a point is on the boundary of the loft.
-
-        Args:
-            point: Point to test (3x1 Matrix)
-
-        Returns:
-            True if the point is on the boundary, False otherwise
-        """
+        """Return whether `point` is on the boundary."""
         if not self.contains_point(point, eps=eps):
             return False
 
@@ -4700,19 +3801,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         return False
 
     def _each_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Iterator[Direction3D]:
-        """
-        Get the outward normal vector at a boundary point.
-
-        Sides are checked for planar in is_valid so normals are constant across faces.
-
-        Edges/vertices currentyl returns normals of one of its adjacent faces. NOTE we can consider making it average instead but there's no need right now.
-
-        Args:
-            point: A point on the boundary
-
-        Returns:
-            The outward normal vector at the point, or None if cannot be determined
-        """
+        """Yield the outward normal of a face `point` is on (one adjacent face's at an edge or vertex)."""
         x_coord, y_coord, z_coord = self._local_coords(point)
 
         if safe_zero_test(z_coord - self.top_points_z_pos, eps=eps):
@@ -4804,36 +3893,10 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 # ============================================================================
 
 def decompose_simple_polygon_into_convex_pieces(points: Profile) -> List[Profile]:
-    """
-    Decompose a simple (non-self-intersecting) polygon, given as an ordered
-    list of (u, v) points, into convex quads/triangles whose union equals the
-    polygon — via horizontal (constant-v) trapezoidal decomposition.
+    """Split a simple polygon of (u, v) points into convex quads and triangles, by horizontal bands.
 
-    See pathcsg.decompose_path_into_convex_pieces for the same algorithm
-    generalized to a Path (lines + arcs): it sweeps directly over a Path's
-    segments instead of a pre-tessellated point list, so the expensive
-    exact-arithmetic part runs over the (small) segment count rather than
-    however many points arc tessellation would otherwise produce. Not wired
-    together with this function (would need pathcsg -> cutcsg -> pathcsg,
-    which is circular) — kept as two independent implementations of the same
-    sweep for now.
-
-    Splits the polygon at every vertex's v-coordinate, and within each
-    resulting v-band, finds every edge active there, sorts their u-crossings
-    left to right, and pairs them up with the standard even-odd polygon-fill
-    rule (1st-2nd pair is interior, 3rd-4th pair is interior, and so on).
-    This handles overlapping v-ranges between edges correctly (unlike naively
-    treating each edge as its own independent band), and degenerate edges
-    that double back along another edge (contributing paired, zero-width
-    crossings) simply cancel out.
-
-    Args:
-        points: Ordered polygon vertices (u, v), last connects back to first.
-            v need not be monotonic along the boundary.
-
-    Returns:
-        List of convex pieces, each a Profile (quad or triangle) suitable for
-        ConvexPolygonExtrusion.
+    Within each band between vertex v's, the active edges' crossings are paired left to right
+    (even-odd). pathcsg.decompose_path_into_convex_pieces is the same sweep over a FancyPath.
     """
     n = len(points)
     edges: List[Tuple[Numeric, Numeric, Numeric, Numeric]] = []  # (v_lo, v_hi, u_at_v_lo, u_at_v_hi)
@@ -4894,15 +3957,9 @@ def decompose_simple_polygon_into_convex_pieces(points: Profile) -> List[Profile
 # ============================================================================
 
 def _clip_bbox_by_halfspace_complement(bbox: AxisAlignedBoundingBox, hs: HalfSpace) -> AxisAlignedBoundingBox:
-    """
-    Tighten a bounding box by removing the region inside ``hs``.
+    """Return the bounding box of `bbox` minus the half space `hs`.
 
-    Returns the AABB of the intersection of ``bbox`` with the complement of ``hs``
-    (i.e., the set of points where ``hs.contains_point()`` is False).
-
-    If any bound of ``bbox`` is None the box is returned unchanged, because
-    we cannot enumerate the corners of an infinite box. An already-empty bbox
-    is also returned unchanged (it has no corners to clip).
+    An infinite or empty `bbox` is returned unchanged.
     """
     if bbox.is_empty:
         return bbox
@@ -4974,16 +4031,7 @@ def _clip_bbox_by_halfspace_complement(bbox: AxisAlignedBoundingBox, hs: HalfSpa
 # ============================================================================
 
 def translate_csg(csg: CutCSG, translation: V3) -> CutCSG:
-    """
-    Return a copy of the CSG object translated by the given vector.
-
-    Args:
-        csg: The CSG object to translate
-        translation: 3D translation vector (3x1 Matrix)
-
-    Returns:
-        A new CSG object with the same structure but translated by translation
-    """
+    """Return a copy of `csg` translated by `translation`."""
     if isinstance(csg, SolidUnion):
         return SolidUnion(children=[translate_csg(c, translation) for c in csg.children], label=csg.label)
     if isinstance(csg, Difference):
@@ -5025,27 +4073,12 @@ def adopt_csg(
     adopting_transform: Optional[Transform],
     csg_in_orig_space: CutCSG,
 ) -> CutCSG:
-    """
-    Transform a CSG object into another coordinate system.
+    """Return `csg_in_orig_space` re-expressed from `orig_transform`'s local space in `adopting_transform`'s.
 
-    If orig_transform is provided, the CSG is treated as being in that transform's local
-    coordinates. If orig_transform is None, the CSG is treated as being in global coordinates.
-    If adopting_transform is provided, the result is expressed in that transform's local
-    coordinates. If adopting_transform is None, the result is expressed in global coordinates.
-
-    Args:
-        orig_transform: The transform whose local space the CSG is in, or None for global
-        adopting_transform: The transform whose local space we want the CSG in,
-            or None to return the CSG in global coordinates
-        csg_in_orig_space: The CSG object (in orig_transform local, or global if orig_transform is None)
-
-    Returns:
-        A new CSG object in adopting_transform's local coordinates, or in global
-        coordinates if adopting_transform is None
+    Either transform may be None for global space.
 
     Example:
         >>> cut_on_b = adopt_csg(timber_a.transform, timber_b.transform, cut_csg)
-        >>> csg_in_tenon_local = adopt_csg(None, tenon_timber.transform, csg_global)
         >>> csg_in_global = adopt_csg(timber_a.transform, None, cut_csg)
     """
     # Helper: Transform from orig (or global) to adopting local, or to global

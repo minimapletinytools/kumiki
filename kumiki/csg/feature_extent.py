@@ -1,16 +1,12 @@
-"""Where a feature is on its cut timber: its extent, cropped once, by its nature.
+"""A feature's extent on its cut timber: the part of it that is actually there.
 
-Every question about where a feature is -- where a dimension hangs on it, what outline lights it,
-how far it reaches on a sheet, whether a view can see it -- starts from the same answer, and this
-is it. Worked out in the timber's local space, from the cut timber's tree (`root`), by the
-feature's nature (FeatureNature):
+Computed in the timber's local space from the cut timber's tree (`root`), by FeatureNature:
 
-- REAL, on the surface: a face is the part of it on the finished surface; a line, the pieces of it
-  where there is timber.
-- PERFECT_REFERENCE, inside the material: a plane is the plane cut to the solid; a line, likewise.
-- AUXILIARY, in a void (a bore's axis): its own extent, which the solid has nothing to bound with.
+- REAL: a face's part on the finished surface; a line's pieces where there is timber.
+- PERFECT_REFERENCE: a plane or line cropped to the solid.
+- AUXILIARY (e.g. a bore's axis): its own declared extent, not cropped.
 
-A point is where it is. FeatureExtents keeps them, one per cut timber's tree.
+A point is just itself. Used for dimension anchors, highlight outlines and visibility.
 """
 
 import weakref
@@ -36,7 +32,7 @@ Interval = Tuple[float, float]
 
 
 def timber_reach(timber: 'PerfectTimberWithin') -> float:
-    """How far to follow a line or a plane to be sure it is past the whole timber."""
+    """Return a distance that takes a line or plane past the whole timber from its middle."""
     return 4 * (float(timber.length) + float(max(timber.size[0], timber.size[1])))
 
 
@@ -45,16 +41,12 @@ def _station(located: Line, point) -> float:
 
 
 def intersected_intervals(one: Sequence[Interval], other: Sequence[Interval]) -> List[Interval]:
-    """The stretches covered by both. Ones that only touch are dropped: a point is not a piece of a line."""
+    """Return the overlaps of two interval lists, dropping ones that only touch."""
     return [(max(a[0], b[0]), min(a[1], b[1])) for a in one for b in other if max(a[0], b[0]) < min(a[1], b[1])]
 
 
 def declared_line_span(feature: CSGFeature, owner: CutCSG, located: Line) -> Optional[Interval]:
-    """Where a feature says its own line ends, as an interval along it, or None.
-
-    Exact, and asked of the feature rather than found by clipping, so there is no inside test at a
-    boundary to go wrong.
-    """
+    """Return the interval along `located` between the feature's declared ends, or None if it has none."""
     extent = feature.get_extent(owner)
     ends = getattr(extent, "ends", None) if extent is not None else None
     if not ends:
@@ -64,7 +56,7 @@ def declared_line_span(feature: CSGFeature, owner: CutCSG, located: Line) -> Opt
 
 
 def line_intervals(located: Line, csg: CutCSG, reach: float, near) -> Optional[List[Interval]]:
-    """Where a line lies on one solid, as intervals along its own direction; None if the solid cannot say."""
+    """Return the intervals along `located` where it lies on `csg`, or None if that can't be computed."""
     pieces = crop_line_to_segments_on_csg(located, csg, seed_reach=reach, near=near)
     if pieces is None:
         return None
@@ -75,9 +67,9 @@ def line_intervals(located: Line, csg: CutCSG, reach: float, near) -> Optional[L
 def line_pieces(
     located: Line, solids: Sequence[Optional[CutCSG]], reach: float, near, declared: Optional[Interval] = None,
 ) -> List[Interval]:
-    """Where a line lies on all of these solids, within `declared` if given, as intervals along it.
+    """Return the intervals along `located` where it lies on every solid (and within `declared`).
 
-    A solid that cannot answer is skipped rather than treated as empty.
+    A solid that can't be computed is skipped.
     """
     intervals: Optional[List[Interval]] = [declared] if declared is not None else None
     for solid in solids:
@@ -110,8 +102,8 @@ class FeatureExtent:
         return self.cross_section is None or not self.cross_section[1]
 
     def anchor(self) -> Optional[np.ndarray]:
-        """Where a dimension hangs on it: a point itself, the middle of a line's longest piece (the
-        one a reader points at, when a cut leaves several), the centroid of a plane's region."""
+        """Return where a dimension attaches: the point, the middle of a line's longest piece, or the
+        centroid of a plane's region. None if empty."""
         if isinstance(self.located, Point):
             return as_ndarray(self.located.position)
         if isinstance(self.located, Line):
@@ -122,8 +114,7 @@ class FeatureExtent:
         return None if self.cross_section is None else cross_section_centroid(self.cross_section)
 
     def outline(self) -> List[Segment3]:
-        """What lights or draws it: a line's pieces, a plane region's boundary (seams between its
-        convex pieces removed)."""
+        """Return the segments that draw it: a line's pieces, or a plane region's outer boundary."""
         if isinstance(self.located, Line):
             return [(self._on_line(low), self._on_line(high)) for low, high in self.pieces]
         if isinstance(self.located, Plane) and self.cross_section is not None:
@@ -131,7 +122,7 @@ class FeatureExtent:
         return []
 
     def polygons(self) -> List[List[np.ndarray]]:
-        """A plane's region as convex polygons of points; nothing for a line or a point."""
+        """Return a plane's region as convex polygons; empty for a line or point."""
         return [] if self.cross_section is None else cross_section_polygons(self.cross_section)
 
     def _on_line(self, station: float) -> np.ndarray:
@@ -141,7 +132,7 @@ class FeatureExtent:
 
 
 class FeatureExtents:
-    """Every feature's extent on one cut timber, each worked out the first time it is asked for."""
+    """Lazily computed extents of every feature on one cut timber."""
 
     def __init__(self, root: Optional[CutCSG], timber: 'PerfectTimberWithin'):
         self.root = root
@@ -153,8 +144,8 @@ class FeatureExtents:
         self._extent_memo: Dict[Tuple[int, str], Optional[FeatureExtent]] = {}
 
     def of(self, feature: CSGFeature, owner: CutCSG) -> Optional[FeatureExtent]:
-        """The extent of `feature`, declared on `owner` (a node of this timber's tree); None where it
-        cannot be placed -- a curved face, or a tree that cannot be cut by its plane."""
+        """Return the extent of `feature` declared on `owner` (a node of this tree), or None for a
+        curved face or a tree its plane can't cut."""
         key = hit_identity(feature, owner)
         if key not in self._extent_memo:
             self._extent_memo[key] = self._work_out(feature, owner)
@@ -182,13 +173,12 @@ class FeatureExtents:
         return None
 
 
-# One FeatureExtents per tree, for as long as the tree lives. Keyed by identity -- a tree is not
-# hashable -- and dropped when the tree is.
+# One FeatureExtents per live tree, keyed by id.
 _extents_memo: Dict[int, FeatureExtents] = {}
 
 
 def extents_of(root: CutCSG, timber: 'PerfectTimberWithin') -> FeatureExtents:
-    """The FeatureExtents of a cut timber's tree, kept for as long as the tree is."""
+    """Return the (cached) FeatureExtents of a cut timber's tree."""
     extents = _extents_memo.get(id(root))
     if extents is None or extents.root is not root:
         extents = FeatureExtents(root, timber)

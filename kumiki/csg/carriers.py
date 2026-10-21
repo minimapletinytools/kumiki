@@ -112,7 +112,7 @@ Row = Dict[Column, float]
 
 
 def merge_coincident_planes(carriers: Dict[CarrierRef, Carrier]) -> Dict[CarrierRef, CarrierRef]:
-    """Each carrier's solving carrier: coincident planes, facing either way, share the first one; anything else is its own."""
+    """Map each carrier to its solving carrier: coincident planes (facing either way) share the first; others map to themselves."""
     canonical: Dict[CarrierRef, CarrierRef] = {}
     planes: List[Tuple[CarrierRef, Plane]] = []
     for ref, carrier in carriers.items():
@@ -136,7 +136,7 @@ class CarrierMap:
 
     @staticmethod
     def union(maps: Sequence['CarrierMap']) -> 'CarrierMap':
-        """Several maps as one, each keeping its own merges. Their primitives must be distinct."""
+        """Return one map combining `maps`, which must cover distinct primitives."""
         carriers: Dict[CarrierRef, Carrier] = {}
         canonical: Dict[CarrierRef, CarrierRef] = {}
         for one in maps:
@@ -148,20 +148,20 @@ class CarrierMap:
         return self._canonical[ref]
 
     def carrier(self, ref: CarrierRef) -> Carrier:
-        """The solving carrier's geometry, which is what the columns are measured against."""
+        """Return the geometry of `ref`'s solving carrier."""
         return self._carriers[self._canonical[ref]]
 
     def solving_carriers(self) -> List[CarrierRef]:
         return list(dict.fromkeys(self._canonical.values()))
 
     def carrier_rows(self, ref: CarrierRef) -> List[Row]:
-        """One row per unknown of the solving carrier `ref` maps to."""
+        """Return one unit row per unknown of `ref`'s solving carrier."""
         column = self.canonical(ref)
         coords: List[Coord] = list(type(self.carrier(ref)).COORDS)
         return [{(column, coord): 1.0} for coord in coords]
 
     def unknowns(self) -> List[Row]:
-        """One row per unknown of every solving carrier."""
+        """Return one unit row per unknown of every solving carrier."""
         return [row for ref in self.solving_carriers() for row in self.carrier_rows(ref)]
 
     def __contains__(self, ref: CarrierRef) -> bool:
