@@ -652,7 +652,7 @@ class CSGFeature(ABC):
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         """Return the carriers of `owner` that produce this feature, or None."""
         key = self.feature_key()
-        if key is not None and key in owner.carriers():
+        if key is not None and owner.has_carrier(key):
             return (CarrierRef(owner, key),)
         return None
 
@@ -1274,9 +1274,8 @@ def _canonical_ordering_corner_faces(
 
 def _meet_of_prism_faces(owner: 'CutCSG', faces: Sequence[PrismFace]) -> Optional[Recipe]:
     """Return where these prism faces meet, or None if one isn't there."""
-    carriers = owner.carriers()
     keys = [prism_face_key(face) for face in faces]
-    if not all(key in carriers for key in keys):
+    if not all(owner.has_carrier(key) for key in keys):
         return None
     return tuple(CarrierRef(owner, key) for key in keys)
 
@@ -1642,9 +1641,8 @@ class ConvexProfileEdgeFeature(EdgeFeature):
         return tuple(face_type(name=self.name, key=face) for face in self.faces)
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
-        carriers = owner.carriers()
         keys = [face.feature_key() for face in self._face_features(owner)]
-        if not all(key in carriers for key in keys):
+        if not all(key is not None and owner.has_carrier(key) for key in keys):
             return None
         return tuple(CarrierRef(owner, key) for key in keys if key is not None)
 
@@ -1823,16 +1821,23 @@ def _declared_features(csg: 'HasFeatures', source: 'FeatureSource') -> List['CSG
     return csg._work_out_declared_features(source)
 
 
+def has_face_plane_carrier(csg: 'HasFeatures', key: FeatureKey) -> bool:
+    """Return whether face_plane_carriers(csg) has `key`, locating only that one face."""
+    node = cast(CutCSG, csg)
+    if key[0] is FeatureCategory.EXTRA:
+        index = key[1]
+        extras = csg.extra_features
+        return (0 <= index < len(extras) and isinstance(extras[index], PlaneFeature)
+                and extras[index].locate_simple_unbounded(node) is not None)
+    feature = csg.default_features().get(key)
+    return isinstance(feature, FaceFeature) and feature.locate_simple_unbounded(node) is not None
+
+
 def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
     """Return a CarrierPlane per default face of `csg` with a plane, and per extra PlaneFeature, by key.
 
-    Cached per node; the returned dict is a copy.
+    Not cached: a solve keeps the carriers it uses in its CarrierMap.
     """
-    return dict(_face_plane_carriers(csg))
-
-
-@memo_by_identity
-def _face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
     carriers: Dict[FeatureKey, Carrier] = {}
     for key, feature in csg.default_features().items():
         if not isinstance(feature, FaceFeature):
@@ -1980,6 +1985,10 @@ class CutCSG(ABC):
         TODO decide whether to drop NEVER_MARK features' carriers, or tag OPTIONAL ones
         """
         ...
+
+    def has_carrier(self, key: FeatureKey) -> bool:
+        """Return whether `key` is one of this node's carriers."""
+        return key in self.carriers()
 
     # does not include derived features
     # TODO rename this to be more descriptive
@@ -2342,6 +2351,9 @@ class HalfSpace(HasFeatures, CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return face_plane_carriers(self)
 
+    def has_carrier(self, key: FeatureKey) -> bool:
+        return has_face_plane_carrier(self, key)
+
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """Return whether P · normal >= offset."""
         # Compute dot product: point · normal
@@ -2512,6 +2524,16 @@ class RectangularPrism(HasFeatures, CutCSG):
 
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return face_plane_carriers(self)
+
+    def has_carrier(self, key: FeatureKey) -> bool:
+        """Return whether `key` is one of this prism's carriers: a side, a finite end, or an extra plane."""
+        if key == _PRISM_CAP_KEYS[PrismFace.TOP]:
+            return self.end_distance is not None
+        if key == _PRISM_CAP_KEYS[PrismFace.BOTTOM]:
+            return self.start_distance is not None
+        if key[0] is FeatureCategory.SIDE:
+            return 0 <= key[1] < len(_PRISM_SIDE_ORDER)
+        return has_face_plane_carrier(self, key)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """Return whether `point` is inside or on the boundary."""
@@ -2721,6 +2743,9 @@ class Cylinder(HasFeatures, CutCSG):
             Line(direction=safe_normalize_vector(self.axis_direction), point=self.position))
         carriers[CYLINDER_BARREL] = CarrierBarrel(axis=CYLINDER_AXIS, radius=self.radius)
         return carriers
+
+    def has_carrier(self, key: FeatureKey) -> bool:
+        return key in (CYLINDER_AXIS, CYLINDER_BARREL) or has_face_plane_carrier(self, key)
 
     def _axial_and_radial(self, point: V3) -> Tuple[Numeric, Numeric]:
         """Return `point`'s distance along the axis from `position`, and from the axis."""
@@ -3380,6 +3405,9 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return face_plane_carriers(self)
 
+    def has_carrier(self, key: FeatureKey) -> bool:
+        return has_face_plane_carrier(self, key)
+
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """Return whether `point` is inside or on the boundary."""
         # Transform point to local coordinates
@@ -3750,6 +3778,9 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return face_plane_carriers(self)
+
+    def has_carrier(self, key: FeatureKey) -> bool:
+        return has_face_plane_carrier(self, key)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """Return whether `point` is inside or on the boundary."""
