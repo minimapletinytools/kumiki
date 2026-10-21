@@ -159,6 +159,8 @@ def _square(half: float) -> Polygon:
     return [(-half, -half), (half, -half), (half, half), (-half, half)]
 
 
+#: (front, back): the regions of the frame's plane where a solid has material just on the side its
+#: normal points to (front), and just on the other side (back).
 Sides = Tuple[PolygonRegions, PolygonRegions]
 
 
@@ -217,9 +219,11 @@ def _cylinder_cross_section(csg: Cylinder, frame: _Frame, seed: PolygonRegions) 
 
 
 def _sides(csg: CutCSG, frame: _Frame, seed: PolygonRegions) -> Sides:
-    """Return (front, back): where `csg` has material just in front of the plane (along its normal) and just behind.
+    """Return (front, back) for `csg` within `seed`: the regions of the frame's plane where it has
+    material just on the normal's side of the plane (front), and just on the other side (back).
 
-    Raises _CannotCrossSection for a primitive it can't cut.
+    A region in both is inside the solid; in exactly one, on its surface. Raises _CannotCrossSection
+    for a primitive it can't cut.
     """
     if isinstance(csg, EmptyCSG):
         return [], []
