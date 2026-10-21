@@ -34,7 +34,7 @@ def _measured_span(handle: FeatureHandle, cut_timbers: Sequence['CutTimber'],
     cut = next((cut for cut in cut_timbers if cut.timber is handle.timber), None)
     if cut is None:
         raise ValueError(f"{handle.feature.name!r} is on a timber not in cut_timbers")
-    span = feature_span(handle, cut.render_timber_with_cuts_csg_local(), in_three_d=True)
+    span = feature_span(handle, cut.feature_extents(), in_three_d=True)
     if span is None:
         raise ValueError(f"{handle.feature.name!r} has no plane, line or point to measure to")
     if spans_memo is not None:

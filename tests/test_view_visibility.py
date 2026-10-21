@@ -46,7 +46,8 @@ def left_side():
 
     def depth(name, reach=3.0):
         handle = next(r.handle for r in required_features(cut) if r.handle.feature.name == name)
-        return nearest_visible_depth(handle, root, look / np.linalg.norm(look), [(root, cut.timber.transform)], reach)
+        return nearest_visible_depth(handle, cut.feature_extents(), look / np.linalg.norm(look),
+                                     [(root, cut.timber.transform)], reach)
 
     return depth
 

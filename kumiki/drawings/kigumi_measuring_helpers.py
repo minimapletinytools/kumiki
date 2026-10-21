@@ -7,7 +7,7 @@ from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from ..csg.feature_extent import FeatureExtents, extents_of
+from ..csg.feature_extent import FeatureExtents
 from ..csg.feature_paths import FeatureHandle
 from ..csg.cutcsg import CutCSG
 from ..geometry import Line, Plane, Point, unit_vector
@@ -35,13 +35,13 @@ def world_geometry(handle: FeatureHandle) -> Optional[Located]:
     return None
 
 
-def feature_anchor(handle: FeatureHandle, root: Optional[CutCSG] = None) -> Optional[V3]:
+def feature_anchor(handle: FeatureHandle, extents: Optional[FeatureExtents] = None) -> Optional[V3]:
     """Return where a dimension attaches to a feature, in world space, or None for a curved face.
 
-    Its extent's anchor on `root`; failing that, uncropped (FeatureExtents with no root).
+    Its extent's anchor in `extents` (the cut timber's); failing that, uncropped.
     """
     timber = handle.timber
-    tries = ([extents_of(root, timber)] if root is not None else []) + [FeatureExtents(None, timber)]
+    tries = ([extents] if extents is not None else []) + [FeatureExtents(None, timber)]
     for extents in tries:
         extent = extents.of(handle.feature, handle.owner)
         anchor = None if extent is None else extent.anchor()

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from kumiki.csg.feature_extent import FeatureExtents
 
 REPO = Path(__file__).resolve().parent.parent
 TOLERANCES = {"face": 5e-4, "edge": 0.012, "point": 0.020}
@@ -76,7 +77,7 @@ def _anchor(frame, member, feature):
     owner = next(node for node in nodes if any(f.name == feature for f in node.get_declared_features()))
     declared = next(f for f in owner.get_declared_features() if f.name == feature)
     handle = FeatureHandle(timber=entry["cut_timber"].timber, hit=OwnedFeatureHit(feature=declared, owner=owner))
-    anchor = feature_anchor(handle, entry["local_csg"])
+    anchor = feature_anchor(handle, entry["cut_timber"].feature_extents())
     assert anchor is not None
     return as_ndarray(anchor)
 
@@ -176,7 +177,7 @@ def test_a_shoulder_crossing_a_perfect_face_of_rough_stock_has_a_line_to_draw(fr
     face = next(hit for hit in hits if hit.feature.name == "ptw.front")
     edge = DerivedEdgeFeature.derive(shoulder, face)
     assert edge is not None and not edge.real
-    segments, absent = edge_highlight_segments(edge, shoulder.owner, cut.timber, root)
+    segments, absent = edge_highlight_segments(edge, shoulder.owner, FeatureExtents(root, cut.timber))
     assert not absent
     assert segments, "a line to draw"
     start, end = segments[0]["start"], segments[0]["end"]

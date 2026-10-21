@@ -5,7 +5,7 @@ import pytest
 
 from kumiki import *
 from kumiki.csg.cutcsg import Cylinder, CylinderAxisFeature, Difference, RectangularPrism, csg_children
-from kumiki.csg.feature_extent import extents_of
+from kumiki.csg.feature_extent import FeatureExtents
 
 
 def _box(x, y, z):
@@ -28,7 +28,7 @@ def notched():
     cut = CutTimber(timber, cuts=[Cutting(timber=timber, negative_csg=_box((0, 10), (-10, 10), (50, 200))),
                                   Cutting(timber=timber, negative_csg=bore)])
     root = cut.render_timber_with_cuts_csg_local()
-    return root, timber, extents_of(root, timber)
+    return root, timber, cut.feature_extents()
 
 
 def _named(node, name):
@@ -73,7 +73,6 @@ def test_an_axis_in_a_void_keeps_its_own_length(notched):
 def test_each_is_worked_out_once_per_tree(notched):
     root, timber, extents = notched
     body = _body(root)
-    assert extents_of(root, timber) is extents
     assert extents.of(_named(body, "rptw.left"), body) is extents.of(_named(body, "rptw.left"), body)
 
 
@@ -104,7 +103,7 @@ def test_two_derived_features_named_alike_on_one_node_are_kept_apart():
         handle = resolve_feature_path(path, frame)
         assert handle is not None
         root = frame.cut_timber_of(handle.timber).render_timber_with_cuts_csg_local()
-        anchors.append(feature_anchor(handle, root))
+        anchors.append(feature_anchor(handle, FeatureExtents(root, handle.timber)))
 
     one, other = anchors
     assert one is not None and other is not None

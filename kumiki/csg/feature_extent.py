@@ -10,7 +10,6 @@ Computed in the timber's local space from the cut timber's tree (`root`), by Fea
 A point is just itself. Used for dimension anchors, highlight outlines and visibility.
 """
 
-import weakref
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -149,7 +148,10 @@ class FeatureExtent:
 
 
 class FeatureExtents:
-    """Lazily computed extents of every feature on one cut timber."""
+    """Lazily computed extents of every feature on one cut timber's tree `root` (CutTimber.feature_extents).
+
+    With `root` None, features are not cropped to a solid.
+    """
 
     def __init__(self, root: Optional[CutCSG], timber: 'PerfectTimberWithin'):
         self.root = root
@@ -227,17 +229,3 @@ class FeatureExtents:
         if cropped == []:
             cropped = clipped(float(FEATURE_EDGE_TOLERANCE) if feature.is_derived() else DECLARED_EDGE_FLOAT_NOISE)
         return cropped
-
-
-# One FeatureExtents per live tree, keyed by id.
-_extents_memo: Dict[int, FeatureExtents] = {}
-
-
-def extents_of(root: CutCSG, timber: 'PerfectTimberWithin') -> FeatureExtents:
-    """Return the (cached) FeatureExtents of a cut timber's tree."""
-    extents = _extents_memo.get(id(root))
-    if extents is None or extents.root is not root:
-        extents = FeatureExtents(root, timber)
-        _extents_memo[id(root)] = extents
-        weakref.finalize(root, _extents_memo.pop, id(root), None)
-    return extents

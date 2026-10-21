@@ -32,6 +32,7 @@ from typing_extensions import deprecated
 import warnings
 
 if TYPE_CHECKING:
+    from .csg.feature_extent import FeatureExtents
     # Annotations only. The runtime imports stay inside the three methods that
     # use these -- identity.py is below timber.py in the import order and
     # reaching for it at module level would close the loop -- but a string
@@ -1826,6 +1827,7 @@ class CutTimber:
     _extended_perfect_csg_local_precomputed: CutCSG
     _rendered_csg_local_precomputed: CutCSG
     _rendered_perfect_csg_local_precomputed: CutCSG
+    _feature_extents_precomputed: 'FeatureExtents'
 
     def __init__(
         self,
@@ -1864,6 +1866,13 @@ class CutTimber:
         self._rendered_perfect_csg_local_precomputed = (
             Difference(self._extended_perfect_csg_local_precomputed, negative_csgs) if negative_csgs
             else self._extended_perfect_csg_local_precomputed)
+
+        from .csg.feature_extent import FeatureExtents
+        self._feature_extents_precomputed = FeatureExtents(self._rendered_csg_local_precomputed, timber)
+
+    def feature_extents(self) -> 'FeatureExtents':
+        """Return the extents of the features on this timber's rendered tree (computed as asked, kept)."""
+        return self._feature_extents_precomputed
 
     def resolve_joint_path(self, path: 'JointPath') -> List['ResolvedJointPath']:
         """Which of this timber's joints a name refers to.

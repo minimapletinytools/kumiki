@@ -26,7 +26,7 @@ from .measure import ViewAxes
 from .sheet_shape import SheetLine, SheetPoint, sheet_gap, sheet_shape
 
 Geometry = Union[Point, Line, Plane]
-from ..csg.feature_extent import extents_of, timber_reach
+from ..csg.feature_extent import FeatureExtents, timber_reach
 
 # TODO probably should make these relative to timber size if it's not alerady, i.e. epsilon per meter kinda deal
 #: Material nearer the place than this is the surface it lies on, not something in front of it.
@@ -93,13 +93,15 @@ def _placement(transform: Transform) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def nearest_visible_depth(
-    handle: FeatureHandle, root: CutCSG, look: np.ndarray, occluders: Sequence[Occluder], reach: float,
+    handle: FeatureHandle, extents: FeatureExtents, look: np.ndarray, occluders: Sequence[Occluder], reach: float,
 ) -> Optional[float]:
     """Return the depth along `look` of the nearest visible part of the feature, or None if none of it is.
 
-    `root` is the feature's own timber's tree; `occluders` include it. Only features drawn as a line
+    `extents` are the feature's own cut timber's (CutTimber.feature_extents); `occluders` include its tree. Only features drawn as a line
     or point are asked about. Non-real features are never hidden.
     """
+    root = extents.root
+    assert root is not None
     transform = handle.timber.transform
     located = handle.feature.locate_simple_unbounded(handle.owner)
     if not isinstance(located, (Plane, Line)):
@@ -127,7 +129,7 @@ def nearest_visible_depth(
         if isinstance(located, Plane):
             # The face's region on the finished surface: its extent, kept for the tree and so shared
             # by every view that asks, brought into this sight plane's frame.
-            extent = extents_of(root, handle.timber).of(handle.feature, handle.owner)
+            extent = extents.of(handle.feature, handle.owner)
             if extent is None:
                 return float(point @ look)
             region = [[own.to_2d(corner) for corner in polygon] for polygon in extent.polygons()]
@@ -243,13 +245,13 @@ def visible_by_view(
     Every timber in `drawn` may hide the others. An anchor drawn on the same line as a nearer one is kept.
     """
     occluders = [(cut.render_timber_with_cuts_csg_local(), cut.timber.transform) for cut in drawn]
-    roots = {id(cut.timber): cut.render_timber_with_cuts_csg_local() for cut in drawn}
+    extents = {id(cut.timber): cut.feature_extents() for cut in drawn}
     reach = max((timber_reach(cut.timber) for cut in drawn), default=4.0)
     visible: Dict[str, List[FeatureHandle]] = {}
     for view, axes in views.items():
         look = as_ndarray(axes.look)
         look /= np.linalg.norm(look)
-        visible[view] = [handle for handle in anchors if id(handle.timber) in roots
-                         and nearest_visible_depth(handle, roots[id(handle.timber)], look, occluders, reach)
+        visible[view] = [handle for handle in anchors if id(handle.timber) in extents
+                         and nearest_visible_depth(handle, extents[id(handle.timber)], look, occluders, reach)
                          is not None]
     return visible

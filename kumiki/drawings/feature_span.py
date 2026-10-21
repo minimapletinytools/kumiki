@@ -7,7 +7,7 @@ import numpy as np
 
 from ..csg.cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, SimpleRectangularPrismEdgeFeature,
                           SimpleRectangularPrismFeature)
-from ..csg.feature_extent import FeatureExtents, extents_of
+from ..csg.feature_extent import FeatureExtents
 from ..csg.feature_paths import FeatureHandle
 from ..geometry import Line, Plane, Point
 from ..rule import as_ndarray, create_v3, unit_ndarray
@@ -42,19 +42,19 @@ def edge_outward_normal(feature: CSGFeature, owner: CutCSG, timber: PerfectTimbe
 
 def feature_span(
     handle: FeatureHandle,
-    root_csg: Optional[CutCSG] = None,
+    extents: Optional[FeatureExtents] = None,
     plane_normal: Optional[VectorLike] = None,
     in_three_d: bool = False,
 ) -> Optional[MeasureSpan]:
     """Return the feature's MeasureSpan in world space, or None if it can't be placed.
 
-    Its extent is cropped to `root_csg` (the cut timber's tree); without it, or for an auxiliary line,
-    the declared extent. With `plane_normal` (a sheet's view direction), a face seen edge-on is a line
+    Its extent comes from `extents` (the cut timber's, CutTimber.feature_extents); without them, or
+    for an auxiliary line, the declared extent. With `plane_normal` (a sheet's view direction), a face seen edge-on is a line
     and otherwise a point, and a line seen end-on is a point. Without it, a face is a PlaneSpan.
     """
     feature, owner, timber = handle.feature, handle.owner, handle.timber
     located = feature.locate_simple_unbounded(owner)
-    extents = extents_of(root_csg, timber) if root_csg is not None else FeatureExtents(None, timber)
+    extents = extents if extents is not None else FeatureExtents(None, timber)
 
     def world(point) -> np.ndarray:
         return as_ndarray(timber.transform.local_to_global(point))
@@ -84,7 +84,7 @@ def feature_span(
     if isinstance(located, Plane):
         # Its extent on the cut timber -- or, with no cut timber or cut away entirely, all of what declared it.
         extent = extents.of(feature, owner)
-        if (extent is None or extent.is_empty) and root_csg is not None:
+        if (extent is None or extent.is_empty) and extents.root is not None:
             extent = FeatureExtents(None, timber).of(feature, owner)
         if extent is None or extent.is_empty:
             return None

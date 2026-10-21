@@ -672,6 +672,7 @@ if TYPE_CHECKING:
     import numpy as np
     # Annotations only: import kumiki inside functions at runtime, since a reload purges it.
     from kumiki.csg.cutcsg import CSGFeature, CSGParity, CutCSG, FeatureTestTolerances, OwnedFeatureHit
+    from kumiki.csg.feature_extent import FeatureExtents
     from kumiki.drawings.drawing import Viewport, ViewportId
     from kumiki.drawings.measure import (AngleRays, MeasureSpan, MeasurementKind, MeasurementPlacement,
                                            MeasurementPlane, MeasurementSpace, VectorLike, ViewAxes)
@@ -1007,13 +1008,13 @@ def _triangulate_local_csg(cut_timber: 'CutTimber', local_csg: 'CutCSG') -> Tria
 
 
 def _perfect_reference_outlines(
-    timber: 'PerfectTimberWithin', root: 'CutCSG', centerplanes: bool,
+    extents: 'FeatureExtents', centerplanes: bool,
 ) -> List[PlaneOutlineWire]:
     """Return picking.perfect_reference_outlines as wire forms."""
     from kumiki.viewer.picking import perfect_reference_outlines
 
     return [{"normal": outline.normal, "positions": outline.positions}
-            for outline in perfect_reference_outlines(timber, root, centerplanes)]
+            for outline in perfect_reference_outlines(extents, centerplanes)]
 
 
 def _base_member_payload(
@@ -1131,8 +1132,8 @@ def _cut_timber_to_triangle_mesh_payload(
             payload["hasActualGeometryDifferentFromPerfect"] = False
     else:
         payload["hasActualGeometryDifferentFromPerfect"] = False
-    payload["centerplanes"] = _perfect_reference_outlines(timber, local_csg, centerplanes=True)
-    payload["perfectFaces"] = _perfect_reference_outlines(timber, local_csg, centerplanes=False)
+    payload["centerplanes"] = _perfect_reference_outlines(cut_timber.feature_extents(), centerplanes=True)
+    payload["perfectFaces"] = _perfect_reference_outlines(cut_timber.feature_extents(), centerplanes=False)
 
     # No-joints box: the plain box cropped only by end-cut trims, for every timber shape.
     try:
@@ -2017,7 +2018,7 @@ def _pick_placement(
     if placed is None or placed[1] is None:
         return empty
     handle = _handle_of(located_pick[0], located_pick[1], timber)
-    picked_span = feature_span(handle, _root_csg_of(ss, payload.get("memberKey")), normal, in_three_d)
+    picked_span = feature_span(handle, _extents_of_member(ss, payload.get("memberKey")), normal, in_three_d)
     if picked_span is None:
         return empty
     # The same answer a written measurement travels with, so the preview shows the number the
@@ -2035,9 +2036,11 @@ def _pick_placement(
             "settled": settled, "extents": _extents_wire(placement)}
 
 
-def _root_csg_of(ss: SlotState, member_key: Optional[str]) -> Optional['CutCSG']:
+def _extents_of_member(ss: SlotState, member_key: Optional[str]) -> Optional['FeatureExtents']:
+    """Return the FeatureExtents of a cached member's cut timber, or None."""
     cached = (getattr(ss, "mesh_cache", None) or {}).get(member_key) or {}
-    return cached.get("local_csg")
+    cut_timber = cached.get("cut_timber")
+    return None if cut_timber is None else cut_timber.feature_extents()
 
 
 def _plane_for_pick(
@@ -2733,11 +2736,11 @@ def _handle_of(feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWith
     return FeatureHandle(timber=timber, hit=OwnedFeatureHit(feature=feature, owner=node))
 
 
-def _anchor_floats(handle: 'FeatureHandle', root: Optional['CutCSG'] = None) -> Optional[List[float]]:
+def _anchor_floats(handle: 'FeatureHandle', extents: Optional['FeatureExtents'] = None) -> Optional[List[float]]:
     """Return a feature's dimension anchor (feature_anchor) as floats."""
     from kumiki.drawings.kigumi_measuring_helpers import feature_anchor
 
-    at = feature_anchor(handle, root)
+    at = feature_anchor(handle, extents)
     return None if at is None else _vector3_to_floats(at)
 
 
@@ -2828,23 +2831,23 @@ def _resolve_anchor_placed(
     cut_timber = frame.cut_timber_of(handle.timber)
     if cut_timber is None:
         return None
-    root_csg = cut_timber.render_timber_with_cuts_csg_local()
     located = handle.feature.locate_simple_unbounded(handle.owner)
-    return _anchor_payload(handle.feature, handle.owner, handle.timber, located, root_csg, plane, solid_space)
+    return _anchor_payload(handle.feature, handle.owner, handle.timber, located, cut_timber.feature_extents(),
+                           plane, solid_space)
 
 
 def _anchor_payload(
     feature: 'CSGFeature', node: 'CutCSG', timber: 'PerfectTimberWithin', located: Optional['Located'],
-    root_csg: 'CutCSG', plane: Optional['VectorLike'], solid_space: bool = False,
+    extents: 'FeatureExtents', plane: Optional['VectorLike'], solid_space: bool = False,
 ) -> Tuple[AnchorWire, Optional['MeasureSpan']]:
     """Return one end of a measurement as a wire form: its anchor, geometry and span."""
     from kumiki.drawings.feature_span import feature_span
 
     handle = _handle_of(feature, node, timber)
     return ({
-        "at": _anchor_floats(handle, root_csg),
+        "at": _anchor_floats(handle, extents),
         "geometry": _world_geometry_payload(handle),
-    }, feature_span(handle, root_csg, plane, solid_space))
+    }, feature_span(handle, extents, plane, solid_space))
 
 
 def _reference_features_payload(timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None) -> List[ReferenceLineWire]:
@@ -2953,13 +2956,15 @@ def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> Highligh
         return result
     cached = slot_state.mesh_cache.get(str((reference or {}).get("timber") or "")) or {}
     timber = handle.timber
-    root = cached.get("local_csg") or slot_state.frame.cut_timber_of(timber).render_timber_with_cuts_csg_local()
+    cut_timber = cached.get("cut_timber") or slot_state.frame.cut_timber_of(timber)
+    extents = cut_timber.feature_extents()
+    root = extents.root
     feature_type = handle.feature.feature_type().name
     result["featureType"] = feature_type
     if feature_type == "POINT":
-        result["at"] = _anchor_floats(handle, root)
+        result["at"] = _anchor_floats(handle, extents)
     elif feature_type == "EDGE":
-        segments, _absent = edge_highlight_segments(handle.feature, handle.owner, timber, root)
+        segments, _absent = edge_highlight_segments(handle.feature, handle.owner, extents)
         if segments:
             result["highlightEdgeSegments"] = segments
     elif cached.get("mesh") is not None and isinstance(path, SingleFeaturePath):
@@ -4252,7 +4257,7 @@ def _drawing_candidates(
             near = _mesh_point_near_ray(entry, origin, direction, reach)
             if near is not None:
                 surface = local_frame.point(near)
-        members.append(DrawnMember(key, root, cut_timber.timber, surface))
+        members.append(DrawnMember(key, cut_timber.feature_extents(), surface))
 
     def blocked_for(key: str) -> Callable[['Float3'], bool]:
         entry = ss.mesh_cache[key]
@@ -4546,7 +4551,7 @@ def _pick_on_member(
     new_path, target_csg, feature_label = pick.path, pick.node, pick.label
     feature_type, edge = pick.kind, pick.edge
     located_pick: Optional['LocatedPick'] = pick.located()
-    lit = _pick_highlights(mesh, local_csg, timber, local_frame, eps, pick)
+    lit = _pick_highlights(mesh, local_csg, cut_timber.feature_extents(), local_frame, eps, pick)
     mesh_walk_ms = (time.monotonic() - t0) * 1000.0
     hl_verts, hl_idx, matched, total = lit.mesh
 
@@ -4581,7 +4586,7 @@ def _pick_on_member(
         # left, which is the same anchor the saved measurement resolves to. An
         # edge in particular anchors at the middle of its longest surviving
         # piece, not at the extent it was declared with.
-        "at": (_anchor_floats(_handle_of(located_pick[0], located_pick[1], timber), local_csg)
+        "at": (_anchor_floats(_handle_of(located_pick[0], located_pick[1], timber), cut_timber.feature_extents())
                if located_pick is not None else None),
         # What a measurement to this pick would BE: one answer, asked once, and
         # read by the hover colour, the preview and the click alike. See
@@ -4621,7 +4626,7 @@ class _PickHighlights(NamedTuple):
     edge_segments: Optional[Any]
 
 
-def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', timber: 'PerfectTimberWithin', local_frame: 'LocalFrame',
+def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', extents: 'FeatureExtents', local_frame: 'LocalFrame',
                      eps: float, pick: 'Pick') -> _PickHighlights:
     """Return the mesh and lines that light `pick` on its member."""
     from kumiki.viewer.picking import (edge_highlight_segments, extract_highlight_mesh, non_real_plane_outline,
@@ -4640,11 +4645,9 @@ def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', timber: 'Perfect
     edge_feature = pick.edge_feature
     located_pick = pick.located()
     if edge_feature is not None:
-        highlight_edge, edge_absent = edge_highlight_segments(
-            edge_feature, target_csg, timber, local_csg,
-        )
+        highlight_edge, edge_absent = edge_highlight_segments(edge_feature, target_csg, extents)
     elif located_pick is not None:
-        highlight_edge = non_real_plane_outline(located_pick[0], located_pick[1], timber, local_csg)
+        highlight_edge = non_real_plane_outline(located_pick[0], located_pick[1], extents)
 
     # Extract highlight mesh for the selected target
     lit = extract_highlight_mesh(
@@ -4802,7 +4805,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
         result["parentHighlightMesh"] = parent_hl
     if actual_feature_label:
         named = next((f for f in target_csg.get_declared_features() if f.name == actual_feature_label), None)
-        outline = None if named is None else non_real_plane_outline(named, target_csg, cut_timber.timber, local_csg)
+        outline = None if named is None else non_real_plane_outline(named, target_csg, cut_timber.feature_extents())
         if outline:
             result["highlightEdgeSegments"] = outline
     return result

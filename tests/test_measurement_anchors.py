@@ -407,6 +407,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
 
         timber = entry["timber"]
         root = entry["cutTimber"].render_timber_with_cuts_csg_local()
+        extents = entry["cutTimber"].feature_extents()
         points = [
             [float(vertex[i]) for i in range(3)]
             for triangle in triangulate_cutcsg(root).mesh.triangles for vertex in triangle
@@ -416,7 +417,7 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
             for hit in picking.features_at_point(root, Float3.of(point), 5e-4, FeatureTestTolerances(face=5e-4)):
                 if hit.feature.feature_type() != CSGFeatureType.EDGE:
                     continue
-                found.setdefault(hit.feature.name, feature_span(FeatureHandle(timber=timber, hit=hit), root, look))
+                found.setdefault(hit.feature.name, feature_span(FeatureHandle(timber=timber, hit=hit), extents, look))
         return found, float(timber.length)
 
     def test_an_arris_of_the_hole_is_as_long_as_the_hole(self, receiving):

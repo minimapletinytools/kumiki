@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from kumiki.csg.feature_extent import FeatureExtents
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -83,7 +84,7 @@ def test_a_perfect_reference_is_cropped_to_the_cut_timber(loaded):
 
     handle = FeatureHandle(timber=slot.mesh_cache[key]["cut_timber"].timber,
                            hit=OwnedFeatureHit(feature=right, owner=body))
-    at = feature_anchor(handle, root)
+    at = feature_anchor(handle, FeatureExtents(root, handle.timber))
     assert at is not None
     assert round(float(transform.global_to_local(at)[2]), 4) == 0.25
     low, high = along("ptw.centerplane_left_right")

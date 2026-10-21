@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from kumiki.viewer.rule_at_home import Float3
+from kumiki.csg.feature_extent import FeatureExtents
 
 REPO = Path(__file__).resolve().parent.parent
 FRONT = "rptw.right×dovetail_right_flank"
@@ -56,7 +57,7 @@ def picked():
 
     front = DerivedEdgeFeature.derive(owned("rptw.right", None), owned("dovetail_right_flank", "free_dovetail"))
     assert front is not None
-    segments = edge_highlight_segments(front, root, beam.timber, root)[0]
+    segments = edge_highlight_segments(front, root, FeatureExtents(root, beam.timber))[0]
     assert segments is not None
     segment = segments[0]
     on_line = [(a + b) / 2 for a, b in zip(segment["start"], segment["end"])]

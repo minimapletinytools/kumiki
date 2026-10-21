@@ -49,6 +49,7 @@ from kumiki.csg.triangles import triangulate_cutcsg
 
 from kumiki.csg.feature_paths import find_csg_by_labels, find_declared_feature, roots_for_path, timber_body_csg
 from kumiki.viewer.rule_at_home import Float3
+from kumiki.csg.feature_extent import FeatureExtents
 # Generous epsilon: mesh vertices come out of a boolean op, so surface points
 # are only approximately on the analytic primitives. Matches the runner's own
 # raycast epsilon.
@@ -1283,7 +1284,7 @@ class TestEdgeHighlightSpan:
         edge, owner, timber, root = self._edge(
             mortise_and_tenon_frame, "shoulder", "rptw.front")
 
-        segment, absent = picking.edge_highlight_segments(edge, owner, timber, root)
+        segment, absent = picking.edge_highlight_segments(edge, owner, FeatureExtents(root, timber))
 
         assert not absent
         # Exactly the timber's width. This edge lies IN the shoulder's cutting
@@ -1330,7 +1331,7 @@ class TestEdgeHighlightSpan:
         timber = Timber(length=scalar(1), size=create_v2(scalar(0.1), scalar(0.2)),
                         transform=Transform.identity())
 
-        segment, absent = picking.edge_highlight_segments(edge, body, timber, body)
+        segment, absent = picking.edge_highlight_segments(edge, body, FeatureExtents(body, timber))
 
         assert segment is None
         assert absent, "an edge cropped away to nothing is not merely unknown"
@@ -1357,7 +1358,7 @@ class TestEdgeHighlightSpan:
                     if hit.feature.feature_type() != CSGFeatureType.EDGE:
                         continue
                     segment, absent = picking.edge_highlight_segments(
-                        hit.feature, hit.owner, cut_timber.timber, local)
+                        hit.feature, hit.owner, FeatureExtents(local, cut_timber.timber))
                     assert not absent, f"{hit.feature.name} vanished"
                     assert segment is not None
                     found += 1
@@ -1370,7 +1371,7 @@ class TestEdgeHighlightSpan:
         edge, owner, timber, root = self._declared_edge(
             mortise_and_tenon_frame, "rptw.front_left")
 
-        segments, absent = picking.edge_highlight_segments(edge, owner, timber, root)
+        segments, absent = picking.edge_highlight_segments(edge, owner, FeatureExtents(root, timber))
 
         assert not absent and segments is not None
         # Nothing cuts this corner, so it survives whole and in one piece.
@@ -1409,7 +1410,7 @@ class TestEdgeHighlightSpan:
                 if edge is None:
                     continue
                 segments, absent = picking.edge_highlight_segments(
-                    edge, first_owner, cut_timber.timber, local)
+                    edge, first_owner, FeatureExtents(local, cut_timber.timber))
                 assert segments is not None or absent, (
                     f"{a_name} x {b_name} could not be cropped at all")
                 checked += 1
@@ -1495,7 +1496,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
             self, oblique_shoulder_frame, name, expected_mm):
         feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
 
-        segments, absent = picking.edge_highlight_segments(feature, owner, timber, root)
+        segments, absent = picking.edge_highlight_segments(feature, owner, FeatureExtents(root, timber))
 
         assert not absent
         assert self._lengths_mm(segments) == pytest.approx([expected_mm], abs=0.01)
@@ -1514,7 +1515,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
             feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
 
             segments, absent = picking.edge_highlight_segments(
-                feature, owner, timber, root)
+                feature, owner, FeatureExtents(root, timber))
 
             assert not absent, name
             assert self._lengths_mm(segments) == pytest.approx(
@@ -1532,7 +1533,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
             feature, owner, timber, root = self._tenon_arris(oblique_shoulder_frame, name)
 
             segments, absent = picking.edge_highlight_segments(
-                feature, owner, timber, root)
+                feature, owner, FeatureExtents(root, timber))
 
             assert segments is None, name
             assert absent, name
@@ -1558,7 +1559,7 @@ class TestAnArrisStopsWhereTheSurfaceDoes:
                 if feature.feature_type() != CSGFeatureType.EDGE:
                     continue
                 segments, _ = picking.edge_highlight_segments(
-                    feature, node, cut_timber.timber, root)
+                    feature, node, FeatureExtents(root, cut_timber.timber))
                 for segment in segments or []:
                     start = picking.to_v3(segment["start"])
                     end = picking.to_v3(segment["end"])
@@ -1601,7 +1602,7 @@ class TestAHousingsInsideEdgeOnAPitchedRafter:
         best = picking.features_at_point(root, Float3.of(local), PICK_EPS)[0]
         assert best.feature.feature_type() == CSGFeatureType.EDGE
 
-        segments, absent = picking.edge_highlight_segments(best.feature, best.owner, plate, root)
+        segments, absent = picking.edge_highlight_segments(best.feature, best.owner, FeatureExtents(root, plate))
 
         assert not absent and segments, "the inside edge was picked but nothing was drawn"
         start, end = picking.to_v3(segments[0]["start"]), picking.to_v3(segments[0]["end"])

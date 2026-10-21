@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Typed
 
 from ..csg.cutcsg import CSGFeature, CutCSG, FeatureTestTolerances, OwnedFeatureHit
 from ..csg.feature_paths import candidate_segments, label_name, walk_labels
-from ..csg.feature_extent import Interval
+from ..csg.feature_extent import FeatureExtents, Interval
 from ..geometry import Line
 from ..rule import Transform, V3, scalar
 from ..timber import PerfectTimberWithin
@@ -170,25 +170,23 @@ def edge_tolerance() -> float:
 def edge_highlight_segments(
     edge_feature: 'CSGFeature',
     owner: 'CutCSG',
-    timber: 'PerfectTimberWithin',
-    root_csg: 'CutCSG',
+    extents: 'FeatureExtents',
 ) -> Tuple[Optional[List[WorldSegment]], bool]:
-    """Return (segments, absent) to draw a selected line feature, in world space: its FeatureExtent on `root_csg`.
+    """Return (segments, absent) to draw a selected line feature, in world space: its FeatureExtent in `extents`.
 
     segments is None when the extent can't be computed (the caller then lights triangles); `absent`
     says the line was cropped away entirely.
     """
-    from kumiki.csg.feature_extent import extents_of
     from kumiki.geometry import Line
 
-    if timber is None or root_csg is None or not isinstance(edge_feature.locate_simple_unbounded(owner), Line):
+    if not isinstance(edge_feature.locate_simple_unbounded(owner), Line):
         return (None, False)
-    extent = extents_of(root_csg, timber).of(edge_feature, owner)
+    extent = extents.of(edge_feature, owner)
     if extent is None:
         return (None, False)
     if extent.is_empty:
         return (None, True)
-    return (_world_segments(extent.outline(), timber), False)
+    return (_world_segments(extent.outline(), extents.timber), False)
 
 
 def _world_segments(segments, timber: 'PerfectTimberWithin') -> List[WorldSegment]:
@@ -213,7 +211,7 @@ def features_at_point(
 
 def features_near_ray(
     root: 'CutCSG', local_pt: Optional[Float3], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
-    timber: Optional['PerfectTimberWithin'] = None,
+    extents: Optional['FeatureExtents'] = None,
 ) -> List['PointerCandidate']:
     """Return the features under the pointer on one tree, in the library's order, each with where it
     was found along the ray. Shared by the 3D and drawing picks; slack is in screen pixels.
@@ -222,7 +220,7 @@ def features_near_ray(
       and kept within their slack of the ray; edges and corners are placed nearest the ray.
     - Non-real planes whose line across the face there passes near the ray, placed at the surface.
     - Non-real lines (a bore's axis) the ray passes near.
-    - With `timber` (a drawing), non-real planes seen edge-on along the ray.
+    - With `extents` (a drawing; the tree's FeatureExtents), non-real planes seen edge-on along the ray.
 
     `group` is left 0; order_along_ray sets it.
     """
@@ -242,7 +240,7 @@ def features_near_ray(
         hits += [hit for hit in _reference_planes_near(root, local_pt, origin, direction, float(tolerances.edge))
                  if _hit_key(hit) not in known]
     at_surface = {_hit_key(hit) for hit in hits}
-    hits += [hit for hit in non_real_features_along_ray(root, local_ray, tolerances, timber)
+    hits += [hit for hit in non_real_features_along_ray(root, local_ray, tolerances, extents)
              if _hit_key(hit) not in at_surface]
 
     candidates = []
@@ -250,20 +248,20 @@ def features_near_ray(
         place = _nearest_on(hit, origin, direction)
         if place is None:
             place = (local_pt if _hit_key(hit) in at_surface
-                     else _place_off_surface(hit, root, timber, origin, direction))
+                     else _place_off_surface(hit, extents, origin, direction))
         depth = _along_ray(origin, direction, place) if place is not None else math.inf
         candidates.append(PointerCandidate(hit, place, depth, 0.0))
     return candidates
 
 
-def _place_off_surface(hit: 'OwnedFeatureHit', root: 'CutCSG', timber: Optional['PerfectTimberWithin'],
+def _place_off_surface(hit: 'OwnedFeatureHit', extents: Optional['FeatureExtents'],
                        origin: Float3, direction: Float3) -> Optional[Float3]:
     """Return where a non-real feature sits along the ray: a line's nearest approach, or an edge-on plane's crossing."""
     ends = hit.feature.declared_ends(hit.owner)
     if ends is not None:
         return ray_nears_segment(origin, direction, (Float3.of(ends[0]), Float3.of(ends[1])), math.inf)
-    if timber is not None:
-        return _plane_on_ray(hit, root, timber, origin, direction, math.inf)
+    if extents is not None:
+        return _plane_on_ray(hit, extents, origin, direction, math.inf)
     return None
 
 
@@ -366,7 +364,7 @@ class PointerCandidate(NamedTuple):
 
 def candidates_under_pointer(
     root: 'CutCSG', local_pt: Optional[Float3], tolerances: 'FeatureTestTolerances', local_ray: LocalRay,
-    timber: 'PerfectTimberWithin',
+    extents: 'FeatureExtents',
 ) -> List[PointerCandidate]:
     """Return the features under the pointer for a drawing view (features_near_ray), filtered by
     measurable_in_view, nearest depth group first."""
@@ -376,7 +374,7 @@ def candidates_under_pointer(
         hits = _only_creases(root, root.find_all_features(local_pt.v3(), tolerances), local_pt) if local_pt else []
         return [PointerCandidate(hit, local_pt, 0.0, 0.0) for hit in hits]
     found = {_hit_key(candidate.hit): candidate
-             for candidate in features_near_ray(root, local_pt, tolerances, local_ray, timber)}
+             for candidate in features_near_ray(root, local_pt, tolerances, local_ray, extents)}
     separation = float(tolerances.edge)
     depths = {key: candidate.depth for key, candidate in found.items()}
     ordered = order_along_ray(measurable_in_view([candidate.hit for candidate in found.values()], direction, separation),
@@ -473,11 +471,11 @@ def _depth_groups(
 
 def non_real_features_along_ray(
     root: 'CutCSG', local_ray: LocalRay, tolerances: 'FeatureTestTolerances',
-    timber: Optional['PerfectTimberWithin'] = None,
+    extents: Optional['FeatureExtents'] = None,
 ) -> List['OwnedFeatureHit']:
     """Return non-real features within the edge tolerance of the ray, in timber-local space.
 
-    Bounded by each feature's own extent. With `timber` (a drawing view), planes seen edge-on too.
+    Bounded by each feature's own extent. With `extents` (a drawing view), planes seen edge-on too.
     """
     from kumiki.csg.cutcsg import OwnedFeatureHit, csg_children
     from kumiki.geometry import Line, Plane
@@ -492,9 +490,9 @@ def non_real_features_along_ray(
         # A non-real POINT would want a point-to-ray distance; nothing declares
         # one yet, so there is nothing here to guess at.
         located = feature.locate_simple_unbounded(owner)
-        if isinstance(located, Plane) and timber is not None:
+        if isinstance(located, Plane) and extents is not None:
             hit = OwnedFeatureHit(feature=feature, owner=owner)
-            if _plane_on_ray(hit, root, timber, origin, direction, tolerance) is not None:
+            if _plane_on_ray(hit, extents, origin, direction, tolerance) is not None:
                 found.append(hit)
             return
         if not isinstance(located, Line):
@@ -519,10 +517,9 @@ def non_real_features_along_ray(
 
 
 
-def _plane_on_ray(hit: 'OwnedFeatureHit', root: 'CutCSG', timber: 'PerfectTimberWithin', origin: Float3,
+def _plane_on_ray(hit: 'OwnedFeatureHit', extents: 'FeatureExtents', origin: Float3,
                   direction: Float3, tolerance: float) -> Optional[Float3]:
     """Return where the ray runs through a plane feature seen edge-on, within `tolerance` and its extent, or None."""
-    from kumiki.csg.feature_extent import extents_of
     from kumiki.drawings.sheet_shape import SQUARE_TO_VIEW
     from kumiki.geometry import Plane
 
@@ -534,7 +531,7 @@ def _plane_on_ray(hit: 'OwnedFeatureHit', root: 'CutCSG', timber: 'PerfectTimber
         return None  # seen at an angle: an area, not a line
     if abs(normal.dot(origin - Float3.of(plane.point))) > tolerance:
         return None
-    extent = extents_of(root, timber).of(hit.feature, hit.owner)
+    extent = extents.of(hit.feature, hit.owner)
     if extent is None or extent.is_empty:
         return None
     # Across the sheet, in the plane: the extent has to reach the ray's line from both sides.
@@ -1002,16 +999,15 @@ def derivation(root: 'CutCSG', hits: List['OwnedFeatureHit'], feature: Optional[
                        for parent in getattr(feature, "parents", ()) if parent is not None])
 
 
-def non_real_plane_outline(feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
-                           root: 'CutCSG') -> Optional[List[WorldSegment]]:
+def non_real_plane_outline(feature: 'CSGFeature', owner: 'CutCSG',
+                           extents: 'FeatureExtents') -> Optional[List[WorldSegment]]:
     """Return a non-real plane's outline in world space (its extent's outline), or None for anything else."""
-    from kumiki.csg.feature_extent import extents_of
     from kumiki.geometry import Plane
 
     if feature.real or not isinstance(feature.locate_simple_unbounded(owner), Plane):
         return None
-    extent = extents_of(root, timber).of(feature, owner)
-    return None if extent is None else _world_segments(extent.outline(), timber)
+    extent = extents.of(feature, owner)
+    return None if extent is None else _world_segments(extent.outline(), extents.timber)
 
 
 class PlaneOutline(NamedTuple):
@@ -1020,18 +1016,18 @@ class PlaneOutline(NamedTuple):
     positions: List[float]
 
 
-def perfect_reference_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG', centerplanes: bool) -> List[PlaneOutline]:
-    """Return the rough body's perfect references cropped to `root`, in world space: centerplanes, and perfect
-    faces the rough body has no face for (ptw.*).
+def perfect_reference_outlines(extents: 'FeatureExtents', centerplanes: bool) -> List[PlaneOutline]:
+    """Return the rough body's perfect references cropped to the cut timber, in world space: centerplanes, and
+    perfect faces the rough body has no face for (ptw.*).
     """
     from kumiki.csg.cutcsg import Difference, FeatureNature, MidplaneFeature, PlaneFeature
-    from kumiki.csg.feature_extent import extents_of
     from kumiki.geometry import Plane
     from kumiki.rule import create_v3
 
+    root, timber = extents.root, extents.timber
+    assert root is not None
     body = root.base if isinstance(root, Difference) else root
     kind = MidplaneFeature if centerplanes else PlaneFeature
-    extents = extents_of(root, timber)
     to_world = lambda point: [float(v) for v in timber.transform.local_to_global(create_v3(*point))]
     outlines: List[PlaneOutline] = []
     for feature in body.get_declared_features():
@@ -1050,10 +1046,10 @@ def perfect_reference_outlines(timber: 'PerfectTimberWithin', root: 'CutCSG', ce
 # --- a drawing's pick: every member drawn under the pointer -------------------------------------
 
 class DrawnMember(NamedTuple):
-    """A member a drawing pick may land on: key, tree (local), placement, and where the ray met its surface."""
+    """A member a drawing pick may land on: key, its cut timber's FeatureExtents (tree and timber), and where
+    the ray met its surface (local)."""
     key: str
-    root: 'CutCSG'
-    timber: 'PerfectTimberWithin'
+    extents: 'FeatureExtents'
     surface_point: Optional[Float3]
 
 
@@ -1083,11 +1079,12 @@ def drawing_candidates(
         return [], 0
     found: List[MemberCandidate] = []
     for member in members:
-        rotation = LocalFrame.of(member.timber.transform)
+        timber, root = member.extents.timber, member.extents.root
+        assert root is not None
+        rotation = LocalFrame.of(timber.transform)
         local_ray = (rotation.point(origin), rotation.direction(direction))
-        for candidate in candidates_under_pointer(member.root, member.surface_point, tolerances, local_ray,
-                                                  member.timber):
-            found.append(MemberCandidate(member.key, member.timber, candidate))
+        for candidate in candidates_under_pointer(root, member.surface_point, tolerances, local_ray, member.extents):
+            found.append(MemberCandidate(member.key, timber, candidate))
 
     # One depth order over every member: grouped as order_along_ray groups, then the library's order.
     separation = float(tolerances.edge)
