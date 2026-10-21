@@ -25,7 +25,7 @@ from ..geometry import (Line, Plane, Point, intersect_line_plane, intersect_plan
 import numpy as np
 
 if TYPE_CHECKING:
-    from .cross_sections import Sides
+    from .cross_sections import PolygonRegions, Sides, _Frame
     from .edges_on_csg import AngleSpans, ConvexHull, Span
 from .identity_memo import memo_by_identity
 from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Midplane, Recipe,
@@ -2097,11 +2097,7 @@ class CutCSG(ABC):
     # nodes (SolidUnion, Intersection, Difference) are never asked: the walkers combine their children.
 
     def get_convex_hull(self) -> 'ConvexHull':
-        """Return this primitive's convex hull as half spaces, or EMPTY, or UNKNOWN if it can't say.
-
-        Exact for primitives that are convex polyhedra; for a curved primitive, a polyhedron containing
-        it (a Cylinder's circumscribing hexagonal prism). Callers use edges_on_csg.convex_hull, which caches it.
-        """
+        """Return this primitive's convex hull."""
         from .edges_on_csg import UNKNOWN_HULL
         return UNKNOWN_HULL
 
@@ -2130,7 +2126,8 @@ class CutCSG(ABC):
             return None
         return [] if hull.is_empty else _spans_within_primitive(hull.require_faces(), line, seed, tolerance, removing)
 
-    def angles_around_line(self, at, direction, basis, tolerance: float) -> Optional['AngleSpans']:
+    def angles_around_line(self, at: np.ndarray, direction: np.ndarray, basis: Tuple[np.ndarray, np.ndarray],
+                           tolerance: float) -> Optional['AngleSpans']:
         """Return the directions around a line, at one point on it, in which this primitive has material.
 
         Looking along the line at `at`, the primitive fills some angles around it; they say whether the
@@ -2153,7 +2150,7 @@ class CutCSG(ABC):
             return None
         return [] if hull.is_empty else _plane_angles(hull.require_faces(), at, direction, basis, tolerance)
 
-    def line_crossings(self, origin, direction) -> List[float]:
+    def line_crossings(self, origin: np.ndarray, direction: np.ndarray) -> List[float]:
         """Return the parameters along the line `origin + t * direction` where it crosses this primitive's
         surfaces: the places the material around the line can change.
 
@@ -2166,7 +2163,7 @@ class CutCSG(ABC):
             return []
         return _plane_stations(hull.require_faces(), origin, direction)
 
-    def plane_sides(self, frame, seed) -> 'Sides':
+    def plane_sides(self, frame: '_Frame', seed: 'PolygonRegions') -> 'Sides':
         """Return where this primitive cuts the plane of `frame`, as (front, back) regions within `seed`.
 
         front is where it has material just on the side the plane's normal points to, back just on the
@@ -2884,7 +2881,8 @@ class Cylinder(HasFeatures, CutCSG):
         from .edges_on_csg import _cylinder_spans
         return _cylinder_spans(self, line, seed, tolerance, removing)
 
-    def angles_around_line(self, at, direction, basis, tolerance: float) -> Optional['AngleSpans']:
+    def angles_around_line(self, at: np.ndarray, direction: np.ndarray, basis: Tuple[np.ndarray, np.ndarray],
+                           tolerance: float) -> Optional['AngleSpans']:
         """Solved exactly: the caps, and half a turn about the barrel's tangent plane where `at` is on it."""
         from .edges_on_csg import _IN_PLANE_EPS, _angles_intersection, _extrusion_caps, _half_turn, _plane_angles
         axis = np.array([float(v) for v in unit_vector(self.axis_direction)])
@@ -2901,7 +2899,7 @@ class Cylinder(HasFeatures, CutCSG):
                 angles = _angles_intersection(angles, _half_turn(across, basis))
         return angles
 
-    def line_crossings(self, origin, direction) -> List[float]:
+    def line_crossings(self, origin: np.ndarray, direction: np.ndarray) -> List[float]:
         """Return the parameters along the line where it crosses the barrel and the finite caps."""
         from .edges_on_csg import _extrusion_caps, _plane_stations
         axis = np.array([float(v) for v in unit_vector(self.axis_direction)])
@@ -2916,7 +2914,7 @@ class Cylinder(HasFeatures, CutCSG):
         caps = _extrusion_caps(unit_vector(self.axis_direction), self.position, self.start_distance, self.end_distance)
         return found + _plane_stations(caps, origin, direction)
 
-    def plane_sides(self, frame, seed) -> 'Sides':
+    def plane_sides(self, frame: '_Frame', seed: 'PolygonRegions') -> 'Sides':
         """Cut exactly: an ellipse (or a strip, for a plane along the axis), then the caps."""
         from .cross_sections import _cylinder_cross_section
         return _cylinder_cross_section(self, frame, seed)
@@ -3908,7 +3906,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         from .edges_on_csg import _loft_sides_are_planar
         return _loft_sides_are_planar(self)
 
-    def plane_sides(self, frame, seed) -> 'Sides':
+    def plane_sides(self, frame: '_Frame', seed: 'PolygonRegions') -> 'Sides':
         from .cross_sections import _CannotCrossSection
         if not self.is_exactly_convex_hull():
             raise _CannotCrossSection("a loft with twisted sides")

@@ -35,7 +35,7 @@ from .cutcsg import (
 from .carriers import Carrier
 
 if TYPE_CHECKING:
-    from .cross_sections import Sides
+    from .cross_sections import PolygonRegions, Sides, _Frame
     from .edges_on_csg import ConvexHull
 
 
@@ -910,11 +910,11 @@ class PathExtrusion(HasFeatures, CutCSG):
             [(float(point[0, 0]), float(point[1, 0])) for point in points],
             self.transform, self.start_distance, self.end_distance))
 
-    def plane_sides(self, frame, seed) -> 'Sides':
+    def plane_sides(self, frame: '_Frame', seed: 'PolygonRegions') -> 'Sides':
         """Return the union of its convex pieces' plane_sides."""
         from .cross_sections import _union
-        front: list = []
-        back: list = []
+        front: 'PolygonRegions' = []
+        back: 'PolygonRegions' = []
         for piece in decompose_path_into_convex_pieces(self.path, tolerance=1e-4):
             convex = ConvexPolygonExtrusion(points=piece, transform=self.transform,
                                             start_distance=self.start_distance, end_distance=self.end_distance)
