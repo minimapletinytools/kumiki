@@ -204,12 +204,13 @@ class FeatureExtents:
 
         Exact first; if that leaves nothing, retried at the edge tolerance (derived) or float noise (declared).
         """
-        assert self.root is not None
+        root = self.root
+        assert root is not None
         parents = [hit.owner for hit in getattr(feature, "parents", ()) if hit is not None] or [owner]
 
         def clipped(tolerance: float) -> Optional[List[Interval]]:
             found = _intervals(located, crop_line_to_crease_segments_on_csg(
-                located, self.root, seed_reach=self.reach, near=self.near, tolerance=tolerance))
+                located, root, seed_reach=self.reach, near=self.near, tolerance=tolerance))
             if found is None:
                 return None
             if declared is not None:

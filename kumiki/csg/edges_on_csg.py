@@ -13,7 +13,9 @@ Faces are cropped by plane in cross_sections.py.
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Callable, List, Optional, Sequence, Tuple, Union
+
+import numpy as np
 
 from ..geometry import (
     Line,
@@ -22,6 +24,10 @@ from ..geometry import (
 )
 from ..rule import V3, Matrix, Numeric, safe_magnitude, scalar
 from .identity_memo import memo_by_identity
+
+if TYPE_CHECKING:
+    from ..rule import Transform
+    from .cutcsg import ConvexPolygonSimpleLoft, CutCSG, Cylinder
 
 
 def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:
@@ -53,7 +59,6 @@ BoundingHalfSpaces = List[Tuple[V3, V3]]
 
 class ConvexHullKind(Enum):
     """Which kind of answer convex_hull gave."""
-
     HALF_SPACES = 0
     EMPTY = 1
     UNKNOWN = 2
@@ -100,7 +105,7 @@ UNKNOWN_HULL = ConvexHull(kind=ConvexHullKind.UNKNOWN)
 
 
 @memo_by_identity
-def convex_hull(csg) -> ConvexHull:
+def convex_hull(csg: 'CutCSG') -> ConvexHull:
     """Return `csg.get_convex_hull()`, cached per node."""
     return csg.get_convex_hull()
 
@@ -110,7 +115,7 @@ def _hull_or_unknown(faces: Optional[BoundingHalfSpaces]) -> ConvexHull:
     return UNKNOWN_HULL if faces is None else ConvexHull.of(faces)
 
 
-def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
+def _loft_half_spaces(csg: 'ConvexPolygonSimpleLoft') -> Optional[BoundingHalfSpaces]:
     """Return the half spaces bounding a loft between two convex profiles, or None if malformed.
 
     Exact when each side is planar; otherwise each side's plane is pushed out to the furthest corner.
@@ -167,7 +172,8 @@ def _cross(a: V3, b: V3) -> V3:
     ])
 
 
-def _extrusion_caps(axis: V3, position: V3, start_distance, end_distance) -> BoundingHalfSpaces:
+def _extrusion_caps(axis: V3, position: V3, start_distance: Optional[Numeric],
+                    end_distance: Optional[Numeric]) -> BoundingHalfSpaces:
     """Return the two end caps of an extrusion as half spaces, skipping an end at infinity."""
     caps: BoundingHalfSpaces = []
     if end_distance is not None:
@@ -179,9 +185,9 @@ def _extrusion_caps(axis: V3, position: V3, start_distance, end_distance) -> Bou
 
 def _extruded_hull_half_spaces(
     points: Sequence[Tuple[float, float]],
-    transform,
-    start_distance,
-    end_distance,
+    transform: 'Transform',
+    start_distance: Optional[Numeric],
+    end_distance: Optional[Numeric],
 ) -> Optional[BoundingHalfSpaces]:
     """Return the half spaces bounding the extrusion of the convex hull of `points`, or None if degenerate."""
     hull = convex_hull_2d(points)
@@ -306,7 +312,7 @@ def _subtracted_spans(keep: Sequence[Span], remove: Sequence[Span]) -> List[Span
 
 
 def _cylinder_spans(
-    csg, line: Line, seed: Span, tolerance: float, removing: bool,
+    csg: 'Cylinder', line: Line, seed: Span, tolerance: float, removing: bool,
 ) -> List[Span]:
     """Return where a line runs inside a cylinder (solved exactly), clipped to `seed`."""
     axis = unit_vector(csg.axis_direction)
@@ -350,7 +356,7 @@ def _cylinder_spans(
     return _spans_within_primitive(caps, line, (low, high), tolerance, removing)
 
 
-def _loft_sides_are_planar(csg) -> bool:
+def _loft_sides_are_planar(csg: 'ConvexPolygonSimpleLoft') -> bool:
     """Return whether every side quad of a loft is planar, so its half spaces describe it exactly."""
     bottom, top = csg.bottom_points, csg.top_points
     if csg.bottom_points_z_pos is None or csg.top_points_z_pos is None:
@@ -395,7 +401,7 @@ _PLANAR_ENOUGH = 1e-9
 
 
 def _spans_on_csg(
-    csg, line: Line, seed: Span, tolerance: float, removing: bool = False,
+    csg: 'CutCSG', line: Line, seed: Span, tolerance: float, removing: bool = False,
     flush_removes: bool = True,
 ) -> Optional[List[Span]]:
     """Return where a line runs inside a CSG tree, as parameter spans, or None if any primitive is UNKNOWN.
@@ -471,7 +477,7 @@ def _spans_on_csg(
 
 def crop_line_to_segments_on_csg(
     line: Line,
-    csg,
+    csg: 'CutCSG',
 
     # TODO this parameter is questionable, just use NaN for bounds?
     seed_reach: Numeric,
@@ -494,7 +500,7 @@ def crop_line_to_segments_on_csg(
 
 def crop_line_to_interior_segments_on_csg(
     line: Line,
-    csg,
+    csg: 'CutCSG',
     seed_reach: Numeric,
     near: Optional[V3] = None,
 ) -> Optional[List[LineSegment]]:
@@ -505,7 +511,7 @@ def crop_line_to_interior_segments_on_csg(
 
 def crop_line_to_boundary_segments_on_csg(
     line: Line,
-    csg,
+    csg: 'CutCSG',
     seed_reach: Numeric,
     near: Optional[V3] = None,
     tolerance: float = 0.0,
@@ -518,7 +524,7 @@ def crop_line_to_boundary_segments_on_csg(
     return None if spans is None else _segments(line, spans)
 
 
-def _boundary_spans(line: Line, csg, seed: Span, tolerance: float) -> Optional[List[Span]]:
+def _boundary_spans(line: Line, csg: 'CutCSG', seed: Span, tolerance: float) -> Optional[List[Span]]:
     closed = _closed_spans(line, csg, seed, tolerance)
     if closed is None:
         return None
@@ -530,7 +536,7 @@ def _boundary_spans(line: Line, csg, seed: Span, tolerance: float) -> Optional[L
 
 def crop_line_to_crease_segments_on_csg(
     line: Line,
-    csg,
+    csg: 'CutCSG',
     seed_reach: Numeric,
     near: Optional[V3] = None,
     tolerance: float = 0.0,
@@ -547,7 +553,7 @@ def crop_line_to_crease_segments_on_csg(
     return _segments(line, _crease_spans(line, csg, spans, seed, tolerance))
 
 
-def is_crease_at(line: Line, csg, point: V3, tolerance: float = 0.0) -> bool:
+def is_crease_at(line: Line, csg: 'CutCSG', point: V3, tolerance: float = 0.0) -> bool:
     """Return whether the surface of `csg` creases along `line` at `point`. True when unsure."""
     direction = unit_vector(line.direction)
     station = float(((point - line.point).T * direction)[0, 0])
@@ -591,7 +597,7 @@ def _angles_less(one: AngleSpans, other: AngleSpans) -> AngleSpans:
     return _angles_intersection(one, rest)
 
 
-def _half_turn(normal, basis) -> AngleSpans:
+def _half_turn(normal: np.ndarray, basis: Tuple[np.ndarray, np.ndarray]) -> AngleSpans:
     """Return the angles around the line on a plane's solid side: within a quarter turn of -normal."""
     u, v = basis
     centre = math.atan2(-float(normal @ v), -float(normal @ u)) % _TAU
@@ -603,10 +609,9 @@ def _half_turn(normal, basis) -> AngleSpans:
     return [(low, high)]
 
 
-def _plane_angles(faces, at, direction, basis, tolerance) -> AngleSpans:
+def _plane_angles(faces: BoundingHalfSpaces, at: np.ndarray, direction: np.ndarray,
+                  basis: Tuple[np.ndarray, np.ndarray], tolerance: float) -> AngleSpans:
     """Return the angles around the line occupied by a convex solid given as half spaces."""
-    import numpy as np
-
     angles: AngleSpans = [(0.0, _TAU)]
     for normal, point in faces:
         n = np.array([float(normal[i, 0]) for i in range(3)])
@@ -623,7 +628,8 @@ def _plane_angles(faces, at, direction, basis, tolerance) -> AngleSpans:
     return angles
 
 
-def _tree_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
+def _tree_angles(csg: 'CutCSG', at: np.ndarray, direction: np.ndarray, basis: Tuple[np.ndarray, np.ndarray],
+                 tolerance: float) -> Optional[AngleSpans]:
     from .cutcsg import Difference, Intersection, SolidUnion
 
     if isinstance(csg, SolidUnion):
@@ -651,10 +657,8 @@ def _tree_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
     return csg.angles_around_line(at, direction, basis, tolerance)
 
 
-def _directions_at(csg, line: Line, station: float, tolerance: float):
+def _directions_at(csg: 'CutCSG', line: Line, station: float, tolerance: float) -> Union[str, AngleSpans, None]:
     """Return _FLAT if the solid lies in one flat face at `station` along `line`, else its angles (None if unsure)."""
-    import numpy as np
-
     direction = np.array([float(v) for v in unit_vector(line.direction)])
     at = np.array([float(line.point[i, 0]) for i in range(3)]) + direction * station
     seed = np.eye(3)[int(np.argmin(np.abs(direction)))]
@@ -672,10 +676,8 @@ def _directions_at(csg, line: Line, station: float, tolerance: float):
     return angles
 
 
-def _plane_stations(faces, origin, direction) -> List[float]:
+def _plane_stations(faces: BoundingHalfSpaces, origin: np.ndarray, direction: np.ndarray) -> List[float]:
     """Return where the line (numpy `origin`, unit `direction`) crosses each half space's plane."""
-    import numpy as np
-
     found = []
     for normal, point in faces:
         n = np.array([float(normal[i, 0]) for i in range(3)])
@@ -685,9 +687,8 @@ def _plane_stations(faces, origin, direction) -> List[float]:
     return found
 
 
-def _stations(csg, line: Line, seed: Span) -> List[float]:
+def _stations(csg: 'CutCSG', line: Line, seed: Span) -> List[float]:
     """Return where along the line, within `seed`, it crosses a primitive's surface (line_crossings)."""
-    import numpy as np
     from .cutcsg import csg_children
 
     direction = np.array([float(v) for v in unit_vector(line.direction)])
@@ -705,7 +706,7 @@ def _stations(csg, line: Line, seed: Span) -> List[float]:
     return sorted(station for station in found if seed[0] < station < seed[1])
 
 
-def _crease_spans(line: Line, csg, spans: Sequence[Span], seed: Span, tolerance: float) -> List[Span]:
+def _crease_spans(line: Line, csg: 'CutCSG', spans: Sequence[Span], seed: Span, tolerance: float) -> List[Span]:
     """Return `spans` less where the surface is one flat face across the line."""
     stations = _stations(csg, line, seed)
     kept: List[Span] = []
@@ -741,7 +742,7 @@ def _segments(line: Line, spans: Sequence[Span]) -> List[LineSegment]:
 
 
 def _closed_spans(
-    line: Line, csg, seed: Span, tolerance: float,
+    line: Line, csg: 'CutCSG', seed: Span, tolerance: float,
 ) -> Optional[List[Span]]:
     """Return where a line lies on a solid, surface included, or None.
 
@@ -768,7 +769,7 @@ def _closed_spans(
 
 
 def _interior_spans(
-    line: Line, csg, seed: Span, tolerance: float,
+    line: Line, csg: 'CutCSG', seed: Span, tolerance: float,
 ) -> Optional[List[Span]]:
     """Return where a line is strictly inside a solid: `_spans_on_csg` with `removing` inverted."""
     return _spans_on_csg(csg, line, seed, tolerance, removing=True)
