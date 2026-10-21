@@ -318,13 +318,6 @@ class TestPathExtrusionLocate:
         ])
         assert SimplePathExtrusionFeature("wall", key=FlatSide(0)).locate_simple_unbounded(self._extrusion(circle)) is None
 
-    def test_extent_anchors_on_the_face(self):
-        extrusion = self._extrusion(self._square())
-        extent = SimplePathExtrusionFeature("east", key=FlatSide(1)).get_extent(extrusion)
-        assert extent is not None
-        assert float(extent.anchor[0]) == pytest.approx(0.1)
-        assert float(extent.anchor[2]) == pytest.approx(0.05)
-
 
 class TestAPathFeatureSaysWhetherItIsCurved:
     """A side is curved exactly when the segment under it is not planar.

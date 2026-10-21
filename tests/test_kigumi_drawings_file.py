@@ -821,6 +821,7 @@ class TestResolvingAnchors:
         # mortise floor it seats on genuinely do land in the same place, so two
         # features agreeing proves nothing either way.
         from kumiki.csg.cutcsg import csg_children
+        from kumiki.csg.feature_extent import FeatureExtents
 
         def local_anchor(timber_path, feature_name):
             cut = next(c for c in measured.cut_timbers if c.timber.ticket.path == timber_path)
@@ -829,9 +830,10 @@ class TestResolvingAnchors:
             def walk(csg):
                 for feature in csg.get_declared_features():
                     if feature.name == feature_name:
-                        extent = feature.get_extent(csg)
-                        if extent is not None:
-                            found.append([float(extent.anchor[i, 0]) for i in range(3)])
+                        extent = FeatureExtents(None, cut.timber).of(feature, csg)
+                        anchor = None if extent is None else extent.anchor()
+                        if anchor is not None:
+                            found.append([float(v) for v in anchor])
                 for child in csg_children(csg):
                     walk(child)
 

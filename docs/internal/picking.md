@@ -141,7 +141,9 @@ When several features tie on depth, each rule decides only where the ones before
 
 ## Lighting the pick: `_pick_highlights`
 
-- An edge: its line, cut to where it survives on the timber (`edge_highlight_segments`).
+- An edge or axis: its `FeatureExtent` outline (`edge_highlight_segments`). A real edge is cut to
+  where the surface creases along it, inside its parent faces' solids and its declared ends; an
+  axis in a void keeps its declared ends.
 - A non-real plane: its outline on the timber (`non_real_plane_outline`).
 - A face: the mesh triangles on it (`extract_highlight_mesh`):
   - skip triangles outside the node's box;

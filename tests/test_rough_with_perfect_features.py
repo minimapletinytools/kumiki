@@ -80,14 +80,19 @@ class TestWhereTheyAre:
         assert not feature.test_point_unbounded(carrying, create_v3(scalar(3), scalar(1), scalar(50)))
 
     def test_its_extent_spans_the_rough_body(self):
-        carrying = _oversawn().get_extended_rough_csg_with_perfect_features_local()
-        region = _features(carrying)["ptw.centerplane_front_back"].get_extent(carrying).region
+        from kumiki.csg.feature_extent import FeatureExtents
+
+        timber = _oversawn()
+        carrying = timber.get_extended_rough_csg_with_perfect_features_local()
+        extent = FeatureExtents(carrying, timber).of(_features(carrying)["ptw.centerplane_front_back"], carrying)
+        assert extent is not None
+        corners = [corner for polygon in extent.polygons() for corner in polygon]
 
         # y = 0, across the rough width (-2..3) and the length.
-        xs = sorted({float(corner[0]) for corner in region.boundary})
-        assert {float(corner[1]) for corner in region.boundary} == {0.0}
-        assert xs == [-2.0, 3.0]
-        assert sorted({float(corner[2]) for corner in region.boundary}) == [0.0, 100.0]
+        span = lambda axis: (round(min(c[axis] for c in corners), 9), round(max(c[axis] for c in corners), 9))
+        assert span(1) == (0.0, 0.0)
+        assert span(0) == (-2.0, 3.0)
+        assert span(2) == (0.0, 100.0)
 
 
 class TestWhatTheyAre:

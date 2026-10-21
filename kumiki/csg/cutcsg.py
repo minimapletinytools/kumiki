@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from enum import Enum, Flag
 import warnings
 from ..rule import *
-from ..geometry import (ConvexPlanarRegion, Line, Plane, Point, intersect_line_plane, intersect_planes,
+from ..geometry import (Line, Plane, Point, intersect_line_plane, intersect_planes,
                        lines_are_coincident, planes_are_coincident, planes_are_parallel,
                        points_are_coincident)
 from .identity_memo import memo_by_identity
@@ -597,28 +597,6 @@ def _drop_real_hits_if_not_on_boundary(
     return [hit for hit in hits if not hit.feature.real]
 
 
-def _face_region(normal: V3, corners: Sequence[V3]) -> ConvexPlanarRegion:
-    """Return a flat face's plane and its corners in order."""
-    return ConvexPlanarRegion(plane=Plane(normal=normal, point=corners[0]), boundary=tuple(corners))
-
-
-def _profile_at(owner: 'CutCSG', profile: Sequence[V2], z: Numeric) -> List[V3]:
-    """Return a 2D profile's points at height `z` along a shape's axis, in the owner's space."""
-    orientation = owner.transform.orientation.matrix  # type: ignore[attr-defined]
-    return [owner.transform.position + safe_transform_vector(orientation, Matrix([p[0], p[1], z]))  # type: ignore[attr-defined]
-            for p in profile]
-
-
-def _side_region(owner: 'CutCSG', normal: V3, start: V2, end: V2,
-                 low: Optional[Numeric], high: Optional[Numeric]) -> Optional[ConvexPlanarRegion]:
-    """Return the outline of an extruded side from `start` to `end`, or None if either is infinite."""
-    if low is None or high is None:
-        return None
-    bottom = _profile_at(owner, [start, end], low)
-    top = _profile_at(owner, [end, start], high)
-    return _face_region(normal, bottom + top)
-
-
 def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeric:
     """Return the midpoint of an extent along an axis, using the finite end if one is infinite."""
     if start is None:
@@ -628,32 +606,8 @@ def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeri
     return (start + end) / scalar(2)
 
 
-# What locate() can hand back. Unbounded on purpose: measurement between two
-# features works on infinite lines and planes, and bounds travel separately in
-# CSGFeatureExtent.
+# What locate_simple_unbounded() returns. Bounds are in feature_extent.FeatureExtents.
 LocatedFeatureGeometry = Union[Point, Line, Plane]
-
-
-# NOTE this class is a little weird but it's fine for now I guess, maybe think of less weird way to do this
-# NOTE this class is used for 2 things
-# 1. as a simple broad phase test on individual nodes
-# 2. to determine where the measurement anchors for 
-# TODO consider splitting this class into different ones for each feature type
-# TODO consider getting rid of this becasue:
-# 1. I don't think we cache extents + and there is no KD/oct tree so this is not really doing much for perf
-# 2. measurement anchor position should have its own function
-@dataclass(frozen=True)
-class CSGFeatureExtent:
-    """Roughly where a feature is, for placing annotations.
-
-    Args:
-        anchor: a representative point (a face's centre, an edge's midpoint, the point).
-        ends: an edge's two endpoints.
-        region: a flat face's plane and corners in order; None if unbounded, curved or not convex.
-    """
-    anchor: V3
-    ends: Optional[Tuple[V3, V3]] = None
-    region: Optional[ConvexPlanarRegion] = None
 
 
 @dataclass(frozen=True)
@@ -681,8 +635,8 @@ class CSGFeature(ABC):
         """
         return None
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Return roughly where the feature is, for annotations, or None if unbounded or not supported."""
+    def declared_ends(self, owner: 'CutCSG') -> Optional[Tuple[V3, V3]]:
+        """Return a line feature's own two ends in `owner`'s space, or None if it has none."""
         return None
 
     @property
@@ -854,11 +808,10 @@ class DerivedEdgeFeature(EdgeFeature):
         return intersect_planes(self.a.feature.locate_simple_unbounded(self.a.owner),
                                 self.b.feature.locate_simple_unbounded(self.b.owner))
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Return the edge's extent, with ends bounded by its parent faces where they can.
+    def declared_ends(self, owner: 'CutCSG') -> Optional[Tuple[V3, V3]]:
+        """Return the edge's ends as bounded by its parent faces' corners, or None if they can't bound it.
 
         Exact along a face's own axes (every arris of a box); otherwise an over-estimate.
-        Without ends, `anchor` is the infinite line's point nearest the origin.
 
         TODO make it exact for oblique lines
         """
@@ -866,31 +819,19 @@ class DerivedEdgeFeature(EdgeFeature):
         if not isinstance(line, Line):
             return None
         start, along = line.point, line.direction
-
-        def reach_along_the_line(corners: Sequence[V3]) -> Tuple[float, float]:
-            """How far along the line those corners reach, either way."""
-            stations = [float(((corner - start).T * along)[0, 0]) for corner in corners]
-            return (min(stations), max(stations))
-
-        def at(station: float) -> V3:
-            return start + along * scalar(repr(station))
-
         bounds = []
         for hit in self.parents:
-            # Nothing for a face that cannot say where its corners are: one
-            # running to infinity, or a shape that does not work them out yet.
             corners = getattr(hit.feature, "corners", None)
             found = corners(hit.owner) if corners is not None else None
             if found:
-                bounds.append(reach_along_the_line(found))
-
-        if bounds:
-            low = max(span[0] for span in bounds)
-            high = min(span[1] for span in bounds)
-            if low < high:
-                return CSGFeatureExtent(
-                    anchor=at((low + high) / 2), ends=(at(low), at(high)))
-        return CSGFeatureExtent(anchor=start)
+                stations = [float(((corner - start).T * along)[0, 0]) for corner in found]
+                bounds.append((min(stations), max(stations)))
+        if not bounds:
+            return None
+        low, high = max(span[0] for span in bounds), min(span[1] for span in bounds)
+        if low >= high:
+            return None
+        return start + along * scalar(repr(low)), start + along * scalar(repr(high))
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         return _meet_of_parents(self.a, self.b)
@@ -909,11 +850,9 @@ class DerivedEdgeFeature(EdgeFeature):
             return None
 
         # A face that isn't there (an infinite prism's cap) forms no edge.
-        for hit in (a, b):
-            if (hit.feature.locate_simple_unbounded(hit.owner) is None
-                    and hit.feature.get_extent(hit.owner) is None):
-                return None
-            
+        if any(hit.feature.locate_simple_unbounded(hit.owner) is None for hit in (a, b)):
+            return None
+
         if planes_are_parallel(face_a.feature.locate_simple_unbounded(face_a.owner),
                                face_b.feature.locate_simple_unbounded(face_b.owner)):
             return None
@@ -976,11 +915,6 @@ class DerivedPointFeature(PointFeature):
         return intersect_line_plane(self.edge.feature.locate_simple_unbounded(self.edge.owner),
                                     self.face.feature.locate_simple_unbounded(self.face.owner))
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        located = self.locate_simple_unbounded(owner)
-        if not isinstance(located, Point):
-            return None
-        return CSGFeatureExtent(anchor=located.position)
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         return _meet_of_parents(self.edge, self.face)
@@ -999,10 +933,8 @@ class DerivedPointFeature(PointFeature):
         if not feature_groups_intersect(a.feature.group, b.feature.group):
             return None
 
-        for hit in (a, b):
-            if (hit.feature.locate_simple_unbounded(hit.owner) is None
-                    and hit.feature.get_extent(hit.owner) is None):
-                return None
+        if any(hit.feature.locate_simple_unbounded(hit.owner) is None for hit in (a, b)):
+            return None
 
         if intersect_line_plane(edge.feature.locate_simple_unbounded(edge.owner),
                                 face.feature.locate_simple_unbounded(face.owner)) is None:
@@ -1045,9 +977,6 @@ class HalfSpaceFeature(FaceFeature):
             return None
         closest_to_origin = owner.normal * (owner.offset / normal_length_sq)
         return Plane(normal=-owner.normal, point=closest_to_origin)
-
-    # get_extent stays None: a half-space's plane is unbounded, so there is no
-    # box to give and no midpoint that means anything.
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         return owner.is_point_on_boundary(point, eps=test_tolerance)
@@ -1127,16 +1056,6 @@ class SimpleRectangularPrismFeature(FaceFeature):
             for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1))
         )
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        if not isinstance(owner, RectangularPrism):
-            return None
-        frame = self._face_frame(owner)
-        if frame is None:
-            return None
-        normal, centre = frame
-        corners = self.corners(owner)
-        # Unbounded in one direction, so there is no outline to give.
-        return CSGFeatureExtent(anchor=centre, region=None if corners is None else _face_region(normal, corners))
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, RectangularPrism):
@@ -1159,23 +1078,6 @@ class SimpleRectangularPrismFeature(FaceFeature):
         return False
 
 
-def _plane_extent(owner: 'CutCSG', plane: Optional[Plane]) -> Optional[CSGFeatureExtent]:
-    """Return where `plane` crosses the prism `owner`, for a plane running along its length."""
-    if plane is None or not isinstance(owner, RectangularPrism):
-        return None
-    width_dir, height_dir, length_dir = owner._local_axes()
-    middle = owner.transform.position + length_dir * _finite_midpoint(owner.start_distance, owner.end_distance)
-    centre = middle - plane.normal * safe_dot_product(middle - plane.point, plane.normal)
-    if owner.start_distance is None or owner.end_distance is None:
-        return CSGFeatureExtent(anchor=centre)
-    across = safe_normalize_vector(cross_product(plane.normal, length_dir))
-    half_across = (Abs(safe_dot_product(across, width_dir)) * owner.size[0]
-                   + Abs(safe_dot_product(across, height_dir)) * owner.size[1]) / 2
-    half_length = (owner.end_distance - owner.start_distance) / 2
-    corners = tuple(centre + across * (half_across * scalar(a)) + length_dir * (half_length * scalar(b))
-                    for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1)))
-    return CSGFeatureExtent(anchor=centre, region=_face_region(plane.normal, corners))
-
 
 @dataclass(frozen=True)
 class PlaneFeature(FaceFeature):
@@ -1196,8 +1098,6 @@ class PlaneFeature(FaceFeature):
         return Plane(normal=safe_transform_vector(transform.orientation.matrix, normal),
                      point=transform.local_to_global(point))
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        return _plane_extent(owner, self.locate_simple_unbounded(owner))
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         extras = getattr(owner, "extra_features", ())
@@ -1237,8 +1137,6 @@ class MidplaneFeature(FaceFeature):
             return None
         return Plane(normal=first.normal, point=(first.point + second.point) / 2)
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        return _plane_extent(owner, self.locate_simple_unbounded(owner))
 
     def solve_recipe(self, owner: 'CutCSG') -> Optional[Recipe]:
         sides = self._sides(owner)
@@ -1334,20 +1232,14 @@ class SimpleRectangularPrismEdgeFeature(EdgeFeature):
         first, second = self._sides()
         return intersect_planes(_as_plane(first.locate_simple_unbounded(owner)), _as_plane(second.locate_simple_unbounded(owner)))
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        line = self.locate_simple_unbounded(owner)
-        if not isinstance(line, Line):
-            return None
+    def declared_ends(self, owner: 'CutCSG') -> Optional[Tuple[V3, V3]]:
+        """Return the two prism corners the arris runs between, or None if the prism is unbounded there."""
         first, second = self._sides()
         corners = first.corners(owner)
-        if corners is not None:
-            shared = [corner for corner in corners
-                      if second.test_point_unbounded(owner, corner)]
-            if len(shared) == 2:
-                return CSGFeatureExtent(
-                    anchor=(shared[0] + shared[1]) / scalar(2),
-                    ends=(shared[0], shared[1]))
-        return CSGFeatureExtent(anchor=line.point)
+        if corners is None:
+            return None
+        shared = [corner for corner in corners if second.test_point_unbounded(owner, corner)]
+        return (shared[0], shared[1]) if len(shared) == 2 else None
 
 
 def _canonical_ordering_corner_faces(
@@ -1494,9 +1386,6 @@ class SimpleRectangularPrismVertexFeature(PointFeature):
         at = self._position(owner)
         return False if at is None else _point_is_near(point, at, test_tolerance)
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        at = self._position(owner)
-        return None if at is None else CSGFeatureExtent(anchor=at)
 
 
 @dataclass(frozen=True)
@@ -1528,19 +1417,14 @@ class CylinderAxisFeature(EdgeFeature):
         return Line(direction=safe_normalize_vector(cylinder.axis_direction),
                     point=cylinder.position)
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+    def declared_ends(self, owner: 'CutCSG') -> Optional[Tuple[V3, V3]]:
+        """Return the axis's ends at the cylinder's caps, or None if either is infinite."""
         cylinder = self._cylinder(owner)
-        if cylinder is None:
+        if cylinder is None or cylinder.start_distance is None or cylinder.end_distance is None:
             return None
         axis = safe_normalize_vector(cylinder.axis_direction)
-        start, end = cylinder.start_distance, cylinder.end_distance
-        anchor = cylinder.position + axis * _finite_midpoint(start, end)
-        if start is None or end is None:
-            return CSGFeatureExtent(anchor=anchor)
-        return CSGFeatureExtent(
-            anchor=anchor,
-            ends=(cylinder.position + axis * start, cylinder.position + axis * end),
-        )
+        return (cylinder.position + axis * cylinder.start_distance,
+                cylinder.position + axis * cylinder.end_distance)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         """Return whether `point` is on the axis line (ends not checked)."""
@@ -1572,13 +1456,6 @@ class SimpleCylinderCapFeature(FaceFeature):
         sign = scalar(1) if self.part is CylinderPart.TOP else scalar(-1)
         return Plane(normal=axis * sign, point=owner.position + axis * distance)
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        if not isinstance(owner, Cylinder):
-            return None
-        distance = self._distance(owner)
-        if distance is None:
-            return None
-        return CSGFeatureExtent(anchor=owner.position + safe_normalize_vector(owner.axis_direction) * distance)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, Cylinder):
@@ -1595,11 +1472,6 @@ class SimpleCylinderBarrelFeature(CurvedFaceFeature):
     def feature_key(self) -> Optional[FeatureKey]:
         return (FeatureCategory.SIDE, 0)
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        if not isinstance(owner, Cylinder):
-            return None
-        mid = _finite_midpoint(owner.start_distance, owner.end_distance)
-        return CSGFeatureExtent(anchor=owner.position + safe_normalize_vector(owner.axis_direction) * mid)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, Cylinder):
@@ -1660,22 +1532,6 @@ class SimpleConvexPolygonExtrusionFeature(FaceFeature):
         normal, centre = frame
         return Plane(normal=normal, point=centre)
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        if not isinstance(owner, ConvexPolygonExtrusion):
-            return None
-        frame = self._frame(owner)
-        if frame is None:
-            return None
-        normal, centre = frame
-        points = owner.points
-        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
-            distance = owner.end_distance if self.key == ExtrusionCap.TOP else owner.start_distance
-            assert distance is not None  # _frame gave a plane, so this end is finite
-            region = _face_region(normal, _profile_at(owner, points, distance))
-        else:
-            region = _side_region(owner, normal, points[self.key], points[(self.key + 1) % len(points)],
-                                  owner.start_distance, owner.end_distance)
-        return CSGFeatureExtent(anchor=centre, region=region)
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonExtrusion):
@@ -1734,40 +1590,6 @@ class SimpleLoftFeature(FaceFeature):
             return None
         return Plane(normal=safe_normalize_vector(normal), point=corners[0])
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        if not isinstance(owner, ConvexPolygonSimpleLoft):
-            return None
-        orientation = owner.transform.orientation.matrix
-        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
-            is_top = self.key == ExtrusionCap.TOP
-            profile = owner.top_points if is_top else owner.bottom_points
-            distance = owner.top_points_z_pos if is_top else owner.bottom_points_z_pos
-        else:
-            profile = [(b + t) / scalar(2) for b, t in zip(owner.bottom_points, owner.top_points)]
-            distance = _finite_midpoint(owner.bottom_points_z_pos, owner.top_points_z_pos)
-        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
-            centroid_2d = sum(profile[1:], profile[0]) / scalar(len(profile))
-        else:
-            p1 = profile[self.key]
-            p2 = profile[(self.key + 1) % len(profile)]
-            centroid_2d = (p1 + p2) / scalar(2)
-        local = Matrix([centroid_2d[0], centroid_2d[1], distance])
-        plane = self.locate_simple_unbounded(owner)
-        if plane is None:
-            region = None
-        elif self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
-            region = _face_region(plane.normal, _profile_at(owner, profile, distance))
-        else:
-            following = (self.key + 1) % len(owner.bottom_points)
-            region = _face_region(plane.normal, [
-                *_profile_at(owner, [owner.bottom_points[self.key], owner.bottom_points[following]],
-                             owner.bottom_points_z_pos),
-                *_profile_at(owner, [owner.top_points[following], owner.top_points[self.key]], owner.top_points_z_pos),
-            ])
-        return CSGFeatureExtent(
-            anchor=owner.transform.position + safe_transform_vector(orientation, local),
-            region=region,
-        )
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
@@ -1854,14 +1676,10 @@ class ConvexProfileEdgeFeature(EdgeFeature):
             point=owner.transform.position + safe_transform_vector(
                 orientation, Matrix([vertex[0], vertex[1], scalar(0)])))
 
-    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        line = self.locate_simple_unbounded(owner)
-        if line is None:
-            return None
+    def declared_ends(self, owner: 'CutCSG') -> Optional[Tuple[V3, V3]]:
+        """Return the edge's two ends, or None if either is at an infinite end."""
         start, end = self._ends(owner)
-        if start is not None and end is not None:
-            return CSGFeatureExtent(anchor=(start + end) / scalar(2), ends=(start, end))
-        return CSGFeatureExtent(anchor=line.point)
+        return None if start is None or end is None else (start, end)
 
 
 def convex_profile_edge_features(sides: int) -> Dict[FeatureKey, CSGFeature]:
@@ -2044,9 +1862,6 @@ class OwnedFeatureHit(Generic[F_co]):
 
     def locate_simple_unbounded(self) -> Optional['LocatedFeatureGeometry']:
         return self.feature.locate_simple_unbounded(self.owner)
-
-    def get_extent(self) -> Optional['CSGFeatureExtent']:
-        return self.feature.get_extent(self.owner)
 
 
 def hit_of_kind(hit: OwnedFeatureHit[CSGFeature], kind: Type[K]) -> Optional[OwnedFeatureHit[K]]:
