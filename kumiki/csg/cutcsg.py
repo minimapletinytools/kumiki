@@ -8,8 +8,6 @@ Values are plain floats compared through the safe_* helpers (see rule.py).
   FeatureTestTolerances instead: slack for mesh-vs-analytic error and click imprecision.
 """
 
-from contextlib import contextmanager
-from contextvars import ContextVar
 import functools
 import math
 import re
@@ -586,6 +584,7 @@ def _drop_real_hits_if_not_on_boundary(
     hits: List['OwnedFeatureHit'],
     point: V3,
     tolerances: 'FeatureTestTolerances',
+    tests: Optional['PointTests'] = None,
 ) -> List['OwnedFeatureHit']:
     """Return `hits`, minus the real ones if `point` isn't on the boundary of `csg`."""
     if not hits:
@@ -596,7 +595,7 @@ def _drop_real_hits_if_not_on_boundary(
         return hits
 
     # if the tested point is on the boundary, then all feature hits are OK
-    if node.is_point_on_boundary(point, eps=tolerances.face):
+    if _on_boundary(node, point, tolerances.face, tests):
         return hits
 
     # if the tested point is not on the boundary, return only the non real features
@@ -1904,66 +1903,55 @@ class CutCSGLabel:
         return f"CutCSGLabel({self.name!r})" if self.name is not None else "NoLabel"
 
 
-# =================================================================================================
-# TODO GLOBAL STATE -- REMOVE. A stopgap for pick speed, not a design.
-#
-# point_tests_memo hides a memo in a ContextVar, and every CutCSG subclass's contains_point,
-# is_point_on_boundary and get_outward_normal is wrapped (__init_subclass__) to read it. That is a
-# global in all but name: a point test answers differently depending on what block it runs inside,
-# and nothing in its signature says so.
-#
-# Why it exists: collect_feature_hits gates each level of a tree on is_point_on_boundary, and each
-# level's test asks every node below it again, so a walk asks each node once per ancestor. Inside
-# a pick, the memo makes that once per node (cute frame top-view picks 15 -> 5 ms).
-#
-# The refactor: pass a context object through the point tests and the feature walks
-# (find_all_features, collect_feature_hits, SolidsAtPoint, the Difference / SolidUnion tests),
-# owned by whoever asks -- a pick, a generator run -- and holding this memo. Then drop the
-# ContextVar, the wrapping in __init_subclass__ and point_tests_memo.
-# =================================================================================================
-_POINT_TESTS = ("contains_point", "is_point_on_boundary", "get_outward_normal")
-_point_tests_memo: ContextVar[Optional[Dict[Tuple, Tuple['CutCSG', object]]]] = ContextVar(
-    "_point_tests_memo", default=None)
+class PointTests:
+    """Point tests for one query (a pick, a find_all_features call), each worked out once per node,
+    point and eps.
 
+    Make one per query and pass it down: compound nodes ask their children through it, so a tree walk
+    that tests every level asks each node once rather than once per ancestor.
+    """
 
-@contextmanager
-def point_tests_memo() -> Iterator[None]:
-    """Context manager caching point tests (_POINT_TESTS) until the block ends."""
-    if _point_tests_memo.get() is not None:
-        yield
-        return
-    token = _point_tests_memo.set({})
-    try:
-        yield
-    finally:
-        _point_tests_memo.reset(token)
+    def __init__(self) -> None:
+        self._memo: Dict[Tuple, Tuple['CutCSG', object]] = {}
 
-
-def _memoized_point_test(test: Callable) -> Callable:
-    @functools.wraps(test)
-    def memoized(self: 'CutCSG', point: V3, eps: Optional[Numeric] = None):
-        memo = _point_tests_memo.get()
-        if memo is None:
-            return test(self, point, eps)
-        key = (test, id(self), float(point[0]), float(point[1]), float(point[2]), eps)
-        kept = memo.get(key)
-        if kept is None or kept[0] is not self:
-            kept = (self, test(self, point, eps))
-            memo[key] = kept
+    def _ask(self, test: str, csg: 'CutCSG', point: V3, eps: Optional[Numeric]):
+        key = (test, id(csg), float(point[0]), float(point[1]), float(point[2]), eps)
+        kept = self._memo.get(key)
+        if kept is None or kept[0] is not csg:
+            kept = (csg, getattr(csg, test)(point, eps=eps, tests=self))
+            self._memo[key] = kept
         return kept[1]
-    return memoized
+
+    def contains(self, csg: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        """Return `csg.contains_point(point, eps)`, cached."""
+        return cast(bool, self._ask("contains_point", csg, point, eps))
+
+    def on_boundary(self, csg: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        """Return `csg.is_point_on_boundary(point, eps)`, cached."""
+        return cast(bool, self._ask("is_point_on_boundary", csg, point, eps))
+
+    def outward_normal(self, csg: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+        """Return `csg.get_outward_normal(point, eps)`, cached."""
+        return cast(Optional[Direction3D], self._ask("get_outward_normal", csg, point, eps))
+
+
+def _contains(csg: 'CutCSG', point: V3, eps: Optional[Numeric], tests: Optional[PointTests]) -> bool:
+    return csg.contains_point(point, eps=eps) if tests is None else tests.contains(csg, point, eps)
+
+
+def _on_boundary(csg: 'CutCSG', point: V3, eps: Optional[Numeric], tests: Optional[PointTests]) -> bool:
+    return csg.is_point_on_boundary(point, eps=eps) if tests is None else tests.on_boundary(csg, point, eps)
+
+
+def _outward_normal(csg: 'CutCSG', point: V3, eps: Optional[Numeric],
+                    tests: Optional[PointTests]) -> Optional[Direction3D]:
+    return csg.get_outward_normal(point, eps=eps) if tests is None else tests.outward_normal(csg, point, eps)
 
 
 @dataclass(frozen=True)
 class CutCSG(ABC):
     """Base class of CSG nodes."""
     label: CutCSGLabel = field(default_factory=CutCSGLabel.NoLabel, kw_only=True)
-
-    def __init_subclass__(cls, **kwargs) -> None:
-        super().__init_subclass__(**kwargs)
-        for name in _POINT_TESTS:
-            if name in cls.__dict__:
-                setattr(cls, name, _memoized_point_test(cls.__dict__[name]))
 
     @abstractmethod
     def __repr__(self) -> str:
@@ -1994,10 +1982,12 @@ class CutCSG(ABC):
         self,
         point: V3,
         tolerances: FeatureTestTolerances,
+        tests: Optional['PointTests'] = None,
     ) -> List['OwnedFeatureHit']:
         """Return every declared feature in this subtree that `point` is on, each at its type's tolerance.
 
-        Real features also require `point` on this node's boundary; non-real ones don't.
+        Real features also require `point` on this node's boundary; non-real ones don't. `tests` caches
+        the point tests across the walk.
         """
         hits: List['OwnedFeatureHit'] = [
             OwnedFeatureHit(feature=feature, owner=self)
@@ -2006,8 +1996,8 @@ class CutCSG(ABC):
                 self, point, tolerances.for_type(feature.feature_type()))
         ]
         for child in csg_children(self):
-            hits.extend(child.collect_feature_hits(point, tolerances))
-        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances)
+            hits.extend(child.collect_feature_hits(point, tolerances, tests))
+        return _drop_real_hits_if_not_on_boundary(self, hits, point, tolerances, tests)
 
     # so basically collect_feature_hits + derived features
     # TODO rename this to be more descriptive
@@ -2015,22 +2005,18 @@ class CutCSG(ABC):
         self,
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
+        tests: Optional['PointTests'] = None,
     ) -> List['OwnedFeatureHit']:
         """Return every feature at `point`, best first: declared ones in this subtree plus derived edges
         and points.
 
         Faces are paired into edges at the EDGE tolerance, and declared edges crossed with faces at the
         POINT tolerance, so edges and points can be picked from further away than their faces. Derived
-        duplicates are dropped at the end.
+        duplicates are dropped at the end. `tests` caches point tests; one is made if not given.
         """
-        with point_tests_memo():
-            return self._find_all_features(point, test_tolerances)
-
-    def _find_all_features(
-        self, point: V3, test_tolerances: Optional[FeatureTestTolerances],
-    ) -> List['OwnedFeatureHit']:
+        tests = tests if tests is not None else PointTests()
         tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
-        hits = self.collect_feature_hits(point, tolerances)
+        hits = self.collect_feature_hits(point, tolerances, tests)
 
         def of_type(gathered, feature_type):
             return [hit for hit in gathered if hit.feature.feature_type() == feature_type]
@@ -2040,7 +2026,7 @@ class CutCSG(ABC):
         # TODO two walks of the tree rather than one, because the gather above also applies the boundary
         # gate at `tolerances.face`. Separating "near the feature" from "on the boundary" would allow one walk.
         candidates = self.collect_feature_hits(
-            point, FeatureTestTolerances.uniform(tolerances.point))
+            point, FeatureTestTolerances.uniform(tolerances.point), tests)
 
         # NOTE for now we don't allow derived features to produce more derived features
         derived_edges = _within_tolerance(
@@ -2070,26 +2056,26 @@ class CutCSG(ABC):
 
 
     @abstractmethod
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is inside or on the boundary."""
         pass
 
     @abstractmethod
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is on the boundary."""
         pass
     
     @abstractmethod
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         """Return the outward normal at boundary point `point`, or None. Undefined off the boundary."""
         pass
 
-    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> List[Direction3D]:
         """Return the outward normal of every face meeting at boundary point `point` (several on an edge or corner).
 
         Shapes that can't tell return get_outward_normal's one.
         """
-        normal = self.get_outward_normal(point, eps=eps)
+        normal = self.get_outward_normal(point, eps=eps, tests=tests)
         return [] if normal is None else [normal]
 
     @abstractmethod
@@ -2293,13 +2279,13 @@ class EmptyCSG(CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         return False
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         return False
 
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         return None
 
     def get_aabb(self) -> 'AxisAlignedBoundingBox':
@@ -2349,20 +2335,20 @@ class HalfSpace(HasFeatures, CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return face_plane_carriers(self)
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether P · normal >= offset."""
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
         return safe_compare(dot_product, self.offset, Comparison.GE, eps=eps)
     
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether P · normal == offset."""
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
         # Use safe_zero_test to handle Float vs Integer comparison with tolerance
         return safe_zero_test(dot_product - self.offset, eps=eps)
     
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         """Return -normal."""
         return -self.normal
 
@@ -2520,7 +2506,7 @@ class RectangularPrism(HasFeatures, CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return face_plane_carriers(self)
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is inside or on the boundary."""
         x_coord, y_coord, z_coord = self._local_coords(point)
 
@@ -2540,7 +2526,7 @@ class RectangularPrism(HasFeatures, CutCSG):
 
         return True
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is on the boundary."""
         # First check if point is contained
         if not self.contains_point(point, eps=eps):
@@ -2607,10 +2593,10 @@ class RectangularPrism(HasFeatures, CutCSG):
         return
 
     # returns the first outward normal on the CSG, use get_outward_normals if that's insufficient.
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         return next(self._each_outward_normal(point, eps=eps), None)
 
-    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> List[Direction3D]:
         return list(self._each_outward_normal(point, eps=eps))
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
@@ -2743,7 +2729,7 @@ class Cylinder(HasFeatures, CutCSG):
                 f"position={self.position.T}, "
                 f"start={self.start_distance}, end={self.end_distance})")
     
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is inside or on the boundary."""
         # Transform point to local coordinates
         local_point = point - self.position
@@ -2768,7 +2754,7 @@ class Cylinder(HasFeatures, CutCSG):
         # Check if within radius
         return safe_compare(radial_distance, self.radius, Comparison.LE, eps=eps)
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is on the barrel or a finite cap."""
         # First check if point is contained
         if not self.contains_point(point, eps=eps):
@@ -2838,10 +2824,10 @@ class Cylinder(HasFeatures, CutCSG):
         return
 
     # returns the first outward normal on the CSG, use get_outward_normals if that's insufficient.
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         return next(self._each_outward_normal(point, eps=eps), None)
 
-    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> List[Direction3D]:
         return list(self._each_outward_normal(point, eps=eps))
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
@@ -2940,15 +2926,17 @@ class SolidsAtPoint:
         solids: Sequence['CutCSG'],
         point: V3,
         eps: Optional[Numeric] = None,
+        tests: Optional[PointTests] = None,
     ) -> None:
         self.point = point
         self.eps = eps
+        self.tests = tests
         self.on_surface: List['CutCSG'] = []
         self.enclosing: List['CutCSG'] = []
         for solid in solids:
-            if not solid.contains_point(point, eps=eps):
+            if not _contains(solid, point, eps, tests):
                 continue
-            if solid.is_point_on_boundary(point, eps=eps):
+            if _on_boundary(solid, point, eps, tests):
                 self.on_surface.append(solid)
             else:
                 self.enclosing.append(solid)
@@ -2967,14 +2955,14 @@ class SolidsAtPoint:
 
     def outward_normals(self) -> List[Optional[Direction3D]]:
         """Return each on-surface solid's outward normal at the point."""
-        return [solid.get_outward_normal(self.point, eps=self.eps)
+        return [_outward_normal(solid, self.point, self.eps, self.tests)
                 for solid in self.on_surface]
 
     def every_outward_normal(self) -> Optional[List[Direction3D]]:
         """Return each face normal of the single solid the point is on the surface of; None if several or none."""
         if len(self.on_surface) != 1:
             return None
-        return self.on_surface[0].get_outward_normals(self.point, eps=self.eps)
+        return self.on_surface[0].get_outward_normals(self.point, eps=self.eps, tests=self.tests)
 
     def average_outward_normal(self, negated: bool = False) -> Optional[Direction3D]:
         """Return the mean outward normal (negated if `negated`), or None if they cancel or are unknown."""
@@ -3047,26 +3035,26 @@ class SolidUnion(CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether any child contains `point`."""
-        return any(child.contains_point(point, eps=eps) for child in self.children)
+        return any(_contains(child, point, eps, tests) for child in self.children)
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is on some child's boundary and not enclosed by the union."""
-        at = SolidsAtPoint(self.children, point, eps=eps)
+        at = SolidsAtPoint(self.children, point, eps=eps, tests=tests)
         if not at.any_holds() or at.any_encloses():
             return False
         # Two children can share a face with neither holding the point inside,
         # and that face is the middle of the union rather than its surface.
         return at.any_on_surface() and not at.close_around_it()
     
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         """Return the average outward normal of the children `point` is on the boundary of, or None."""
-        return SolidsAtPoint(self.children, point, eps=eps).average_outward_normal()
+        return SolidsAtPoint(self.children, point, eps=eps, tests=tests).average_outward_normal()
 
-    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
-        own = SolidsAtPoint(self.children, point, eps=eps).every_outward_normal()
-        return own if own is not None else super().get_outward_normals(point, eps=eps)
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> List[Direction3D]:
+        own = SolidsAtPoint(self.children, point, eps=eps, tests=tests).every_outward_normal()
+        return own if own is not None else super().get_outward_normals(point, eps=eps, tests=tests)
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         # Empty children contribute no points to the union, so they're excluded
@@ -3111,18 +3099,18 @@ class Intersection(CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        return self.left.contains_point(point, eps=eps) and self.right.contains_point(point, eps=eps)
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
+        return _contains(self.left, point, eps, tests) and _contains(self.right, point, eps, tests)
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         # Boundary of intersection = points in both solids that are on either boundary.
-        if not self.contains_point(point, eps=eps):
+        if not _contains(self, point, eps, tests):
             return False
-        return self.left.is_point_on_boundary(point, eps=eps) or self.right.is_point_on_boundary(point, eps=eps)
+        return _on_boundary(self.left, point, eps, tests) or _on_boundary(self.right, point, eps, tests)
 
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         """Return the outward normal at `point`, averaged where both sides' surfaces meet."""
-        at = SolidsAtPoint([self.left, self.right], point, eps=eps)
+        at = SolidsAtPoint([self.left, self.right], point, eps=eps, tests=tests)
         average = at.average_outward_normal()
         if average is not None:
             return average
@@ -3133,9 +3121,9 @@ class Intersection(CutCSG):
                 return normal
         return None
 
-    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
-        own = SolidsAtPoint([self.left, self.right], point, eps=eps).every_outward_normal()
-        return own if own is not None else super().get_outward_normals(point, eps=eps)
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> List[Direction3D]:
+        own = SolidsAtPoint([self.left, self.right], point, eps=eps, tests=tests).every_outward_normal()
+        return own if own is not None else super().get_outward_normals(point, eps=eps, tests=tests)
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         left_bbox = self.left.get_aabb()
@@ -3184,12 +3172,12 @@ class Difference(CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is in `base` and not strictly inside any subtracted solid (nor on a flush cut)."""
-        if not self.base.contains_point(point, eps=eps):
+        if not _contains(self.base, point, eps, tests):
             return False
 
-        removed = SolidsAtPoint(self.subtract, point, eps=eps)
+        removed = SolidsAtPoint(self.subtract, point, eps=eps, tests=tests)
         if removed.any_encloses():
             return False
         # Several subtracts can close around a point none of them holds inside
@@ -3198,12 +3186,13 @@ class Difference(CutCSG):
             return False
         if not removed.any_on_surface():
             return True
-        if not self.base.is_point_on_boundary(point, eps=eps):
+        if not _on_boundary(self.base, point, eps, tests):
             return True
-        return not self._cut_is_flush_with_the_base(removed, point, eps=eps)
+        return not self._cut_is_flush_with_the_base(removed, point, eps=eps, tests=tests)
 
     def _cut_is_flush_with_the_base(
         self, removed: 'SolidsAtPoint', point: V3, eps: Optional[Numeric] = None,
+        tests: Optional['PointTests'] = None,
     ) -> bool:
         """Return whether a subtracted solid's surface at `point` lies along the base's, facing the same way. True if a normal is unknown."""
         # Flush only where every face the cut has at the point lies along one
@@ -3211,11 +3200,11 @@ class Difference(CutCSG):
         # corner there.
         #
         # NOTE only exact for planar surfaces, not curved surfaces.
-        base_normals = self.base.get_outward_normals(point, eps=eps)
+        base_normals = self.base.get_outward_normals(point, eps=eps, tests=tests)
         if not base_normals:
             return True
         for solid in removed.on_surface:
-            sub_normals = solid.get_outward_normals(point, eps=eps)
+            sub_normals = solid.get_outward_normals(point, eps=eps, tests=tests)
             if not sub_normals:
                 return True
             if all(any(safe_equality_test(safe_dot_product(base_normal, sub_normal), 1, eps=eps)
@@ -3224,33 +3213,33 @@ class Difference(CutCSG):
                 return True
         return False
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is in the difference and on the base's surface or a cut's wall."""
-        if not self.contains_point(point, eps=eps):
+        if not _contains(self, point, eps, tests):
             return False
-        if self.base.is_point_on_boundary(point, eps=eps):
+        if _on_boundary(self.base, point, eps, tests):
             return True
-        return SolidsAtPoint(self.subtract, point, eps=eps).any_on_surface()
+        return SolidsAtPoint(self.subtract, point, eps=eps, tests=tests).any_on_surface()
 
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         """Return the base's normal at `point`, else the average negated normal of the cuts there; None if unknown."""
         # If point is on base boundary, return base's normal
-        if self.base.is_point_on_boundary(point, eps=eps):
-            return self.base.get_outward_normal(point, eps=eps)
+        if _on_boundary(self.base, point, eps, tests):
+            return _outward_normal(self.base, point, eps, tests)
         
         # Otherwise, point must be on subtract boundary (creating a "hole")
         # The normal should point inward to the subtract (which is outward from the difference)
         # So we negate the subtract's outward normal
-        return SolidsAtPoint(self.subtract, point, eps=eps).average_outward_normal(negated=True)
+        return SolidsAtPoint(self.subtract, point, eps=eps, tests=tests).average_outward_normal(negated=True)
 
-    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> List[Direction3D]:
         """Return the base's normals at `point`, plus the negated normals of cuts through it not parallel to one."""
-        if not self.base.is_point_on_boundary(point, eps=eps):
-            return super().get_outward_normals(point, eps=eps)
-        base_normals = list(self.base.get_outward_normals(point, eps=eps))
+        if not _on_boundary(self.base, point, eps, tests):
+            return super().get_outward_normals(point, eps=eps, tests=tests)
+        base_normals = list(self.base.get_outward_normals(point, eps=eps, tests=tests))
         normals = list(base_normals)
-        for solid in SolidsAtPoint(self.subtract, point, eps=eps).on_surface:
-            for normal in solid.get_outward_normals(point, eps=eps):
+        for solid in SolidsAtPoint(self.subtract, point, eps=eps, tests=tests).on_surface:
+            for normal in solid.get_outward_normals(point, eps=eps, tests=tests):
                 along_base = any(
                     safe_equality_test(safe_dot_product(base_normal, normal), 1, eps=eps)
                     or safe_equality_test(safe_dot_product(base_normal, normal), -1, eps=eps)
@@ -3387,7 +3376,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return face_plane_carriers(self)
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is inside or on the boundary."""
         # Transform point to local coordinates
         local_point = point - self.transform.position
@@ -3407,7 +3396,7 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         # profile is wound -- see point_in_convex_profile.
         return point_in_convex_profile(self.points, Matrix([x_coord, y_coord]), eps)
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is on a cap or a side."""
         # First check if point is contained
         if not self.contains_point(point, eps=eps):
@@ -3539,10 +3528,10 @@ class ConvexPolygonExtrusion(HasFeatures, CutCSG):
         return
 
     # returns the first outward normal on the CSG, use get_outward_normals if that's insufficient.
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         return next(self._each_outward_normal(point, eps=eps), None)
 
-    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> List[Direction3D]:
         return list(self._each_outward_normal(point, eps=eps))
 
     def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
@@ -3758,7 +3747,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return face_plane_carriers(self)
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is inside or on the boundary."""
         x_coord, y_coord, z_coord = self._local_coords(point)
 
@@ -3771,7 +3760,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
 
         return point_in_convex_profile(cross_section, Matrix([x_coord, y_coord]), eps)
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         """Return whether `point` is on the boundary."""
         if not self.contains_point(point, eps=eps):
             return False
@@ -3884,10 +3873,10 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         return
 
     # returns the first outward normal on the CSG, use get_outward_normals if that's insufficient.
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         return next(self._each_outward_normal(point, eps=eps), None)
 
-    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None) -> List[Direction3D]:
+    def get_outward_normals(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> List[Direction3D]:
         return list(self._each_outward_normal(point, eps=eps))
 
     def get_aabb(self) -> AxisAlignedBoundingBox:

@@ -35,6 +35,7 @@ from .cutcsg import (
 from .carriers import Carrier
 
 if TYPE_CHECKING:
+    from .cutcsg import PointTests
     from .cross_sections import PolygonRegions, Sides, PlaneFrame
     from .edges_on_csg import ConvexHull
 
@@ -829,7 +830,7 @@ class PathExtrusion(HasFeatures, CutCSG):
     def carriers(self) -> Dict[FeatureKey, Carrier]:
         return {}
 
-    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         x, y, z = self._local_coords(point)
         if self.start_distance is not None and safe_compare(z, self.start_distance, Comparison.LT, eps=eps):
             return False
@@ -837,7 +838,7 @@ class PathExtrusion(HasFeatures, CutCSG):
             return False
         return self.path.contains_point_2d(create_v2(x, y), eps=eps)
 
-    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> bool:
         if not self.contains_point(point, eps=eps):
             return False
         x, y, z = self._local_coords(point)
@@ -847,7 +848,7 @@ class PathExtrusion(HasFeatures, CutCSG):
             return True
         return self.path.is_point_on_boundary_2d(create_v2(x, y), eps=eps)
 
-    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None, tests: Optional['PointTests'] = None) -> Optional[Direction3D]:
         x, y, z = self._local_coords(point)
         if self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps):
             return safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), scalar(1)]))

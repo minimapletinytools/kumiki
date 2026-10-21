@@ -4411,11 +4411,7 @@ def _nothing_at_point(member_key: str) -> PickResultWire:
 
 def _handle_find_csg_at_point(state: RunnerState, payload: PickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Handle a find_csg_at_point request."""
-    from kumiki.csg.cutcsg import point_tests_memo
-
-    # One pick asks the same trees the same point questions many times over.
-    with point_tests_memo():
-        return _find_csg_at_point(state, payload, slot_state)
+    return _find_csg_at_point(state, payload, slot_state)
 
 
 class _PickAsk(NamedTuple):

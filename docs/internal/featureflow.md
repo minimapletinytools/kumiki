@@ -28,8 +28,8 @@ the material: a centerplane, a perfect face in rough stock) or AUXILIARY (in a v
 
 ## 2. Where it is: FeatureExtent
 
-`extents_of(root, timber).of(feature, owner)` crops the feature once, by its nature, and keeps the
-answer for as long as the tree lives:
+`cut_timber.feature_extents().of(feature, owner)` crops the feature once, by its nature, and the cut
+timber keeps the answer:
 
 - a REAL face: the part on the finished surface (`face_cross_section`, front XOR back);
 - a PERFECT_REFERENCE plane: the plane cut to the solid (`plane_cross_section`, front ∪ back);

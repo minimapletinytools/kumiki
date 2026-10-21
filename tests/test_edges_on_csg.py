@@ -250,13 +250,13 @@ class _UnknownShape(CutCSG):
     def carriers(self):
         return {}
 
-    def contains_point(self, point, eps=None) -> bool:
+    def contains_point(self, point, eps=None, tests=None) -> bool:
         return False
 
-    def is_point_on_boundary(self, point, eps=None) -> bool:
+    def is_point_on_boundary(self, point, eps=None, tests=None) -> bool:
         return False
 
-    def get_outward_normal(self, point, eps=None):
+    def get_outward_normal(self, point, eps=None, tests=None):
         return None
 
     def get_aabb(self):

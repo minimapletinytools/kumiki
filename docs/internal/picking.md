@@ -39,7 +39,6 @@ On a click, and on a hover once the pointer has settled:
 
 Click and hover both come here, so a hover always shows what a click would take.
 
-- Turn on the point-test memo for this pick (`point_tests_memo`).
 - Read the request once (`_PickAsk`). A missing `space` means 3D.
 - In a drawing, with a ray: do a **drawing pick** (`_pick_in_drawing`).
 - Otherwise: do a **3D pick** (`_pick_on_member`) on the member that was hit.
@@ -164,6 +163,7 @@ Lights a node named by a path (the tree panel, a saved selection), with no point
 
 A drawing pick is around 5–15 ms on the cute frame and tinyhouse. What keeps it there:
 
-- the point-test memo: each node answers each point question once per pick;
+- `find_all_features` makes a `PointTests` cache, so each node answers each point question once per call;
 - members are skipped by box before anything else;
-- feature extents, solid bounds and declared features are worked out once per tree and kept.
+- declared features and convex hulls are worked out when a node is built, and feature extents are
+  kept by each cut timber (`CutTimber.feature_extents`).
