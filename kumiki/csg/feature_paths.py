@@ -23,21 +23,11 @@ def hit_identity(feature: CSGFeature, owner: CutCSG) -> Tuple:
     return (id(owner), feature.name)
 
 
-def _same_hit(one: OwnedFeatureHit, other: OwnedFeatureHit) -> bool:
-    """Return whether two hits are the same feature: same owner and name, or same parents if derived."""
-    if one.owner is not other.owner or type(one.feature) is not type(other.feature):
-        return False
-    if isinstance(one.feature, (DerivedEdgeFeature, DerivedPointFeature)):
-        assert isinstance(other.feature, (DerivedEdgeFeature, DerivedPointFeature))
-        return all(_same_hit(mine, theirs) for mine, theirs in zip(one.feature.parents, other.feature.parents))
-    return one.feature.name == other.feature.name
-
-
 @dataclass(frozen=True, eq=False)
 class FeatureHandle(Generic[F_co]):
     """A feature on one timber: the timber and the hit (feature plus owning node).
 
-    Equal when the timber and owner node are the same objects and the feature matches (see `_same_hit`).
+    Equal when on the same timber object with the same hit_identity.
     """
     timber: 'PerfectTimberWithin'
     hit: OwnedFeatureHit[F_co]
@@ -52,7 +42,7 @@ class FeatureHandle(Generic[F_co]):
 
     def __eq__(self, other) -> bool:
         return (isinstance(other, FeatureHandle) and self.timber is other.timber
-                and _same_hit(self.hit, other.hit))
+                and hit_identity(self.feature, self.owner) == hit_identity(other.feature, other.owner))
 
     def __hash__(self) -> int:
         return hash((id(self.timber), hit_identity(self.hit.feature, self.hit.owner)))

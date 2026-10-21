@@ -1875,48 +1875,19 @@ MEASURE_SUPPRESSED: Final = "suppressed"
 _duplicate_warning_given = False
 
 
-def _feature_path_identity(anchor: Optional[AnchorWire]) -> Tuple[str, Tuple[str, ...], str, str]:
-    """Return a wire feature reference as a comparable tuple."""
-    # Imported per call: a reload purges kumiki's modules, so a reference held
-    # from before would be to a class that no longer exists.
-    from kumiki.identity import ResolvedTimberPath
-
-    # Through the path types, so a wire form and the object it came from give
-    # the same answer -- including a timber written by hand without an
-    # occurrence, and an edge's two parents whichever way round they were
-    # written.
-    path = deserialize_feature_path(anchor)
-    if path is None:
-        return ("", (), "", "")
-    return path.identity()
+def _measure_pair_identity(measure: MeasureWire) -> Tuple[Tuple, Tuple]:
+    """Return a wire measurement's pair identity (kumiki's pair_identity)."""
+    from kumiki.drawings.measure import pair_identity
+    return pair_identity(deserialize_feature_path(measure.get("a")), deserialize_feature_path(measure.get("b")))
 
 
-def _anchor_sort_key(anchor: Optional[AnchorWire]) -> Tuple[str, ...]:
-    """Return an anchor's sort key within a pair; a missing anchor sorts first."""
-    path = deserialize_feature_path(anchor)
-    return ("",) if path is None else path.sort_key
+def _measure_identity(measure: MeasureWire) -> Tuple[Tuple, Tuple, Tuple, str]:
+    """Return a wire measurement's identity within its viewport (kumiki's measurement_identity)."""
+    from kumiki.drawings.measure import MeasurementKind, measurement_identity
 
-
-def _measure_pair_identity(measure: MeasureWire) -> Tuple[Any, Any]:
-    """Return a measurement's two features' identities, unordered."""
-    first, second = sorted((measure.get("a"), measure.get("b")), key=_anchor_sort_key)
-    return (_feature_path_identity(first), _feature_path_identity(second))
-
-
-def _measure_identity(measure: MeasureWire) -> Tuple[Any, Any, Any, str]:
-    """Return a measurement's identity within its viewport: anchors (unordered), kind, and id.
-
-    Matches Measure.identity, so file measurements can override code ones.
-    """
-    from kumiki.drawings.measure import Measure, MeasurementKind
-
-    first, second = _measure_pair_identity(measure)
     kind = measure.get("kind")
-    return (
-        first, second,
-        Measure.kind_identity(MeasurementKind.from_wire(kind) if kind else None),
-        str(measure.get("measureId") or ""),
-    )
+    return measurement_identity(_measure_pair_identity(measure),
+                                MeasurementKind.from_wire(kind) if kind else None, measure.get("measureId"))
 
 
 def serialize_feature_path(path: 'FeaturePath') -> AnchorWire:
@@ -2130,7 +2101,7 @@ def merge_measurements(
     it deleted; others are the file's own. Within a tier, a repeated identity: the later wins.
     """
     global _duplicate_warning_given
-    from_file: Dict[Tuple[Any, Any, Any, str], MeasureWire] = {}
+    from_file: Dict[Tuple[Tuple, Tuple, Tuple, str], MeasureWire] = {}
     for measure in file_measures:
         identity = _measure_identity(measure)
         if identity in from_file and not _duplicate_warning_given:
@@ -2147,18 +2118,10 @@ def merge_measurements(
     used = set()
     for measure in code_measures:
         identity = _measure_identity(measure)
-        # Through does_override rather than a bare lookup, so the rule about
-        # what replaces what lives in one place. For these two tiers it is a
-        # full match, which is what the dict already did -- but it is the rule
-        # that says so, not this loop.
         override = None
         for candidate_identity, candidate in from_file.items():
-            if does_override_identities(
-                candidate_identity, _measure_pair_identity(candidate),
-                MeasurementSource.FILE_OVERRIDE,
-                identity, _measure_pair_identity(measure),
-                MeasurementSource.PYTHON_CODED,
-            ):
+            if does_override_identities(candidate_identity, MeasurementSource.FILE_OVERRIDE,
+                                        identity, MeasurementSource.PYTHON_CODED):
                 override, identity = candidate, candidate_identity
                 break
         if override is None:

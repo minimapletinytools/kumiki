@@ -631,7 +631,7 @@ class TestSingleFeaturePath:
         reference = SingleFeaturePath(ResolvedTimberPath("posts/fl"), FeatureRef(("cut",), "x"), "FACE")
         on_the_wire = runner.serialize_feature_path(reference)
 
-        assert runner._feature_path_identity(on_the_wire) == reference.identity()
+        assert runner.deserialize_feature_path(on_the_wire).identity() == reference.identity()
 
     def test_a_measurement_is_the_same_measured_either_way_round(self):
         found = {}
@@ -711,8 +711,8 @@ class TestResolvingATimberPath:
 
     def test_a_hand_written_reference_matches_the_canonical_one(self):
         # The two forms are one reference, decided in one place.
-        short = runner._feature_path_identity({"timber": "posts/fl", "csgPath": ["cut"]})
-        canonical = runner._feature_path_identity({"timber": "posts/fl#0", "csgPath": ["cut"]})
+        short = runner.deserialize_feature_path({"timber": "posts/fl", "csgPath": ["cut"]}).identity()
+        canonical = runner.deserialize_feature_path({"timber": "posts/fl#0", "csgPath": ["cut"]}).identity()
 
         assert short == canonical
 
@@ -1049,7 +1049,6 @@ class TestDerivedFeaturePath:
 
         assert on_the_wire["kind"] == "edge"
         assert runner.deserialize_feature_path(on_the_wire).identity() == reference.identity()
-        assert runner._feature_path_identity(on_the_wire) == reference.identity()
 
     def test_a_single_path_still_reads_without_a_kind(self):
         # Every reference saved before edges existed is this shape.
