@@ -645,31 +645,17 @@ def _face_ray(direction: VectorLike, vertex: VectorLike, plane: 'PlaneSpan') -> 
 def _area_either_side(region, vertex: V3, direction: V3, normal: V3) -> Tuple[float, float]:
     """Return a planar region's area `(ahead, behind)` of the line through `vertex` square to
     `direction`."""
+    from ..csg.cross_sections import _area, _clip
+
     across = _unit(_cross(normal, direction))
     ahead = behind = 0.0
     for polygon in region:
         flat = [(_dot(corner - vertex, direction), _dot(corner - vertex, across)) for corner in polygon]
-        whole = _polygon_area(flat)
-        front = _polygon_area(_clip_ahead(flat))
+        whole = _area(flat)
+        front = _area(_clip(flat, -1.0, 0.0, 0.0))  # the part with x >= 0
         ahead += front
         behind += max(0.0, whole - front)
     return ahead, behind
-
-
-def _polygon_area(points) -> float:
-    return abs(sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1]))) / 2
-
-
-def _clip_ahead(points):
-    """Return the part of a 2D polygon where x >= 0."""
-    kept = []
-    for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1]):
-        if x0 >= 0:
-            kept.append((x0, y0))
-        if (x0 >= 0) != (x1 >= 0):
-            share = x0 / (x0 - x1)
-            kept.append((0.0, y0 + (y1 - y0) * share))
-    return kept
 
 
 def _lines_meet(first: 'LineSpan', second: 'LineSpan') -> Optional[Tuple[V3, Optional[Tuple[V3, V3]]]]:

@@ -11,12 +11,8 @@ segment; a Plane is an infinite plane, not a face. That is what measurement
 wants -- "the distance between two parallel edges" means the distance between
 the infinite lines they lie on.
 
-Their BOUNDED counterparts live here too, beside them: a LineSegment is a
-stretch of a Line, a ConvexPlanarRegion an area of a Plane. They are what you
-get back from cropping an unbounded primitive to a solid (see
-kumiki.csg.edges_on_csg) -- a line comes back as a list of LineSegments, since a
-cut through the middle of one leaves a piece either side. Both are plain
-geometry: neither knows what a feature or a timber is.
+A LineSegment is a stretch of a Line: what cropping a line to a solid returns (see
+kumiki.csg.edges_on_csg), one per piece left.
 
 measuring.py re-exports all of these, so `from kumiki.measuring import Plane`
 keeps working.
@@ -190,120 +186,6 @@ STRAIGHT_ENOUGH = 1e-9
 # How short an edge may be, as a fraction of the outline's longest, before it
 # counts as no edge at all.
 _DEGENERATE_EDGE = 1e-9
-
-
-@dataclass(frozen=True)
-class ConvexPlanarRegion:
-    """An area of a Plane, bounded by a convex outline lying in it.
-
-    `boundary` is in order around the region, and lies on `plane`. An empty
-    boundary means nothing survived cropping -- the plane meets the solid
-    nowhere -- which is a thing worth knowing rather than an error.
-
-    Convex is in the name because it is a promise the readers rely on, not a
-    description of how it usually turns out. centroid() averages the corners,
-    which is the centre only of a convex outline; extent_along() reads the
-    corners alone, which bounds the area only if nothing bulges between them.
-    Hand either a concave outline and it answers confidently and wrongly, so
-    the outline is checked once here instead.
-    """
-
-    # TODO this can be derived from boundary points. Either:
-    #  - specify the boundary is local V2 coordinates to the plane (although that requires the plane to have a coordinate system, which we kinda don't want)
-    #. - assert in __post__init__ that boundary points are in the plane
-    #. - delete the plane object and add a compute_plane() function that derives it
-    plane: Plane
-    boundary: Tuple[V3, ...]
-
-    def __post_init__(self) -> None:
-        
-
-        corners = self.boundary
-        if len(corners) < 3:
-            # Nothing to be concave about: empty, a point, or an edge.
-            return
-        normal = unit_vector(self.plane.normal)
-        edges = [corners[(i + 1) % len(corners)] - corners[i] for i in range(len(corners))]
-        lengths = [float((edge.T * edge)[0, 0]) ** 0.5 for edge in edges]
-        # An edge of no length has no direction, so no corner it touches turns.
-        # Negligible RELATIVE to the outline rather than absolutely zero:
-        # clipping a polygon routinely lands two corners a rounding error apart,
-        # and dividing by that length turns the noise between them into an
-        # arbitrary angle. This used to crash on real joinery.
-        longest = max(lengths) if lengths else 0.0
-        too_short = longest * _DEGENERATE_EDGE
-        turning = 0
-        for i in range(len(corners)):
-            after = (i + 1) % len(corners)
-            # The cross product is an AREA -- |e1||e2|sin(t) -- so comparing it
-            # against one number for the whole outline asks a different question
-            # at every corner. Dividing the two edge lengths back out leaves
-            # sin(t) itself: the angle turned through, which is what "straight
-            # on" is actually about, and which no longer depends on how long
-            # this corner's edges happen to be or how long the longest one is.
-            # Measured absolutely, a real reflex corner between two 14um edges
-            # sits below the slack a 1m edge sets, and passes as convex.
-            if lengths[i] <= too_short or lengths[after] <= too_short:
-                # A repeated corner, or one the clip left a rounding error away
-                # from its neighbour.
-                continue
-            scale = lengths[i] * lengths[after]
-            turn = float(
-                (cross_product(edges[i], edges[after]).T * normal)[0, 0]
-            ) / scale
-            if abs(turn) <= STRAIGHT_ENOUGH:
-                # Straight on. Clipping makes these whenever a cut passes
-                # exactly through a corner.
-                continue
-            direction = 1 if turn > 0 else -1
-            if turning == 0:
-                turning = direction
-            elif direction != turning:
-                raise ValueError(
-                    "ConvexPlanarRegion boundary turns both ways, so it is not "
-                    f"convex: corner {i} reverses. Boundary: {corners}"
-                )
-
-    @property
-    def is_empty(self) -> bool:
-        return len(self.boundary) < 3
-
-    def centroid(self) -> Optional[V3]:
-        """The middle of it by area, for a dimension to attach to.
-
-        By area rather than by averaging corners: a clip can repeat a corner, or leave one where an
-        edge was cut short, and every corner then pulled the middle its way.
-        """
-        if not self.boundary:
-            return None
-        corners = [[float(point[i, 0]) for i in range(3)] for point in self.boundary]
-        unique = [corner for index, corner in enumerate(corners)
-                  if all(max(abs(a - b) for a, b in zip(corner, earlier)) > 1e-12 for earlier in corners[:index])]
-        origin = unique[0]
-        total, weighted = 0.0, [0.0, 0.0, 0.0]
-        for first, second in zip(unique[1:], unique[2:]):
-            u = [a - o for a, o in zip(first, origin)]
-            v = [b - o for b, o in zip(second, origin)]
-            cross = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
-            area = sum(c * c for c in cross) ** 0.5 / 2
-            total += area
-            weighted = [w + area * (o + a + b) / 3 for w, o, a, b in zip(weighted, origin, first, second)]
-        if total <= 1e-18:
-            middle = [sum(values) / len(unique) for values in zip(*unique)]
-        else:
-            middle = [w / total for w in weighted]
-        return create_v3(*middle)
-
-    def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
-        """How far it reaches along any direction, as (min, max).
-
-        This is what makes orienting to a viewport unnecessary: ask along the
-        viewport's own axes and the answer is the bounds in that view.
-        """
-        if not self.boundary:
-            return None
-        reach = [float((point.T * direction)[0, 0]) for point in self.boundary]
-        return (min(reach), max(reach))
 
 
 @dataclass(frozen=True)

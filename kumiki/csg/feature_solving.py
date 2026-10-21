@@ -131,9 +131,33 @@ class Solve:
     def measure_row(self, measure: SolveMeasurement) -> Row:
         return measure_row(measure, self.carriers)
 
+    def known_rows(self, measures: Sequence[SolveMeasurement], known: Sequence[FeatureHandle]) -> List[Row]:
+        """Return the rows the measurements and `known` features fix."""
+        return [row for handle in known for row in self.dof_rows(handle)] + [self.measure_row(m) for m in measures]
 
-def _carriers_for(handles: Sequence[FeatureHandle], cut_timbers: Sequence['CutTimber']) -> CarrierMap:
-    """Return the carrier map of the timbers the handles are on, looked up in `cut_timbers`."""
+    def remaining(self, target: FeatureHandle, measures: Sequence[SolveMeasurement],
+                  known: Sequence[FeatureHandle]) -> Remaining:
+        """Return the DOFs of `target` left free by the measurements and `known` features."""
+        return remaining(self.known_rows(measures, known), self.dof_rows(target))
+
+    def report(self, targets: Sequence[FeatureHandle], measures: Sequence[SolveMeasurement],
+               known: Sequence[FeatureHandle]) -> 'SolveReport':
+        """Return the free DOFs of each target, and of all together, given the measurements and `known` features."""
+        known_rows = self.known_rows(measures, known)
+        reports: List[FeatureReport] = []
+        target_rows: List[Row] = []
+        for handle in targets:
+            if handle.feature.solve_recipe(handle.owner) is None:
+                reports.append(FeatureReport(handle, None))
+                continue
+            rows = self.dof_rows(handle)
+            target_rows += rows
+            reports.append(FeatureReport(handle, remaining(known_rows, rows)))
+        return SolveReport(features=reports, total=remaining(known_rows, target_rows))
+
+
+def _solve_for(handles: Sequence[FeatureHandle], cut_timbers: Sequence['CutTimber']) -> Solve:
+    """Return a Solve over just the timbers `handles` are on, looked up in `cut_timbers`."""
     touched: List['CutTimber'] = []
     for handle in handles:
         if any(cut.timber is handle.timber for cut in touched):
@@ -142,14 +166,7 @@ def _carriers_for(handles: Sequence[FeatureHandle], cut_timbers: Sequence['CutTi
         if found is None:
             raise ValueError(f"{handle.feature.name!r} is on a timber not in cut_timbers")
         touched.append(found)
-    return carrier_map_of(*touched)
-
-
-def _known_rows(
-    measures: Sequence[SolveMeasurement], known: Sequence[FeatureHandle], carriers: CarrierMap,
-) -> List[Row]:
-    rows: List[Row] = [row for handle in known for row in feature_handle_dof_rows(handle, carriers)]
-    return rows + [measure_row(measure, carriers) for measure in measures]
+    return Solve(touched)
 
 
 def _handles(measures: Sequence[SolveMeasurement], known: Sequence[FeatureHandle]) -> List[FeatureHandle]:
@@ -162,12 +179,8 @@ def remaining_dofs(
     known: Sequence[FeatureHandle],
     cut_timbers: Sequence['CutTimber'],
 ) -> Remaining:
-    """Return the DOFs of `target` left free by the measurements and `known` features.
-
-    `cut_timbers` must hold every timber the target, measurements and known features are on.
-    """
-    carriers = _carriers_for([target, *_handles(measures, known)], cut_timbers)
-    return remaining(_known_rows(measures, known, carriers), feature_handle_dof_rows(target, carriers))
+    """Solve.remaining, over the timbers involved. `cut_timbers` must hold all of them."""
+    return _solve_for([target, *_handles(measures, known)], cut_timbers).remaining(target, measures, known)
 
 
 @dataclass(frozen=True)
@@ -190,24 +203,8 @@ def solve_report(
     known: Sequence[FeatureHandle],
     cut_timbers: Sequence['CutTimber'],
 ) -> SolveReport:
-    """Return the free DOFs of each target, and of all together, given the measurements and `known` features.
-
-    Targets may be on any number of timbers. `cut_timbers` must hold every timber the targets,
-    measurements and known features are on; a frame's `cut_timbers` will do.
-    """
-    carriers = _carriers_for([*targets, *_handles(measures, known)], cut_timbers)
-    known_rows = _known_rows(measures, known, carriers)
-    reports: List[FeatureReport] = []
-    target_rows: List[Row] = []
-    for handle in targets:
-        recipe = handle.feature.solve_recipe(handle.owner)
-        if recipe is None:
-            reports.append(FeatureReport(handle, None))
-            continue
-        rows = feature_dof_rows(recipe, carriers)
-        target_rows += rows
-        reports.append(FeatureReport(handle, remaining(known_rows, rows)))
-    return SolveReport(features=reports, total=remaining(known_rows, target_rows))
+    """Solve.report, over the timbers involved. `cut_timbers` must hold all of them; a frame's will do."""
+    return _solve_for([*targets, *_handles(measures, known)], cut_timbers).report(targets, measures, known)
 
 
 def required_targets(cut_timber: 'CutTimber', face_test: FaceTest = on_finished_surface) -> List[FeatureHandle]:

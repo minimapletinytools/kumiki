@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from kumiki.csg.cutcsg import AxisAlignedBoundingBox, CutCSG, HalfSpace, RectangularPrism
 from kumiki.geometry import (
-    ConvexPlanarRegion, Line, LineSegment, Plane,
+    Line, LineSegment, Plane,
 )
 from kumiki.csg.edges_on_csg import (
     ConvexHullKind,
@@ -171,40 +171,6 @@ class TestPlaneCrossSection:
         assert centre is not None and centre[2] == pytest.approx(0.25, abs=1e-9)
 
 
-class TestConvexPlanarRegion:
-    def test_extent_along_answers_for_any_direction(self):
-        square = (_v(1, -1, 0), _v(-1, -1, 0), _v(-1, 1, 0), _v(1, 1, 0))
-        region = ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)), boundary=square)
-
-        low, high = _reach(region, _v(0.7071, 0.7071, 0))
-        assert high - low == pytest.approx(2 * 2 * 0.7071, abs=1e-9)
-
-    def test_an_empty_region_has_no_centroid_to_offer(self):
-        assert ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
-                             boundary=()).centroid() is None
-
-    def test_a_repeated_corner_does_not_pull_the_centroid(self):
-        # Clipping can hand back a closed outline, its first corner again at the end. Averaged as
-        # corners, that corner counted twice and a dimension attached off the middle of a face.
-        square = (_v(1, -1, 0), _v(-1, -1, 0), _v(-1, 1, 0), _v(1, 1, 0), _v(1, -1, 0))
-        centre = ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
-                                    boundary=square).centroid()
-
-        assert centre is not None
-        assert [float(centre[i, 0]) for i in range(3)] == pytest.approx([0, 0, 0], abs=1e-12)
-
-    def test_the_centroid_is_the_middle_by_area(self):
-        # A trapezoid's corners average to the middle of its height; its area doesn't.
-        trapezoid = (_v(0, 0, 0), _v(4, 0, 0), _v(3, 1, 0), _v(1, 1, 0))
-        centre = ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
-                                    boundary=trapezoid).centroid()
-        assert centre is not None
-
-        # Area-weighted: y = h (b1 + 2 b2) / (3 (b1 + b2)) with b1 = 4, b2 = 2.
-        assert float(centre[1, 0]) == pytest.approx(8 / 18)
-        assert float(centre[0, 0]) == pytest.approx(2)
-
-
 class TestLoftedSolids:
     """A loft's sides are planar only when the taper is a pure per-axis scale."""
 
@@ -308,7 +274,7 @@ def _span(segments, direction=None):
 
 
 class TestTheBoundedTypes:
-    """LineSegment and ConvexPlanarRegion, apart from what produces them."""
+    """LineSegment, apart from what produces it."""
 
     def _line(self):
         return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
@@ -330,75 +296,6 @@ class TestTheBoundedTypes:
         piece = LineSegment(line=backwards, start=_v(0, 0, 0), end=_v(0, 0, 1))
 
         assert float(piece.line.direction[2, 0]) == -1.0
-
-    def test_a_convex_outline_is_accepted(self):
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
-
-        region = ConvexPlanarRegion(plane=plane, boundary=(
-            _v(0, 0, 0), _v(1, 0, 0), _v(1, 1, 0), _v(0, 1, 0)))
-
-        assert not region.is_empty
-
-    def test_a_concave_outline_is_refused_on_the_spot(self):
-        # Rather than answering confidently and wrongly later: centroid()
-        # averages the corners and extent_along() reads only the corners, and
-        # both of those are the centre and the bounds of a CONVEX outline.
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
-
-        with pytest.raises(ValueError, match="not convex"):
-            ConvexPlanarRegion(plane=plane, boundary=(
-                _v(0, 0, 0), _v(2, 0, 0), _v(1, 1, 0), _v(2, 2, 0), _v(0, 2, 0)))
-
-    def test_a_straight_corner_is_not_a_reversal(self):
-        # Three points in a row turn neither way, and clipping produces them
-        # whenever a cut passes exactly through a corner.
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
-
-        ConvexPlanarRegion(plane=plane, boundary=(
-            _v(0, 0, 0), _v(1, 0, 0), _v(2, 0, 0), _v(2, 1, 0), _v(0, 1, 0)))
-
-    def test_too_few_corners_to_be_concave_is_allowed(self):
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
-
-        assert ConvexPlanarRegion(plane=plane, boundary=()).is_empty
-        assert ConvexPlanarRegion(plane=plane, boundary=(_v(0, 0, 0), _v(1, 0, 0))).is_empty
-
-    def test_the_check_does_not_care_how_big_the_region_is(self):
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
-
-        for size in (0.005, 5.0):
-            ConvexPlanarRegion(plane=plane, boundary=(
-                _v(0, 0, 0), _v(size, 0, 0), _v(size, size, 0), _v(0, size, 0)))
-
-    def test_a_reversal_between_two_short_edges_is_still_a_reversal(self):
-        """Why the test is per corner and relative rather than one number.
-
-        A turn is a cross product, so it is an AREA: |e1||e2|sin(t). Compared
-        against a single slack taken from the outline's longest edge, the same
-        angle reads as huge between two long edges and as nothing between two
-        short ones -- so this dent, which is a real reflex corner, passed as
-        convex. Dividing the edge lengths back out leaves the angle itself.
-        """
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
-        nick = 1e-5
-        # A metre square with a 14-micron dent in the middle of its top edge.
-        dented = (
-            _v(0, 0, 0), _v(1, 0, 0), _v(1, 1, 0),
-            _v(0.5 + nick, 1, 0), _v(0.5, 1 - nick, 0), _v(0.5 - nick, 1, 0),
-            _v(0, 1, 0),
-        )
-
-        with pytest.raises(ValueError, match="not convex"):
-            ConvexPlanarRegion(plane=plane, boundary=dented)
-
-    def test_a_repeated_corner_is_not_a_turn(self):
-        # No edge, so no direction to turn from. Dividing by its length would
-        # divide by zero.
-        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
-
-        ConvexPlanarRegion(plane=plane, boundary=(
-            _v(0, 0, 0), _v(1, 0, 0), _v(1, 0, 0), _v(1, 1, 0), _v(0, 1, 0)))
-
 
 class TestCropLineToSegmentsOnCsg:
     """An edge, cropped by the whole tree rather than by what encloses it."""

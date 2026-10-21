@@ -17,7 +17,7 @@ from ..csg.edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to
 from ..csg.cutcsg import CSGFeature, CutCSG
 from ..csg.feature_paths import FeatureHandle
 from ..csg.identity_memo import memo_by_identity
-from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, SightFrame, area, material_crossing,
+from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, PlaneFrame, area, material_crossing,
                                   segments_outside, shadow, subtract)
 from ..geometry import Line, Plane, Point
 from ..rule import Transform, V3, as_ndarray, create_v3, safe_dot_product, safe_normalize_vector
@@ -80,10 +80,10 @@ def drawn_over(front: Optional[Geometry], behind: Optional[Geometry], look, tole
 
 
 def _frame_in(transform: Transform, origin: np.ndarray, u: np.ndarray, v: np.ndarray,
-              normal: np.ndarray) -> SightFrame:
+              normal: np.ndarray) -> PlaneFrame:
     """Return a world plane frame in the local space of `transform`."""
     rotation, position = _placement(transform)
-    return ((origin - position) @ rotation, u @ rotation, v @ rotation, normal @ rotation)
+    return PlaneFrame.with_axes((origin - position) @ rotation, u @ rotation, v @ rotation, normal @ rotation)
 
 
 @memo_by_identity
@@ -130,9 +130,7 @@ def nearest_visible_depth(
             extent = extents_of(root, handle.timber).of(handle.feature, handle.owner)
             if extent is None:
                 return float(point @ look)
-            frame_origin, frame_u, frame_v = own[0], own[1], own[2]
-            region = [[(float((corner - frame_origin) @ frame_u), float((corner - frame_origin) @ frame_v))
-                       for corner in polygon] for polygon in extent.polygons()]
+            region = [[own.to_2d(corner) for corner in polygon] for polygon in extent.polygons()]
             if area(region) <= 0:
                 return None
             corners = [point for polygon in region for point in polygon]

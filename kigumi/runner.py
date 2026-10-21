@@ -685,7 +685,7 @@ if TYPE_CHECKING:
     from kumiki.kiwari import Kiwari
     from kumiki.ticket import Ticket
     from kumiki.timber import Accessory, CutTimber, Cutting, Frame, Joint, PerfectTimberWithin
-    from kumiki.viewer.rule_at_home import Float3, Rows3
+    from kumiki.viewer.rule_at_home import Float3, LocalFrame
 
     Located = Union[Point, Line, Plane]
     # A picked feature, the node that owns it, and what it lies on.
@@ -2941,7 +2941,8 @@ def feature_highlights(slot_state: SlotState, references: Sequence[AnchorWire]) 
 
 
 def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> HighlightWire:
-    from kumiki.viewer.picking import build_inv_transform_float, edge_highlight_segments, extract_highlight_mesh
+    from kumiki.viewer.picking import edge_highlight_segments, extract_highlight_mesh
+    from kumiki.viewer.rule_at_home import LocalFrame
     from kumiki.csg.feature_paths import resolve_feature_path
     from kumiki.identity import SingleFeaturePath
 
@@ -2962,9 +2963,9 @@ def _feature_highlight(slot_state: SlotState, reference: AnchorWire) -> Highligh
         if segments:
             result["highlightEdgeSegments"] = segments
     elif cached.get("mesh") is not None and isinstance(path, SingleFeaturePath):
-        rotation, position = build_inv_transform_float(timber.transform)
+        local_frame = LocalFrame.of(timber.transform)
         vertices, indices, _matched, _total = extract_highlight_mesh(
-            cached["mesh"]["vertices"], cached["mesh"]["indices"], handle.owner, rotation, position,
+            cached["mesh"]["vertices"], cached["mesh"]["indices"], handle.owner, local_frame,
             5e-4, root_csg=root, selected_path=list(path.ref.csg_path), selected_ref=handle.owner,
             feature_label=handle.feature.name, feature_type=feature_type,
         )
@@ -3961,10 +3962,9 @@ def make_error_response(request_id: Any, command: str, exc: Exception) -> Respon
 # ===========================================================================
 
 def _local_ray_from_payload(
-    payload: PickRequest, rot: 'Rows3', pos: 'Float3',
+    payload: PickRequest, frame: 'LocalFrame',
 ) -> Optional[LocalRay]:
     """Return the pointer's ray in timber-local space, or None if none was sent."""
-    from kumiki.viewer.picking import inv_transform_direction, inv_transform_point
     ray = payload.get("ray")
     if not isinstance(ray, dict):
         return None
@@ -3974,8 +3974,8 @@ def _local_ray_from_payload(
     if len(origin) != 3 or len(direction) != 3:
         return None
     return (
-        inv_transform_point(rot, pos, origin),
-        inv_transform_direction(rot, direction),
+        frame.point(origin),
+        frame.direction(direction),
     )
 
 
@@ -4222,8 +4222,8 @@ def _drawing_candidates(
     A member the ray hits is asked at that surface point; one it just misses, at its mesh point
     nearest the ray.
     """
-    from kumiki.viewer.picking import (DrawnMember, build_inv_transform_float, drawing_candidates,
-                                       inv_transform_direction, inv_transform_point)
+    from kumiki.viewer.picking import DrawnMember, drawing_candidates
+    from kumiki.viewer.rule_at_home import LocalFrame
     from kumiki.viewer.rule_at_home import Float3
 
     ray = payload.get("ray") or {}
@@ -4242,23 +4242,23 @@ def _drawing_candidates(
         box = _member_world_box(entry)
         if not _ray_nears_box(origin, direction, box, reach):
             continue
-        rotation, position = build_inv_transform_float(cut_timber.timber.transform)
+        local_frame = LocalFrame.of(cut_timber.timber.transform)
         surface = None
         if key == hit_member or _ray_meets_mesh(entry, origin, direction):
             # Nothing of a member is at a surface point out of its reach.
             if at is not None and all(low - reach <= x <= high + reach for x, low, high in zip(at, *box)):
-                surface = inv_transform_point(rotation, position, at)
+                surface = local_frame.point(at)
         else:
             near = _mesh_point_near_ray(entry, origin, direction, reach)
             if near is not None:
-                surface = inv_transform_point(rotation, position, near)
+                surface = local_frame.point(near)
         members.append(DrawnMember(key, root, cut_timber.timber, surface))
 
     def blocked_for(key: str) -> Callable[['Float3'], bool]:
         entry = ss.mesh_cache[key]
         cut_timber, root = entry["cut_timber"], cast('CutCSG', entry["local_csg"])
-        rotation, position = build_inv_transform_float(cut_timber.timber.transform)
-        return _sight_blocker(ss, cut_timber, root, payload, inv_transform_direction(rotation, direction))
+        local_frame = LocalFrame.of(cut_timber.timber.transform)
+        return _sight_blocker(ss, cut_timber, root, payload, local_frame.direction(direction))
 
     return drawing_candidates(members, (origin, direction), tolerances, blocked_for)
 
@@ -4494,8 +4494,8 @@ def _pick_on_member(
     """Pick on one member at a world point. `across` (in a drawing) gives the candidates on every
     member and which was taken; otherwise this member's own are used.
     """
-    from kumiki.viewer.picking import (Candidates, best_matching_candidate, build_inv_transform_float, choose,
-                                       find_candidates, inv_transform_point, navigate)
+    from kumiki.viewer.picking import Candidates, best_matching_candidate, choose, find_candidates, navigate
+    from kumiki.viewer.rule_at_home import LocalFrame
 
     if not isinstance(member_key, str) or member_key not in ss.mesh_cache:
         raise ValueError(f"Unknown memberKey: {member_key}")
@@ -4517,17 +4517,17 @@ def _pick_on_member(
         raise ValueError(f"No CSG data cached for {member_key}")
 
     timber = cut_timber.timber
-    timber_rot, timber_pos = build_inv_transform_float(timber.transform)
+    local_frame = LocalFrame.of(timber.transform)
 
     # Convert global click point to timber-local
-    local_pt = inv_transform_point(timber_rot, timber_pos, point)
+    local_pt = local_frame.point(point)
 
     t0 = time.monotonic()
 
     # Three steps, kumiki's (picking.py): where navigating the tree lands, what is under the pointer,
     # and which of it is wanted -- named by the caller (Tab, the menu), else the one that finishes the
     # measurement in hand, else the first in a drawing, else what navigation found.
-    local_ray = _local_ray_from_payload(payload, timber_rot, timber_pos)
+    local_ray = _local_ray_from_payload(payload, local_frame)
     navigated = navigate(local_csg, local_pt, ask.eps, ask.ctrl_click, ask.current_path)
     candidate_index = payload.get("candidateIndex")
     if across is not None:
@@ -4546,7 +4546,7 @@ def _pick_on_member(
     new_path, target_csg, feature_label = pick.path, pick.node, pick.label
     feature_type, edge = pick.kind, pick.edge
     located_pick: Optional['LocatedPick'] = pick.located()
-    lit = _pick_highlights(mesh, local_csg, timber, timber_rot, timber_pos, eps, pick)
+    lit = _pick_highlights(mesh, local_csg, timber, local_frame, eps, pick)
     mesh_walk_ms = (time.monotonic() - t0) * 1000.0
     hl_verts, hl_idx, matched, total = lit.mesh
 
@@ -4621,8 +4621,8 @@ class _PickHighlights(NamedTuple):
     edge_segments: Optional[Any]
 
 
-def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', timber: 'PerfectTimberWithin', timber_rot: Any,
-                     timber_pos: Any, eps: float, pick: 'Pick') -> _PickHighlights:
+def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', timber: 'PerfectTimberWithin', local_frame: 'LocalFrame',
+                     eps: float, pick: 'Pick') -> _PickHighlights:
     """Return the mesh and lines that light `pick` on its member."""
     from kumiki.viewer.picking import (edge_highlight_segments, extract_highlight_mesh, non_real_plane_outline,
                                        resolve_csg_at_path)
@@ -4651,8 +4651,7 @@ def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', timber: 'Perfect
         mesh["vertices"],
         mesh["indices"],
         target_csg,
-        timber_rot,
-        timber_pos,
+        local_frame,
         eps,
         root_csg=local_csg,
         selected_path=new_path,
@@ -4670,8 +4669,7 @@ def _pick_highlights(mesh: MemberMeshWire, local_csg: 'CutCSG', timber: 'Perfect
             mesh["vertices"],
             mesh["indices"],
             parent_csg,
-            timber_rot,
-            timber_pos,
+            local_frame,
             eps,
             root_csg=local_csg,
             selected_path=new_path,
@@ -4721,8 +4719,8 @@ def _log_pick(
 def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_state: Optional['SlotState'] = None) -> PickResultWire:
     """Resolve the CSG at a path and return its highlight."""
     from kumiki.csg.feature_paths import label_name
-    from kumiki.viewer.picking import (build_inv_transform_float, extract_highlight_mesh,
-                                       non_real_plane_outline, resolve_csg_at_path)
+    from kumiki.viewer.picking import extract_highlight_mesh, non_real_plane_outline, resolve_csg_at_path
+    from kumiki.viewer.rule_at_home import LocalFrame
     ss = slot_state if slot_state is not None else state._active
     member_key = payload.get("memberKey")
     path = payload.get("path") or []
@@ -4743,7 +4741,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
         raise ValueError(f"No CSG data cached for {member_key}")
 
     timber = cut_timber.timber
-    timber_rot, timber_pos = build_inv_transform_float(timber.transform)
+    local_frame = LocalFrame.of(timber.transform)
 
     # Resolve the CSG node at the given path (no point hint needed)
     target_csg = resolve_csg_at_path(local_csg, path)
@@ -4759,8 +4757,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
         mesh["vertices"],
         mesh["indices"],
         target_csg,
-        timber_rot,
-        timber_pos,
+        local_frame,
         eps,
         root_csg=local_csg,
         selected_path=path,
@@ -4774,8 +4771,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: PathPickRequest, slot_
             mesh["vertices"],
             mesh["indices"],
             target_csg,
-            timber_rot,
-            timber_pos,
+            local_frame,
             eps,
             root_csg=local_csg,
             selected_path=path,

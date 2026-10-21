@@ -25,7 +25,7 @@ from ..geometry import (Line, Plane, Point, intersect_line_plane, intersect_plan
 import numpy as np
 
 if TYPE_CHECKING:
-    from .cross_sections import PolygonRegions, Sides, _Frame
+    from .cross_sections import PolygonRegions, Sides, PlaneFrame
     from .edges_on_csg import AngleSpans, ConvexHull, Span
 from .identity_memo import memo_by_identity
 from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Midplane, Recipe,
@@ -2163,7 +2163,7 @@ class CutCSG(ABC):
             return []
         return _plane_stations(hull.require_faces(), origin, direction)
 
-    def plane_sides(self, frame: '_Frame', seed: 'PolygonRegions') -> 'Sides':
+    def plane_sides(self, frame: 'PlaneFrame', seed: 'PolygonRegions') -> 'Sides':
         """Return where this primitive cuts the plane of `frame`, as (front, back) regions within `seed`.
 
         front is where it has material just on the side the plane's normal points to, back just on the
@@ -2914,7 +2914,7 @@ class Cylinder(HasFeatures, CutCSG):
         caps = _extrusion_caps(unit_vector(self.axis_direction), self.position, self.start_distance, self.end_distance)
         return found + _plane_stations(caps, origin, direction)
 
-    def plane_sides(self, frame: '_Frame', seed: 'PolygonRegions') -> 'Sides':
+    def plane_sides(self, frame: 'PlaneFrame', seed: 'PolygonRegions') -> 'Sides':
         """Cut exactly: an ellipse (or a strip, for a plane along the axis), then the caps."""
         from .cross_sections import _cylinder_cross_section
         return _cylinder_cross_section(self, frame, seed)
@@ -3906,7 +3906,7 @@ class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
         from .edges_on_csg import _loft_sides_are_planar
         return _loft_sides_are_planar(self)
 
-    def plane_sides(self, frame: '_Frame', seed: 'PolygonRegions') -> 'Sides':
+    def plane_sides(self, frame: 'PlaneFrame', seed: 'PolygonRegions') -> 'Sides':
         from .cross_sections import _CannotCrossSection
         if not self.is_exactly_convex_hull():
             raise _CannotCrossSection("a loft with twisted sides")
