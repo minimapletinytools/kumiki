@@ -829,6 +829,7 @@ class TestWhereAnAngleSits:
 
         kind = PlaneSpan if "normal" in fields else LineSpan if "direction" in fields else PointSpan
         return kind(**{key: v(value) if key in ('at', 'normal', 'direction')
+                       else tuple(tuple(v(corner) for corner in polygon) for polygon in value) if key == 'region'
                        else value for key, value in fields.items()})
 
     def _rays(self, first, second):
@@ -903,27 +904,77 @@ class TestWhereAnAngleSits:
         assert [round(v, 6) for v in rays.opens_from] == [1.0, 0.0, 0.0]
         assert [round(v, 6) for v in rays.opens_to] == [0.0, 1.0, 0.0]
 
-    def test_skew_edges_stand_between_them(self):
-        # Two edges that never meet. The nearest approach is the honest place.
+    def test_skew_edges_are_measured_on_the_first_with_the_second_carried_over(self):
+        # Two edges that never meet: the corner is on the first at its nearest approach, and the
+        # second's direction is carried to it -- a dashed stretch from where the second comes nearest.
         along = self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 400.0))
         over = self._span(at=(0, 0, 400), direction=(0, 1, 0), interval=(0.0, 400.0))
 
         rays = self._corner(along, over)
 
-        assert [round(v, 6) for v in rays.vertex] == [0.0, 0.0, 200.0]
+        assert [round(v, 6) for v in rays.vertex] == [0.0, 0.0, 0.0]
+        carried = [[round(v, 6) for v in end] for end in rays.phantoms[-1]]
+        assert carried == [[0.0, 0.0, 400.0], [0.0, 0.0, 0.0]]
 
-    def test_the_vertex_is_kept_on_the_edges(self):
-        """Clamped to what survives, so the arc lands on the timber.
-
-        Two edges can come nearest each other far past the end of both.
-        """
+    def test_edges_meeting_past_their_ends_meet_where_they_meet_and_are_drawn_on_to_it(self):
+        # Neither edge reaches the corner. It is where they meet, and each is drawn on to it.
         along = self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 100.0))
-        over = self._span(at=(900, 0, 50), direction=(0, 1, 0), interval=(0.0, 100.0))
+        up = self._span(at=(900, 300, 0), direction=(0, 1, 0), interval=(0.0, 100.0))
 
-        rays = self._corner(along, over)
+        rays = self._corner(along, up)
 
-        # x is clamped to the end of the first edge, not carried out to 900.
-        assert rays.vertex[0] <= 900
+        assert [round(v, 6) for v in rays.vertex] == [900.0, 0.0, 0.0]
+        drawn = sorted([[round(v, 6) for v in end] for end in segment] for segment in rays.phantoms)
+        assert drawn == [[[100.0, 0.0, 0.0], [900.0, 0.0, 0.0]], [[900.0, 300.0, 0.0], [900.0, 0.0, 0.0]]]
+
+    def test_two_faces_meet_in_the_middle_of_where_both_reach(self):
+        # A floor (z = 0) from x 0..1000 and a wall (x = 0) only from y 600..800: the corner is the
+        # middle of where both reach along the line they share, not wherever their middles project.
+        floor = self._span(at=(500, 500, 0), normal=(0, 0, 1),
+                           region=(((0, 0, 0), (1000, 0, 0), (1000, 1000, 0), (0, 1000, 0)),))
+        wall = self._span(at=(0, 700, 500), normal=(1, 0, 0),
+                          region=(((0, 600, 0), (0, 800, 0), (0, 800, 1000), (0, 600, 1000)),))
+
+        rays = self._corner(floor, wall)
+
+        assert [round(v, 6) for v in rays.vertex] == [0.0, 700.0, 0.0]
+        assert round(self._value(rays), 6) == 90.0
+        assert rays.phantoms == ()
+
+    def test_a_face_short_of_the_corner_is_swept_on_to_it(self):
+        # The wall stops 200 above the floor: its plane is outlined down to the corner line.
+        floor = self._span(at=(500, 500, 0), normal=(0, 0, 1),
+                           region=(((0, 0, 0), (1000, 0, 0), (1000, 1000, 0), (0, 1000, 0)),))
+        wall = self._span(at=(0, 500, 600), normal=(1, 0, 0),
+                          region=(((0, 400, 200), (0, 600, 200), (0, 600, 1000), (0, 400, 1000)),))
+
+        rays = self._corner(floor, wall)
+
+        assert [round(v, 6) for v in rays.vertex] == [0.0, 500.0, 0.0]
+        drawn = sorted(sorted([round(v, 6) for v in end] for end in segment) for segment in rays.phantoms)
+        assert drawn == [[[0.0, 400.0, 0.0], [0.0, 400.0, 200.0]], [[0.0, 400.0, 0.0], [0.0, 600.0, 0.0]],
+                         [[0.0, 600.0, 0.0], [0.0, 600.0, 200.0]]]
+
+    def test_a_face_across_the_corner_opens_toward_most_of_it(self):
+        # The wall reaches both sides of the floor's plane, mostly above: its ray points up.
+        floor = self._span(at=(500, 500, 0), normal=(0, 0, 1),
+                           region=(((0, 0, 0), (1000, 0, 0), (1000, 1000, 0), (0, 1000, 0)),))
+        wall = self._span(at=(0, 500, 300), normal=(1, 0, 0),
+                          region=(((0, 400, -100), (0, 600, -100), (0, 600, 700), (0, 400, 700)),))
+
+        rays = self._corner(floor, wall)
+
+        assert [round(v, 6) for v in rays.opens_to] == [0.0, 0.0, 1.0]
+
+    def test_a_flip_measures_the_supplement(self):
+        from kumiki.drawings.measure import angle_rays
+
+        slope = (0.7071067811865476, 0.7071067811865476, 0)
+        first = self._span(at=(-300, 0, 0), normal=(0, 1, 0))
+        second = self._span(at=(-300, 300, 0), normal=slope)
+
+        assert round(self._value(angle_rays(first, second)), 6) == 45.0
+        assert round(self._value(angle_rays(first, second, flip=True)), 6) == 135.0
 
     def test_an_edge_running_into_a_face(self):
         face = self._span(at=(0, 0, 0), normal=(0, 0, 1))

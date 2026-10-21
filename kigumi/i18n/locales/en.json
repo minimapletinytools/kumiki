@@ -229,6 +229,8 @@
   "viewer.selection.measuring.cancel": "(esc) cancel",
   "viewer.selection.measuring.cancel.title": "Stop measuring and release the held feature",
   "viewer.selection.measureKind": "measures",
+  "viewer.selection.flipAngle": "flip angle",
+  "viewer.selection.flipAngle.title": "Measure the angle on the other side of the corner",
   "viewer.measure.kind.projected_perpendicular_distance": "distance",
   "viewer.measure.kind.projected_horizontal_distance": "horizontal",
   "viewer.measure.kind.projected_vertical_distance": "vertical",

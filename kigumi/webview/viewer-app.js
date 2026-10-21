@@ -3762,8 +3762,20 @@ class KigumiViewerApp extends LitElement {
         }, MEASUREMENT_SETTLE_MS);
     }
 
+    /** Measure an angle on the other side of the corner: its supplement. */
+    flipMeasurementAngle(viewportId, measureKey) {
+        const found = this.focusedMeasurement(viewportId, measureKey);
+        if (!found) {
+            return;
+        }
+        const was = found.measure.placement || { offset: 0 };
+        this._writeMeasurementPlacement(
+            viewportId, measureKey, { ...was, flip: !was.flip }, was, 'flip angle');
+        this.emitViewerLog('measure-flip', { viewport: viewportId, flip: !was.flip });
+    }
+
     /** Write where a dimension now sits, and what would put it back. */
-    _writeMeasurementPlacement(viewportId, measureKey, placement, was) {
+    _writeMeasurementPlacement(viewportId, measureKey, placement, was, label = 'move measurement') {
         const found = this.focusedMeasurement(viewportId, measureKey);
         if (!found) {
             return;
@@ -3778,7 +3790,7 @@ class KigumiViewerApp extends LitElement {
         };
         this._focusMeasurementOnArrival = { viewportId, measureKey };
         this.undoStacks.push(this.frameKey, drawingId, {
-            label: 'move measurement',
+            label,
             redo: { type: 'updateMeasurement', ...where, changes: { placement } },
             undo: { type: 'updateMeasurement', ...where, changes: { placement: was } },
         });
@@ -7244,6 +7256,18 @@ class KigumiViewerApp extends LitElement {
         arc.setAttribute('class', `dim-line${options.className ? ` ${options.className}` : ''}`);
         arc.setAttribute('fill', 'none');
         into.appendChild(arc);
+        // Each feature carried on, dashed, to the corner it does not reach.
+        for (const [start, end] of (rays && rays.phantoms) || []) {
+            const a = this._projectToPage(start, viewport, pageRect);
+            const b = this._projectToPage(end, viewport, pageRect);
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', a.x);
+            line.setAttribute('y1', a.y);
+            line.setAttribute('x2', b.x);
+            line.setAttribute('y2', b.y);
+            line.setAttribute('class', `dim-phantom${options.className ? ` ${options.className}` : ''}`);
+            into.appendChild(line);
+        }
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', drawn.label.x);
