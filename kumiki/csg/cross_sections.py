@@ -10,12 +10,9 @@ from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from .edges_on_csg import _loft_sides_are_planar, solid_bounds
-from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, CutCSG, Cylinder, Difference, EmptyCSG,
-                     FaceFeature, Intersection, SolidUnion)
+from .cutcsg import CutCSG, Cylinder, Difference, FaceFeature, Intersection, SolidUnion
 from .feature_paths import FeatureHandle
 from ..geometry import Plane, perpendicular_axes
-from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
 from ..rule import Matrix, V3, as_ndarray, unit_ndarray
 
 Polygon = List[Tuple[float, float]]
@@ -225,8 +222,6 @@ def _sides(csg: CutCSG, frame: _Frame, seed: PolygonRegions) -> Sides:
     A region in both is inside the solid; in exactly one, on its surface. Raises _CannotCrossSection
     for a primitive it can't cut.
     """
-    if isinstance(csg, EmptyCSG):
-        return [], []
     if isinstance(csg, SolidUnion):
         front: PolygonRegions = []
         back: PolygonRegions = []
@@ -248,25 +243,7 @@ def _sides(csg: CutCSG, frame: _Frame, seed: PolygonRegions) -> Sides:
             cut_front, cut_back = _sides(cut, frame, seed)
             front, back = _subtract(front, cut_front), _subtract(back, cut_back)
         return front, back
-    if isinstance(csg, Cylinder):
-        return _cylinder_cross_section(csg, frame, seed)
-    if isinstance(csg, PathExtrusion):
-        front, back = [], []
-        for piece in decompose_path_into_convex_pieces(csg.path, tolerance=1e-4):
-            convex = ConvexPolygonExtrusion(points=piece, transform=csg.transform,
-                                            start_distance=csg.start_distance, end_distance=csg.end_distance)
-            piece_front, piece_back = _sides(convex, frame, seed)
-            front, back = _union(front, piece_front), _union(back, piece_back)
-        return front, back
-
-    if isinstance(csg, ConvexPolygonSimpleLoft) and not _loft_sides_are_planar(csg):
-        raise _CannotCrossSection("a loft with twisted sides")
-    bounds = solid_bounds(csg)
-    if bounds.is_empty:
-        return [], []
-    if bounds.is_unknown:
-        raise _CannotCrossSection(type(csg).__name__)
-    return _half_space_cross_section(bounds.require_faces(), frame, seed)
+    return csg.plane_sides(frame, seed)
 
 
 def face_reaches_surface(face: FeatureHandle[FaceFeature], root: CutCSG, near: V3, reach: float) -> bool:

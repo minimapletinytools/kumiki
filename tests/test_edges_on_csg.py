@@ -676,9 +676,7 @@ class TestWhatIsSolvedAndWhatIsBounded:
         return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
 
     def _solved(self, csg):
-        from kumiki.csg.edges_on_csg import _exact_spans
-
-        return _exact_spans(csg, self._line(), (-10.0, 10.0), 0.0, False) is not None
+        return csg.exact_line_spans(self._line(), (-10.0, 10.0), 0.0, False) is not None
 
     def _loft(self, bottom, top):
         from kumiki.csg.cutcsg import ConvexPolygonSimpleLoft
