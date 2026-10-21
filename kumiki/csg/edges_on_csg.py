@@ -23,7 +23,6 @@ from ..geometry import (
     unit_vector,
 )
 from ..rule import V2, V3, Matrix, Numeric, safe_magnitude, scalar
-from .identity_memo import memo_by_identity
 
 if TYPE_CHECKING:
     from ..rule import Transform
@@ -104,10 +103,11 @@ EMPTY_HULL = ConvexHull(kind=ConvexHullKind.EMPTY)
 UNKNOWN_HULL = ConvexHull(kind=ConvexHullKind.UNKNOWN)
 
 
-@memo_by_identity
 def convex_hull(csg: 'CutCSG') -> ConvexHull:
-    """Return `csg.get_convex_hull()`, cached per node."""
-    return csg.get_convex_hull()
+    """Return the convex hull of `csg`: the one worked out at construction for a feature-declaring
+    primitive, else `csg.get_convex_hull()`."""
+    hull = getattr(csg, "_convex_hull_precomputed", None)
+    return hull if hull is not None else csg.get_convex_hull()
 
 
 def _hull_or_unknown(faces: Optional[BoundingHalfSpaces]) -> ConvexHull:

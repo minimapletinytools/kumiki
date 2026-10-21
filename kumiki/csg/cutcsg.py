@@ -1578,7 +1578,7 @@ class SimpleLoftFeature(FaceFeature):
         # A side; planar, since is_valid refuses a twisted loft.
         index = int(self.key)
         count = len(owner.bottom_points)
-        if index >= count:
+        if index >= count or count != len(owner.top_points):
             return None
         following = (index + 1) % count
         def placed(profile_point, z_pos):
@@ -1755,15 +1755,41 @@ class HasFeatures:
 
     feature_overrides: Sequence[FeatureOverride] = field(default=(), kw_only=True)
     extra_features: Sequence['CSGFeature'] = field(default=(), kw_only=True)
+    # Set at construction, so every query of a node reads the same objects.
+    _declared_features_precomputed: Dict['FeatureSource', Tuple['CSGFeature', ...]] = field(
+        init=False, repr=False, compare=False)
+    _face_plane_carriers_precomputed: Dict['FeatureKey', 'Carrier'] = field(init=False, repr=False, compare=False)
+    _convex_hull_precomputed: 'ConvexHull' = field(init=False, repr=False, compare=False)
 
     def __post_init__(self):
+        """Validate authored features and work out the node's declared features, face carriers and
+        convex hull. Subclasses set their own derived fields before calling this."""
         if self.feature_overrides or self.extra_features:
             self._check_authored_features()
+        object.__setattr__(self, "_declared_features_precomputed", self._work_out_declared_features())
+        object.__setattr__(self, "_face_plane_carriers_precomputed", self._work_out_face_plane_carriers())
+        object.__setattr__(self, "_convex_hull_precomputed", cast(CutCSG, self).get_convex_hull())
 
     # TODO should probably make this an abstract method, or... this overrides the CutCSG one or osemthing? plesae update the comment explaniing if that's the case
     def default_features(self) -> Dict['FeatureKey', 'CSGFeature']:
         """Return this primitive's default features by key. Must all be in FeatureGroup.NONE."""
         return {}
+
+    def _work_out_face_plane_carriers(self) -> Dict['FeatureKey', 'Carrier']:
+        carriers: Dict[FeatureKey, Carrier] = {}
+        node = cast(CutCSG, self)
+        for key, feature in self.default_features().items():
+            if not isinstance(feature, FaceFeature):
+                continue
+            plane = feature.locate_simple_unbounded(node)
+            if plane is not None:
+                carriers[key] = CarrierPlane(plane)
+        for index, extra in enumerate(self.extra_features):
+            if isinstance(extra, PlaneFeature):
+                plane = extra.locate_simple_unbounded(node)
+                if plane is not None:
+                    carriers[(FeatureCategory.EXTRA, index)] = CarrierPlane(plane)
+        return carriers
 
     def _check_authored_features(self) -> None:
         """Raise for overrides of missing or repeated keys, keyed extras, or repeated names."""
@@ -1803,49 +1829,30 @@ class HasFeatures:
     def get_declared_features(
         self, source: 'FeatureSource' = FeatureSource.BOTH,
     ) -> List['CSGFeature']:
-        """Return the features this node declares (defaults with overrides applied, plus extras), cached per node."""
-        return list(_declared_features(self, source))
+        """Return the features this node declares (defaults with overrides applied, plus extras)."""
+        return list(self._declared_features_precomputed[source])
 
-    def _work_out_declared_features(self, source: 'FeatureSource') -> List['CSGFeature']:
+    def _work_out_declared_features(self) -> Dict['FeatureSource', Tuple['CSGFeature', ...]]:
+        """Return the declared features for each FeatureSource: DEFAULTS, OVERRIDES and BOTH."""
         defaults = self.default_features()
-        if source is FeatureSource.DEFAULTS:
-            return list(defaults.values())
-        overridden = {override.key: override.apply(defaults[override.key])
-                      for override in self.feature_overrides}
-        authored = [*overridden.values(), *self.extra_features]
-        if source is FeatureSource.OVERRIDES:
-            return authored
-        return authored + [feature for key, feature in defaults.items() if key not in overridden]
-
-
-@memo_by_identity
-def _declared_features(csg: 'HasFeatures', source: 'FeatureSource') -> List['CSGFeature']:
-    return csg._work_out_declared_features(source)
+        overridden = {override.key: override.apply(defaults[override.key]) for override in self.feature_overrides}
+        authored = (*overridden.values(), *self.extra_features)
+        return {
+            FeatureSource.DEFAULTS: tuple(defaults.values()),
+            FeatureSource.OVERRIDES: authored,
+            FeatureSource.BOTH: authored + tuple(feature for key, feature in defaults.items() if key not in overridden),
+        }
 
 
 def face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
     """Return a CarrierPlane per default face of `csg` with a plane, and per extra PlaneFeature, by key.
 
-    Cached per node; the returned dict is a copy.
+    The returned dict is a copy.
     """
-    return dict(_face_plane_carriers(csg))
+    return dict(csg._face_plane_carriers_precomputed)
 
 
-@memo_by_identity
-def _face_plane_carriers(csg: 'HasFeatures') -> Dict[FeatureKey, Carrier]:
-    carriers: Dict[FeatureKey, Carrier] = {}
-    for key, feature in csg.default_features().items():
-        if not isinstance(feature, FaceFeature):
-            continue
-        plane = feature.locate_simple_unbounded(cast(CutCSG, csg))
-        if plane is not None:
-            carriers[key] = CarrierPlane(plane)
-    for index, extra in enumerate(csg.extra_features):
-        if isinstance(extra, PlaneFeature):
-            plane = extra.locate_simple_unbounded(cast(CutCSG, csg))
-            if plane is not None:
-                carriers[(FeatureCategory.EXTRA, index)] = CarrierPlane(plane)
-    return carriers
+
 
 
 # TODO consider making this typed, you could do this by adding... an optional owner field to FeatureHit and removing this class all together. Or making several OwnedFeatureHit classes is fine too I guess.
@@ -2438,11 +2445,11 @@ class RectangularPrism(HasFeatures, CutCSG):
     _axes_precomputed: Tuple[Direction3D, Direction3D, Direction3D] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self):
-        super().__post_init__()
         m = self.transform.orientation.matrix
         axes = (Matrix([m[0, 0], m[1, 0], m[2, 0]]), Matrix([m[0, 1], m[1, 1], m[2, 1]]),
                 Matrix([m[0, 2], m[1, 2], m[2, 2]]))
         object.__setattr__(self, "_axes_precomputed", axes)
+        super().__post_init__()
 
     # Features this primitive names on its own boundary. Private: read it
     def get_bottom_position(self) -> V3:
