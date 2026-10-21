@@ -238,12 +238,11 @@ def features_near_ray(
     """Return the features under the pointer on one tree, in the library's order, each with where it
     was found along the ray. Shared by the 3D and drawing picks; slack is in screen pixels.
 
-    - Features at the surface point `local_pt` (None if the ray misses), kept within their slack of
-      the ray; edges and corners are placed nearest the ray.
+    - Features at the surface point `local_pt` (None if the ray misses), gathered SLANT_REACH wider
+      and kept within their slack of the ray; edges and corners are placed nearest the ray.
+    - Non-real planes whose line across the face there passes near the ray, placed at the surface.
     - Non-real lines (a bore's axis) the ray passes near.
-    - In 3D (no `timber`): the gather is SLANT_REACH wider, and non-real planes whose line across the
-      face passes near the ray are added.
-    - In a drawing (`timber` given): non-real planes seen edge-on along the ray are added.
+    - With `timber` (a drawing), non-real planes seen edge-on along the ray.
 
     `group` is left 0; order_along_ray sets it.
     """
@@ -253,17 +252,15 @@ def features_near_ray(
 
     origin, direction = Float3.of(local_ray[0]), Float3.of(local_ray[1]).unit()
     assert direction is not None
-    in_3d = timber is None
-    gather = (replace(tolerances, edge=float(tolerances.edge) * SLANT_REACH,
-                      point=float(tolerances.point or tolerances.edge) * SLANT_REACH) if in_3d else tolerances)
+    gather = replace(tolerances, edge=float(tolerances.edge) * SLANT_REACH,
+                     point=float(tolerances.point or tolerances.edge) * SLANT_REACH)
     hits: List['OwnedFeatureHit'] = []
     if local_pt is not None:
         gathered = _only_creases(root, root.find_all_features(local_pt.v3(), gather), local_pt)
         hits = [hit for hit in gathered if _within_slack(hit, origin, direction, tolerances)]
-        if in_3d:
-            known = {_hit_key(hit) for hit in hits}
-            hits += [hit for hit in _reference_planes_near(root, local_pt, origin, direction, float(tolerances.edge))
-                     if _hit_key(hit) not in known]
+        known = {_hit_key(hit) for hit in hits}
+        hits += [hit for hit in _reference_planes_near(root, local_pt, origin, direction, float(tolerances.edge))
+                 if _hit_key(hit) not in known]
     at_surface = {_hit_key(hit) for hit in hits}
     hits += [hit for hit in non_real_features_along_ray(root, local_ray, tolerances, timber)
              if _hit_key(hit) not in at_surface]
