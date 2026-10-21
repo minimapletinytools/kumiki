@@ -9,13 +9,14 @@ import math
 import warnings
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from ..rule import sqrt as sym_sqrt
 
 from ..rule import *
 from ..geometry import Plane
 from .cutcsg import (
+    ConvexPolygonExtrusion,
     AxisAlignedBoundingBox,
     CSGFeature,
     CSGFeatureType,
@@ -32,6 +33,10 @@ from .cutcsg import (
     Profile,
 )
 from .carriers import Carrier
+
+if TYPE_CHECKING:
+    from .cross_sections import Sides
+    from .edges_on_csg import SolidBounds
 
 
 # ============================================================================
@@ -892,3 +897,27 @@ class PathExtrusion(HasFeatures, CutCSG):
             return result
 
         return AxisAlignedBoundingBox(_min(*xs), _min(*ys), _min(*zs), _max(*xs), _max(*ys), _max(*zs))
+
+
+    def bounding_half_spaces(self) -> 'SolidBounds':
+        """Return the hull of the path's segment start points.
+
+        KNOWN BUG: an arc bulging outward lies outside this hull, so the bound is too small.
+        """
+        from .edges_on_csg import _bounds_or_unknown, _extruded_hull_half_spaces
+        points = [seg.start for seg in self.path.segments]
+        return _bounds_or_unknown(_extruded_hull_half_spaces(
+            [(float(point[0, 0]), float(point[1, 0])) for point in points],
+            self.transform, self.start_distance, self.end_distance))
+
+    def plane_sides(self, frame, seed) -> 'Sides':
+        """Return the union of its convex pieces' sides."""
+        from .cross_sections import _union
+        front: list = []
+        back: list = []
+        for piece in decompose_path_into_convex_pieces(self.path, tolerance=1e-4):
+            convex = ConvexPolygonExtrusion(points=piece, transform=self.transform,
+                                            start_distance=self.start_distance, end_distance=self.end_distance)
+            piece_front, piece_back = convex.plane_sides(frame, seed)
+            front, back = _union(front, piece_front), _union(back, piece_back)
+        return front, back

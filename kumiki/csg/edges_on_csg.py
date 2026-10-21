@@ -13,13 +13,11 @@ Faces are cropped by plane in cross_sections.py.
 import math
 from dataclasses import dataclass
 from enum import Enum
-import warnings
 from typing import List, Optional, Sequence, Tuple
 
 from ..geometry import (
     Line,
     LineSegment,
-    perpendicular_axes,
     unit_vector,
 )
 from ..rule import V3, Matrix, Numeric, safe_magnitude, scalar
@@ -104,68 +102,8 @@ UNKNOWN_BOUNDS = SolidBounds(kind=BoundsKind.UNKNOWN)
 
 @memo_by_identity
 def solid_bounds(csg) -> SolidBounds:
-    """Return a primitive's bounding half spaces (outward approximations), EMPTY, or UNKNOWN."""
-    from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
-                         EmptyCSG, HalfSpace, RectangularPrism)
-    from .pathcsg import PathExtrusion
-
-    if isinstance(csg, EmptyCSG):
-        return EMPTY_BOUNDS
-
-    if isinstance(csg, HalfSpace):
-        # Inside is p . normal >= offset, so the outward normal is the other way.
-        normal = unit_vector(csg.normal)
-        return SolidBounds.of([(-normal, normal * csg.offset)])
-
-    if isinstance(csg, RectangularPrism):
-        width_dir, height_dir, length_dir = csg._local_axes()
-        centre = csg.transform.position
-        half_width = csg.size[0] / scalar(2)
-        half_height = csg.size[1] / scalar(2)
-        faces: BoundingHalfSpaces = [
-            (width_dir, centre + width_dir * half_width),
-            (-width_dir, centre - width_dir * half_width),
-            (height_dir, centre + height_dir * half_height),
-            (-height_dir, centre - height_dir * half_height),
-        ]
-        # An end that runs to infinity bounds nothing, and says so by being None.
-        if csg.end_distance is not None:
-            faces.append((length_dir, centre + length_dir * csg.end_distance))
-        if csg.start_distance is not None:
-            faces.append((-length_dir, centre + length_dir * csg.start_distance))
-        return SolidBounds.of(faces)
-
-    if isinstance(csg, Cylinder):
-        # A circumscribing hexagon.
-        axis = unit_vector(csg.axis_direction)
-        across, up = perpendicular_axes(axis)
-        faces = []
-        for step in range(6):
-            angle = math.pi * step / 3
-            normal = across * scalar(math.cos(angle)) + up * scalar(math.sin(angle))
-            faces.append((normal, csg.position + normal * csg.radius))
-        return SolidBounds.of(faces + _extrusion_caps(
-            axis, csg.position, csg.start_distance, csg.end_distance))
-
-    if isinstance(csg, ConvexPolygonExtrusion):
-        return _bounds_or_unknown(_extruded_hull_half_spaces(
-            [(float(x), float(y)) for x, y in csg.points],
-            csg.transform, csg.start_distance, csg.end_distance,
-        ))
-
-    if isinstance(csg, PathExtrusion):
-        # The hull of the path's segment start points.
-        # KNOWN BUG: an arc bulging outward lies outside this hull, so the bound is too small.
-        points = [seg.start for seg in csg.path.segments]
-        return _bounds_or_unknown(_extruded_hull_half_spaces(
-            [(float(point[0, 0]), float(point[1, 0])) for point in points],
-            csg.transform, csg.start_distance, csg.end_distance,
-        ))
-
-    if isinstance(csg, ConvexPolygonSimpleLoft):
-        return _bounds_or_unknown(_loft_half_spaces(csg))
-
-    return UNKNOWN_BOUNDS
+    """Return `csg.bounding_half_spaces()`, cached per node."""
+    return csg.bounding_half_spaces()
 
 
 def _bounds_or_unknown(faces: Optional[BoundingHalfSpaces]) -> SolidBounds:
@@ -457,35 +395,6 @@ def _loft_sides_are_planar(csg) -> bool:
 _PLANAR_ENOUGH = 1e-9
 
 
-def _exact_spans(
-    csg, line: Line, seed: Span, tolerance: float, removing: bool,
-) -> Optional[List[Span]]:
-    """Return where a line runs inside a primitive, exactly, or None if the shape isn't solved.
-
-    Prisms, half spaces, convex extrusions and planar-sided lofts are exactly their half spaces;
-    cylinders are solved directly. Path extrusions and twisted lofts return None.
-    """
-    from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
-                         HalfSpace, RectangularPrism)
-
-    if isinstance(csg, Cylinder):
-        return _cylinder_spans(csg, line, seed, tolerance, removing)
-
-    exactly_bounded = isinstance(csg, (HalfSpace, RectangularPrism, ConvexPolygonExtrusion))
-    if isinstance(csg, ConvexPolygonSimpleLoft):
-        exactly_bounded = _loft_sides_are_planar(csg)
-
-    if not exactly_bounded:
-        return None
-
-    bounds = solid_bounds(csg)
-    if bounds.is_unknown:
-        return None
-    if bounds.is_empty:
-        return []
-    return _spans_within_primitive(bounds.require_faces(), line, seed, tolerance, removing)
-
-
 def _spans_on_csg(
     csg, line: Line, seed: Span, tolerance: float, removing: bool = False,
     flush_removes: bool = True,
@@ -549,7 +458,7 @@ def _spans_on_csg(
 
         return _subtracted_spans(kept, removed)
 
-    exact = _exact_spans(csg, line, seed, tolerance, removing)
+    exact = csg.exact_line_spans(line, seed, tolerance, removing)
     if exact is not None:
         return exact
 
@@ -715,38 +624,6 @@ def _plane_angles(faces, at, direction, basis, tolerance) -> AngleSpans:
     return angles
 
 
-def _primitive_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
-    """Return the angles around the line a primitive occupies at `at`, or None if the shape isn't solved."""
-    import numpy as np
-    from .cutcsg import ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder, HalfSpace, RectangularPrism
-
-    if isinstance(csg, Cylinder):
-        axis = np.array([float(v) for v in unit_vector(csg.axis_direction)])
-        offset = at - np.array([float(csg.position[i, 0]) for i in range(3)])
-        radial = offset - axis * float(offset @ axis)
-        distance = float(np.linalg.norm(radial)) - float(csg.radius)
-        if distance > tolerance + _IN_PLANE_EPS:
-            return []
-        caps = _extrusion_caps(unit_vector(csg.axis_direction), csg.position, csg.start_distance, csg.end_distance)
-        angles = _plane_angles(caps, at, direction, basis, tolerance)
-        if angles and distance >= -(tolerance + _IN_PLANE_EPS):
-            across = radial - direction * float(radial @ direction)
-            if float(np.linalg.norm(across)) > 1e-12:
-                angles = _angles_intersection(angles, _half_turn(across, basis))
-        return angles
-    exact = isinstance(csg, (HalfSpace, RectangularPrism, ConvexPolygonExtrusion))
-    if isinstance(csg, ConvexPolygonSimpleLoft):
-        exact = _loft_sides_are_planar(csg)
-    if not exact:
-        return None
-    bounds = solid_bounds(csg)
-    if bounds.is_unknown:
-        return None
-    if bounds.is_empty:
-        return []
-    return _plane_angles(bounds.require_faces(), at, direction, basis, tolerance)
-
-
 def _tree_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
     from .cutcsg import Difference, Intersection, SolidUnion
 
@@ -772,7 +649,7 @@ def _tree_angles(csg, at, direction, basis, tolerance) -> Optional[AngleSpans]:
                 return None
             kept = _angles_less(kept, removed)
         return kept
-    return _primitive_angles(csg, at, direction, basis, tolerance)
+    return csg.angles_around_line(at, direction, basis, tolerance)
 
 
 def _directions_at(csg, line: Line, station: float, tolerance: float):
@@ -796,43 +673,34 @@ def _directions_at(csg, line: Line, station: float, tolerance: float):
     return angles
 
 
-def _stations(csg, line: Line, seed: Span) -> List[float]:
-    """Return where along the line, within `seed`, it crosses a primitive's plane or a cylinder's barrel."""
+def _plane_stations(faces, origin, direction) -> List[float]:
+    """Return where the line (numpy `origin`, unit `direction`) crosses each half space's plane."""
     import numpy as np
-    from .cutcsg import Cylinder, csg_children
+
+    found = []
+    for normal, point in faces:
+        n = np.array([float(normal[i, 0]) for i in range(3)])
+        along = float(n @ direction)
+        if abs(along) > 1e-12:
+            found.append(float(n @ (np.array([float(point[i, 0]) for i in range(3)]) - origin)) / along)
+    return found
+
+
+def _stations(csg, line: Line, seed: Span) -> List[float]:
+    """Return where along the line, within `seed`, it crosses a primitive's surface (line_crossings)."""
+    import numpy as np
+    from .cutcsg import csg_children
 
     direction = np.array([float(v) for v in unit_vector(line.direction)])
     origin = np.array([float(line.point[i, 0]) for i in range(3)])
     found: List[float] = []
 
-    def planes(faces) -> None:
-        for normal, point in faces:
-            n = np.array([float(normal[i, 0]) for i in range(3)])
-            along = float(n @ direction)
-            if abs(along) > 1e-12:
-                found.append(float(n @ (np.array([float(point[i, 0]) for i in range(3)]) - origin)) / along)
-
     def walk(node) -> None:
         children = csg_children(node)
-        if children:
-            for child in children:
-                walk(child)
-            return
-        if isinstance(node, Cylinder):
-            axis = np.array([float(v) for v in unit_vector(node.axis_direction)])
-            start = origin - np.array([float(node.position[i, 0]) for i in range(3)])
-            across, offset = direction - axis * float(direction @ axis), start - axis * float(start @ axis)
-            a, b = float(across @ across), 2 * float(offset @ across)
-            c = float(offset @ offset) - float(node.radius) ** 2
-            if a > 1e-18 and b * b - 4 * a * c > 0:
-                root = (b * b - 4 * a * c) ** 0.5
-                found.extend([(-b - root) / (2 * a), (-b + root) / (2 * a)])
-            planes(_extrusion_caps(unit_vector(node.axis_direction), node.position, node.start_distance,
-                                   node.end_distance))
-            return
-        bounds = solid_bounds(node)
-        if not bounds.is_unknown and not bounds.is_empty:
-            planes(bounds.require_faces())
+        for child in children:
+            walk(child)
+        if not children:
+            found.extend(node.line_crossings(origin, direction))
 
     walk(csg)
     return sorted(station for station in found if seed[0] < station < seed[1])
