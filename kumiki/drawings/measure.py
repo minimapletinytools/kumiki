@@ -1032,26 +1032,35 @@ class Measure:
             placement = replace(placement, offset=-placement.offset)
         return second, first, placement
 
-    @staticmethod
-    def kind_identity(kind: Optional['MeasurementKind']) -> Tuple:
-        if kind is None:
-            return ()
-        wire = kind.as_wire()
-        return (wire["operation"], wire["space"], wire["direction"])
-
     def pair_identity(self, frame: 'Frame') -> Optional[Tuple[Tuple, Tuple]]:
         """Return the two anchors' identities in wire order, or None if either isn't in `frame`."""
         anchors = self.wire_anchors(frame)
-        if anchors is None:
-            return None
-        return (anchors[0].identity(), anchors[1].identity())
+        return None if anchors is None else pair_identity(anchors[0], anchors[1])
 
     def identity(self, frame: 'Frame') -> Optional[Tuple[Tuple, Tuple, Tuple, str]]:
         """Return (pair, kind, measure_id), or None if either anchor isn't in `frame`."""
         pair = self.pair_identity(frame)
-        if pair is None:
-            return None
-        return (*pair, self.kind_identity(self.kind), str(self.measure_id or ""))
+        return None if pair is None else measurement_identity(pair, self.kind, self.measure_id)
+
+
+def pair_identity(a: Optional[FeaturePath], b: Optional[FeaturePath]) -> Tuple[Tuple, Tuple]:
+    """Return two anchors' identities, sorted by sort_key; a missing anchor is () and sorts first."""
+    first, second = sorted((a, b), key=lambda path: ("",) if path is None else path.sort_key)
+    return (() if first is None else first.identity(), () if second is None else second.identity())
+
+
+def kind_identity(kind: Optional['MeasurementKind']) -> Tuple:
+    """Return a comparable form of a kind; () for none."""
+    if kind is None:
+        return ()
+    wire = kind.as_wire()
+    return (wire["operation"], wire["space"], wire["direction"])
+
+
+def measurement_identity(pair: Tuple[Tuple, Tuple], kind: Optional['MeasurementKind'],
+                         measure_id: Union[MeasurementId, str, None]) -> Tuple[Tuple, Tuple, Tuple, str]:
+    """Return a measurement's identity within its viewport: its pair_identity, kind and id."""
+    return (*pair, kind_identity(kind), str(measure_id or ""))
 
 
 class MeasurementSource(Enum):
@@ -1084,28 +1093,21 @@ def does_override(
     Only a higher tier replaces. A FILE_OVERRIDE matches on everything including the kind; other
     tiers match on the two features alone.
     """
-    candidate_identity, candidate_pair = candidate.identity(frame), candidate.pair_identity(frame)
-    existing_identity, existing_pair = existing.identity(frame), existing.pair_identity(frame)
-    if (candidate_identity is None or candidate_pair is None
-            or existing_identity is None or existing_pair is None):
+    candidate_identity, existing_identity = candidate.identity(frame), existing.identity(frame)
+    if candidate_identity is None or existing_identity is None:
         return False
-    return does_override_identities(
-        candidate_identity, candidate_pair, candidate_source,
-        existing_identity, existing_pair, existing_source,
-    )
+    return does_override_identities(candidate_identity, candidate_source, existing_identity, existing_source)
 
 
 def does_override_identities(
     candidate_identity: Tuple,
-    candidate_pair: Tuple,
     candidate_source: MeasurementSource,
     existing_identity: Tuple,
-    existing_pair: Tuple,
     existing_source: MeasurementSource,
 ) -> bool:
-    """does_override, for identities rather than Measures (the viewer reads plain dicts)."""
+    """does_override, for measurement_identity tuples (the runner reads plain dicts)."""
     if _SOURCE_RANK[candidate_source] <= _SOURCE_RANK[existing_source]:
         return False
     if candidate_source is MeasurementSource.FILE_OVERRIDE:
         return candidate_identity == existing_identity
-    return candidate_pair == existing_pair
+    return candidate_identity[:2] == existing_identity[:2]
