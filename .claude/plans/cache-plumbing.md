@@ -1,6 +1,7 @@
 # Caches with owners: no more global memos
 
-Status: plan, nothing done yet (2026-10-20).
+Status (2026-10-21): only face carriers done (they are no longer cached; see "Left to do"). Steps 1-6
+were implemented on branch `cache-plumbing` (closed PR #146) and set aside; step 1 as written was dropped.
 
 ## The problem
 
@@ -87,3 +88,31 @@ Each step on its own, checked the same way: the full tests, the drawings of
 - **Lifetime**: today a cached result outlives a solve; owned caches die with their owner. A
   generator that rebuilds its `DrawingSolve` per drawing loses cross-drawing reuse, so check the
   cat corner cot's per-member solves don't get slower.
+
+## Left to do: convex hull and declared features
+
+Both are still `memo_by_identity` tables (`edges_on_csg.convex_hull`, `cutcsg._declared_features`).
+
+**Computing at construction (step 1 as written) was tried and dropped.** It cost load time on frames
+built from many throwaway nodes: tinyhouse120 0.46 -> 0.56 s. Of the 1,173 feature-declaring nodes built
+loading tinyhouse, 75 are ever asked for their features, and none for carriers or hull; cat_corner_cot,
+which solves drawings, asks about 421 of 585. Measured with the old lazy memos on main.
+
+**Face carriers: done.** Not cached at all. A solve keeps them in its CarrierMap; `solve_recipe` asks
+`owner.has_carrier(key)`, which answers without building every carrier (a prism by its ends alone).
+
+Options for the other two:
+
+- **Convex hull.** Asked only by the CSG walkers in `edges_on_csg` and `cross_sections`. A cache could
+  be passed through them, owned by `FeatureExtents` (one per cut timber). Cost: about 17 functions gain
+  a parameter that every recursive call forwards, and 44 outside call sites choose whether to pass
+  one -- noisy for what it saves (about a tenth of the construction-time cost above).
+- **Declared features.** `get_declared_features()` is a core node API, called from feature walks,
+  picking, the solver, feature-path resolution, the runner's tree view and patterns. Passing a cache
+  down means every one of those callers carries it, and a caller without it gets new feature objects
+  on each call, which code relying on the same object coming back would break on. Not a good fit.
+- **Either: a lazily filled slot on the node** (`functools.cached_property`). The value is a pure
+  function of the frozen node, kept in its `__dict__`, out of equality and hashing; only nodes that are
+  asked pay. It is a write after construction, though nothing visible about the node changes.
+- **Either: compute at construction, made cheaper.** Most of declared features' cost is applying
+  overrides; nodes without overrides could skip that. Still paid by every throwaway node.
