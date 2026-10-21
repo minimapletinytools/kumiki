@@ -9,7 +9,7 @@ import pytest
 
 from kumiki.csg.cutcsg import CutCSGLabel, Difference, RectangularPrism
 from kumiki.csg.required_features import required_features
-from kumiki.drawings.visibility import nearest_visible_depth, sight_is_blocked
+from kumiki.drawings.visibility import Occluder, nearest_visible_depth, sight_is_blocked
 from kumiki.rule import Transform, create_v2, create_v3, scalar
 
 PATTERN = Path(__file__).resolve().parent.parent / "patterns" / "structures" / "my_cute_frame_drawing_test.py"
@@ -47,7 +47,7 @@ def left_side():
     def depth(name, reach=3.0):
         handle = next(r.handle for r in required_features(cut) if r.handle.feature.name == name)
         return nearest_visible_depth(handle, cut.feature_extents(), look / np.linalg.norm(look),
-                                     [(root, cut.timber.transform)], reach)
+                                     [Occluder(root, cut.timber.transform)], reach)
 
     return depth
 

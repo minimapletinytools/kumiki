@@ -9,6 +9,7 @@ over by a nearer one is also hidden; in a view it is kept.
 """
 
 import warnings
+from dataclasses import dataclass, field
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -16,7 +17,6 @@ import numpy as np
 from ..csg.edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to_interior_segments_on_csg
 from ..csg.cutcsg import CSGFeature, CutCSG
 from ..csg.feature_paths import FeatureHandle
-from ..csg.identity_memo import memo_by_identity
 from ..csg.cross_sections import (CannotCrossSection, PolygonRegions, PlaneFrame, area, material_crossing,
                                   segments_outside, shadow, subtract)
 from ..geometry import Line, Plane, Point
@@ -47,8 +47,23 @@ def sight_is_blocked(root: CutCSG, place: V3, toward_camera: V3) -> bool:
                for piece in inside or [])
 
 
-# A solid that may hide what is behind it: a drawn timber's tree, in its own local space, and where it is.
-Occluder = Tuple[CutCSG, Transform]
+@dataclass(frozen=True, eq=False)
+class Occluder:
+    """A solid that may hide what is behind it: a drawn timber's tree in its own local space, and its transform.
+
+    `rotation` and `position` (floats: world = rotation @ local + position) and `corners` (its bounding
+    box's eight world corners, None if infinite) are worked out at construction.
+    """
+    solid: CutCSG
+    transform: Transform
+    rotation: np.ndarray = field(init=False, repr=False)
+    position: np.ndarray = field(init=False, repr=False)
+    corners: Optional[np.ndarray] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "rotation", np.array(self.transform.orientation.matrix.tolist(), dtype=float))
+        object.__setattr__(self, "position", as_ndarray(self.transform.position))
+        object.__setattr__(self, "corners", _box_corners(self.solid, self.rotation, self.position))
 
 
 def never_hidden(feature: CSGFeature) -> bool:
@@ -60,8 +75,8 @@ def hidden_at(place: np.ndarray, look: np.ndarray, occluders: Sequence[Occluder]
     """Return whether any occluder's material is between world `place` and the camera along `look`."""
     toward = create_v3(*(-np.asarray(look, dtype=float)))
     at = create_v3(*place)
-    return any(sight_is_blocked(solid, placed.global_to_local(at), placed.global_to_local_direction(toward))
-               for solid, placed in occluders)
+    return any(sight_is_blocked(o.solid, o.transform.global_to_local(at), o.transform.global_to_local_direction(toward))
+               for o in occluders)
 
 
 def drawn_over(front: Optional[Geometry], behind: Optional[Geometry], look, tolerance: float) -> bool:
@@ -79,17 +94,10 @@ def drawn_over(front: Optional[Geometry], behind: Optional[Geometry], look, tole
     return gap is not None and gap <= tolerance
 
 
-def _frame_in(transform: Transform, origin: np.ndarray, u: np.ndarray, v: np.ndarray,
+def _frame_in(rotation: np.ndarray, position: np.ndarray, origin: np.ndarray, u: np.ndarray, v: np.ndarray,
               normal: np.ndarray) -> PlaneFrame:
-    """Return a world plane frame in the local space of `transform`."""
-    rotation, position = _placement(transform)
+    """Return a world plane frame in the local space placed by `rotation` and `position`."""
     return PlaneFrame.with_axes((origin - position) @ rotation, u @ rotation, v @ rotation, normal @ rotation)
-
-
-@memo_by_identity
-def _placement(transform: Transform) -> Tuple[np.ndarray, np.ndarray]:
-    """Return a transform's rotation and position as float arrays."""
-    return np.array(transform.orientation.matrix.tolist(), dtype=float), as_ndarray(transform.position)
 
 
 def nearest_visible_depth(
@@ -124,7 +132,8 @@ def nearest_visible_depth(
     offset = float(normal @ point)
     origin = normal * offset
     world = (origin, across, look, normal)
-    own = _frame_in(transform, *world)
+    own = _frame_in(np.array(transform.orientation.matrix.tolist(), dtype=float), as_ndarray(transform.position),
+                    *world)
     try:
         if isinstance(located, Plane):
             # The face's region on the finished surface: its extent, kept for the tree and so shared
@@ -177,8 +186,8 @@ def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reac
     """Return what the occluders hide in the frame's plane within the `across` strip: their material swept away from the camera."""
     origin, u, _v, normal = world
     hidden: PolygonRegions = []
-    for solid, transform in occluders:
-        corners = _world_corners(solid, transform)
+    for occluder in occluders:
+        corners = occluder.corners
         if corners is not None:
             # Its box clear of the plane, or of the strip: nothing of it can be in the way.
             side = (corners - origin) @ normal
@@ -187,7 +196,7 @@ def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reac
                     or spread.max() < across[0] - _CLEAR or spread.min() > across[1] + _CLEAR):
                 continue
         try:
-            hidden += shadow(material_crossing(solid, _frame_in(transform, *world), reach, across), 2 * reach)
+            hidden += shadow(material_crossing(occluder.solid, _frame_in(occluder.rotation, occluder.position, *world), reach, across), 2 * reach)
         except CannotCrossSection:
             continue  # unsure means seen
     return hidden
@@ -197,20 +206,8 @@ def _blocking(occluders: Sequence[Occluder], world: Tuple[np.ndarray, ...], reac
 _CLEAR = 1e-6
 
 
-def _world_corners(solid: CutCSG, transform: Transform) -> Optional[np.ndarray]:
-    """Return the eight world corners of `solid`'s bounding box, or None if infinite. Cached."""
-    memo = _corners_memo(solid)
-    if id(transform) not in memo:
-        memo[id(transform)] = (transform, _work_out_corners(solid, transform))
-    return memo[id(transform)][1]
-
-
-@memo_by_identity
-def _corners_memo(solid: CutCSG) -> Dict[int, Tuple[Transform, Optional[np.ndarray]]]:
-    return {}
-
-
-def _work_out_corners(solid: CutCSG, transform: Transform) -> Optional[np.ndarray]:
+def _box_corners(solid: CutCSG, rotation: np.ndarray, position: np.ndarray) -> Optional[np.ndarray]:
+    """Return the eight world corners of `solid`'s bounding box, or None if it is empty or infinite."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         box = solid.get_aabb()
@@ -221,7 +218,6 @@ def _work_out_corners(solid: CutCSG, transform: Transform) -> Optional[np.ndarra
     if len(floats) != 6:
         return None
     low, high = floats[:3], floats[3:]
-    rotation, position = _placement(transform)
     local = np.array([[x, y, z] for x in (low[0], high[0]) for y in (low[1], high[1]) for z in (low[2], high[2])])
     return local @ rotation.T + position
 
@@ -244,7 +240,7 @@ def visible_by_view(
 
     Every timber in `drawn` may hide the others. An anchor drawn on the same line as a nearer one is kept.
     """
-    occluders = [(cut.render_timber_with_cuts_csg_local(), cut.timber.transform) for cut in drawn]
+    occluders = [Occluder(cut.render_timber_with_cuts_csg_local(), cut.timber.transform) for cut in drawn]
     extents = {id(cut.timber): cut.feature_extents() for cut in drawn}
     reach = max((timber_reach(cut.timber) for cut in drawn), default=4.0)
     visible: Dict[str, List[FeatureHandle]] = {}

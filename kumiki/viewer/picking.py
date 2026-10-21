@@ -7,7 +7,7 @@ the wire forms. Hot paths use Float3 (rule_at_home.py) rather than V3.
 
 import math
 import warnings
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, NamedTuple, Optional, Tuple, TypedDict
 
 from ..csg.cutcsg import CSGFeature, CutCSG, FeatureTestTolerances, OwnedFeatureHit
 from ..csg.feature_paths import candidate_segments, label_name, walk_labels
@@ -16,6 +16,9 @@ from ..geometry import Line
 from ..rule import Transform, V3, scalar
 from ..timber import PerfectTimberWithin
 from .rule_at_home import Float3, LocalFrame
+
+if TYPE_CHECKING:
+    from ..drawings.visibility import Occluder
 
 #: A pointer's ray in timber-local space: origin, direction.
 LocalRay = Tuple[Float3, Float3]
@@ -858,7 +861,7 @@ def find_candidates(
     return Candidates(hits, len(hits))
 
 
-def sight_blocker(transform: Transform, occluders: List[Tuple['CutCSG', Transform]],
+def sight_blocker(transform: Transform, occluders: List['Occluder'],
                   direction: Float3) -> Callable[[Float3], bool]:
     """Return `blocked(place)`: whether an occluder hides a place (local to `transform`) looking along `direction`."""
     from kumiki.drawings.visibility import hidden_at

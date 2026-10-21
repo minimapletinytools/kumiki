@@ -1927,11 +1927,12 @@ def _sight_blocker(
 
     The members considered are the request's `drawnMembers` (all if None), including `own`.
     """
+    from kumiki.drawings.visibility import Occluder
     from kumiki.viewer.picking import sight_blocker
 
     drawn = payload.get("drawnMembers")
-    occluders = [(own_root, own.timber.transform)] + [
-        (cast('CutCSG', entry["local_csg"]), entry["cut_timber"].timber.transform)
+    occluders = [Occluder(own_root, own.timber.transform)] + [
+        Occluder(cast('CutCSG', entry["local_csg"]), entry["cut_timber"].timber.transform)
         for key, entry in ss.mesh_cache.items()
         if entry.get("cut_timber") is not None and entry.get("cut_timber") is not own
         and entry.get("local_csg") is not None and (drawn is None or key in drawn)]
