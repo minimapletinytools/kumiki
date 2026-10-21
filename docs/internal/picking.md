@@ -75,9 +75,8 @@ Click and hover both come here, so a hover always shows what a click would take.
   - A member the ray just misses is asked at the point of its mesh nearest the ray, so an edge is
     picked from outside its silhouette as well as from inside.
 - **Find each member's candidates** (`candidates_under_pointer` → `features_near_ray`), in that
-  member's own space. The same steps as a 3D pick, except as marked:
-  - Features near its point (`find_all_features`), without the 3D pick's `SLANT_REACH` widening
-    or plane traces.
+  member's own space:
+  - The 3D pick's steps, at its point (`find_all_features`, `SLANT_REACH`, plane traces).
   - Non-real lines and non-real planes along the ray (`non_real_features_along_ray`). A plane
     counts when it is seen edge-on, the ray is within the edge slack of it, and the ray crosses the
     part of the plane that lies in the timber (its `FeatureExtent`).
