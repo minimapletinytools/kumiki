@@ -155,3 +155,29 @@ def test_the_3d_view_offers_a_centerplane_a_few_pixels_off_its_line(frame):
     aimed = look + across / np.linalg.norm(across) * (8 * per_pixel / 2.0)
     offered = _reply(frame, camera, aimed / np.linalg.norm(aimed), "3d", per_pixel)
     assert any("centerplane" in (c.get("label") or "") and c.get("memberKey") == "Left Side#0" for c in offered)
+
+
+def test_a_shoulder_crossing_a_perfect_face_of_rough_stock_has_a_line_to_draw(frame):
+    # Neither parent has corners to bound the edge -- a half space and a bare plane -- so it is
+    # drawn where it is on the timber: across the shoulder face. Without that it was picked, and
+    # nothing was lit.
+    from kumiki.csg.cutcsg import DerivedEdgeFeature, FeatureGroup, OwnedFeatureHit, csg_children
+    from kumiki.viewer.picking import edge_highlight_segments
+
+    _runner, slot = frame
+    cut = slot.mesh_cache["Back Cross#0"]["cut_timber"]
+    root = slot.mesh_cache["Back Cross#0"]["local_csg"]
+    nodes, index = [root], 0
+    while index < len(nodes):
+        nodes += csg_children(nodes[index])
+        index += 1
+    hits = [OwnedFeatureHit(feature=feature, owner=node) for node in nodes for feature in node.get_declared_features()]
+    shoulder = next(hit for hit in hits if hit.feature.group is FeatureGroup.SHOULDER_PLANE)
+    face = next(hit for hit in hits if hit.feature.name == "ptw.front")
+    edge = DerivedEdgeFeature.derive(shoulder, face)
+    assert edge is not None and not edge.real
+    segments, absent = edge_highlight_segments(edge, shoulder.owner, cut.timber, root)
+    assert not absent
+    assert segments, "a line to draw"
+    start, end = segments[0]["start"], segments[0]["end"]
+    assert abs(sum((a - b) ** 2 for a, b in zip(start, end)) ** 0.5 - 0.1154) < 0.002, "across the rough stock"

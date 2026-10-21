@@ -455,12 +455,12 @@ def edge_highlight_segments(
     if timber is None or root_csg is None or not isinstance(line, Line):
         return (None, False)
     if not edge_feature.real:
-        return (non_real_highlight_segments(edge_feature, owner, timber), False)
+        return (non_real_highlight_segments(edge_feature, owner, timber, root_csg), False)
     return cropped_edge_segments(edge_feature, line, timber, root_csg, owner)
 
 
 def non_real_highlight_segments(
-    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin',
+    feature: 'CSGFeature', owner: 'CutCSG', timber: 'PerfectTimberWithin', root_csg: Optional['CutCSG'] = None,
 ) -> Optional[List[WorldSegment]]:
     """Where a non-real feature is drawn: its own extent, in world space.
 
@@ -474,12 +474,24 @@ def non_real_highlight_segments(
     The uncut body would bound it as well (see D5 in the feature-selection plan)
     and is the fallback if something ever declares a non-real feature that
     reaches past the piece; nothing does, and the clip is not free on a hover.
+
+    Where it can't bound itself -- a shoulder's half space crossing a perfect face of rough stock, two
+    planes with no corners between them -- its extent on the cut timber (`root_csg`): the line where
+    there is timber.
     """
-    extent = feature.get_extent(owner)
-    if extent is None or extent.ends is None:
-        return None
+    from kumiki.csg.feature_extent import extents_of
+    from kumiki.rule import create_v3
+
     to_world = lambda point: Float3.of(timber.transform.local_to_global(point))
-    return [{"start": to_world(extent.ends[0]), "end": to_world(extent.ends[1])}]
+    extent = feature.get_extent(owner)
+    if extent is not None and extent.ends is not None:
+        return [{"start": to_world(extent.ends[0]), "end": to_world(extent.ends[1])}]
+    if root_csg is None:
+        return None
+    on_timber = extents_of(root_csg, timber).of(feature, owner)
+    if on_timber is None or on_timber.is_empty:
+        return None
+    return [{"start": to_world(create_v3(*start)), "end": to_world(create_v3(*end))} for start, end in on_timber.outline()]
 
 
 def features_at_point(
