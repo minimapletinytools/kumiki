@@ -246,7 +246,7 @@ def _extent(span: MeasureSpan) -> Optional[Tuple[V3, V3]]:
 
 def place_pair(one: Optional[Located], other: Optional[Located], one_span: MeasureSpan, other_span: MeasureSpan,
                declared: Optional[MeasurementKind], plane, view: Optional[ViewAxes], in_three_d: bool,
-               along: Optional[float] = None) -> PairPlacement:
+               along: Optional[float] = None, flip: bool = False) -> PairPlacement:
     """Where a measurement between two features attaches, and what it comes to.
 
     The two ends together: where a dimension attaches is a property of the pair and its plane, and
@@ -264,7 +264,7 @@ def place_pair(one: Optional[Located], other: Optional[Located], one_span: Measu
                 and isinstance(one_span, LineSpan) and isinstance(other_span, LineSpan)):
             slide = slide_axis(one_span)
     elif kind is not None and kind.operation is MeasurementOperation.ANGLE:
-        rays = angle_rays(one_span, other_span)
+        rays = angle_rays(one_span, other_span, flip)
     return PairPlacement(kind, tuple(admitted), anchors, rays,
                          settle(one, other, rays, declared, kind, admitted, in_three_d, plane, view),
                          extents=extents, slide=slide)

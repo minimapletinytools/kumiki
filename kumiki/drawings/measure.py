@@ -368,12 +368,17 @@ class PlaneSpan:
     at: V3
     normal: V3
     outward: Optional[V3] = field(default=None, kw_only=True)
+    #: The part of the plane the face covers on its timber, as convex polygons of world points; empty
+    #: when not known. Decides where an angle's corner goes and which way it opens.
+    region: Tuple[Tuple[V3, ...], ...] = field(default=(), kw_only=True)
 
     def __post_init__(self):
         object.__setattr__(self, 'at', _as_v3(self.at))
         object.__setattr__(self, 'normal', _as_v3(self.normal))
         if self.outward is not None:
             object.__setattr__(self, 'outward', _as_v3(self.outward))
+        object.__setattr__(self, 'region', tuple(tuple(_as_v3(corner) for corner in polygon)
+                                                 for polygon in self.region))
 
     @property
     def facing(self) -> V3:
@@ -651,55 +656,74 @@ class AngleRays:
     #: The plane the angle is IN: for two faces, the one both are perpendicular
     #: to, whose normal is the corner they share.
     normal: V3
+    #: Each feature drawn on to the corner where the corner is off it, as world segments, dashed:
+    #: a line carried on along itself; a face, in 3D, its plane swept to the corner line.
+    phantoms: Tuple[Tuple[V3, V3], ...] = ()
 
     def as_wire(self) -> Dict[str, list]:
         return {"vertex": list(self.vertex), "from": list(self.opens_from),
-                "to": list(self.opens_to), "normal": list(self.normal)}
+                "to": list(self.opens_to), "normal": list(self.normal),
+                "phantoms": [[list(start), list(end)] for start, end in self.phantoms]}
 
 
-def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
+def angle_rays(first: MeasureSpan, second: MeasureSpan, flip: bool = False) -> Optional[AngleRays]:
     """Where an angle between two features is, and which two ways it opens.
 
-    A vertex, two unit rays from it, and the plane they span, in world space,
-    as `{"vertex", "from", "to", "normal"}` -- or None when the pair makes no
-    corner.
+    A vertex, two unit rays from it, and the plane they span, in world space -- or None when the
+    pair makes no corner.
+
+    - Two faces: the corner is on the line their planes share, in the middle of where both faces
+      reach along it (the middle of the gap between them where they don't).
+    - A line and a face, or two lines: where they meet, wherever that is. Two lines that never meet
+      (skew) are measured at the first's nearest approach, the second carried over to it.
+    - Each ray opens toward where most of its feature is: a face's area, a line's length.
+    - `flip` measures the other way round the second feature: the supplement.
+
+    Where the corner is off a feature, `phantoms` draw the feature on to it.
     """
     if first is None or second is None:
         return None
+    carried: Optional[Tuple[V3, V3]] = None
     if isinstance(first, PlaneSpan) and isinstance(second, PlaneSpan):
         crossing = _plane_crossing(first, second)
         if crossing is None:
             return None
         along = crossing.direction
-        middle = (first.at + second.at) / 2
-        vertex = _closest_on_line(middle, crossing.point, along)
+        vertex = _corner_on(crossing, first, second)
         # Square to the shared corner, and lying in its own face.
-        rays = (_ray_toward(_cross(along, first.facing), vertex, first),
-                _ray_toward(_cross(along, second.facing), vertex, second))
+        rays = (_face_ray(_cross(along, first.facing), vertex, first),
+                _face_ray(_cross(along, second.facing), vertex, second))
     elif isinstance(first, LineSpan) and isinstance(second, LineSpan):
-        placed = _closest_between(first, second)
-        if placed is None:
+        met = _lines_meet(first, second)
+        if met is None:
             return None
-        vertex = placed
+        vertex, carried = met
         rays = (_ray_toward(first.along, vertex, first, second),
-                _ray_toward(second.along, vertex, second, first))
+                _ray_toward(second.along, vertex if carried is None else carried[0], second, first))
     elif isinstance(first, LineSpan) and isinstance(second, PlaneSpan) or \
             isinstance(first, PlaneSpan) and isinstance(second, LineSpan):
         line, plane = (first, second) if isinstance(first, LineSpan) else (second, first)
         assert isinstance(line, LineSpan) and isinstance(plane, PlaneSpan)
-        vertex = _line_meets_plane(line, plane)
+        vertex = _line_meets_plane(line, plane, keep_on_line=False)
         if vertex is None:
             return None
         in_plane = _flatten_onto(line.along, plane.facing)
         if in_plane is None:
             return None
         line_ray = _ray_toward(line.along, vertex, line, plane)
-        plane_ray = _ray_toward(in_plane, vertex, plane)
+        plane_ray = _face_ray(in_plane, vertex, plane)
         rays = (line_ray, plane_ray) if isinstance(first, LineSpan) else (plane_ray, line_ray)
     else:
         return None
-    if rays[0] is None or rays[1] is None:
+    ray_from, ray_to = rays
+    if ray_from is None or ray_to is None:
         return None
+    # Before any flip: they say where each feature is from the corner, which a flip does not move.
+    phantoms = _phantoms(first, vertex, ray_from) + _phantoms(second, vertex, ray_to)
+    if carried is not None:
+        phantoms += ((carried[0], carried[1]),)
+    if flip:
+        ray_to = -ray_to
     # The plane the angle is IN: the one both rays lie in, which for two faces
     # is the plane they are each perpendicular to -- its normal is the corner
     # they share. Carried so the arc can be swept in it rather than drawn flat
@@ -712,24 +736,136 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan) -> Optional[AngleRays]:
     # reaches it today -- every shape above refuses a near-parallel pair first,
     # the closest at 0.57 degrees -- so this is the guard behind those, doing
     # what it says rather than what it did.
-    upright = _raw_cross(rays[0], rays[1])
+    upright = _raw_cross(ray_from, ray_to)
     if not any(abs(part) > 1e-9 for part in upright):
         return None
-    return AngleRays(vertex=_v3(vertex), opens_from=rays[0], opens_to=rays[1],
-                     normal=_unit(upright))
+    return AngleRays(vertex=_v3(vertex), opens_from=ray_from, opens_to=ray_to,
+                     normal=_unit(upright), phantoms=tuple(phantoms))
 
-def _closest_between(first: LineSpan, second: LineSpan) -> Optional[V3]:
-    """Where two lines come nearest each other, kept on both.
-    """
-    one, other = first.along, second.along
-    stations = closest_stations(Line(direction=one, point=first.at),
-                                Line(direction=other, point=second.at),
-                                eps=PARALLEL_EPSILON)
+
+#: Closer than this, in world units, two lines meet; and a corner is on a feature.
+CORNER_TOLERANCE = 1e-6
+
+
+def _corner_on(crossing: Line, first: 'PlaneSpan', second: 'PlaneSpan') -> V3:
+    """Where on two faces' shared line the corner goes: the middle of where both reach along it, or
+    of the gap between them. Without both regions, nearest the middle of the two faces' anchors."""
+    along, through = crossing.direction, crossing.point
+    reach_a, reach_b = (_reach_along(span.region, through, along) for span in (first, second))
+    if reach_a is None or reach_b is None:
+        return _closest_on_line((first.at + second.at) / 2, through, along)
+    (low_a, high_a), (low_b, high_b) = reach_a, reach_b
+    low, high = max(low_a, low_b), min(high_a, high_b)
+    if low > high:  # apart along the line: the middle of the gap
+        low, high = min(high_a, high_b), max(low_a, low_b)
+    return _v3(through) + _v3(along) * ((low + high) / 2)
+
+
+def _reach_along(region, through, along) -> Optional[Tuple[float, float]]:
+    """How far a region's corners reach along a line, from its point."""
+    stations = [_dot(corner - _v3(through), along) for polygon in region for corner in polygon]
+    return (min(stations), max(stations)) if stations else None
+
+
+def _face_ray(direction: VectorLike, vertex: VectorLike, plane: 'PlaneSpan') -> Optional[V3]:
+    """A ray in a face's plane from the corner, turned toward the side holding most of the face."""
+    unit = _unit(direction)
+    if not any(abs(part) > 1e-9 for part in unit):
+        return None
+    if not plane.region:
+        return _ray_toward(unit, vertex, plane)
+    ahead, behind = _area_either_side(plane.region, _v3(vertex), unit, plane.facing)
+    if abs(ahead - behind) <= 1e-12:
+        return _ray_toward(unit, vertex, plane)
+    return unit if ahead >= behind else -unit
+
+
+def _area_either_side(region, vertex: V3, direction: V3, normal: V3) -> Tuple[float, float]:
+    """A planar region's area ahead of the line through `vertex` square to `direction` (in its plane),
+    and behind it."""
+    across = _unit(_cross(normal, direction))
+    ahead = behind = 0.0
+    for polygon in region:
+        flat = [(_dot(corner - vertex, direction), _dot(corner - vertex, across)) for corner in polygon]
+        whole = _polygon_area(flat)
+        front = _polygon_area(_clip_ahead(flat))
+        ahead += front
+        behind += max(0.0, whole - front)
+    return ahead, behind
+
+
+def _polygon_area(points) -> float:
+    return abs(sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1]))) / 2
+
+
+def _clip_ahead(points):
+    """The part of a 2D polygon where x >= 0."""
+    kept = []
+    for (x0, y0), (x1, y1) in zip(points, points[1:] + points[:1]):
+        if x0 >= 0:
+            kept.append((x0, y0))
+        if (x0 >= 0) != (x1 >= 0):
+            share = x0 / (x0 - x1)
+            kept.append((0.0, y0 + (y1 - y0) * share))
+    return kept
+
+
+def _lines_meet(first: 'LineSpan', second: 'LineSpan') -> Optional[Tuple[V3, Optional[Tuple[V3, V3]]]]:
+    """Where two lines meet, wherever along them; for two that never do (skew), the first's point of
+    nearest approach, with the stretch from the second's to it -- what carries the second over."""
+    stations = closest_stations(Line(direction=first.along, point=first.at),
+                                Line(direction=second.along, point=second.at), eps=PARALLEL_EPSILON)
     if stations is None:
         return None
-    on_one = first.at + one * _clamp_to(stations[0], first.interval)
-    on_other = second.at + other * _clamp_to(stations[1], second.interval)
-    return (on_one + on_other) / 2
+    on_first = first.at + first.along * stations[0]
+    on_second = second.at + second.along * stations[1]
+    gap = on_second - on_first
+    if safe_zero_test_sq(_dot(gap, gap), eps=CORNER_TOLERANCE):
+        return on_first, None
+    return on_first, (on_second, on_first)
+
+
+def _phantoms(span: MeasureSpan, vertex: VectorLike, ray: V3) -> Tuple[Tuple[V3, V3], ...]:
+    """A feature drawn on to the corner, where the corner is off it."""
+    vertex = _v3(vertex)
+    if isinstance(span, LineSpan) and span.interval is not None:
+        low, high = sorted(_dot(end - span.at, span.along) for end in span.ends_global())
+        station = _dot(vertex - span.at, span.along)
+        if station < low - CORNER_TOLERANCE:
+            return ((span.at + span.along * low, vertex),)
+        if station > high + CORNER_TOLERANCE:
+            return ((span.at + span.along * high, vertex),)
+        return ()
+    if isinstance(span, PlaneSpan) and span.region:
+        return _face_phantoms(span, vertex, ray)
+    return ()
+
+
+def _face_phantoms(span: 'PlaneSpan', vertex: V3, ray: V3) -> Tuple[Tuple[V3, V3], ...]:
+    """A face swept on to its corner, in its own plane: from its two ends along the corner line,
+    straight across to that line, and along it as far as the corner -- the part of the plane between
+    the face and the corner, outlined. Nothing where the face already reaches the corner."""
+    corner_line = _unit(_cross(span.facing, ray))
+    corners = [corner for polygon in span.region for corner in polygon]
+    across = [_dot(corner - vertex, ray) for corner in corners]
+    along = [_dot(corner - vertex, corner_line) for corner in corners]
+    on_line = lambda station: vertex + corner_line * station
+    segments = []
+    if min(across) > CORNER_TOLERANCE:
+        # The face stops short of the corner line: its two far ends, carried across to it.
+        for pick in (along.index(min(along)), along.index(max(along))):
+            segments.append((corners[pick], on_line(along[pick])))
+        low, high = min(min(along), 0.0), max(max(along), 0.0)
+    else:
+        # It reaches the corner line: only where the corner is past its end along it.
+        low, high = min(along), max(along)
+        if low - CORNER_TOLERANCE <= 0.0 <= high + CORNER_TOLERANCE:
+            return ()
+        low, high = (0.0, low) if 0.0 < low else (high, 0.0)
+    if high - low > CORNER_TOLERANCE:
+        segments.append((on_line(low), on_line(high)))
+    return tuple(segments)
+
 
 def _clamp_to(station: float, interval: Optional[Tuple[float, float]]) -> float:
     if interval is None:
@@ -738,8 +874,9 @@ def _clamp_to(station: float, interval: Optional[Tuple[float, float]]) -> float:
     return max(low, min(high, station))
 
 
-def _line_meets_plane(line: LineSpan, plane: PlaneSpan) -> Optional[V3]:
-    """Where a line crosses a plane, kept within the line's interval.
+def _line_meets_plane(line: LineSpan, plane: PlaneSpan, keep_on_line: bool = True) -> Optional[V3]:
+    """Where a line crosses a plane: kept within the line's interval, or (not `keep_on_line`) where
+    it really does.
 
     None when it runs flat along the face and so never crosses -- the same
     contract as geometry.intersect_line_plane.
@@ -749,7 +886,8 @@ def _line_meets_plane(line: LineSpan, plane: PlaneSpan) -> Optional[V3]:
         return None
     at = line.at
     step = _dot(plane.at - at, normal) / _dot(unit, normal)
-    step = _clamp_to(step, line.interval)
+    if keep_on_line:
+        step = _clamp_to(step, line.interval)
     return at + unit * step
 
 
@@ -1055,16 +1193,20 @@ class MeasurementPlacement:
     #: can slide -- anywhere else the anchors are fixed by the features -- and it reads along
     #: slide_axis, so it does not depend on which end is which. None is the default.
     along: Optional[float] = None
+    #: An angle measured the other way round its second feature: the supplement of the one it
+    #: opens by default (angle_rays). Only an angle has one.
+    flip: bool = False
 
     @classmethod
     def from_wire(cls, value) -> Optional['MeasurementPlacement']:
-        """A placement as a file or the viewer has it: {"offset", "along"}, either optional."""
+        """A placement as a file or the viewer has it: {"offset", "along", "flip"}, each optional."""
         if value is None or isinstance(value, cls):
             return value
         if isinstance(value, Mapping):
             offset, along = value.get("offset"), value.get("along")
             return cls(offset=None if offset is None else float(offset),
-                       along=None if along is None else float(along))
+                       along=None if along is None else float(along),
+                       flip=bool(value.get("flip", False)))
         raise TypeError(f"Expected a placement or a mapping, got {type(value).__name__}")
 
 

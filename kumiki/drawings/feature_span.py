@@ -110,7 +110,9 @@ def feature_span(
         at = world(middle)
         normal = _unit_or_up(as_ndarray(timber.transform.local_to_global_direction(located.normal)))
         if in_three_d:
-            return PlaneSpan(at=create_v3(*at), normal=create_v3(*normal))
+            region = tuple(tuple(create_v3(*world(create_v3(*as_ndarray(corner)))) for corner in polygon)
+                           for polygon in extent.polygons())
+            return PlaneSpan(at=create_v3(*at), normal=create_v3(*normal), region=region)
         if plane_normal is None:
             return PointSpan(at=create_v3(*at))
         # Edge-on, it draws as a line along the face, square to its normal and to the view.

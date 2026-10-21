@@ -82,6 +82,7 @@ class MeasureKindWire(TypedDict):
 class PlacementWire(TypedDict, total=False):
     offset: float
     along: float  # MeasurementPlacement.along
+    flip: bool  # MeasurementPlacement.flip
 
 
 class ExtentsWire(TypedDict):
@@ -90,7 +91,9 @@ class ExtentsWire(TypedDict):
     b: Optional[List[Vec3]]
 
 
-AngleWire = TypedDict("AngleWire", {"vertex": Vec3, "from": Vec3, "to": Vec3, "normal": Vec3})
+#: AngleRays.as_wire: the corner, the two ways it opens, its plane, and the dashed extensions.
+AngleWire = TypedDict("AngleWire", {"vertex": Vec3, "from": Vec3, "to": Vec3, "normal": Vec3,
+                                    "phantoms": List[List[Vec3]]})
 
 
 class SettledEndWire(TypedDict, total=False):
@@ -2249,6 +2252,8 @@ def _placement_wire(placement: 'MeasurementPlacement') -> PlacementWire:
     wire = cast(PlacementWire, {"offset": placement.offset})
     if placement.along is not None:
         wire["along"] = placement.along
+    if placement.flip:
+        wire["flip"] = True
     return wire
 
 
@@ -2843,8 +2848,9 @@ def _resolve_measurement(
         # Placed for the measurement that will actually be drawn, judged in the space its ends came
         # back in (kigumi_measuring_helpers.place_pair).
         along = (measure.get("placement") or {}).get("along")
+        flip = bool((measure.get("placement") or {}).get("flip", False))
         placement = place_pair(ends["a"], ends["b"], spans["a"], spans["b"], declared, plane, view, in_three_d,
-                               None if along is None else float(along))
+                               None if along is None else float(along), flip)
         kind = placement.kind
         if kind is not None and kind.operation is MeasurementOperation.DISTANCE and placement.anchors is not None:
             at_a, at_b = placement.anchors

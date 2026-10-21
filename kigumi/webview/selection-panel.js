@@ -183,6 +183,26 @@ export class SelectionPanel {
         return line;
     }
 
+    /** For an angle: measure the other side of the corner. */
+    _angleFlipRow(found) {
+        if (!found.measure.angle) {
+            return null;
+        }
+        const line = document.createElement('div');
+        line.className = 'ip-detail';
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'ip-action';
+        action.textContent = this.t('viewer.selection.flipAngle');
+        action.title = this.t('viewer.selection.flipAngle.title');
+        action.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.app.flipMeasurementAngle(found.viewportId, found.measureKey);
+        });
+        line.appendChild(action);
+        return line;
+    }
+
     updateInfo(frameData) {
         this.app.currentFrameData = frameData || {};
         const selectedMembers = this.app.selectionManager.getSelectedTimbers();
@@ -390,9 +410,11 @@ export class SelectionPanel {
         // one nobody finds.
         if (this.collapsed) {
             const measurement = this.app.focusedMeasurement();
-            const kindRow = measurement && this._measureKindRow(measurement);
-            if (kindRow) {
-                body.appendChild(kindRow);
+            const rows = measurement
+                ? [this._measureKindRow(measurement), this._angleFlipRow(measurement)].filter(Boolean)
+                : [];
+            if (rows.length > 0) {
+                rows.forEach((row) => body.appendChild(row));
                 panel.appendChild(body);
             }
             return;
@@ -467,6 +489,10 @@ export class SelectionPanel {
             const kindRow = this._measureKindRow(measurement);
             if (kindRow) {
                 body.appendChild(kindRow);
+            }
+            const flipRow = this._angleFlipRow(measurement);
+            if (flipRow) {
+                body.appendChild(flipRow);
             }
         }
 
