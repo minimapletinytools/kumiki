@@ -11,7 +11,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from kumiki.csg.feature_extent import FeatureExtents
 
 REPO = Path(__file__).resolve().parent.parent
 TOLERANCES = {"face": 5e-4, "edge": 0.012, "point": 0.020}
@@ -177,7 +176,7 @@ def test_a_shoulder_crossing_a_perfect_face_of_rough_stock_has_a_line_to_draw(fr
     face = next(hit for hit in hits if hit.feature.name == "ptw.front")
     edge = DerivedEdgeFeature.derive(shoulder, face)
     assert edge is not None and not edge.real
-    segments, absent = edge_highlight_segments(edge, shoulder.owner, FeatureExtents(root, cut.timber))
+    segments, absent = edge_highlight_segments(edge, shoulder.owner, cut.feature_extents())
     assert not absent
     assert segments, "a line to draw"
     start, end = segments[0]["start"], segments[0]["end"]
