@@ -393,7 +393,7 @@ def cut_roof_slope_trim_joint(wall_timbers: list[Timber], roof_plane_point: V3, 
     cuttings = {}
     for i, timber in enumerate(wall_timbers):
         timber_local_hs = adopt_csg(None, timber.transform, global_halfspace)
-        cutting = Cutting(timber=timber, negativecsg=timber_local_hs, label=f"roof_slope_cut_{i}") if hasattr(timber, 'negativecsg') else Cutting(timber=timber, negative_csg=timber_local_hs, label=f"roof_slope_cut_{i}")
+        cutting = Cutting(timber=timber, negativecsg=timber_local_hs, label=CutCSGLabel(f"roof_slope_cut_{i}")) if hasattr(timber, 'negativecsg') else Cutting(timber=timber, negative_csg=timber_local_hs, label=CutCSGLabel(f"roof_slope_cut_{i}"))
         cuttings[f"wall_timber_{i}"] = cutting
 
     return Joint(
