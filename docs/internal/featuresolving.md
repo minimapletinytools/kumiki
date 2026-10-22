@@ -157,8 +157,9 @@ Picks dimensions one at a time until every target is solved.
 - Take the targets' rows, with everything already known projected out.
 - Repeat while any target is unsolved:
   - Sort the remaining candidates by the policy's preferences, compared one after another (by
-    default: from a reference face, perfect faces over rough ones, from something already solved,
-    then shortest).
+    default `PREFERENCE_ORDER`: angles first, angles from the timber, fewer face ends, from a reference
+    face, perfect faces over rough ones, declared over derived, from something already solved, then
+    shortest).
   - Walk down that order and take the first candidate that **helps**: its row adds something new,
     and all of what it adds is still unsolved. It must also pass the policy's rules; if no helpful
     candidate passes them, take the first helpful one anyway and say so.
@@ -166,15 +167,37 @@ Picks dimensions one at a time until every target is solved.
 - Stop when nothing is unsolved, or no candidate helps. Warn about any target left unsolved (often
   a feature no view shows, like a blind mortise's bottom).
 
+## Entry point: `faces_to_edges(result, cut_timbers, faces, views, carriers)` (`drawings/auto_dimensioning.py`)
+
+After picking, moves each face end of a dimension onto one of the face's edges, since a viewer sees
+edges as drawn lines and a face only edge-on. Solving works with faces; only what is drawn changes.
+
+- Before solving, `without_edges_on_faces` drops, per view, each edge that lies on one of the faces it
+  meets, where that face is seen edge-on: the face's line is the edge's, so measuring the face measures
+  it. Edges seen end-on draw as points and stay (a slanted face needs one to be measured from).
+- For each face end, seen edge-on in the dimension's view:
+  - take the boundary segment of the face's region that runs along its drawn line, nearest the camera;
+  - find another face of `faces` whose region has a boundary along the same stretch (they meet at a
+    crease there; a face whose plane only passes through is a seam, and is skipped), trying the best
+    group first;
+  - use the declared edge that is the meet of the two faces (e.g. `rptw.front_left`), else derive it,
+    whatever their groups;
+  - record the shared stretch as the edge's extent, so it is never cropped for.
+- The dimension keeps its value. Its row is the same but for the tilt columns, which the sheet's
+  assumptions fix, so the solve is unchanged. A move the solver can't write a row for isn't made.
+- Not checked: whether another timber hides the chosen edge while some of the face shows.
+
 ## The whole pipeline (as in `patterns/structures/my_cute_frame_drawing_test.py`)
 
 - Set up a `DrawingSolve` over the frame's cut timbers.
 - **Datum**: fix one timber's reference faces and its bottom end, as known rows.
 - **Targets**: the planning features of every timber.
 - **Assumptions**: square, along the sheet axes, and lined up in each view.
-- **Visible**: what each view can see of the targets.
+- **Anchors**: the targets, and the edges of faces some view draws slanted (`derived_edge_anchors`).
+- **Visible**: what each view can see of the anchors, less edges lying on a face seen edge-on.
 - **Candidates**: every dimension the views could draw.
-- **Pick**: `auto_dimension`, then put the picks on the drawing, view by view.
+- **Pick**: `auto_dimension`.
+- **Onto edges**: `faces_to_edges`, then put the picks on the drawing, view by view.
 
 ## Worked example: a tenon
 
