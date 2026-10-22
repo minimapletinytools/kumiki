@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, Iterator, List
+from typing import TYPE_CHECKING, Callable, Iterator, List, Sequence
 
 from .cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
-                     OwnedFeatureHit, csg_children, measured_by_default)
+                     OwnedFeatureHit, csg_children, derive_edge_hits, measured_by_default)
 from .feature_paths import FeatureHandle
 from .feature_extent import extents_of
 
@@ -92,3 +92,21 @@ def planning_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished
     body = cut_timber.get_extended_rough_csg_with_perfect_features_local()
     return [required for required in required_features(cut_timber, face_test)
             if required.handle.owner is body or required.handle.feature.properties.purpose is FeaturePurpose.SHOULDER]
+
+
+def derived_edges(cut_timber: 'CutTimber', faces: Sequence[FeatureHandle]) -> List[FeatureHandle]:
+    """Return the edges where two of `faces` meet on `cut_timber`, where their groups let them form one
+    and some of it is on the timber: e.g. a shoulder plane against the timber's faces.
+
+    For dimensioning to: such an edge seen end-on draws as a point, which a slanted face has none of.
+    """
+    root = cut_timber.render_timber_with_cuts_csg_local()
+    timber = cut_timber.timber
+    hits = [face.hit for face in faces if face.timber is timber and isinstance(face.feature, FaceFeature)]
+    extents = extents_of(root, timber)
+    edges = []
+    for hit in derive_edge_hits(root, hits):
+        extent = extents.of(hit.feature, hit.owner)
+        if extent is not None and not extent.is_empty:
+            edges.append(FeatureHandle(timber=timber, hit=hit))
+    return edges

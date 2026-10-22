@@ -92,7 +92,7 @@ def square_assumptions(handles: Sequence[FeatureHandle], carriers: CarrierMap) -
     The handles' planes and lines are grouped, in the order given, into aligned sets: features
     whose directions all lie along one set of three square axes. Within a set, the features along
     each axis are chained by parallel rows, and one feature per axis is held square to one per
-    other axis. That covers every relative angle in the set without pairing every feature.
+    other axis. Axes of different sets that are square are held square too.
     """
     sets: List[List[List[_Directed]]] = []  # set -> axis -> features along it
     for item in _directed(handles, carriers):
@@ -120,6 +120,15 @@ def square_assumptions(handles: Sequence[FeatureHandle], carriers: CarrierMap) -
             for second in axes[i + 1:]:
                 a, b = first[0], second[0]
                 assumptions.append(Assumption(f"{_name(a)} square to {_name(b)}", (_square_row(a, b),)))
+    # Across sets: an axis of one square to an axis of another stays so, e.g. a sloped shoulder square
+    # to its timber's sides but not its other faces.
+    for i, axes in enumerate(sets):
+        for other in sets[i + 1:]:
+            for along in axes:
+                for other_along in other:
+                    a, b = along[0], other_along[0]
+                    if abs(float(a.direction @ b.direction)) < ALIGNED:
+                        assumptions.append(Assumption(f"{_name(a)} square to {_name(b)}", (_square_row(a, b),)))
     return assumptions
 
 

@@ -128,3 +128,25 @@ class TestEachTimber:
         assert "Back Cross ×2 (generated)" in names and "Left Side ×2 (generated)" in names
         assert "Back Cross (generated)" in ids and "Left Side (generated)" in ids
         assert len(frame.drawings) == 3
+
+
+class TestDerivedEdges:
+    """Edges where faces meet are offered to dimension to: a slanted face draws with no point of its own."""
+
+    def test_a_shoulder_meets_the_timber_s_faces(self, pattern):
+        from kumiki.csg.required_features import derived_edges, required_features
+
+        frame = pattern["_load_cute_frame"]()()
+        cut = next(c for c in frame.cut_timbers if c.timber.ticket.path == "Back Cross")
+        names = {edge.feature.name for edge in derived_edges(cut, [r.handle for r in required_features(cut)])}
+        assert {"shoulder×rptw.left", "shoulder×rptw.back"} <= names
+        assert all(name.startswith("shoulder×") for name in names)
+
+    def test_none_is_a_reference_though_named_after_one(self, pattern):
+        from kumiki.csg.required_features import derived_edges, required_features
+
+        frame = pattern["_load_cute_frame"]()()
+        cut = next(c for c in frame.cut_timbers if c.timber.ticket.path == "Back Cross")
+        handles = [r.handle for r in required_features(cut)]
+        assert any(is_reference(h) and h.feature.name == "rptw.left" for h in handles)
+        assert not any(is_reference(edge) for edge in derived_edges(cut, handles))

@@ -54,7 +54,7 @@ class TestSquare:
         # The five other offsets, and the prism spinning about the known face's normal.
         assert with_square.count == 5 + 1
 
-    def test_a_plane_at_an_angle_gets_nothing(self):
+    def test_a_plane_at_an_angle_is_held_square_only_to_the_axis_it_is_square_to(self):
         timber = create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(150)),
                                length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="t")
         bevel = HalfSpace(normal=safe_normalize_vector(create_v3(1, 0, 1)), offset=mm(1020) / sqrt(2),
@@ -66,8 +66,10 @@ class TestSquare:
         assumptions = square_assumptions(handles, carriers)
         bevel_face = next(handle.feature.name for handle in handles if handle.owner is bevel)
 
-        assert not any(bevel_face in assumption.reason for assumption in assumptions)
-        assert len(assumptions) == 6
+        # The bevel leans along the length and across the width, but is square to the height axis.
+        about_bevel = [assumption.reason for assumption in assumptions if bevel_face in assumption.reason]
+        assert len(about_bevel) == 1 and "square to" in about_bevel[0]
+        assert len(assumptions) == 6 + 1
 
 
 class TestSheetAxes:
