@@ -455,11 +455,6 @@ def sheet_candidates(
     return candidates
 
 
-def _slanted(line: SheetLine, right: np.ndarray, up: np.ndarray) -> bool:
-    """Return whether a drawn line runs along neither of the sheet's axes."""
-    return max(abs(float(line.run @ right)), abs(float(line.run @ up))) < 1 - 1e-9
-
-
 def coincidence_assumptions(
     anchors: Mapping[str, Sequence[FeatureHandle]], views: Mapping[str, ViewAxes], solve: DrawingSolve,
 ) -> List[Assumption]:
