@@ -31,7 +31,7 @@ from kumiki.drawings.measure import ViewAxes
 from kumiki.geometry import Plane
 from kumiki.drawings.measure_solving import DrawingSolve
 from kumiki.drawings.visibility import visible_by_view
-from kumiki.csg.required_features import planning_features, required_features
+from kumiki.csg.required_features import derived_edges, planning_features, required_features
 
 
 ROUGH_ALLOWANCE = inches(1)
@@ -108,7 +108,10 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     for view in VIEWS:
         assumptions += sheet_axis_assumptions(directed, carriers, _sheet(view)[1])
     # Centerplanes can't be referenced by a drawing yet, so they're solved for but never dimensioned to.
+    # Edges where faces meet (a shoulder against a face) draw as points, which a slanted face needs.
     anchors = [handle for handle in directed if not isinstance(handle.feature, MidplaneFeature)]
+    anchors += [edge for cut in cut_timbers
+                for edge in derived_edges(cut, [handle for handle in directed if handle.timber is cut.timber])]
     views = {view: _sheet(view)[0] for view in VIEWS}
     visible = visible_by_view(anchors, views, cut_timbers)
     # What the views show lined up needs no dimension.
@@ -174,6 +177,7 @@ def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
     for _, sheet in sheets.values():
         assumptions += sheet_axis_assumptions(targets, carriers, sheet)
     anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
+    anchors += derived_edges(cut, targets)
     views = {view: axes for view, (axes, _) in sheets.items()}
     visible = visible_by_view(anchors, views, [cut])
     assumptions += coincidence_assumptions(visible, views, solve)

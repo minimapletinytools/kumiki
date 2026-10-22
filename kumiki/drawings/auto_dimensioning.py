@@ -69,7 +69,12 @@ def fixed(criterion: Criterion) -> Criterion:
 
 
 def is_reference(handle: FeatureHandle) -> bool:
-    """Return whether the feature is one of its timber's reference features, or a face of a reference edge."""
+    """Return whether the feature is one of its timber's reference features, or a face of a reference edge.
+
+    A derived feature never is, though its name ("shoulder×rptw.left") contains a face's.
+    """
+    if handle.feature.is_derived():
+        return False
     return handle.feature.name.split(".", 1)[-1] in _reference_names(handle.timber)
 
 
@@ -112,6 +117,12 @@ def perfect_over_rough(candidate: DimensionCandidate, context: PickContext) -> f
 
 
 @fixed
+def declared_over_derived(candidate: DimensionCandidate, context: PickContext) -> float:
+    """Criterion: how many ends are derived features (e.g. where a shoulder meets a face)."""
+    return float(sum(end.feature.is_derived() for end in _ends(candidate)))
+
+
+@fixed
 def shortest(candidate: DimensionCandidate, context: PickContext) -> float:
     return candidate.length
 
@@ -123,7 +134,7 @@ class Policy:
     `prefer` criteria are compared in order until one separates two candidates. `rules` must score
     0, unless no helpful candidate passes them; then one pick ignores them and warns.
     """
-    prefer: Sequence[Criterion] = (from_reference, perfect_over_rough, from_solved, shortest)
+    prefer: Sequence[Criterion] = (from_reference, perfect_over_rough, declared_over_derived, from_solved, shortest)
     rules: Sequence[Criterion] = ()
 
 
