@@ -23,7 +23,7 @@ from ..csg.identity_memo import memo_by_identity
 from ..geometry import Line, Plane
 from ..timber_features import TimberFeature
 from ..rule import as_ndarray, create_v3, unit_ndarray
-from .measure import Measure, MeasurementKind, ViewAxes
+from .measure import Measure, MeasurementKind, MeasurementOperation, ViewAxes
 from .measure_solving import DrawingSolve
 from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, SheetShape, sheet_gap, sheet_shape
 
@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 HORIZONTAL = MeasurementKind.parse("projected_horizontal_distance")
 VERTICAL = MeasurementKind.parse("projected_vertical_distance")
+ANGLE = MeasurementKind.parse("projected_angle")
 #: Closer than this on the sheet, in world units, two drawn features are one on top of the other.
 COINCIDENT = 1e-9
 
@@ -122,6 +123,40 @@ def perfect_over_rough(candidate: DimensionCandidate, context: PickContext) -> f
 
 
 @fixed
+def angles_first(candidate: DimensionCandidate, context: PickContext) -> float:
+    """Criterion: a distance after an angle. A slanted face is marked out by its angle and one position,
+    not by two distances."""
+    kind = candidate.measure.kind
+    return 0.0 if kind is not None and kind.operation is MeasurementOperation.ANGLE else 1.0
+
+
+@fixed
+def angles_from_the_timber(candidate: DimensionCandidate, context: PickContext) -> float:
+    """Criterion: an angle measured from one of the timber's own faces (rptw., ptw., rough.) before one
+    measured from a joint's. Distances all score 0."""
+    kind = candidate.measure.kind
+    if kind is None or kind.operation is not MeasurementOperation.ANGLE:
+        return 0.0
+    own = any(not end.feature.is_derived() and end.feature.name.startswith(_TIMBER_FACE_PREFIXES)
+              for end in _ends(candidate))
+    return 0.0 if own else 1.0
+
+
+#: Name prefixes of a timber's own faces.
+_TIMBER_FACE_PREFIXES = ("rptw.", "ptw.", "rough.")
+
+
+@fixed
+def edges_not_faces(candidate: DimensionCandidate, context: PickContext) -> float:
+    """Criterion: a derived edge measured to a face, after one measured to another edge: a face its edges
+    define is marked out by those edges."""
+    ends = _ends(candidate)
+    derived = [end.feature.is_derived() for end in ends]
+    faces = [isinstance(end.feature.locate_simple_unbounded(end.owner), Plane) for end in ends]
+    return 1.0 if (derived[0] and faces[1]) or (derived[1] and faces[0]) else 0.0
+
+
+@fixed
 def declared_over_derived(candidate: DimensionCandidate, context: PickContext) -> float:
     """Criterion: how many ends are derived features (e.g. where a shoulder meets a face)."""
     return float(sum(end.feature.is_derived() for end in _ends(candidate)))
@@ -139,7 +174,8 @@ class Policy:
     `prefer` criteria are compared in order until one separates two candidates. `rules` must score
     0, unless no helpful candidate passes them; then one pick ignores them and warns.
     """
-    prefer: Sequence[Criterion] = (from_reference, perfect_over_rough, declared_over_derived, from_solved, shortest)
+    prefer: Sequence[Criterion] = (angles_first, angles_from_the_timber, edges_not_faces, from_reference, perfect_over_rough,
+                                   declared_over_derived, from_solved, shortest)
     rules: Sequence[Criterion] = ()
 
 
@@ -385,25 +421,43 @@ def _slanted(line: SheetLine, right: np.ndarray, up: np.ndarray) -> bool:
 def sheet_candidates(
     anchors: Mapping[str, Sequence[FeatureHandle]], views: Mapping[str, ViewAxes], solve: DrawingSolve,
 ) -> List[DimensionCandidate]:
-    """Return every perpendicular dimension a view can draw between anchors it can see.
+    """Return the dimensions a view can draw between anchors it can see (`anchors` are per view,
+    visibility.visible_by_view):
 
-    Between two parallel drawn lines, or from a drawn point to a line. `anchors` are per view
-    (visibility.visible_by_view).
+    - perpendicular distances between two parallel drawn lines, or from a drawn point to a line;
+    - angles between a slanted drawn line (along neither sheet axis) and another line;
+    - horizontal and vertical distances between two drawn points, one of them a derived edge seen end-on.
     """
     candidates = []
     for view, axes in views.items():
         look = as_ndarray(axes.look)
         look /= np.linalg.norm(look)
+        right, up = unit_ndarray(as_ndarray(axes.right)), unit_ndarray(as_ndarray(axes.up))
         drawn = [(handle, _on_sheet(handle, look)) for handle in anchors.get(view, ())]
         drawn = [(handle, shape) for handle, shape in drawn if shape is not None]
         for i, (a, shape_a) in enumerate(drawn):
             for b, shape_b in drawn[i + 1:]:
+                add = lambda kind, length: candidates.append(
+                    DimensionCandidate(view, Measure(a, b, kind=kind), length, axes, solve))
                 length = _separation(shape_a, shape_b, look)
-                if length is None or length < COINCIDENT:
-                    continue  # one on top of the other: coincidence_assumptions
-                candidates.append(DimensionCandidate(view, Measure(a, b, kind=PERPENDICULAR), length, axes,
-                                                      solve))
+                if length is not None and length >= COINCIDENT:
+                    add(PERPENDICULAR, length)
+                if isinstance(shape_a, SheetLine) and isinstance(shape_b, SheetLine):
+                    if abs(float(shape_a.run @ shape_b.run)) < 1 - 1e-9 and (
+                            _slanted(shape_a, right, up) or _slanted(shape_b, right, up)):
+                        add(ANGLE, 0.0)
+                elif isinstance(shape_a, SheetPoint) and isinstance(shape_b, SheetPoint) and (
+                        a.feature.is_derived() or b.feature.is_derived()):
+                    gap = shape_b.at - shape_a.at
+                    for kind, axis in ((HORIZONTAL, right), (VERTICAL, up)):
+                        if abs(float(gap @ axis)) >= COINCIDENT:
+                            add(kind, abs(float(gap @ axis)))
     return candidates
+
+
+def _slanted(line: SheetLine, right: np.ndarray, up: np.ndarray) -> bool:
+    """Return whether a drawn line runs along neither of the sheet's axes."""
+    return max(abs(float(line.run @ right)), abs(float(line.run @ up))) < 1 - 1e-9
 
 
 def coincidence_assumptions(
