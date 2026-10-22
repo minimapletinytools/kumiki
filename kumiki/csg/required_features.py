@@ -2,10 +2,10 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Callable, Iterator, List, Sequence
+from typing import TYPE_CHECKING, Callable, Iterator, List
 
 from .cutcsg import (CSGFeature, CurvedFaceFeature, CutCSG, FaceFeature, FeatureMarkingStatus, FeaturePurpose,
-                     OwnedFeatureHit, csg_children, derive_edge_hits, measured_by_default)
+                     OwnedFeatureHit, csg_children, measured_by_default)
 from .feature_paths import FeatureHandle
 from .feature_extent import extents_of
 
@@ -92,41 +92,3 @@ def planning_features(cut_timber: 'CutTimber', face_test: FaceTest = on_finished
     body = cut_timber.get_extended_rough_csg_with_perfect_features_local()
     return [required for required in required_features(cut_timber, face_test)
             if required.handle.owner is body or required.handle.feature.properties.purpose is FeaturePurpose.SHOULDER]
-
-
-def derived_edges(cut_timber: 'CutTimber', faces: Sequence[FeatureHandle]) -> List[FeatureHandle]:
-    """Return the edges where a face of `faces` at an angle to the timber's axes meets another of
-    `faces` on `cut_timber`, where their groups let them form one and some of it is on the timber:
-    e.g. a sloped shoulder against the timber's faces.
-
-    For dimensioning to: seen end-on such an edge draws as a point, and a face drawn slanted has no
-    other point or parallel line to be measured from. Faces square to the timber's axes have those,
-    so their edges are left out.
-    """
-    root = cut_timber.render_timber_with_cuts_csg_local()
-    timber = cut_timber.timber
-    hits = [face.hit for face in faces if face.timber is timber and isinstance(face.feature, FaceFeature)]
-    slanted = [hit for hit in hits if not _along_an_axis(hit)]
-    extents = extents_of(root, timber)
-    edges, seen = [], set()
-    for one in slanted:
-        for other in hits:
-            pair = frozenset((id(one), id(other)))
-            if other is one or pair in seen:
-                continue
-            seen.add(pair)
-            for hit in derive_edge_hits(root, [one, other]):
-                extent = extents.of(hit.feature, hit.owner)
-                if extent is not None and not extent.is_empty:
-                    edges.append(FeatureHandle(timber=timber, hit=hit))
-    return edges
-
-
-def _along_an_axis(hit: 'OwnedFeatureHit') -> bool:
-    """Return whether a face's normal lies along one of its timber's local axes."""
-    plane = hit.feature.locate_simple_unbounded(hit.owner)
-    if plane is None:
-        return True
-    normal = [abs(float(v)) for v in plane.normal]
-    length = sum(v * v for v in normal) ** 0.5
-    return length == 0 or max(normal) / length > 1 - 1e-9
