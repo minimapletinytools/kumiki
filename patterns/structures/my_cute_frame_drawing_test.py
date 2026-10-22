@@ -38,7 +38,8 @@ ROUGH_ALLOWANCE = inches(1)
 
 
 #: Anchor every face's derived edges, not only those of faces some view draws slanted. Edges draw
-#: as lines, so dimensions prefer them, but each adds time.
+#: as lines, so dimensions prefer them. A toggle because it about doubles the time to dimension
+#: (cat_corner_cot: 4.3 to 8.6 s): every edge in view pairs with every other anchor as a candidate.
 EVERY_FACES_EDGES = False
 
 
