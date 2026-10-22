@@ -174,19 +174,19 @@ class TestAPointAndALine:
         assert anchors[0] == pytest.approx((3, 0, 0))
         assert placed(anchors[1]) == (3, 0, 7)
 
-    def test_a_foot_past_the_end_is_brought_back_onto_the_feature(self):
-        # A dimension whose end floats off the end of a short edge points at
-        # nothing. The nearest place on the feature is the honest answer.
+    def test_a_foot_past_the_end_stays_square(self):
+        # Brought back onto the feature, the dimension would not be square and would draw a length other
+        # than the one it reads; the viewer draws the line on to the foot instead.
         anchors = distance_anchors(
             point((99, 0, 7)), line((0, 0, 0), (1, 0, 0), (0, 10)), PERPENDICULAR)
 
-        assert anchors[1] == pytest.approx((10, 0, 0))
+        assert anchors[1] == pytest.approx((99, 0, 0))
 
     def test_and_at_the_other_end_too(self):
         anchors = distance_anchors(
             point((-99, 0, 7)), line((0, 0, 0), (1, 0, 0), (4, 10)), PERPENDICULAR)
 
-        assert anchors[1] == pytest.approx((4, 0, 0))
+        assert anchors[1] == pytest.approx((-99, 0, 0))
 
 
 class TestTwoPoints:
