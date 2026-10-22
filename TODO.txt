@@ -140,6 +140,11 @@ DONE-when dragging measurements the anchros should drag too until they can't any
 DONE-definitely highlight the features being measured...
 DONE-do a full end to end review and find opportunities to refactor..
 DONE-The remaining inconsistency: this only holds when there's a root_csg. The solver's call (feature_solving.py:60) passes no root. For planes, that path still uses the old approximate crop (approximately_crop_plane_to_area_on_csg), which can't subtract cuts. That's why the generator's picks didn't change in #112. Moving the solver onto FeatureExtent too would let the approximate crop go. That's the leftover part of review item 1, together with the Solve object (item 5).
+DONE-solver should know that any coinicident feature in the ortognal plane to the viewer plane is solved for free
+DONE-midplanes (and probably perfect-reference fetaures) not selectable in 3d view of drawing.
+IGNORE-maybe review runner.py ;__;
+DONE-archive unused agent plans
+DONE-when dragging python measurements, theres' a flicker as it tries to reload from python, can you reomve that? (that's cuz we roundtrip fro pythoon....)
 
 -DECISION TIME STANDALONE APP
   -decide how to do file browser, maybe combine with kigumi explorer probably
@@ -151,21 +156,24 @@ DONE-The remaining inconsistency: this only holds when there's a root_csg. The s
   -cilkcing on patterns borken in electron ivew..
 
 
--solver should know that any coinicident feature in the ortognal plane to the viewer plane is solved for free
+-the active view you are measuring in should be highlighted somehow
+
+
+-review and cleanup the internal/docs
 
 
 -angle mesaurement anchor positon derivatino needs to be improved
   -extend featuers with dotted line out to angle anchors need sto be different in 3d view (you need the entire plane I think)
-    
--midplanes (and probably perfect-reference fetaures) not selectable in 3d view of drawing.
--space out dotted lines more
--the active view you are measuring in should be highlighted somehow
+
+-I think you need to rework hidden selection... we only want to be able to select PTW planes behind rough stock, right now you can select other non real features
+  -PTW and non real features are different groups so you can just force it to happen
+  -another idea is to expand PTW planes to rough stock dimensions? that way they aren't hidden, this might just be better?
 
 
--review the featureflow.md docs and stuff and rewrite them
 
--rough timber wiht PTW features decsisions
-  1. double down on what we have now, you'll need PTW fetaures to intersect with shoulder planes too to get those derived features
+
+DONE??/IGNORE??-rough timber wiht PTW features decsisions
+  DONE 1. double down on what we have now, you'll need PTW fetaures to intersect with shoulder planes too to get those derived features
   2. remove PTW fetaures as part of rough CSG tree, instead take the ptw planes, intersect it with all rough planes and shoulder planes and expose those edges 
     - those edges could be added as etxra features to the rough CSG tree OR you could have extra featuers at teh timber level... 
     - one thing is now we're working with edges not planes, but the edges still need the planes as carriers when it comes to solving...
@@ -175,10 +183,6 @@ DONE-The remaining inconsistency: this only holds when there's a root_csg. The s
       - but in this case, the midplanes need a different recipe...
 
 
-
-
-
--when dragging python measurements, theres' a flicker as it tries to reload from python, can you reomve that?
 
 
 
@@ -195,7 +199,7 @@ DONE-The remaining inconsistency: this only holds when there's a root_csg. The s
 
 
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
--maybe review runner.py ;__;
+
 -add types to runner.py
 -improve board  functions, think bout the simplest way to do this...
 -update shed example to include board
@@ -206,7 +210,7 @@ DONE-The remaining inconsistency: this only holds when there's a root_csg. The s
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
   
-IGNORE-rename/reorg all mortise and tenon joints
+-rename/reorg all mortise and tenon joints
   DONE-mortise_and_tenon_join/...
   DONE-delete 45 degree relative tenon size, basic, 
   -face_aligned
