@@ -146,6 +146,12 @@ IGNORE-maybe review runner.py ;__;
 DONE-archive unused agent plans
 DONE-when dragging python measurements, theres' a flicker as it tries to reload from python, can you reomve that? (that's cuz we roundtrip fro pythoon....)
 
+DONE-midplanes (and probably perfect-reference fetaures) not selectable in 3d view of drawing.
+DONE-space out dotted lines more
+DONE-solver should know that any coinicident feature in the ortognal plane to the viewer plane is solved for free
+DONE-angle mesaurement anchor positon derivatino needs to be improved
+  -extend featuers with dotted line out to angle anchors need sto be different in 3d view (you need the entire plane I think)
+
 -DECISION TIME STANDALONE APP
   -decide how to do file browser, maybe combine with kigumi explorer probably
   -make sure using external agent works, don't allow self api key
@@ -157,17 +163,15 @@ DONE-when dragging python measurements, theres' a flicker as it tries to reload 
 
 
 -the active view you are measuring in should be highlighted somehow
-
-
+-check that edges are being highlighted correctly in 2d drawing mesaurements
 -review and cleanup the internal/docs
 
-
--angle mesaurement anchor positon derivatino needs to be improved
-  -extend featuers with dotted line out to angle anchors need sto be different in 3d view (you need the entire plane I think)
 
 -I think you need to rework hidden selection... we only want to be able to select PTW planes behind rough stock, right now you can select other non real features
   -PTW and non real features are different groups so you can just force it to happen
   -another idea is to expand PTW planes to rough stock dimensions? that way they aren't hidden, this might just be better?
+
+
 
 
 
