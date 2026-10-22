@@ -389,24 +389,24 @@ def _across(line: SheetLine, look: np.ndarray) -> np.ndarray:
 
 
 def derived_edge_anchors(cut_timber: 'CutTimber', faces: Sequence[FeatureHandle],
-                         views: Mapping[str, ViewAxes], all_faces: bool = False) -> List[FeatureHandle]:
+                         views: Mapping[str, ViewAxes]) -> List[FeatureHandle]:
     """Return the edges where a face of `faces` that some view draws slanted (along neither sheet axis)
     meets another of `faces` on `cut_timber`, where their groups let them form one and some of it is on
-    the timber: e.g. a sloped shoulder against the timber's faces. With `all_faces`, every face's edges.
+    the timber: e.g. a sloped shoulder against the timber's faces.
 
     For dimensioning to: seen end-on such an edge draws as a point, and a face drawn slanted has no
     parallel line to be measured from.
 
-    Leaving out the other faces' edges by default is an optimization: they could be anchors too, but
-    each pairs with every other anchor in view as a candidate (about doubling the time to dimension),
-    and a face drawn along a sheet axis has parallel lines to measure from.
+    The other faces' edges are left out: a face drawn along a sheet axis has parallel lines to measure
+    from, and faces_to_edges moves a measurement onto its edge after solving. As anchors, each would pair
+    with every other anchor in view as a candidate (about doubling the time to dimension).
     """
     root = cut_timber.render_timber_with_cuts_csg_local()
     timber = cut_timber.timber
     hits = [face.hit for face in faces if face.timber is timber and isinstance(face.feature, FaceFeature)]
     sheets = [(unit_ndarray(as_ndarray(axes.look)), unit_ndarray(as_ndarray(axes.right)),
                unit_ndarray(as_ndarray(axes.up))) for axes in views.values()]
-    slanted = hits if all_faces else [hit for hit in hits if any(_drawn_slanted(FeatureHandle(timber=timber, hit=hit), *sheet)
+    slanted = [hit for hit in hits if any(_drawn_slanted(FeatureHandle(timber=timber, hit=hit), *sheet)
                                           for sheet in sheets)]
     extents = extents_of(root, timber)
     edges, seen = [], set()
