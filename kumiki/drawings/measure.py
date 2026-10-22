@@ -347,14 +347,10 @@ def _at_station(span: Union[PointSpan, LineSpan], along: VectorLike, station: fl
 
 
 def _foot_on(span: LineSpan, point: VectorLike) -> V3:
-    """Return the foot of the perpendicular from `point` on a span, clamped to the span."""
+    """Return the foot of the perpendicular from `point` on a span's line, which may be past the span's
+    ends (the viewer draws the span on to it)."""
     at, unit = span.at, span.along
-    station = _dot(_v3(point) - at, unit)
-    low, high = span.interval or (station, station)
-    # Clamped: a dimension whose end floats off the end of a short edge points
-    # at nothing, and the nearest place on the feature is the honest answer.
-    station = max(low, min(high, station))
-    return at + unit * station
+    return at + unit * _dot(_v3(point) - at, unit)
 
 
 def _representative_point(span: MeasureSpan) -> V3:
