@@ -145,27 +145,33 @@ class TestDerivedEdges:
                           feature_overrides=[shoulder_override(HALF_SPACE_PLANE, "shoulder", FeatureGroup.SHOULDER_PLANE)])
         return CutTimber(timber, cuts=[Cutting(timber=timber, negative_csg=bevel)])
 
-    def test_a_sloped_shoulder_meets_the_timber_s_faces(self):
-        from kumiki.csg.required_features import derived_edges, required_features
+    def _edges(self, pattern, cut, handles):
+        from kumiki.drawings.auto_dimensioning import derived_edge_anchors
+
+        views = {view: axes for view, (axes, _) in pattern["_shop_sheets"](cut.timber).items()}
+        return derived_edge_anchors(cut, handles, views)
+
+    def test_a_sloped_shoulder_meets_the_timber_s_faces(self, pattern):
+        from kumiki.csg.required_features import required_features
 
         cut = self._bevelled()
-        names = {edge.feature.name for edge in derived_edges(cut, [r.handle for r in required_features(cut)])}
+        names = {edge.feature.name for edge in self._edges(pattern, cut, [r.handle for r in required_features(cut)])}
         assert {"shoulder×rptw.front", "shoulder×rptw.back"} <= names
         assert all(name.startswith("shoulder×") for name in names)
 
-    def test_none_is_a_reference_though_named_after_one(self):
-        from kumiki.csg.required_features import derived_edges, required_features
+    def test_none_is_a_reference_though_named_after_one(self, pattern):
+        from kumiki.csg.required_features import required_features
 
         cut = self._bevelled()
         handles = [r.handle for r in required_features(cut)]
         assert any(is_reference(h) and h.feature.name == "rptw.front" for h in handles)
-        edges = derived_edges(cut, handles)
+        edges = self._edges(pattern, cut, handles)
         assert any(edge.feature.name == "shoulder×rptw.front" for edge in edges)
         assert not any(is_reference(edge) for edge in edges)
 
-    def test_faces_square_to_the_timber_give_none(self, pattern):
-        from kumiki.csg.required_features import derived_edges, required_features
+    def test_faces_no_view_draws_slanted_give_none(self, pattern):
+        from kumiki.csg.required_features import required_features
 
         frame = pattern["_load_cute_frame"]()()
         cut = next(c for c in frame.cut_timbers if c.timber.ticket.path == "Back Cross")
-        assert derived_edges(cut, [r.handle for r in required_features(cut)]) == []
+        assert self._edges(pattern, cut, [r.handle for r in required_features(cut)]) == []

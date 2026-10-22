@@ -8,13 +8,15 @@ Temporary, and expected to be renamed.
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
 from ..csg.assumptions import Assumption
 from ..csg.carriers import Row
 from ..csg.dof_solver import rank_svd, remaining, rows_matrix
+from ..csg.cutcsg import FaceFeature, derive_edge_hits
+from ..csg.feature_extent import extents_of
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
 from ..csg.identity_memo import memo_by_identity
@@ -24,6 +26,9 @@ from ..rule import as_ndarray, create_v3, unit_ndarray
 from .measure import Measure, MeasurementKind, ViewAxes
 from .measure_solving import DrawingSolve
 from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, SheetShape, sheet_gap, sheet_shape
+
+if TYPE_CHECKING:
+    from ..timber import CutTimber
 
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 HORIZONTAL = MeasurementKind.parse("projected_horizontal_distance")
@@ -330,6 +335,51 @@ def _separation(one: SheetShape, other: SheetShape, look: np.ndarray) -> Optiona
 def _across(line: SheetLine, look: np.ndarray) -> np.ndarray:
     """Return the in-sheet direction square to a drawn line."""
     return unit_ndarray(np.cross(line.run, look))
+
+
+def derived_edge_anchors(cut_timber: 'CutTimber', faces: Sequence[FeatureHandle],
+                         views: Mapping[str, ViewAxes]) -> List[FeatureHandle]:
+    """Return the edges where a face of `faces` that some view draws slanted (along neither sheet axis)
+    meets another of `faces` on `cut_timber`, where their groups let them form one and some of it is on
+    the timber: e.g. a sloped shoulder against the timber's faces.
+
+    For dimensioning to: seen end-on such an edge draws as a point, and a face drawn slanted has no
+    parallel line to be measured from.
+
+    Leaving out the other faces' edges is an optimization: they could be anchors too, but each costs a
+    visibility check per view, and a face drawn along a sheet axis has parallel lines to measure from.
+    """
+    root = cut_timber.render_timber_with_cuts_csg_local()
+    timber = cut_timber.timber
+    hits = [face.hit for face in faces if face.timber is timber and isinstance(face.feature, FaceFeature)]
+    sheets = [(unit_ndarray(as_ndarray(axes.look)), unit_ndarray(as_ndarray(axes.right)),
+               unit_ndarray(as_ndarray(axes.up))) for axes in views.values()]
+    slanted = [hit for hit in hits if any(_drawn_slanted(FeatureHandle(timber=timber, hit=hit), *sheet)
+                                          for sheet in sheets)]
+    extents = extents_of(root, timber)
+    edges, seen = [], set()
+    for one in slanted:
+        for other in hits:
+            pair = frozenset((id(one), id(other)))
+            if other is one or pair in seen:
+                continue
+            seen.add(pair)
+            for hit in derive_edge_hits(root, [one, other]):
+                extent = extents.of(hit.feature, hit.owner)
+                if extent is not None and not extent.is_empty:
+                    edges.append(FeatureHandle(timber=timber, hit=hit))
+    return edges
+
+
+def _drawn_slanted(handle: FeatureHandle, look: np.ndarray, right: np.ndarray, up: np.ndarray) -> bool:
+    """Return whether a view looking along `look` draws the feature as a line along neither sheet axis."""
+    shape = _on_sheet(handle, look)
+    return isinstance(shape, SheetLine) and _slanted(shape, right, up)
+
+
+def _slanted(line: SheetLine, right: np.ndarray, up: np.ndarray) -> bool:
+    """Return whether a drawn line runs along neither of the sheet's axes."""
+    return max(abs(float(line.run @ right)), abs(float(line.run @ up))) < 1 - 1e-9
 
 
 def sheet_candidates(
