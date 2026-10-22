@@ -7,15 +7,16 @@ Temporary, and expected to be renamed.
 """
 
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Callable, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
 from ..csg.assumptions import Assumption
-from ..csg.carriers import Row
+from ..csg.carriers import CarrierMap, CarrierPlane, CarrierRef, Row
 from ..csg.dof_solver import rank_svd, remaining, rows_matrix
-from ..csg.cutcsg import FaceFeature, derive_edge_hits
+from ..csg.cutcsg import (CutCSG, DerivedEdgeFeature, EdgeFeature, FaceFeature, OwnedFeatureHit, derive_edge_hits,
+                         shared_ancestor)
 from ..csg.feature_extent import extents_of
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
@@ -420,6 +421,138 @@ def derived_edge_anchors(cut_timber: 'CutTimber', faces: Sequence[FeatureHandle]
                 if extent is not None and not extent.is_empty:
                     edges.append(FeatureHandle(timber=timber, hit=hit))
     return edges
+
+
+def _meets(edge: FeatureHandle) -> List['CarrierRef']:
+    """Return the carriers an edge is the meet of (two for a derived or declared meet of faces), else none."""
+    recipe = edge.feature.solve_recipe(edge.owner) or ()
+    return [part for part in recipe if isinstance(part, CarrierRef)] if len(recipe) == 2 else []
+
+
+def _on_an_edge_on_face(handle: FeatureHandle, look: np.ndarray) -> bool:
+    """Return whether an edge draws as a line lying on a face it is the meet of, seen edge-on (that face's
+    drawn line), so a measurement to the face measures it too."""
+    if not isinstance(_on_sheet(handle, look), SheetLine):
+        return False
+    local = unit_ndarray(as_ndarray(handle.timber.transform.global_to_local_direction(create_v3(*look))))
+    carriers = [ref.carrier() for ref in _meets(handle)]
+    return any(isinstance(carrier, CarrierPlane)
+               and abs(float(unit_ndarray(as_ndarray(carrier.plane.normal)) @ local)) < 1e-9
+               for carrier in carriers)
+
+
+def without_edges_on_faces(visible: Mapping[str, Sequence[FeatureHandle]],
+                           views: Mapping[str, ViewAxes]) -> Dict[str, List[FeatureHandle]]:
+    """Return `visible` (per view) less the edges lying on a face seen edge-on there."""
+    out = {}
+    for view, handles in visible.items():
+        look = unit_ndarray(as_ndarray(views[view].look))
+        out[view] = [handle for handle in handles if not _on_an_edge_on_face(handle, look)]
+    return out
+
+
+def faces_to_edges(result: AutoDimensioning, cut_timbers: Sequence['CutTimber'], faces: Sequence[FeatureHandle],
+                   views: Mapping[str, ViewAxes], carriers: CarrierMap) -> AutoDimensioning:
+    """Return `result` with each pick's face ends, seen edge-on, moved onto an edge of the face.
+
+    The edge is along the face region's boundary nearest the camera in the pick's view, where it meets
+    another face of `faces`: a declared edge there if one is the meet of the same two faces, else the
+    derived one, whatever their groups. The measurement keeps its value and, but for the tilt columns
+    the sheet's assumptions fix, its row. A face with no such edge stays.
+    """
+    roots = {id(cut.timber): cut.render_timber_with_cuts_csg_local() for cut in cut_timbers}
+    by_timber: Dict[int, List[FeatureHandle]] = {}
+    for face in faces:
+        if isinstance(face.feature, FaceFeature):
+            by_timber.setdefault(id(face.timber), []).append(face)
+    memo: Dict[Tuple, FeatureHandle] = {}
+
+    def edge_of(end: FeatureHandle, view: str) -> FeatureHandle:
+        key = (_key(end), id(end.timber), view)
+        if key not in memo:
+            root = roots.get(id(end.timber))
+            look = unit_ndarray(as_ndarray(views[view].look))
+            memo[key] = end if root is None else _nearest_edge_of(
+                end, look, root, by_timber.get(id(end.timber), []), carriers)
+        return memo[key]
+
+    picks = []
+    for pick in result.picks:
+        candidate = pick.candidate
+        old_a, old_b = _ends(candidate)
+        a, b = edge_of(old_a, candidate.view), edge_of(old_b, candidate.view)
+        # Both ends moved, else one; whichever the solver can still write a row for.
+        for ends in ((a, b), (a, old_b), (old_a, b)):
+            moved = replace(candidate, measure=replace(candidate.measure, anchor_a=ends[0], anchor_b=ends[1]))
+            if ends != (old_a, old_b) and moved.row is not None:
+                candidate = moved
+                break
+        picks.append(replace(pick, candidate=candidate))
+    return replace(result, picks=picks)
+
+
+#: How far a point may be off a plane and still be on it, in meters.
+_ON_PLANE = 1e-7
+
+
+def _nearest_edge_of(end: FeatureHandle, look: np.ndarray, root: CutCSG, faces: Sequence[FeatureHandle],
+                     carriers: CarrierMap) -> FeatureHandle:
+    """Return the edge of face `end` along its region's boundary nearest the camera, else `end`."""
+    plane = end.feature.locate_simple_unbounded(end.owner)
+    if (end.feature.is_derived() or not isinstance(end.feature, FaceFeature) or not isinstance(plane, Plane)
+            or not isinstance(_on_sheet(end, look), SheetLine)):
+        return end
+    extent = extents_of(root, end.timber).of(end.feature, end.owner)
+    if extent is None:
+        return end
+    local = unit_ndarray(as_ndarray(end.timber.transform.global_to_local_direction(create_v3(*look))))
+    along = [(start, stop) for start, stop in extent.outline()
+             if np.linalg.norm(stop - start) > _ON_PLANE
+             and abs(float(unit_ndarray(stop - start) @ local)) < 1e-6]
+    if not along:
+        return end
+    # Nearest by depth alone: another timber could hide that edge while some of the face shows, but
+    # the face's nearest boundary is rarely hidden when the face isn't, so visibility isn't checked.
+    start, stop = min(along, key=lambda segment: float((segment[0] + segment[1]) @ local))
+    normal = unit_ndarray(as_ndarray(plane.normal))
+    for other in faces:
+        other_plane = other.feature.locate_simple_unbounded(other.owner)
+        if not isinstance(other_plane, Plane) or other is end:
+            continue
+        other_normal = unit_ndarray(as_ndarray(other_plane.normal))
+        if abs(abs(float(normal @ other_normal)) - 1) < 1e-9:
+            continue
+        if all(abs(float(other_normal @ (point - as_ndarray(other_plane.point)))) < _ON_PLANE for point in (start, stop)):
+            edge = _edge_between(end, other, root, carriers)
+            if edge is not None:
+                return edge
+    return end
+
+
+def _edge_between(one: FeatureHandle, other: FeatureHandle, root: CutCSG,
+                  carriers: CarrierMap) -> Optional[FeatureHandle]:
+    """Return the edge where two faces meet: a declared edge of either's owner that is their meet, else
+    the derived one (whatever their groups), or None."""
+    faces = {_canonical(part, carriers) for face in (one, other)
+             for part in (face.feature.solve_recipe(face.owner) or ()) if isinstance(part, CarrierRef)}
+    for owner in {id(face.owner): face.owner for face in (one, other)}.values():
+        for feature in _declared_edges(owner):
+            edge = FeatureHandle(timber=one.timber, hit=OwnedFeatureHit(feature=feature, owner=owner))
+            if {_canonical(ref, carriers) for ref in _meets(edge)} == faces:
+                return edge
+    derived = DerivedEdgeFeature.derive(one.hit, other.hit, any_groups=True)
+    owner = None if derived is None else shared_ancestor(root, one.owner, other.owner)
+    return None if derived is None or owner is None else FeatureHandle(
+        timber=one.timber, hit=OwnedFeatureHit(feature=derived, owner=owner))
+
+
+@memo_by_identity
+def _declared_edges(owner: CutCSG) -> List[EdgeFeature]:
+    return [feature for feature in owner.get_declared_features() if isinstance(feature, EdgeFeature)]
+
+
+def _canonical(ref: 'CarrierRef', carriers: CarrierMap) -> 'CarrierRef':
+    return carriers.canonical(ref) if ref in carriers else ref
 
 
 def _drawn_slanted(handle: FeatureHandle, look: np.ndarray, right: np.ndarray, up: np.ndarray) -> bool:

@@ -263,8 +263,9 @@ def resolve_feature_path(path: FeaturePath, frame: 'Frame') -> Optional[FeatureH
         second = find_declared_feature(cut_timber, path.b)
         if first is None or second is None:
             return None
-        derive = DerivedPointFeature.derive if path.feature_type == "POINT" else DerivedEdgeFeature.derive
-        derived = derive(first, second)
+        # Named by both its faces, so an edge derives whatever their groups.
+        derived = (DerivedPointFeature.derive(first, second) if path.feature_type == "POINT"
+                   else DerivedEdgeFeature.derive(first, second, any_groups=True))
         if derived is None:
             return None
         owner = shared_ancestor(cut_timber.render_timber_with_cuts_csg_local(), first.owner, second.owner)

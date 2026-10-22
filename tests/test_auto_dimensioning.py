@@ -23,7 +23,8 @@ def pattern():
 
 @pytest.fixture(scope="module")
 def solve(pattern):
-    return pattern["solve_cute_frame"]
+    # The picks as the policy made them, before faces are moved onto edges.
+    return lambda *args: pattern["solve_cute_frame"](*args, onto_edges=False)
 
 
 def _from_a_reference(pick) -> bool:
