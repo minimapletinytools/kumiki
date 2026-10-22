@@ -37,6 +37,11 @@ from kumiki.csg.required_features import planning_features, required_features
 ROUGH_ALLOWANCE = inches(1)
 
 
+#: Anchor every face's derived edges, not only those of faces some view draws slanted. Edges draw
+#: as lines, so dimensions prefer them, but each adds time.
+EVERY_FACES_EDGES = False
+
+
 def _rough(timber: Timber) -> Timber:
     """*timber*, its rough stock ROUGH_ALLOWANCE larger on each long face that is not a reference face."""
     referenced = {face for feature in timber.ticket.reference_features for face in feature.long_faces_it_rests_on()}
@@ -112,7 +117,7 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     views = {view: _sheet(view)[0] for view in VIEWS}
     anchors = [handle for handle in directed if not isinstance(handle.feature, MidplaneFeature)]
     anchors += [edge for cut in cut_timbers for edge in derived_edge_anchors(
-        cut, [handle for handle in directed if handle.timber is cut.timber], views)]
+        cut, [handle for handle in directed if handle.timber is cut.timber], views, all_faces=EVERY_FACES_EDGES)]
     visible = visible_by_view(anchors, views, cut_timbers)
     # What the views show lined up needs no dimension.
     assumptions += coincidence_assumptions(visible, views, solve)
@@ -178,7 +183,7 @@ def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
         assumptions += sheet_axis_assumptions(targets, carriers, sheet)
     views = {view: axes for view, (axes, _) in sheets.items()}
     anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
-    anchors += derived_edge_anchors(cut, targets, views)
+    anchors += derived_edge_anchors(cut, targets, views, all_faces=EVERY_FACES_EDGES)
     visible = visible_by_view(anchors, views, [cut])
     assumptions += coincidence_assumptions(visible, views, solve)
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]

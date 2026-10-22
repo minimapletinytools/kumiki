@@ -132,28 +132,30 @@ def angles_first(candidate: DimensionCandidate, context: PickContext) -> float:
 
 @fixed
 def angles_from_the_timber(candidate: DimensionCandidate, context: PickContext) -> float:
-    """Criterion: an angle measured from one of the timber's own faces (rptw., ptw., rough.) before one
-    measured from a joint's. Distances all score 0."""
+    """Criterion: an angle measured from one of the timber's own faces (rptw., ptw., rough.), or an edge
+    between two of them, before one measured from a joint's. Distances all score 0."""
     kind = candidate.measure.kind
     if kind is None or kind.operation is not MeasurementOperation.ANGLE:
         return 0.0
-    own = any(not end.feature.is_derived() and end.feature.name.startswith(_TIMBER_FACE_PREFIXES)
-              for end in _ends(candidate))
-    return 0.0 if own else 1.0
+    return 0.0 if any(_of_the_timber(end.feature) for end in _ends(candidate)) else 1.0
 
 
 #: Name prefixes of a timber's own faces.
 _TIMBER_FACE_PREFIXES = ("rptw.", "ptw.", "rough.")
 
 
+def _of_the_timber(feature) -> bool:
+    """Return whether a feature is one of the timber's own faces, or an edge derived from two of them."""
+    if feature.is_derived():
+        return all(_of_the_timber(parent.feature) for parent in feature.parents)
+    return feature.name.startswith(_TIMBER_FACE_PREFIXES)
+
+
 @fixed
-def edges_not_faces(candidate: DimensionCandidate, context: PickContext) -> float:
-    """Criterion: a derived edge measured to a face, after one measured to another edge: a face its edges
-    define is marked out by those edges."""
-    ends = _ends(candidate)
-    derived = [end.feature.is_derived() for end in ends]
-    faces = [isinstance(end.feature.locate_simple_unbounded(end.owner), Plane) for end in ends]
-    return 1.0 if (derived[0] and faces[1]) or (derived[1] and faces[0]) else 0.0
+def edges_over_faces(candidate: DimensionCandidate, context: PickContext) -> float:
+    """Criterion: how many ends are faces. A derived edge stands for its two faces and draws as a line,
+    while a face is only seen edge-on."""
+    return float(sum(isinstance(end.feature.locate_simple_unbounded(end.owner), Plane) for end in _ends(candidate)))
 
 
 @fixed
@@ -167,6 +169,19 @@ def shortest(candidate: DimensionCandidate, context: PickContext) -> float:
     return candidate.length
 
 
+#: The default order of preference, first to last; reorder or drop lines to try another.
+PREFERENCE_ORDER: Tuple[Criterion, ...] = (
+    angles_first,
+    angles_from_the_timber,
+    edges_over_faces,
+    from_reference,
+    perfect_over_rough,
+    declared_over_derived,
+    from_solved,
+    shortest,
+)
+
+
 @dataclass(frozen=True)
 class Policy:
     """How to choose among helpful candidates.
@@ -174,8 +189,7 @@ class Policy:
     `prefer` criteria are compared in order until one separates two candidates. `rules` must score
     0, unless no helpful candidate passes them; then one pick ignores them and warns.
     """
-    prefer: Sequence[Criterion] = (angles_first, angles_from_the_timber, edges_not_faces, from_reference, perfect_over_rough,
-                                   declared_over_derived, from_solved, shortest)
+    prefer: Sequence[Criterion] = PREFERENCE_ORDER
     rules: Sequence[Criterion] = ()
 
 
@@ -374,23 +388,24 @@ def _across(line: SheetLine, look: np.ndarray) -> np.ndarray:
 
 
 def derived_edge_anchors(cut_timber: 'CutTimber', faces: Sequence[FeatureHandle],
-                         views: Mapping[str, ViewAxes]) -> List[FeatureHandle]:
+                         views: Mapping[str, ViewAxes], all_faces: bool = False) -> List[FeatureHandle]:
     """Return the edges where a face of `faces` that some view draws slanted (along neither sheet axis)
     meets another of `faces` on `cut_timber`, where their groups let them form one and some of it is on
-    the timber: e.g. a sloped shoulder against the timber's faces.
+    the timber: e.g. a sloped shoulder against the timber's faces. With `all_faces`, every face's edges.
 
     For dimensioning to: seen end-on such an edge draws as a point, and a face drawn slanted has no
     parallel line to be measured from.
 
-    Leaving out the other faces' edges is an optimization: they could be anchors too, but each costs a
-    visibility check per view, and a face drawn along a sheet axis has parallel lines to measure from.
+    Leaving out the other faces' edges by default is an optimization: they could be anchors too, but
+    each costs a visibility check per view, and a face drawn along a sheet axis has parallel lines to
+    measure from.
     """
     root = cut_timber.render_timber_with_cuts_csg_local()
     timber = cut_timber.timber
     hits = [face.hit for face in faces if face.timber is timber and isinstance(face.feature, FaceFeature)]
     sheets = [(unit_ndarray(as_ndarray(axes.look)), unit_ndarray(as_ndarray(axes.right)),
                unit_ndarray(as_ndarray(axes.up))) for axes in views.values()]
-    slanted = [hit for hit in hits if any(_drawn_slanted(FeatureHandle(timber=timber, hit=hit), *sheet)
+    slanted = hits if all_faces else [hit for hit in hits if any(_drawn_slanted(FeatureHandle(timber=timber, hit=hit), *sheet)
                                           for sheet in sheets)]
     extents = extents_of(root, timber)
     edges, seen = [], set()
