@@ -24,7 +24,8 @@ from kumiki.csg.carriers import Row
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
 from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, Policy, auto_dimension, coincidence_assumptions, derived_edge_anchors, is_reference,
-                                              sheet_candidates)
+                                              sheet_candidates, faces_to_edges,
+                                              without_edges_on_faces)
 from kumiki.drawings.drawing import (ELEVATION_IDS, SHOP_DRAWING_IDS, Drawing, DrawingId, elevation_viewports,
                                      shop_drawing_viewports)
 from kumiki.drawings.measure import ViewAxes
@@ -40,6 +41,8 @@ ROUGH_ALLOWANCE = inches(1)
 #: Anchor every face's derived edges, not only those of faces some view draws slanted. Edges draw
 #: as lines, so dimensions prefer them. A toggle because it about doubles the time to dimension
 #: (cat_corner_cot: 4.3 to 8.6 s): every edge in view pairs with every other anchor as a candidate.
+#: Not needed now that faces_to_edges moves each picked face onto its nearest edge after solving
+#: (cat_corner_cot: 12 face-to-face picks left without it, none with it); kept to compare.
 EVERY_FACES_EDGES = False
 
 
@@ -90,8 +93,9 @@ def _rows(handles: Sequence[FeatureHandle], solve: DrawingSolve) -> List[Row]:
     return [row for handle in handles for row in solve.dof_rows(handle)]
 
 
-def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
-    """Pick dimensions until every planning feature is solved. Returns (frame, AutoDimensioning, report lines)."""
+def solve_cute_frame(policy: Policy = DEFAULT_POLICY, onto_edges: bool = True):
+    """Pick dimensions until every planning feature is solved, then (with `onto_edges`) move picked faces
+    onto their nearest edges. Returns (frame, AutoDimensioning, report lines)."""
     frame = _load_cute_frame()()
     cut_timbers = list(frame.cut_timbers)
     solve = DrawingSolve(cut_timbers)
@@ -119,12 +123,15 @@ def solve_cute_frame(policy: Policy = DEFAULT_POLICY):
     anchors = [handle for handle in directed if not isinstance(handle.feature, MidplaneFeature)]
     anchors += [edge for cut in cut_timbers for edge in derived_edge_anchors(
         cut, [handle for handle in directed if handle.timber is cut.timber], views, all_faces=EVERY_FACES_EDGES)]
-    visible = visible_by_view(anchors, views, cut_timbers)
+    # Edges lying on a face seen edge-on are measured through that face, and moved onto after solving.
+    visible = without_edges_on_faces(visible_by_view(anchors, views, cut_timbers), views)
     # What the views show lined up needs no dimension.
     assumptions += coincidence_assumptions(visible, views, solve)
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
     candidates = sheet_candidates(visible, views, solve)
     result = auto_dimension(candidates, targets, known_rows, solve, policy)
+    if onto_edges:
+        result = faces_to_edges(result, cut_timbers, directed, views, solve.carriers)
 
     report = [f"fixed: {FIXED_TIMBER} (from {[_name(handle) for handle in known]}), {len(assumptions)} assumptions",
               f"targets: {len(targets)} features, {len(candidates)} candidate dimensions",
@@ -185,11 +192,12 @@ def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
     views = {view: axes for view, (axes, _) in sheets.items()}
     anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
     anchors += derived_edge_anchors(cut, targets, views, all_faces=EVERY_FACES_EDGES)
-    visible = visible_by_view(anchors, views, [cut])
+    visible = without_edges_on_faces(visible_by_view(anchors, views, [cut]), views)
     assumptions += coincidence_assumptions(visible, views, solve)
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
     candidates = sheet_candidates(visible, views, solve)
-    result = auto_dimension(candidates, targets, known_rows, solve, policy)
+    result = faces_to_edges(auto_dimension(candidates, targets, known_rows, solve, policy), [cut], targets, views,
+                            solve.carriers)
 
     report = [f"{cut.timber.ticket.path}: {len(targets)} features, from {[_name(h) for h in known]}, "
               f"{len(candidates)} candidates, {result.left_before} left before"]

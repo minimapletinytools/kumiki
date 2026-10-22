@@ -843,16 +843,16 @@ class DerivedEdgeFeature(EdgeFeature):
         return _meet_of_parents(self.a, self.b)
 
     @staticmethod
-    def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedEdgeFeature']:
+    def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit', any_groups: bool = False) -> Optional['DerivedEdgeFeature']:
         """Return the edge where `a` and `b` meet, or None.
 
-        None if either isn't a face, their groups can't meet, either face isn't there (e.g. an infinite
-        prism's cap), or their planes are parallel.
+        None if either isn't a face, their groups can't meet (unless `any_groups`), either face isn't there
+        (e.g. an infinite prism's cap), or their planes are parallel.
         """
         face_a, face_b = hit_of_kind(a, FaceFeature), hit_of_kind(b, FaceFeature)
         if face_a is None or face_b is None:
             return None
-        if not feature_groups_intersect(a.feature.group, b.feature.group):
+        if not any_groups and not feature_groups_intersect(a.feature.group, b.feature.group):
             return None
 
         # A face that isn't there (an infinite prism's cap) forms no edge.
