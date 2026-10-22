@@ -101,13 +101,15 @@ def solve_measurement(measure: Measure, cut_timbers: Sequence['CutTimber'], view
         at_a, at_b = (as_ndarray(point) for point in distance_anchors(first, second, kind, view))
         return SolveDistance(a, b, at_a, at_b, across if across is not None else _gap_direction(at_a, at_b))
 
+    flat_first, flat_second = _projected(first, look), _projected(second, look)
     if kind.direction is not MeasurementDirection.PERPENDICULAR:
-        if not (isinstance(first, PointSpan) and isinstance(second, PointSpan)):
+        # Between two points as drawn: a point, or a line seen end-on.
+        if not (isinstance(flat_first, PointSpan) and isinstance(flat_second, PointSpan)):
             raise ValueError(f"a {kind.name} is only taken between two points")
         along = unit_ndarray(as_ndarray(view.right if kind.direction is MeasurementDirection.HORIZONTAL else view.up))
-        return SolveDistance(a, b, as_ndarray(first.at), as_ndarray(second.at), along)
+        return SolveDistance(a, b, _on_feature(first, as_ndarray(flat_first.at), look),
+                             _on_feature(second, as_ndarray(flat_second.at), look), along)
 
-    flat_first, flat_second = _projected(first, look), _projected(second, look)
     anchor_a, anchor_b = (as_ndarray(point) for point in distance_anchors(flat_first, flat_second, kind, view))
     return SolveDistance(a, b, _on_feature(first, anchor_a, look), _on_feature(second, anchor_b, look),
                          across if across is not None else _gap_direction(anchor_a, anchor_b, look))
