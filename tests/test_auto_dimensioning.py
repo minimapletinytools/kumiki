@@ -139,7 +139,7 @@ class TestDerivedEdges:
 
         timber = create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(150)),
                                length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0),
-                               ticket=TimberTicket("post", reference_features=(TimberFeature.FRONT_FACE,)))
+                               ticket=TimberTicket("post", reference_features=(TimberFeature.LEFT_BACK_EDGE,)))
         bevel = HalfSpace(normal=safe_normalize_vector(create_v3(1, 0, 1)), offset=mm(1020) / sqrt(2),
                           label=CutCSGLabel("bevel"),
                           feature_overrides=[shoulder_override(HALF_SPACE_PLANE, "shoulder", FeatureGroup.SHOULDER_PLANE)])
@@ -164,9 +164,9 @@ class TestDerivedEdges:
 
         cut = self._bevelled()
         handles = [r.handle for r in required_features(cut)]
-        assert any(is_reference(h) and h.feature.name == "rptw.front" for h in handles)
+        assert any(is_reference(h) and h.feature.name == "rptw.back" for h in handles)
         edges = self._edges(pattern, cut, handles)
-        assert any(edge.feature.name == "shoulder×rptw.front" for edge in edges)
+        assert any(edge.feature.name == "shoulder×rptw.back" for edge in edges)
         assert not any(is_reference(edge) for edge in edges)
 
     def test_faces_no_view_draws_slanted_give_none(self, pattern):
@@ -175,3 +175,13 @@ class TestDerivedEdges:
         frame = pattern["_load_cute_frame"]()()
         cut = next(c for c in frame.cut_timbers if c.timber.ticket.path == "Back Cross")
         assert self._edges(pattern, cut, [r.handle for r in required_features(cut)]) == []
+
+    def test_a_sloped_shoulder_is_set_out_by_an_angle_from_the_timber(self, pattern):
+        from kumiki.drawings.measure import MeasurementOperation
+
+        result, _ = pattern["solve_timber"](self._bevelled())
+        first = result.picks[0].candidate.measure
+        assert first.kind.operation is MeasurementOperation.ANGLE
+        assert any(end.feature.name.startswith("rptw.") for end in (first.anchor_a, first.anchor_b))
+        assert "shoulder" in {first.anchor_a.feature.name, first.anchor_b.feature.name}
+        assert not result.unsolved
