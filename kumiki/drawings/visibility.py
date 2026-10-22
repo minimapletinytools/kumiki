@@ -13,7 +13,7 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
-from ..csg.edges_on_csg import crop_line_to_crease_segments_on_csg, crop_line_to_interior_segments_on_csg
+from ..csg.edges_on_csg import crop_line_to_interior_segments_on_csg
 from ..csg.cutcsg import CSGFeature, CutCSG
 from ..csg.feature_paths import FeatureHandle
 from ..csg.identity_memo import memo_by_identity
@@ -26,7 +26,7 @@ from .measure import ViewAxes
 from .sheet_shape import SheetLine, SheetPoint, sheet_gap, sheet_shape
 
 Geometry = Union[Point, Line, Plane]
-from ..csg.feature_extent import extents_of, timber_reach
+from ..csg.feature_extent import FeatureExtent, extents_of, timber_reach
 
 # TODO probably should make these relative to timber size if it's not alerady, i.e. epsilon per meter kinda deal
 #: Material nearer the place than this is the surface it lies on, not something in front of it.
@@ -110,8 +110,11 @@ def nearest_visible_depth(
     shape = sheet_shape(located, as_ndarray(transform.global_to_local_direction(create_v3(*look))))
     if shape is None:
         return None  # a face seen at an angle: drawn as an area, not a line
+    extent = extents_of(root, handle.timber).of(handle.feature, handle.owner)
+    if extent is None:
+        return float(point @ look)
     if isinstance(shape, SheetPoint):
-        return _end_on_depth(located, root, transform, look, occluders, reach)
+        return _end_on_depth(extent, transform, look, occluders)
     if isinstance(located, Plane):
         normal = as_ndarray(transform.local_to_global_direction(located.normal))
     else:
@@ -125,11 +128,7 @@ def nearest_visible_depth(
     own = _frame_in(transform, *world)
     try:
         if isinstance(located, Plane):
-            # The face's region on the finished surface: its extent, kept for the tree and so shared
-            # by every view that asks, brought into this sight plane's frame.
-            extent = extents_of(root, handle.timber).of(handle.feature, handle.owner)
-            if extent is None:
-                return float(point @ look)
+            # The face's region on the finished surface, brought into this sight plane's frame.
             region = [[own.to_2d(corner) for corner in polygon] for polygon in extent.polygons()]
             if area(region) <= 0:
                 return None
@@ -138,12 +137,9 @@ def nearest_visible_depth(
             visible = subtract(region, _overlapping(blocked, corners))
             depths = [y for polygon in visible for _x, y in polygon]
         else:
-            pieces = crop_line_to_crease_segments_on_csg(located, root, seed_reach=reach, near=located.point)
-            if pieces is None:
-                return float(point @ look)
-            to_2d = lambda end: tuple(float((as_ndarray(transform.local_to_global(end)) - origin) @ axis)
+            to_2d = lambda end: tuple(float((as_ndarray(transform.local_to_global(create_v3(*end))) - origin) @ axis)
                                       for axis in (across, look))
-            segments = [(to_2d(piece.start), to_2d(piece.end)) for piece in pieces]
+            segments = [(to_2d(start), to_2d(end)) for start, end in extent.outline()]
             ends = [end for segment in segments for end in segment]
             if not ends:
                 return None
@@ -224,13 +220,12 @@ def _work_out_corners(solid: CutCSG, transform: Transform) -> Optional[np.ndarra
     return local @ rotation.T + position
 
 
-def _end_on_depth(line: Line, root: CutCSG, transform: Transform, look: np.ndarray,
-                  occluders: Sequence[Occluder], reach: float) -> Optional[float]:
+def _end_on_depth(extent: FeatureExtent, transform: Transform, look: np.ndarray,
+                  occluders: Sequence[Occluder]) -> Optional[float]:
     """Return the depth of a line seen end-on, if the sight line from its nearest end is clear."""
-    pieces = crop_line_to_crease_segments_on_csg(line, root, seed_reach=reach, near=line.point)
-    if not pieces:
-        return None if pieces is not None else float(as_ndarray(transform.local_to_global(line.point)) @ look)
-    ends = [as_ndarray(transform.local_to_global(end)) for piece in pieces for end in (piece.start, piece.end)]
+    ends = [as_ndarray(transform.local_to_global(create_v3(*end))) for piece in extent.outline() for end in piece]
+    if not ends:
+        return None
     nearest = min(ends, key=lambda end: float(end @ look))
     return None if hidden_at(nearest, look, occluders) else float(nearest @ look)
 
