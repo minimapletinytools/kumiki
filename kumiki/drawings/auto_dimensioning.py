@@ -397,8 +397,8 @@ def derived_edge_anchors(cut_timber: 'CutTimber', faces: Sequence[FeatureHandle]
     parallel line to be measured from.
 
     Leaving out the other faces' edges by default is an optimization: they could be anchors too, but
-    each costs a visibility check per view, and a face drawn along a sheet axis has parallel lines to
-    measure from.
+    each pairs with every other anchor in view as a candidate (about doubling the time to dimension),
+    and a face drawn along a sheet axis has parallel lines to measure from.
     """
     root = cut_timber.render_timber_with_cuts_csg_local()
     timber = cut_timber.timber
