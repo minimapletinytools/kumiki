@@ -17,7 +17,7 @@ from ..csg.carriers import CarrierMap, CarrierPlane, CarrierRef, Row
 from ..csg.dof_solver import rank_svd, remaining, rows_matrix
 from ..csg.cutcsg import (CutCSG, DerivedEdgeFeature, EdgeFeature, FaceFeature, OwnedFeatureHit, derive_edge_hits,
                          shared_ancestor)
-from ..csg.feature_extent import extents_of
+from ..csg.feature_extent import FeatureExtent, extents_of
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
 from ..csg.identity_memo import memo_by_identity
@@ -515,18 +515,57 @@ def _nearest_edge_of(end: FeatureHandle, look: np.ndarray, root: CutCSG, faces: 
     # the face's nearest boundary is rarely hidden when the face isn't, so visibility isn't checked.
     start, stop = min(along, key=lambda segment: float((segment[0] + segment[1]) @ local))
     normal = unit_ndarray(as_ndarray(plane.normal))
-    for other in faces:
+    # Best group first: where the timber's own face and a cut's coplanar side both hold the boundary,
+    # the edge is the timber face's.
+    for other in sorted(faces, key=lambda face: face.feature.group.value):
         other_plane = other.feature.locate_simple_unbounded(other.owner)
         if not isinstance(other_plane, Plane) or other is end:
             continue
         other_normal = unit_ndarray(as_ndarray(other_plane.normal))
         if abs(abs(float(normal @ other_normal)) - 1) < 1e-9:
             continue
-        if all(abs(float(other_normal @ (point - as_ndarray(other_plane.point)))) < _ON_PLANE for point in (start, stop)):
-            edge = _edge_between(end, other, root, carriers)
-            if edge is not None:
-                return edge
+        if not all(abs(float(other_normal @ (point - as_ndarray(other_plane.point)))) < _ON_PLANE
+                   for point in (start, stop)):
+            continue
+        # Where the other face's region has a boundary along the same stretch, the two meet at a crease;
+        # elsewhere its plane only passes through a seam between `end` and a face in line with it.
+        shared = _shared_stretch(start, stop, extents_of(root, other.timber).of(other.feature, other.owner))
+        edge = None if shared is None else _edge_between(end, other, root, carriers)
+        if edge is not None and shared is not None:
+            _know_extent(edge, root, *shared)
+            return edge
     return end
+
+
+def _shared_stretch(start: np.ndarray, stop: np.ndarray,
+                    other: Optional[FeatureExtent]) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """Return the part of segment `start`-`stop` that a boundary segment of the `other` region runs along, or None."""
+    if other is None:
+        return None
+    length = float(np.linalg.norm(stop - start))
+    run = (stop - start) / length
+    best: Optional[Tuple[float, float]] = None
+    for one, two in other.outline():
+        if any(float(np.linalg.norm((point - start) - run * float((point - start) @ run))) > _ON_PLANE
+               for point in (one, two)):
+            continue
+        low, high = sorted((float((one - start) @ run), float((two - start) @ run)))
+        low, high = max(low, 0.0), min(high, length)
+        if high - low > _ON_PLANE and (best is None or high - low > best[1] - best[0]):
+            best = (low, high)
+    return None if best is None else (start + run * best[0], start + run * best[1])
+
+
+def _know_extent(edge: FeatureHandle, root: CutCSG, start: np.ndarray, stop: np.ndarray) -> None:
+    """Record the segment `start`-`stop` (local) as the edge's extent, so it isn't cropped for again."""
+    line = edge.feature.locate_simple_unbounded(edge.owner)
+    if not isinstance(line, Line):
+        return
+    direction = unit_ndarray(as_ndarray(line.direction))
+    point = as_ndarray(line.point)
+    low, high = sorted(float((end - point) @ direction) for end in (start, stop))
+    located = Line(direction=create_v3(*direction), point=line.point)
+    extents_of(root, edge.timber).know(edge.feature, edge.owner, FeatureExtent(located, pieces=((low, high),)))
 
 
 def _edge_between(one: FeatureHandle, other: FeatureHandle, root: CutCSG,
