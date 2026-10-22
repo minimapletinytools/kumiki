@@ -182,6 +182,8 @@ class TestDerivedEdges:
         result, _ = pattern["solve_timber"](self._bevelled())
         first = result.picks[0].candidate.measure
         assert first.kind.operation is MeasurementOperation.ANGLE
-        assert any(end.feature.name.startswith("rptw.") for end in (first.anchor_a, first.anchor_b))
-        assert "shoulder" in {first.anchor_a.feature.name, first.anchor_b.feature.name}
+        names = {first.anchor_a.feature.name, first.anchor_b.feature.name}
+        # The shoulder by one of its edges, from one of the timber's faces.
+        assert any(name.startswith("shoulder×") for name in names)
+        assert any(name.startswith("rptw.") for name in names)
         assert not result.unsolved
