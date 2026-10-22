@@ -168,6 +168,10 @@ class FeatureExtents:
             self._extent_memo[key] = self._work_out(feature, owner)
         return self._extent_memo[key]
 
+    def know(self, feature: CSGFeature, owner: CutCSG, extent: FeatureExtent) -> None:
+        """Record an extent found some cheaper way (e.g. read off a face's outline), unless one is known."""
+        self._extent_memo.setdefault(hit_identity(feature, owner), extent)
+
     def _work_out(self, feature: CSGFeature, owner: CutCSG) -> Optional[FeatureExtent]:
         located = feature.locate_simple_unbounded(owner)
         auxiliary = feature.nature is FeatureNature.AUXILIARY
