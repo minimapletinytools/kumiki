@@ -175,33 +175,29 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
                 && copied.startsWith('patterns/structures/my_cute_frame.py \u203a '),
             `${menuItems.join(' | ')} -> ${JSON.stringify(copied)}`);
 
-        // The inspector under the tabs shows the view's members; a click there selects in the view,
-        // and the selection comes back to the inspector.
-        const inspectorDoc = 'document.querySelector("#slot-bottom iframe")?.contentDocument';
-        const memberRows = await waitFor(() => inShell(`${inspectorDoc}?.querySelectorAll("#member-rows tr").length || 0`), { timeoutMs: 15000 })
+        // The view's sidebar: the tree first; its members, where a click selects in the view; its options.
+        const showTab = (tab) => inShell(`${viewDoc}.querySelector('.vsb-tab[data-tab="${tab}"]').click()`);
+        const shownPage = () => inShell(`[...${viewDoc}.querySelectorAll('.vsb-page')].filter((page) => !page.hidden).map((page) => page.dataset.tab).join()`);
+        check('the view\'s sidebar opens on its tree', await shownPage() === 'tree', await shownPage());
+        await showTab('members');
+        const memberRows = await waitFor(() => inShell(`${viewDoc}?.querySelectorAll("#timber-rows tr").length || 0`), { timeoutMs: 15000 })
             .catch(() => 0);
-        check('the inspector lists the members of the view', memberRows > 0, `${memberRows} members`);
-        check('the view leaves its member list to the inspector', await inShell(`(() => {
-            const frame = document.querySelector('#slot-center iframe:not([hidden])');
-            const panels = frame && frame.contentDocument.getElementById('panels');
-            return !!panels && frame.contentWindow.getComputedStyle(panels).display === 'none';
-        })()`));
-        await inShell(`${inspectorDoc}.querySelector("#member-rows tr").click()`);
-        const selectedRows = await waitFor(() => inShell(`${inspectorDoc}?.querySelectorAll("#member-rows tr.is-selected").length || 0`), { timeoutMs: 5000 })
+        check('the sidebar\'s members tab lists the members of the view', await shownPage() === 'members' && memberRows > 0,
+            `${memberRows} members`);
+        await inShell(`${viewDoc}.querySelector("#timber-rows tr").click()`);
+        const selectedRows = await waitFor(() => inShell(`${viewDoc}?.querySelectorAll("#timber-rows tr.is-selected").length || 0`), { timeoutMs: 5000 })
             .catch(() => 0);
         const viewSelection = (await panels().describe(`viewer:${FRAME}`)).selection;
-        check('a click in the inspector selects in the view, and shows it',
+        check('a click on a member row selects it in the view, and shows it',
             selectedRows === 1 && viewSelection && viewSelection.members.length === 1,
             `${selectedRows} row, ${viewSelection && viewSelection.members.length} selected in the view`);
-        await capture('03b-inspector');
+        await capture('03b-members');
 
-        // The options are drawn in the inspector against a stand-in for the view: a change there
-        // reaches the view, and its answer comes back.
-        const lengthOfFirstRow = () => inShell(`${inspectorDoc}.querySelector("#member-rows tr").children[4].textContent`);
+        const lengthOfFirstRow = () => inShell(`${viewDoc}.querySelector("#timber-rows tr").children[4].textContent`);
         const metricLength = await lengthOfFirstRow();
+        await showTab('options');
         await inShell(`(() => {
-            ${inspectorDoc}.querySelector('.inspector-tab[data-tab="options"]').click();
-            const units = ${inspectorDoc}.getElementById('units-select');
+            const units = ${viewDoc}.getElementById('units-select');
             units.value = 'imperial';
             units.dispatchEvent(new Event('change', { bubbles: true }));
         })()`);
@@ -209,21 +205,26 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             const length = await lengthOfFirstRow();
             return length !== metricLength ? length : null;
         }, { timeoutMs: 5000 }).catch(() => null);
-        check('an option changed in the inspector changes the view',
-            imperialLength !== null && await inShell(`${inspectorDoc}.getElementById('units-select').value`) === 'imperial',
-            `${metricLength} -> ${imperialLength}`);
+        check('an option changed in the sidebar changes the view', imperialLength !== null, `${metricLength} -> ${imperialLength}`);
         await capture('03c-options');
         await inShell(`(() => {
-            const units = ${inspectorDoc}.getElementById('units-select');
+            const units = ${viewDoc}.getElementById('units-select');
             units.value = 'metric';
             units.dispatchEvent(new Event('change', { bubbles: true }));
         })()`);
         await waitFor(async () => (await lengthOfFirstRow()) === metricLength, { timeoutMs: 5000 }).catch(() => null);
-        check('the view leaves its options to the inspector', await inShell(`(() => {
-            const frame = document.querySelector('#slot-center iframe:not([hidden])');
-            const controls = frame && frame.contentDocument.getElementById('top-controls');
-            return !!controls && frame.contentWindow.getComputedStyle(controls).display === 'none';
-        })()`));
+        const viewportWide = () => inShell(`${viewDoc}.getElementById('viewport').getBoundingClientRect().width`);
+        const widthOpen = await viewportWide();
+        await inShell(`${viewDoc}.querySelector('.vsb-collapse').click()`);
+        const widthCollapsed = await waitFor(async () => {
+            const width = await viewportWide();
+            return width > widthOpen ? width : null;
+        }, { timeoutMs: 5000 }).catch(() => null);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await capture('03e-sidebar-collapsed');
+        await inShell(`${viewDoc}.querySelector('.vsb-expand').click()`);
+        check('collapsing the sidebar gives the 3D view its width', widthCollapsed !== null, `${widthOpen} -> ${widthCollapsed}`);
+        await showTab('tree');
 
         // A drawing's dotted lines, clipped per timber by the member id pass: drawn, and every shader
         // they need compiled. Nothing else here enters a drawing, so nothing else draws them.
@@ -272,23 +273,26 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         await capture('03c-drawing-dotted-lines');
         connection().activePanel.dispose();
 
-        // A frame's parameters: typed in the inspector, held by the view, shown back.
+        // A frame's parameters: typed in the view's sidebar, held by the view, shown back.
         await runAppCommand('kigumi.openFrameFromSidebar', PARAMETER_FRAME);
-        await inShell(`${inspectorDoc}.querySelector('.inspector-tab[data-tab="parameters"]').click()`);
-        const parameterRows = await waitFor(() => inShell(`${inspectorDoc}?.querySelectorAll(".kiwari-row").length || 0`), { timeoutMs: 60000 })
+        await waitFor(() => inShell(`!!${viewDoc}?.querySelector('.vsb-tab[data-tab="parameters"]')`), { timeoutMs: 60000 }).catch(() => false);
+        await showTab('parameters');
+        const pageAfterClick = await shownPage();
+        const parameterRows = await waitFor(() => inShell(`${viewDoc}?.querySelectorAll(".kiwari-row").length || 0`), { timeoutMs: 60000 })
             .catch(() => 0);
         await inShell(`(() => {
-            const box = ${inspectorDoc}.querySelector('input.kiwari-box[type="text"]');
+            const box = ${viewDoc}.querySelector('input.kiwari-box[type="text"]');
             box.value = '7';
             box.dispatchEvent(new Event('input', { bubbles: true }));
         })()`);
-        const parameterEdits = await waitFor(() => inShell(`${inspectorDoc}.querySelectorAll(".kiwari-row-changed, .kiwari-problem").length`), { timeoutMs: 5000 })
+        const parameterEdits = await waitFor(() => inShell(`${viewDoc}.querySelectorAll(".kiwari-row-changed, .kiwari-problem").length`), { timeoutMs: 5000 })
             .catch(() => 0);
-        check('the inspector shows a frame\'s parameters, and an edit there reaches the view',
-            parameterRows > 0 && parameterEdits > 0, `${parameterRows} parameters`);
+        const pageAfterEdit = await shownPage();
+        check('the sidebar shows a frame\'s parameters, and an edit there reaches the view',
+            pageAfterEdit === 'parameters' && parameterRows > 0 && parameterEdits > 0,
+            `${parameterRows} parameters; page ${pageAfterClick} -> ${pageAfterEdit}`);
         await capture('03d-parameters');
         connection().activePanel.dispose();
-        await inShell(`${inspectorDoc}.querySelector('.inspector-tab[data-tab="members"]').click()`);
 
         const picking = runAppCommand('kigumi.browsePatterns');
         await waitFor(() => inShell('!document.getElementById("quickpick").hidden && document.querySelectorAll("#quickpick .item").length'), { timeoutMs: 30000 });
@@ -343,8 +347,6 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             return active && active.type === 'editor' ? active : null;
         });
         check('viewPatternSource opens a file in the Monaco editor panel', !!editorPanel && editorPanel.filePath === FRAME);
-        const inspectedTitle = await inShell('document.querySelector("#slot-bottom iframe")?.contentDocument?.getElementById("view-title").textContent');
-        check('with a source file in front, the inspector keeps showing the last view', inspectedTitle === tabs[1], inspectedTitle);
         const editorReady = await waitFor(() => inShell(`(() => {
             const frame = document.querySelector('#slot-center iframe:not([hidden])');
             return !!(frame && frame.contentDocument && frame.contentDocument.querySelector('.monaco-editor'));

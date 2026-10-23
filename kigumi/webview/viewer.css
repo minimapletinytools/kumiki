@@ -49,17 +49,228 @@
     --hv-tag-slice: #8a6aa8;
     --hv-tag-generic: #6e7691;
     display: block;
-    min-height: 100vh;
+    height: 100vh;
     background: linear-gradient(180deg, var(--hv-bg-top) 0%, var(--hv-bg-bottom) 100%);
     color: var(--hv-text);
-    overflow: auto;
+    overflow: hidden;
+}
+/* The sidebar, then the 3D view taking the rest of the page. */
+#view-layout {
+    display: flex;
+    height: 100vh;
 }
 #viewport {
     position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+}
+
+/* ---- The view's sidebar (view-sidebar.js) ---- */
+#view-sidebar {
+    position: relative;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--hv-panel-bg);
+    border-right: 1px solid var(--hv-panel-border);
+    font: 12px 'Segoe UI', sans-serif;
+}
+#view-sidebar.is-collapsed {
+    width: 22px;
+}
+.vsb-expand {
+    flex: 1 1 auto;
     width: 100%;
-    height: 90vh; /* Reduced from 95vh to make the viewer area slightly smaller */
-    min-height: 420px;
+    border: none;
+    background: transparent;
+    color: var(--hv-dim);
+    font-size: 16px;
+    cursor: pointer;
+}
+.vsb-expand:hover {
+    color: var(--hv-title);
+    background: var(--hv-layers-hover-bg);
+}
+.vsb-frame {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.vsb-frame[hidden],
+.vsb-page[hidden],
+.vsb-expand[hidden] {
+    display: none;
+}
+.vsb-header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding: 4px 4px 4px 10px;
     border-bottom: 1px solid var(--hv-panel-border);
+    color: var(--hv-title);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.vsb-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vsb-collapse {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--hv-dim);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+.vsb-collapse:hover {
+    color: var(--hv-title);
+    background: var(--hv-layers-hover-bg);
+}
+/* A page scrolls on its own; the tree's lays out its sections instead. */
+.vsb-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.vsb-page.is-fill {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+}
+.vsb-empty {
+    color: var(--hv-dim);
+    padding: 4px 2px;
+}
+/* The pages' names, along the bottom, as the panels under a view have theirs. On one
+   line: a narrow sidebar shortens them rather than wrapping. */
+.vsb-tabs {
+    flex: none;
+    display: flex;
+    border-top: 1px solid var(--hv-panel-border);
+    background: var(--hv-layers-header-bg);
+}
+.vsb-tab {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 6px 4px 5px;
+    border: none;
+    border-top: 2px solid transparent;
+    background: transparent;
+    color: var(--hv-dim);
+    font: 11px 'Segoe UI', sans-serif;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.vsb-tab:hover {
+    color: var(--hv-title);
+}
+.vsb-tab.is-active {
+    color: var(--hv-title);
+    border-top-color: var(--hv-accent-border-strong);
+}
+.vsb-badge {
+    margin-left: 4px;
+    padding: 0 5px;
+    border-radius: 8px;
+    background: var(--hv-layers-selected-bg);
+    font-size: 10px;
+}
+.vsb-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -5px;
+    width: 9px;
+    cursor: ew-resize;
+    z-index: 2;
+}
+/* Only hints at itself on approach: a permanent divider would be noise. */
+.vsb-resize::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 3px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 120ms ease;
+}
+.vsb-resize:hover::after,
+.vsb-resize.is-dragging::after {
+    background: var(--hv-accent-border-strong);
+}
+/* The tree's sections, stacked as a sidebar's views: flush, a rule between, each
+   collapsing to its header. The selection and the drawing take what they need, up
+   to a share of the height, and the layers list the rest. */
+.vsb-page.is-fill > .ip-panel,
+.vsb-page.is-fill > #drawing-panel-host > *,
+.vsb-page.is-fill .lp-panel {
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: transparent;
+}
+.vsb-page.is-fill > .ip-panel {
+    max-height: 40%;
+    overflow: auto;
+    border-bottom: 1px solid var(--hv-panel-border);
+}
+.vsb-page.is-fill > #drawing-panel-host {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+.vsb-page.is-fill > #drawing-panel-host:not(:empty) {
+    border-bottom: 1px solid var(--hv-panel-border);
+}
+#timber-rows tr {
+    cursor: pointer;
+}
+#timber-rows tr:hover {
+    background: var(--hv-layers-hover-bg);
+}
+#timber-rows tr.is-selected {
+    background: var(--hv-layers-selected-bg);
+}
+/* The other pages' panels sit flush in the sidebar rather than as cards. */
+.vsb-page > #render-controls,
+.vsb-page > #kiwari-controls,
+.vsb-page > .panel-box {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding-left: 0;
+    padding-right: 0;
+}
+/* The page names itself; the panels' own titles would say it twice. */
+#view-sidebar .viewer-settings-title,
+#view-sidebar .kiwari-title {
+    display: none;
 }
 #loading-overlay {
     position: absolute;
@@ -114,58 +325,6 @@
     font-weight: 700;
 }
 canvas { display: block; width: 100%; height: 100%; }
-/* The left rail stacks the info pane above the timber list. It is laid out as
-   a column so the two panes share the height instead of overlapping: the info
-   pane takes what its content needs and the list gets the rest. The rail
-   itself is click-through, so the gap between the panes does not swallow
-   clicks meant for the model behind it. */
-#left-rail {
-    position: absolute;
-    top: 12px;
-    bottom: 8px;
-    left: 8px;
-    width: var(--kigumi-rail-width, 260px);
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    pointer-events: none;
-}
-
-#left-rail > * {
-    pointer-events: auto;
-}
-
-#rail-resize {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: -5px;
-    width: 9px;
-    cursor: ew-resize;
-    background: transparent;
-    z-index: 1;
-}
-
-/* Only hints at itself on approach: a permanent divider would be noise on a
-   rail that mostly just sits there. */
-#rail-resize::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 3px;
-    width: 3px;
-    border-radius: 2px;
-    background: transparent;
-    transition: background 120ms ease;
-}
-
-#rail-resize:hover::after,
-#rail-resize.is-dragging::after {
-    background: var(--hv-accent-border-strong);
-}
-
 /* Sizes to its content, so it never crowds out the list below it. */
 .ip-panel {
     flex: 0 0 auto;
@@ -756,18 +915,8 @@ canvas { display: block; width: 100%; height: 100%; }
     opacity: 0.55;
     cursor: default;
 }
-#top-controls {
-    width: 100%;
-    max-width: none;
-    margin: 14px 0 0;
-    padding: 0 14px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 12px;
-    align-items: start;
-}
-/* Frame parameters (kiwari). Sits beside the settings panel in #top-controls,
-   and is not rendered at all when a frame takes no parameters. */
+/* Frame parameters (kiwari): the sidebar's parameters page, not rendered at all when a
+   frame takes no parameters. */
 #kiwari-controls {
     width: auto;
     max-width: none;
@@ -1157,25 +1306,6 @@ canvas { display: block; width: 100%; height: 100%; }
     cursor: help;
     user-select: none;
     white-space: nowrap;
-}
-/* The host shows these in a panel of its own (the app's inspector). */
-kigumi-app.panels-outside #panels,
-kigumi-app.panels-outside #top-controls {
-    display: none;
-}
-/* With nothing left under it, the 3D view is the whole page. */
-kigumi-app.panels-outside #viewport {
-    height: 100vh;
-    min-height: 0;
-    border-bottom: none;
-}
-#panels {
-    width: 100%;
-    max-width: none;
-    margin: 16px auto 28px;
-    padding: 0 14px;
-    display: grid;
-    gap: 14px;
 }
 .panel-box {
     background: var(--hv-panel-bg);

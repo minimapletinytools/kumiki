@@ -177,8 +177,6 @@ function getWebviewContent(surface, frameData, geometryData, profiling, uiState 
             // it with the package-time FEATURE_FLAGS.assemblyPreview master switch.
             assemblyPreviewSetting: getHost().getConfig('viewer.assemblyPreview', false) === true,
             drawingBetaSetting: getHost().getConfig('viewer.drawingBeta', false) === true,
-            // The host shows the member list and the log in a panel of its own (the app's inspector).
-            panelsOutside: getHost().viewerPanelsOutside === true,
             i18n: { locale, strings: loadCatalog(locale) },
         },
     });

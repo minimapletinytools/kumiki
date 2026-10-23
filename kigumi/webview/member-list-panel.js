@@ -84,6 +84,16 @@ export class MemberListPanel {
             ['#member-opt-csg', 'showCsgFeatureCount'],
             ['#member-opt-tags', 'showTags'],
         ];
+        // A click on a row selects that member in the view; with shift, cmd or ctrl, adds it.
+        const tbody = renderRoot.querySelector('#timber-rows');
+        if (tbody) {
+            tbody.addEventListener('click', (event) => {
+                const row = event.target.closest('tr[data-key]');
+                if (row && row.dataset.key) {
+                    this.app.selectMembers([row.dataset.key], event.shiftKey || event.metaKey || event.ctrlKey);
+                }
+            });
+        }
         for (const [selector, option] of bindings) {
             const element = renderRoot.querySelector(selector);
             if (!element) {
@@ -121,7 +131,6 @@ export class MemberListPanel {
     }
 
     rebuild(meshes) {
-        this.app.publishViewState();
         const tbody = this.app.renderRoot && this.app.renderRoot.querySelector
             ? this.app.renderRoot.querySelector('#timber-rows')
             : null;
@@ -136,6 +145,7 @@ export class MemberListPanel {
             const tags = KigumiTags.coerceTags(mesh.tags);
             const tagsLabel = tags.length > 0 ? tags.map((tag) => tag.name).join(', ') : '—';
             const row = document.createElement('tr');
+            row.dataset.key = mesh.memberKey || mesh.timberKey || '';
             row.innerHTML = '<td>' + (index + 1) + '</td>'
                 + '<td>' + escapeHtml(typeLabel) + '</td>'
                 + '<td>' + escapeHtml(memberName) + '</td>'
@@ -148,24 +158,21 @@ export class MemberListPanel {
             tbody.appendChild(row);
         }
         this.applyOptionVisibility();
+        this.syncSelection();
     }
 
-    /** The table as data, every option's column included, for a member list drawn elsewhere. */
-    rows(meshes) {
-        return meshes.map((mesh, index) => ({
-            key: mesh.memberKey || mesh.timberKey || `index-${index}`,
-            type: mesh.memberType === 'accessory' ? 'accessory' : 'timber',
-            name: mesh.memberName || mesh.name || '?',
-            tags: KigumiTags.coerceTags(mesh.tags).map((tag) => tag.name),
-            length: this.formatLength(mesh, { rough: false }),
-            roughLength: this.formatLength(mesh, { rough: true }),
-            width: this.formatCrossSection(mesh, 'width', { nominal: false }),
-            height: this.formatCrossSection(mesh, 'height', { nominal: false }),
-            nominalWidth: this.formatCrossSection(mesh, 'width', { nominal: true }),
-            nominalHeight: this.formatCrossSection(mesh, 'height', { nominal: true }),
-            csgNodes: mesh.csg_nodes !== undefined ? mesh.csg_nodes : null,
-            csgFeatures: mesh.csg_features !== undefined ? mesh.csg_features : null,
-        }));
+    /** Mark the rows of the members selected in the view. */
+    syncSelection() {
+        const tbody = this.app.renderRoot && this.app.renderRoot.querySelector
+            ? this.app.renderRoot.querySelector('#timber-rows')
+            : null;
+        if (!tbody) {
+            return;
+        }
+        const selected = new Set(this.app.selectionManager.getSelectedTimbers());
+        for (const row of tbody.children) {
+            row.classList.toggle('is-selected', selected.has(row.dataset.key));
+        }
     }
 
     formatCrossSection(mesh, axis, { nominal = this.options.showNominalSizes } = {}) {

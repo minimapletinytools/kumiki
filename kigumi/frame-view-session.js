@@ -12,8 +12,6 @@ const { describeSelection } = require('./webview/selection-copy');
 
 // Resolved once from VS Code's own display language (no user override yet).
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
-// How much of a view's log a panel outside it is sent when it starts showing that view.
-const MAX_LOG_LINES = 2000;
 
 const VIEWER_LOG_LEVEL_ORDER = {
     debug: 10,
@@ -94,36 +92,6 @@ class FrameViewSession {
         this._lastGeometryData = null;
         this._lastProfiling = null;
         this._lastLayersData = null;
-        // For panels outside the view (the standalone app's inspector): the recent log, and
-        // what the view's page last said it shows (see publishViewState in viewer-app.js).
-        this.logLines = [];
-        this.viewState = null;
-        this._logListeners = new Set();
-        this._viewStateListeners = new Set();
-    }
-
-    onLogLine(callback) {
-        this._logListeners.add(callback);
-        return { dispose: () => this._logListeners.delete(callback) };
-    }
-
-    onViewState(callback) {
-        this._viewStateListeners.add(callback);
-        return { dispose: () => this._viewStateListeners.delete(callback) };
-    }
-
-    clearLogLines() {
-        this.logLines = [];
-    }
-
-    /** A call from the view's options or parameters panel, drawn outside it (viewer-panels.js). */
-    callViewPanel(method, args, seq) {
-        this._postToWebview({ type: 'panelCall', method, args, seq });
-    }
-
-    /** Select members in the view, as a click in it would. */
-    selectMembers(memberKeys, { additive = false } = {}) {
-        this._postToWebview({ type: 'selectMembers', memberKeys, additive });
     }
 
     // Project root for this session: the runner's resolved root if available,
@@ -479,13 +447,6 @@ class FrameViewSession {
                 }
                 if (lines.length > 0 && this.channel && typeof this.channel.show === 'function') {
                     this.channel.show(true);
-                }
-                return;
-            }
-            if (message.type === 'viewState') {
-                this.viewState = message.state || null;
-                for (const listener of [...this._viewStateListeners]) {
-                    listener(this.viewState);
                 }
                 return;
             }
@@ -1794,13 +1755,6 @@ class FrameViewSession {
             // Logging must not break the viewer session.
         }
         this.channel.appendLine(formatted);
-        this.logLines.push(formatted);
-        if (this.logLines.length > MAX_LOG_LINES) {
-            this.logLines.splice(0, this.logLines.length - MAX_LOG_LINES);
-        }
-        for (const listener of [...this._logListeners]) {
-            listener(formatted);
-        }
         if (this.panel) {
             this.panel.postMessage({ type: 'logEntry', text: formatted }).catch(() => {});
         }
