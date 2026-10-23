@@ -1003,7 +1003,7 @@ class KigumiViewerApp extends LitElement {
             {
                 id: 'tree',
                 label: t('viewer.sidebar.tab.tree'),
-                heading: html`<span class="vsb-mark" title=${t('viewer.sidebar.treeMark')}>木組</span>`,
+                heading: html`<span class="vsb-mark" title=${t('viewer.sidebar.treeMark')}>🏠</span>`,
                 // Its sections share the height, each collapsing to give the others room.
                 fill: true,
                 // What is selected, then the drawing it is in, then everything there is.
@@ -7557,7 +7557,6 @@ class KigumiViewerApp extends LitElement {
         if (!this._drawingPanel) {
             this._drawingPanel = new DrawingPanel(this.selectionManager);
             this._drawingPanel.mount(host);
-            host.addEventListener('kigumi-close-drawing', () => this.leaveDrawing());
             host.addEventListener('kigumi-save-drawings', () => this.saveDrawings());
             host.addEventListener('kigumi-focus-measurement', (event) => {
                 this._focusMeasurementFrom(event.detail);

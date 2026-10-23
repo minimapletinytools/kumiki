@@ -191,17 +191,6 @@
             });
             header.appendChild(save);
 
-            const close = document.createElement('button');
-            close.type = 'button';
-            close.className = 'dp-action';
-            close.textContent = t('viewer.selection.leaveDrawing');
-            close.title = t('viewer.selection.leaveDrawing.title');
-            close.addEventListener('click', (event) => {
-                event.stopPropagation();
-                this._emit('kigumi-close-drawing', {});
-            });
-            header.appendChild(close);
-
             return header;
         }
 
