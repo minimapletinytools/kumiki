@@ -5,7 +5,8 @@
  * A node is { key, type, label, description?, tooltip?, icon, spin?,
  * expanded? (containers only), children?, action?, rowActions?, data? }.
  * `action` is the command run on click; `rowActions` lists the row's extra
- * actions from ROW_ACTIONS.
+ * actions from ROW_ACTIONS. A container with `lazyDir` set has not been
+ * listed yet: the page asks for it (sidebarExpand) once it is opened.
  */
 
 const path = require('path');
@@ -14,6 +15,7 @@ const { discoverDependencyContent } = require('./discovery-adapter');
 const { getInitializationStatus, isInitializationInProgress } = require('./project-initializer');
 const { groupPatternsByPatternbook } = require('./pattern-source-utils');
 const { createTranslator } = require('./i18n');
+const { FileTree, DEFAULT_FILES_EXCLUDE } = require('./sidebar-files');
 const { getHost } = require('./host');
 
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
@@ -23,6 +25,7 @@ const ROW_ACTIONS = Object.freeze({
     viewSource: { command: 'kigumi.viewPatternSource', icon: 'go-to-file', labelKey: 'sidebar.action.viewSource', inline: true },
     duplicate: { command: 'kigumi.duplicatePatternToWorkspace', icon: 'copy', labelKey: 'sidebar.action.duplicate', inline: true },
     openInNewWindow: { command: 'kigumi.openPatternInNewWindow', icon: 'link-external', labelKey: 'sidebar.action.openInNewWindow', inline: false },
+    openInViewer: { command: 'kigumi.openInViewer', icon: 'eye', labelKey: 'sidebar.action.openInViewer', inline: false },
 });
 
 const LIBRARY_SECTIONS = new Set(['shipped-patterns', 'dependency-patterns']);
@@ -56,8 +59,8 @@ function open(command, ...args) {
 
 function patternRowActions(sectionKey) {
     return LIBRARY_SECTIONS.has(sectionKey)
-        ? ['viewSource', 'duplicate', 'openInNewWindow']
-        : ['viewSource', 'openInNewWindow'];
+        ? ['viewSource', 'duplicate', 'openInViewer', 'openInNewWindow']
+        : ['viewSource', 'openInViewer', 'openInNewWindow'];
 }
 
 function byLabelThenDescription(a, b) {
@@ -78,6 +81,10 @@ class SidebarModel {
         this._scanPromise = null;
         this._groupByPatternbook = true;
         this._state = emptyState();
+        this._files = new FileTree({
+            getExclude: () => getHost().getConfig('app.filesExclude', DEFAULT_FILES_EXCLUDE),
+            onChange: () => this._fire(),
+        });
     }
 
     onDidChange(listener) {
@@ -106,6 +113,25 @@ class SidebarModel {
     toggleGroupByPatternbook() {
         this._groupByPatternbook = !this._groupByPatternbook;
         this._fire();
+    }
+
+    /** Lists a folder of the "All files" tree, if it is in the workspace. */
+    async openFolder(dirPath) {
+        const root = this._filesRoot();
+        const relative = root && typeof dirPath === 'string' ? path.relative(root, dirPath) : '..';
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+            return;
+        }
+        await this._files.open(dirPath);
+    }
+
+    isFolderListed(dirPath) {
+        return this._files.entries(dirPath) !== null;
+    }
+
+    /** Lists the opened folders of the "All files" tree again. */
+    refreshFiles() {
+        return this._files.refresh();
     }
 
     ensureLoaded() {
@@ -328,6 +354,13 @@ class SidebarModel {
         const nodes = [...this._statusNodes()];
         const state = this._state;
 
+        const filesRoot = this._filesRoot();
+        if (filesRoot) {
+            nodes.push(this._folderNode(filesRoot, {
+                key: 'files-root', type: 'filesRoot', label: t('sidebar.allFiles'), icon: 'files',
+            }));
+        }
+
         nodes.push(node({
             key: 'frames-root',
             type: 'framesRoot',
@@ -454,6 +487,43 @@ class SidebarModel {
         return nodes;
     }
 
+    // The workspace folder, when the host shows a file browser (VS Code has its own).
+    _filesRoot() {
+        return getHost().showsFileBrowser ? (getHost().workspaceRoots()[0] || null) : null;
+    }
+
+    _folderNode(dirPath, fields) {
+        const entries = this._files.entries(dirPath);
+        return node({
+            expanded: false,
+            ...fields,
+            lazyDir: entries === null ? dirPath : undefined,
+            children: entries === null ? [] : entries.map((entry) => (entry.isDirectory
+                ? this._folderNode(entry.filePath, {
+                    key: `file-folder:${entry.filePath}`, type: 'fileFolder', label: entry.name, icon: 'folder',
+                })
+                : this._fileNode(entry))),
+            data: { dirPath },
+        });
+    }
+
+    // A file opens its source; a frame or patternbook keeps its explorer icon.
+    _fileNode(entry) {
+        const { frames, workspacePatternbooks } = this._state;
+        const icon = frames.some((frame) => frame.filePath === entry.filePath) ? 'fish2-very-sad'
+            : workspacePatternbooks.some((book) => book.filePath === entry.filePath) ? 'library'
+                : 'file';
+        return node({
+            key: `file:${entry.filePath}`,
+            type: 'fileItem',
+            label: entry.name,
+            icon,
+            action: open('kigumi.openFileSource', entry.filePath),
+            rowActions: entry.name.endsWith('.py') ? ['openInViewer'] : [],
+            data: { filePath: entry.filePath },
+        });
+    }
+
     _placeholder(key, label, description) {
         return node({ key, type: 'placeholder', label, description, icon: 'circle-slash' });
     }
@@ -465,7 +535,7 @@ class SidebarModel {
             label,
             icon: 'fish2-very-sad',
             action: open('kigumi.openFrameFromSidebar', filePath),
-            rowActions: ['viewSource'],
+            rowActions: ['viewSource', 'openInViewer'],
             data,
         });
     }

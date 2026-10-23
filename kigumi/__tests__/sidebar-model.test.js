@@ -12,6 +12,9 @@ jest.mock('../project-initializer', () => ({
 const { scanWorkspaceForFrames } = require('../frame-scanner');
 const { discoverDependencyContent } = require('../discovery-adapter');
 const { getInitializationStatus, isInitializationInProgress } = require('../project-initializer');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { setHost } = require('../host');
 const { SidebarModel, ROW_ACTIONS } = require('../sidebar-model');
 
@@ -209,8 +212,8 @@ describe('row actions', () => {
     const theirs = findNode(tree, (node) => node.label === 'theirs');
     const group = findNode(tree, (node) => node.type === 'patternbookGroup');
 
-    expect(mine.rowActions).toEqual(['viewSource', 'openInNewWindow']);
-    expect(theirs.rowActions).toEqual(['viewSource', 'duplicate', 'openInNewWindow']);
+    expect(mine.rowActions).toEqual(['viewSource', 'openInViewer', 'openInNewWindow']);
+    expect(theirs.rowActions).toEqual(['viewSource', 'duplicate', 'openInViewer', 'openInNewWindow']);
     expect(group.rowActions).toEqual(['viewSource', 'duplicate']);
   });
 
@@ -247,5 +250,105 @@ describe('test snapshot', () => {
     expect(snapshot.state.frameCount).toBe(1);
     expect(frames.childLabels).toEqual(['frame.py']);
     expect(snapshot.groupByPatternbook).toBe(true);
+  });
+});
+
+describe('all files', () => {
+  let root;
+
+  function filesHost(extra = {}) {
+    setHost({
+      locale: 'en',
+      workspaceRoots: () => [root],
+      getConfig: (_key, fallback) => fallback,
+      showsFileBrowser: true,
+      ...extra,
+    });
+  }
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-files-'));
+    for (const dir of ['patterns', 'docs', '.venv', '__pycache__']) {
+      fs.mkdirSync(path.join(root, dir));
+    }
+    fs.writeFileSync(path.join(root, 'b_frame.py'), '');
+    fs.writeFileSync(path.join(root, 'a_notes.txt'), '');
+    fs.writeFileSync(path.join(root, 'patterns', 'book.py'), '');
+  });
+
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('a host without a file browser shows none', () => {
+    expect(rootOf(new SidebarModel(), 'filesRoot')).toBeUndefined();
+  });
+
+  test('the root comes first, collapsed and not listed until opened', () => {
+    filesHost();
+    const model = new SidebarModel();
+    const tree = model.getTree().filter((one) => !one.type.startsWith('project') && !one.type.startsWith('kumiki'));
+
+    expect(tree[0]).toMatchObject({ type: 'filesRoot', expanded: false, lazyDir: root, children: [] });
+  });
+
+  test('an opened folder lists folders first, then files, leaving out the excluded', async () => {
+    filesHost();
+    const model = new SidebarModel();
+    await model.openFolder(root);
+    const files = rootOf(model, 'filesRoot');
+
+    expect(files.lazyDir).toBeUndefined();
+    expect(files.children.map((child) => child.label)).toEqual(['docs', 'patterns', 'a_notes.txt', 'b_frame.py']);
+    expect(findNode(files.children, (one) => one.label === 'patterns').lazyDir).toBe(path.join(root, 'patterns'));
+  });
+
+  test('the exclude setting replaces the default', async () => {
+    filesHost({ getConfig: (key, fallback) => (key === 'app.filesExclude' ? ['*.txt'] : fallback) });
+    const model = new SidebarModel();
+    await model.openFolder(root);
+
+    const labels = rootOf(model, 'filesRoot').children.map((child) => child.label);
+    expect(labels).toEqual(expect.arrayContaining(['.venv', '__pycache__', 'b_frame.py']));
+    expect(labels).not.toContain('a_notes.txt');
+  });
+
+  test('frames and patternbooks keep their icons; a click opens the source; Python files open in the viewer', async () => {
+    filesHost();
+    const frame = path.join(root, 'b_frame.py');
+    const book = path.join(root, 'patterns', 'book.py');
+    scanWorkspaceForFrames.mockResolvedValue({
+      frameFiles: [{ filePath: frame, relativePath: 'b_frame.py' }],
+      patternbookFiles: [{ filePath: book, relativePath: 'patterns/book.py', patterns: [] }],
+      scanErrors: [],
+    });
+    const model = new SidebarModel();
+    await model.refresh(true);
+    await model.openFolder(root);
+    await model.openFolder(path.join(root, 'patterns'));
+    const byLabel = (label) => findNode(rootOf(model, 'filesRoot').children, (one) => one.label === label);
+
+    expect(byLabel('b_frame.py')).toMatchObject({
+      icon: 'fish2-very-sad', rowActions: ['openInViewer'],
+      action: { command: 'kigumi.openFileSource', arguments: [frame] },
+    });
+    expect(byLabel('book.py').icon).toBe('library');
+    expect(byLabel('a_notes.txt')).toMatchObject({ icon: 'file', rowActions: [] });
+  });
+
+  test('a folder outside the workspace is not listed', async () => {
+    filesHost();
+    const model = new SidebarModel();
+    await model.openFolder(os.tmpdir());
+
+    expect(model.isFolderListed(os.tmpdir())).toBe(false);
+  });
+
+  test('refreshing lists opened folders again', async () => {
+    filesHost();
+    const model = new SidebarModel();
+    await model.openFolder(root);
+    fs.writeFileSync(path.join(root, 'c_new.py'), '');
+    await model.refreshFiles();
+
+    expect(rootOf(model, 'filesRoot').children.map((child) => child.label)).toContain('c_new.py');
   });
 });

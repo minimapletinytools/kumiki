@@ -54,6 +54,8 @@ class KigumiSidebar extends LitElement {
         this.selectedKey = saved.selectedKey || null;
         this.focusedKey = this.selectedKey;
         this.menuState = null;
+        // Keys of unlisted folders already asked for (sidebarExpand).
+        this.requestedFolders = new Set();
         this.contextMenu = new ContextMenu();
         this.onWindowMessage = this.onWindowMessage.bind(this);
         this.onWindowPointerDown = this.onWindowPointerDown.bind(this);
@@ -82,6 +84,13 @@ class KigumiSidebar extends LitElement {
             this.tree = Array.isArray(message.tree) ? message.tree : [];
             this.groupByPatternbook = message.groupByPatternbook !== false;
             this.isScanning = !!message.isScanning;
+            const unlisted = new Set();
+            const walk = (nodes) => nodes.forEach((one) => {
+                if (one.lazyDir) unlisted.add(one.key);
+                if (one.children) walk(one.children);
+            });
+            walk(this.tree);
+            this.requestedFolders = new Set([...this.requestedFolders].filter((key) => unlisted.has(key)));
         }
     }
 
@@ -232,6 +241,13 @@ class KigumiSidebar extends LitElement {
     }
 
     updated() {
+        // An open folder that isn't listed yet is asked for, however it came to be open.
+        for (const row of this.rows()) {
+            if (row.isExpanded && row.node.lazyDir && !this.requestedFolders.has(row.node.key)) {
+                this.requestedFolders.add(row.node.key);
+                post({ type: 'sidebarExpand', key: row.node.key });
+            }
+        }
         if (this.menuState) {
             const menu = this.querySelector('.ks-menu');
             if (menu) {

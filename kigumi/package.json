@@ -25,6 +25,7 @@
   "activationEvents": [
     "onStartupFinished",
     "onCommand:kigumi.openCurrentFileInViewer",
+    "onCommand:kigumi.openInViewer",
     "onCommand:kigumi.automationOpenFileInViewer",
     "onCommand:kigumi.automationListSessions",
     "onCommand:kigumi.automationRefreshSession",
@@ -59,6 +60,11 @@
         "command": "kigumi.openCurrentFileInViewer",
         "title": "%command.openCurrentFileInViewer.title%",
         "icon": "$(play)"
+      },
+      {
+        "command": "kigumi.openInViewer",
+        "title": "%command.openInViewer.title%",
+        "category": "Kigumi"
       },
       {
         "command": "kigumi.initializeProjectInWorkspace",
@@ -174,6 +180,24 @@
         {
           "command": "kigumi.openPatternInNewWindow",
           "when": "false"
+        },
+        {
+          "command": "kigumi.openInViewer",
+          "when": "false"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "kigumi.openInViewer",
+          "when": "resourceExtname == .py",
+          "group": "navigation@90"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "kigumi.openInViewer",
+          "when": "resourceExtname == .py",
+          "group": "navigation@90"
         }
       ]
     },

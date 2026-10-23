@@ -9,6 +9,7 @@ const path = require('path');
 const { app, protocol, Menu, dialog, shell: electronShell } = require('electron');
 const { setHost } = require('../../host');
 const { createKigumiApp } = require('../../kigumi-app');
+const { DEFAULT_FILES_EXCLUDE } = require('../../sidebar-files');
 const { webviewDir } = require('../../webview-html');
 const { ShellConnection } = require('../../app-shell/shell-connection');
 const { PageStore } = require('../../app-shell/page-store');
@@ -32,6 +33,8 @@ const STATUS_CLEAR_MS = 10000;
 const APP_DEFAULTS = {
     'viewer.autoRefreshOnFileChange': true,
     'app.editorCommand': '',
+    // Names the explorer's "All files" leaves out; `*` matches anything.
+    'app.filesExclude': [...DEFAULT_FILES_EXCLUDE],
     // The agent panel. With no key it uses the Claude login on this machine, if there is one.
     'agent.apiKey': '',
     'agent.model': '',
