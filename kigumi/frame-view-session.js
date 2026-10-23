@@ -9,6 +9,8 @@ const { requestWebviewRoundTrip } = require('./webview-request');
 const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 const { createTranslator } = require('./i18n');
 const { describeSelection } = require('./webview/selection-copy');
+const { extractRunnerErrorDetails, parseTracebackLocation, deriveViewerErrorMessage } = require('./runner-errors');
+const { exportFormats, exportMember, installCadqueryOcp, pushCadqueryStatus } = require('./export-requests');
 
 // Resolved once from VS Code's own display language (no user override yet).
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
@@ -283,7 +285,7 @@ class FrameViewSession {
             throw startError;
         }
         this.profiler.markTiming(initTiming, 'initialize.runner.end');
-        await this._pushCadqueryStatus();
+        await pushCadqueryStatus(this);
 
         // For shared-runner pattern sessions, load the slot now
         if (this.sessionType === 'pattern' && !this.ownsRunner) {
@@ -487,19 +489,19 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'requestExportFiles') {
-                this._handleExportBatchRequest(message).catch((err) => {
+                exportFormats(this, message).catch((err) => {
                     this.log(`[export] requestExportFiles error: ${err.message || err}`);
                 });
                 return;
             }
             if (message.type === 'requestExportMember') {
-                this._handleExportMemberRequest(message).catch((err) => {
+                exportMember(this, message).catch((err) => {
                     this.log(`[export] requestExportMember error: ${err.message || err}`);
                 });
                 return;
             }
             if (message.type === 'requestInstallCadqueryOcp') {
-                this._handleInstallCadqueryOcp().catch((err) => {
+                installCadqueryOcp(this).catch((err) => {
                     this.log(`[export] requestInstallCadqueryOcp error: ${err.message || err}`);
                 });
                 return;
@@ -914,7 +916,7 @@ class FrameViewSession {
             }
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
             this.profiler.markTiming(timing, 'refresh.end', { refresh_total_ms: Math.round(refresh_total_s * 1000) });
-            await this._pushCadqueryStatus();
+            await pushCadqueryStatus(this);
             this.log(`[refresh] Reload complete for ${path.basename(this.filePath)}`);
         } catch (error) {
             refreshError = error;
@@ -1282,172 +1284,6 @@ class FrameViewSession {
             });
     }
 
-    getExportDirectory() {
-        const projectRoot = this.projectRoot;
-        const baseName = path.basename(this.filePath, path.extname(this.filePath));
-        const safeBaseName = (baseName || 'frame')
-            .replace(/[^a-zA-Z0-9._-]+/g, '_')
-            .replace(/^_+|_+$/g, '') || 'frame';
-        return path.join(projectRoot, 'kigumi_exports', safeBaseName);
-    }
-
-    async _handleExportRequest(format, includeCombined = true, includeIndividuals = true, includeAccessories = true) {
-        if (!this.runnerSession) {
-            return;
-        }
-
-        await this.ensureRunnerSession();
-
-        const normalizedFormat = format === 'step'
-            ? 'step'
-            : format === '3mf'
-                ? '3mf'
-                : format === 'obj'
-                    ? 'obj'
-                    : 'stl';
-        const outputDir = this.getExportDirectory();
-        fs.mkdirSync(outputDir, { recursive: true });
-
-        try {
-            const result = await this.runnerSession.slotRequest('export_frame', this.slotName, {
-                format: normalizedFormat,
-                outputDir,
-                includeCombined: Boolean(includeCombined),
-                includeIndividuals: Boolean(includeIndividuals),
-                includeAccessories: Boolean(includeAccessories),
-            });
-
-            const writtenFiles = Array.isArray(result && result.files) ? result.files : [];
-            const formatLabel = normalizedFormat.toUpperCase();
-            this.log(`[export] Wrote ${writtenFiles.length} ${formatLabel} file(s) to ${outputDir}`);
-            return { format: normalizedFormat, writtenFiles, outputDir };
-        } catch (error) {
-            const details = this.extractRunnerErrorDetails(error);
-            const formatLabel = normalizedFormat.toUpperCase();
-            this.log(`[export] ${formatLabel} export failed: ${details.message}`);
-
-            const openOutputAction = t('message.action.openKigumiOutput');
-            const installHint = normalizedFormat === 'step' && details.message.includes('cadquery-ocp')
-                ? ' Install STEP support with: pip install cadquery-ocp'
-                : normalizedFormat === '3mf' && details.message.includes('3MF export requires')
-                    ? ' Install 3MF support with: pip install lxml networkx'
-                : '';
-            const choice = await getHost().showMessage(
-                'error',
-                `Kigumi ${formatLabel} export failed: ${details.message}${installHint}`,
-                openOutputAction
-            );
-            if (choice === openOutputAction) {
-                this.channel.show(true);
-            }
-            throw error;
-        }
-    }
-
-    async _handleExportBatchRequest(message) {
-        const formatsRaw = Array.isArray(message && message.formats) ? message.formats : [];
-        const formats = [...new Set(formatsRaw
-            .map((entry) => (typeof entry === 'string' ? entry.toLowerCase() : ''))
-            .filter((entry) => entry === 'stl' || entry === '3mf' || entry === 'obj' || entry === 'step'))];
-
-        if (formats.length === 0) {
-            void getHost().showMessage('warning', t('message.selectExportFormat'));
-            return;
-        }
-
-        const includeCombined = message.includeCombined !== false;
-        const includeIndividuals = message.includeIndividuals === true;
-        const includeAccessories = message.includeAccessories !== false;
-
-        if (!includeCombined && !includeIndividuals) {
-            void getHost().showMessage('warning', t('message.enableExportMode'));
-            return;
-        }
-
-        const allWrittenFiles = [];
-        const failedFormats = [];
-        let outputDir = this.getExportDirectory();
-
-        for (const format of formats) {
-            try {
-                const result = await this._handleExportRequest(
-                    format,
-                    includeCombined,
-                    includeIndividuals,
-                    includeAccessories,
-                );
-                if (result && Array.isArray(result.writtenFiles)) {
-                    allWrittenFiles.push(...result.writtenFiles);
-                    outputDir = result.outputDir || outputDir;
-                }
-            } catch (_error) {
-                failedFormats.push(format.toUpperCase());
-            }
-        }
-
-        const formatLabel = formats.map((entry) => entry.toUpperCase()).join(', ');
-        const summary = `Kigumi exported ${allWrittenFiles.length} file(s) across ${formatLabel} to ${outputDir}`;
-        this.log(`[export] ${summary}`);
-
-        if (failedFormats.length > 0) {
-            void getHost().showMessage('warning', `${summary}. Failed: ${failedFormats.join(', ')}`);
-        } else {
-            void getHost().showMessage('info', summary);
-        }
-    }
-
-    async _handleExportMemberRequest(message) {
-        const memberKey = (message && typeof message.memberKey === 'string') ? message.memberKey : '';
-        const format = (message && typeof message.format === 'string') ? message.format.toLowerCase() : '';
-
-        // memberKey/format always come from the context-menu UI (hardcoded 'stl'/'step'
-        // buttons plus whichever member was right-clicked), so a malformed message here
-        // indicates a webview bug, not a user mistake -- log rather than prompt.
-        if (!memberKey || (format !== 'stl' && format !== 'step')) {
-            this.log(`[export] requestExportMember ignored malformed message: ${JSON.stringify(message)}`);
-            return;
-        }
-
-        if (!this.runnerSession) {
-            return;
-        }
-        await this.ensureRunnerSession();
-
-        const outputDir = this.getExportDirectory();
-        fs.mkdirSync(outputDir, { recursive: true });
-
-        const formatLabel = format.toUpperCase();
-        try {
-            const result = await this.runnerSession.slotRequest('export_member', this.slotName, {
-                memberKey,
-                format,
-                outputDir,
-            });
-            const writtenFiles = Array.isArray(result && result.files) ? result.files : [];
-            const summary = `Kigumi exported ${formatLabel} for '${memberKey}' to ${writtenFiles[0] || outputDir}`;
-            this.log(`[export] ${summary}`);
-            void getHost().showMessage('info', summary);
-            return { format, memberKey, writtenFiles, outputDir };
-        } catch (error) {
-            const details = this.extractRunnerErrorDetails(error);
-            this.log(`[export] ${formatLabel} export of '${memberKey}' failed: ${details.message}`);
-
-            const openOutputAction = t('message.action.openKigumiOutput');
-            const installHint = format === 'step' && details.message.includes('cadquery-ocp')
-                ? ' Install STEP support with: pip install cadquery-ocp'
-                : '';
-            const choice = await getHost().showMessage(
-                'error',
-                `Kigumi ${formatLabel} export of '${memberKey}' failed: ${details.message}${installHint}`,
-                openOutputAction
-            );
-            if (choice === openOutputAction) {
-                this.channel.show(true);
-            }
-            throw error;
-        }
-    }
-
     async _handleSaveViewerSettingsRequest(message) {
         const payload = (message && message.settings && typeof message.settings === 'object')
             ? message.settings
@@ -1483,79 +1319,6 @@ class FrameViewSession {
                 this.log(`[settings] Failed to post viewerSettingsSaved: ${error.message || error}`);
             });
         }
-    }
-
-    async _pushCadqueryStatus() {
-        if (!this.panel || !this.runnerSession) {
-            return;
-        }
-
-        let installed = false;
-        try {
-            installed = await this.runnerSession.isCadqueryOcpInstalled();
-        } catch (error) {
-            this.log(`[export] Failed to detect cadquery-ocp: ${error.message || error}`);
-        }
-
-        this.panel.postMessage({
-            type: 'dependencyStatus',
-            payload: {
-                cadqueryOcpInstalled: installed,
-            },
-        }).catch((error) => {
-            this.log(`[webview] Failed to post dependency status: ${error.message || error}`);
-        });
-    }
-
-    async _handleInstallCadqueryOcp() {
-        if (!this.runnerSession) {
-            return;
-        }
-
-        this._postCadqueryInstallStatus(true);
-        try {
-            await this.runnerSession.installCadqueryOcp();
-
-            if (this.ownsRunner) {
-                await this.runnerSession.dispose();
-                this.runnerSession = null;
-                await this.ensureRunnerSession();
-            } else {
-                this.log('[export] cadquery-ocp installed. Restart the main Kigumi viewer session if STEP export was attempted before install.');
-            }
-
-            await this._pushCadqueryStatus();
-            void getHost().showMessage('info', t('message.cadqueryInstalled'));
-        } catch (error) {
-            const details = this.extractRunnerErrorDetails(error);
-            this.log(`[export] cadquery-ocp install failed: ${details.message}`);
-            const openOutputAction = t('message.action.openKigumiOutput');
-            const choice = await getHost().showMessage(
-                'error',
-                `Failed to install cadquery-ocp: ${details.message}`,
-                openOutputAction
-            );
-            if (choice === openOutputAction) {
-                this.channel.show(true);
-            }
-        } finally {
-            this._postCadqueryInstallStatus(false);
-        }
-    }
-
-    _postCadqueryInstallStatus(isInstalling) {
-        if (!this.panel) {
-            return;
-        }
-
-        this.panel.postMessage({
-            type: 'dependencyInstallStatus',
-            payload: {
-                installingCadqueryOcp: Boolean(isInstalling),
-            },
-        }).catch((error) => {
-            this.log(`[webview] Failed to post dependency install status: ${error.message || error}`);
-        });
     }
 
     async onFileChanged(source) {
@@ -1601,66 +1364,13 @@ class FrameViewSession {
         });
     }
 
-    extractRunnerErrorDetails(error) {
-        const payload = error && error.runnerError && typeof error.runnerError === 'object'
-            ? error.runnerError
-            : null;
-        const message = payload && typeof payload.message === 'string'
-            ? payload.message
-            : (error && error.message ? error.message : String(error));
-        const traceback = payload && typeof payload.traceback === 'string'
-            ? payload.traceback
-            : (error && typeof error.runnerTraceback === 'string' ? error.runnerTraceback : null);
-        const type = payload && typeof payload.type === 'string'
-            ? payload.type
-            : (error && typeof error.runnerErrorType === 'string' ? error.runnerErrorType : null);
-        return { message, traceback, type };
-    }
-
-    parseTracebackLocation(traceback) {
-        if (!traceback || typeof traceback !== 'string') {
-            return null;
-        }
-        const fileLineRegex = /File "([^"]+)", line (\d+)/g;
-        const candidates = [];
-        let match = fileLineRegex.exec(traceback);
-        while (match) {
-            candidates.push({ filePath: match[1], lineNumber: Number(match[2]) });
-            match = fileLineRegex.exec(traceback);
-        }
-        for (let index = candidates.length - 1; index >= 0; index -= 1) {
-            const candidate = candidates[index];
-            if (candidate.filePath && fs.existsSync(candidate.filePath) && Number.isFinite(candidate.lineNumber)) {
-                return candidate;
-            }
-        }
-        return null;
-    }
-
-    deriveViewerErrorMessage(details) {
-        const message = details && typeof details.message === 'string' ? details.message : '';
-        if (!message) {
-            return 'Unable to render this file in Kigumi viewer.';
-        }
-
-        if (message.includes("Module must expose a module-level 'example' Frame, a 'patternbook', or a build_frame() function")) {
-            return "This file is not a valid Kigumi frame/example/pattern. Add module-level 'example', 'patternbook', or build_frame().";
-        }
-
-        if (message.includes('No patternbook found in')) {
-            return 'This file does not define a patternbook that Kigumi can open.';
-        }
-
-        return `Kigumi failed to render this file: ${message}`;
-    }
-
     pushViewerErrorState(details) {
         if (!this.panel) {
             return;
         }
 
         const refreshToken = this.refreshSequence;
-        const loadingText = this.deriveViewerErrorMessage(details);
+        const loadingText = deriveViewerErrorMessage(details);
         this.panel.postMessage({
             type: 'viewerState',
             uiState: {
@@ -1709,7 +1419,7 @@ class FrameViewSession {
     }
 
     async reportRunnerError(error, contextLabel) {
-        const details = this.extractRunnerErrorDetails(error);
+        const details = extractRunnerErrorDetails(error);
         const errorTypePart = details.type ? `${details.type}: ` : '';
         this.log(`[error] ${contextLabel} -> ${errorTypePart}${details.message}`);
         this.pushViewerErrorState(details);
@@ -1723,7 +1433,7 @@ class FrameViewSession {
         }
 
         this.channel.show(true);
-        const location = this.parseTracebackLocation(details.traceback);
+        const location = parseTracebackLocation(details.traceback);
         const openOutputAction = t('message.action.openKigumiOutput');
         const goToErrorAction = t('message.action.goToError');
         const actions = [openOutputAction];
