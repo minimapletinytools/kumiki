@@ -1,7 +1,7 @@
 name: Kigumi Tests
 
-# The same unit tests the release build runs, on every change, so a failure
-# shows up on the PR rather than when a tag is pushed.
+# The same unit tests the release build runs, and the extension tests in VS Code, on every
+# change, so a failure shows up on the PR rather than when a tag is pushed.
 on:
   push:
     branches:
@@ -58,3 +58,67 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
+
+  # The extension in a real VS Code: the viewer and the explorer open, render and answer the
+  # automation commands. VS Code needs a display, so it runs under xvfb.
+  extension:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: kigumi
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Cache uv artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: uv-${{ runner.os }}-py3.13-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py3.13-
+
+      # The runner tests start runner.py against the repo's .venv.
+      - name: Install dependencies
+        run: |
+          if [ ! -f ../kumiki/_pattern_index.json ]; then
+            echo '{"schema_version":1,"entries":{}}' > ../kumiki/_pattern_index.json
+          fi
+          uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: kigumi/package.json
+
+      - name: Install Node.js dependencies
+        run: npm install
+
+      - name: Cache the VS Code the tests download
+        uses: actions/cache@v4
+        with:
+          path: kigumi/.vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('kigumi/package.json') }}
+          restore-keys: |
+            vscode-test-${{ runner.os }}-
+
+      - name: Install a virtual display
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Run extension tests
+        run: xvfb-run -a npm run test:ext
+
+      - name: Run the complex extension tests
+        run: xvfb-run -a npm run test:ext:complex
