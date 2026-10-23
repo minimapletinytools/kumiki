@@ -1,432 +1,425 @@
-(function (globalScope) {
-    'use strict';
+import * as KigumiFeatureStates from './feature-states.js';
 
-    const { leadingRole } = (typeof module !== 'undefined' && module.exports)
-        ? require('./feature-states.js')
-        : globalScope.KigumiFeatureStates;
-    // What should be lit, given what is selected, hovered and held.
-    //
-    // A LIST, not seven lifetimes. Each overlay used to be built when the
-    // message that caused it arrived and torn down by one of seven scattered
-    // calls -- so there was no path from "the state is X" to "these overlays
-    // should exist", and every state change that produced no message had to
-    // remember to tear the right thing down by hand. Two bugs grew there: a
-    // measurement preview erased a statement after it was drawn, and the record
-    // of what was on screen nulled by a teardown in the middle of a redraw.
-    //
-    // This is pure. It answers what should exist; the caller reconciles what
-    // does against what should, and nothing has to remember anything.
-    //
-    // IDENTITY vs APPEARANCE. `id` says WHICH thing is lit, and nothing else --
-    // so an overlay that is still wanted is left alone rather than rebuilt.
-    // Colour and opacity ride alongside and are applied every pass, which is
-    // why a selection deepening now fades the highlight with it; the old code
-    // froze that at the moment the message arrived.
+const { leadingRole } = KigumiFeatureStates;
+// What should be lit, given what is selected, hovered and held.
+//
+// A LIST, not seven lifetimes. Each overlay used to be built when the
+// message that caused it arrived and torn down by one of seven scattered
+// calls -- so there was no path from "the state is X" to "these overlays
+// should exist", and every state change that produced no message had to
+// remember to tear the right thing down by hand. Two bugs grew there: a
+// measurement preview erased a statement after it was drawn, and the record
+// of what was on screen nulled by a teardown in the middle of a redraw.
+//
+// This is pure. It answers what should exist; the caller reconciles what
+// does against what should, and nothing has to remember anything.
+//
+// IDENTITY vs APPEARANCE. `id` says WHICH thing is lit, and nothing else --
+// so an overlay that is still wanted is left alone rather than rebuilt.
+// Colour and opacity ride alongside and are applied every pass, which is
+// why a selection deepening now fades the highlight with it; the old code
+// froze that at the moment the message arrived.
 
-    /** Selection: the tagged node, and the feature within it. */
-    const CSG_COLORS = Object.freeze({ tagged: 0x29b6f6, feature: 0x0288d1 });
+/** Selection: the tagged node, and the feature within it. */
+const CSG_COLORS = Object.freeze({ tagged: 0x29b6f6, feature: 0x0288d1 });
 
-    /** The pointer, in another hue and drawn over the selection. */
-    const HOVER_COLOR = 0xffa726;
+/** The pointer, in another hue and drawn over the selection. */
+const HOVER_COLOR = 0xffa726;
 
-    /** A pair the click will refuse. Red, and the click does refuse it. */
-    const HOVER_REFUSED_COLOR = 0xef5350;
+/** A pair the click will refuse. Red, and the click does refuse it. */
+const HOVER_REFUSED_COLOR = 0xef5350;
 
-    /** The first end of a measurement: held, not selected, and green. */
-    const HELD_COLOR = 0x66bb6a;
+/** The first end of a measurement: held, not selected, and green. */
+const HELD_COLOR = 0x66bb6a;
 
-    const HOVER_OPACITY = 0.8;
-    const HELD_OPACITY = 0.8;
+const HOVER_OPACITY = 0.8;
+const HELD_OPACITY = 0.8;
 
-    /** An end of a selected measurement: what it is measured between. */
-    const MEASUREMENT_END_COLOR = 0xab47bc;
-    const MEASUREMENT_END_OPACITY = 0.7;
+/** An end of a selected measurement: what it is measured between. */
+const MEASUREMENT_END_COLOR = 0xab47bc;
+const MEASUREMENT_END_OPACITY = 0.7;
 
-    /**
-     * A timber's reference features: the primary in red, as a drawing marks it, the rest
-     * fainter. Subtle on purpose -- a mark on the timber, not a highlight -- so thin, faint and
-     * depth tested: it shows on the surface and not through what is in front of it.
-     */
-    const REFERENCE_COLOR = 0xc0392b;
-    const REFERENCE_OTHER_COLOR = 0xe57373;
-    const REFERENCE_OPACITY = 0.7;
-    const REFERENCE_OTHER_OPACITY = 0.45;
-    const REFERENCE_EDGE_WIDTH_PX = 3;
+/**
+ * A timber's reference features: the primary in red, as a drawing marks it, the rest
+ * fainter. Subtle on purpose -- a mark on the timber, not a highlight -- so thin, faint and
+ * depth tested: it shows on the surface and not through what is in front of it.
+ */
+const REFERENCE_COLOR = 0xc0392b;
+const REFERENCE_OTHER_COLOR = 0xe57373;
+const REFERENCE_OPACITY = 0.7;
+const REFERENCE_OTHER_OPACITY = 0.45;
+const REFERENCE_EDGE_WIDTH_PX = 3;
 
-    /** Over the selection, and over each other in this order. */
-    const ORDER = Object.freeze({
-        // Beneath the selection: background to what you are doing.
-        referenceEdges: 990,
-        measurementEndMesh: 993,
-        measurementEndEdges: 994,
-        measurementEndPoint: 995,
-        csgMesh: 999,
-        csgEdges: 1000,
-        // A point sits on the edges that meet at it and on the faces behind
-        // those, so it goes over both or it is the one thing you cannot see.
-        csgPoint: 1001,
-        hoverMesh: 1100,
-        hoverEdges: 1101,
-        hoverPoint: 1102,
-        // Above the hover: what is HELD is the more important of the two, and
-        // they are the two most likely to overlap -- the pointer is usually
-        // right beside the thing being held. They used to share 1101, which
-        // left which one won undefined.
-        heldMesh: 1103,
-        heldEdges: 1104,
-        heldPoint: 1105,
-    });
+/** Over the selection, and over each other in this order. */
+const ORDER = Object.freeze({
+    // Beneath the selection: background to what you are doing.
+    referenceEdges: 990,
+    measurementEndMesh: 993,
+    measurementEndEdges: 994,
+    measurementEndPoint: 995,
+    csgMesh: 999,
+    csgEdges: 1000,
+    // A point sits on the edges that meet at it and on the faces behind
+    // those, so it goes over both or it is the one thing you cannot see.
+    csgPoint: 1001,
+    hoverMesh: 1100,
+    hoverEdges: 1101,
+    hoverPoint: 1102,
+    // Above the hover: what is HELD is the more important of the two, and
+    // they are the two most likely to overlap -- the pointer is usually
+    // right beside the thing being held. They used to share 1101, which
+    // left which one won undefined.
+    heldMesh: 1103,
+    heldEdges: 1104,
+    heldPoint: 1105,
+});
 
-    function hasMesh(mesh) {
-        return Boolean(mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0
-            && Array.isArray(mesh.indices));
+function hasMesh(mesh) {
+    return Boolean(mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0
+        && Array.isArray(mesh.indices));
+}
+
+function hasEdges(positions) {
+    return Array.isArray(positions) && positions.length > 0;
+}
+
+function hasPoint(at) {
+    return Array.isArray(at) && at.length === 3 && at.every(Number.isFinite);
+}
+
+/**
+ * Where a pick's point marker goes, or null when the pick is not a point.
+ *
+ * `at` comes back for EVERY feature -- a face's centre, an edge's midpoint
+ * -- so what the pick IS has to gate it, or every selection would grow a
+ * dot in the middle of itself. A held end keeps its kind on `geometry`
+ * rather than as a featureType, so both are read.
+ */
+function pointHighlightAt(answer) {
+    if (!answer) {
+        return null;
     }
-
-    function hasEdges(positions) {
-        return Array.isArray(positions) && positions.length > 0;
+    const isPoint = answer.featureType === 'POINT'
+        || Boolean(answer.geometry && answer.geometry.kind === 'point');
+    if (!isPoint) {
+        return null;
     }
-
-    function hasPoint(at) {
-        return Array.isArray(at) && at.length === 3 && at.every(Number.isFinite);
+    const at = Array.isArray(answer.at)
+        ? answer.at
+        : (answer.geometry && answer.geometry.at);
+    if (!Array.isArray(at) || at.length !== 3) {
+        return null;
     }
+    const numbers = at.map(Number);
+    return numbers.every(Number.isFinite) ? numbers : null;
+}
 
-    /**
-     * Where a pick's point marker goes, or null when the pick is not a point.
-     *
-     * `at` comes back for EVERY feature -- a face's centre, an edge's midpoint
-     * -- so what the pick IS has to gate it, or every selection would grow a
-     * dot in the middle of itself. A held end keeps its kind on `geometry`
-     * rather than as a featureType, so both are read.
-     */
-    function pointHighlightAt(answer) {
-        if (!answer) {
-            return null;
+
+/**
+ * Which overlays should exist, given the state.
+ *
+ * `features` are FeatureStates (feature-states.js): each lit feature with
+ * its roles -- selection, hover, held -- and for each the geometry the
+ * runner sent, `{ key, mesh, parentMesh, edgePositions, pointAt,
+ * featureLabel, refused }`. `policy` carries the opacities the current
+ * selection asks for.
+ *
+ * One look per feature: a feature with several roles is drawn as its
+ * leading role (FeatureStates.leadingRole), not as a stack of translucent
+ * copies. A selected feature's parent is other geometry, so it stays as
+ * context whichever role leads -- when `showFeatureParent` asks for it.
+ */
+function highlightsFor(state) {
+    const found = state || {};
+    const policy = found.policy || {};
+    const out = [];
+    for (const feature of found.features || []) {
+        const selection = feature.roles.selection;
+        if (selection && found.showFeatureParent) {
+            parentOverlay(selection, policy, out);
         }
-        const isPoint = answer.featureType === 'POINT'
-            || Boolean(answer.geometry && answer.geometry.kind === 'point');
-        if (!isPoint) {
-            return null;
+        const leading = leadingRole(feature);
+        if (!leading) {
+            continue;
         }
-        const at = Array.isArray(answer.at)
-            ? answer.at
-            : (answer.geometry && answer.geometry.at);
-        if (!Array.isArray(at) || at.length !== 3) {
-            return null;
+        const from = out.length;
+        if (leading.role === 'selection') {
+            selectionOverlays(leading.source, policy, out);
+        } else if (leading.role === 'hover') {
+            hoverOverlays(leading.source, out);
+        } else if (leading.role === 'held') {
+            heldOverlays(leading.source, out);
+        } else if (leading.role === 'measurementEnd') {
+            styledOverlays(leading.source, 'measurement-end', {
+                color: MEASUREMENT_END_COLOR, opacity: MEASUREMENT_END_OPACITY,
+                mesh: ORDER.measurementEndMesh, edges: ORDER.measurementEndEdges, point: ORDER.measurementEndPoint,
+            }, out);
+        } else {
+            styledOverlays(leading.source, 'reference', {
+                color: leading.source.primary ? REFERENCE_COLOR : REFERENCE_OTHER_COLOR,
+                opacity: leading.source.primary ? REFERENCE_OPACITY : REFERENCE_OTHER_OPACITY,
+                edges: ORDER.referenceEdges,
+                depthTest: true,
+                linewidth: REFERENCE_EDGE_WIDTH_PX,
+            }, out);
         }
-        const numbers = at.map(Number);
-        return numbers.every(Number.isFinite) ? numbers : null;
+        // Which role drew it, so a drawing can show each in the right views: see viewer-app's
+        // renderViewports.
+        for (let index = from; index < out.length; index += 1) {
+            out[index].role = leading.role;
+        }
     }
+    return out;
+}
 
-
-    /**
-     * Which overlays should exist, given the state.
-     *
-     * `features` are FeatureStates (feature-states.js): each lit feature with
-     * its roles -- selection, hover, held -- and for each the geometry the
-     * runner sent, `{ key, mesh, parentMesh, edgePositions, pointAt,
-     * featureLabel, refused }`. `policy` carries the opacities the current
-     * selection asks for.
-     *
-     * One look per feature: a feature with several roles is drawn as its
-     * leading role (FeatureStates.leadingRole), not as a stack of translucent
-     * copies. A selected feature's parent is other geometry, so it stays as
-     * context whichever role leads -- when `showFeatureParent` asks for it.
-     */
-    function highlightsFor(state) {
-        const found = state || {};
-        const policy = found.policy || {};
-        const out = [];
-        for (const feature of found.features || []) {
-            const selection = feature.roles.selection;
-            if (selection && found.showFeatureParent) {
-                parentOverlay(selection, policy, out);
-            }
-            const leading = leadingRole(feature);
-            if (!leading) {
-                continue;
-            }
-            const from = out.length;
-            if (leading.role === 'selection') {
-                selectionOverlays(leading.source, policy, out);
-            } else if (leading.role === 'hover') {
-                hoverOverlays(leading.source, out);
-            } else if (leading.role === 'held') {
-                heldOverlays(leading.source, out);
-            } else if (leading.role === 'measurementEnd') {
-                styledOverlays(leading.source, 'measurement-end', {
-                    color: MEASUREMENT_END_COLOR, opacity: MEASUREMENT_END_OPACITY,
-                    mesh: ORDER.measurementEndMesh, edges: ORDER.measurementEndEdges, point: ORDER.measurementEndPoint,
-                }, out);
-            } else {
-                styledOverlays(leading.source, 'reference', {
-                    color: leading.source.primary ? REFERENCE_COLOR : REFERENCE_OTHER_COLOR,
-                    opacity: leading.source.primary ? REFERENCE_OPACITY : REFERENCE_OTHER_OPACITY,
-                    edges: ORDER.referenceEdges,
-                    depthTest: true,
-                    linewidth: REFERENCE_EDGE_WIDTH_PX,
-                }, out);
-            }
-            // Which role drew it, so a drawing can show each in the right views: see viewer-app's
-            // renderViewports.
-            for (let index = from; index < out.length; index += 1) {
-                out[index].role = leading.role;
-            }
-        }
-        return out;
+/** A selected feature's parent, dim, so which is which is visible. */
+function parentOverlay(csg, policy, out) {
+    if (csg.featureLabel && hasMesh(csg.parentMesh)) {
+        out.push({
+            id: `csg-parent:${csg.key}`,
+            shape: 'mesh',
+            mesh: csg.parentMesh,
+            color: CSG_COLORS.tagged,
+            opacity: policy.parentHighlightOpacity,
+            renderOrder: ORDER.csgMesh,
+            role: 'selection',
+        });
     }
+}
 
-    /** A selected feature's parent, dim, so which is which is visible. */
-    function parentOverlay(csg, policy, out) {
-        if (csg.featureLabel && hasMesh(csg.parentMesh)) {
+/** The selection: the tagged node, or a feature (its parent is parentOverlay's). */
+function selectionOverlays(csg, policy, out) {
+    if (hasPoint(csg.pointAt)) {
+        // A vertex is a position and nothing else -- neither triangles
+        // nor a line runs through it -- so it is drawn as a marker held
+        // at a fixed size on screen, the way a snap target has to be
+        // findable however far out the camera is.
+        out.push({
+            id: `csg-point:${csg.key}`,
+            shape: 'point',
+            at: csg.pointAt,
+            color: CSG_COLORS.feature,
+            opacity: 1,
+            renderOrder: ORDER.csgPoint,
+        });
+    }
+    if (hasEdges(csg.edgePositions)) {
+        // An edge is a line: shading the triangles beside it lit a
+        // stray wedge that read as geometry rather than as a selection.
+        out.push({
+            id: `csg-edges:${csg.key}`,
+            shape: 'edges',
+            positions: csg.edgePositions,
+            color: CSG_COLORS.feature,
+            opacity: 1,
+            renderOrder: ORDER.csgEdges,
+        });
+    }
+    if (csg.featureLabel && hasMesh(csg.parentMesh)) {
+        // A feature inside something: bright, over its dim parent.
+        if (hasMesh(csg.mesh)) {
             out.push({
-                id: `csg-parent:${csg.key}`,
-                shape: 'mesh',
-                mesh: csg.parentMesh,
-                color: CSG_COLORS.tagged,
-                opacity: policy.parentHighlightOpacity,
-                renderOrder: ORDER.csgMesh,
-                role: 'selection',
-            });
-        }
-    }
-
-    /** The selection: the tagged node, or a feature (its parent is parentOverlay's). */
-    function selectionOverlays(csg, policy, out) {
-        if (hasPoint(csg.pointAt)) {
-            // A vertex is a position and nothing else -- neither triangles
-            // nor a line runs through it -- so it is drawn as a marker held
-            // at a fixed size on screen, the way a snap target has to be
-            // findable however far out the camera is.
-            out.push({
-                id: `csg-point:${csg.key}`,
-                shape: 'point',
-                at: csg.pointAt,
-                color: CSG_COLORS.feature,
-                opacity: 1,
-                renderOrder: ORDER.csgPoint,
-            });
-        }
-        if (hasEdges(csg.edgePositions)) {
-            // An edge is a line: shading the triangles beside it lit a
-            // stray wedge that read as geometry rather than as a selection.
-            out.push({
-                id: `csg-edges:${csg.key}`,
-                shape: 'edges',
-                positions: csg.edgePositions,
-                color: CSG_COLORS.feature,
-                opacity: 1,
-                renderOrder: ORDER.csgEdges,
-            });
-        }
-        if (csg.featureLabel && hasMesh(csg.parentMesh)) {
-            // A feature inside something: bright, over its dim parent.
-            if (hasMesh(csg.mesh)) {
-                out.push({
-                    id: `csg-feature:${csg.key}`,
-                    shape: 'mesh',
-                    mesh: csg.mesh,
-                    color: CSG_COLORS.feature,
-                    opacity: policy.featureHighlightOpacity,
-                    renderOrder: ORDER.csgMesh,
-                });
-            }
-        } else if (hasMesh(csg.mesh)) {
-            out.push({
-                id: `csg-node:${csg.key}`,
+                id: `csg-feature:${csg.key}`,
                 shape: 'mesh',
                 mesh: csg.mesh,
-                color: CSG_COLORS.tagged,
-                opacity: policy.csgHighlightOpacity,
+                color: CSG_COLORS.feature,
+                opacity: policy.featureHighlightOpacity,
                 renderOrder: ORDER.csgMesh,
             });
         }
-
-
+    } else if (hasMesh(csg.mesh)) {
+        out.push({
+            id: `csg-node:${csg.key}`,
+            shape: 'mesh',
+            mesh: csg.mesh,
+            color: CSG_COLORS.tagged,
+            opacity: policy.csgHighlightOpacity,
+            renderOrder: ORDER.csgMesh,
+        });
     }
 
-    /** The pointer: orange, or red over a pair the click will refuse. */
-    function hoverOverlays(hover, out) {
-        // One colour decides both: what is drawn red is what the click
-        // refuses, so they cannot disagree about the same feature.
-        const color = hover.refused ? HOVER_REFUSED_COLOR : HOVER_COLOR;
-        if (hasPoint(hover.pointAt)) {
-            out.push({
-                id: `hover-point:${hover.key}`,
-                shape: 'point',
-                at: hover.pointAt,
-                color,
-                opacity: 1,
-                renderOrder: ORDER.hoverPoint,
-            });
-        }
-        if (hasEdges(hover.edgePositions)) {
-            out.push({
-                id: `hover-edges:${hover.key}`,
-                shape: 'edges',
-                positions: hover.edgePositions,
-                color,
-                opacity: 1,
-                renderOrder: ORDER.hoverEdges,
-            });
-        }
-        if (hasMesh(hover.mesh)) {
-            out.push({
-                id: `hover-mesh:${hover.key}`,
-                shape: 'mesh',
-                mesh: hover.mesh,
-                color,
-                opacity: HOVER_OPACITY,
-                renderOrder: ORDER.hoverMesh,
-            });
-        }
 
+}
 
+/** The pointer: orange, or red over a pair the click will refuse. */
+function hoverOverlays(hover, out) {
+    // One colour decides both: what is drawn red is what the click
+    // refuses, so they cannot disagree about the same feature.
+    const color = hover.refused ? HOVER_REFUSED_COLOR : HOVER_COLOR;
+    if (hasPoint(hover.pointAt)) {
+        out.push({
+            id: `hover-point:${hover.key}`,
+            shape: 'point',
+            at: hover.pointAt,
+            color,
+            opacity: 1,
+            renderOrder: ORDER.hoverPoint,
+        });
+    }
+    if (hasEdges(hover.edgePositions)) {
+        out.push({
+            id: `hover-edges:${hover.key}`,
+            shape: 'edges',
+            positions: hover.edgePositions,
+            color,
+            opacity: 1,
+            renderOrder: ORDER.hoverEdges,
+        });
+    }
+    if (hasMesh(hover.mesh)) {
+        out.push({
+            id: `hover-mesh:${hover.key}`,
+            shape: 'mesh',
+            mesh: hover.mesh,
+            color,
+            opacity: HOVER_OPACITY,
+            renderOrder: ORDER.hoverMesh,
+        });
     }
 
-    /**
-     * A feature's overlays in one look: its point, its edges and its faces, where it has them.
-     * `look.depthTest` and `look.linewidth`, when given, go on the overlays: the rest are
-     * drawn over everything, at the usual width.
-     */
-    function styledOverlays(source, prefix, look, out) {
-        const drawn = {};
-        if (look.depthTest) {
-            drawn.depthTest = true;
-        }
-        if (look.linewidth) {
-            drawn.linewidth = look.linewidth;
-        }
-        if (look.point !== undefined && hasPoint(source.pointAt)) {
-            out.push({ id: `${prefix}-point:${source.key}`, shape: 'point', at: source.pointAt,
-                       color: look.color, opacity: 1, renderOrder: look.point, ...drawn });
-        }
-        if (look.edges !== undefined && hasEdges(source.edgePositions)) {
-            out.push({ id: `${prefix}-edges:${source.key}`, shape: 'edges', positions: source.edgePositions,
-                       color: look.color, opacity: look.opacity, renderOrder: look.edges, ...drawn });
-        }
-        if (look.mesh !== undefined && hasMesh(source.mesh)) {
-            out.push({ id: `${prefix}-mesh:${source.key}`, shape: 'mesh', mesh: source.mesh,
-                       color: look.color, opacity: look.opacity, renderOrder: look.mesh, ...drawn });
-        }
+
+}
+
+/**
+ * A feature's overlays in one look: its point, its edges and its faces, where it has them.
+ * `look.depthTest` and `look.linewidth`, when given, go on the overlays: the rest are
+ * drawn over everything, at the usual width.
+ */
+function styledOverlays(source, prefix, look, out) {
+    const drawn = {};
+    if (look.depthTest) {
+        drawn.depthTest = true;
+    }
+    if (look.linewidth) {
+        drawn.linewidth = look.linewidth;
+    }
+    if (look.point !== undefined && hasPoint(source.pointAt)) {
+        out.push({ id: `${prefix}-point:${source.key}`, shape: 'point', at: source.pointAt,
+                   color: look.color, opacity: 1, renderOrder: look.point, ...drawn });
+    }
+    if (look.edges !== undefined && hasEdges(source.edgePositions)) {
+        out.push({ id: `${prefix}-edges:${source.key}`, shape: 'edges', positions: source.edgePositions,
+                   color: look.color, opacity: look.opacity, renderOrder: look.edges, ...drawn });
+    }
+    if (look.mesh !== undefined && hasMesh(source.mesh)) {
+        out.push({ id: `${prefix}-mesh:${source.key}`, shape: 'mesh', mesh: source.mesh,
+                   color: look.color, opacity: look.opacity, renderOrder: look.mesh, ...drawn });
+    }
+}
+
+/** The first end of a measurement, held: green. */
+function heldOverlays(held, out) {
+    if (hasPoint(held.pointAt)) {
+        out.push({
+            id: `held-point:${held.key}`,
+            shape: 'point',
+            at: held.pointAt,
+            color: HELD_COLOR,
+            opacity: 1,
+            renderOrder: ORDER.heldPoint,
+        });
+    }
+    if (hasEdges(held.edgePositions)) {
+        out.push({
+            id: `held-edges:${held.key}`,
+            shape: 'edges',
+            positions: held.edgePositions,
+            color: HELD_COLOR,
+            opacity: 1,
+            renderOrder: ORDER.heldEdges,
+        });
+    }
+    if (hasMesh(held.mesh)) {
+        out.push({
+            id: `held-mesh:${held.key}`,
+            shape: 'mesh',
+            mesh: held.mesh,
+            color: HELD_COLOR,
+            opacity: HELD_OPACITY,
+            renderOrder: ORDER.heldMesh,
+        });
     }
 
-    /** The first end of a measurement, held: green. */
-    function heldOverlays(held, out) {
-        if (hasPoint(held.pointAt)) {
-            out.push({
-                id: `held-point:${held.key}`,
-                shape: 'point',
-                at: held.pointAt,
-                color: HELD_COLOR,
-                opacity: 1,
-                renderOrder: ORDER.heldPoint,
-            });
-        }
-        if (hasEdges(held.edgePositions)) {
-            out.push({
-                id: `held-edges:${held.key}`,
-                shape: 'edges',
-                positions: held.edgePositions,
-                color: HELD_COLOR,
-                opacity: 1,
-                renderOrder: ORDER.heldEdges,
-            });
-        }
-        if (hasMesh(held.mesh)) {
-            out.push({
-                id: `held-mesh:${held.key}`,
-                shape: 'mesh',
-                mesh: held.mesh,
-                color: HELD_COLOR,
-                opacity: HELD_OPACITY,
-                renderOrder: ORDER.heldMesh,
-            });
-        }
 
+    return out;
+}
 
-        return out;
+/**
+ * Which selection geometry is still about the selection.
+ *
+ * The runner's answer is kept rather than drawn on arrival, so it outlives
+ * the moment it arrived in -- and a message from before the focus moved
+ * describes a selection nobody has. Offered only while it still names what
+ * is focused, which is how a stale highlight stops being possible rather
+ * than being cleaned up after.
+ */
+function sourceForFocus(source, focusKey) {
+    if (!source || !focusKey || source.key !== focusKey) {
+        return null;
     }
+    return source;
+}
 
-    /**
-     * Which selection geometry is still about the selection.
-     *
-     * The runner's answer is kept rather than drawn on arrival, so it outlives
-     * the moment it arrived in -- and a message from before the focus moved
-     * describes a selection nobody has. Offered only while it still names what
-     * is focused, which is how a stale highlight stops being possible rather
-     * than being cleaned up after.
-     */
-    function sourceForFocus(source, focusKey) {
-        if (!source || !focusKey || source.key !== focusKey) {
-            return null;
-        }
-        return source;
-    }
-
-    /**
-     * Make what exists match what should exist.
-     *
-     * `existing` is a Map of id to whatever the caller builds; `build`,
-     * `update` and `drop` are how it makes, refreshes and disposes of one. The
-     * three.js half lives with the caller; the DECISIONS -- what is new, what
-     * is still wanted, what has gone -- live here, where they can be checked.
-     *
-     * An overlay that is still wanted is UPDATED, never rebuilt: its geometry
-     * has not changed, only its colour or opacity might have, and rebuilding
-     * would throw away a mesh to draw the same mesh.
-     */
-    function reconcile(existing, wanted, handlers) {
-        const { build, update, drop } = handlers || {};
-        const seen = new Set();
-        for (const descriptor of wanted || []) {
-            seen.add(descriptor.id);
-            let object = existing.get(descriptor.id);
-            if (object === undefined) {
-                object = build ? build(descriptor) : null;
-                if (object === null || object === undefined) {
-                    // Nothing could be made of it. Not an error -- a source can
-                    // arrive without the geometry to draw -- and not a reason
-                    // to stop.
-                    seen.delete(descriptor.id);
-                    continue;
-                }
-                existing.set(descriptor.id, object);
-            }
-            if (update) {
-                update(object, descriptor);
-            }
-        }
-        for (const id of Array.from(existing.keys())) {
-            if (seen.has(id)) {
+/**
+ * Make what exists match what should exist.
+ *
+ * `existing` is a Map of id to whatever the caller builds; `build`,
+ * `update` and `drop` are how it makes, refreshes and disposes of one. The
+ * three.js half lives with the caller; the DECISIONS -- what is new, what
+ * is still wanted, what has gone -- live here, where they can be checked.
+ *
+ * An overlay that is still wanted is UPDATED, never rebuilt: its geometry
+ * has not changed, only its colour or opacity might have, and rebuilding
+ * would throw away a mesh to draw the same mesh.
+ */
+function reconcile(existing, wanted, handlers) {
+    const { build, update, drop } = handlers || {};
+    const seen = new Set();
+    for (const descriptor of wanted || []) {
+        seen.add(descriptor.id);
+        let object = existing.get(descriptor.id);
+        if (object === undefined) {
+            object = build ? build(descriptor) : null;
+            if (object === null || object === undefined) {
+                // Nothing could be made of it. Not an error -- a source can
+                // arrive without the geometry to draw -- and not a reason
+                // to stop.
+                seen.delete(descriptor.id);
                 continue;
             }
-            if (drop) {
-                drop(existing.get(id));
-            }
-            existing.delete(id);
+            existing.set(descriptor.id, object);
         }
-        return existing;
+        if (update) {
+            update(object, descriptor);
+        }
     }
-
-    const KigumiHighlights = {
-        highlightsFor,
-        pointHighlightAt,
-        reconcile,
-        sourceForFocus,
-        CSG_COLORS,
-        HOVER_COLOR,
-        HOVER_REFUSED_COLOR,
-        HELD_COLOR,
-        HOVER_OPACITY,
-        HELD_OPACITY,
-        MEASUREMENT_END_COLOR,
-        REFERENCE_COLOR,
-        REFERENCE_OTHER_COLOR,
-        ORDER,
-    };
-
-    if (typeof module !== 'undefined' && module.exports) {
-        module.exports = KigumiHighlights;
+    for (const id of Array.from(existing.keys())) {
+        if (seen.has(id)) {
+            continue;
+        }
+        if (drop) {
+            drop(existing.get(id));
+        }
+        existing.delete(id);
     }
-    globalScope.KigumiHighlights = KigumiHighlights;
-})(typeof window !== 'undefined' ? window : globalThis);
+    return existing;
+}
+
+const KigumiHighlights = {
+    highlightsFor,
+    pointHighlightAt,
+    reconcile,
+    sourceForFocus,
+    CSG_COLORS,
+    HOVER_COLOR,
+    HOVER_REFUSED_COLOR,
+    HELD_COLOR,
+    HOVER_OPACITY,
+    HELD_OPACITY,
+    MEASUREMENT_END_COLOR,
+    REFERENCE_COLOR,
+    REFERENCE_OTHER_COLOR,
+    ORDER,
+};
+
+export { highlightsFor, pointHighlightAt, reconcile, sourceForFocus, CSG_COLORS, HOVER_COLOR, HOVER_REFUSED_COLOR, HELD_COLOR, HOVER_OPACITY, HELD_OPACITY, MEASUREMENT_END_COLOR, REFERENCE_COLOR, REFERENCE_OTHER_COLOR, ORDER };

@@ -1,7 +1,26 @@
 /**
- * What the viewer's modules share: its constants, the globals it reads from the page (window.Kigumi*),
- * the payload it was opened with, its translator, and small helpers. Loaded first, by viewer-app.js.
+ * What the viewer's modules share: its constants, the modules they all use (re-exported here), the
+ * payload it was opened with, its translator, and small helpers. Loaded first, by viewer-app.js.
  */
+
+import * as KigumiCameraControls from './camera-controls.js';
+import * as KigumiDisplayOptions from './display-options-store.js';
+import * as KigumiDrawingPanel from './drawing-panel.js';
+import * as KigumiI18n from './i18n.js';
+import * as KigumiInput from './input-controller.js';
+import * as KigumiKiwariValues from './kiwari-values.js';
+import * as KigumiMeasureDraft from './measure-draft.js';
+import * as KigumiMeasurements from './measurements.js';
+import * as KigumiSceneManager from './scene-manager.js';
+import * as KigumiScenes from './scene-store.js';
+import * as KigumiSelectionVisuals from './selection-visuals.js';
+import * as KigumiTags from './tags.js';
+import * as KigumiUnits from './units.js';
+import { AssemblyTimeline } from './assembly-timeline.js';
+import { CameraController } from './camera-controller.js';
+import { CsgTreeView } from './csg-tree-view.js';
+import { GeometryMode } from './geometry-mode.js';
+import { SelectionStore, choosePickAction } from './selection-store.js';
 
 export const ViewerPhase = Object.freeze({
     BOOTING: 'booting',
@@ -27,8 +46,8 @@ export const FOOTPRINT_COLOR_SWATCHES = {
     moss: { fill: 0x9dc8a0, edge: 0x2f5233 },
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
-export const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
-export const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, MAX_TILT_RADIANS, sceneMembers, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+export const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = KigumiDisplayOptions;
+export const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, MAX_TILT_RADIANS, sceneMembers, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = KigumiScenes;
 // Matches the id build_default_drawing_for_debugging ships in runner.py.
 export const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 // The one reserved drawing that holds the 3D view's measurements. A drawing
@@ -41,20 +60,16 @@ export const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
 // marked deleted in the file -- listed greyed, to be put back -- and one already
 // deleted is left alone.
 export const MEASUREMENT_CODE_ORIGIN = 'code';
-export const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
-export const { SceneManager } = window.KigumiSceneManager;
-export const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
-export const KigumiMeasurements = window.KigumiMeasurements;
+export const { CameraCubeGizmo, OrbitCenterGizmo } = KigumiCameraControls;
+export const { SceneManager } = KigumiSceneManager;
+export const { PointerDrag, actionForButton, resolvePointers } = KigumiInput;
 // One definition of a measurement's identity, shared with the panels.
 export const { measurementKey } = KigumiMeasurements;
-export const { DrawingPanel } = window.KigumiDrawingPanel;
+export const { DrawingPanel } = KigumiDrawingPanel;
 // Read off `window` like their neighbours above rather than left as bare
 // globals. They resolved either way -- these modules publish the name -- but
 // only by accident of load order, and an accident is what kept the missing
 // declarations below invisible for so long.
-export const CsgTreeView = window.CsgTreeView;
-export const KigumiKiwariValues = window.KigumiKiwariValues;
-export const choosePickAction = window.choosePickAction;
 
 // Swept away with the unused constants around it when the state was folded out
 // of this file, and every name here is used still. Six of them went on working
@@ -78,12 +93,7 @@ export const INITIAL_PAYLOAD = window.__KIGUMI_INITIAL_PAYLOAD__ || {
 export const vscode = window.__kigumiVsCode
     || (typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null);
 export const VIEWER_APP_VERSION = '2026.03.17.4';
-export const SelectionStore = window.SelectionStore;
-export const CameraController = window.CameraController;
-export const GeometryMode = window.GeometryMode;
-export const KigumiTags = window.KigumiTags;
-export const KigumiUnits = window.KigumiUnits;
-export const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
+export const t = KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
 /**
  * What names one measurement within its viewport.
@@ -323,12 +333,12 @@ export function heldHighlightKey(reference) {
     if (!reference) {
         return null;
     }
-    return JSON.stringify(window.KigumiMeasureDraft.referenceKey(reference));
+    return JSON.stringify(KigumiMeasureDraft.referenceKey(reference));
 }
 
 // Which state a selection is in, and what that does to every timber's opacity.
 // Lives in selection-visuals.js so it can be loaded and tested without lit.
-export const SelectionVisuals = window.KigumiSelectionVisuals;
+export const SelectionVisuals = KigumiSelectionVisuals;
 export const {
     SELECTION_VISUAL_STATES,
     computeSelectionVisualContext,
@@ -640,7 +650,6 @@ if (!CameraController) {
 if (!GeometryMode) {
     throw new Error('GeometryMode is not loaded. Ensure geometry-mode.js is included before viewer-app.js.');
 }
-export const AssemblyTimeline = window.AssemblyTimeline;
 if (!AssemblyTimeline) {
     throw new Error('AssemblyTimeline is not loaded. Ensure assembly-timeline.js is included before viewer-app.js.');
 }
@@ -731,3 +740,5 @@ export function edgeSegmentPositions(segments) {
     }
     return positions;
 }
+
+export { KigumiMeasurements, CsgTreeView, KigumiKiwariValues, choosePickAction, SelectionStore, CameraController, GeometryMode, KigumiTags, KigumiUnits, AssemblyTimeline };

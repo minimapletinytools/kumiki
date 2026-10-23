@@ -5,12 +5,16 @@
  */
 
 import { CSG_HIGHLIGHT_EDGE_WIDTH_PX, CSG_HIGHLIGHT_POINT_SIZE_PX, CsgTreeView, DRAWING_CONTEXT_OPACITY, KigumiMeasurements, SelectionVisuals, computeSelectionVisualContext, csgFocusKey, describeCandidates, edgeSegmentPositions, heldHighlightKey, selectionVisualPolicy, vscode } from './viewer-shared.js';
+import * as KigumiFeatureStates from './feature-states.js';
+import * as KigumiHighlights from './highlights.js';
+import * as KigumiHover from './hover-state.js';
+import * as KigumiMemberStates from './member-states.js';
 
 export const SelectionVisualsMixin = (Base) => class extends Base {
     handleCSGSelectionResult(message) {
         // While measuring, a click the hover showed as refused does nothing but say why.
         // Selecting it anyway left a feature selected and no measurement.
-        if (window.KigumiHover.HoverState.clickDoesNothing(message, this.measureDraft.isActive)) {
+        if (KigumiHover.HoverState.clickDoesNothing(message, this.measureDraft.isActive)) {
             this.reportMeasureRefusal((message.verdict || {}).reason || 'no-kind');
             return;
         }
@@ -85,7 +89,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
             mesh: hlMesh,
             parentMesh: parentHlMesh,
             edgePositions: edgeSegmentPositions(message.highlightEdgeSegments),
-            pointAt: window.KigumiHighlights.pointHighlightAt(message),
+            pointAt: KigumiHighlights.pointHighlightAt(message),
             featureLabel,
         };
 
@@ -180,7 +184,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
         }
         this._visualSignature = signature;
         this.applySelectionOpacity();
-        this._reconcileHighlights(window.KigumiHighlights.highlightsFor(lit));
+        this._reconcileHighlights(KigumiHighlights.highlightsFor(lit));
         return true;
     }
 
@@ -244,7 +248,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
                 key,
                 mesh: highlight.highlightMesh,
                 edgePositions: edgeSegmentPositions(highlight.highlightEdgeSegments),
-                pointAt: window.KigumiHighlights.pointHighlightAt(highlight),
+                pointAt: KigumiHighlights.pointHighlightAt(highlight),
             });
         });
         this.requestUpdate();
@@ -261,7 +265,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
             return [];
         }
         const drawn = this.activeSceneMembers;
-        const { featureKeyOf } = window.KigumiFeatureStates;
+        const { featureKeyOf } = KigumiFeatureStates;
         const sources = [];
         for (const [memberKey, features] of this._referenceFeaturesByMember) {
             if (this.isMemberHidden(memberKey) || (drawn && !drawn.has(memberKey))) {
@@ -283,22 +287,22 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
         const source = this._csgHighlightSource;
         const held = this.measureDraft && this.measureDraft.heldEnd;
         const hover = this._hover && this._hover.drawn;
-        const { featureKeyOf, featureStatesFor } = window.KigumiFeatureStates;
+        const { featureKeyOf, featureStatesFor } = KigumiFeatureStates;
         return {
             features: featureStatesFor({
-                selection: window.KigumiHighlights.sourceForFocus(source, csgFocusKey(focus)),
+                selection: KigumiHighlights.sourceForFocus(source, csgFocusKey(focus)),
                 hover: hover ? {
                     key: featureKeyOf(hover),
                     mesh: hover.highlightMesh,
                     edgePositions: edgeSegmentPositions(hover.highlightEdgeSegments),
-                    pointAt: window.KigumiHighlights.pointHighlightAt(hover),
-                    refused: window.KigumiHover.HoverState.isRefused(hover),
+                    pointAt: KigumiHighlights.pointHighlightAt(hover),
+                    refused: KigumiHover.HoverState.isRefused(hover),
                 } : null,
                 held: (held && held.highlight) ? {
                     key: held.featureKey || heldHighlightKey(held.reference),
                     mesh: held.highlight.highlightMesh,
                     edgePositions: edgeSegmentPositions(held.highlight.highlightEdgeSegments),
-                    pointAt: window.KigumiHighlights.pointHighlightAt(held),
+                    pointAt: KigumiHighlights.pointHighlightAt(held),
                 } : null,
                 measurementEnd: this._measurementEndSources(),
                 reference: this._referenceSources(),
@@ -319,7 +323,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
      * something should be lit; that is highlightsFor's job, and it is pure.
      */
     _reconcileHighlights(wanted) {
-        window.KigumiHighlights.reconcile(this._highlightObjects, wanted, {
+        KigumiHighlights.reconcile(this._highlightObjects, wanted, {
             build: (descriptor) => {
                 const object = this._buildHighlightObject(descriptor);
                 if (object) {
@@ -431,7 +435,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
 
     /** What a member looks like: its state, resolved with the current settings. See member-states.js. */
     _memberAppearance(memberKey, bundle, { baseSelectedOpacity, visualContext, policy }) {
-        return window.KigumiMemberStates.appearanceFor(this._memberState(memberKey, visualContext), {
+        return KigumiMemberStates.appearanceFor(this._memberState(memberKey, visualContext), {
             baseSelectedOpacity,
             policy,
             profile: this.resolveRenderProfile(bundle.profileId),
@@ -444,7 +448,7 @@ export const SelectionVisualsMixin = (Base) => class extends Base {
 
     /** What state a member is in. See member-states.js; the signature folds it per member. */
     _memberState(memberKey, visualContext) {
-        return window.KigumiMemberStates.memberStateFor(memberKey, {
+        return KigumiMemberStates.memberStateFor(memberKey, {
             hidden: this.isMemberHidden(memberKey),
             locked: this.isMemberLocked(memberKey),
             visualContext,

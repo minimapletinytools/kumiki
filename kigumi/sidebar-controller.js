@@ -15,9 +15,6 @@ const SIDEBAR_ASSETS = [
     ['__CODICON_CSS_URI__', 'vendor/codicon.css'],
     ['__SIDEBAR_CSS_URI__', 'sidebar/sidebar.css'],
     ['__LIT_JS_URI__', 'vendor/lit.min.js'],
-    ['__I18N_JS_URI__', 'i18n.js'],
-    ['__CONTEXT_MENU_JS_URI__', 'context-menu.js'],
-    ['__SIDEBAR_TREE_JS_URI__', 'sidebar/sidebar-tree.js'],
     ['__SIDEBAR_APP_JS_URI__', 'sidebar/sidebar-app.js'],
 ];
 

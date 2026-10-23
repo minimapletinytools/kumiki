@@ -5,6 +5,7 @@
  */
 
 import { CameraCubeGizmo, DEFAULT_FOOTPRINT_COLOR, DEFAULT_THEME_UI, FOOTPRINT_COLOR_SWATCHES, GeometryMode, OrbitCenterGizmo, THEMES, radialFadeColor, t, vscode } from './viewer-shared.js';
+import * as KigumiPickTolerances from './pick-tolerances.js';
 
 export const RenderingMixin = (Base) => class extends Base {
     setTheme(id) {
@@ -563,7 +564,7 @@ export const RenderingMixin = (Base) => class extends Base {
      * whole canvas, a sheet's views snapped at a fraction of their pixels.
      */
     _pickTolerances(worldPoint, camera, viewHeight) {
-        return window.KigumiPickTolerances.pickTolerances(
+        return KigumiPickTolerances.pickTolerances(
             camera || this.camera, viewHeight || this._getRendererResolution().y, worldPoint);
     }
 

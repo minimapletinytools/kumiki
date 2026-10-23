@@ -5,6 +5,7 @@
  */
 
 import { KigumiMeasurements, MEASUREMENT_ANGLE_RADIUS_PX, MEASUREMENT_CODE_ORIGIN, MEASUREMENT_DRAG_SLOP_PX, MEASUREMENT_OFFSET_PX, MEASUREMENT_SETTLE_MS, THREE_D_MEASUREMENTS_ID, anchorName, describeAnchor, measurementKey, t, vscode } from './viewer-shared.js';
+import * as KigumiFeatureStates from './feature-states.js';
 
 export const MeasuringMixin = (Base) => class extends Base {
 
@@ -81,7 +82,7 @@ export const MeasuringMixin = (Base) => class extends Base {
         return {
             // The same key the selection and the hover name this feature by,
             // so a held end merges with them into one feature state.
-            featureKey: window.KigumiFeatureStates.featureKeyOf({
+            featureKey: KigumiFeatureStates.featureKeyOf({
                 memberKey: message.memberKey || (this.selectionManager.csgFocus || {}).timberKey,
                 path: message.path,
                 featureLabel: message.featureLabel,

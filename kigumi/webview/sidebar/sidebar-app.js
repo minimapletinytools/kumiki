@@ -1,12 +1,15 @@
 import { LitElement, html, nothing } from 'lit';
+import * as KigumiContextMenu from '../context-menu.js';
+import * as KigumiI18n from '../i18n.js';
+import * as KigumiSidebarTree from './sidebar-tree.js';
 
 // The Kigumi explorer page. Renders the tree the host posts (sidebar-model.js)
 // and sends back what the user does. Row logic lives in sidebar-tree.js.
 
-const { visibleRows, highlightParts, collapseAll, keyAction } = window.KigumiSidebarTree;
-const { ContextMenu, menuPosition } = window.KigumiContextMenu;
+const { visibleRows, highlightParts, collapseAll, keyAction } = KigumiSidebarTree;
+const { ContextMenu, menuPosition } = KigumiContextMenu;
 const payload = window.__KIGUMI_INITIAL_PAYLOAD__ || {};
-const t = window.KigumiI18n.createTranslator(payload.i18n && payload.i18n.strings);
+const t = KigumiI18n.createTranslator(payload.i18n && payload.i18n.strings);
 const ROW_ACTIONS = payload.rowActions || {};
 const STATUS_TYPES = new Set(['projectStatusAction', 'kumikiVersionAction', 'kumikiWebsiteAction']);
 

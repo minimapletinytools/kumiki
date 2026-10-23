@@ -1,7 +1,6 @@
 import { html } from 'lit';
-
-const KigumiTags = window.KigumiTags;
-const KigumiUnits = window.KigumiUnits;
+import * as KigumiTags from './tags.js';
+import * as KigumiUnits from './units.js';
 
 /**
  * The member list: every timber and accessory in the frame, as a table.

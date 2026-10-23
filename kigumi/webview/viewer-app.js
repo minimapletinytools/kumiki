@@ -3,7 +3,7 @@ import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
 import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPanel, usePanelRuntime } from './viewer-panels.js';
-import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DRAWING_BETA_ENABLED, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiKiwariValues, KigumiTags, KigumiUnits, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, VIEWER_APP_VERSION, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
+import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DRAWING_BETA_ENABLED, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, VIEWER_APP_VERSION, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
 import { PickingMixin } from './viewer-picking.js';
 import { MeasuringMixin } from './viewer-measuring.js';
 import { MenusMixin } from './viewer-menus.js';
@@ -12,8 +12,19 @@ import { CameraMixin } from './viewer-camera.js';
 import { RenderingMixin } from './viewer-rendering.js';
 import { AssemblyMixin } from './viewer-assembly.js';
 import { DrawingsMixin } from './viewer-drawings.js';
+import * as KigumiContextMenu from './context-menu.js';
+import * as KigumiDrawingOverlays from './drawing-overlays.js';
+import * as KigumiKiwariValues from './kiwari-values.js';
+import * as KigumiMeasureDraft from './measure-draft.js';
+import * as KigumiMemberIdBuffer from './member-id-buffer.js';
+import * as KigumiOverlay from './overlay-header.js';
+import * as KigumiRenderMode from './render-mode.js';
+import * as KigumiUndoStacks from './undo-stacks.js';
+import * as KigumiUnits from './units.js';
+// Defines <kigumi-layers-view>, which the tree page draws.
+import './layers-panel.js';
 
-usePanelRuntime({ t, KigumiUnits: window.KigumiUnits, KigumiKiwariValues: window.KigumiKiwariValues });
+usePanelRuntime({ t, KigumiUnits: KigumiUnits, KigumiKiwariValues: KigumiKiwariValues });
 useSidebarRuntime({ html, t });
 
 class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraMixin(SelectionVisualsMixin(MenusMixin(MeasuringMixin(PickingMixin(LitElement)))))))) {
@@ -60,8 +71,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
         // Making a measurement, and what could be taken back. Both are per
         // viewer; the stacks key themselves by frame and drawing.
-        this.measureDraft = new window.KigumiMeasureDraft.MeasureDraft();
-        this.undoStacks = new window.KigumiUndoStacks.UndoStacks();
+        this.measureDraft = new KigumiMeasureDraft.MeasureDraft();
+        this.undoStacks = new KigumiUndoStacks.UndoStacks();
         /** Lines drawn for the feature a measurement is being taken from. */
         // The eyeball on the 3D measurements node. About looking rather than
         // about the drawing, so deliberately not on the undo stack.
@@ -74,7 +85,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.leftClickDragRotatesCamera = true;
         // What a right-click is offering. One menu for every kind of menu --
         // dismissing, choosing and where it sits are solved once.
-        this.contextMenu = new window.KigumiContextMenu.ContextMenu();
+        this.contextMenu = new KigumiContextMenu.ContextMenu();
         this.showAssemblyTimeline = true;
         this.disassemblyMultiplier = 1.5;
         this.assemblyData = null;
@@ -249,7 +260,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                          aria-expanded=${this.cameraPanelCollapsed ? 'false' : 'true'}
                          @click=${() => this.toggleCameraPanel()}>
                         <span class="ov-title">${t('viewer.chrome.gizmo.camera')}</span>
-                        <span class="ov-chev">${window.KigumiOverlay.ARROWS.right[this.cameraPanelCollapsed ? 'collapsed' : 'open']}</span>
+                        <span class="ov-chev">${KigumiOverlay.ARROWS.right[this.cameraPanelCollapsed ? 'collapsed' : 'open']}</span>
                     </div>
                     <div class="gizmo-body">
                         <canvas id="gizmo-cube-c"></canvas>
@@ -642,9 +653,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.renderer.outputEncoding = THREE.sRGBEncoding;
         // Which member is frontmost at each pixel: what clips a drawing's dotted lines to their own
         // timber. See member-id-buffer.js.
-        this.memberIds = new window.KigumiMemberIdBuffer.MemberIdBuffer({ THREE, renderer: this.renderer });
+        this.memberIds = new KigumiMemberIdBuffer.MemberIdBuffer({ THREE, renderer: this.renderer });
         // A drawing's dotted perfect faces and centerlines, clipped by the id pass. See drawing-overlays.js.
-        this.drawingOverlays = new window.KigumiDrawingOverlays.DrawingOverlays({
+        this.drawingOverlays = new KigumiDrawingOverlays.DrawingOverlays({
             THREE, memberIds: this.memberIds, resolution: this._getRendererResolution() });
         this.renderer.shadowMap.enabled = false;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -943,7 +954,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
      * back out.
      */
     applyRenderMode() {
-        const mode = window.KigumiRenderMode.renderModeFor({
+        const mode = KigumiRenderMode.renderModeFor({
             page: this.sceneStore.activeScene().page,
             shadowsEnabled: this.shadowsEnabled,
             reflectionsEnabled: this.reflectionsEnabled,
@@ -2257,7 +2268,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         // timeline marks above are positioned this way instead.
         const menu = this.querySelector('#member-context-menu');
         if (menu) {
-            const at = window.KigumiContextMenu.menuPosition(
+            const at = KigumiContextMenu.menuPosition(
                 { x: Number(menu.dataset.x), y: Number(menu.dataset.y) },
                 { width: menu.offsetWidth, height: menu.offsetHeight },
                 { width: window.innerWidth, height: window.innerHeight },

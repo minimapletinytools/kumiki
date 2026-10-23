@@ -5,6 +5,7 @@
  */
 
 import { DEBUG_DRAWING_SCENE_ID, DEFAULT_SCENE_ID, DrawingPanel, KigumiMeasurements, anchorName, describeAnchor, measurementKey, pageScreenRect, panPage, rectAspect, sceneMembers, vscode, zoomPageAt } from './viewer-shared.js';
+import { SELECTION_MODES } from './selection-store.js';
 
 export const DrawingsMixin = (Base) => class extends Base {
     /** The members this scene is about, or null when it is about all of them. */
@@ -132,8 +133,8 @@ export const DrawingsMixin = (Base) => class extends Base {
         this.clearHover();
         this.selectionManager.setMode(
             this.isInDrawing
-                ? window.SELECTION_MODES.DRAWING
-                : window.SELECTION_MODES.MODEL);
+                ? SELECTION_MODES.DRAWING
+                : SELECTION_MODES.MODEL);
         // A drawing is of the frame assembled. Scrubbed apart in 3D, it goes
         // back together on the way in, and stays so when you come back out.
         if (this.isInDrawing) {

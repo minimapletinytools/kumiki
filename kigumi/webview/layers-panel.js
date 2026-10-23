@@ -1,1427 +1,1419 @@
-(function (globalScope) {
-    // The reserved drawing that holds the 3D view's measurements. Not a drawing
-    // you open -- see .claude/plans/measurement-spec.md.
-    const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
+import * as KigumiI18n from './i18n.js';
+import * as KigumiMeasurements from './measurements.js';
+import * as KigumiOverlay from './overlay-header.js';
+import * as TagIndex from './tag-index.js';
+import * as KigumiTags from './tags.js';
+import { CsgTreeView } from './csg-tree-view.js';
+import { LayerStateStore } from './layer-state-store.js';
 
-    // LayersPanel renders a collapsible overlay tree on the left edge of the viewport.
-    // It syncs bidirectionally with SelectionStore: canvas clicks highlight the
-    // corresponding row, and clicking a row updates the canvas selection.
-    const _i18nStrings = (globalScope.__KIGUMI_INITIAL_PAYLOAD__
-        && globalScope.__KIGUMI_INITIAL_PAYLOAD__.i18n
-        && globalScope.__KIGUMI_INITIAL_PAYLOAD__.i18n.strings) || {};
-    const t = globalScope.KigumiI18n
-        ? globalScope.KigumiI18n.createTranslator(_i18nStrings)
-        : (key) => key;
-    // The model behind the embedded CSG trees. viewer.html loads it ahead of
-    // this file; capturing it here makes that ordering a stated dependency
-    // rather than something the rows happen to get away with at click time.
-    const CsgTreeView = globalScope.CsgTreeView;
-    // Tags arrive as {kind, name}; viewer.html loads these ahead of us.
-    const KigumiTags = globalScope.KigumiTags;
-    const TagIndex = globalScope.TagIndex;
-    const { overlayHeader } = globalScope.KigumiOverlay
-        || (typeof require === 'function' ? require('./overlay-header') : {});
+// The reserved drawing that holds the 3D view's measurements. Not a drawing
+// you open -- see .claude/plans/measurement-spec.md.
+const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
 
-    // CSG rows indent from where the member rows leave off (.lp-depth-0 is
-    // 18px), one step per level. The old 10px step started shallower than the
-    // timber row above it, so a tree read as a sibling of its own timber.
-    const CSG_INDENT_BASE_PX = 18;
-    const CSG_INDENT_STEP_PX = 14;
-    // What .lp-depth-0 / .lp-depth-1 / .lp-depth-2 indent member rows by, kept
-    // here so the guard test can check CSG rows nest deeper than their parent.
-    const MEMBER_ROW_INDENT_PX = [18, 22, 34];
+// LayersPanel renders a collapsible overlay tree on the left edge of the viewport.
+// It syncs bidirectionally with SelectionStore: canvas clicks highlight the
+// corresponding row, and clicking a row updates the canvas selection.
+const _i18nStrings = (globalThis.__KIGUMI_INITIAL_PAYLOAD__
+    && globalThis.__KIGUMI_INITIAL_PAYLOAD__.i18n
+    && globalThis.__KIGUMI_INITIAL_PAYLOAD__.i18n.strings) || {};
+const t = KigumiI18n.createTranslator(_i18nStrings);
+const { overlayHeader } = KigumiOverlay;
 
-    function csgIndentPx(depth) {
-        return CSG_INDENT_BASE_PX + depth * CSG_INDENT_STEP_PX;
+// CSG rows indent from where the member rows leave off (.lp-depth-0 is
+// 18px), one step per level. The old 10px step started shallower than the
+// timber row above it, so a tree read as a sibling of its own timber.
+const CSG_INDENT_BASE_PX = 18;
+const CSG_INDENT_STEP_PX = 14;
+// What .lp-depth-0 / .lp-depth-1 / .lp-depth-2 indent member rows by, kept
+// here so the guard test can check CSG rows nest deeper than their parent.
+const MEMBER_ROW_INDENT_PX = [18, 22, 34];
+
+function csgIndentPx(depth) {
+    return CSG_INDENT_BASE_PX + depth * CSG_INDENT_STEP_PX;
+}
+
+class LayersPanel {
+    constructor(selectionManager, layerStateStore) {
+        this.selectionManager = selectionManager;
+        this.layerStateStore = layerStateStore;
+        this.hierarchy = null;
+        this.collapsed = false;
+        // Default: top-level sections open, individual nodes closed
+        this.expandedNodes = new Set(['section:timbers', 'section:joints']);
+        // Per-timber CSG payloads, fetched lazily when a row is expanded.
+        this.csgTreesByKey = new Map();
+        this.requestedCsgTrees = new Set();
+        this._pendingReveal = null;
+        this._focusedCsgNodeId = null;
+        this.filterText = '';
+        this.tagIndex = [];
+        this.tagEntriesById = new Map();
+        this.el = null;
+        // Where the tree is scrolled to. The tree is wiped and rebuilt on
+        // every change, and emptying a scroll container puts it back at the
+        // top, so the place has to outlive the rows.
+        this._treeScrollTop = 0;
+        // Which row has been scrolled into view, so a rebuild does not do
+        // it again. See _reveal.
+        this._revealedNodeId = null;
+        // Drawings, and which of them is open. Set by the viewer; the panel
+        // keeps no list of its own to fall out of step.
+        this.drawings = [];
+        /** Whether a drawing is open: the 3D measurements section hides then. */
+        this.inDrawing = false;
+        this.measurementsHidden = false;
+        this.activeSceneId = null;
+        this.drawingsEnabled = false;
+        this.viewport = null;
+        this._unsubSelection = null;
+        this._unsubLayerState = null;
+        this._onPanelWheel = this._onPanelWheel.bind(this);
     }
 
-    class LayersPanel {
-        constructor(selectionManager, layerStateStore) {
-            this.selectionManager = selectionManager;
-            this.layerStateStore = layerStateStore;
-            this.hierarchy = null;
-            this.collapsed = false;
-            // Default: top-level sections open, individual nodes closed
-            this.expandedNodes = new Set(['section:timbers', 'section:joints']);
-            // Per-timber CSG payloads, fetched lazily when a row is expanded.
-            this.csgTreesByKey = new Map();
-            this.requestedCsgTrees = new Set();
-            this._pendingReveal = null;
-            this._focusedCsgNodeId = null;
-            this.filterText = '';
-            this.tagIndex = [];
-            this.tagEntriesById = new Map();
-            this.el = null;
-            // Where the tree is scrolled to. The tree is wiped and rebuilt on
-            // every change, and emptying a scroll container puts it back at the
-            // top, so the place has to outlive the rows.
-            this._treeScrollTop = 0;
-            // Which row has been scrolled into view, so a rebuild does not do
-            // it again. See _reveal.
-            this._revealedNodeId = null;
-            // Drawings, and which of them is open. Set by the viewer; the panel
-            // keeps no list of its own to fall out of step.
-            this.drawings = [];
-            /** Whether a drawing is open: the 3D measurements section hides then. */
-            this.inDrawing = false;
-            this.measurementsHidden = false;
-            this.activeSceneId = null;
-            this.drawingsEnabled = false;
-            this.viewport = null;
-            this._unsubSelection = null;
-            this._unsubLayerState = null;
-            this._onPanelWheel = this._onPanelWheel.bind(this);
-        }
+    mount(viewport) {
+        this.viewport = viewport;
+        this.el = document.createElement('div');
+        this.el.id = 'layers-panel';
+        this.el.addEventListener('wheel', this._onPanelWheel, { passive: false });
+        // No browser menu (cut, copy, paste) over the tree: a row with a menu opens its own.
+        this.el.addEventListener('contextmenu', (event) => event.preventDefault());
+        viewport.insertBefore(this.el, viewport.firstChild);
+        this._render();
 
-        mount(viewport) {
-            this.viewport = viewport;
-            this.el = document.createElement('div');
-            this.el.id = 'layers-panel';
-            this.el.addEventListener('wheel', this._onPanelWheel, { passive: false });
-            // No browser menu (cut, copy, paste) over the tree: a row with a menu opens its own.
-            this.el.addEventListener('contextmenu', (event) => event.preventDefault());
-            viewport.insertBefore(this.el, viewport.firstChild);
-            this._render();
-
-            this._unsubSelection = this.selectionManager.onSelectionChanged(() => {
-                if (!this.selectionManager.csgFocus) {
-                    this._focusedCsgNodeId = null;
-                }
-                this._syncHighlight();
-            });
-            this._unsubLayerState = this.layerStateStore.onStateChanged(() => {
-                this._updateStateIcons();
-            });
-        }
-
-        setHierarchy(hierarchy) {
-            this.hierarchy = hierarchy || { timbers: [], joints: [] };
-            // A frame seen for the first time opens the way the top-level sections do;
-            // one already seen keeps however it was left.
-            this._seenFrameSections = this._seenFrameSections || new Set();
-            (this._frames() || []).forEach((frame, index) => {
-                const id = 'section:' + this._frameSectionId(index);
-                if (!this._seenFrameSections.has(id)) {
-                    this._seenFrameSections.add(id);
-                    for (const open of [id, id + ':timbers', id + ':joints']) {
-                        this.expandedNodes.add(open);
-                    }
-                }
-            });
-            this.tagIndex = TagIndex.buildTagIndex(this.hierarchy);
-            this.tagEntriesById = new Map(this.tagIndex.map((entry) => [entry.id, entry]));
-            // New frame data means the cached CSG could be stale -- an edit to
-            // the source is exactly when the tree changes shape -- so it is
-            // dropped and refetched on the next expand rather than shown as if
-            // it still described the model on screen.
-            this.csgTreesByKey.clear();
-            this.requestedCsgTrees.clear();
-            const allKeys = [
-                ...this.hierarchy.timbers.map(t => t.key),
-                ...(this.hierarchy.joints || []).flatMap(j => [...(j.timberKeys || []), ...(j.accessoryKeys || [])]),
-            ];
-            this.layerStateStore.pruneKeys(allKeys);
-            this._render();
-        }
-
-        destroy() {
-            if (this._unsubSelection) this._unsubSelection();
-            if (this._unsubLayerState) this._unsubLayerState();
-            if (this.el) {
-                this.el.removeEventListener('wheel', this._onPanelWheel);
+        this._unsubSelection = this.selectionManager.onSelectionChanged(() => {
+            if (!this.selectionManager.csgFocus) {
+                this._focusedCsgNodeId = null;
             }
-            if (this.el && this.el.parentNode) this.el.parentNode.removeChild(this.el);
-            this.el = null;
-        }
-
-        _onPanelWheel(event) {
-            if (!this.el || this.collapsed) {
-                return;
-            }
-            const tree = this.el.querySelector('.lp-tree');
-            if (!tree) {
-                return;
-            }
-
-            // Keep wheel interaction local to layers so viewport wheel-zoom doesn't fire.
-            tree.scrollTop += event.deltaY;
-            event.preventDefault();
-            event.stopPropagation();
-        }
-
-        // ------------------------------------------------------------------
-        // Filter helpers
-        // ------------------------------------------------------------------
-
-        _matchesFilter(name, tags) {
-            const q = this.filterText.trim().toLowerCase();
-            if (!q) return true;
-            if (name && name.toLowerCase().includes(q)) return true;
-            if (tags && tags.some((tag) => tag.name.toLowerCase().includes(q))) return true;
-            return false;
-        }
-
-        // ------------------------------------------------------------------
-        // Rendering
-        // ------------------------------------------------------------------
-
-        _render() {
-            if (!this.el) return;
-            this._rememberTreeScroll();
-            this.el.innerHTML = '';
-            this.el.className = 'lp-panel ' + (this.collapsed ? 'lp-collapsed' : 'lp-expanded');
-            if (this.viewport) {
-                this.viewport.classList.toggle('lp-open', !this.collapsed);
-            }
-
-            const header = overlayHeader(t('viewer.layers.header'), {
-                collapsed: this.collapsed,
-                onToggle: () => {
-                    this.collapsed = !this.collapsed;
-                    this._render();
-                },
-                doc: document,
-            });
-            header.title = this.collapsed ? t('viewer.layers.expand.title') : t('viewer.layers.collapse.title');
-            this.el.appendChild(header);
-
-            if (this.collapsed) {
-                // The tree went with the wipe. Left set, it would be a detached
-                // element later renders drew into and nobody saw.
-                this._treeEl = null;
-                return;
-            }
-
-            // Search input
-            const filterBar = document.createElement('div');
-            filterBar.className = 'lp-filter-bar';
-            const filterInput = document.createElement('input');
-            filterInput.className = 'lp-filter-input';
-            filterInput.type = 'text';
-            filterInput.placeholder = t('viewer.layers.search.placeholder');
-            filterInput.value = this.filterText;
-            filterInput.addEventListener('input', (e) => {
-                this.filterText = e.target.value;
-                this._renderTree();
-            });
-            filterBar.appendChild(filterInput);
-            this.el.appendChild(filterBar);
-
-            this._treeEl = document.createElement('div');
-            this._treeEl.className = 'lp-tree';
-            this.el.appendChild(this._treeEl);
-
-            this._footerEl = document.createElement('div');
-            this._footerEl.className = 'lp-footer';
-            this.el.appendChild(this._footerEl);
-
-            this._renderTree();
-            this._renderFooter();
-        }
-
-        _renderTree() {
-            if (!this._treeEl) return;
-            this._rememberTreeScroll();
-            this._treeEl.innerHTML = '';
-            const frames = this._frames();
-            // With several frames, a drawing of one frame's timbers goes under that frame;
-            // only one that spans frames, or has none, is listed up here.
-            const strayDrawings = frames
-                ? (this.drawings || []).filter((drawing) => this._drawingFrameIndex(drawing) < 0)
-                : null;
-            if (this.drawingsEnabled) {
-                // No save button here. Saving is offered in the drawing panel,
-                // beside the drawing being saved; two of them is two places to
-                // look and one to forget to update.
-                this._renderSection(
-                    this._treeEl, 'drawings', t('viewer.layers.section.drawings'),
-                    () => this._buildDrawingRows(frames ? (drawing) => strayDrawings.includes(drawing) : null),
-                );
-            }
-            this._renderSection(this._treeEl, 'tags', t('viewer.layers.section.tags'), () => this._buildTagRows());
-            if (frames) {
-                frames.forEach((frame, index) => this._renderSection(
-                    this._treeEl, this._frameSectionId(index), '\u{1F3E0} ' + frame.name,
-                    () => this._buildFrameSections(frame, index),
-                ));
-            } else {
-                this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
-                this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
-            }
-            // Last, and only in the 3D view. These measurements are about the
-            // model rather than about any drawing of it, so inside a drawing
-            // they are neither shown nor drawable -- which is why this is the
-            // one section that comes and goes with the scene.
-            if (this.drawingsEnabled && !this.inDrawing) {
-                this._renderSection(
-                    this._treeEl, 'measurements', t('viewer.layers.section.measurements'),
-                    () => this._buildThreeDMeasurementRows(),
-                    () => this._makeMeasurementsEyeButton(),
-                );
-            }
-            // Before the highlight, which may scroll to reveal a row: put the
-            // reader back where they were first, then let a reveal move from
-            // there. Done the other way round, a reveal would be undone.
-            this._treeEl.scrollTop = this._treeScrollTop;
             this._syncHighlight();
-        }
+        });
+        this._unsubLayerState = this.layerStateStore.onStateChanged(() => {
+            this._updateStateIcons();
+        });
+    }
 
-        /**
-         * Note where the tree is scrolled to, for the rebuild about to wipe it.
-         *
-         * Pulled from the element at the one moment it matters -- just before
-         * the rows go -- rather than tracked on every scroll event.
-         *
-         * A tree with no rows has no position worth keeping. That is the empty
-         * one _render() has just built, and taking its 0 would throw away the
-         * place we are about to return to.
-         */
-        _rememberTreeScroll() {
-            if (this._treeEl && this._treeEl.children.length) {
-                this._treeScrollTop = this._treeEl.scrollTop;
-            }
-        }
-
-        // ------------------------------------------------------------------
-        // Several frames: each its own section, holding its drawings, timbers and joints
-        // ------------------------------------------------------------------
-
-        /** The file's frames when it shows more than one, else null. */
-        _frames() {
-            const frames = this.hierarchy && this.hierarchy.frames;
-            return Array.isArray(frames) && frames.length > 1 ? frames : null;
-        }
-
-        _frameSectionId(index) {
-            const frames = this._frames();
-            return 'frame:' + index + ':' + (frames ? frames[index].name : '');
-        }
-
-        /** The one frame *drawing*'s timbers are from, or -1 when they are from several, or none. */
-        _drawingFrameIndex(drawing) {
-            const frames = this._frames();
-            if (!frames || !drawing) {
-                return -1;
-            }
-            const members = Array.isArray(drawing.members) && drawing.members.length
-                ? drawing.members
-                : (drawing.viewports || []).flatMap((pane) => pane.members || []);
-            if (!members.length) {
-                return -1;
-            }
-            const involved = frames
-                .map((frame, index) => (members.some((key) => frame.timberKeys.includes(key)) ? index : -1))
-                .filter((index) => index >= 0);
-            return involved.length === 1 ? involved[0] : -1;
-        }
-
-        /** Which frame *timberKey* or *jointId* is in, or -1. */
-        _frameIndexOf({ timberKey, jointId }) {
-            const frames = this._frames();
-            if (!frames) {
-                return -1;
-            }
-            return frames.findIndex((frame) => (jointId !== undefined && jointId !== null
-                ? frame.jointIds.includes(String(jointId))
-                : frame.timberKeys.includes(timberKey)));
-        }
-
-        /** The sections inside one frame's, as rows of its body. */
-        _buildFrameSections(frame, index) {
-            const body = document.createElement('div');
-            body.className = 'lp-frame-body';
-            const id = this._frameSectionId(index);
-            if (this.drawingsEnabled) {
-                const drawings = (this.drawings || []).filter((drawing) => this._drawingFrameIndex(drawing) === index);
-                if (drawings.length) {
-                    this._renderSection(body, id + ':drawings', t('viewer.layers.section.drawings'),
-                        () => this._buildDrawingRows((drawing) => drawings.includes(drawing)));
+    setHierarchy(hierarchy) {
+        this.hierarchy = hierarchy || { timbers: [], joints: [] };
+        // A frame seen for the first time opens the way the top-level sections do;
+        // one already seen keeps however it was left.
+        this._seenFrameSections = this._seenFrameSections || new Set();
+        (this._frames() || []).forEach((frame, index) => {
+            const id = 'section:' + this._frameSectionId(index);
+            if (!this._seenFrameSections.has(id)) {
+                this._seenFrameSections.add(id);
+                for (const open of [id, id + ':timbers', id + ':joints']) {
+                    this.expandedNodes.add(open);
                 }
             }
-            const timberKeys = new Set(frame.timberKeys);
-            const jointIds = new Set(frame.jointIds);
-            this._renderSection(body, id + ':timbers', t('viewer.layers.section.timbers'),
-                () => this._buildTimberRows(timberKeys));
-            this._renderSection(body, id + ':joints', t('viewer.layers.section.joints'),
-                () => this._buildJointRows(jointIds));
-            return [body];
+        });
+        this.tagIndex = TagIndex.buildTagIndex(this.hierarchy);
+        this.tagEntriesById = new Map(this.tagIndex.map((entry) => [entry.id, entry]));
+        // New frame data means the cached CSG could be stale -- an edit to
+        // the source is exactly when the tree changes shape -- so it is
+        // dropped and refetched on the next expand rather than shown as if
+        // it still described the model on screen.
+        this.csgTreesByKey.clear();
+        this.requestedCsgTrees.clear();
+        const allKeys = [
+            ...this.hierarchy.timbers.map(t => t.key),
+            ...(this.hierarchy.joints || []).flatMap(j => [...(j.timberKeys || []), ...(j.accessoryKeys || [])]),
+        ];
+        this.layerStateStore.pruneKeys(allKeys);
+        this._render();
+    }
+
+    destroy() {
+        if (this._unsubSelection) this._unsubSelection();
+        if (this._unsubLayerState) this._unsubLayerState();
+        if (this.el) {
+            this.el.removeEventListener('wheel', this._onPanelWheel);
+        }
+        if (this.el && this.el.parentNode) this.el.parentNode.removeChild(this.el);
+        this.el = null;
+    }
+
+    _onPanelWheel(event) {
+        if (!this.el || this.collapsed) {
+            return;
+        }
+        const tree = this.el.querySelector('.lp-tree');
+        if (!tree) {
+            return;
         }
 
-        _renderSection(parent, sectionId, title, buildRows, buildAction) {
-            const nodeId = 'section:' + sectionId;
-            // Built whether or not the section is open, to know whether there is anything in it:
-            // an empty section is greyed and cannot be opened.
-            const rows = Array.from(buildRows());
-            const empty = rows.length === 0;
-            const expanded = !empty && this.expandedNodes.has(nodeId);
+        // Keep wheel interaction local to layers so viewport wheel-zoom doesn't fire.
+        tree.scrollTop += event.deltaY;
+        event.preventDefault();
+        event.stopPropagation();
+    }
 
-            const section = document.createElement('div');
-            section.className = 'lp-section';
+    // ------------------------------------------------------------------
+    // Filter helpers
+    // ------------------------------------------------------------------
 
-            const sectionHeader = document.createElement('div');
-            sectionHeader.className = 'lp-section-header' + (expanded ? ' lp-open' : '')
-                + (empty ? ' lp-section-empty' : '');
-            const chevSpan = document.createElement('span');
-            chevSpan.className = 'lp-chev';
-            chevSpan.textContent = empty ? '' : (expanded ? '▾' : '▸');
-            sectionHeader.appendChild(chevSpan);
-            const titleSpan = document.createElement('span');
-            titleSpan.textContent = ' ' + title;
-            sectionHeader.appendChild(titleSpan);
-            if (typeof buildAction === 'function') {
-                const action = buildAction();
-                if (action) {
-                    sectionHeader.appendChild(action);
-                }
-            }
-            if (!empty) {
-                sectionHeader.addEventListener('click', () => {
-                    this._toggle(nodeId);
-                });
-            }
-            section.appendChild(sectionHeader);
+    _matchesFilter(name, tags) {
+        const q = this.filterText.trim().toLowerCase();
+        if (!q) return true;
+        if (name && name.toLowerCase().includes(q)) return true;
+        if (tags && tags.some((tag) => tag.name.toLowerCase().includes(q))) return true;
+        return false;
+    }
 
-            if (expanded) {
-                const body = document.createElement('div');
-                body.className = 'lp-section-body';
-                for (const row of rows) {
-                    body.appendChild(row);
-                }
-                section.appendChild(body);
-            }
+    // ------------------------------------------------------------------
+    // Rendering
+    // ------------------------------------------------------------------
 
-            parent.appendChild(section);
+    _render() {
+        if (!this.el) return;
+        this._rememberTreeScroll();
+        this.el.innerHTML = '';
+        this.el.className = 'lp-panel ' + (this.collapsed ? 'lp-collapsed' : 'lp-expanded');
+        if (this.viewport) {
+            this.viewport.classList.toggle('lp-open', !this.collapsed);
         }
 
-        _makeRow(opts) {
-            const { nodeId, rowType, depth, label, hasChildren, selectNode, memberKey } = opts;
-            const expanded = hasChildren && this.expandedNodes.has(nodeId);
+        const header = overlayHeader(t('viewer.layers.header'), {
+            collapsed: this.collapsed,
+            onToggle: () => {
+                this.collapsed = !this.collapsed;
+                this._render();
+            },
+            doc: document,
+        });
+        header.title = this.collapsed ? t('viewer.layers.expand.title') : t('viewer.layers.collapse.title');
+        this.el.appendChild(header);
 
-            const row = document.createElement('div');
-            row.className = 'lp-row lp-row-' + rowType + ' lp-depth-' + depth;
-            row.dataset.nodeId = nodeId;
-            if (memberKey) row.dataset.memberKey = memberKey;
-
-            if (memberKey && (rowType === 'timber' || rowType === 'jointMember')) {
-                row.addEventListener('contextmenu', (event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    row.dispatchEvent(new CustomEvent('kigumi-member-contextmenu', {
-                        detail: { memberKey, clientX: event.clientX, clientY: event.clientY },
-                        bubbles: true,
-                        composed: true,
-                    }));
-                });
-            } else if (selectNode && selectNode.type === 'joint') {
-                this._offerCopy(row, {
-                    kind: 'joint', name: label, jointId: selectNode.jointId, timberKeys: selectNode.timberKeys,
-                });
-            }
-
-            // Chevron / expand control
-            const chev = document.createElement('span');
-            chev.className = 'lp-chev' + (hasChildren ? ' lp-has-children' : ' lp-leaf');
-            chev.textContent = hasChildren ? (expanded ? '▾' : '▸') : '';
-            if (hasChildren) {
-                chev.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this._toggle(nodeId);
-                });
-            }
-            row.appendChild(chev);
-
-            const labelEl = document.createElement('span');
-            labelEl.className = 'lp-label';
-            labelEl.textContent = label;
-            row.appendChild(labelEl);
-
-            // Lock / hide icon buttons (only for member-level rows)
-            if (memberKey) {
-                const icons = document.createElement('span');
-                icons.className = 'lp-icons';
-
-                const lockBtn = document.createElement('button');
-                lockBtn.className = 'lp-icon-btn lp-btn-lock';
-                lockBtn.dataset.action = 'lock';
-                lockBtn.title = t('viewer.layers.lock.title');
-                lockBtn.textContent = '🔒';
-                lockBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.layerStateStore.toggleLocked(memberKey);
-                });
-                icons.appendChild(lockBtn);
-
-                const hideBtn = document.createElement('button');
-                hideBtn.className = 'lp-icon-btn lp-btn-hide';
-                hideBtn.dataset.action = 'hide';
-                hideBtn.title = t('viewer.layers.hide.title');
-                hideBtn.textContent = '👁';
-                hideBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.layerStateStore.toggleHidden(memberKey);
-                });
-                icons.appendChild(hideBtn);
-
-                row.appendChild(icons);
-            }
-
-            if (selectNode) {
-                row.classList.add('lp-selectable');
-                row.addEventListener('click', (event) => {
-                    if (memberKey && this.layerStateStore.isLocked(memberKey)) {
-                        return;
-                    }
-                    this._applySelection(selectNode, !!event.shiftKey);
-                });
-            }
-
-            return row;
+        if (this.collapsed) {
+            // The tree went with the wipe. Left set, it would be a detached
+            // element later renders drew into and nobody saw.
+            this._treeEl = null;
+            return;
         }
 
-        /** Apply a row click to the selection store. */
-        _applySelection(node, additive) {
-            const selection = this.selectionManager;
-            if (node.type === 'timber' || node.type === 'accessory') {
-                if (additive) {
-                    selection.toggleTimber(node.key);
-                } else {
-                    selection.selectTimber(node.key, false);
-                }
-                return;
-            }
-            if (node.type === 'joint') {
-                selection.selectJoint(node.jointId, node.timberKeys || [], additive);
-                return;
-            }
-            if (node.type === 'tag') {
-                selection.selectTimbers(node.memberKeys || [], additive);
-            }
+        // Search input
+        const filterBar = document.createElement('div');
+        filterBar.className = 'lp-filter-bar';
+        const filterInput = document.createElement('input');
+        filterInput.className = 'lp-filter-input';
+        filterInput.type = 'text';
+        filterInput.placeholder = t('viewer.layers.search.placeholder');
+        filterInput.value = this.filterText;
+        filterInput.addEventListener('input', (e) => {
+            this.filterText = e.target.value;
+            this._renderTree();
+        });
+        filterBar.appendChild(filterInput);
+        this.el.appendChild(filterBar);
+
+        this._treeEl = document.createElement('div');
+        this._treeEl.className = 'lp-tree';
+        this.el.appendChild(this._treeEl);
+
+        this._footerEl = document.createElement('div');
+        this._footerEl.className = 'lp-footer';
+        this.el.appendChild(this._footerEl);
+
+        this._renderTree();
+        this._renderFooter();
+    }
+
+    _renderTree() {
+        if (!this._treeEl) return;
+        this._rememberTreeScroll();
+        this._treeEl.innerHTML = '';
+        const frames = this._frames();
+        // With several frames, a drawing of one frame's timbers goes under that frame;
+        // only one that spans frames, or has none, is listed up here.
+        const strayDrawings = frames
+            ? (this.drawings || []).filter((drawing) => this._drawingFrameIndex(drawing) < 0)
+            : null;
+        if (this.drawingsEnabled) {
+            // No save button here. Saving is offered in the drawing panel,
+            // beside the drawing being saved; two of them is two places to
+            // look and one to forget to update.
+            this._renderSection(
+                this._treeEl, 'drawings', t('viewer.layers.section.drawings'),
+                () => this._buildDrawingRows(frames ? (drawing) => strayDrawings.includes(drawing) : null),
+            );
         }
-
-        _buildTagRows() {
-            return this.tagIndex
-                .filter((entry) => this._matchesFilter(entry.name))
-                .map((entry) => this._makeTagRow(entry));
-        }
-
-        /**
-         * Where a drawing came from, as one mark.
-         *
-         * The fill reads as how much of it comes from the drawings file: none,
-         * some, all. Origin and saved-ness are separate things, so they get
-         * separate marks -- crossing them into four glyphs would be a legend to
-         * memorize, and would not survive a third source ever turning up.
-         */
-        _originMark(origin) {
-            if (origin === 'code') {
-                return { glyph: '\u25cb', title: t('viewer.layers.drawing.fromCode') };
-            }
-            if (origin === 'overridden') {
-                return { glyph: '\u25d0', title: t('viewer.layers.drawing.overridden') };
-            }
-            return { glyph: '\u25cf', title: t('viewer.layers.drawing.fromFile') };
-        }
-
-        _buildDrawingRows(include = null) {
-            return (this.drawings || [])
-                .filter((drawing) => !include || include(drawing))
-                // The 3D measurements are held in a drawing so that the file
-                // merge, saving and identity all apply to them unchanged -- but
-                // it is not a drawing you open, and listing it among the ones
-                // you do would offer to enter a sheet that does not exist. It
-                // gets a section of its own below.
-                .filter((drawing) => drawing.id !== THREE_D_MEASUREMENTS_ID)
-                .filter((drawing) => this._matchesFilter(drawing.name || drawing.id))
-                .map((drawing) => this._makeDrawingRow(drawing));
-        }
-
-        /** The measurements held against the model rather than against a drawing. */
-        _threeDMeasurements() {
-            const drawing = (this.drawings || [])
-                .find((one) => one.id === THREE_D_MEASUREMENTS_ID);
-            if (!drawing) {
-                return [];
-            }
-            // Carrying which viewport it is on, since selecting one needs both
-            // that and its key -- the same pair every other measurement row
-            // hands back.
-            return (drawing.viewports || []).flatMap((pane) => (pane.measurements || [])
-                .map((measure) => ({ ...measure, viewportId: pane.id })));
-        }
-
-        _buildThreeDMeasurementRows() {
-            return this._threeDMeasurements()
-                .map((measure, index) => this._makeThreeDMeasurementRow(measure, index))
-                .filter(Boolean);
-        }
-
-        /** One 3D measurement: what it is between. */
-        _makeThreeDMeasurementRow(measure, index) {
-            const between = [measure.a, measure.b]
-                .map((anchor) => (anchor && anchor.feature) || (anchor && anchor.timber) || '?')
-                .join(' / ');
-            if (!this._matchesFilter(between)) {
-                return null;
-            }
-            // Broken here means the reference no longer finds a feature -- a
-            // renamed face, a timber that has gone. The runner says so when it
-            // resolves, so no camera is needed to tell. The view-dependent
-            // refusals cannot arise: these belong to no viewport.
-            const broken = Boolean(measure.unresolved);
-            const deleted = globalScope.KigumiMeasurements.isDeleted(measure);
-            const row = document.createElement('div');
-            row.className = 'lp-row lp-row-measurement lp-depth-0 lp-selectable'
-                + (broken ? ' lp-broken' : '')
-                + (deleted ? ' lp-deleted' : '');
-            row.dataset.nodeId = 'measurement:' + index;
-
-            const chev = document.createElement('span');
-            chev.className = 'lp-chev lp-leaf';
-            row.appendChild(chev);
-
-            const name = document.createElement('span');
-            name.className = 'lp-name';
-            name.textContent = between;
-            name.title = broken
-                ? t('viewer.layers.measurement.unresolved')
-                : between;
-            row.appendChild(name);
-            if (broken) {
-                // Said as well as coloured. Colour alone is not a reason, and
-                // is not available to everyone reading it.
-                const why = document.createElement('span');
-                why.className = 'lp-broken-note';
-                why.textContent = t('viewer.drawing.refused.unresolved');
-                row.appendChild(why);
-            }
-            row.addEventListener('click', (event) => this._emit(
-                'kigumi-focus-measurement', {
-                    viewportId: measure.viewportId || null,
-                    measureKey: globalScope.KigumiMeasurements.measurementKey(measure),
-                    add: Boolean(event.shiftKey),
-                }));
-            if (deleted) {
-                // Greyed, and put back from a right-click: it is the code's, deleted in the file.
-                name.title = t('viewer.drawing.deleted');
-            }
-            // Copied for an assistant from a right-click, and put back from one if deleted.
-            row.addEventListener('contextmenu', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                this._emit('kigumi-measurement-contextmenu', {
-                    viewportId: measure.viewportId || null,
-                    measureKey: globalScope.KigumiMeasurements.measurementKey(measure),
-                    clientX: event.clientX, clientY: event.clientY,
-                });
-            });
-            return row;
-        }
-
-        /** The eyeball on the 3D measurements section: all of them, or none. */
-        _makeMeasurementsEyeButton() {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'lp-section-action';
-            button.textContent = this.measurementsHidden ? '\u25cb' : '\u25c9';
-            button.title = this.measurementsHidden
-                ? t('viewer.layers.measurements.show.title')
-                : t('viewer.layers.measurements.hide.title');
-            button.addEventListener('click', (event) => {
-                event.stopPropagation();
-                this._emit('kigumi-toggle-measurements', { hidden: !this.measurementsHidden });
-            });
-            return button;
-        }
-
-        /** One drawing: where it came from, what it is called, and whether it is saved. */
-        _makeDrawingRow(drawing) {
-            const active = drawing.id === this.activeSceneId;
-            const row = document.createElement('div');
-            row.className = 'lp-row lp-row-drawing lp-depth-0 lp-selectable'
-                + (active ? ' lp-row-active-drawing' : '');
-            row.dataset.nodeId = 'drawing:' + drawing.id;
-            row.title = t('viewer.layers.drawing.open.title');
-
-            const chev = document.createElement('span');
-            chev.className = 'lp-chev lp-leaf';
-            row.appendChild(chev);
-
-            const mark = this._originMark(drawing.origin);
-            const origin = document.createElement('span');
-            origin.className = 'lp-drawing-origin';
-            origin.textContent = mark.glyph;
-            origin.title = mark.title;
-            row.appendChild(origin);
-
-            const name = document.createElement('span');
-            name.className = 'lp-drawing-name';
-            name.textContent = drawing.name || drawing.id;
-            row.appendChild(name);
-
-            // The convention an editor uses for a modified tab, for the same
-            // reason: it says there is something to save without saying more.
-            const unsaved = document.createElement('span');
-            unsaved.className = 'lp-drawing-unsaved';
-            unsaved.textContent = drawing.dirty ? '\u2022' : '';
-            unsaved.title = drawing.dirty ? t('viewer.layers.drawing.unsaved') : '';
-            row.appendChild(unsaved);
-
-            row.addEventListener('click', () => {
-                this._emit('kigumi-enter-drawing', { sceneId: drawing.id });
-            });
-
-            return row;
-        }
-
-        /** One tag: its kind as a colour, its name, and how many wear it. */
-        _makeTagRow(entry) {
-            const row = document.createElement('div');
-            row.className = 'lp-row lp-row-tag lp-depth-0 lp-selectable';
-            row.dataset.nodeId = 'tag:' + entry.id;
-            row.dataset.tagId = entry.id;
-            row.title = t('viewer.layers.tag.select.title', { count: entry.memberKeys.length });
-
-            const chev = document.createElement('span');
-            chev.className = 'lp-chev lp-leaf';
-            row.appendChild(chev);
-
-            const chip = document.createElement('span');
-            chip.className = 'tag-chip';
-            chip.dataset.tagKind = entry.kind;
-            chip.textContent = entry.name;
-            row.appendChild(chip);
-
-            // Shown only while the tag is partly selected, so a tag you reached
-            // some other way still reads as involved without pretending it is
-            // fully selected.
-            const partialMark = document.createElement('span');
-            partialMark.className = 'lp-tag-partial-mark';
-            partialMark.textContent = '*';
-            partialMark.title = t('viewer.layers.tag.partial.title');
-            row.appendChild(partialMark);
-
-            const count = document.createElement('span');
-            count.className = 'lp-tag-count';
-            count.textContent = String(entry.memberKeys.length);
-            row.appendChild(count);
-
-            row.addEventListener('click', (event) => {
-                this._applySelection({ type: 'tag', memberKeys: entry.memberKeys }, !!event.shiftKey);
-            });
-            this._offerCopy(row, { kind: 'tag', tagKind: entry.kind, name: entry.name, memberKeys: entry.memberKeys });
-
-            return row;
-        }
-
-        /** A right click on `row` offers to copy `item` for an assistant; see viewer-app's showLayerContextMenu. */
-        _offerCopy(row, item) {
-            row.addEventListener('contextmenu', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                this._emit('kigumi-layer-contextmenu', { item, clientX: event.clientX, clientY: event.clientY });
-            });
-        }
-
-        _buildTimberRows(onlyKeys = null) {
-            const rows = [];
-            if (!this.hierarchy) return rows;
-
-            for (const timber of this.hierarchy.timbers) {
-                if (onlyKeys && !onlyKeys.has(timber.key)) continue;
-                if (!this._matchesFilter(timber.name, timber.tags)) continue;
-                const nodeId = 'timber:' + timber.key;
-                rows.push(this._makeRow({
-                    nodeId,
-                    rowType: 'timber',
-                    depth: 0,
-                    label: timber.name,
-                    // Every timber has a CSG tree, even an uncut one -- it is
-                    // still a body with faces worth naming.
-                    hasChildren: true,
-                    memberKey: timber.key,
-                    selectNode: { type: 'timber', key: timber.key },
-                }));
-                if (!this.expandedNodes.has(nodeId)) continue;
-                rows.push(...this._buildCsgRows({
-                    timberKey: timber.key,
-                    context: { section: 'timbers' },
-                    depth: 1,
-                }));
-            }
-            return rows;
-        }
-
-        // ------------------------------------------------------------------
-        // The CSG trees embedded in both sections
-        // ------------------------------------------------------------------
-
-        /**
-         * Rows for one timber's CSG tree.
-         *
-         * In the timber section this is the body with every cutting beneath
-         * it; in a joint section it is the body with just that joint's
-         * cutting, so the cutting can be read against what it cuts into.
-         */
-        _buildCsgRows({ timberKey, context, depth, jointId, cutIndex }) {
-            const payload = this.csgTreesByKey.get(timberKey);
-            if (!payload) {
-                this._requestCsgTree(timberKey);
-                return [this._makeCsgPlaceholderRow(depth, t('viewer.layers.csg.loading'))];
-            }
-
-            const tree = context.section === 'joints'
-                ? CsgTreeView.jointCuttingTree(payload, timberKey, jointId, cutIndex)
-                : CsgTreeView.timberTree(payload, timberKey);
-            if (!tree) {
-                return [this._makeCsgPlaceholderRow(depth, t('viewer.layers.csg.empty'))];
-            }
-
-            return CsgTreeView.flatten(tree, this.expandedNodes).map((row) => (
-                this._makeCsgRow(row, { timberKey, context, baseDepth: depth })
+        this._renderSection(this._treeEl, 'tags', t('viewer.layers.section.tags'), () => this._buildTagRows());
+        if (frames) {
+            frames.forEach((frame, index) => this._renderSection(
+                this._treeEl, this._frameSectionId(index), '\u{1F3E0} ' + frame.name,
+                () => this._buildFrameSections(frame, index),
             ));
+        } else {
+            this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
+            this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
         }
-
-        _makeCsgPlaceholderRow(depth, text) {
-            const row = document.createElement('div');
-            row.className = 'lp-row lp-row-csg lp-csg-placeholder';
-            // Indented the same way the rows it stands in for will be, so the
-            // list does not jump sideways when the tree arrives.
-            row.style.paddingLeft = csgIndentPx(depth) + 'px';
-            row.textContent = text;
-            return row;
+        // Last, and only in the 3D view. These measurements are about the
+        // model rather than about any drawing of it, so inside a drawing
+        // they are neither shown nor drawable -- which is why this is the
+        // one section that comes and goes with the scene.
+        if (this.drawingsEnabled && !this.inDrawing) {
+            this._renderSection(
+                this._treeEl, 'measurements', t('viewer.layers.section.measurements'),
+                () => this._buildThreeDMeasurementRows(),
+                () => this._makeMeasurementsEyeButton(),
+            );
         }
+        // Before the highlight, which may scroll to reveal a row: put the
+        // reader back where they were first, then let a reveal move from
+        // there. Done the other way round, a reveal would be undone.
+        this._treeEl.scrollTop = this._treeScrollTop;
+        this._syncHighlight();
+    }
 
-        /** One CSG node row: its base type, its tag, and what it does. */
-        _makeCsgRow(node, { timberKey, context, baseDepth }) {
-            const row = document.createElement('div');
-            const depth = baseDepth + node.depth;
-            row.className = 'lp-row lp-row-csg lp-selectable'
-                + (node.role === 'cut' ? ' lp-csg-cut' : '')
-                + (node.role === 'base' ? ' lp-csg-base' : '');
-            row.dataset.nodeId = node.id;
-            row.style.paddingLeft = csgIndentPx(depth) + 'px';
-
-            const chev = document.createElement('span');
-            chev.className = 'lp-chev' + (node.hasChildren ? ' lp-has-children' : ' lp-leaf');
-            chev.textContent = node.hasChildren ? (node.expanded ? '\u25be' : '\u25b8') : '';
-            if (node.hasChildren) {
-                chev.addEventListener('click', (event) => {
-                    event.stopPropagation();
-                    this._toggle(node.id);
-                });
-            }
-            row.appendChild(chev);
-
-            // A difference reads as arithmetic: the base is the material you
-            // start with and the cuts come off it, so both sides are signed
-            // rather than leaving the positive one to look like any other child.
-            if (node.role === 'cut' || node.role === 'base') {
-                const sign = document.createElement('span');
-                const isCut = node.role === 'cut';
-                sign.className = isCut ? 'lp-csg-minus' : 'lp-csg-plus';
-                sign.textContent = isCut ? '\u2212' : '+';
-                row.appendChild(sign);
-            }
-
-            const kind = document.createElement('span');
-            kind.className = 'lp-csg-kind';
-            kind.textContent = node.displayName || node.kind;
-            row.appendChild(kind);
-
-            if (node.label) {
-                const label = document.createElement('span');
-                label.className = 'lp-csg-label';
-                label.textContent = node.label;
-                row.appendChild(label);
-            }
-
-            // Which joint made this cut is the useful fact in the timber
-            // section; under a joint it is already known, so it is left off.
-            if (context.section === 'timbers' && node.role === 'cut' && node.jointName) {
-                const joint = document.createElement('span');
-                joint.className = 'lp-csg-joint';
-                joint.textContent = node.jointName;
-                row.appendChild(joint);
-            }
-
-            if (node.features && node.features.length) {
-                const feats = document.createElement('span');
-                feats.className = 'lp-csg-features';
-                feats.textContent = String(node.features.length);
-                feats.title = node.features
-                    .map((f) => f.name + ' (' + String(f.type).toLowerCase() + ')')
-                    .join('\n');
-                row.appendChild(feats);
-            }
-
-            row.addEventListener('click', () => {
-                this._focusCsgNode(node, timberKey, context);
-            });
-            this._offerCopy(row, { kind: 'csg', memberKey: timberKey, node });
-            return row;
-        }
-
-        /** Clicking a CSG row focuses it, and drives the 3D highlight. */
-        _focusCsgNode(node, timberKey, context) {
-            this.selectionManager.setCsgFocus({
-                timberKey,
-                path: node.path,
-                featureLabel: null,
-                cutIndex: node.cutIndex,
-                context,
-            });
-            this.selectionManager.setFocusedNodeId(node.id);
-            this._focusedCsgNodeId = node.id;
-            this._renderTree();
-            if (node.path && node.path.length) {
-                this._emit('kigumi-request-csg-by-path', { memberKey: timberKey, path: node.path });
-            }
-        }
-
-        _requestCsgTree(timberKey) {
-            if (this.requestedCsgTrees.has(timberKey)) {
-                return;
-            }
-            this.requestedCsgTrees.add(timberKey);
-            this._emit('kigumi-request-csg-tree', { memberKey: timberKey });
-        }
-
-        /** The drawings to list, and which one is open. */
-        setDrawings(drawings, activeSceneId, options = {}) {
-            this.drawings = Array.isArray(drawings) ? drawings : [];
-            this.activeSceneId = activeSceneId || null;
-            this.inDrawing = Boolean(options.inDrawing);
-            this.measurementsHidden = Boolean(options.measurementsHidden);
-            this._render();
-        }
-
-        _emit(type, detail) {
-            if (!this.el) return;
-            this.el.dispatchEvent(new CustomEvent(type, {
-                detail, bubbles: true, composed: true,
-            }));
-        }
-
-        /** A tree came back from the runner. */
-        setCsgTree(timberKey, payload) {
-            if (!timberKey || !payload) return;
-            this.csgTreesByKey.set(timberKey, payload);
-            this.requestedCsgTrees.delete(timberKey);
-            const pending = this._pendingReveal;
-            if (pending && pending.timberKey === timberKey) {
-                this._pendingReveal = null;
-                this.revealCsg(pending);
-                return;
-            }
-            this._renderTree();
-        }
-
-        _buildJointRows(onlyIds = null) {
-            const rows = [];
-            if (!this.hierarchy) return rows;
-
-            const nameByKey = {};
-            for (const t of this.hierarchy.timbers) nameByKey[t.key] = t.name;
-
-            for (const joint of (this.hierarchy.joints || [])) {
-                if (onlyIds && !onlyIds.has(joint.id)) continue;
-                if (!this._matchesFilter(joint.name)) continue;
-
-                const jointNodeId = 'joint:' + joint.id;
-                const members = [...(joint.timberKeys || []), ...(joint.accessoryKeys || [])];
-                const hasChildren = members.length > 0;
-
-                rows.push(this._makeRow({
-                    nodeId: jointNodeId,
-                    rowType: 'joint',
-                    depth: 0,
-                    label: joint.name,
-                    hasChildren,
-                    selectNode: { type: 'joint', jointId: joint.id, timberKeys: joint.timberKeys || [] },
-                }));
-
-                if (!hasChildren || !this.expandedNodes.has(jointNodeId)) continue;
-
-                // One row per cutting rather than per member: a joint that
-                // cuts the same timber twice has two things to show, and each
-                // gets its own tree.
-                const cuttings = joint.cuttings && joint.cuttings.length
-                    ? joint.cuttings
-                    : (joint.timberKeys || []).map((timberKey) => ({ timberKey, cutIndex: null }));
-                const cutsPerTimber = new Map();
-                for (const cutting of cuttings) {
-                    cutsPerTimber.set(cutting.timberKey, (cutsPerTimber.get(cutting.timberKey) || 0) + 1);
-                }
-
-                for (const cutting of cuttings) {
-                    const { timberKey, cutIndex } = cutting;
-                    const cuttingNodeId = 'jcut:' + joint.id + ':' + timberKey + ':' + cutIndex;
-                    const name = nameByKey[timberKey] || timberKey;
-                    // The cut number only earns its space when there is more
-                    // than one cut on this timber to tell apart.
-                    const label = cutsPerTimber.get(timberKey) > 1 && cutIndex !== null
-                        ? t('viewer.layers.csg.cutOn', { timber: name, cut: cutIndex + 1 })
-                        : name;
-                    rows.push(this._makeRow({
-                        nodeId: cuttingNodeId,
-                        rowType: 'jointMember',
-                        depth: 1,
-                        label,
-                        hasChildren: true,
-                        memberKey: timberKey,
-                        selectNode: { type: 'timber', key: timberKey },
-                    }));
-                    if (!this.expandedNodes.has(cuttingNodeId)) continue;
-                    rows.push(...this._buildCsgRows({
-                        timberKey,
-                        context: { section: 'joints', jointId: joint.id, cutIndex },
-                        depth: 2,
-                        jointId: joint.id,
-                        cutIndex,
-                    }));
-                }
-
-                for (const accKey of (joint.accessoryKeys || [])) {
-                    rows.push(this._makeRow({
-                        nodeId: 'jm:' + joint.id + ':' + accKey,
-                        rowType: 'jointMember',
-                        depth: 1,
-                        label: accKey.replace(/^accessory:[^:]+:/, '').replace(/^accessory:/, ''),
-                        hasChildren: false,
-                        selectNode: { type: 'accessory', key: accKey },
-                        // An accessory is a scene member like any other: it is
-                        // drawn, it is pickable, and hiding it is keyed the
-                        // same way. Without this it had no memberKey, which is
-                        // what the lock and hide buttons hang off -- so a peg
-                        // could be selected and never hidden.
-                        memberKey: accKey,
-                    }));
-                }
-            }
-            return rows;
-        }
-
-        // ------------------------------------------------------------------
-        // Selection sync
-        // ------------------------------------------------------------------
-
-        _syncHighlight() {
-            if (!this.el) return;
-
-            for (const row of this.el.querySelectorAll('.lp-row.lp-selected')) {
-                row.classList.remove('lp-selected');
-            }
-
-            this._syncTagHighlight();
-
-            const selectedTimbers = this.selectionManager.selectedTimbers;
-
-            // Canvas-driven: highlight timber/accessory rows that match selected keys
-            for (const key of selectedTimbers) {
-                const safeKey = CSS.escape(key);
-                for (const row of this.el.querySelectorAll('.lp-row[data-member-key="' + safeKey + '"]')) {
-                    row.classList.add('lp-selected');
-                }
-                for (const row of this.el.querySelectorAll('.lp-row[data-node-id="timber:' + safeKey + '"]')) {
-                    row.classList.add('lp-selected');
-                }
-                // Joint members referencing this key
-                for (const row of this.el.querySelectorAll('.lp-row-jointMember[data-node-id$=":' + safeKey + '"]')) {
-                    row.classList.add('lp-selected');
-                }
-            }
-
-            // The focused CSG row, if it is currently rendered.
-            const focusedId = this._focusedCsgNodeId;
-            if (focusedId) {
-                const row = this.el.querySelector(
-                    '.lp-row-csg[data-node-id="' + CSS.escape(focusedId) + '"]');
-                if (row) {
-                    row.classList.add('lp-selected');
-                    this._reveal(focusedId, row);
-                }
-            } else if (selectedTimbers.size === 1) {
-                // Scroll to selected timber row (canvas click)
-                const key = Array.from(selectedTimbers)[0];
-                const row = this.el.querySelector('.lp-row[data-node-id="timber:' + CSS.escape(key) + '"]');
-                if (row) this._reveal('timber:' + key, row);
-            } else {
-                this._revealedNodeId = null;
-            }
-        }
-
-        /**
-         * Scroll a row into view, but only when it is not the one already shown.
-         *
-         * Marking rows selected is DERIVED, and redone on every rebuild at no
-         * cost. Scrolling to one is an EFFECT, and re-running it on a rebuild
-         * moved the tree under the reader: clicking a 3D measurement rebuilds
-         * the tree, and the rebuild scrolled back to whichever timber was
-         * selected -- above the measurements, so always upward, and away from
-         * the row just clicked.
-         *
-         * What is remembered is the one row showing now, so coming back to a
-         * row after looking at another reveals it again.
-         */
-        _reveal(nodeId, row) {
-            if (this._revealedNodeId === nodeId) {
-                return;
-            }
-            this._revealedNodeId = nodeId;
-            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-
-        /**
-         * Show a CSG node in the list: open the sections and rows above it,
-         * mark it, and scroll to it. Called when a 3D pick needs the list to
-         * follow. Fetches the tree first if it is not in yet.
-         */
-        revealCsg({ section, timberKey, jointId, cutIndex, path }) {
-            const payload = this.csgTreesByKey.get(timberKey);
-            if (!payload) {
-                this._pendingReveal = { section, timberKey, jointId, cutIndex, path };
-                this._requestCsgTree(timberKey);
-                return;
-            }
-
-            const inJoints = section === 'joints';
-            const tree = inJoints
-                ? CsgTreeView.jointCuttingTree(payload, timberKey, jointId, cutIndex)
-                : CsgTreeView.timberTree(payload, timberKey);
-            if (!tree) {
-                return;
-            }
-
-            // Everything between the section header and the node itself.
-            const frameIndex = this._frameIndexOf({ timberKey, jointId: inJoints ? jointId : null });
-            if (frameIndex >= 0) {
-                const frameSection = 'section:' + this._frameSectionId(frameIndex);
-                this.expandedNodes.add(frameSection);
-                this.expandedNodes.add(frameSection + (inJoints ? ':joints' : ':timbers'));
-            } else {
-                this.expandedNodes.add(inJoints ? 'section:joints' : 'section:timbers');
-            }
-            if (inJoints) {
-                this.expandedNodes.add('joint:' + jointId);
-                this.expandedNodes.add('jcut:' + jointId + ':' + timberKey + ':' + cutIndex);
-            } else {
-                this.expandedNodes.add('timber:' + timberKey);
-            }
-
-            const target = CsgTreeView.findByPath(tree, path || []);
-            if (target) {
-                // Expand down to the node, but not the node itself: revealing
-                // something should not unfold everything beneath it.
-                const chain = CsgTreeView.ancestorIds(tree, target.id);
-                for (const id of chain.slice(0, -1)) {
-                    this.expandedNodes.add(id);
-                }
-                this._focusedCsgNodeId = target.id;
-                this.selectionManager.setFocusedNodeId(target.id);
-            }
-            // Asked for by name, so it scrolls even to the row already showing.
-            // _reveal suppresses the reveals a rebuild would repeat, not the
-            // ones somebody requested.
-            this._revealedNodeId = null;
-            this._renderTree();
-        }
-
-        _renderFooter() {
-            if (!this._footerEl) return;
-            this._footerEl.innerHTML = '';
-            const anyHidden = this.layerStateStore.hasAnyHidden();
-            const anyLocked = this.layerStateStore.hasAnyLocked();
-            if (!anyHidden && !anyLocked) return;
-
-            if (anyHidden) {
-                const btn = document.createElement('button');
-                btn.className = 'lp-footer-btn';
-                btn.textContent = t('viewer.layers.footer.showAll');
-                btn.addEventListener('click', () => this.layerStateStore.showAll());
-                this._footerEl.appendChild(btn);
-            }
-            if (anyLocked) {
-                const btn = document.createElement('button');
-                btn.className = 'lp-footer-btn';
-                btn.textContent = t('viewer.layers.footer.unlockAll');
-                btn.addEventListener('click', () => this.layerStateStore.unlockAll());
-                this._footerEl.appendChild(btn);
-            }
-        }
-
-        /** Paint each tag row with how much of it the selection covers. */
-        _syncTagHighlight() {
-            const selected = this.selectionManager.selectedTimbers;
-            for (const row of this.el.querySelectorAll('.lp-row-tag')) {
-                const entry = this.tagEntriesById.get(row.dataset.tagId);
-                const state = entry ? TagIndex.tagSelectionState(entry, selected) : 'none';
-                row.classList.toggle('lp-selected', state === 'all');
-                row.classList.toggle('lp-tag-partial', state === 'partial');
-            }
-        }
-
-        _updateStateIcons() {
-            if (!this.el) return;
-            for (const row of this.el.querySelectorAll('.lp-row[data-member-key]')) {
-                const key = row.dataset.memberKey;
-                const state = this.layerStateStore.getState(key);
-                const lockBtn = row.querySelector('[data-action="lock"]');
-                const hideBtn = row.querySelector('[data-action="hide"]');
-                if (lockBtn) {
-                    lockBtn.classList.toggle('lp-active', state.locked);
-                    lockBtn.title = state.locked ? t('viewer.layers.unlock.title') : t('viewer.layers.lock.title');
-                }
-                if (hideBtn) {
-                    hideBtn.classList.toggle('lp-active', state.hidden);
-                    hideBtn.title = state.hidden ? t('viewer.layers.show.title') : t('viewer.layers.hide.title');
-                }
-            }
-            this._renderFooter();
-        }
-
-        // ------------------------------------------------------------------
-        // Helpers
-        // ------------------------------------------------------------------
-
-        _toggle(nodeId) {
-            if (this.expandedNodes.has(nodeId)) {
-                this.expandedNodes.delete(nodeId);
-            } else {
-                this.expandedNodes.add(nodeId);
-            }
-            this._renderTree();
+    /**
+     * Note where the tree is scrolled to, for the rebuild about to wipe it.
+     *
+     * Pulled from the element at the one moment it matters -- just before
+     * the rows go -- rather than tracked on every scroll event.
+     *
+     * A tree with no rows has no position worth keeping. That is the empty
+     * one _render() has just built, and taking its 0 would throw away the
+     * place we are about to return to.
+     */
+    _rememberTreeScroll() {
+        if (this._treeEl && this._treeEl.children.length) {
+            this._treeScrollTop = this._treeEl.scrollTop;
         }
     }
 
-    const LayersViewBase = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
+    // ------------------------------------------------------------------
+    // Several frames: each its own section, holding its drawings, timbers and joints
+    // ------------------------------------------------------------------
 
-    class KigumiLayersView extends LayersViewBase {
-        constructor() {
-            super();
-            this._selectionManager = null;
-            this._layerStateStore = null;
-            this._panel = null;
-            this._hierarchy = { timbers: [], joints: [] };
-            this._unsubLayerState = null;
+    /** The file's frames when it shows more than one, else null. */
+    _frames() {
+        const frames = this.hierarchy && this.hierarchy.frames;
+        return Array.isArray(frames) && frames.length > 1 ? frames : null;
+    }
+
+    _frameSectionId(index) {
+        const frames = this._frames();
+        return 'frame:' + index + ':' + (frames ? frames[index].name : '');
+    }
+
+    /** The one frame *drawing*'s timbers are from, or -1 when they are from several, or none. */
+    _drawingFrameIndex(drawing) {
+        const frames = this._frames();
+        if (!frames || !drawing) {
+            return -1;
         }
-
-        connectedCallback() {
-            this._ensureMounted();
+        const members = Array.isArray(drawing.members) && drawing.members.length
+            ? drawing.members
+            : (drawing.viewports || []).flatMap((pane) => pane.members || []);
+        if (!members.length) {
+            return -1;
         }
+        const involved = frames
+            .map((frame, index) => (members.some((key) => frame.timberKeys.includes(key)) ? index : -1))
+            .filter((index) => index >= 0);
+        return involved.length === 1 ? involved[0] : -1;
+    }
 
-        disconnectedCallback() {
-            this._disposePanel();
+    /** Which frame *timberKey* or *jointId* is in, or -1. */
+    _frameIndexOf({ timberKey, jointId }) {
+        const frames = this._frames();
+        if (!frames) {
+            return -1;
         }
+        return frames.findIndex((frame) => (jointId !== undefined && jointId !== null
+            ? frame.jointIds.includes(String(jointId))
+            : frame.timberKeys.includes(timberKey)));
+    }
 
-        /**
-         * Which members are hidden, locked or fixed.
-         *
-         * Exposed so anything that needs to KNOW can ask, rather than being
-         * told and keeping a copy. The viewer used to mirror this into a Map of
-         * its own, synced by events -- two copies of one fact, the second of
-         * which is stale exactly when an event is missed.
-         */
-        get layerState() {
-            return this._layerStateStore || null;
-        }
-
-        attach(selectionManager, _vscode) {
-            this._selectionManager = selectionManager;
-            this._ensureMounted();
-        }
-
-        /** Hand a fetched CSG tree to the panel. */
-        setCsgTree(memberKey, payload) {
-            if (this._panel) {
-                this._panel.setCsgTree(memberKey, payload);
+    /** The sections inside one frame's, as rows of its body. */
+    _buildFrameSections(frame, index) {
+        const body = document.createElement('div');
+        body.className = 'lp-frame-body';
+        const id = this._frameSectionId(index);
+        if (this.drawingsEnabled) {
+            const drawings = (this.drawings || []).filter((drawing) => this._drawingFrameIndex(drawing) === index);
+            if (drawings.length) {
+                this._renderSection(body, id + ':drawings', t('viewer.layers.section.drawings'),
+                    () => this._buildDrawingRows((drawing) => drawings.includes(drawing)));
             }
         }
+        const timberKeys = new Set(frame.timberKeys);
+        const jointIds = new Set(frame.jointIds);
+        this._renderSection(body, id + ':timbers', t('viewer.layers.section.timbers'),
+            () => this._buildTimberRows(timberKeys));
+        this._renderSection(body, id + ':joints', t('viewer.layers.section.joints'),
+            () => this._buildJointRows(jointIds));
+        return [body];
+    }
 
-        /** Show a CSG node in the list, opening whatever is above it. */
-        revealCsg(target) {
-            if (this._panel) {
-                this._panel.revealCsg(target);
+    _renderSection(parent, sectionId, title, buildRows, buildAction) {
+        const nodeId = 'section:' + sectionId;
+        // Built whether or not the section is open, to know whether there is anything in it:
+        // an empty section is greyed and cannot be opened.
+        const rows = Array.from(buildRows());
+        const empty = rows.length === 0;
+        const expanded = !empty && this.expandedNodes.has(nodeId);
+
+        const section = document.createElement('div');
+        section.className = 'lp-section';
+
+        const sectionHeader = document.createElement('div');
+        sectionHeader.className = 'lp-section-header' + (expanded ? ' lp-open' : '')
+            + (empty ? ' lp-section-empty' : '');
+        const chevSpan = document.createElement('span');
+        chevSpan.className = 'lp-chev';
+        chevSpan.textContent = empty ? '' : (expanded ? '▾' : '▸');
+        sectionHeader.appendChild(chevSpan);
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = ' ' + title;
+        sectionHeader.appendChild(titleSpan);
+        if (typeof buildAction === 'function') {
+            const action = buildAction();
+            if (action) {
+                sectionHeader.appendChild(action);
             }
         }
+        if (!empty) {
+            sectionHeader.addEventListener('click', () => {
+                this._toggle(nodeId);
+            });
+        }
+        section.appendChild(sectionHeader);
 
-        setLayersPayload(payload) {
-            this._hierarchy = this._convertRunnerPayload(payload || {});
-            this._ensureMounted();
-            if (this._panel) {
-                this._panel.setHierarchy(this._hierarchy);
+        if (expanded) {
+            const body = document.createElement('div');
+            body.className = 'lp-section-body';
+            for (const row of rows) {
+                body.appendChild(row);
             }
-            this._emitLayerStateSync();
+            section.appendChild(body);
         }
 
-        /** The drawings to list, and which one is open. */
-        setDrawings(drawings, activeSceneId, options = {}) {
-            this._drawings = { drawings, activeSceneId, options };
-            this._ensureMounted();
-            if (this._panel) {
-                this._panel.setDrawings(drawings, activeSceneId, options);
-            }
-        }
+        parent.appendChild(section);
+    }
 
-        /** Whether the drawings section is offered at all (the beta setting). */
-        setDrawingsEnabled(enabled) {
-            this._drawingsEnabled = Boolean(enabled);
-            this._ensureMounted();
-            if (this._panel) {
-                this._panel.drawingsEnabled = this._drawingsEnabled;
-            }
-        }
+    _makeRow(opts) {
+        const { nodeId, rowType, depth, label, hasChildren, selectNode, memberKey } = opts;
+        const expanded = hasChildren && this.expandedNodes.has(nodeId);
 
-        _ensureMounted() {
-            if (this._panel || !this._selectionManager) {
-                return;
-            }
+        const row = document.createElement('div');
+        row.className = 'lp-row lp-row-' + rowType + ' lp-depth-' + depth;
+        row.dataset.nodeId = nodeId;
+        if (memberKey) row.dataset.memberKey = memberKey;
 
-            const LayerStateStoreCtor = globalScope.LayerStateStore;
-            if (!LayerStateStoreCtor) {
-                console.warn('LayerStateStore is not available; layers panel disabled.');
-                return;
-            }
-
-            this._layerStateStore = new LayerStateStoreCtor();
-            this._unsubLayerState = this._layerStateStore.onStateChanged((event) => {
-                this.dispatchEvent(new CustomEvent('layer-state-changed', {
-                    detail: event,
+        if (memberKey && (rowType === 'timber' || rowType === 'jointMember')) {
+            row.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                row.dispatchEvent(new CustomEvent('kigumi-member-contextmenu', {
+                    detail: { memberKey, clientX: event.clientX, clientY: event.clientY },
                     bubbles: true,
                     composed: true,
                 }));
             });
-            this._panel = new LayersPanel(this._selectionManager, this._layerStateStore);
-            this._panel.drawingsEnabled = Boolean(this._drawingsEnabled);
-            this._panel.mount(this);
+        } else if (selectNode && selectNode.type === 'joint') {
+            this._offerCopy(row, {
+                kind: 'joint', name: label, jointId: selectNode.jointId, timberKeys: selectNode.timberKeys,
+            });
+        }
+
+        // Chevron / expand control
+        const chev = document.createElement('span');
+        chev.className = 'lp-chev' + (hasChildren ? ' lp-has-children' : ' lp-leaf');
+        chev.textContent = hasChildren ? (expanded ? '▾' : '▸') : '';
+        if (hasChildren) {
+            chev.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._toggle(nodeId);
+            });
+        }
+        row.appendChild(chev);
+
+        const labelEl = document.createElement('span');
+        labelEl.className = 'lp-label';
+        labelEl.textContent = label;
+        row.appendChild(labelEl);
+
+        // Lock / hide icon buttons (only for member-level rows)
+        if (memberKey) {
+            const icons = document.createElement('span');
+            icons.className = 'lp-icons';
+
+            const lockBtn = document.createElement('button');
+            lockBtn.className = 'lp-icon-btn lp-btn-lock';
+            lockBtn.dataset.action = 'lock';
+            lockBtn.title = t('viewer.layers.lock.title');
+            lockBtn.textContent = '🔒';
+            lockBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.layerStateStore.toggleLocked(memberKey);
+            });
+            icons.appendChild(lockBtn);
+
+            const hideBtn = document.createElement('button');
+            hideBtn.className = 'lp-icon-btn lp-btn-hide';
+            hideBtn.dataset.action = 'hide';
+            hideBtn.title = t('viewer.layers.hide.title');
+            hideBtn.textContent = '👁';
+            hideBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.layerStateStore.toggleHidden(memberKey);
+            });
+            icons.appendChild(hideBtn);
+
+            row.appendChild(icons);
+        }
+
+        if (selectNode) {
+            row.classList.add('lp-selectable');
+            row.addEventListener('click', (event) => {
+                if (memberKey && this.layerStateStore.isLocked(memberKey)) {
+                    return;
+                }
+                this._applySelection(selectNode, !!event.shiftKey);
+            });
+        }
+
+        return row;
+    }
+
+    /** Apply a row click to the selection store. */
+    _applySelection(node, additive) {
+        const selection = this.selectionManager;
+        if (node.type === 'timber' || node.type === 'accessory') {
+            if (additive) {
+                selection.toggleTimber(node.key);
+            } else {
+                selection.selectTimber(node.key, false);
+            }
+            return;
+        }
+        if (node.type === 'joint') {
+            selection.selectJoint(node.jointId, node.timberKeys || [], additive);
+            return;
+        }
+        if (node.type === 'tag') {
+            selection.selectTimbers(node.memberKeys || [], additive);
+        }
+    }
+
+    _buildTagRows() {
+        return this.tagIndex
+            .filter((entry) => this._matchesFilter(entry.name))
+            .map((entry) => this._makeTagRow(entry));
+    }
+
+    /**
+     * Where a drawing came from, as one mark.
+     *
+     * The fill reads as how much of it comes from the drawings file: none,
+     * some, all. Origin and saved-ness are separate things, so they get
+     * separate marks -- crossing them into four glyphs would be a legend to
+     * memorize, and would not survive a third source ever turning up.
+     */
+    _originMark(origin) {
+        if (origin === 'code') {
+            return { glyph: '\u25cb', title: t('viewer.layers.drawing.fromCode') };
+        }
+        if (origin === 'overridden') {
+            return { glyph: '\u25d0', title: t('viewer.layers.drawing.overridden') };
+        }
+        return { glyph: '\u25cf', title: t('viewer.layers.drawing.fromFile') };
+    }
+
+    _buildDrawingRows(include = null) {
+        return (this.drawings || [])
+            .filter((drawing) => !include || include(drawing))
+            // The 3D measurements are held in a drawing so that the file
+            // merge, saving and identity all apply to them unchanged -- but
+            // it is not a drawing you open, and listing it among the ones
+            // you do would offer to enter a sheet that does not exist. It
+            // gets a section of its own below.
+            .filter((drawing) => drawing.id !== THREE_D_MEASUREMENTS_ID)
+            .filter((drawing) => this._matchesFilter(drawing.name || drawing.id))
+            .map((drawing) => this._makeDrawingRow(drawing));
+    }
+
+    /** The measurements held against the model rather than against a drawing. */
+    _threeDMeasurements() {
+        const drawing = (this.drawings || [])
+            .find((one) => one.id === THREE_D_MEASUREMENTS_ID);
+        if (!drawing) {
+            return [];
+        }
+        // Carrying which viewport it is on, since selecting one needs both
+        // that and its key -- the same pair every other measurement row
+        // hands back.
+        return (drawing.viewports || []).flatMap((pane) => (pane.measurements || [])
+            .map((measure) => ({ ...measure, viewportId: pane.id })));
+    }
+
+    _buildThreeDMeasurementRows() {
+        return this._threeDMeasurements()
+            .map((measure, index) => this._makeThreeDMeasurementRow(measure, index))
+            .filter(Boolean);
+    }
+
+    /** One 3D measurement: what it is between. */
+    _makeThreeDMeasurementRow(measure, index) {
+        const between = [measure.a, measure.b]
+            .map((anchor) => (anchor && anchor.feature) || (anchor && anchor.timber) || '?')
+            .join(' / ');
+        if (!this._matchesFilter(between)) {
+            return null;
+        }
+        // Broken here means the reference no longer finds a feature -- a
+        // renamed face, a timber that has gone. The runner says so when it
+        // resolves, so no camera is needed to tell. The view-dependent
+        // refusals cannot arise: these belong to no viewport.
+        const broken = Boolean(measure.unresolved);
+        const deleted = KigumiMeasurements.isDeleted(measure);
+        const row = document.createElement('div');
+        row.className = 'lp-row lp-row-measurement lp-depth-0 lp-selectable'
+            + (broken ? ' lp-broken' : '')
+            + (deleted ? ' lp-deleted' : '');
+        row.dataset.nodeId = 'measurement:' + index;
+
+        const chev = document.createElement('span');
+        chev.className = 'lp-chev lp-leaf';
+        row.appendChild(chev);
+
+        const name = document.createElement('span');
+        name.className = 'lp-name';
+        name.textContent = between;
+        name.title = broken
+            ? t('viewer.layers.measurement.unresolved')
+            : between;
+        row.appendChild(name);
+        if (broken) {
+            // Said as well as coloured. Colour alone is not a reason, and
+            // is not available to everyone reading it.
+            const why = document.createElement('span');
+            why.className = 'lp-broken-note';
+            why.textContent = t('viewer.drawing.refused.unresolved');
+            row.appendChild(why);
+        }
+        row.addEventListener('click', (event) => this._emit(
+            'kigumi-focus-measurement', {
+                viewportId: measure.viewportId || null,
+                measureKey: KigumiMeasurements.measurementKey(measure),
+                add: Boolean(event.shiftKey),
+            }));
+        if (deleted) {
+            // Greyed, and put back from a right-click: it is the code's, deleted in the file.
+            name.title = t('viewer.drawing.deleted');
+        }
+        // Copied for an assistant from a right-click, and put back from one if deleted.
+        row.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this._emit('kigumi-measurement-contextmenu', {
+                viewportId: measure.viewportId || null,
+                measureKey: KigumiMeasurements.measurementKey(measure),
+                clientX: event.clientX, clientY: event.clientY,
+            });
+        });
+        return row;
+    }
+
+    /** The eyeball on the 3D measurements section: all of them, or none. */
+    _makeMeasurementsEyeButton() {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'lp-section-action';
+        button.textContent = this.measurementsHidden ? '\u25cb' : '\u25c9';
+        button.title = this.measurementsHidden
+            ? t('viewer.layers.measurements.show.title')
+            : t('viewer.layers.measurements.hide.title');
+        button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this._emit('kigumi-toggle-measurements', { hidden: !this.measurementsHidden });
+        });
+        return button;
+    }
+
+    /** One drawing: where it came from, what it is called, and whether it is saved. */
+    _makeDrawingRow(drawing) {
+        const active = drawing.id === this.activeSceneId;
+        const row = document.createElement('div');
+        row.className = 'lp-row lp-row-drawing lp-depth-0 lp-selectable'
+            + (active ? ' lp-row-active-drawing' : '');
+        row.dataset.nodeId = 'drawing:' + drawing.id;
+        row.title = t('viewer.layers.drawing.open.title');
+
+        const chev = document.createElement('span');
+        chev.className = 'lp-chev lp-leaf';
+        row.appendChild(chev);
+
+        const mark = this._originMark(drawing.origin);
+        const origin = document.createElement('span');
+        origin.className = 'lp-drawing-origin';
+        origin.textContent = mark.glyph;
+        origin.title = mark.title;
+        row.appendChild(origin);
+
+        const name = document.createElement('span');
+        name.className = 'lp-drawing-name';
+        name.textContent = drawing.name || drawing.id;
+        row.appendChild(name);
+
+        // The convention an editor uses for a modified tab, for the same
+        // reason: it says there is something to save without saying more.
+        const unsaved = document.createElement('span');
+        unsaved.className = 'lp-drawing-unsaved';
+        unsaved.textContent = drawing.dirty ? '\u2022' : '';
+        unsaved.title = drawing.dirty ? t('viewer.layers.drawing.unsaved') : '';
+        row.appendChild(unsaved);
+
+        row.addEventListener('click', () => {
+            this._emit('kigumi-enter-drawing', { sceneId: drawing.id });
+        });
+
+        return row;
+    }
+
+    /** One tag: its kind as a colour, its name, and how many wear it. */
+    _makeTagRow(entry) {
+        const row = document.createElement('div');
+        row.className = 'lp-row lp-row-tag lp-depth-0 lp-selectable';
+        row.dataset.nodeId = 'tag:' + entry.id;
+        row.dataset.tagId = entry.id;
+        row.title = t('viewer.layers.tag.select.title', { count: entry.memberKeys.length });
+
+        const chev = document.createElement('span');
+        chev.className = 'lp-chev lp-leaf';
+        row.appendChild(chev);
+
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.dataset.tagKind = entry.kind;
+        chip.textContent = entry.name;
+        row.appendChild(chip);
+
+        // Shown only while the tag is partly selected, so a tag you reached
+        // some other way still reads as involved without pretending it is
+        // fully selected.
+        const partialMark = document.createElement('span');
+        partialMark.className = 'lp-tag-partial-mark';
+        partialMark.textContent = '*';
+        partialMark.title = t('viewer.layers.tag.partial.title');
+        row.appendChild(partialMark);
+
+        const count = document.createElement('span');
+        count.className = 'lp-tag-count';
+        count.textContent = String(entry.memberKeys.length);
+        row.appendChild(count);
+
+        row.addEventListener('click', (event) => {
+            this._applySelection({ type: 'tag', memberKeys: entry.memberKeys }, !!event.shiftKey);
+        });
+        this._offerCopy(row, { kind: 'tag', tagKind: entry.kind, name: entry.name, memberKeys: entry.memberKeys });
+
+        return row;
+    }
+
+    /** A right click on `row` offers to copy `item` for an assistant; see viewer-app's showLayerContextMenu. */
+    _offerCopy(row, item) {
+        row.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            this._emit('kigumi-layer-contextmenu', { item, clientX: event.clientX, clientY: event.clientY });
+        });
+    }
+
+    _buildTimberRows(onlyKeys = null) {
+        const rows = [];
+        if (!this.hierarchy) return rows;
+
+        for (const timber of this.hierarchy.timbers) {
+            if (onlyKeys && !onlyKeys.has(timber.key)) continue;
+            if (!this._matchesFilter(timber.name, timber.tags)) continue;
+            const nodeId = 'timber:' + timber.key;
+            rows.push(this._makeRow({
+                nodeId,
+                rowType: 'timber',
+                depth: 0,
+                label: timber.name,
+                // Every timber has a CSG tree, even an uncut one -- it is
+                // still a body with faces worth naming.
+                hasChildren: true,
+                memberKey: timber.key,
+                selectNode: { type: 'timber', key: timber.key },
+            }));
+            if (!this.expandedNodes.has(nodeId)) continue;
+            rows.push(...this._buildCsgRows({
+                timberKey: timber.key,
+                context: { section: 'timbers' },
+                depth: 1,
+            }));
+        }
+        return rows;
+    }
+
+    // ------------------------------------------------------------------
+    // The CSG trees embedded in both sections
+    // ------------------------------------------------------------------
+
+    /**
+     * Rows for one timber's CSG tree.
+     *
+     * In the timber section this is the body with every cutting beneath
+     * it; in a joint section it is the body with just that joint's
+     * cutting, so the cutting can be read against what it cuts into.
+     */
+    _buildCsgRows({ timberKey, context, depth, jointId, cutIndex }) {
+        const payload = this.csgTreesByKey.get(timberKey);
+        if (!payload) {
+            this._requestCsgTree(timberKey);
+            return [this._makeCsgPlaceholderRow(depth, t('viewer.layers.csg.loading'))];
+        }
+
+        const tree = context.section === 'joints'
+            ? CsgTreeView.jointCuttingTree(payload, timberKey, jointId, cutIndex)
+            : CsgTreeView.timberTree(payload, timberKey);
+        if (!tree) {
+            return [this._makeCsgPlaceholderRow(depth, t('viewer.layers.csg.empty'))];
+        }
+
+        return CsgTreeView.flatten(tree, this.expandedNodes).map((row) => (
+            this._makeCsgRow(row, { timberKey, context, baseDepth: depth })
+        ));
+    }
+
+    _makeCsgPlaceholderRow(depth, text) {
+        const row = document.createElement('div');
+        row.className = 'lp-row lp-row-csg lp-csg-placeholder';
+        // Indented the same way the rows it stands in for will be, so the
+        // list does not jump sideways when the tree arrives.
+        row.style.paddingLeft = csgIndentPx(depth) + 'px';
+        row.textContent = text;
+        return row;
+    }
+
+    /** One CSG node row: its base type, its tag, and what it does. */
+    _makeCsgRow(node, { timberKey, context, baseDepth }) {
+        const row = document.createElement('div');
+        const depth = baseDepth + node.depth;
+        row.className = 'lp-row lp-row-csg lp-selectable'
+            + (node.role === 'cut' ? ' lp-csg-cut' : '')
+            + (node.role === 'base' ? ' lp-csg-base' : '');
+        row.dataset.nodeId = node.id;
+        row.style.paddingLeft = csgIndentPx(depth) + 'px';
+
+        const chev = document.createElement('span');
+        chev.className = 'lp-chev' + (node.hasChildren ? ' lp-has-children' : ' lp-leaf');
+        chev.textContent = node.hasChildren ? (node.expanded ? '\u25be' : '\u25b8') : '';
+        if (node.hasChildren) {
+            chev.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this._toggle(node.id);
+            });
+        }
+        row.appendChild(chev);
+
+        // A difference reads as arithmetic: the base is the material you
+        // start with and the cuts come off it, so both sides are signed
+        // rather than leaving the positive one to look like any other child.
+        if (node.role === 'cut' || node.role === 'base') {
+            const sign = document.createElement('span');
+            const isCut = node.role === 'cut';
+            sign.className = isCut ? 'lp-csg-minus' : 'lp-csg-plus';
+            sign.textContent = isCut ? '\u2212' : '+';
+            row.appendChild(sign);
+        }
+
+        const kind = document.createElement('span');
+        kind.className = 'lp-csg-kind';
+        kind.textContent = node.displayName || node.kind;
+        row.appendChild(kind);
+
+        if (node.label) {
+            const label = document.createElement('span');
+            label.className = 'lp-csg-label';
+            label.textContent = node.label;
+            row.appendChild(label);
+        }
+
+        // Which joint made this cut is the useful fact in the timber
+        // section; under a joint it is already known, so it is left off.
+        if (context.section === 'timbers' && node.role === 'cut' && node.jointName) {
+            const joint = document.createElement('span');
+            joint.className = 'lp-csg-joint';
+            joint.textContent = node.jointName;
+            row.appendChild(joint);
+        }
+
+        if (node.features && node.features.length) {
+            const feats = document.createElement('span');
+            feats.className = 'lp-csg-features';
+            feats.textContent = String(node.features.length);
+            feats.title = node.features
+                .map((f) => f.name + ' (' + String(f.type).toLowerCase() + ')')
+                .join('\n');
+            row.appendChild(feats);
+        }
+
+        row.addEventListener('click', () => {
+            this._focusCsgNode(node, timberKey, context);
+        });
+        this._offerCopy(row, { kind: 'csg', memberKey: timberKey, node });
+        return row;
+    }
+
+    /** Clicking a CSG row focuses it, and drives the 3D highlight. */
+    _focusCsgNode(node, timberKey, context) {
+        this.selectionManager.setCsgFocus({
+            timberKey,
+            path: node.path,
+            featureLabel: null,
+            cutIndex: node.cutIndex,
+            context,
+        });
+        this.selectionManager.setFocusedNodeId(node.id);
+        this._focusedCsgNodeId = node.id;
+        this._renderTree();
+        if (node.path && node.path.length) {
+            this._emit('kigumi-request-csg-by-path', { memberKey: timberKey, path: node.path });
+        }
+    }
+
+    _requestCsgTree(timberKey) {
+        if (this.requestedCsgTrees.has(timberKey)) {
+            return;
+        }
+        this.requestedCsgTrees.add(timberKey);
+        this._emit('kigumi-request-csg-tree', { memberKey: timberKey });
+    }
+
+    /** The drawings to list, and which one is open. */
+    setDrawings(drawings, activeSceneId, options = {}) {
+        this.drawings = Array.isArray(drawings) ? drawings : [];
+        this.activeSceneId = activeSceneId || null;
+        this.inDrawing = Boolean(options.inDrawing);
+        this.measurementsHidden = Boolean(options.measurementsHidden);
+        this._render();
+    }
+
+    _emit(type, detail) {
+        if (!this.el) return;
+        this.el.dispatchEvent(new CustomEvent(type, {
+            detail, bubbles: true, composed: true,
+        }));
+    }
+
+    /** A tree came back from the runner. */
+    setCsgTree(timberKey, payload) {
+        if (!timberKey || !payload) return;
+        this.csgTreesByKey.set(timberKey, payload);
+        this.requestedCsgTrees.delete(timberKey);
+        const pending = this._pendingReveal;
+        if (pending && pending.timberKey === timberKey) {
+            this._pendingReveal = null;
+            this.revealCsg(pending);
+            return;
+        }
+        this._renderTree();
+    }
+
+    _buildJointRows(onlyIds = null) {
+        const rows = [];
+        if (!this.hierarchy) return rows;
+
+        const nameByKey = {};
+        for (const t of this.hierarchy.timbers) nameByKey[t.key] = t.name;
+
+        for (const joint of (this.hierarchy.joints || [])) {
+            if (onlyIds && !onlyIds.has(joint.id)) continue;
+            if (!this._matchesFilter(joint.name)) continue;
+
+            const jointNodeId = 'joint:' + joint.id;
+            const members = [...(joint.timberKeys || []), ...(joint.accessoryKeys || [])];
+            const hasChildren = members.length > 0;
+
+            rows.push(this._makeRow({
+                nodeId: jointNodeId,
+                rowType: 'joint',
+                depth: 0,
+                label: joint.name,
+                hasChildren,
+                selectNode: { type: 'joint', jointId: joint.id, timberKeys: joint.timberKeys || [] },
+            }));
+
+            if (!hasChildren || !this.expandedNodes.has(jointNodeId)) continue;
+
+            // One row per cutting rather than per member: a joint that
+            // cuts the same timber twice has two things to show, and each
+            // gets its own tree.
+            const cuttings = joint.cuttings && joint.cuttings.length
+                ? joint.cuttings
+                : (joint.timberKeys || []).map((timberKey) => ({ timberKey, cutIndex: null }));
+            const cutsPerTimber = new Map();
+            for (const cutting of cuttings) {
+                cutsPerTimber.set(cutting.timberKey, (cutsPerTimber.get(cutting.timberKey) || 0) + 1);
+            }
+
+            for (const cutting of cuttings) {
+                const { timberKey, cutIndex } = cutting;
+                const cuttingNodeId = 'jcut:' + joint.id + ':' + timberKey + ':' + cutIndex;
+                const name = nameByKey[timberKey] || timberKey;
+                // The cut number only earns its space when there is more
+                // than one cut on this timber to tell apart.
+                const label = cutsPerTimber.get(timberKey) > 1 && cutIndex !== null
+                    ? t('viewer.layers.csg.cutOn', { timber: name, cut: cutIndex + 1 })
+                    : name;
+                rows.push(this._makeRow({
+                    nodeId: cuttingNodeId,
+                    rowType: 'jointMember',
+                    depth: 1,
+                    label,
+                    hasChildren: true,
+                    memberKey: timberKey,
+                    selectNode: { type: 'timber', key: timberKey },
+                }));
+                if (!this.expandedNodes.has(cuttingNodeId)) continue;
+                rows.push(...this._buildCsgRows({
+                    timberKey,
+                    context: { section: 'joints', jointId: joint.id, cutIndex },
+                    depth: 2,
+                    jointId: joint.id,
+                    cutIndex,
+                }));
+            }
+
+            for (const accKey of (joint.accessoryKeys || [])) {
+                rows.push(this._makeRow({
+                    nodeId: 'jm:' + joint.id + ':' + accKey,
+                    rowType: 'jointMember',
+                    depth: 1,
+                    label: accKey.replace(/^accessory:[^:]+:/, '').replace(/^accessory:/, ''),
+                    hasChildren: false,
+                    selectNode: { type: 'accessory', key: accKey },
+                    // An accessory is a scene member like any other: it is
+                    // drawn, it is pickable, and hiding it is keyed the
+                    // same way. Without this it had no memberKey, which is
+                    // what the lock and hide buttons hang off -- so a peg
+                    // could be selected and never hidden.
+                    memberKey: accKey,
+                }));
+            }
+        }
+        return rows;
+    }
+
+    // ------------------------------------------------------------------
+    // Selection sync
+    // ------------------------------------------------------------------
+
+    _syncHighlight() {
+        if (!this.el) return;
+
+        for (const row of this.el.querySelectorAll('.lp-row.lp-selected')) {
+            row.classList.remove('lp-selected');
+        }
+
+        this._syncTagHighlight();
+
+        const selectedTimbers = this.selectionManager.selectedTimbers;
+
+        // Canvas-driven: highlight timber/accessory rows that match selected keys
+        for (const key of selectedTimbers) {
+            const safeKey = CSS.escape(key);
+            for (const row of this.el.querySelectorAll('.lp-row[data-member-key="' + safeKey + '"]')) {
+                row.classList.add('lp-selected');
+            }
+            for (const row of this.el.querySelectorAll('.lp-row[data-node-id="timber:' + safeKey + '"]')) {
+                row.classList.add('lp-selected');
+            }
+            // Joint members referencing this key
+            for (const row of this.el.querySelectorAll('.lp-row-jointMember[data-node-id$=":' + safeKey + '"]')) {
+                row.classList.add('lp-selected');
+            }
+        }
+
+        // The focused CSG row, if it is currently rendered.
+        const focusedId = this._focusedCsgNodeId;
+        if (focusedId) {
+            const row = this.el.querySelector(
+                '.lp-row-csg[data-node-id="' + CSS.escape(focusedId) + '"]');
+            if (row) {
+                row.classList.add('lp-selected');
+                this._reveal(focusedId, row);
+            }
+        } else if (selectedTimbers.size === 1) {
+            // Scroll to selected timber row (canvas click)
+            const key = Array.from(selectedTimbers)[0];
+            const row = this.el.querySelector('.lp-row[data-node-id="timber:' + CSS.escape(key) + '"]');
+            if (row) this._reveal('timber:' + key, row);
+        } else {
+            this._revealedNodeId = null;
+        }
+    }
+
+    /**
+     * Scroll a row into view, but only when it is not the one already shown.
+     *
+     * Marking rows selected is DERIVED, and redone on every rebuild at no
+     * cost. Scrolling to one is an EFFECT, and re-running it on a rebuild
+     * moved the tree under the reader: clicking a 3D measurement rebuilds
+     * the tree, and the rebuild scrolled back to whichever timber was
+     * selected -- above the measurements, so always upward, and away from
+     * the row just clicked.
+     *
+     * What is remembered is the one row showing now, so coming back to a
+     * row after looking at another reveals it again.
+     */
+    _reveal(nodeId, row) {
+        if (this._revealedNodeId === nodeId) {
+            return;
+        }
+        this._revealedNodeId = nodeId;
+        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    /**
+     * Show a CSG node in the list: open the sections and rows above it,
+     * mark it, and scroll to it. Called when a 3D pick needs the list to
+     * follow. Fetches the tree first if it is not in yet.
+     */
+    revealCsg({ section, timberKey, jointId, cutIndex, path }) {
+        const payload = this.csgTreesByKey.get(timberKey);
+        if (!payload) {
+            this._pendingReveal = { section, timberKey, jointId, cutIndex, path };
+            this._requestCsgTree(timberKey);
+            return;
+        }
+
+        const inJoints = section === 'joints';
+        const tree = inJoints
+            ? CsgTreeView.jointCuttingTree(payload, timberKey, jointId, cutIndex)
+            : CsgTreeView.timberTree(payload, timberKey);
+        if (!tree) {
+            return;
+        }
+
+        // Everything between the section header and the node itself.
+        const frameIndex = this._frameIndexOf({ timberKey, jointId: inJoints ? jointId : null });
+        if (frameIndex >= 0) {
+            const frameSection = 'section:' + this._frameSectionId(frameIndex);
+            this.expandedNodes.add(frameSection);
+            this.expandedNodes.add(frameSection + (inJoints ? ':joints' : ':timbers'));
+        } else {
+            this.expandedNodes.add(inJoints ? 'section:joints' : 'section:timbers');
+        }
+        if (inJoints) {
+            this.expandedNodes.add('joint:' + jointId);
+            this.expandedNodes.add('jcut:' + jointId + ':' + timberKey + ':' + cutIndex);
+        } else {
+            this.expandedNodes.add('timber:' + timberKey);
+        }
+
+        const target = CsgTreeView.findByPath(tree, path || []);
+        if (target) {
+            // Expand down to the node, but not the node itself: revealing
+            // something should not unfold everything beneath it.
+            const chain = CsgTreeView.ancestorIds(tree, target.id);
+            for (const id of chain.slice(0, -1)) {
+                this.expandedNodes.add(id);
+            }
+            this._focusedCsgNodeId = target.id;
+            this.selectionManager.setFocusedNodeId(target.id);
+        }
+        // Asked for by name, so it scrolls even to the row already showing.
+        // _reveal suppresses the reveals a rebuild would repeat, not the
+        // ones somebody requested.
+        this._revealedNodeId = null;
+        this._renderTree();
+    }
+
+    _renderFooter() {
+        if (!this._footerEl) return;
+        this._footerEl.innerHTML = '';
+        const anyHidden = this.layerStateStore.hasAnyHidden();
+        const anyLocked = this.layerStateStore.hasAnyLocked();
+        if (!anyHidden && !anyLocked) return;
+
+        if (anyHidden) {
+            const btn = document.createElement('button');
+            btn.className = 'lp-footer-btn';
+            btn.textContent = t('viewer.layers.footer.showAll');
+            btn.addEventListener('click', () => this.layerStateStore.showAll());
+            this._footerEl.appendChild(btn);
+        }
+        if (anyLocked) {
+            const btn = document.createElement('button');
+            btn.className = 'lp-footer-btn';
+            btn.textContent = t('viewer.layers.footer.unlockAll');
+            btn.addEventListener('click', () => this.layerStateStore.unlockAll());
+            this._footerEl.appendChild(btn);
+        }
+    }
+
+    /** Paint each tag row with how much of it the selection covers. */
+    _syncTagHighlight() {
+        const selected = this.selectionManager.selectedTimbers;
+        for (const row of this.el.querySelectorAll('.lp-row-tag')) {
+            const entry = this.tagEntriesById.get(row.dataset.tagId);
+            const state = entry ? TagIndex.tagSelectionState(entry, selected) : 'none';
+            row.classList.toggle('lp-selected', state === 'all');
+            row.classList.toggle('lp-tag-partial', state === 'partial');
+        }
+    }
+
+    _updateStateIcons() {
+        if (!this.el) return;
+        for (const row of this.el.querySelectorAll('.lp-row[data-member-key]')) {
+            const key = row.dataset.memberKey;
+            const state = this.layerStateStore.getState(key);
+            const lockBtn = row.querySelector('[data-action="lock"]');
+            const hideBtn = row.querySelector('[data-action="hide"]');
+            if (lockBtn) {
+                lockBtn.classList.toggle('lp-active', state.locked);
+                lockBtn.title = state.locked ? t('viewer.layers.unlock.title') : t('viewer.layers.lock.title');
+            }
+            if (hideBtn) {
+                hideBtn.classList.toggle('lp-active', state.hidden);
+                hideBtn.title = state.hidden ? t('viewer.layers.show.title') : t('viewer.layers.hide.title');
+            }
+        }
+        this._renderFooter();
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    _toggle(nodeId) {
+        if (this.expandedNodes.has(nodeId)) {
+            this.expandedNodes.delete(nodeId);
+        } else {
+            this.expandedNodes.add(nodeId);
+        }
+        this._renderTree();
+    }
+}
+
+const LayersViewBase = typeof HTMLElement !== 'undefined' ? HTMLElement : class {};
+
+class KigumiLayersView extends LayersViewBase {
+    constructor() {
+        super();
+        this._selectionManager = null;
+        this._layerStateStore = null;
+        this._panel = null;
+        this._hierarchy = { timbers: [], joints: [] };
+        this._unsubLayerState = null;
+    }
+
+    connectedCallback() {
+        this._ensureMounted();
+    }
+
+    disconnectedCallback() {
+        this._disposePanel();
+    }
+
+    /**
+     * Which members are hidden, locked or fixed.
+     *
+     * Exposed so anything that needs to KNOW can ask, rather than being
+     * told and keeping a copy. The viewer used to mirror this into a Map of
+     * its own, synced by events -- two copies of one fact, the second of
+     * which is stale exactly when an event is missed.
+     */
+    get layerState() {
+        return this._layerStateStore || null;
+    }
+
+    attach(selectionManager, _vscode) {
+        this._selectionManager = selectionManager;
+        this._ensureMounted();
+    }
+
+    /** Hand a fetched CSG tree to the panel. */
+    setCsgTree(memberKey, payload) {
+        if (this._panel) {
+            this._panel.setCsgTree(memberKey, payload);
+        }
+    }
+
+    /** Show a CSG node in the list, opening whatever is above it. */
+    revealCsg(target) {
+        if (this._panel) {
+            this._panel.revealCsg(target);
+        }
+    }
+
+    setLayersPayload(payload) {
+        this._hierarchy = this._convertRunnerPayload(payload || {});
+        this._ensureMounted();
+        if (this._panel) {
             this._panel.setHierarchy(this._hierarchy);
-            // Whatever arrived before there was a panel to give it to.
-            if (this._drawings) {
-                this._panel.setDrawings(
-                    this._drawings.drawings, this._drawings.activeSceneId,
-                    this._drawings.options || {});
-            }
-            this._emitLayerStateSync();
+        }
+        this._emitLayerStateSync();
+    }
+
+    /** The drawings to list, and which one is open. */
+    setDrawings(drawings, activeSceneId, options = {}) {
+        this._drawings = { drawings, activeSceneId, options };
+        this._ensureMounted();
+        if (this._panel) {
+            this._panel.setDrawings(drawings, activeSceneId, options);
+        }
+    }
+
+    /** Whether the drawings section is offered at all (the beta setting). */
+    setDrawingsEnabled(enabled) {
+        this._drawingsEnabled = Boolean(enabled);
+        this._ensureMounted();
+        if (this._panel) {
+            this._panel.drawingsEnabled = this._drawingsEnabled;
+        }
+    }
+
+    _ensureMounted() {
+        if (this._panel || !this._selectionManager) {
+            return;
         }
 
-        _disposePanel() {
-            if (!this._panel) {
-                return;
-            }
-            if (this._unsubLayerState) {
-                this._unsubLayerState();
-                this._unsubLayerState = null;
-            }
-            this._panel.destroy();
-            this._panel = null;
+        const LayerStateStoreCtor = LayerStateStore;
+        if (!LayerStateStoreCtor) {
+            console.warn('LayerStateStore is not available; layers panel disabled.');
+            return;
         }
 
-        _emitLayerStateSync() {
-            if (!this._layerStateStore) {
-                return;
-            }
-            const keys = new Set();
-            for (const timber of (this._hierarchy.timbers || [])) {
-                if (timber && typeof timber.key === 'string') {
-                    keys.add(timber.key);
-                }
-            }
-            for (const joint of (this._hierarchy.joints || [])) {
-                for (const timberKey of (joint && joint.timberKeys) || []) {
-                    if (typeof timberKey === 'string') {
-                        keys.add(timberKey);
-                    }
-                }
-                for (const accessoryKey of (joint && joint.accessoryKeys) || []) {
-                    if (typeof accessoryKey === 'string') {
-                        keys.add(accessoryKey);
-                    }
-                }
-            }
-
-            const states = {};
-            for (const key of keys) {
-                states[key] = this._layerStateStore.getState(key);
-            }
-
-            this.dispatchEvent(new CustomEvent('layer-state-sync', {
-                detail: { states },
+        this._layerStateStore = new LayerStateStoreCtor();
+        this._unsubLayerState = this._layerStateStore.onStateChanged((event) => {
+            this.dispatchEvent(new CustomEvent('layer-state-changed', {
+                detail: event,
                 bubbles: true,
                 composed: true,
             }));
+        });
+        this._panel = new LayersPanel(this._selectionManager, this._layerStateStore);
+        this._panel.drawingsEnabled = Boolean(this._drawingsEnabled);
+        this._panel.mount(this);
+        this._panel.setHierarchy(this._hierarchy);
+        // Whatever arrived before there was a panel to give it to.
+        if (this._drawings) {
+            this._panel.setDrawings(
+                this._drawings.drawings, this._drawings.activeSceneId,
+                this._drawings.options || {});
         }
+        this._emitLayerStateSync();
+    }
 
-        _convertRunnerPayload(payload) {
-            const timbers = Array.isArray(payload.timbers) ? payload.timbers : [];
-            const accessories = Array.isArray(payload.accessories) ? payload.accessories : [];
-            const joints = Array.isArray(payload.joints) ? payload.joints : [];
+    _disposePanel() {
+        if (!this._panel) {
+            return;
+        }
+        if (this._unsubLayerState) {
+            this._unsubLayerState();
+            this._unsubLayerState = null;
+        }
+        this._panel.destroy();
+        this._panel = null;
+    }
 
-            const timberKeyByKumikiEphemeralId = new Map();
-            for (const t of timbers) {
-                if (typeof t.kumikiEphemeralId === 'number' && typeof t.memberKey === 'string') {
-                    timberKeyByKumikiEphemeralId.set(t.kumikiEphemeralId, t.memberKey);
+    _emitLayerStateSync() {
+        if (!this._layerStateStore) {
+            return;
+        }
+        const keys = new Set();
+        for (const timber of (this._hierarchy.timbers || [])) {
+            if (timber && typeof timber.key === 'string') {
+                keys.add(timber.key);
+            }
+        }
+        for (const joint of (this._hierarchy.joints || [])) {
+            for (const timberKey of (joint && joint.timberKeys) || []) {
+                if (typeof timberKey === 'string') {
+                    keys.add(timberKey);
                 }
             }
-
-            const accessoryKeyByKumikiEphemeralId = new Map();
-            for (const a of accessories) {
-                if (typeof a.kumikiEphemeralId === 'number' && typeof a.memberKey === 'string') {
-                    accessoryKeyByKumikiEphemeralId.set(a.kumikiEphemeralId, a.memberKey);
+            for (const accessoryKey of (joint && joint.accessoryKeys) || []) {
+                if (typeof accessoryKey === 'string') {
+                    keys.add(accessoryKey);
                 }
             }
-
-            const hierarchyTimbers = timbers.map((t) => ({
-                key: t.memberKey,
-                name: t.name || t.memberKey,
-                tags: KigumiTags.coerceTags(t.tags),
-            })).filter((t) => typeof t.key === 'string' && t.key.length > 0);
-
-            const hierarchyJoints = joints.map((j) => ({
-                id: String(j.kumikiEphemeralId != null ? j.kumikiEphemeralId : j.name || 'joint'),
-                name: j.name || 'joint',
-                timberKeys: (Array.isArray(j.members) ? j.members : [])
-                    .map((m) => timberKeyByKumikiEphemeralId.get(m.timberKumikiEphemeralId))
-                    .filter((key) => typeof key === 'string'),
-                // One entry per cutting, which is what the joint section shows:
-                // a member cut twice by the same joint gets a row per cut.
-                cuttings: (Array.isArray(j.members) ? j.members : []).flatMap((m) => {
-                    const key = timberKeyByKumikiEphemeralId.get(m.timberKumikiEphemeralId);
-                    if (typeof key !== 'string') {
-                        return [];
-                    }
-                    return (Array.isArray(m.cutIndices) ? m.cutIndices : [])
-                        .map((cutIndex) => ({ timberKey: key, cutIndex }));
-                }),
-                accessoryKeys: (Array.isArray(j.accessoryKumikiEphemeralIds) ? j.accessoryKumikiEphemeralIds : [])
-                    .map((kid) => accessoryKeyByKumikiEphemeralId.get(kid))
-                    .filter((key) => typeof key === 'string'),
-            }));
-
-            // Only when a file shows several frames: which timbers and joints are each one's.
-            const frames = Array.isArray(payload.frames) && payload.frames.length > 1
-                ? payload.frames.map((frame) => ({
-                    name: frame.name || 'frame',
-                    timberKeys: (Array.isArray(frame.timberKumikiEphemeralIds) ? frame.timberKumikiEphemeralIds : [])
-                        .map((kid) => timberKeyByKumikiEphemeralId.get(kid))
-                        .filter((key) => typeof key === 'string'),
-                    jointIds: (Array.isArray(frame.jointKumikiEphemeralIds) ? frame.jointKumikiEphemeralIds : [])
-                        .map((kid) => String(kid)),
-                }))
-                : null;
-
-            return {
-                timbers: hierarchyTimbers,
-                joints: hierarchyJoints,
-                frames,
-            };
         }
+
+        const states = {};
+        for (const key of keys) {
+            states[key] = this._layerStateStore.getState(key);
+        }
+
+        this.dispatchEvent(new CustomEvent('layer-state-sync', {
+            detail: { states },
+            bubbles: true,
+            composed: true,
+        }));
     }
 
-    if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { LayersPanel, KigumiLayersView, csgIndentPx, MEMBER_ROW_INDENT_PX };
+    _convertRunnerPayload(payload) {
+        const timbers = Array.isArray(payload.timbers) ? payload.timbers : [];
+        const accessories = Array.isArray(payload.accessories) ? payload.accessories : [];
+        const joints = Array.isArray(payload.joints) ? payload.joints : [];
+
+        const timberKeyByKumikiEphemeralId = new Map();
+        for (const t of timbers) {
+            if (typeof t.kumikiEphemeralId === 'number' && typeof t.memberKey === 'string') {
+                timberKeyByKumikiEphemeralId.set(t.kumikiEphemeralId, t.memberKey);
+            }
+        }
+
+        const accessoryKeyByKumikiEphemeralId = new Map();
+        for (const a of accessories) {
+            if (typeof a.kumikiEphemeralId === 'number' && typeof a.memberKey === 'string') {
+                accessoryKeyByKumikiEphemeralId.set(a.kumikiEphemeralId, a.memberKey);
+            }
+        }
+
+        const hierarchyTimbers = timbers.map((t) => ({
+            key: t.memberKey,
+            name: t.name || t.memberKey,
+            tags: KigumiTags.coerceTags(t.tags),
+        })).filter((t) => typeof t.key === 'string' && t.key.length > 0);
+
+        const hierarchyJoints = joints.map((j) => ({
+            id: String(j.kumikiEphemeralId != null ? j.kumikiEphemeralId : j.name || 'joint'),
+            name: j.name || 'joint',
+            timberKeys: (Array.isArray(j.members) ? j.members : [])
+                .map((m) => timberKeyByKumikiEphemeralId.get(m.timberKumikiEphemeralId))
+                .filter((key) => typeof key === 'string'),
+            // One entry per cutting, which is what the joint section shows:
+            // a member cut twice by the same joint gets a row per cut.
+            cuttings: (Array.isArray(j.members) ? j.members : []).flatMap((m) => {
+                const key = timberKeyByKumikiEphemeralId.get(m.timberKumikiEphemeralId);
+                if (typeof key !== 'string') {
+                    return [];
+                }
+                return (Array.isArray(m.cutIndices) ? m.cutIndices : [])
+                    .map((cutIndex) => ({ timberKey: key, cutIndex }));
+            }),
+            accessoryKeys: (Array.isArray(j.accessoryKumikiEphemeralIds) ? j.accessoryKumikiEphemeralIds : [])
+                .map((kid) => accessoryKeyByKumikiEphemeralId.get(kid))
+                .filter((key) => typeof key === 'string'),
+        }));
+
+        // Only when a file shows several frames: which timbers and joints are each one's.
+        const frames = Array.isArray(payload.frames) && payload.frames.length > 1
+            ? payload.frames.map((frame) => ({
+                name: frame.name || 'frame',
+                timberKeys: (Array.isArray(frame.timberKumikiEphemeralIds) ? frame.timberKumikiEphemeralIds : [])
+                    .map((kid) => timberKeyByKumikiEphemeralId.get(kid))
+                    .filter((key) => typeof key === 'string'),
+                jointIds: (Array.isArray(frame.jointKumikiEphemeralIds) ? frame.jointKumikiEphemeralIds : [])
+                    .map((kid) => String(kid)),
+            }))
+            : null;
+
+        return {
+            timbers: hierarchyTimbers,
+            joints: hierarchyJoints,
+            frames,
+        };
     }
-    globalScope.LayersPanel = LayersPanel;
-    globalScope.KigumiLayersView = KigumiLayersView;
-    if (globalScope.customElements && !globalScope.customElements.get('kigumi-layers-view')) {
-        globalScope.customElements.define('kigumi-layers-view', KigumiLayersView);
-    }
-})(typeof window !== 'undefined' ? window : globalThis);
+}
+if (globalThis.customElements && !globalThis.customElements.get('kigumi-layers-view')) {
+    globalThis.customElements.define('kigumi-layers-view', KigumiLayersView);
+}
+
+export { LayersPanel, KigumiLayersView, csgIndentPx, MEMBER_ROW_INDENT_PX };

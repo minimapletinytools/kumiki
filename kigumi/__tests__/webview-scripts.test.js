@@ -87,51 +87,49 @@ describe('every script the template asks for is actually wired', () => {
     });
 });
 
-describe('every global the webview reaches for is loaded before it is used', () => {
-    /** Which file defines each `globalScope.X = ...`. */
-    const defines = new Map();
-    for (const name of fs.readdirSync(webviewDir)) {
-        if (!name.endsWith('.js')) {
-            continue;
-        }
+describe('the view is ES modules, and every import is there', () => {
+    // The page loads three.js, the scripts the extension host shares (feature flags, selection
+    // copy) and the boot diagnostics that must run first as classic scripts; everything else is
+    // imported from viewer-app.js. A missing file only shows as a blank view.
+    const files = [...fs.readdirSync(webviewDir), ...fs.readdirSync(path.join(webviewDir, 'sidebar')).map((name) => `sidebar/${name}`)]
+        .filter((name) => name.endsWith('.js'));
+    const imports = files.flatMap((name) => {
         const source = fs.readFileSync(path.join(webviewDir, name), 'utf8');
-        for (const match of source.matchAll(/globalScope\.([A-Za-z0-9_]+)\s*=/g)) {
-            defines.set(match[1], name);
-        }
-    }
-
-    /** The webview files loaded by the template, in order. */
-    const loaded = placeholders
-        .map((placeholder) => filled.get(placeholder))
-        .filter(Boolean);
-
-    // Every `window.Kigumi*` or known store the app and its panels use.
-    const used = new Set();
-    for (const name of [...viewerSourceFiles(), 'selection-panel.js', 'drawing-panel.js']) {
-        const source = fs.readFileSync(path.join(webviewDir, name), 'utf8');
-        for (const match of source.matchAll(/window\.([A-Za-z0-9_]+)/g)) {
-            if (defines.has(match[1])) {
-                used.add(match[1]);
-            }
-        }
-    }
+        return [...source.matchAll(/^import (?:[^;]*? from )?'(\.[^']+)';$/gm)].map((match) => ({ name, target: match[1] }));
+    });
 
     test('there is something to check', () => {
-        expect(used.size).toBeGreaterThan(5);
+        expect(imports.length).toBeGreaterThan(40);
     });
 
-    test.each([...used])('%s is defined by a script the template loads', (global) => {
-        expect(loaded).toContain(defines.get(global));
+    test('every relative import names a file', () => {
+        const missing = imports.filter(({ name, target }) => !fs.existsSync(path.join(webviewDir, path.dirname(name), target)));
+        expect(missing).toEqual([]);
     });
 
-    test('and loaded before viewer-app.js, which uses them in its constructor', () => {
-        const appAt = loaded.indexOf('viewer-app.js');
-        const late = [...used].filter((global) => {
-            const at = loaded.indexOf(defines.get(global));
-            return appAt !== -1 && at > appAt;
-        });
+    test('every module is imported by another, or is a page\'s entry', () => {
+        // A module nothing imports never runs: layers-panel.js, which defines <kigumi-layers-view>,
+        // went missing that way and the tree page was empty.
+        const imported = new Set(imports.map(({ name, target }) => path.normalize(path.join(path.dirname(name), target))));
+        const entries = new Set(['viewer-app.js', path.join('sidebar', 'sidebar-app.js')]);
+        const unloaded = files.filter((name) => /^export /m.test(fs.readFileSync(path.join(webviewDir, name), 'utf8')))
+            .map((name) => path.normalize(name))
+            .filter((name) => !imported.has(name) && !entries.has(name));
+        expect(unloaded).toEqual([]);
+    });
 
-        expect(late).toEqual([]);
+    test('the template loads only the classic scripts and the app', () => {
+        const loaded = placeholders.map((placeholder) => filled.get(placeholder)).filter(Boolean);
+        expect(loaded.filter((name) => !name.startsWith('vendor/'))).toEqual(
+            ['boot-diagnostics.js', 'feature-flags.js', 'selection-copy.js', 'viewer-app.js']);
+    });
+
+    test('no module reaches for another through window', () => {
+        const reach = files.filter((name) => /^(import|export) /m.test(fs.readFileSync(path.join(webviewDir, name), 'utf8')))
+            .flatMap((name) => [...fs.readFileSync(path.join(webviewDir, name), 'utf8').matchAll(/(?:window|globalThis)\.(Kigumi\w+|[A-Z]\w+Store|CsgTreeView|TagIndex)\b/g)]
+                .map((match) => `${name}: ${match[1]}`))
+            .filter((entry) => !/KigumiSelectionCopy|KigumiBootDiagnostics/.test(entry));
+        expect(reach).toEqual([]);
     });
 });
 

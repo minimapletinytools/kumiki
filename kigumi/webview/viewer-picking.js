@@ -5,12 +5,13 @@
  */
 
 import { choosePickAction, vscode } from './viewer-shared.js';
+import * as KigumiHover from './hover-state.js';
 
 export const PickingMixin = (Base) => class extends Base {
     /** The pointer moved over the canvas. Cheap: no request goes out here. */
     handleCanvasHover(event) {
         if (!this._hover) {
-            this._hover = new window.KigumiHover.HoverState();
+            this._hover = new KigumiHover.HoverState();
         }
         // Which viewport a pick lands in is decided from here, since the answer
         // arrives long after the click that asked.
@@ -57,7 +58,7 @@ export const PickingMixin = (Base) => class extends Base {
             measuring: this.measureDraft.isActive,
             alongRay: Boolean(along.ray),
         });
-        const target = window.KigumiHover.hoverTarget(decision)
+        const target = KigumiHover.hoverTarget(decision)
             || (decision.action === 'csg' && along.ray ? { memberKey: null, point: along.ray.origin } : null);
         if (decision.action !== 'csg' || !target) {
             // Either nothing under the pointer, or a click here would take the

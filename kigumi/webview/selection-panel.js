@@ -1,10 +1,12 @@
 import { html } from 'lit';
+import * as KigumiMeasurements from './measurements.js';
+import * as KigumiOverlay from './overlay-header.js';
+import * as TagIndex from './tag-index.js';
+import * as KigumiUnits from './units.js';
+import { drawButtonKey } from './selection-store.js';
 
-const KigumiUnits = window.KigumiUnits;
-const KigumiMeasurements = window.KigumiMeasurements;
-const TagIndex = window.TagIndex;
 const KigumiSelectionCopy = window.KigumiSelectionCopy;
-const { overlayHeader } = window.KigumiOverlay;
+const { overlayHeader } = KigumiOverlay;
 
 /**
  * The selection pane: what is selected, as stock and as a path into the CSG.
@@ -36,7 +38,7 @@ export class SelectionPanel {
         // Drawing nothing means drawing the whole frame, which is a reasonable
         // thing to ask for -- so rather than disabling the button with nothing
         // selected, it says which of the two it is about to do.
-        const drawKey = window.drawButtonKey(
+        const drawKey = drawButtonKey(
             this.app.selectionManager.getSelectedTimbers().length);
         action.textContent = inDrawing
             ? this.t('viewer.selection.leaveDrawing')
