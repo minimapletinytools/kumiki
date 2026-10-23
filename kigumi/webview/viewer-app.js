@@ -1632,7 +1632,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         }
 
         try {
-            const titles = Array.from(this.renderRoot.querySelectorAll('#panels .panel-title'))
+            const titles = Array.from(this.renderRoot.querySelectorAll('#view-sidebar .panel-title'))
                 .map((element) => (element.textContent || '').replace(/\s+/g, ' ').trim())
                 .filter((label) => label.length > 0);
             const rawPanelIndex = titles.indexOf('Raw Python Output');
