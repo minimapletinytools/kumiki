@@ -23,7 +23,7 @@ screen, a corner within 10 px, on either side, whatever the zoom or the angle.
 - **Candidates**: every feature under the pointer, best first. A click takes the first one; Tab
   steps through them; right-click lists them.
 
-## What the viewer sends (`viewer-app.js`)
+## What the viewer sends (`webview/viewer-picking.js`)
 
 On a click, and on a hover once the pointer has settled:
 

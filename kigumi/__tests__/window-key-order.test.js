@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { viewerSource } = require('../test/viewer-source');
 
 // The viewer's keydown handler decides things in an order that matters, and
 // the order is invisible: every branch reads correctly on its own.
@@ -14,8 +15,7 @@ const path = require('path');
 //
 // viewer-app.js has no runtime harness, so this reads the source.
 
-const app = fs.readFileSync(
-    path.join(__dirname, '..', 'webview', 'viewer-app.js'), 'utf8');
+const app = viewerSource();
 
 /** The body of a one-argument method, by brace matching. */
 function methodBody(name) {

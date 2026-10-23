@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { viewerSource } = require('../test/viewer-source');
 
 // The webview builds a pick request; the extension host rebuilds it FIELD BY
 // FIELD before handing it to the runner. Anything added to the request and not
@@ -11,8 +12,7 @@ const path = require('path');
 // `space` went missing, so the runner kept projecting in the 3D view and every
 // face came back unmeasurable and drew red.
 
-const app = fs.readFileSync(
-    path.join(__dirname, '..', 'webview', 'viewer-app.js'), 'utf8');
+const app = viewerSource();
 const session = fs.readFileSync(
     path.join(__dirname, '..', 'frame-view-session.js'), 'utf8');
 

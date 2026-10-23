@@ -1,10 +1,12 @@
-// describeCandidates is a pure function at the top of viewer-app.js, which is a
+// describeCandidates is a pure function in viewer-shared.js, which is a
 // browser module -- so this pulls just that function out of the source rather
 // than loading the whole app.
 const fs = require('fs');
 const path = require('path');
 
-const source = fs.readFileSync(path.join(__dirname, '../webview/viewer-app.js'), 'utf8');
+const { viewerSource } = require('../test/viewer-source');
+
+const source = viewerSource();
 const start = source.indexOf('function describeCandidates(');
 const end = source.indexOf('\n}\n', start) + 3;
 // eslint-disable-next-line no-eval

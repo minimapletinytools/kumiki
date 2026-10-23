@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { viewerSource, viewerSourceFiles } = require('../test/viewer-source');
 
 // The webview loads its modules as plain scripts, wired in two places at
 // once: a <script> placeholder in viewer.html and a row of WEBVIEW_ASSETS in
@@ -106,7 +107,7 @@ describe('every global the webview reaches for is loaded before it is used', () 
 
     // Every `window.Kigumi*` or known store the app and its panels use.
     const used = new Set();
-    for (const name of ['viewer-app.js', 'selection-panel.js', 'drawing-panel.js']) {
+    for (const name of [...viewerSourceFiles(), 'selection-panel.js', 'drawing-panel.js']) {
         const source = fs.readFileSync(path.join(webviewDir, name), 'utf8');
         for (const match of source.matchAll(/window\.([A-Za-z0-9_]+)/g)) {
             if (defines.has(match[1])) {
@@ -139,7 +140,7 @@ describe('every argument a shared decision takes is actually passed', () => {
     // was updated -- so in a drawing the store refused the timber selection,
     // the pick never became a 'csg', and nothing selected or hovered at all.
     // A pure function is easy to test and easy to leave unwired.
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
 
     /** Each `choosePickAction({ ... })` call in the app, with its argument text. */
     function callsTo(name) {
@@ -185,7 +186,7 @@ describe('the app asks the draft what is held, rather than deciding again', () =
     // answering the moment a second end was picked -- leaving every further
     // pick judged as if nothing were held. The draft answers it now, and the
     // answer is unit tested there.
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
     const at = app.indexOf('_heldForRequest() {');
     const body = app.slice(at, app.indexOf('\n    }', at));
 
@@ -210,7 +211,7 @@ describe('the hover machine has one home', () => {
     // hover bugs grew on that seam: a stale verdict left green because the
     // comparison lived on one side, and the record of what was drawn nulled by
     // a teardown on the other.
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
     const machine = fs.readFileSync(path.join(webviewDir, 'hover-state.js'), 'utf8');
 
     test.each(['_hoverDrawn', '_candidateIndex', '_hoverClient'])(
@@ -260,7 +261,7 @@ describe('the hover is asked again whenever the held end changes', () => {
     // -- and the colour under it, which says whether a click will be taken,
     // depends on exactly that. Without a re-ask the verdict on screen is the
     // one from before, however right the comparison that draws it.
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
 
 
     test.each([
@@ -286,7 +287,7 @@ describe('overlays are reconciled from a list, not torn down by hand', () => {
     // the reconciler makes the scene match, so an overlay goes away by leaving
     // the list. These tests pin that shape, since losing it brings the old
     // class of bug back with it.
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
 
     test('the pass asks what should be lit', () => {
         expect(methodBody(app, 'applyDerivedVisuals')).toContain('highlightsFor');
@@ -377,7 +378,7 @@ describe('everything the frame is drawn from is in the signature it is drawn for
     //
     // This is that check. It is the reason the pulled design is safe to rely
     // on, so it is not decoration.
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
 
 
     /**
@@ -451,7 +452,7 @@ describe('a pointer gesture owns its listeners', () => {
     // name and so could not take down: leaving the viewer with the mouse still
     // held leaked both handlers, and each held the whole app. The rail resize
     // had been given a line in teardown by hand; a name means neither needs one.
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
 
     /** Every place a pointer listener goes up, by the method it is in. */
     function listenerHomes(kind) {
@@ -506,7 +507,7 @@ describe('a pointer gesture owns its listeners', () => {
 // and these guard the four places that has to hold. viewer-app.js cannot be
 // loaded here (it imports lit and defines a custom element), so they are read.
 describe('the feature menu holds the hover still', () => {
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
 
     test('opening the menu pins, and a menu that did not open does not', () => {
         const body = methodBody(app, 'showFeatureContextMenu');
@@ -591,7 +592,7 @@ describe('the feature menu holds the hover still', () => {
 // menu away. It showed cut/copy/paste over the dimension instead. viewer-app.js
 // cannot be loaded here, so the wiring is read.
 describe('a measurement offers its menu where it is drawn', () => {
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
 
     test('a dimension opens the same menu as its list row', () => {
         const body = methodBody(app, '_measurementGroup');
@@ -615,7 +616,7 @@ describe('a measurement offers its menu where it is drawn', () => {
 describe('a dropped dimension stays where it was dropped', () => {
     // Let go of at once, it drew at its old place until the runner answered -- a flicker on every
     // drag, worst on a dimension the code declares, whose move goes through the runner as an override.
-    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const app = viewerSource();
 
     test('the drop holds it rather than letting go', () => {
         expect(app).toContain('this._settleMeasurementDrag(dragged);');
