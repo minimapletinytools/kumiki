@@ -527,6 +527,10 @@ function buildMenu() {
 }
 
 async function start() {
+    // Run from source, the Dock shows Electron's icon; a build has its own (electron-builder.yml).
+    if (process.platform === 'darwin' && !app.isPackaged && app.dock) {
+        app.dock.setIcon(path.join(KIGUMI_DIR, 'templogo.png'));
+    }
     protocol.handle('kigumi', handleProtocol);
 
     const userData = app.getPath('userData');

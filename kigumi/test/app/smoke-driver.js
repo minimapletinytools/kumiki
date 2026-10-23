@@ -228,10 +228,16 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
 
         // A drawing's dotted lines, clipped per timber by the member id pass: drawn, and every shader
         // they need compiled. Nothing else here enters a drawing, so nothing else draws them.
-        // Drawings are behind a beta setting, read when a viewer opens.
-        fs.writeFileSync(settings.filePath, JSON.stringify(
-            { ...JSON.parse(fs.readFileSync(settings.filePath, 'utf8')), 'viewer.drawingBeta': true }, null, 2));
-        await waitFor(() => settings.get('viewer.drawingBeta') === true, { timeoutMs: 5000 });
+        // Drawings are a beta feature: turned on from the options' beta section, a setting the open
+        // views reload to read.
+        await showTab('options');
+        await inShell(`${viewDoc}.getElementById('beta-drawing-toggle').click()`);
+        const betaSaved = await waitFor(() => settings.get('viewer.drawingBeta') === true, { timeoutMs: 5000 }).catch(() => false);
+        const betaShown = await waitFor(() => inShell(`(() => {
+            const app = document.querySelector("#slot-center iframe:not([hidden])")?.contentDocument?.querySelector("kigumi-app");
+            return !!(app && app.drawingBetaEnabled);
+        })()`), { timeoutMs: 20000 }).catch(() => false);
+        check('turning drawings on in the beta section saves it, and the open view reloads with them', betaSaved && betaShown);
         await runAppCommand('kigumi.openFrameFromSidebar', DRAWING_FRAME);
         const viewerApp = 'document.querySelector("#slot-center iframe:not([hidden])").contentDocument.querySelector("kigumi-app")';
         const drawingId = await waitFor(() => inShell(`(() => {

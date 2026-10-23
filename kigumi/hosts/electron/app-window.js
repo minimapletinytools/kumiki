@@ -8,6 +8,8 @@ const path = require('path');
 const { BrowserWindow, ipcMain, shell: electronShell } = require('electron');
 
 const SHELL_PRELOAD = path.join(__dirname, 'shell-preload.js');
+// The window's icon where the platform takes one from the window (Windows, Linux).
+const APP_ICON = path.join(__dirname, '..', '..', 'templogo.png');
 
 function createAppWindow({ origin, log = () => {} }) {
     const shellUrl = `${origin}/webview/shell/shell.html`;
@@ -18,6 +20,7 @@ function createAppWindow({ origin, log = () => {} }) {
         minWidth: 720,
         minHeight: 480,
         title: 'Kigumi',
+        icon: APP_ICON,
         show: false,
         ...(isMac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 12, y: 10 } } : {}),
         webPreferences: { preload: SHELL_PRELOAD, contextIsolation: true, backgroundThrottling: false },

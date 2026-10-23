@@ -2422,7 +2422,19 @@ class KigumiViewerApp extends LitElement {
     }
 
     get panelFlags() {
-        return { assemblyPreview: ASSEMBLY_PREVIEW_ENABLED, drawingBeta: DRAWING_BETA_ENABLED };
+        return {
+            assemblyPreview: ASSEMBLY_PREVIEW_ENABLED,
+            drawingBeta: DRAWING_BETA_ENABLED,
+            // Whether the package lets assembly preview be turned on at all (feature-flags.js).
+            assemblyPreviewAvailable: Boolean(FEATURE_FLAGS.assemblyPreview),
+        };
+    }
+
+    /** Turn a beta feature ('assemblyPreview' or 'drawingBeta') on or off: a setting, so the host reloads the views. */
+    setBetaFeature(feature, enabled) {
+        if (vscode) {
+            vscode.postMessage({ type: 'setBetaFeature', feature, enabled: Boolean(enabled) });
+        }
     }
 
     setDebugEnabled(enabled) {

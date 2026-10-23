@@ -255,7 +255,7 @@
     "test:ext:complex": "node ./test/run-extension-tests.js --suite complex",
     "test:ext:complex:grep": "node ./test/run-extension-tests.js --suite complex --grep",
     "test:all": "npm run test:unit && npm run test:ext",
-    "app:start": "electron hosts/electron/main.js",
+    "app:start": "node scripts/start-app.js",
     "app:fetch-uv": "node scripts/fetch-uv.js",
     "app:dist": "npm run prepare:instructions && node scripts/bundle-docs.js && node scripts/fetch-uv.js && electron-builder --config electron-builder.yml",
     "test:app": "node test/app/run-app-tests.js"

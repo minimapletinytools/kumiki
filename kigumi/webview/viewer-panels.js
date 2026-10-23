@@ -262,6 +262,20 @@ export class ViewerSettingsPanel {
                             ? t('viewer.options.export.installingCadquery')
                             : t('viewer.options.export.installCadquery')}</button>`
                     : ''}
+                <!-- Saved as settings, so they hold for every view; the open views reload to show them. -->
+                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.beta')}></div>
+                <div class="viewer-settings-subtitle">${t('viewer.options.section.beta')}</div>
+                ${this.app.panelFlags.assemblyPreviewAvailable ? html`
+                <label>
+                    <input id="beta-assembly-toggle" type="checkbox" .checked=${this.app.panelFlags.assemblyPreview}
+                        @change=${(event) => this.app.setBetaFeature('assemblyPreview', event.target.checked)}>
+                    ${t('viewer.options.beta.assemblyPreview')}
+                </label>` : ''}
+                <label>
+                    <input id="beta-drawing-toggle" type="checkbox" .checked=${this.app.panelFlags.drawingBeta}
+                        @change=${(event) => this.app.setBetaFeature('drawingBeta', event.target.checked)}>
+                    ${t('viewer.options.beta.drawings')}
+                </label>
             </section>
         `;
     }
