@@ -109,7 +109,7 @@ jobs:
       - name: Cache the VS Code the tests download
         uses: actions/cache@v4
         with:
-          path: kigumi/.vscode-test
+          path: .vscode-test
           key: vscode-test-${{ runner.os }}-${{ hashFiles('kigumi/package.json') }}
           restore-keys: |
             vscode-test-${{ runner.os }}-
@@ -117,8 +117,13 @@ jobs:
       - name: Install a virtual display
         run: sudo apt-get update && sudo apt-get install -y xvfb
 
+      # No GPU here: the view draws with SwiftShader (run-extension-tests.js).
       - name: Run extension tests
         run: xvfb-run -a npm run test:ext
+        env:
+          KIGUMI_SOFTWARE_GL: '1'
 
       - name: Run the complex extension tests
         run: xvfb-run -a npm run test:ext:complex
+        env:
+          KIGUMI_SOFTWARE_GL: '1'

@@ -96,6 +96,10 @@ async function main() {
         '--disable-workspace-trust',
         '--user-data-dir',
         userDataDir,
+        // A machine with no GPU (CI) blocks WebGL, and the view draws nothing; SwiftShader draws in software.
+        ...(process.env.KIGUMI_SOFTWARE_GL === '1'
+          ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']
+          : []),
       ],
     });
   } catch (error) {
