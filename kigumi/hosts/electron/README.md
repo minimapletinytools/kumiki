@@ -11,7 +11,7 @@ From `kigumi/`:
 | Command | Does |
 |---|---|
 | `npm run app:start -- <project-folder>` | Run from source. Without a folder it reopens the last one. |
-| `npm run test:app` | Opens this repo in the app and runs `test/app/smoke-driver.js` in it. Add `-- --app <packaged executable>` to test a build. |
+| `npm run test:app` | Opens this repo in the app and runs the scenarios in `test/app/scenarios/` in it, each from a known layout. `KIGUMI_TEST_SCENARIO=sidebar,mcp` runs just those. Add `-- --app <packaged executable>` to test a build. |
 | `npm run app:dist` | Bundles docs and a pinned uv, then builds installers into `dist-app/`. |
 
 `test:app` needs the repo's `.venv` (`uv sync` at the repo root).
