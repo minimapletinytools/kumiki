@@ -175,17 +175,17 @@ export class MemberListPanel {
         }
     }
 
-    formatCrossSection(mesh, axis, { nominal = this.options.showNominalSizes } = {}) {
+    formatCrossSection(mesh, axis) {
         const nominalKey = axis === 'width' ? 'nominal_width' : 'nominal_height';
         const perfectKey = axis === 'width' ? 'perfect_width' : 'perfect_height';
         const legacyKey = axis === 'width' ? 'prism_width' : 'prism_height';
 
-        const selected = nominal ? mesh[nominalKey] : mesh[perfectKey];
+        const selected = this.options.showNominalSizes ? mesh[nominalKey] : mesh[perfectKey];
         const value = selected !== undefined ? selected : mesh[legacyKey];
         return value === undefined ? '—' : this.app.fmt(value);
     }
 
-    formatLength(mesh, { rough = this.options.showRoughLength } = {}) {
+    formatLength(mesh) {
         // The finished piece rather than the stock it was cut from: a timber
         // with an end joint is never cut to length first, so its declared
         // length is not a dimension anyone meant (see docs/concepts.md).
@@ -193,7 +193,7 @@ export class MemberListPanel {
         if (exactLengthM === null) {
             return '—';
         }
-        if (rough) {
+        if (this.options.showRoughLength) {
             return this.app.fmt(exactLengthM + (this.roughLengthAllowanceMm / 1000));
         }
         return this.app.fmt(exactLengthM);

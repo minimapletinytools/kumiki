@@ -2,17 +2,18 @@
  * The viewer's options and its frame parameters (kiwari), as panels that draw from an `app` (the
  * viewer) and change things only through its methods. They live in the view's sidebar.
  *
- * No imports: the page passes lit's `html`, its translator and the shared value modules to
- * usePanelRuntime first.
+ * The page passes its translator and the shared value modules (window globals) to usePanelRuntime
+ * first.
  */
 
-let html;
+import { html } from 'lit';
+
 let t;
 let KigumiUnits;
 let KigumiKiwariValues;
 
 export function usePanelRuntime(runtime) {
-    ({ html, t, KigumiUnits, KigumiKiwariValues } = runtime);
+    ({ t, KigumiUnits, KigumiKiwariValues } = runtime);
 }
 
 /** A precision as the step it reads to: '2' -> 0.01, '1/16' as it is. */

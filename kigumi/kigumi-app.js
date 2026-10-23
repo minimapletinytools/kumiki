@@ -85,6 +85,8 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
     const outputChannel = channel;
     const frameSessions = new Map();       // filePath → FrameViewSession (main sessions)
     const patternSessions = new Map();     // slotName → FrameViewSession (pattern sessions)
+    // Every view session, frames first.
+    const allSessions = () => [...frameSessions.values(), ...patternSessions.values()];
     const standaloneRunners = new Set();   // PythonRunnerSession instances not owned by any session
     const disposables = [];
     let patternSlotCounter = 0;
@@ -120,14 +122,14 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         }
         if (affects('viewer.autoRefreshOnFileChange')) {
             autoRefreshOnFileChange = host.getConfig('viewer.autoRefreshOnFileChange', false);
-            for (const session of [...frameSessions.values(), ...patternSessions.values()]) {
+            for (const session of allSessions()) {
                 session.setWatcherEnabled(autoRefreshOnFileChange);
             }
             outputChannel.appendLine(`[kigumi] Auto refresh on file change: ${autoRefreshOnFileChange ? 'enabled' : 'disabled'}`);
         }
         // Read when a view's page is built, so the open views are built again.
         if (affects('viewer.assemblyPreview') || affects('viewer.drawingBeta')) {
-            for (const session of [...frameSessions.values(), ...patternSessions.values()]) {
+            for (const session of allSessions()) {
                 session.reloadPage();
             }
         }
@@ -265,7 +267,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         },
 
         'kigumi.automationListSessions': async () => {
-            const sessions = [...frameSessions.values(), ...patternSessions.values()].map((session) => session.getTestSnapshot());
+            const sessions = allSessions().map((session) => session.getTestSnapshot());
             return { total: sessions.length, sessions };
         },
 
@@ -1023,7 +1025,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             }
         }
 
-        return [...frameSessions.values(), ...patternSessions.values()].find((session) => !session.isDisposed) || null;
+        return allSessions().find((session) => !session.isDisposed) || null;
     }
 
     function pruneWorkspaceLogs() {
@@ -1041,10 +1043,10 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
 
     // Disposes every session and runner, and the app's own listeners.
     async function dispose() {
-        const allSessions = [...frameSessions.values(), ...patternSessions.values()];
+        const sessions = allSessions();
         frameSessions.clear();
         patternSessions.clear();
-        await Promise.allSettled(allSessions.map((session) => session.dispose()));
+        await Promise.allSettled(sessions.map((session) => session.dispose()));
         const runners = Array.from(standaloneRunners);
         standaloneRunners.clear();
         await Promise.allSettled(runners.map((runner) => runner.dispose()));

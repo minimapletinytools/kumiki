@@ -87,7 +87,7 @@ const GeometryMode = window.GeometryMode;
 const KigumiTags = window.KigumiTags;
 const KigumiUnits = window.KigumiUnits;
 const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
-usePanelRuntime({ html, t, KigumiUnits: window.KigumiUnits, KigumiKiwariValues: window.KigumiKiwariValues });
+usePanelRuntime({ t, KigumiUnits: window.KigumiUnits, KigumiKiwariValues: window.KigumiKiwariValues });
 useSidebarRuntime({ html, t });
 
 /**
@@ -928,6 +928,10 @@ class KigumiViewerApp extends LitElement {
         this.onWindowContextMenuDismiss = this.onWindowContextMenuDismiss.bind(this);
     }
 
+    // ------------------------------------------------------------------
+    // The page: rendering, the sidebar's pages, lifecycle and wiring
+    // ------------------------------------------------------------------
+
     createRenderRoot() {
         return this;
     }
@@ -1440,6 +1444,10 @@ class KigumiViewerApp extends LitElement {
         animate();
     }
 
+    // ------------------------------------------------------------------
+    // Viewports, cameras and the sheet
+    // ------------------------------------------------------------------
+
     // The viewport the camera controls act on. With one viewport this is the
     // only one; with several it is the one last interacted with, which is what
     // the cube and the orbit gizmo describe.
@@ -1763,6 +1771,10 @@ class KigumiViewerApp extends LitElement {
         return this._sheetColors;
     }
 
+    // ------------------------------------------------------------------
+    // The log
+    // ------------------------------------------------------------------
+
     emitViewerLog(eventName, details = {}) {
         const payload = {
             type: 'viewerLog',
@@ -1807,6 +1819,10 @@ class KigumiViewerApp extends LitElement {
             line.classList.toggle('log-filtered-out', !match);
         }
     }
+
+    // ------------------------------------------------------------------
+    // Options, export choices and saved settings
+    // ------------------------------------------------------------------
 
     setViewerOptions(nextPartial, options = {}) {
         const normalized = normalizeViewerOptions(nextPartial);
@@ -2016,6 +2032,10 @@ class KigumiViewerApp extends LitElement {
     }
 
     /** One section per kiwari the frames were built from. */
+    // ------------------------------------------------------------------
+    // Frame parameters (kiwari)
+    // ------------------------------------------------------------------
+
     setKiwariFromFrame(frameData) {
         this.kiwariSections = KigumiKiwariValues.sectionsFromPayload(frameData && frameData.kiwari, this.unitSystem());
         this.requestUpdate();
@@ -2058,6 +2078,10 @@ class KigumiViewerApp extends LitElement {
         }
         vscode.postMessage({ type: 'saveParameters', kiwari: this.pendingKiwariValues() });
     }
+
+    // ------------------------------------------------------------------
+    // Messages from the host, and answers to its requests
+    // ------------------------------------------------------------------
 
     requestRefresh() {
         if (!vscode) {
@@ -2424,6 +2448,10 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    // ------------------------------------------------------------------
+    // What the options panel reads and calls
+    // ------------------------------------------------------------------
+
     // What the options panel reads that lives elsewhere (viewer-panels.js).
     get themeChoices() {
         return Object.entries(THEMES).map(([id, theme]) => ({ id, labelKey: theme.labelKey }));
@@ -2542,6 +2570,10 @@ class KigumiViewerApp extends LitElement {
             'Failed to set camera state',
         );
     }
+
+    // ------------------------------------------------------------------
+    // Window events: pointer, keyboard, resize; picking along a ray
+    // ------------------------------------------------------------------
 
     onWindowScroll() {
         const toV3d = this.renderRoot.querySelector('#to-v3d');
@@ -4335,6 +4367,10 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    // ------------------------------------------------------------------
+    // Selection: what a click picked, and how members and highlights look
+    // ------------------------------------------------------------------
+
     handleCSGSelectionResult(message) {
         // While measuring, a click the hover showed as refused does nothing but say why.
         // Selecting it anyway left a feature selected and no measurement.
@@ -4786,6 +4822,10 @@ class KigumiViewerApp extends LitElement {
         });
     }
 
+    // ------------------------------------------------------------------
+    // The gizmo and light dial, dragged
+    // ------------------------------------------------------------------
+
     onGizmoPointerMove(event) {
         if (!this.gizmoDragging) {
             return;
@@ -4829,6 +4869,10 @@ class KigumiViewerApp extends LitElement {
     }
 
     /** A length in metres, in whichever units the viewer is set to. */
+    // ------------------------------------------------------------------
+    // Units
+    // ------------------------------------------------------------------
+
     fmt(value) {
         return KigumiUnits.formatLength(value, this.units, this.unitPrecision());
     }
@@ -4866,6 +4910,10 @@ class KigumiViewerApp extends LitElement {
         this._syncDrawingPanel();
         this.requestUpdate();
     }
+
+    // ------------------------------------------------------------------
+    // Camera motion, theme and geometry mode
+    // ------------------------------------------------------------------
 
     clampPhi(value) {
         return this.cameraController.clampPhi(value);
@@ -5375,6 +5423,10 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    // ------------------------------------------------------------------
+    // After each render; the context menu and the timeline, drawn
+    // ------------------------------------------------------------------
+
     // The webview CSP blocks inline style attributes (style-src has no
     // 'unsafe-inline'), so lit style= bindings never reach the DOM. Setting
     // properties through the CSSOM is allowed: marks carry their position in
@@ -5522,6 +5574,10 @@ class KigumiViewerApp extends LitElement {
             </div>
         `;
     }
+
+    // ------------------------------------------------------------------
+    // Rendering: gizmo, edges, shadows, footprints, materials, light, silhouettes
+    // ------------------------------------------------------------------
 
     setCenterGizmoEnabled(enabled) {
         this.showCenterGizmo = enabled;
@@ -6189,8 +6245,7 @@ class KigumiViewerApp extends LitElement {
      */
 
     // ------------------------------------------------------------------
-    // CSG trees: fetched here (the vscode channel lives in this component),
-    // rendered by the layers panel.
+    // Pointer gestures
     // ------------------------------------------------------------------
 
     /**
@@ -6242,6 +6297,11 @@ class KigumiViewerApp extends LitElement {
     }
 
     /** The layers panel expanded a row and needs that timber's tree. */
+    // ------------------------------------------------------------------
+    // CSG trees: fetched here (the vscode channel lives in this component),
+    // rendered by the layers panel.
+    // ------------------------------------------------------------------
+
     onCsgTreeRequested(event) {
         const detail = (event && event.detail) || {};
         this.requestCsgTree(detail.memberKey);
@@ -6319,6 +6379,10 @@ class KigumiViewerApp extends LitElement {
             this._revealCsgFocusInList(target, focus.path);
         }
     }
+
+    // ------------------------------------------------------------------
+    // Debug info, loading the scene, and applying a payload
+    // ------------------------------------------------------------------
 
     updateDebug(geometryData, profiling) {
         const meshes = (geometryData && geometryData.meshes) ? geometryData.meshes : [];
@@ -6794,6 +6858,10 @@ class KigumiViewerApp extends LitElement {
         this.setViewPhase(ViewerPhase.READY, '', { refreshToken, error: null });
     }
 
+    // ------------------------------------------------------------------
+    // Projection
+    // ------------------------------------------------------------------
+
     updateCamera() {
         // Every viewport, not just the active one: the others are on screen at
         // the same time and would otherwise never be positioned.
@@ -6847,6 +6915,10 @@ class KigumiViewerApp extends LitElement {
     get drawingBetaEnabled() {
         return DRAWING_BETA_ENABLED;
     }
+
+    // ------------------------------------------------------------------
+    // Measurements, drawn on the page
+    // ------------------------------------------------------------------
 
     /**
      * Draw every measurement of the active scene, on the sheet.
@@ -7329,6 +7401,10 @@ class KigumiViewerApp extends LitElement {
     }
 
     /** The members this scene is about, or null when it is about all of them. */
+    // ------------------------------------------------------------------
+    // The page: panning, zooming, its size
+    // ------------------------------------------------------------------
+
     get activeSceneMembers() {
         return sceneMembers(this.sceneStore.activeScene());
     }
@@ -7439,6 +7515,10 @@ class KigumiViewerApp extends LitElement {
     }
 
     /** Switch scenes: new viewports, and whatever camera controls it asks for. */
+    // ------------------------------------------------------------------
+    // Scenes and drawings
+    // ------------------------------------------------------------------
+
     setActiveScene(sceneId) {
         if (!this.sceneStore.setActiveScene(sceneId)) {
             return;

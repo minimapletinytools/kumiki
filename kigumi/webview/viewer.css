@@ -366,13 +366,6 @@ canvas { display: block; width: 100%; height: 100%; }
     border-bottom: 1px solid var(--hv-panel-border);
 }
 
-.dp-name {
-    flex: 1 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .dp-origin {
     opacity: 0.75;
 }
@@ -702,10 +695,6 @@ canvas { display: block; width: 100%; height: 100%; }
     flex-direction: column;
     gap: 2px;
     line-height: 1.5;
-}
-
-.ip-counts {
-    color: var(--hv-dim);
 }
 
 .ip-breadcrumb {
@@ -1165,14 +1154,6 @@ canvas { display: block; width: 100%; height: 100%; }
     letter-spacing: 0.02em;
     text-transform: lowercase;
 }
-
-.render-controls-title {
-    color: var(--hv-title);
-    font: 600 12px 'Segoe UI', sans-serif;
-    letter-spacing: 0.02em;
-    text-transform: lowercase;
-    margin-right: 6px;
-}
 #render-controls label {
     display: inline-flex;
     align-items: center;
@@ -1421,10 +1402,6 @@ canvas { display: block; width: 100%; height: 100%; }
 #timber-panel table.member-hide-tags [data-col="tags"] {
     display: none;
 }
-#timber-panel table.member-hide-sizes [data-col="width"],
-#timber-panel table.member-hide-sizes [data-col="height"] {
-    display: none;
-}
 #timber-panel table.member-hide-csg [data-col="csg"],
 #timber-panel table.member-hide-csg [data-col="feature"] {
     display: none;
@@ -1546,142 +1523,17 @@ canvas { display: block; width: 100%; height: 100%; }
     background: var(--hv-accent-mid);
 }
 .dim { color: var(--hv-dim); }
-/* ---- Layers panel ---- */
+/* ---- Layers panel (layers-panel.js) ---- */
 kigumi-layers-view {
-    /* Takes the rail's remaining height. min-height lets it shrink rather
-       than push the info pane off the top when the list is long. */
+    /* Takes the tree page's remaining height. min-height lets it shrink rather
+       than push the selection off the top when the list is long. */
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
     max-height: none;
     pointer-events: auto;
 }
-.layers-panel {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    background: var(--hv-layers-bg);
-    color: var(--hv-text);
-    border: 1px solid var(--hv-panel-border);
-    border-radius: 6px;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    overflow: hidden;
-    font-size: 12px;
-}
-.layers-panel.is-collapsed {
-    width: 28px;
-    height: 28px;
-    background: var(--hv-layers-collapsed-bg);
-}
-kigumi-layers-view:has(.layers-panel.is-collapsed) {
-    flex: 0 0 auto;
-    width: 28px;
-    max-height: 28px;
-}
-.layers-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 6px;
-    border-bottom: 1px solid var(--hv-panel-border);
-    background: var(--hv-layers-header-bg);
-}
-.layers-collapse-btn {
-    background: transparent;
-    border: 1px solid var(--hv-panel-border);
-    border-radius: 4px;
-    color: var(--hv-title);
-    cursor: pointer;
-    font-size: 12px;
-    line-height: 1;
-    padding: 2px 6px;
-}
-.layers-collapse-btn:hover {
-    background: var(--hv-control-bg-solid-hover);
-}
-.layers-title {
-    color: var(--hv-title);
-    font-weight: 600;
-    font-size: 12px;
-    letter-spacing: 0.06em;
-    text-transform: lowercase;
-    flex: 1 1 auto;
-}
-.layers-panel.is-collapsed .layers-title {
-    display: none;
-}
-.layers-body {
-    flex: 1 1 auto;
-    overflow: auto;
-    padding: 4px 0;
-}
-.layers-empty {
-    padding: 8px 12px;
-    color: var(--hv-dim);
-    font-style: italic;
-}
-.layers-row {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 6px 2px 0;
-    cursor: pointer;
-    user-select: none;
-    line-height: 1.4;
-    border-radius: 3px;
-}
-.layers-row:hover {
-    background: var(--hv-layers-hover-bg);
-}
-.layers-row.is-highlighted {
-    background: var(--hv-layers-selected-bg);
-    color: var(--hv-title);
-    font-weight: 600;
-}
-.layers-disclosure {
-    display: inline-block;
-    width: 12px;
-    text-align: center;
-    color: var(--hv-dim);
-    font-size: 10px;
-}
-.layers-disclosure.is-toggle {
-    cursor: pointer;
-}
-.layers-disclosure.is-leaf {
-    opacity: 0.4;
-    cursor: default;
-}
-.layers-label {
-    flex: 1 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.layers-kind-folder > .layers-label {
-    text-transform: lowercase;
-    color: var(--hv-title);
-    font-weight: 600;
-    letter-spacing: 0.03em;
-}
-.layers-kind-timber > .layers-label,
-.layers-kind-joint > .layers-label {
-    color: var(--hv-text);
-}
-.layers-kind-cut > .layers-label,
-.layers-kind-jointEntry > .layers-label,
-.layers-kind-accessory > .layers-label {
-    color: var(--hv-dim);
-}
-.layers-kind-taggedCSG > .layers-label,
-.layers-kind-feature > .layers-label {
-    color: var(--hv-accent);
-    font-style: italic;
-}
 
-/* ---- Layers panel (lp-* class compatibility for current implementation) ---- */
 kigumi-layers-view:has(.lp-collapsed) {
     flex: 0 0 auto;
 }
