@@ -152,14 +152,40 @@ DONE-solver should know that any coinicident feature in the ortognal plane to th
 DONE-angle mesaurement anchor positon derivatino needs to be improved
   -extend featuers with dotted line out to angle anchors need sto be different in 3d view (you need the entire plane I think)
 
--DECISION TIME STANDALONE APP
-  -decide how to do file browser, maybe combine with kigumi explorer probably
-  -make sure using external agent works, don't allow self api key
-  -decide if you want to setup backend, auth, billing, subscription or pay per token or both? or just get rid of the agent panel entirely
-  -can we bring vscoed kigumi more in parity with standalone app
-    -need to decide how to deal with the  stuff below the main view
-  -should be able to right click file and say open in viewer or osmetihng(both vscoed and electron), or maybe have it open both in electron
-  -cilkcing on patterns borken in electron ivew..
+DONE-DECISION TIME STANDALONE APP
+  DONE-for standalone app, add the file browser to the sidebar, combined with kigumi explorer
+    -you can add an "all files" root to the menu that shows at the top, default collapsed (does not show in vscode)
+    -frames and patterns that get detected have the frame/pattern icon even in the full file browser view
+    -the file browser side behaves like files browser in vscoed, clicking on the pattern/frame opens its source code
+    -add a right click -> open in viewer option for the filebrowser (can you add support for this in vscode file browser as well?)
+  DONE-for tree view and below panels, create a new left sidebar that is contained within the view and has its own collapse and scroll buttons
+      -the navigation to different panels is at the bottom of this sidebar, similar to how the below panels have their naivagtion tabs
+      -the tree list view is the weird one, as it's currentyl several different panels 
+        -e.g.
+          -the info/selection pane
+          -the measurement thing
+          -the tree view
+        -keep the distinct separation as each panel should be separately collapsible to allow more space for the other panels, but they all live in the side panel together, you may need to borrow some standard visual style best practices fro this
+
+  DONE-remove "Tree" title for left menu, give ita cute kigumi kanji icon instead or somethnig
+  DONE-dreawing/measurement tab should be labeled measurements: <name>
+  DONE-instead of "close" in drawing view it should say "back to 3d"
+  DONE-layers expanded by default, rename to "elements"
+  DONE-add command p file search capability
+  DONE-add hotkey for opening current file in viewer (for VS code too)
+  IGNORE-decide how to do extension settings 
+    -so you can enable assembly and drawings
+    -I guess this could just go in the options pane... 
+    -or you could add a tab to the sidebar for settings? 
+    -or you could add afile > options menu that opens a options tab like vsocde)
+  DONE-should be able to right click file and say open in viewer or osmetihng(both vscoed and electron), or maybe have it open both in electron
+  IGNORE/DONE-cilkcing on patterns borken in electron ivew..
+
+
+  -setup MCP for external agent and instrucitons for external agent
+  -setup backend, auth, billing, subscription or pay per token or both? or just get rid of the agent panel entirely
+  
+  
 
 
 -the active view you are measuring in should be highlighted somehow
@@ -192,7 +218,6 @@ DONE??/IGNORE??-rough timber wiht PTW features decsisions
 
 
 
--add beta features section to option
 -add support to run @tools from the parameter section
   -do this for generating saw horse router jig lol
   -router jig template function? takes a timber and a flat profile (extrusion or prism), adds a "template blcok over both, cuts out the timber, and then cuts out the profile extruding upwards to make the template based on bit + collar paraemetrs. shouldn't be too hard? would be cool if it makes mid supports too for extra wide profiles...
