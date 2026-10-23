@@ -42,6 +42,7 @@
  * @property {(callback: (change: {filePath, languageId, isDirty, saved}) => void) => Disposable} onDocumentChange
  * @property {(options: {title: string, beside: boolean, resourceRoot: string, filePath: string}) => ViewerSurface} createViewerSurface
  * @property {boolean} [viewerPanelsOutside]  the host shows a view's member list and log outside it (view-inspector.js)
+ * @property {boolean} [showsFileBrowser]  the explorer lists the workspace's files ("All files"); off where the host has its own
  * @property {() => Array<object>} [listPanels]  the host's own panels, for agents (agent/panel-directory.js)
  * @property {(id: string) => Promise<object|null>} [describePanel]
  */

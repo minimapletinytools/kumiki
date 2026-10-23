@@ -138,6 +138,9 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
         // The inspector shows each view's member list and log (view-inspector.js).
         viewerPanelsOutside: true,
 
+        // The explorer lists the workspace's files too (sidebar-model.js); VS Code has its own.
+        showsFileBrowser: true,
+
         getConfig: (key, fallback) => settings.get(key, fallback),
 
         updateConfig: async (key, value) => settings.set(key, value),

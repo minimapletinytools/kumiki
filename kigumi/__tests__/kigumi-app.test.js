@@ -113,3 +113,48 @@ test('with no pattern viewers open, unload says so without asking', async () => 
   expect(host.messages[0][0]).toBe('info');
   await app.dispose();
 });
+
+test('a file in the file browser opens its source', async () => {
+  const host = fakeHost();
+  const app = newApp(host);
+  await app.commands['kigumi.openFileSource']('/w/notes.txt');
+
+  expect(host.showFile).toHaveBeenCalledWith('/w/notes.txt');
+  await app.dispose();
+});
+
+test('open in viewer with nothing to open says so', async () => {
+  const host = fakeHost();
+  const app = newApp(host);
+  await app.commands['kigumi.openInViewer']({ data: {} });
+
+  expect(host.messages).toEqual([['error', 'No file path provided.']]);
+  await app.dispose();
+});
+
+test('open in viewer on a patternbook (a VS Code Uri) asks which of its patterns', async () => {
+  const host = fakeHost();
+  const app = newApp(host);
+  app.sidebarModel._state = {
+    ...app.sidebarModel.state,
+    workspacePatternbooks: [{ filePath: '/w/book.py', patterns: [{ path: 'a/one' }, { path: 'a/two' }] }],
+  };
+  await app.commands['kigumi.openInViewer']({ fsPath: '/w/book.py' });
+
+  expect(host.pickOne).toHaveBeenCalledTimes(1);
+  expect(host.pickOne.mock.calls[0][0].map((item) => item.label)).toEqual(['a/one', 'a/two']);
+  await app.dispose();
+});
+
+test('only a host with a file browser watches every file', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-watch-'));
+  for (const showsFileBrowser of [false, true]) {
+    const host = fakeHost({ showsFileBrowser, workspaceRoots: () => [workspace], watchFiles: jest.fn(() => ({ dispose() {} })) });
+    const app = newApp(host);
+    const globs = host.watchFiles.mock.calls.map((call) => call[1]);
+
+    expect(globs.includes('**/*')).toBe(showsFileBrowser);
+    await app.dispose();
+  }
+  fs.rmSync(workspace, { recursive: true, force: true });
+});

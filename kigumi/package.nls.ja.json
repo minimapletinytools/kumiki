@@ -1,5 +1,6 @@
 {
   "command.openCurrentFileInViewer.title": "Kigumi: 現在のファイルをビューアーで開く",
+  "command.openInViewer.title": "Kigumi ビューアで開く",
   "command.initializeProjectInWorkspace.title": "Kigumi: プロジェクトを初期化",
   "command.refreshSidebar.title": "Kigumi: サイドバーを更新",
   "command.toggleGroupByPatternbook.title": "Kigumi: パターンブックでのグループ化を切り替え",

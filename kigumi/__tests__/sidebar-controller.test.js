@@ -14,6 +14,7 @@ function fakeModel(tree) {
     getGroupByPatternbook: () => true,
     toggleGroupByPatternbook: jest.fn(),
     refresh: jest.fn().mockResolvedValue(),
+    openFolder: jest.fn().mockResolvedValue(),
     ensureLoaded: jest.fn(),
     onDidChange: (listener) => {
       listeners.add(listener);
@@ -149,4 +150,20 @@ describe('the sidebar protocol and page wiring agree', () => {
     }
     expect([...filled.keys()].filter((placeholder) => !asked.includes(placeholder))).toEqual([]);
   });
+});
+
+test('opening an unlisted folder asks the model to list it', async () => {
+  const model = fakeModel([
+    { key: 'files-root', type: 'filesRoot', label: 'All Files', lazyDir: '/w', children: [] },
+    { key: 'listed', type: 'fileFolder', label: 'docs', children: [] },
+  ]);
+  const controller = new SidebarController(model, { runCommand: jest.fn() });
+  const surface = fakeSurface();
+  controller.attach(surface);
+  controller.postState();
+  await surface.send({ type: 'sidebarExpand', key: 'files-root' });
+  await surface.send({ type: 'sidebarExpand', key: 'listed' });
+
+  expect(model.openFolder).toHaveBeenCalledTimes(1);
+  expect(model.openFolder).toHaveBeenCalledWith('/w');
 });

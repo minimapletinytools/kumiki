@@ -189,6 +189,20 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
     newPythonFileWatcher.start();
     disposables.push(newPythonFileWatcher);
 
+    // The "All files" tree lists only opened folders; a file created or deleted in one lists it again.
+    if (host.showsFileBrowser && getWorkspaceRoot()) {
+        let relistTimer = null;
+        const relist = (filePath) => {
+            if (sidebarModel.isFolderListed(path.dirname(filePath)) && !relistTimer) {
+                relistTimer = setTimeout(() => {
+                    relistTimer = null;
+                    void sidebarModel.refreshFiles();
+                }, 200);
+            }
+        };
+        disposables.push(host.watchFiles(getWorkspaceRoot(), '**/*', { onCreate: relist, onDelete: relist }));
+    }
+
     // Runs `fn(session)` for the session identified by automation `options`,
     // or returns the shared not-found result (merged with `notFoundExtra`).
     function withSession(options, fn, notFoundExtra = {}) {
@@ -355,6 +369,25 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         },
 
         'kigumi.openFrameFromSidebar': (filePath) => openFileInViewer(filePath),
+
+        'kigumi.openFileSource': (filePath) => host.showFile(filePath),
+
+        // A file path, a VS Code Uri (its Explorer's right-click), or a sidebar row.
+        'kigumi.openInViewer': async (target) => {
+            const data = target && typeof target === 'object' && target.data ? target.data : null;
+            if (data && data.sourceFile && data.patternName) {
+                await openPatternRecord(data);
+                return;
+            }
+            const filePath = typeof target === 'string' ? target
+                : target && typeof target.fsPath === 'string' ? target.fsPath
+                    : data && (data.filePath || data.sourceFile);
+            if (!filePath) {
+                host.showMessage('error', t('message.noFilePathProvided'));
+                return;
+            }
+            await openFileOrPatternbookInViewer(filePath);
+        },
         'kigumi.openExampleFromSidebar': (sourceFile) => openFileInViewer(sourceFile),
 
         'kigumi.openPatternFromSidebar': (patternRecord) => openPatternRecord(patternRecord),
@@ -701,6 +734,25 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         }
         await host.showSourceBesideViewer(filePath);
         await renderFile(filePath);
+    }
+
+    // A patternbook (and not a frame) opens one of its patterns, chosen when it has several.
+    async function openFileOrPatternbookInViewer(filePath) {
+        const { frames, workspacePatternbooks } = sidebarModel.state;
+        const book = workspacePatternbooks.find((one) => one.filePath === filePath);
+        const patterns = book && Array.isArray(book.patterns) ? book.patterns : [];
+        if (patterns.length === 0 || frames.some((frame) => frame.filePath === filePath)) {
+            await openFileInViewer(filePath);
+            return;
+        }
+        const picked = patterns.length === 1 ? { value: patterns[0] } : await host.pickOne(
+            patterns.map((pattern) => ({ label: pattern.path, value: pattern })),
+            { placeholder: t('message.pickPatternToOpen') },
+        );
+        const pattern = picked && picked.value;
+        if (pattern) {
+            await openPatternRecord({ sourceFile: filePath, patternName: pattern.path });
+        }
     }
 
     async function openPatternRecord(record, { forceNewWindow = false } = {}) {

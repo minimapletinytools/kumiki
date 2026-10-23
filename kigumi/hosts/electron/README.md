@@ -35,8 +35,8 @@ can later run in a browser.
 - `electron-host.js`: the Host (see `../../host.js`).
 
 Settings live in `<userData>/settings.json`: the extension's `kigumi.*` keys
-without the prefix, plus `app.workspaceFolder` and `app.editorCommand` (e.g.
-`"code -g {file}:{line}"`). Kigumi > Open Settings File (or the gear in the
+without the prefix, plus `app.workspaceFolder`, `app.editorCommand` (e.g.
+`"code -g {file}:{line}"`) and `app.filesExclude` (names the explorer's All Files leaves out). Kigumi > Open Settings File (or the gear in the
 status bar) opens it listing every key; edits apply without a restart. Auto
 refresh on save defaults to on in the app. Logs are in
 `<userData>/logs/kigumi.log`, rotated to `kigumi.1.log` past 5 MB.
@@ -44,7 +44,7 @@ refresh on save defaults to on in the app. Logs are in
 ## Layout
 
 The window's layout is data in `../../app-shell/shell-connection.js`:
-- the explorer on the left;
+- the explorer on the left, with an All Files tree of the workspace at the top (collapsed; a click opens a file's source, and a Python file's right-click menu opens it in a viewer);
 - tabs in the centre, for views and source files alike;
 - the inspector underneath (`../../view-inspector.js`), showing the member list and the log of the view in front, or of the last one that was;
 - the agent on the right.

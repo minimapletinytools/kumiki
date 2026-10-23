@@ -113,6 +113,11 @@ class SidebarController {
                 this.model.toggleGroupByPatternbook();
             } else if (message.type === 'sidebarRefresh') {
                 await this.model.refresh(true);
+            } else if (message.type === 'sidebarExpand') {
+                const folder = this._nodes.get(message.key);
+                if (folder && folder.lazyDir) {
+                    await this.model.openFolder(folder.lazyDir);
+                }
             }
         } catch (error) {
             this.log(`[sidebar] ${message.type} failed: ${error.message || error}`);

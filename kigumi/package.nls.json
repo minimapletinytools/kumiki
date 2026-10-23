@@ -1,5 +1,6 @@
 {
   "command.openCurrentFileInViewer.title": "Kigumi: Open Current File In Viewer",
+  "command.openInViewer.title": "Open in Kigumi Viewer",
   "command.initializeProjectInWorkspace.title": "Kigumi: Initialize Project",
   "command.refreshSidebar.title": "Kigumi: Refresh Sidebar",
   "command.toggleGroupByPatternbook.title": "Kigumi: Toggle Patternbook Grouping",
