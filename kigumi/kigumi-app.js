@@ -11,6 +11,7 @@ const { FrameViewSession } = require('./frame-view-session');
 const { PythonRunnerSession } = require('./runner-session');
 const { SidebarModel } = require('./sidebar-model');
 const { SidebarController } = require('./sidebar-controller');
+const { DEFAULT_FILES_EXCLUDE, listFiles } = require('./sidebar-files');
 const { NewPythonFileWatcher } = require('./new-python-file-watcher');
 const { normalizeRetentionDays, pruneOldLogFiles } = require('./log-retention');
 const {
@@ -378,6 +379,28 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
 
         'kigumi.openFileSource': (filePath) => host.showFile(filePath),
 
+        // Go to File: any file in the workspace, by name; opens its source.
+        'kigumi.quickOpenFile': async () => {
+            const filePath = await pickWorkspaceFile({ placeholder: t('message.pickFileToOpen') });
+            if (filePath) {
+                await host.showFile(filePath);
+            }
+        },
+
+        // Open in Viewer: a Python file in the workspace, frames and patternbooks first.
+        'kigumi.quickOpenInViewer': async () => {
+            const { frames, workspacePatternbooks } = sidebarModel.state;
+            const known = new Set([...frames, ...workspacePatternbooks].map((entry) => entry.filePath));
+            const filePath = await pickWorkspaceFile({
+                placeholder: t('message.pickFileToView'),
+                only: (candidate) => candidate.endsWith('.py'),
+                first: (candidate) => known.has(candidate),
+            });
+            if (filePath) {
+                await openFileOrPatternbookInViewer(filePath);
+            }
+        },
+
         // A file path, a VS Code Uri (its Explorer's right-click), or a sidebar row.
         'kigumi.openInViewer': async (target) => {
             const data = target && typeof target === 'object' && target.data ? target.data : null;
@@ -740,6 +763,23 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         }
         await host.showSourceBesideViewer(filePath);
         await renderFile(filePath);
+    }
+
+    /** Ask for a file of the workspace (leaving out app.filesExclude); returns its path, or null. */
+    async function pickWorkspaceFile({ placeholder, only = () => true, first = () => false }) {
+        const root = getWorkspaceRoot();
+        if (!root) {
+            host.showMessage('error', t('message.openWorkspaceFolderFirst'));
+            return null;
+        }
+        const files = (await listFiles(root, host.getConfig('app.filesExclude', DEFAULT_FILES_EXCLUDE))).filter(only);
+        const ordered = [...files.filter(first), ...files.filter((filePath) => !first(filePath))];
+        const picked = await host.pickOne(ordered.map((filePath) => ({
+            label: path.basename(filePath),
+            description: path.relative(root, path.dirname(filePath)),
+            value: filePath,
+        })), { placeholder });
+        return picked ? picked.value : null;
     }
 
     // A patternbook (and not a frame) opens one of its patterns, chosen when it has several.

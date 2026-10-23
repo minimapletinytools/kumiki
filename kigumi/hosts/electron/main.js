@@ -10,6 +10,7 @@ const { app, protocol, Menu, dialog, shell: electronShell } = require('electron'
 const { setHost } = require('../../host');
 const { createKigumiApp } = require('../../kigumi-app');
 const { DEFAULT_FILES_EXCLUDE } = require('../../sidebar-files');
+const { acceleratorFor } = require('./keybindings');
 const { webviewDir } = require('../../webview-html');
 const { ShellConnection } = require('../../app-shell/shell-connection');
 const { PageStore } = require('../../app-shell/page-store');
@@ -462,7 +463,10 @@ function buildMenu() {
         {
             label: 'File',
             submenu: [
-                { label: 'Open Folder…', accelerator: 'CmdOrCtrl+O', click: () => chooseWorkspaceFolder() },
+                command('Go to File…', 'kigumi.quickOpenFile', acceleratorFor('kigumi.quickOpenFile')),
+                command('Open in Viewer…', 'kigumi.quickOpenInViewer', acceleratorFor('kigumi.quickOpenInViewer')),
+                { type: 'separator' },
+                { label: 'Open Folder…', click: () => chooseWorkspaceFolder() },
                 { label: 'Open Frame File…', accelerator: 'CmdOrCtrl+Shift+O', click: () => chooseFrameFile() },
                 { type: 'separator' },
                 {
@@ -481,7 +485,7 @@ function buildMenu() {
             label: 'Kigumi',
             submenu: [
                 command('Refresh Active Viewer', 'kigumi.render', 'CmdOrCtrl+R'),
-                command('Browse Patterns…', 'kigumi.browsePatterns', 'CmdOrCtrl+P'),
+                command('Browse Patterns…', 'kigumi.browsePatterns'),
                 command('Close Pattern Viewer…', 'kigumi.unloadPattern'),
                 { type: 'separator' },
                 command('Initialize Project', 'kigumi.initializeProjectInWorkspace'),

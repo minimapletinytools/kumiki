@@ -359,6 +359,8 @@
   "message.currentFileNotPython": "現在のファイルはPythonファイルではありません!",
   "message.noFilePathProvided": "ファイルパスが指定されていません。",
   "message.pickPatternToOpen": "開くパターンを選択",
+  "message.pickFileToOpen": "ファイルに移動",
+  "message.pickFileToView": "ビューアで開く",
   "message.runnerNotRunning": "Kigumiランナーが実行されていません。",
   "message.selectExportFormat": "少なくとも1つのエクスポート形式を選択してください。",
   "message.enableExportMode": "結合ファイルまたは個別ファイルの出力を有効にしてください。",

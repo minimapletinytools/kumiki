@@ -158,3 +158,40 @@ test('only a host with a file browser watches every file', async () => {
   }
   fs.rmSync(workspace, { recursive: true, force: true });
 });
+
+describe('go to file and open in viewer', () => {
+  let workspace;
+
+  beforeEach(() => {
+    workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-quick-'));
+    for (const dir of ['patterns', '.venv', 'docs']) fs.mkdirSync(path.join(workspace, dir));
+    fs.writeFileSync(path.join(workspace, 'notes.txt'), '');
+    fs.writeFileSync(path.join(workspace, 'patterns', 'a_helper.py'), '');
+    fs.writeFileSync(path.join(workspace, 'patterns', 'z_frame.py'), '');
+    fs.writeFileSync(path.join(workspace, '.venv', 'hidden.py'), '');
+  });
+
+  afterEach(() => fs.rmSync(workspace, { recursive: true, force: true }));
+
+  test('go to file lists every file but the excluded, and opens the one picked', async () => {
+    const host = fakeHost({ workspaceRoots: () => [workspace], pickOne: jest.fn(async (items) => items[0]) });
+    const app = newApp(host);
+    await app.commands['kigumi.quickOpenFile']();
+
+    const items = host.pickOne.mock.calls[0][0];
+    expect(items.map((item) => item.label).sort()).toEqual(['a_helper.py', 'notes.txt', 'z_frame.py']);
+    expect(items.find((item) => item.label === 'z_frame.py').description).toBe('patterns');
+    expect(host.showFile).toHaveBeenCalledWith(items[0].value);
+    await app.dispose();
+  });
+
+  test('open in viewer lists only Python files, frames first', async () => {
+    const host = fakeHost({ workspaceRoots: () => [workspace] });
+    const app = newApp(host);
+    app.sidebarModel._state = { ...app.sidebarModel.state, frames: [{ filePath: path.join(workspace, 'patterns', 'z_frame.py') }] };
+    await app.commands['kigumi.quickOpenInViewer']();
+
+    expect(host.pickOne.mock.calls[0][0].map((item) => item.label)).toEqual(['z_frame.py', 'a_helper.py']);
+    await app.dispose();
+  });
+});

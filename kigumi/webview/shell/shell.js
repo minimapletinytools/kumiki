@@ -280,6 +280,7 @@
     // ---------------------------------------------------------------------
 
     const quickpick = { requestId: null, items: [], visible: [], selected: 0 };
+    const QUICKPICK_SHOWN = 300;
 
     function closeQuickPick(index) {
         if (quickpick.requestId === null) return;
@@ -292,6 +293,8 @@
         const needle = $('quickpick-filter').value.trim().toLowerCase();
         quickpick.visible = [];
         let pendingSeparator = null;
+        // Drawn up to a limit: a workspace's files can number in the thousands.
+        let matched = 0;
         quickpick.items.forEach((item, index) => {
             if (item.separator) {
                 pendingSeparator = item;
@@ -299,6 +302,8 @@
             }
             const text = `${item.label} ${item.description || ''} ${item.detail || ''}`.toLowerCase();
             if (needle && !text.includes(needle)) return;
+            matched += 1;
+            if (matched > QUICKPICK_SHOWN) return;
             if (pendingSeparator) {
                 quickpick.visible.push({ separator: pendingSeparator });
                 pendingSeparator = null;
@@ -323,6 +328,7 @@
             return element;
         }));
         if (choices.length === 0) list.append(el('div', 'empty', 'No matching items'));
+        if (matched > QUICKPICK_SHOWN) list.append(el('div', 'empty', `${matched - QUICKPICK_SHOWN} more: type to narrow`));
         const selected = list.querySelector('.is-selected');
         if (selected) selected.scrollIntoView({ block: 'nearest' });
     }

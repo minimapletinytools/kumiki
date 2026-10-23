@@ -50,6 +50,16 @@ The window's layout is data in `../../app-shell/shell-connection.js`:
 
 The title bar buttons show and hide the sides.
 
+## Keyboard shortcuts
+
+`keybindings.js` lists them in VS Code's keybinding shape (`{ key, mac, command }`), and the menus
+take their accelerators from it. Not configurable yet.
+
+| Key | Command |
+|---|---|
+| Cmd/Ctrl+P | Go to File: any file of the workspace, opened as source |
+| Cmd/Ctrl+O | Open in Viewer: a Python file of the workspace, frames and patternbooks first |
+
 ## Agent and MCP
 
 - **Agent panel** (the sparkle button, or Kigumi > Toggle Agent): the Claude Agent SDK, run in the

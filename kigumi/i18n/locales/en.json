@@ -359,6 +359,8 @@
   "message.currentFileNotPython": "Current file is not a Python file!",
   "message.noFilePathProvided": "No file path provided.",
   "message.pickPatternToOpen": "Pick a pattern to open",
+  "message.pickFileToOpen": "Go to file",
+  "message.pickFileToView": "Open in viewer",
   "message.runnerNotRunning": "Kigumi runner is not running.",
   "message.selectExportFormat": "Select at least one export format.",
   "message.enableExportMode": "Enable combined and/or individual export.",

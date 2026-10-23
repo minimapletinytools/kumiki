@@ -81,4 +81,35 @@ class FileTree {
     }
 }
 
-module.exports = { FileTree, DEFAULT_FILES_EXCLUDE, excludeMatcher };
+/**
+ * Lists every file under `root`, leaving out excluded names (and what is under them), up to
+ * `limit` files: what Go to File searches.
+ */
+async function listFiles(root, exclude, { limit = 20000 } = {}) {
+    const excluded = excludeMatcher(exclude);
+    const files = [];
+    const pending = [root];
+    while (pending.length > 0 && files.length < limit) {
+        const dirPath = pending.shift();
+        let dirents = [];
+        try {
+            dirents = await fs.promises.readdir(dirPath, { withFileTypes: true });
+        } catch (_error) {
+            continue;
+        }
+        for (const dirent of dirents) {
+            if (excluded(dirent.name)) {
+                continue;
+            }
+            const filePath = path.join(dirPath, dirent.name);
+            if (dirent.isDirectory()) {
+                pending.push(filePath);
+            } else if (dirent.isFile() && files.length < limit) {
+                files.push(filePath);
+            }
+        }
+    }
+    return files.sort();
+}
+
+module.exports = { FileTree, DEFAULT_FILES_EXCLUDE, excludeMatcher, listFiles };
