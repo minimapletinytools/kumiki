@@ -88,7 +88,7 @@ class AgentSession {
      * @param {(line: string) => void} [options.log]
      */
     constructor({ panels, run, post, cwd, setting, version = '0.0.0', log = () => {} }) {
-        this.tools = createKigumiTools({ panels, run });
+        this.tools = createKigumiTools({ panels, run, workspaceFolders: () => [cwd()].filter(Boolean) });
         this.post = post;
         this.cwd = cwd;
         this.setting = setting;

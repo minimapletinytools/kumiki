@@ -18,8 +18,9 @@ const text = (value) => [{ type: 'text', text: typeof value === 'string' ? value
  * @param {object} options
  * @param {ReturnType<typeof import('./panel-directory').createPanelDirectory>} options.panels
  * @param {(commandId: string, args?: object) => Promise<any>} options.run  an app command
+ * @param {() => string[]} [options.workspaceFolders]  the folders open, the project first
  */
-function createKigumiTools({ panels, run }) {
+function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
     const panelId = z.string().optional()
         .describe('A panel id from list_panels. Defaults to the active panel, or the active view.');
 
@@ -35,6 +36,17 @@ function createKigumiTools({ panels, run }) {
     }
 
     return [
+        {
+            name: 'get_workspace_folder',
+            description: 'The project folder open in Kigumi: where its frame files and patterns are, and '
+                + 'what the file paths the other tools give are relative to.',
+            shape: {},
+            readOnly: true,
+            run: async () => {
+                const folders = workspaceFolders();
+                return text({ workspaceFolder: folders[0] || null, workspaceFolders: folders });
+            },
+        },
         {
             name: 'list_panels',
             description: 'Every open Kigumi panel (3D views, code editors, the log), which one is active, '

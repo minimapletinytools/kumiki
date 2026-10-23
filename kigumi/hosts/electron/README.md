@@ -69,8 +69,12 @@ take their accelerators from it. Not configurable yet.
   Hiding the panel keeps the conversation; the clear button starts a new one.
 - **MCP server** (`../../agent/mcp-http.js`): with `mcp.enabled` on, Kigumi's tools are served at
   `http://127.0.0.1:<mcp.port>/mcp` (default port 7345) to any agent holding `mcp.token`, which is
-  generated the first time. Kigumi > Copy MCP Setup for Claude Code copies the `claude mcp add` line.
-- **The tools** (`../../agent/tools.js`): `list_panels`, `describe_panel` (what a panel shows and
+  generated the first time. Turn it on from a view's options (beta features > MCP server); the MCP
+  section there then copies the setup for Claude Code, Claude Desktop, Cursor or VS Code
+  (`../../agent/mcp-setup.js`) and lists the clients seen in the last 10 minutes. Kigumi > Copy MCP
+  Setup for Claude Code copies the `claude mcp add` line. Not in VS Code yet:
+  `.claude/plans/vscode-mcp.md`.
+- **The tools** (`../../agent/tools.js`): `get_workspace_folder`, `list_panels` (with each panel's file), `describe_panel` (what a panel shows and
   what is selected in it), `open_in_viewer`, `refresh_view`, `read_view_log`, `get_camera`,
   `set_camera`, `screenshot`. Panels answer through `../../agent/panel-directory.js`.
 

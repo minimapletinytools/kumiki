@@ -36,11 +36,23 @@ function createPanelDirectory({ views, host }) {
         };
     }
 
-    /** Every open panel, views first. */
+    /** Every open panel, views first, each with the name of its file and its path in the workspace. */
     function list() {
         const own = liveViews().map(viewEntry);
         const others = typeof host.listPanels === 'function' ? host.listPanels() || [] : [];
-        return [...own, ...others];
+        return [...own, ...others].map(withFileNames);
+    }
+
+    function withFileNames(panel) {
+        if (!panel.filePath) {
+            return panel;
+        }
+        const root = typeof host.workspaceRootFor === 'function' ? host.workspaceRootFor(panel.filePath) : null;
+        return {
+            ...panel,
+            fileName: path.basename(panel.filePath),
+            relativePath: root ? path.relative(root, panel.filePath) : null,
+        };
     }
 
     /** The main panel with focus; else, with the window not focused (an agent outside asking),

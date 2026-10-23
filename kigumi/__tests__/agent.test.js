@@ -4,7 +4,8 @@ const path = require('path');
 
 const { createPanelDirectory } = require('../agent/panel-directory');
 const { createKigumiTools } = require('../agent/tools');
-const { startMcpHttpServer, claudeCodeAddCommand } = require('../agent/mcp-http');
+const { startMcpHttpServer } = require('../agent/mcp-http');
+const { MCP_CLIENTS, mcpSetupText } = require('../agent/mcp-setup');
 const { AgentSession, toPanelEvents } = require('../agent/agent-session');
 
 function view(filePath, { active = false, visible = true, description = {}, patternName = null } = {}) {
@@ -18,10 +19,14 @@ function view(filePath, { active = false, visible = true, description = {}, patt
     };
 }
 
-function directory({ views = [], hostPanels = [], describeHost = async () => null } = {}) {
+function directory({ views = [], hostPanels = [], describeHost = async () => null, root = null } = {}) {
     return createPanelDirectory({
         views: () => views,
-        host: { listPanels: () => hostPanels, describePanel: describeHost },
+        host: {
+            listPanels: () => hostPanels,
+            describePanel: describeHost,
+            workspaceRootFor: (filePath) => (root && filePath.startsWith(root) ? root : null),
+        },
     });
 }
 
@@ -125,9 +130,16 @@ describe('the MCP server', () => {
     const token = 'test-token';
     let server;
 
+    let clientsChanged = 0;
+
     beforeAll(async () => {
-        const panels = directory({ views: [{ id: 'viewer:/a.py', session: view('/a.py', { active: true }) }] });
-        server = await startMcpHttpServer({ tools: createKigumiTools({ panels, run: async () => ({}) }), token, port: 0 });
+        const panels = directory({ views: [{ id: 'viewer:/w/a.py', session: view('/w/a.py', { active: true }) }], root: '/w' });
+        server = await startMcpHttpServer({
+            tools: createKigumiTools({ panels, run: async () => ({}), workspaceFolders: () => ['/w'] }),
+            token,
+            port: 0,
+            onClientsChange: () => { clientsChanged += 1; },
+        });
     });
 
     afterAll(async () => {
@@ -146,7 +158,17 @@ describe('the MCP server', () => {
             expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(['list_panels', 'describe_panel', 'screenshot']));
 
             const result = await client.callTool({ name: 'list_panels', arguments: {} });
-            expect(JSON.parse(result.content[0].text).active).toBe('viewer:/a.py');
+            const listed = JSON.parse(result.content[0].text);
+            expect(listed.active).toBe('viewer:/w/a.py');
+            expect(listed.panels[0]).toMatchObject({ fileName: 'a.py', relativePath: 'a.py' });
+
+            const workspace = await client.callTool({ name: 'get_workspace_folder', arguments: {} });
+            expect(JSON.parse(workspace.content[0].text)).toEqual({ workspaceFolder: '/w', workspaceFolders: ['/w'] });
+
+            // The client named itself when it connected, and its tool calls are counted against it.
+            const seen = server.clients().find((one) => one.name === 'test');
+            expect(seen).toMatchObject({ version: '0.0.0', calls: 2, lastTool: 'get_workspace_folder' });
+            expect(clientsChanged).toBeGreaterThan(0);
         } finally {
             await client.close();
         }
@@ -158,9 +180,16 @@ describe('the MCP server', () => {
         expect(response.status).toBe(401);
     });
 
-    test('says how to add it to Claude Code', () => {
-        expect(claudeCodeAddCommand(server.url, token))
+    test('says how to add it to Claude Code, and to each other agent, with its URL and token', () => {
+        expect(mcpSetupText('claude-code', server.url, token))
             .toBe(`claude mcp add --transport http kigumi ${server.url} --header "Authorization: Bearer ${token}"`);
+        for (const { id } of MCP_CLIENTS) {
+            const text = mcpSetupText(id, server.url, token);
+            expect(text).toContain(server.url);
+            expect(text).toContain(token);
+        }
+        expect(JSON.parse(mcpSetupText('vscode', server.url, token)).servers.kigumi.type).toBe('http');
+        expect(mcpSetupText('nobody', server.url, token)).toBeNull();
     });
 });
 

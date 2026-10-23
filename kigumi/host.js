@@ -41,6 +41,8 @@
  * @property {(callback: (affects: (key: string) => boolean) => void) => Disposable} onConfigChange
  * @property {(callback: (change: {filePath, languageId, isDirty, saved}) => void) => Disposable} onDocumentChange
  * @property {(options: {title: string, beside: boolean, resourceRoot: string, filePath: string}) => ViewerSurface} createViewerSurface
+ * @property {{state: () => object, onChange: (listener: (state: object) => void) => Disposable, copySetup: (clientId: string) => void}} [mcp]
+ *   Kigumi's MCP server, where the host runs one (the standalone app's main.js)
  * @property {boolean} [showsFileBrowser]  the explorer lists the workspace's files ("All files"); off where the host has its own
  * @property {() => Array<object>} [listPanels]  the host's own panels, for agents (agent/panel-directory.js)
  * @property {(id: string) => Promise<object|null>} [describePanel]

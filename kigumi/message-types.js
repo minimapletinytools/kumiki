@@ -34,6 +34,8 @@ const TO_EXTENSION = Object.freeze([
     'requestRefresh',
     'requestSaveDrawings',
     'requestSaveViewerSettings',
+    'copyMcpSetup',
+    'requestMcpState',
     'saveParameters',
     'setBetaFeature',
     'setRefreshOptions',

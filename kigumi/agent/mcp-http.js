@@ -70,10 +70,12 @@ function readBody(request) {
  * @param {number} [options.port]      0 picks a free one
  * @param {string} [options.version]
  * @param {(line: string) => void} [options.log]
- * @returns {Promise<{ url: string, port: number, close: () => Promise<void> }>}
+ * @param {() => void} [options.onClientsChange]  after a client is seen
+ * @returns {Promise<{ url: string, port: number, clients: () => Array<object>, close: () => Promise<void> }>}
  */
-function startMcpHttpServer({ tools, token, port = 0, version = '0.0.0', log = () => {} }) {
+function startMcpHttpServer({ tools, token, port = 0, version = '0.0.0', log = () => {}, onClientsChange = () => {} }) {
     const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
+    const clients = createClientLog(onClientsChange);
 
     const httpServer = http.createServer(async (request, response) => {
         if (!request.url || request.url.split('?')[0] !== PATH) {
@@ -93,6 +95,7 @@ function startMcpHttpServer({ tools, token, port = 0, version = '0.0.0', log = (
         }
         try {
             const body = await readBody(request);
+            clients.saw(body, request.headers['user-agent'] || '');
             const server = buildServer(tools, version);
             const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
             response.on('close', () => {
@@ -117,15 +120,63 @@ function startMcpHttpServer({ tools, token, port = 0, version = '0.0.0', log = (
             resolve({
                 url: `http://127.0.0.1:${actual}${PATH}`,
                 port: actual,
+                clients: () => clients.recent(),
                 close: () => new Promise((done) => httpServer.close(() => done())),
             });
         });
     });
 }
 
-/** The command that adds this server to Claude Code. */
-function claudeCodeAddCommand(url, token) {
-    return `claude mcp add --transport http kigumi ${url} --header "Authorization: Bearer ${token}"`;
+// How long a client counts as connected after it was last seen.
+const RECENT_MS = 10 * 60 * 1000;
+
+/**
+ * The clients seen: each named by the `clientInfo` of its `initialize`, and credited, by its user
+ * agent, with the requests after. Stateless requests carry no session, so this is the nearest to
+ * "connected" there is.
+ */
+function createClientLog(onChange) {
+    const byAgent = new Map();
+    const messages = (body) => (Array.isArray(body) ? body : body ? [body] : []);
+
+    function saw(body, userAgent) {
+        const now = Date.now();
+        for (const message of messages(body)) {
+            if (message.method === 'initialize') {
+                const info = (message.params && message.params.clientInfo) || {};
+                byAgent.set(userAgent, {
+                    name: info.name || 'unknown client',
+                    version: info.version || null,
+                    firstSeen: now,
+                    lastSeen: now,
+                    calls: 0,
+                    lastTool: null,
+                });
+                continue;
+            }
+            const client = byAgent.get(userAgent);
+            if (!client) {
+                continue;
+            }
+            client.lastSeen = now;
+            if (message.method === 'tools/call') {
+                client.calls += 1;
+                client.lastTool = (message.params && message.params.name) || null;
+            }
+        }
+        onChange();
+    }
+
+    /** The clients seen in the last RECENT_MS, most recent first. */
+    function recent() {
+        const since = Date.now() - RECENT_MS;
+        return [...byAgent.values()]
+            .filter((client) => client.lastSeen >= since)
+            .sort((a, b) => b.lastSeen - a.lastSeen)
+            .map((client) => ({ ...client }));
+    }
+
+    return { saw, recent };
 }
 
-module.exports = { startMcpHttpServer, claudeCodeAddCommand, newToken };
+module.exports = { startMcpHttpServer, newToken };

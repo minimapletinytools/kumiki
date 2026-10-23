@@ -35,3 +35,4 @@ tempsidebaricon.png
 agent/agent-session.js
 agent/tools.js
 agent/mcp-http.js
+agent/mcp-setup.js

@@ -20,7 +20,8 @@ const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
 const { AgentSession } = require('../../agent/agent-session');
 const { createKigumiTools } = require('../../agent/tools');
-const { startMcpHttpServer, claudeCodeAddCommand, newToken } = require('../../agent/mcp-http');
+const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
+const { MCP_CLIENTS, mcpSetupText } = require('../../agent/mcp-setup');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
 const ORIGIN = 'kigumi://app';
@@ -401,6 +402,37 @@ function toggleAgentPanel() {
 }
 
 let mcpServer = null;
+let mcpError = null;
+const mcpListeners = new Set();
+
+/** The MCP server as the options panel shows it: on or off, where, and who has been talking to it. */
+function mcpState() {
+    return {
+        enabled: settings.get('mcp.enabled', false) === true,
+        running: Boolean(mcpServer),
+        url: mcpServer ? mcpServer.url : null,
+        error: mcpError,
+        clients: mcpServer ? mcpServer.clients() : [],
+        setups: MCP_CLIENTS.map(({ id, label }) => ({ id, label })),
+    };
+}
+
+function notifyMcp() {
+    const state = mcpState();
+    for (const listener of [...mcpListeners]) {
+        listener(state);
+    }
+}
+
+// What the host offers the views about MCP (host.js, `mcp`).
+const mcpControls = {
+    state: mcpState,
+    onChange(listener) {
+        mcpListeners.add(listener);
+        return { dispose: () => mcpListeners.delete(listener) };
+    },
+    copySetup: (clientId) => copyMcpSetup(clientId),
+};
 
 // Serves Kigumi's tools over MCP while `mcp.enabled` is on, on the port and token in settings.
 async function syncMcpServer() {
@@ -411,7 +443,11 @@ async function syncMcpServer() {
         logChannel.appendLine('[mcp] Stopped');
         mcpServer = null;
     }
+    if (!wanted) {
+        mcpError = null;
+    }
     if (!wanted || mcpServer || !kigumiApp) {
+        notifyMcp();
         return;
     }
     let token = settings.get('mcp.token', '');
@@ -421,27 +457,40 @@ async function syncMcpServer() {
     }
     try {
         mcpServer = await startMcpHttpServer({
-            tools: createKigumiTools({ panels: kigumiApp.panels, run: runToolCommand }),
+            tools: createKigumiTools({
+                panels: kigumiApp.panels,
+                run: runToolCommand,
+                workspaceFolders: () => (workspaceFolder ? [workspaceFolder] : []),
+            }),
             token,
             port,
             version: packageJson.version,
             log: (line) => logChannel.appendLine(line),
+            onClientsChange: notifyMcp,
         });
+        mcpError = null;
         logChannel.appendLine(`[mcp] Serving Kigumi's tools at ${mcpServer.url}`);
     } catch (error) {
-        logChannel.appendLine(`[mcp] Could not start on port ${port}: ${error.message || error}`);
+        mcpError = `Could not start on port ${port}: ${error.message || error}`;
+        logChannel.appendLine(`[mcp] ${mcpError}`);
         setStatus('error', `Kigumi's MCP server could not start on port ${port}: ${error.message || error}`);
     }
+    notifyMcp();
 }
 
-// Puts the line that adds Kigumi to Claude Code on the clipboard.
-function copyMcpSetup() {
+// Puts what adds Kigumi to an agent (mcp-setup.js) on the clipboard; Claude Code's by default.
+function copyMcpSetup(clientId = 'claude-code') {
     if (!mcpServer) {
-        setStatus('warning', 'Turn on "mcp.enabled" in Kigumi settings first.');
+        setStatus('warning', 'Turn on the MCP server first (options, beta features).');
         return;
     }
-    require('electron').clipboard.writeText(claudeCodeAddCommand(mcpServer.url, settings.get('mcp.token', '')));
-    setStatus('info', 'Copied the command that adds Kigumi to Claude Code.');
+    const text = mcpSetupText(clientId, mcpServer.url, settings.get('mcp.token', ''));
+    if (!text) {
+        return;
+    }
+    require('electron').clipboard.writeText(text);
+    const client = MCP_CLIENTS.find((one) => one.id === clientId);
+    setStatus('info', `Copied the MCP setup for ${client ? client.label : clientId}.`);
 }
 
 function onShellCommand(id, ...args) {
@@ -599,6 +648,7 @@ async function start() {
         setStatus,
         setProgress,
         openEditor: openEditorTab,
+        mcp: mcpControls,
     }));
 
     kigumiApp = createKigumiApp({

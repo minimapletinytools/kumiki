@@ -276,8 +276,50 @@ export class ViewerSettingsPanel {
                         @change=${(event) => this.app.setBetaFeature('drawingBeta', event.target.checked)}>
                     ${t('viewer.options.beta.drawings')}
                 </label>
+                ${this.app.panelFlags.mcpAvailable ? html`
+                <label>
+                    <input id="beta-mcp-toggle" type="checkbox" .checked=${Boolean(this.app.mcpState && this.app.mcpState.enabled)}
+                        @change=${(event) => this.app.setBetaFeature('mcp', event.target.checked)}>
+                    ${t('viewer.options.beta.mcp')}
+                </label>
+                ${this.renderMcp(this.app.mcpState)}` : ''}
             </section>
         `;
+    }
+
+    /** Kigumi's MCP server: whether it is serving, the setup to copy for each agent, and who has called. */
+    renderMcp(state) {
+        if (!state || !state.enabled) {
+            return '';
+        }
+        const ago = (time) => {
+            const minutes = Math.floor((Date.now() - time) / 60000);
+            return minutes < 1 ? t('viewer.options.mcp.justNow') : t('viewer.options.mcp.minutesAgo', { minutes });
+        };
+        return html`
+            <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.mcp')}></div>
+            <div class="viewer-settings-subtitle">${t('viewer.options.section.mcp')}</div>
+            <div class="mcp-status" id="mcp-status">${state.running
+                ? t('viewer.options.mcp.serving', { url: state.url })
+                : (state.error || t('viewer.options.mcp.starting'))}</div>
+            <div class="mcp-copy">
+                <span>${t('viewer.options.mcp.copyFor')}</span>
+                ${(state.setups || []).map((setup) => html`
+                    <button type="button" class="mcp-copy-btn" data-client=${setup.id} ?disabled=${!state.running}
+                        title=${t('viewer.options.mcp.copy.title', { client: setup.label })}
+                        @click=${() => this.app.copyMcpSetup(setup.id)}>${setup.label}</button>`)}
+            </div>
+            <div class="mcp-clients" id="mcp-clients">
+                <div class="mcp-clients-title">${t('viewer.options.mcp.clients')}</div>
+                ${(state.clients || []).length === 0
+                    ? html`<div class="mcp-client dim">${t('viewer.options.mcp.noClients')}</div>`
+                    : state.clients.map((client) => html`
+                        <div class="mcp-client">
+                            <span class="mcp-client-name">${client.name}${client.version ? ` ${client.version}` : ''}</span>
+                            <span class="dim">${ago(client.lastSeen)} · ${t('viewer.options.mcp.calls', { count: client.calls })}${client.lastTool
+                                ? ` · ${client.lastTool}` : ''}</span>
+                        </div>`)}
+            </div>`;
     }
 
     // Declarative description of every settings control: which element id it

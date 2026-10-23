@@ -27,6 +27,7 @@ const VIEWER_LOG_LEVEL_ORDER = {
 const BETA_FEATURE_SETTINGS = Object.freeze({
     assemblyPreview: 'viewer.assemblyPreview',
     drawingBeta: 'viewer.drawingBeta',
+    mcp: 'mcp.enabled',
 });
 
 function assemblyPreviewSettingEnabled() {
@@ -98,6 +99,12 @@ class FrameViewSession {
         this._lastGeometryData = null;
         this._lastProfiling = null;
         this._lastLayersData = null;
+    }
+
+    _postMcpState(state) {
+        if (this.panel) {
+            this.panel.postMessage({ type: 'mcpState', state }).catch(() => {});
+        }
     }
 
     /** Draw the view's page anew from what it last showed, so it reads the settings again (the beta features). */
@@ -335,6 +342,24 @@ class FrameViewSession {
                 const options = (message.options && typeof message.options === 'object') ? message.options : {};
                 this.refreshOptions = { ...this.refreshOptions, ...options };
                 this.log(`[webview] setRefreshOptions: ${JSON.stringify(options)}`);
+                return;
+            }
+            // Kigumi's MCP server, where the host runs one: its state, live, and its setup to copy.
+            if (message.type === 'requestMcpState') {
+                const mcp = getHost().mcp;
+                if (mcp) {
+                    if (!this._mcpSubscription) {
+                        this._mcpSubscription = mcp.onChange((state) => this._postMcpState(state));
+                    }
+                    this._postMcpState(mcp.state());
+                }
+                return;
+            }
+            if (message.type === 'copyMcpSetup') {
+                const mcp = getHost().mcp;
+                if (mcp) {
+                    mcp.copySetup(String(message.client || ''));
+                }
                 return;
             }
             if (message.type === 'setBetaFeature') {
@@ -1729,6 +1754,10 @@ class FrameViewSession {
             return;
         }
         this.isDisposed = true;
+        if (this._mcpSubscription) {
+            this._mcpSubscription.dispose();
+            this._mcpSubscription = null;
+        }
 
         this.log(`Disposing session for ${this.filePath} (slot=${this.slotName})`);
 

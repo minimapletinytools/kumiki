@@ -239,6 +239,37 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             return !!(app && app.drawingBetaEnabled);
         })()`), { timeoutMs: 20000 }).catch(() => false);
         check('turning drawings on in the beta section saves it, and the open view reloads with them', betaSaved && betaShown);
+
+        // The MCP server, from the same beta section: on, it says where it serves, copies each agent's
+        // setup, and lists a client that connects. On a free port, so a Kigumi already running is no matter.
+        settings.set('mcp.port', 0);
+        await showTab('options');
+        await inShell(`${viewDoc}.getElementById('beta-mcp-toggle').click()`);
+        const mcpStatus = await waitFor(() => inShell(`(${viewDoc}.getElementById('mcp-status') || {}).textContent || ''`)
+            .then((text) => (text.includes('http://127.0.0.1:') ? text : null)), { timeoutMs: 10000 }).catch(() => '');
+        const mcpUrl = (mcpStatus.match(/http:\/\/\S+/) || [])[0];
+        let clientListed = false;
+        if (mcpUrl) {
+            const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
+            const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+            const client = new Client({ name: 'smoke-agent', version: '1.0' });
+            await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl), {
+                requestInit: { headers: { Authorization: `Bearer ${settings.get('mcp.token')}` } },
+            }));
+            await client.callTool({ name: 'get_workspace_folder', arguments: {} });
+            clientListed = await waitFor(() => inShell(`(${viewDoc}.getElementById('mcp-clients') || {}).textContent || ''`)
+                .then((text) => text.includes('smoke-agent')), { timeoutMs: 5000 }).catch(() => false);
+            await client.close();
+        }
+        clipboard.writeText('');
+        await inShell(`${viewDoc}.querySelector('.mcp-copy-btn[data-client="claude-code"]').click()`);
+        const copiedSetup = await waitFor(() => clipboard.readText() || null, { timeoutMs: 5000 }).catch(() => '');
+        check('the MCP server turns on from the options, lists a client that connects, and copies its setup',
+            settings.get('mcp.enabled') === true && Boolean(mcpUrl) && clientListed
+                && copiedSetup.startsWith('claude mcp add') && copiedSetup.includes(mcpUrl),
+            `${mcpStatus}; listed ${clientListed}; ${copiedSetup.slice(0, 40)}`);
+        await inShell(`${viewDoc}.getElementById('beta-mcp-toggle').click()`);
+        await waitFor(() => settings.get('mcp.enabled') === false, { timeoutMs: 5000 }).catch(() => null);
         await runAppCommand('kigumi.openFrameFromSidebar', DRAWING_FRAME);
         const viewerApp = 'document.querySelector("#slot-center iframe:not([hidden])").contentDocument.querySelector("kigumi-app")';
         const drawingId = await waitFor(() => inShell(`(() => {
