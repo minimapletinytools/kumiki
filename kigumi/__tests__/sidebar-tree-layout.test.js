@@ -2,11 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const { csgIndentPx, MEMBER_ROW_INDENT_PX } = require('../webview/layers-panel.js');
 
-// The left rail has no visual test harness, so these guard the one failure it
-// has actually hit: the two panes share appearance rules, and a shared rule
-// that also carries SIZING silently hands whichever selector comes later in
-// the file control of the other pane's height.
-describe('left rail layout', () => {
+// The sidebar's tree page has no visual test harness, so these guard the one
+// failure it has actually hit: the panes share appearance rules, and a shared
+// rule that also carries SIZING silently hands whichever selector comes later
+// in the file control of the other pane's height.
+describe('sidebar tree layout', () => {
     const css = fs.readFileSync(path.join(__dirname, '..', 'webview', 'viewer.css'), 'utf8');
 
     /** Every rule whose selector mentions `selector`, with its declarations. */
@@ -45,24 +45,20 @@ describe('left rail layout', () => {
         expect(shared).toEqual([]);
     });
 
-    test('the rail is a column so one pane pushes the other', () => {
-        const rail = rulesFor('#left-rail').find((r) => r.sel === '#left-rail');
-        expect(rail).toBeDefined();
-        expect(rail.body).toMatch(/flex-direction:\s*column/);
+    test('the tree page is a column so one section pushes the other', () => {
+        const page = rulesFor('.vsb-page').find((r) => r.sel === '.vsb-page');
+        expect(page).toBeDefined();
+        expect(page.body).toMatch(/flex-direction:\s*column/);
     });
 
-    test('the rail starts at the top of the viewport', () => {
-        // Regression: it reserved 64px for the old floating #info box, which
-        // now lives inside the rail -- leaving a gap above the info pane.
-        const rail = rulesFor('#left-rail').find((r) => r.sel === '#left-rail');
-        const top = (rail.body.match(/top:\s*([0-9]+)px/) || [])[1];
-        expect(Number(top)).toBeLessThanOrEqual(16);
+    test('the tree page starts at the top of the sidebar, its sections flush', () => {
+        const fill = rulesFor('.vsb-page.is-fill').find((r) => r.sel === '.vsb-page.is-fill');
+        expect(fill.body).toMatch(/padding:\s*0/);
+        expect(fill.body).toMatch(/overflow:\s*hidden/);
     });
 
-    test('rail width is a variable, so resizing moves both panes together', () => {
-        const rail = rulesFor('#left-rail').find((r) => r.sel === '#left-rail');
-        expect(rail.body).toMatch(/width:\s*var\(--kigumi-rail-width/);
-        expect(rulesFor('#rail-resize').length).toBeGreaterThan(0);
+    test('the sidebar has a handle for its width', () => {
+        expect(rulesFor('.vsb-resize').length).toBeGreaterThan(0);
     });
 
     test('the info pane wraps rather than truncating what it shows', () => {

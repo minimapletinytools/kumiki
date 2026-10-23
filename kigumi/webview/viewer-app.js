@@ -2,9 +2,9 @@ import { LitElement, html } from 'lit';
 import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import {
-    ViewerSettingsPanel, ViewerKiwariPanel, usePanelRuntime, panelSnapshot, PANEL_ACTIONS,
-    EXPORT_FORMATS, EXPORT_FORMAT_PROP,
+    ViewerSettingsPanel, ViewerKiwariPanel, usePanelRuntime, EXPORT_FORMATS, EXPORT_FORMAT_PROP,
 } from './viewer-panels.js';
+import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
 
 const ViewerPhase = Object.freeze({
     BOOTING: 'booting',
@@ -88,6 +88,7 @@ const KigumiTags = window.KigumiTags;
 const KigumiUnits = window.KigumiUnits;
 const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 usePanelRuntime({ html, t, KigumiUnits: window.KigumiUnits, KigumiKiwariValues: window.KigumiKiwariValues });
+useSidebarRuntime({ html, t });
 
 /**
  * What names one measurement within its viewport.
@@ -488,8 +489,6 @@ const FEATURE_TYPE_NOUNS = () => ({
 
 // Rail width limits: wide enough for a deep CSG row to be readable, narrow
 // enough that the rail never takes over the viewport.
-const RAIL_MIN_WIDTH_PX = 180;
-const RAIL_MAX_WIDTH_PX = 640;
 
 const THEMES = Object.freeze({
     'cream': createTheme({
@@ -895,6 +894,7 @@ class KigumiViewerApp extends LitElement {
         this._measurementEndAsked = new Set();
         this.kiwariPanel = new ViewerKiwariPanel(this);
         this.memberListPanel = new MemberListPanel(this, { t });
+        this.sidebar = new ViewSidebar({ requestUpdate: () => this.requestUpdate(), store: vscode });
         this.selectionPanel = new SelectionPanel(this, {
             t,
             csgTreeView: CsgTreeView,
@@ -923,7 +923,6 @@ class KigumiViewerApp extends LitElement {
         this.onCsgByPathRequested = this.onCsgByPathRequested.bind(this);
         this.onEnterDrawingRequested = this.onEnterDrawingRequested.bind(this);
         this.onSaveDrawingsRequested = this.onSaveDrawingsRequested.bind(this);
-        this.onRailResizeStart = this.onRailResizeStart.bind(this);
         this.onWindowContextMenuDismiss = this.onWindowContextMenuDismiss.bind(this);
     }
 
@@ -939,6 +938,8 @@ class KigumiViewerApp extends LitElement {
             : t('viewer.chrome.navHint.rightClick');
         return html`
             <button id="to-v3d" title=${t('viewer.chrome.toV3d.title')}>${t('viewer.chrome.toV3d')}</button>
+            <div id="view-layout">
+            ${this.sidebar.render(this.sidebarPages())}
             <div id="viewport">
                 ${hasPendingChanges
                     ? html`<button
@@ -957,17 +958,6 @@ class KigumiViewerApp extends LitElement {
                 <div id="loading-overlay" class=${this.overlayClasses()}>
                     <div id="loading-text">${this.viewState.loadingText}</div>
                     <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
-                </div>
-                <div id="left-rail">
-                    <!-- What is selected, then the drawing it is in, then
-                         everything there is. Narrowest first: the panel you
-                         came to read is the one about what you just clicked. -->
-                    ${this.selectionPanel.render()}
-                    <!-- Content only; where it lives is this one line. -->
-                    <div id="drawing-panel-host"></div>
-                    <kigumi-layers-view id="layers-view"></kigumi-layers-view>
-                    <div id="rail-resize" title=${t('viewer.layers.resize.title')}
-                         @pointerdown=${this.onRailResizeStart}></div>
                 </div>
                 <div id="gizmo-panel" class=${this.cameraPanelCollapsed ? 'is-collapsed' : ''}
                      aria-label=${t('viewer.chrome.gizmoPanel.ariaLabel')}>
@@ -1001,29 +991,55 @@ class KigumiViewerApp extends LitElement {
                 ${this.renderAssemblyTimeline()}
                 ${this.renderMemberContextMenu()}
             </div>
-            <div id="top-controls">
-                ${this.settingsPanel.render()}
-                ${this.kiwariPanel.render()}
-            </div>
-            <div id="panels">
-                ${this.memberListPanel.render()}
-                <div id="log-panel-box" class="panel-box">
-                    <div class="panel-title">
-                        ${t('viewer.log.title')}
-                        <div id="log-panel-toolbar">
-                            <input id="log-filter" type="text" placeholder=${t('viewer.log.filter.placeholder')}>
-                            <button id="log-clear-btn" type="button">${t('viewer.log.clear')}</button>
-                            <button id="log-open-output-btn" type="button">${t('viewer.log.openOutput')}</button>
-                        </div>
-                    </div>
-                    <div id="log-output"></div>
-                </div>
-                <div class="panel-box">
-                    <div class="panel-title">${t('viewer.rawOutput.title')}</div>
-                    <pre id="raw-output"></pre>
-                </div>
             </div>
         `;
+    }
+
+    /** The sidebar's pages (view-sidebar.js): the tree, options, parameters, members and log. */
+    sidebarPages() {
+        const geometry = this._lastGeometryData;
+        const memberCount = geometry && Array.isArray(geometry.meshes) ? geometry.meshes.length : 0;
+        return [
+            {
+                id: 'tree',
+                label: t('viewer.sidebar.tab.tree'),
+                // Its sections share the height, each collapsing to give the others room.
+                fill: true,
+                // What is selected, then the drawing it is in, then everything there is.
+                // Narrowest first: the panel you came to read is the one about what you just clicked.
+                content: html`
+                    ${this.selectionPanel.render()}
+                    <div id="drawing-panel-host"></div>
+                    <kigumi-layers-view id="layers-view"></kigumi-layers-view>`,
+            },
+            { id: 'options', label: t('viewer.sidebar.tab.options'), content: this.settingsPanel.render() },
+            {
+                id: 'parameters',
+                label: t('viewer.sidebar.tab.parameters'),
+                content: this.kiwariPanel.render() || html`<div class="vsb-empty">${t('viewer.sidebar.noParameters')}</div>`,
+            },
+            { id: 'members', label: t('viewer.sidebar.tab.members'), badge: memberCount || '', content: this.memberListPanel.render() },
+            {
+                id: 'log',
+                label: t('viewer.sidebar.tab.log'),
+                content: html`
+                    <div id="log-panel-box" class="panel-box">
+                        <div class="panel-title">
+                            ${t('viewer.log.title')}
+                            <div id="log-panel-toolbar">
+                                <input id="log-filter" type="text" placeholder=${t('viewer.log.filter.placeholder')}>
+                                <button id="log-clear-btn" type="button">${t('viewer.log.clear')}</button>
+                                <button id="log-open-output-btn" type="button">${t('viewer.log.openOutput')}</button>
+                            </div>
+                        </div>
+                        <div id="log-output"></div>
+                    </div>
+                    <div class="panel-box">
+                        <div class="panel-title">${t('viewer.rawOutput.title')}</div>
+                        <pre id="raw-output"></pre>
+                    </div>`,
+            },
+        ];
     }
 
     firstUpdated() {
@@ -1051,9 +1067,8 @@ class KigumiViewerApp extends LitElement {
                 this.escapeMeasurement();
             }
             this.selectionPanel.updateInfo(this.currentFrameData);
-            this.publishViewState();
+            this.memberListPanel.syncSelection();
         });
-        this.classList.toggle('panels-outside', INITIAL_PAYLOAD.panelsOutside === true);
 
         // Attach Layers panel to selection store + extension messaging.
         const layersView = this.renderRoot.querySelector('#layers-view');
@@ -1102,6 +1117,9 @@ class KigumiViewerApp extends LitElement {
         window.removeEventListener('mousemove', this.onWindowMouseMove);
         window.removeEventListener('mousedown', this.onWindowContextMenuDismiss);
         window.removeEventListener('resize', this.onWindowResize);
+        if (this._viewportObserver) {
+            this._viewportObserver.disconnect();
+        }
         window.removeEventListener('keydown', this.onWindowKeyDown);
         window.removeEventListener('keyup', this.onWindowKeyUp);
         window.removeEventListener('blur', this.onWindowBlur);
@@ -1333,6 +1351,9 @@ class KigumiViewerApp extends LitElement {
         });
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.setSize(viewport.offsetWidth, viewport.offsetHeight, false);
+        // The sidebar beside it changes its width as well as the window does.
+        this._viewportObserver = new window.ResizeObserver(() => this.onWindowResize());
+        this._viewportObserver.observe(viewport);
         this.renderer.outputEncoding = THREE.sRGBEncoding;
         // Which member is frontmost at each pixel: what clips a drawing's dotted lines to their own
         // timber. See member-id-buffer.js.
@@ -2102,15 +2123,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        if (message.type === 'panelCall') {
-            this.applyPanelCall(message.method, message.args, message.seq);
-            return;
-        }
-
-        if (message.type === 'selectMembers') {
-            this.selectMembers(message.memberKeys, message.additive === true);
-            return;
-        }
 
         if (message.type === 'logEntry') {
             const text = typeof message.text === 'string' ? message.text : String(message.text);
@@ -2400,46 +2412,7 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    /** What this view shows and what is selected in it, for an agent asking. See agent/panel-directory.js. */
-    /**
-     * What this view shows, for panels outside it (the app's inspector): the member list as
-     * data, and which members are selected. Sent when either changes, at most once a frame.
-     */
-    publishViewState() {
-        if (!INITIAL_PAYLOAD.panelsOutside || !vscode || this._viewStateQueued) {
-            return;
-        }
-        this._viewStateQueued = true;
-        requestAnimationFrame(() => {
-            this._viewStateQueued = false;
-            const geometry = this._lastGeometryData;
-            vscode.postMessage({
-                type: 'viewState',
-                state: {
-                    frameName: (this.currentFrameData && this.currentFrameData.name) || null,
-                    members: this.memberListPanel.rows(geometry && geometry.meshes ? geometry.meshes : []),
-                    selection: this.selectionManager.getSelectedTimbers(),
-                    // The options and parameters panels, and the last of their calls this
-                    // has applied, so a stand-in can tell an answer to its latest change
-                    // from one to an earlier keystroke.
-                    panels: panelSnapshot(this),
-                    panelCallSeq: this._panelCallSeq || 0,
-                },
-            });
-        });
-    }
-
-    /** A call from the options or parameters panel drawn outside the view (viewer-panels.js). */
-    applyPanelCall(method, args, seq) {
-        if (PANEL_ACTIONS.includes(method) && typeof this[method] === 'function') {
-            this[method](...(Array.isArray(args) ? args : []));
-        }
-        this._panelCallSeq = Math.max(this._panelCallSeq || 0, Number(seq) || 0);
-        this.requestUpdate();
-        this.publishViewState();
-    }
-
-    // What the panels read that lives elsewhere (viewer-panels.js, panelSnapshot).
+    // What the options panel reads that lives elsewhere (viewer-panels.js).
     get themeChoices() {
         return Object.entries(THEMES).map(([id, theme]) => ({ id, labelKey: theme.labelKey }));
     }
@@ -2484,7 +2457,7 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    /** Selection asked for from outside the view, as a click on each member would make it. */
+    /** Select members, as a click on each would (the member list's rows). */
     selectMembers(memberKeys, additive) {
         const keys = (Array.isArray(memberKeys) ? memberKeys : []).filter((key) => this.sceneManager.has(key));
         this._dropCsgFocus();
@@ -2497,6 +2470,7 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    /** What this view shows and what is selected in it, for an agent asking. See agent/panel-directory.js. */
     describePanel() {
         const scene = this.sceneStore.activeScene();
         const counts = (this.currentFrameData || {});
@@ -5373,7 +5347,7 @@ class KigumiViewerApp extends LitElement {
     // properties through the CSSOM is allowed: marks carry their position in
     // data-left and get placed here after every render.
     updated() {
-        this.publishViewState();
+        this.sidebar.sync(this);
         this.querySelectorAll('.assembly-timeline-mark[data-left]').forEach((mark) => {
             mark.style.left = `${mark.dataset.left}%`;
         });
@@ -6186,14 +6160,6 @@ class KigumiViewerApp extends LitElement {
     // rendered by the layers panel.
     // ------------------------------------------------------------------
 
-    // ------------------------------------------------------------------
-    // Rail width. Both panes are children of #left-rail, so setting the
-    // rail's width resizes the info pane and the timber list together. The
-    // value lives on the host as a CSS variable, which survives lit
-    // re-renders of the shadow tree in a way an inline style on the rail
-    // would not.
-    // ------------------------------------------------------------------
-
     /**
      * Run a pointer gesture, owning its listeners for as long as it lasts.
      *
@@ -6239,47 +6205,6 @@ class KigumiViewerApp extends LitElement {
     _endAllPointerGestures() {
         for (const name of Array.from(this._pointerGestures.keys())) {
             this._endPointerGesture(name);
-        }
-    }
-
-    onRailResizeStart(event) {
-        const rail = this.renderRoot.querySelector('#left-rail');
-        if (!rail || event.button !== 0) {
-            return;
-        }
-        event.preventDefault();
-        this._railResize = {
-            startX: event.clientX,
-            startWidth: rail.getBoundingClientRect().width,
-        };
-        const handle = this.renderRoot.querySelector('#rail-resize');
-        if (handle) {
-            handle.classList.add('is-dragging');
-        }
-        this._beginPointerGesture('rail-resize', {
-            onMove: (moveEvent) => this.onRailResizeMove(moveEvent),
-            onEnd: () => this.onRailResizeEnd(),
-        });
-    }
-
-    onRailResizeMove(event) {
-        if (!this._railResize) {
-            return;
-        }
-        const delta = event.clientX - this._railResize.startX;
-        // Wide enough to read a row, narrow enough to leave the model visible.
-        const width = Math.max(RAIL_MIN_WIDTH_PX, Math.min(
-            RAIL_MAX_WIDTH_PX,
-            this._railResize.startWidth + delta,
-        ));
-        this.style.setProperty('--kigumi-rail-width', width + 'px');
-    }
-
-    onRailResizeEnd() {
-        this._railResize = null;
-        const handle = this.renderRoot.querySelector('#rail-resize');
-        if (handle) {
-            handle.classList.remove('is-dragging');
         }
     }
 

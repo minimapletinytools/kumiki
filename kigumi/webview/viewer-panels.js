@@ -1,15 +1,9 @@
 /**
- * The viewer's options and its frame parameters (kiwari), as panels that draw from an `app`
- * and change things only through its methods.
- *
- * The viewer draws them against itself. The standalone app's inspector draws them outside the
- * view, against a stand-in that holds a snapshot of the viewer (panelSnapshot) and sends each
- * method call back to it (PANEL_ACTIONS). So everything these read from `app` is listed in
- * panelSnapshot, and everything they call on it in PANEL_ACTIONS.
+ * The viewer's options and its frame parameters (kiwari), as panels that draw from an `app` (the
+ * viewer) and change things only through its methods. They live in the view's sidebar.
  *
  * No imports: the page passes lit's `html`, its translator and the shared value modules to
- * usePanelRuntime first, since the viewer gets lit through an import map and the inspector
- * cannot have one.
+ * usePanelRuntime first.
  */
 
 let html;
@@ -34,65 +28,6 @@ export const EXPORT_FORMAT_PROP = {
     obj: 'exportFormatObjEnabled',
     step: 'exportFormatStepEnabled',
 };
-
-/** The viewer methods the panels call. */
-export const PANEL_ACTIONS = Object.freeze([
-    'setCenterGizmoEnabled', 'setUnits', 'setUnitPrecision', 'setEdgeMode', 'setShadowsEnabled',
-    'setReflectionsEnabled', 'setFootprintColor', 'setDebugEnabled', 'setShowFeatureParent',
-    'setReferenceFeatures', 'setDrawingGhostsVisible', 'setLeftClickDragRotatesCameraEnabled',
-    'setShowAssemblyTimeline', 'setExportCombinedEnabled', 'setExportIndividualsEnabled',
-    'setExportAccessoriesEnabled', 'setExportFormatEnabled', 'setEdgeLineVisibilityPercent',
-    'setEdgeLineThicknessPx', 'setUnselectedTransparencyPercent', 'setSelectedTransparencyPercent',
-    'setDisassemblyMultiplier', 'setDrawingOption', 'setTheme', 'setGeometryMode', 'openDebugDrawing',
-    'saveViewerSettings', 'exportFiles', 'installCadqueryOcp',
-    'setKiwariDraft', 'setKiwariEnabled', 'setKiwariAxisDraft', 'resetKiwariToDefaults',
-    'saveKiwariToFile', 'requestRefresh',
-]);
-
-const SNAPSHOT_PROPS = Object.freeze([
-    'units', 'showFeatureParent', 'referenceFeatures', 'edgeMode', 'edgeLineVisibilityPercent',
-    'edgeLineThicknessPx', 'unselectedTransparencyPercent', 'selectedTransparencyPercent',
-    'leftClickDragRotatesCamera', 'activeTheme', 'debugEnabled', 'showCenterGizmo', 'shadowsEnabled',
-    'reflectionsEnabled', 'footprintColor', 'showAssemblyTimeline', 'disassemblyMultiplier',
-    'showDrawingGhosts', 'showDrawingPerfectFaces', 'showDrawingCenterplanes', 'showDrawingReferenceFeatures',
-    ...Object.values(EXPORT_FORMAT_PROP), 'exportCombinedEnabled',
-    'exportIndividualsEnabled', 'exportAccessoriesEnabled', 'cadqueryOcpInstalled',
-    'installingCadqueryOcp', 'themeChoices', 'footprintColorIds', 'panelFlags',
-]);
-
-// A kiwari section keeps two Sets, which do not survive every way a message travels.
-const SECTION_SETS = ['enabled', 'changed'];
-
-/** What the panels read from the viewer, as plain data. */
-export function panelSnapshot(app) {
-    const snapshot = Object.fromEntries(SNAPSHOT_PROPS.map((prop) => [prop, app[prop]]));
-    snapshot.unitSystem = app.unitSystem();
-    snapshot.unitPrecision = app.unitPrecision();
-    snapshot.geometryMode = (app.viewerOptions && app.viewerOptions.geometryMode) || 'actual';
-    snapshot.kiwariSections = (app.kiwariSections || []).map((state) => ({
-        ...state,
-        ...Object.fromEntries(SECTION_SETS.map((key) => [key, [...(state[key] || [])]])),
-    }));
-    return snapshot;
-}
-
-/** A stand-in for the viewer, from a snapshot, sending each action to `call(method, args)`. */
-export function panelStandIn(snapshot, call) {
-    const app = {
-        ...snapshot,
-        viewerOptions: { geometryMode: snapshot.geometryMode },
-        kiwariSections: (snapshot.kiwariSections || []).map((state) => ({
-            ...state,
-            ...Object.fromEntries(SECTION_SETS.map((key) => [key, new Set(state[key] || [])])),
-        })),
-        unitSystem: () => snapshot.unitSystem,
-        unitPrecision: () => snapshot.unitPrecision,
-    };
-    for (const method of PANEL_ACTIONS) {
-        app[method] = (...args) => call(method, args);
-    }
-    return app;
-}
 
 export class ViewerSettingsPanel {
     constructor(app) {

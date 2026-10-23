@@ -20,8 +20,6 @@ const { LogChannel } = require('./log-channel');
 const { AgentSession } = require('../../agent/agent-session');
 const { createKigumiTools } = require('../../agent/tools');
 const { startMcpHttpServer, claudeCodeAddCommand, newToken } = require('../../agent/mcp-http');
-const { ViewInspector } = require('../../view-inspector');
-const { resolveLocale } = require('../../i18n');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
 const ORIGIN = 'kigumi://app';
@@ -435,35 +433,6 @@ async function syncMcpServer() {
     }
 }
 
-let inspector = null;
-
-// The inspector under the tabs, showing the view in front -- or, while a source file is, the
-// last view that was.
-function createInspector() {
-    const surface = connection.createPanel('inspector', { title: 'Inspector' });
-    let lastView = null;
-    const inspectedView = () => {
-        const active = connection.activePanel;
-        if (active && active.type === 'viewer') {
-            lastView = active;
-        } else if (lastView && !connection.panels.has(lastView.id)) {
-            lastView = connection.findPanel((panel) => panel.type === 'viewer');
-        }
-        return lastView;
-    };
-    inspector = new ViewInspector({
-        surface,
-        currentSession: () => kigumiApp && kigumiApp.panels.sessionForSurface(inspectedView()),
-        locale: resolveLocale(app.getLocale()),
-    });
-    surface.onDispose(() => {
-        inspector.dispose();
-        inspector = null;
-    });
-    surface.loadUrl(`${ORIGIN}/webview/inspector/inspector.html`);
-    connection.onDidChange(() => inspector && inspector.sync());
-}
-
 // Puts the line that adds Kigumi to Claude Code on the clipboard.
 function copyMcpSetup() {
     if (!mcpServer) {
@@ -526,7 +495,6 @@ function buildMenu() {
                 },
                 { type: 'separator' },
                 { label: 'Toggle Agent', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() },
-                { label: 'Toggle Inspector', accelerator: 'CmdOrCtrl+J', click: () => connection.setSideShown('bottom', !connection.layout.bottom) },
                 { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcpServer), click: () => copyMcpSetup() },
                 { type: 'separator' },
                 { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
@@ -633,7 +601,6 @@ async function start() {
         bundledUv: bundledUvPath(),
     });
     kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
-    createInspector();
 
     settings.onChange(() => {
         buildMenu();

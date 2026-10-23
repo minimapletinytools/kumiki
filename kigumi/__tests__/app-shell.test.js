@@ -165,12 +165,12 @@ describe('shell connection', () => {
 
   test('revealing a side panel shows its side', () => {
     const { connection } = connect();
-    const inspector = connection.createPanel('inspector');
-    connection.setSideShown('bottom', false);
-    expect(inspector.visible).toBe(false);
+    const agent = connection.createPanel('agent');
+    connection.setSideShown('right', false);
+    expect(agent.visible).toBe(false);
 
-    inspector.reveal();
-    expect(inspector.visible).toBe(true);
+    agent.reveal();
+    expect(agent.visible).toBe(true);
   });
 
   test('closing a tab asks first, and a no keeps it open', async () => {

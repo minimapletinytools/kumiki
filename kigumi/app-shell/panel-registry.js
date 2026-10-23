@@ -1,7 +1,7 @@
 /**
  * The kinds of panel the app shell can show, and the layout slot each lives in.
  * The layout is fixed: `left` (one panel), `center` (tabs), `bottom` (one panel, under the
- * tabs), `right` (one panel).
+ * tabs; none uses it yet), `right` (one panel).
  */
 
 const SLOTS = Object.freeze(['left', 'center', 'bottom', 'right']);
@@ -11,7 +11,6 @@ const PANEL_TYPES = Object.freeze({
     viewer: { slot: 'center', icon: 'fish2-very-sad', redrawAfterReload: true },
     log: { slot: 'center', icon: 'output' },
     editor: { slot: 'center', icon: 'file-code' },
-    inspector: { slot: 'bottom', icon: 'layout-panel' },
     agent: { slot: 'right', icon: 'sparkle' },
 });
 

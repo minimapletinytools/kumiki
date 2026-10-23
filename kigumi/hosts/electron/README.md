@@ -45,11 +45,10 @@ refresh on save defaults to on in the app. Logs are in
 
 The window's layout is data in `../../app-shell/shell-connection.js`:
 - the explorer on the left, with an All Files tree of the workspace at the top (collapsed; a click opens a file's source, and a Python file's right-click menu opens it in a viewer);
-- tabs in the centre, for views and source files alike;
-- the inspector underneath (`../../view-inspector.js`), showing the member list and the log of the view in front, or of the last one that was;
+- tabs in the centre, for views and source files alike (a view draws its own sidebar of panels: the tree, options, parameters, members and log; `../../webview/view-sidebar.js`);
 - the agent on the right.
 
-The title bar buttons and Cmd/Ctrl+J show and hide the sides.
+The title bar buttons show and hide the sides.
 
 ## Agent and MCP
 

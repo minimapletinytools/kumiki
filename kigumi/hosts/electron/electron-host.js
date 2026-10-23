@@ -72,7 +72,7 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
     // come from the app's sessions; the agent panel is the one asking.
     function listPanels() {
         return [...connection.panels.values()]
-            .filter((panel) => !['viewer', 'agent', 'inspector'].includes(panel.type))
+            .filter((panel) => !['viewer', 'agent'].includes(panel.type))
             .map((panel) => ({
                 id: `tab:${panel.id}`,
                 kind: panel.type,
@@ -134,9 +134,6 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
 
         listPanels,
         describePanel,
-
-        // The inspector shows each view's member list and log (view-inspector.js).
-        viewerPanelsOutside: true,
 
         // The explorer lists the workspace's files too (sidebar-model.js); VS Code has its own.
         showsFileBrowser: true,
