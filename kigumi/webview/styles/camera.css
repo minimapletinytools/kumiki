@@ -1,0 +1,67 @@
+/* The camera controls: the gizmo cube, the light dial and their buttons. */
+/* The camera controls: one column under one header, which collapses it. */
+#gizmo-panel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 122px;
+    display: flex;
+    flex-direction: column;
+    background: var(--hv-panel-bg);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 6px;
+    overflow: hidden;
+    backdrop-filter: blur(4px);
+    z-index: 3;
+}
+#gizmo-panel.is-collapsed {
+    width: auto;
+}
+#gizmo-panel.is-collapsed .gizmo-body {
+    display: none;
+}
+.gizmo-body {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 6px;
+}
+.gizmo-title {
+    color: var(--hv-title);
+    font: 11px 'Segoe UI', sans-serif;
+    margin-top: 2px;
+    text-transform: lowercase;
+}
+#gizmo-cube-c,
+#light-dial-c {
+    width: 108px;
+    height: 108px;
+    display: block;
+    border-radius: 4px;
+    border: 1px solid var(--hv-control-border-strong);
+    background: var(--hv-overlay-bg);
+    touch-action: none;
+    cursor: grab;
+}
+#gizmo-cube-c:active,
+#light-dial-c:active {
+    cursor: grabbing;
+}
+#focus-btn,
+#camera-mode-btn,
+#projection-mode-btn {
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 6px;
+    background: var(--hv-control-bg-strong);
+    color: var(--hv-title);
+    font: 12px 'Segoe UI', sans-serif;
+    padding: 5px 8px;
+    cursor: pointer;
+    text-transform: lowercase;
+}
+#focus-btn:hover,
+#camera-mode-btn:hover,
+#projection-mode-btn:hover {
+    background: var(--hv-control-bg-solid-hover);
+}

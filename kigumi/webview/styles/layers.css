@@ -1,0 +1,385 @@
+/* The layers panel (layers-panel.js) and tag chips. */
+/* The drawings section: where a drawing came from, and whether it is saved. */
+.lp-drawing-origin {
+    opacity: 0.75;
+    margin-right: 4px;
+    font-size: 0.9em;
+}
+
+.lp-drawing-name {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lp-drawing-unsaved {
+    width: 10px;
+    text-align: center;
+    opacity: 0.85;
+}
+
+.lp-row-active-drawing {
+    font-weight: 600;
+}
+
+.lp-section-action {
+    margin-left: auto;
+    font: inherit;
+    font-size: 0.85em;
+    color: var(--hv-title);
+    background: transparent;
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 3px;
+    padding: 0 6px;
+    cursor: pointer;
+}
+
+.lp-section-action:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+/* ---- Layers panel (layers-panel.js) ---- */
+kigumi-layers-view {
+    /* Takes the tree page's remaining height. min-height lets it shrink rather
+       than push the selection off the top when the list is long. */
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    max-height: none;
+    pointer-events: auto;
+}
+
+kigumi-layers-view:has(.lp-collapsed) {
+    flex: 0 0 auto;
+}
+
+.lp-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background: var(--hv-layers-bg);
+    color: var(--hv-text);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    overflow: hidden;
+    font-size: 12px;
+}
+
+.lp-panel.lp-collapsed {
+    height: auto;
+}
+
+.lp-filter-bar {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--hv-accent-border);
+}
+
+.lp-filter-input {
+    width: 100%;
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--hv-accent-border);
+    background: var(--hv-input-bg);
+    color: var(--hv-text);
+    font: 12px/1.3 'Segoe UI', sans-serif;
+}
+
+.lp-footer-btn,
+.lp-icon-btn {
+    border: 1px solid var(--hv-accent-border);
+    background: var(--hv-chip-bg);
+    color: var(--hv-text);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.lp-footer-btn {
+    padding: 2px 6px;
+    font-size: 11px;
+}
+
+.lp-tree {
+    flex: 1 1 auto;
+    overflow: auto;
+    padding: 4px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--hv-accent-border-strong) transparent;
+}
+
+.lp-tree::-webkit-scrollbar {
+    width: 0;
+    height: 7px;
+}
+
+.lp-tree::-webkit-scrollbar-thumb {
+    background: var(--hv-accent-border-strong);
+    border-radius: 4px;
+}
+
+.lp-tree::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.lp-section {
+    margin-bottom: 2px;
+}
+
+.lp-section-header {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--hv-title);
+    font-weight: 600;
+    text-transform: lowercase;
+}
+
+.lp-section-header:hover,
+.lp-row:hover {
+    background: var(--hv-layers-hover-bg);
+}
+
+/* Nothing in it: greyed, with no chevron, and does not open. */
+.lp-section-header.lp-section-empty {
+    opacity: 0.45;
+    cursor: default;
+}
+.lp-section-header.lp-section-empty:hover {
+    background: transparent;
+}
+
+.lp-section-body {
+    padding: 0 0 2px;
+    min-width: max-content;
+}
+
+/* One frame's drawings, timbers and joints, when a file shows several frames. */
+.lp-frame-body {
+    padding-left: 10px;
+}
+
+.lp-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 4px 1px 6px;
+    user-select: none;
+    line-height: 1.4;
+    border-radius: 3px;
+}
+
+.lp-row.lp-selectable {
+    cursor: pointer;
+}
+
+.lp-row.lp-selected {
+    background: var(--hv-layers-selected-bg);
+    color: var(--hv-title);
+    font-weight: 600;
+}
+
+.lp-depth-0 {
+    padding-left: 18px;
+}
+
+.lp-depth-1 {
+    padding-left: 22px;
+}
+
+.lp-depth-2 {
+    padding-left: 34px;
+}
+
+.lp-chev {
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+    color: var(--hv-dim);
+    font-size: 12px;
+}
+
+.lp-chev.lp-leaf {
+    opacity: 0.4;
+}
+
+.lp-label {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* CSG tree rows. Indentation is set inline from the node's depth, since the
+   tree is arbitrarily deep and the lp-depth-N classes only cover the fixed
+   member hierarchy above it. */
+.lp-row-csg {
+    gap: 3px;
+    font-size: 11px;
+    color: var(--hv-title);
+    /* Sizes to its content so long paths scroll rather than truncate. */
+    width: max-content;
+    min-width: 100%;
+    white-space: nowrap;
+}
+
+.lp-row-csg .lp-chev {
+    width: 11px;
+    flex: 0 0 auto;
+}
+
+/* The base type is the row's anchor: it says what the node actually is. */
+.lp-csg-kind {
+    color: var(--hv-title);
+    flex: 0 0 auto;
+}
+
+/* The tag, when the node has one, is the part worth reading first. */
+.lp-csg-label {
+    color: var(--hv-title);
+    font-weight: 600;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* A difference reads as arithmetic: minus for what comes off, plus for the
+   material it comes off of. */
+.lp-csg-minus,
+.lp-csg-plus {
+    flex: 0 0 auto;
+    font-weight: 700;
+}
+
+.lp-csg-minus {
+    color: var(--hv-accent);
+}
+
+.lp-csg-plus {
+    color: var(--hv-dim);
+}
+
+.lp-csg-joint {
+    padding-left: 8px;
+    color: var(--hv-dim);
+    font-style: italic;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.lp-csg-features {
+    flex: 0 0 auto;
+    padding: 0 4px;
+    border-radius: 6px;
+    background: var(--hv-accent-border);
+    color: var(--hv-text);
+    font-size: 10px;
+    cursor: help;
+}
+
+/* A cut subtree is material being removed. The rule down its left edge makes
+   that readable at a glance in a deep tree, where a lone minus sign several
+   levels in is easy to miss. */
+.lp-csg-cut {
+    border-left: 2px solid var(--hv-accent-soft);
+}
+
+.lp-csg-placeholder {
+    color: var(--hv-dim);
+    font-style: italic;
+    font-size: 11px;
+}
+
+.lp-row-joint > .lp-label,
+.lp-row-timber > .lp-label {
+    color: var(--hv-text);
+}
+
+.lp-row-jointMember > .lp-label {
+    color: var(--hv-dim);
+}
+
+/* One pill, wherever tags are shown: the tags section and the selection pane. */
+.tag-chip {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 10px;
+    border: 1px solid var(--hv-accent-border);
+    background: var(--hv-chip-bg);
+    font-size: 10px;
+    color: var(--hv-dim);
+}
+
+/* A tag's kind reads as its colour, in the tags section and on the pills the
+   timber and joint rows carry. */
+.tag-chip[data-tag-kind="member"] {
+    border-color: var(--hv-tag-member);
+    color: var(--hv-tag-member);
+}
+
+.tag-chip[data-tag-kind="slice"] {
+    border-color: var(--hv-tag-slice);
+    color: var(--hv-tag-slice);
+}
+
+.tag-chip[data-tag-kind="generic"] {
+    border-color: var(--hv-tag-generic);
+    color: var(--hv-tag-generic);
+}
+
+.lp-row-tag > .tag-chip {
+    font-size: 11px;
+}
+
+.lp-tag-count {
+    margin-left: auto;
+    padding-left: 6px;
+    font-size: 10px;
+    color: var(--hv-dim);
+}
+
+/* The partial marker only earns its space while the tag is partly selected. */
+.lp-tag-partial-mark {
+    display: none;
+    padding-left: 3px;
+    color: var(--hv-strong);
+}
+
+.lp-row-tag.lp-tag-partial > .lp-tag-partial-mark {
+    display: inline;
+}
+
+.lp-row-tag.lp-tag-partial {
+    background: var(--hv-layers-hover-bg);
+}
+
+.lp-icons {
+    display: inline-flex;
+    gap: 2px;
+    margin-right: 4px;
+}
+
+.lp-icon-btn {
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+    font-size: 11px;
+    padding: 0;
+}
+
+.lp-icon-btn.lp-active {
+    border-color: var(--hv-accent-border-strong);
+    background: var(--hv-control-bg-hover);
+}
+
+.lp-footer {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 6px 8px;
+    border-top: 1px solid var(--hv-accent-border);
+}

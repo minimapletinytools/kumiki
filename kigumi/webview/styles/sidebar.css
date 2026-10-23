@@ -1,0 +1,203 @@
+/* The view's sidebar (view-sidebar.js), and how the panels sit in it. */
+/* ---- The view's sidebar (view-sidebar.js) ---- */
+#view-sidebar {
+    position: relative;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--hv-panel-bg);
+    border-right: 1px solid var(--hv-panel-border);
+    font: 12px 'Segoe UI', sans-serif;
+}
+#view-sidebar.is-collapsed {
+    width: 22px;
+}
+.vsb-expand {
+    flex: 1 1 auto;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--hv-dim);
+    font-size: 16px;
+    cursor: pointer;
+}
+.vsb-expand:hover {
+    color: var(--hv-title);
+    background: var(--hv-layers-hover-bg);
+}
+.vsb-frame {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.vsb-frame[hidden],
+.vsb-page[hidden],
+.vsb-expand[hidden] {
+    display: none;
+}
+.vsb-header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    padding: 4px 4px 4px 10px;
+    border-bottom: 1px solid var(--hv-panel-border);
+    color: var(--hv-title);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.vsb-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* The tree page's heading: a house, for the frame. */
+.vsb-mark {
+    font-size: 14px;
+    line-height: 1;
+}
+.vsb-collapse {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--hv-dim);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+.vsb-collapse:hover {
+    color: var(--hv-title);
+    background: var(--hv-layers-hover-bg);
+}
+/* A page scrolls on its own; the tree's lays out its sections instead. */
+.vsb-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.vsb-page.is-fill {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+}
+.vsb-empty {
+    color: var(--hv-dim);
+    padding: 4px 2px;
+}
+/* The pages' names, along the bottom, as the panels under a view have theirs. On one
+   line: a narrow sidebar shortens them rather than wrapping. */
+.vsb-tabs {
+    flex: none;
+    display: flex;
+    border-top: 1px solid var(--hv-panel-border);
+    background: var(--hv-layers-header-bg);
+}
+.vsb-tab {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 6px 4px 5px;
+    border: none;
+    border-top: 2px solid transparent;
+    background: transparent;
+    color: var(--hv-dim);
+    font: 11px 'Segoe UI', sans-serif;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.vsb-tab:hover {
+    color: var(--hv-title);
+}
+.vsb-tab.is-active {
+    color: var(--hv-title);
+    border-top-color: var(--hv-accent-border-strong);
+}
+.vsb-badge {
+    margin-left: 4px;
+    padding: 0 5px;
+    border-radius: 8px;
+    background: var(--hv-layers-selected-bg);
+    font-size: 10px;
+}
+.vsb-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -5px;
+    width: 9px;
+    cursor: ew-resize;
+    z-index: 2;
+}
+/* Only hints at itself on approach: a permanent divider would be noise. */
+.vsb-resize::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 3px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 120ms ease;
+}
+.vsb-resize:hover::after,
+.vsb-resize.is-dragging::after {
+    background: var(--hv-accent-border-strong);
+}
+/* The tree's sections, stacked as a sidebar's views: flush, a rule between, each
+   collapsing to its header. The selection and the drawing take what they need, up
+   to a share of the height, and the layers list the rest. */
+.vsb-page.is-fill > .ip-panel,
+.vsb-page.is-fill > #drawing-panel-host > *,
+.vsb-page.is-fill .lp-panel {
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: transparent;
+}
+.vsb-page.is-fill > .ip-panel {
+    max-height: 40%;
+    overflow: auto;
+    border-bottom: 1px solid var(--hv-panel-border);
+}
+.vsb-page.is-fill > #drawing-panel-host {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+.vsb-page.is-fill > #drawing-panel-host:not(:empty) {
+    border-bottom: 1px solid var(--hv-panel-border);
+}
+/* The other pages' panels sit flush in the sidebar rather than as cards. */
+.vsb-page > #render-controls,
+.vsb-page > #kiwari-controls,
+.vsb-page > .panel-box {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding-left: 0;
+    padding-right: 0;
+}
+/* The page names itself; the panels' own titles would say it twice. */
+#view-sidebar .viewer-settings-title,
+#view-sidebar .kiwari-title {
+    display: none;
+}

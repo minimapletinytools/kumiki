@@ -1,0 +1,50 @@
+/* The header of every panel over or beside the view (overlay-header.js). After drawing.css: a drawing's header is one too, and these win. */
+/* The header of every panel over the view (overlay-header.js): its name and the
+   arrow that collapses it, on one line. */
+.ov-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--hv-title);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    padding: 4px 8px;
+    background: var(--hv-layers-header-bg);
+    user-select: none;
+}
+
+.ov-header:hover .ov-chev {
+    color: var(--hv-title);
+}
+
+.ov-chev {
+    flex: none;
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--hv-dim);
+}
+
+.ov-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ov-header-right .ov-title {
+    text-align: right;
+}
+
+/* A rule under the header only when something is under it. */
+.ov-header:not(:last-child) {
+    border-bottom: 1px solid var(--hv-panel-border);
+}
+#gizmo-panel.is-collapsed .ov-header {
+    border-bottom: none;
+}

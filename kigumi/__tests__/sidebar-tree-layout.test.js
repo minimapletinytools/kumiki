@@ -7,7 +7,10 @@ const { csgIndentPx, MEMBER_ROW_INDENT_PX } = require('../webview/layers-panel.j
 // rule that also carries SIZING silently hands whichever selector comes later
 // in the file control of the other pane's height.
 describe('sidebar tree layout', () => {
-    const css = fs.readFileSync(path.join(__dirname, '..', 'webview', 'viewer.css'), 'utf8');
+    const webviewDir = path.join(__dirname, '..', 'webview');
+    const css = [path.join(webviewDir, 'viewer.css'), ...fs.readdirSync(path.join(webviewDir, 'styles'))
+        .map((name) => path.join(webviewDir, 'styles', name))]
+        .map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 
     /** Every rule whose selector mentions `selector`, with its declarations. */
     function rulesFor(selector) {

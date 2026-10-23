@@ -1,0 +1,153 @@
+/* The member list (member-list-panel.js), the log and the raw output. */
+#timber-rows tr {
+    cursor: pointer;
+}
+#timber-rows tr:hover {
+    background: var(--hv-layers-hover-bg);
+}
+#timber-rows tr.is-selected {
+    background: var(--hv-layers-selected-bg);
+}
+.panel-box {
+    background: var(--hv-panel-bg);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 8px;
+    overflow: hidden;
+    backdrop-filter: blur(4px);
+}
+.panel-title {
+    background: var(--hv-panel-header-bg);
+    color: var(--hv-title);
+    font: 12px 'Segoe UI', sans-serif;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--hv-panel-border);
+    display: flex;
+    align-items: center;
+}
+#member-list-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--hv-panel-border);
+    background: var(--hv-control-bg);
+}
+#member-list-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font: 11px/1.4 'Segoe UI', sans-serif;
+    color: var(--hv-text);
+    white-space: nowrap;
+}
+#member-list-legend {
+    border-bottom: 1px solid var(--hv-panel-border);
+    background: var(--hv-accent-soft);
+}
+#member-list-legend summary {
+    cursor: pointer;
+    padding: 7px 10px;
+    font: 600 11px/1.4 'Segoe UI', sans-serif;
+    color: var(--hv-title);
+    user-select: none;
+}
+.member-list-legend-body {
+    padding: 0 10px 8px;
+    font: 11px/1.45 'Segoe UI', sans-serif;
+    color: var(--hv-dim);
+}
+.member-list-legend-body p {
+    margin: 6px 0;
+}
+#timber-panel {
+    max-height: 220px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+#timber-panel table {
+    width: 100%; border-collapse: collapse;
+    font: 11px/1.5 'Segoe UI', monospace; color: var(--hv-text);
+}
+#timber-panel thead th {
+    position: sticky; top: 0; background: var(--hv-table-head-bg);
+    color: var(--hv-title); font-weight: 600; text-align: left;
+    padding: 4px 10px; border-bottom: 1px solid var(--hv-panel-border);
+    white-space: nowrap;
+}
+#timber-panel tbody tr:hover { background: var(--hv-row-hover-bg); }
+#timber-panel tbody td {
+    padding: 3px 10px; border-bottom: 1px solid var(--hv-row-border);
+    white-space: nowrap; font-family: 'Courier New', monospace;
+}
+#timber-panel tbody td:first-child {
+    color: var(--hv-row-index); font-family: 'Segoe UI', sans-serif;
+}
+#timber-panel tbody td:nth-child(4) {
+    white-space: normal;
+    min-width: 220px;
+}
+#timber-panel table.member-hide-tags [data-col="tags"] {
+    display: none;
+}
+#timber-panel table.member-hide-csg [data-col="csg"],
+#timber-panel table.member-hide-csg [data-col="feature"] {
+    display: none;
+}
+#raw-output {
+    max-height: 260px;
+    overflow: auto;
+    padding: 10px;
+    color: var(--hv-text);
+    font: 11px/1.5 'Courier New', monospace;
+    white-space: pre;
+}
+#log-panel-box .panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#log-panel-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+#log-panel-toolbar button {
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--hv-control-bg);
+    border: 1px solid var(--hv-control-border);
+    color: var(--hv-text);
+    font: 11px 'Segoe UI', sans-serif;
+    cursor: pointer;
+}
+#log-panel-toolbar button:hover {
+    background: var(--hv-control-bg-hover);
+}
+#log-filter {
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--hv-input-border);
+    background: var(--hv-input-bg);
+    color: var(--hv-text);
+    font: 11px 'Segoe UI', sans-serif;
+    width: 140px;
+}
+#log-filter::placeholder {
+    color: var(--hv-dim);
+}
+#log-output {
+    max-height: 220px;
+    overflow: auto;
+    padding: 8px 10px;
+    color: var(--hv-text);
+    font: 11px/1.5 'Courier New', monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+#log-output .log-line {
+    padding: 1px 0;
+}
+#log-output .log-line.log-filtered-out {
+    display: none;
+}

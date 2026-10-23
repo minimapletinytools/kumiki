@@ -1,0 +1,138 @@
+/* The selection panel (selection-panel.js). */
+/* Sizes to its content, so it never crowds out the list below it. */
+.ip-panel {
+    flex: 0 0 auto;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--hv-layers-bg);
+    color: var(--hv-text);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    overflow: hidden;
+    font-size: 12px;
+    user-select: none;
+}
+
+.ip-action {
+    margin-left: auto;
+    font: inherit;
+    font-size: 0.9em;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+    color: var(--hv-title);
+    background: transparent;
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 3px;
+    padding: 1px 7px;
+    cursor: pointer;
+}
+
+.ip-action:hover {
+    background: var(--hv-panel-border);
+}
+
+/* Measuring from the focus: the button, and while an end is held, what to do next. Centred. */
+.ip-measure-line {
+    justify-content: center;
+}
+.ip-action.ip-measure {
+    margin-left: 0;
+}
+.ip-measure-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    color: var(--hv-title);
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+.ip-measure-hint .ip-measure {
+    margin-top: 4px;
+}
+
+.ip-body {
+    padding: 4px 8px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.5;
+}
+
+.ip-breadcrumb {
+    color: var(--hv-strong);
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* The features a derived edge or point is formed from, one per line. */
+.ip-derived-from {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 2px;
+}
+
+.ip-derived-path {
+    padding-left: 10px;
+    color: var(--hv-text);
+    overflow-wrap: anywhere;
+}
+
+.ip-derived-cross {
+    padding-left: 10px;
+    font-size: 0.85em;
+}
+
+.ip-detail {
+    display: flex;
+    gap: 6px;
+}
+
+.ip-detail-label {
+    color: var(--hv-dim);
+    min-width: 78px;
+}
+
+/* How a focused measurement is measured, when the pair admits more than one
+   way. Sized to its row rather than to the panel: the label beside it is the
+   fixed part. */
+.ip-kind {
+    font: inherit;
+    font-size: 0.95em;
+    color: var(--hv-text);
+    background: var(--hv-panel-bg);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 3px;
+    padding: 0 2px;
+    max-width: 100%;
+    cursor: pointer;
+}
+
+.ip-detail-value {
+    color: var(--hv-text);
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+/* The selected member as stock: name, cross-section, finished length. */
+.ip-size {
+    font-variant-numeric: tabular-nums;
+    color: var(--hv-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ip-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.ip-tags {
+    align-items: flex-start;
+}
