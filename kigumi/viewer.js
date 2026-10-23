@@ -207,4 +207,9 @@ function requestViewerScreenshot(panel, options = {}) {
     });
 }
 
-module.exports = { createFrameViewer, initializeFrameViewer, renderFrameViewer, requestViewerScreenshot };
+/** Make the next render of `panel` build its page anew, rather than update it. */
+function forgetViewerPage(panel) {
+    initializedPanels.delete(panel);
+}
+
+module.exports = { createFrameViewer, initializeFrameViewer, renderFrameViewer, forgetViewerPage, requestViewerScreenshot };

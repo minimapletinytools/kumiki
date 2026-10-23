@@ -124,6 +124,12 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             }
             outputChannel.appendLine(`[kigumi] Auto refresh on file change: ${autoRefreshOnFileChange ? 'enabled' : 'disabled'}`);
         }
+        // Read when a view's page is built, so the open views are built again.
+        if (affects('viewer.assemblyPreview') || affects('viewer.drawingBeta')) {
+            for (const session of [...frameSessions.values(), ...patternSessions.values()]) {
+                session.reloadPage();
+            }
+        }
         if (affects('viewer.logRetentionDays')) {
             logRetentionDays = normalizeRetentionDays(host.getConfig('viewer.logRetentionDays', 15));
             pruneWorkspaceLogs();

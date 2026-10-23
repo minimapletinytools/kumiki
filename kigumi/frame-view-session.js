@@ -4,7 +4,7 @@ const { getHost } = require('./host');
 const { PythonRunnerSession } = require('./runner-session');
 const { FileWatcher } = require('./file-watcher');
 const { RefreshProfiler } = require('./refresh-profiler');
-const { createFrameViewer, initializeFrameViewer, renderFrameViewer, requestViewerScreenshot } = require('./viewer');
+const { createFrameViewer, initializeFrameViewer, renderFrameViewer, forgetViewerPage, requestViewerScreenshot } = require('./viewer');
 const { requestWebviewRoundTrip } = require('./webview-request');
 const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 const { createTranslator } = require('./i18n');
@@ -23,6 +23,12 @@ const VIEWER_LOG_LEVEL_ORDER = {
 // User-facing toggle for the assembly preview timeline (the package-time
 // FEATURE_FLAGS.assemblyPreview stays the master switch on top of this).
 // Read fresh at each use so toggling applies on the next refresh.
+// The settings behind the options panel's beta features (viewer-app.js, setBetaFeature).
+const BETA_FEATURE_SETTINGS = Object.freeze({
+    assemblyPreview: 'viewer.assemblyPreview',
+    drawingBeta: 'viewer.drawingBeta',
+});
+
 function assemblyPreviewSettingEnabled() {
     return getHost().getConfig('viewer.assemblyPreview', false) === true;
 }
@@ -92,6 +98,34 @@ class FrameViewSession {
         this._lastGeometryData = null;
         this._lastProfiling = null;
         this._lastLayersData = null;
+    }
+
+    /** Draw the view's page anew from what it last showed, so it reads the settings again (the beta features). */
+    reloadPage() {
+        if (!this.panel || !this._lastFrameData || !this._lastGeometryData) {
+            return;
+        }
+        forgetViewerPage(this.panel);
+        this._renderFromCache();
+        this.log(`[settings] Reloaded the page for slot '${this.slotName}'`);
+    }
+
+    _renderFromCache() {
+        renderFrameViewer(this.panel, this.filePath, this._lastFrameData, this._lastGeometryData, this._lastProfiling, {
+            phase: 'ready',
+            refreshToken: this.refreshSequence,
+            loadingText: '',
+            keepLoading: false,
+        }, this.refreshOptions, this.viewerSettings);
+        if (this._lastLayersData) {
+            this.panel.postMessage({
+                type: 'layersTree',
+                payload: this._lastLayersData,
+            }).catch((err) => {
+                this.log(`[layers] Failed to post layers tree: ${err.message || err}`);
+            });
+            this._fetchAssemblyInBackground(this._lastLayersData);
+        }
     }
 
     // Project root for this session: the runner's resolved root if available,
@@ -301,6 +335,15 @@ class FrameViewSession {
                 const options = (message.options && typeof message.options === 'object') ? message.options : {};
                 this.refreshOptions = { ...this.refreshOptions, ...options };
                 this.log(`[webview] setRefreshOptions: ${JSON.stringify(options)}`);
+                return;
+            }
+            if (message.type === 'setBetaFeature') {
+                const key = BETA_FEATURE_SETTINGS[message.feature];
+                if (key) {
+                    Promise.resolve(getHost().updateConfig(key, message.enabled === true)).catch((error) => {
+                        this.log(`[settings] setBetaFeature error: ${error.message || error}`);
+                    });
+                }
                 return;
             }
             if (message.type === 'requestSaveViewerSettings') {
@@ -629,21 +672,7 @@ class FrameViewSession {
 
         if (this._lastFrameData && this._lastGeometryData) {
             // Fast path: use cached data, no round-trip to runner
-            renderFrameViewer(this.panel, this.filePath, this._lastFrameData, this._lastGeometryData, this._lastProfiling, {
-                phase: 'ready',
-                refreshToken: this.refreshSequence,
-                loadingText: '',
-                keepLoading: false,
-            }, this.refreshOptions, this.viewerSettings);
-            if (this._lastLayersData) {
-                this.panel.postMessage({
-                    type: 'layersTree',
-                    payload: this._lastLayersData,
-                }).catch((err) => {
-                    this.log(`[layers] Failed to post layers tree: ${err.message || err}`);
-                });
-                this._fetchAssemblyInBackground(this._lastLayersData);
-            }
+            this._renderFromCache();
             this.log(`[reopen] Re-rendered from cached data for slot '${this.slotName}'`);
         } else {
             initializeFrameViewer(this.panel, this.filePath, {
