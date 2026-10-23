@@ -157,7 +157,7 @@
         }
 
         _header() {
-            const header = overlayHeader(this.drawing.name || this.drawing.id, {
+            const header = overlayHeader(t('viewer.drawing.measurements', { name: this.drawing.name || this.drawing.id }), {
                 collapsed: this.collapsed,
                 onToggle: () => {
                     this.collapsed = !this.collapsed;

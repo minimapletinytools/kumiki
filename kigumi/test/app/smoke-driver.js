@@ -154,7 +154,9 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
         clipboard.writeText('');
         const menuItems = await inShell(`(async () => {
             const doc = ${viewDoc};
-            doc.querySelector('#layers-view .ov-header').click();
+            if (doc.querySelector('#layers-view .lp-panel').classList.contains('lp-collapsed')) {
+                doc.querySelector('#layers-view .ov-header').click();
+            }
             await new Promise((resolve) => setTimeout(resolve, 100));
             const row = doc.querySelector('#layers-view .lp-row-timber');
             const box = row.getBoundingClientRect();
@@ -167,7 +169,6 @@ module.exports = async function smoke({ runAppCommand, connection, window, logLi
             const copy = Array.from(doc.querySelectorAll('#member-context-menu .context-menu-item'))
                 .find((item) => item.textContent.trim() === 'copy for ai');
             if (copy) copy.click();
-            doc.querySelector('#layers-view .ov-header').click();
         })()`);
         const copied = await waitFor(() => clipboard.readText() || null, { timeoutMs: 5000 }).catch(() => '');
         check('a right click on a timber in the layers tree copies its name for an assistant',

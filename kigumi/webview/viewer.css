@@ -123,6 +123,18 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The tree page's heading: kigumi (木組, wood joinery), as a small block of wood. */
+.vsb-mark {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #e9cfa4;
+    color: #6b4a2b;
+    border: 1px solid #c9a676;
+    font: 600 12px/1.4 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+    letter-spacing: 0.12em;
+    text-transform: none;
+}
 .vsb-collapse {
     flex: none;
     width: 22px;

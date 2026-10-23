@@ -40,7 +40,7 @@
             this.selectionManager = selectionManager;
             this.layerStateStore = layerStateStore;
             this.hierarchy = null;
-            this.collapsed = true;
+            this.collapsed = false;
             // Default: top-level sections open, individual nodes closed
             this.expandedNodes = new Set(['section:timbers', 'section:joints']);
             // Per-timber CSG payloads, fetched lazily when a row is expanded.

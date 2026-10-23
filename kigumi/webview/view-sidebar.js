@@ -62,8 +62,9 @@ export class ViewSidebar {
     }
 
     /**
-     * @param {Array<{id: string, label: string, badge?: string|number, content: any, fill?: boolean}>} pages
+     * @param {Array<{id: string, label: string, badge?: string|number, content: any, fill?: boolean, heading?: any}>} pages
      *   `fill`: the page lays out its own height (the tree's sections share it), rather than scrolling.
+     *   `heading`: drawn in the header instead of the label.
      */
     render(pages) {
         const active = pages.some((page) => page.id === this.tab) ? this.tab : pages[0].id;
@@ -75,7 +76,7 @@ export class ViewSidebar {
                     @click=${() => this.setCollapsed(false)}>›</button>
                 <div class="vsb-frame" ?hidden=${this.collapsed}>
                     <div class="vsb-header">
-                        <span class="vsb-title">${activePage.label}</span>
+                        <span class="vsb-title">${activePage.heading || activePage.label}</span>
                         <button class="vsb-collapse" type="button" title=${t('viewer.sidebar.collapse')}
                             aria-label=${t('viewer.sidebar.collapse')}
                             @click=${() => this.setCollapsed(true)}>‹</button>
