@@ -1,0 +1,4 @@
+@import url('/webview/shell/theme.css');
+body { margin: 20px; background: var(--ka-bg); color: var(--ka-fg); font: 13px system-ui, sans-serif; }
+p { opacity: .65; }
+pre { white-space: pre-wrap; tab-size: 4; font: 13px/1.6 monospace; }
