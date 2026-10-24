@@ -10,7 +10,7 @@ from kumiki.construction import *
 from kumiki.rule import *
 from kumiki.measuring import get_center_point_on_face_global
 from kumiki.csg.cutcsg import (
-    HALF_SPACE_PLANE, FeatureGroup, FeatureOverride, FeatureProperties, PrismFace, prism_face_key,
+    HALF_SPACE_PLANE, FeatureGroup, FeatureOverride, FeatureProperties, PrismFace, measured_against, prism_face_key,
 )
 from ..shavings import *
 from ..shavings.relief import (
@@ -23,8 +23,12 @@ from ..shavings.relief import (
 #: The faces of what a lap removes -- the crossing timber's sides and the lap's depth plane. They
 #: meet the lapped timber's bodies along the lap's outline; see FeatureGroup.CROSSING.
 _CROSSING_FACE = FeatureProperties(group=FeatureGroup.CROSSING)
+#: Opposite sides, each measured against the other: the lap's width either way.
+_OPPOSITE = {PrismFace.RIGHT: PrismFace.LEFT, PrismFace.LEFT: PrismFace.RIGHT,
+             PrismFace.FRONT: PrismFace.BACK, PrismFace.BACK: PrismFace.FRONT}
 _CROSSING_SIDES = [
-    FeatureOverride(prism_face_key(face), f"crossing_{face.name.lower()}", _CROSSING_FACE)
+    FeatureOverride(prism_face_key(face), f"crossing_{face.name.lower()}",
+                    measured_against(_CROSSING_FACE, f"crossing_{_OPPOSITE[face].name.lower()}"))
     for face in (PrismFace.RIGHT, PrismFace.FRONT, PrismFace.LEFT, PrismFace.BACK)
 ]
 _LAP_DEPTH = [FeatureOverride(HALF_SPACE_PLANE, "lap_depth", _CROSSING_FACE)]

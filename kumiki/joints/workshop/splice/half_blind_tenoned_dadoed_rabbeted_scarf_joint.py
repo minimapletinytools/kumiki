@@ -11,6 +11,7 @@ from kumiki.rule import *
 from kumiki.measuring import locate_top_center_position
 from kumiki.csg.cutcsg import (
     FeatureGroup,
+    measured_against,
     FeatureOverride,
     FeatureProperties,
     PrismFace,
@@ -230,8 +231,8 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
     # stays is named: the plain prisms these are copied from still cut the sockets, and a
     # socket wall is the receiving timber's surface, not a face of the stub.
     stub_tenon_overrides = [
-        FeatureOverride(prism_face_key(PrismFace.RIGHT), "stub_tenon_right", _STUB_TENON_FACE),
-        FeatureOverride(prism_face_key(PrismFace.LEFT), "stub_tenon_left", _STUB_TENON_FACE),
+        FeatureOverride(prism_face_key(PrismFace.RIGHT), "stub_tenon_right", measured_against(_STUB_TENON_FACE, "stub_tenon_left")),
+        FeatureOverride(prism_face_key(PrismFace.LEFT), "stub_tenon_left", measured_against(_STUB_TENON_FACE, "stub_tenon_right")),
         FeatureOverride(prism_face_key(PrismFace.BACK), "stub_tenon_back", _STUB_TENON_FACE),
     ]
     timber1_stub_tenon_standing = replace(
