@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, protocol, Menu, dialog, shell: electronShell } = require('electron');
+const { app, protocol, Menu, dialog, safeStorage, shell: electronShell } = require('electron');
 const { setHost } = require('../../host');
 const { createKigumiApp } = require('../../kigumi-app');
 const { DEFAULT_FILES_EXCLUDE } = require('../../sidebar-files');
@@ -20,6 +20,9 @@ const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
 const { AgentSession } = require('../../agent/agent-session');
 const { createFileTools } = require('../../agent/file-tools');
+const { createAccount } = require('../../agent/account');
+const { backendConfig } = require('../../agent/backend-config');
+const { SecureStorage } = require('./secure-storage');
 const { createKigumiTools } = require('../../agent/tools');
 const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../../agent/mcp-setup');
@@ -378,6 +381,39 @@ function runToolCommand(id, args) {
 }
 
 let agentSession = null;
+let account = null;
+// A kigumi://auth link that came before the account existed (a cold start from the browser).
+let pendingAuthLink = null;
+
+/** Sign-in coming back from the browser: kigumi://auth?code=… */
+function handleAuthLink(url) {
+    if (!account) {
+        pendingAuthLink = url;
+        return;
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+    }
+    account.completeSignIn(url).catch((error) => {
+        logChannel.appendLine(`[account] sign-in failed: ${error.message}`);
+        setStatus('error', `Could not sign in: ${error.message}`);
+    });
+}
+
+function createAppAccount() {
+    account = createAccount({
+        ...backendConfig(process.env),
+        storage: new SecureStorage(path.join(app.getPath('userData'), 'account'), safeStorage,
+            (line) => logChannel.appendLine(line)),
+        redirectTo: 'kigumi://auth',
+        openExternal: (url) => electronShell.openExternal(url),
+        onChange: () => agentSession && agentSession.postState(),
+    });
+    const link = pendingAuthLink || process.argv.find((arg) => arg.startsWith('kigumi://auth'));
+    pendingAuthLink = null;
+    if (link) handleAuthLink(link);
+}
 
 // Shows or hides the agent. Hidden, it keeps its conversation.
 function toggleAgentPanel() {
@@ -394,6 +430,7 @@ function toggleAgentPanel() {
         setting: (key, fallback) => settings.get(key, fallback),
         setSetting: (key, value) => settings.set(key, value),
         fileTools: createFileTools({ root: () => workspaceFolder }),
+        account,
         log: (line) => logChannel.appendLine(line),
     });
     surface.onMessage((message) => agentSession && agentSession.handle(message));
@@ -608,6 +645,7 @@ async function start() {
 
     const log = (line) => logChannel.appendLine(line);
     const appWindow = createAppWindow({ origin: ORIGIN, log });
+    createAppAccount();
     mainWindow = appWindow.window;
     pages = new PageStore({ origin: ORIGIN, webviewDir });
     connection = new ShellConnection({
@@ -708,11 +746,28 @@ async function start() {
     }
 }
 
+// kigumi:// links from the browser (sign-in) open this app, once there is a backend to sign in to;
+// until then the system's handler is left alone. Run from source, Electron is told which app it is.
+if (backendConfig(process.env).supabaseUrl) {
+    const fromSource = process.defaultApp && process.argv.length >= 2;
+    app.setAsDefaultProtocolClient('kigumi', ...(fromSource ? [process.execPath, [path.resolve(process.argv[1])]] : []));
+}
+app.on('open-url', (event, url) => {
+    event.preventDefault();
+    if (url.startsWith('kigumi://auth')) handleAuthLink(url);
+});
+
 // One Kigumi at a time: a second launch focuses the running window.
 if (!app.requestSingleInstanceLock()) {
     app.quit();
 } else {
     app.on('second-instance', (_event, argv) => {
+        // On Windows and Linux a kigumi:// link starts a second instance, carrying the link.
+        const link = argv.find((arg) => arg.startsWith('kigumi://auth'));
+        if (link) {
+            handleAuthLink(link);
+            return;
+        }
         if (!mainWindow || mainWindow.isDestroyed()) return;
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.focus();

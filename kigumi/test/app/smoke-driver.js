@@ -13,7 +13,7 @@ const { createContext } = require('./helpers');
 // In order; each starts from the reset layout, so none depends on another.
 const SCENARIOS = [
     'explorer', 'viewer', 'sidebar', 'drawings', 'mcp', 'parameters', 'quick-pick',
-    'tabs-and-editors', 'go-to-file', 'layout', 'settings', 'crash-recovery',
+    'tabs-and-editors', 'go-to-file', 'layout', 'agent', 'settings', 'crash-recovery',
 ].map((name) => require(`./scenarios/${name}`));
 
 module.exports = async function smoke(app) {

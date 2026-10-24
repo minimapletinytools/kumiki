@@ -25,7 +25,8 @@ async function languageModelFor(route, { fetch } = {}) {
     }
     const { createOpenRouter } = require('@openrouter/ai-sdk-provider');
     const provider = createOpenRouter({
-        apiKey: route.apiKey, compatibility: 'strict', fetch,
+        // Through the backend, `fetch` puts the account's token in instead.
+        apiKey: route.apiKey || 'kigumi-account', compatibility: 'strict', fetch,
         ...(route.baseURL ? { baseURL: route.baseURL } : {}),
         headers: { 'X-Title': 'Kigumi' },
     });

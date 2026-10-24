@@ -29,7 +29,8 @@ function findModel(id) {
  * @param {object} credentials
  * @param {string} [credentials.anthropicKey]
  * @param {string} [credentials.openrouterKey]
- * @param {{url: string, token: string}|null} [credentials.backend]  signed in to Kigumi's backend
+ * @param {{url: string}|null} [credentials.backend]  signed in to Kigumi's backend, whose requests
+ *     carry the account's token (agent/account.js fetchWithToken)
  */
 function routeModel(model, { anthropicKey, openrouterKey, backend } = {}) {
     if (anthropicKey && model.anthropic) {
@@ -38,8 +39,8 @@ function routeModel(model, { anthropicKey, openrouterKey, backend } = {}) {
     if (openrouterKey && model.openrouter) {
         return { via: 'openrouter', modelId: model.openrouter, apiKey: openrouterKey };
     }
-    if (backend && backend.token && model.openrouter) {
-        return { via: 'backend', modelId: model.openrouter, apiKey: backend.token, baseURL: `${backend.url.replace(/\/$/, '')}/v1` };
+    if (backend && backend.url && model.openrouter) {
+        return { via: 'backend', modelId: model.openrouter, baseURL: `${backend.url.replace(/\/$/, '')}/v1` };
     }
     return null;
 }

@@ -53,12 +53,12 @@ describe('the model table', () => {
     test('a key the user set wins over the account; an Anthropic key only for Anthropic models', () => {
         const haiku = findModel('claude-haiku-4.5');
         const deepseek = findModel('deepseek-v4.1-flash');
-        const backend = { url: 'https://api.example/', token: 'jwt' };
+        const backend = { url: 'https://api.example/' };
 
         expect(routeModel(haiku, { anthropicKey: 'sk-ant', backend })).toEqual(
             { via: 'anthropic', modelId: 'claude-haiku-4-5', apiKey: 'sk-ant' });
         expect(routeModel(deepseek, { anthropicKey: 'sk-ant', backend })).toEqual(
-            { via: 'backend', modelId: 'deepseek/deepseek-v4.1-flash', apiKey: 'jwt', baseURL: 'https://api.example/v1' });
+            { via: 'backend', modelId: 'deepseek/deepseek-v4.1-flash', baseURL: 'https://api.example/v1' });
         expect(routeModel(deepseek, { openrouterKey: 'sk-or', backend }).via).toBe('openrouter');
         expect(routeModel(deepseek, {})).toBeNull();
     });
@@ -164,16 +164,25 @@ describe('the file tools', () => {
 describe('the agent session', () => {
     const panels = { list: () => [], active: () => null, describe: async () => null, viewSession: () => null };
 
-    function session({ settings = {}, backend = () => null, model } = {}) {
+    /** An account that is signed in, as far as the session can tell. */
+    const signedIn = () => ({
+        state: () => ({ configured: true, signedIn: true, email: 'maple@example.com', balanceUsd: 1 }),
+        backend: () => ({ url: 'https://api.example' }),
+        fetchWithToken: async () => new Response(),
+        refreshBalance: jest.fn(async () => {}),
+    });
+
+    function session({ settings = {}, account = null, model } = {}) {
         const posted = [];
         const values = { ...settings };
+        const created = [];
         const agent = new AgentSession({
             panels, run: async () => ({}), post: (message) => posted.push(message), cwd: () => null,
             setting: (key, fallback) => (key in values ? values[key] : fallback),
             setSetting: (key, value) => { values[key] = value; },
-            backend, createModel: async () => model,
+            account, createModel: async (route, options) => { created.push([route, options]); return model; },
         });
-        return { agent, posted, values };
+        return { agent, posted, values, created };
     }
 
     test('says what to do when nothing can carry a request', async () => {
@@ -190,17 +199,23 @@ describe('the agent session', () => {
         expect(values['agent.model']).toBe('claude-sonnet-5');
         expect(posted.pop()).toEqual({
             type: 'agent:state', models: MODELS.map(({ id, label }) => ({ id, label })), model: 'claude-sonnet-5', via: 'openrouter',
+            account: { configured: false },
         });
     });
 
-    test('a turn ends with its cost; out of credit says so', async () => {
-        const { agent, posted } = session({
-            backend: () => ({ url: 'https://api.example', token: 'jwt' }),
-            model: scripted([...say('1', 'Hi.'), finish('stop', 0.0005)]),
-        });
-        await agent.prompt('hi');
-        expect(posted).toContainEqual({ type: 'agent:done', isError: false, costUsd: 0.0005 });
+    test('signed in, requests carry the account\'s token; a turn ends with its cost and the balance is fetched again', async () => {
+        const account = signedIn();
+        const { agent, posted, created } = session({ account, model: scripted([...say('1', 'Hi.'), finish('stop', 0.0005)]) });
 
+        await agent.prompt('hi');
+
+        expect(created[0][0].via).toBe('backend');
+        expect(created[0][1].fetch).toBe(account.fetchWithToken);
+        expect(posted).toContainEqual({ type: 'agent:done', isError: false, costUsd: 0.0005 });
+        expect(account.refreshBalance).toHaveBeenCalled();
+    });
+
+    test('out of credit says so', () => {
         expect(describeFailure({ statusCode: 402, message: 'Payment Required' })).toBe('Out of credit.');
     });
 

@@ -18,6 +18,8 @@ const SETTINGS_AT_START = {
     'viewer.drawingBeta': false,
     'mcp.enabled': false,
     'viewer.autoRefreshOnFileChange': true,
+    'agent.model': '',
+    'agent.openrouterApiKey': '',
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

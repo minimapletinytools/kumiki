@@ -125,14 +125,36 @@
 
     modelSelect.addEventListener('change', () => vscode.postMessage({ type: 'agent:setModel', id: modelSelect.value }));
 
-    const ROUTE_NOTES = {
-        anthropic: 'Using your Anthropic key.',
-        openrouter: 'Using your OpenRouter key.',
-        backend: '',
-    };
+    function linkButton(label, onClick) {
+        const button = document.createElement('button');
+        button.className = 'link-btn';
+        button.textContent = label;
+        button.addEventListener('click', onClick);
+        return button;
+    }
+
+    // Where requests go: the user's own key, or the Kigumi account (signed in, or a way to sign in).
+    function showRoute(via, account) {
+        const parts = [];
+        if (via === 'anthropic') parts.push('Using your Anthropic key.');
+        else if (via === 'openrouter') parts.push('Using your OpenRouter key.');
+        else if (account.signedIn) {
+            const left = typeof account.balanceUsd === 'number' ? ` · $${account.balanceUsd.toFixed(2)} left` : '';
+            parts.push(`${account.email || 'Signed in'}${left} · `,
+                linkButton('Sign out', () => vscode.postMessage({ type: 'agent:signOut' })));
+        } else if (account.configured) {
+            parts.push('Sign in to use the agent, with free usage to start: ',
+                linkButton('GitHub', () => vscode.postMessage({ type: 'agent:signIn', provider: 'github' })),
+                ' · ',
+                linkButton('Google', () => vscode.postMessage({ type: 'agent:signIn', provider: 'google' })));
+        } else {
+            parts.push('Set agent.openrouterApiKey (or agent.apiKey, an Anthropic key) in settings to use the agent.');
+        }
+        routeNote.replaceChildren(...parts);
+    }
 
     // The models to choose from, and where requests for the chosen one go.
-    function showState({ models = [], model, via }) {
+    function showState({ models = [], model, via, account = { configured: false } }) {
         modelSelect.replaceChildren(...models.map(({ id, label }) => {
             const option = document.createElement('option');
             option.value = id;
@@ -140,7 +162,7 @@
             return option;
         }));
         modelSelect.value = model;
-        routeNote.textContent = via ? ROUTE_NOTES[via] || '' : 'Sign in, or set an API key in settings, to use the agent.';
+        showRoute(via, account);
     }
 
     messagesEl.addEventListener('click', (event) => {

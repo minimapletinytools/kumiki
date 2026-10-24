@@ -4,8 +4,9 @@
  *
  * The panel and this talk in messages:
  *   panel -> here:  agent:ready, agent:prompt {text}, agent:stop, agent:clear,
- *                   agent:permissionAnswer {requestId, allow}, agent:setModel {id}
- *   here -> panel:  agent:state {models, model, via}, agent:busy {busy}, agent:text {text} (streamed),
+ *                   agent:permissionAnswer {requestId, allow}, agent:setModel {id},
+ *                   agent:signIn {provider}, agent:signOut
+ *   here -> panel:  agent:state {models, model, via, account}, agent:busy {busy}, agent:text {text} (streamed),
  *                   agent:tool {id, name, input}, agent:toolResult {id, isError, text},
  *                   agent:permission {requestId, toolName, input}, agent:done {isError, error?, costUsd?},
  *                   agent:error {message}
@@ -50,17 +51,18 @@ class AgentSession {
      * @param {(key: string, fallback: any) => any} options.setting
      * @param {(key: string, value: any) => void} [options.setSetting]
      * @param {object[]} [options.fileTools]   tools for the project's files (agent/file-tools.js)
-     * @param {() => {url: string, token: string}|null} [options.backend]  signed in to Kigumi's backend
-     * @param {(route: object) => Promise<object>} [options.createModel]  a language model for a route
+     * @param {object|null} [options.account]  the Kigumi account (agent/account.js)
+     * @param {(route: object, options: {fetch?: typeof fetch}) => Promise<object>} [options.createModel]
+     *     a language model for a route
      * @param {(line: string) => void} [options.log]
      */
-    constructor({ panels, run, post, cwd, setting, setSetting = () => {}, fileTools = [], backend = () => null,
+    constructor({ panels, run, post, cwd, setting, setSetting = () => {}, fileTools = [], account = null,
         createModel = languageModelFor, log = () => {} }) {
         this.tools = [...createKigumiTools({ panels, run, workspaceFolders: () => [cwd()].filter(Boolean) }), ...fileTools];
         this.post = post;
         this.setting = setting;
         this.setSetting = setSetting;
-        this.backend = backend;
+        this.account = account;
         this.createModel = createModel;
         this.log = log;
         this.history = [];
@@ -82,7 +84,7 @@ class AgentSession {
         return routeModel(this.model, {
             anthropicKey: this.setting('agent.apiKey', ''),
             openrouterKey: this.setting('agent.openrouterApiKey', ''),
-            backend: this.backend(),
+            backend: this.account && this.account.backend(),
         });
     }
 
@@ -93,6 +95,7 @@ class AgentSession {
             models: MODELS.map(({ id, label }) => ({ id, label })),
             model: this.model.id,
             via: route ? route.via : null,
+            account: this.account ? this.account.state() : { configured: false },
         });
     }
 
@@ -115,6 +118,11 @@ class AgentSession {
             this.postState();
         } else if (message.type === 'agent:ready') {
             this.postState();
+        } else if (message.type === 'agent:signIn' && this.account) {
+            this.account.signIn(message.provider === 'google' ? 'google' : 'github')
+                .catch((error) => this.post({ type: 'agent:error', message: `Could not sign in: ${error.message}` }));
+        } else if (message.type === 'agent:signOut' && this.account) {
+            void this.account.signOut().then(() => this.postState());
         }
     }
 
@@ -152,7 +160,7 @@ class AgentSession {
         this.post({ type: 'agent:busy', busy: true });
         try {
             const { history, costUsd } = await runTurn({
-                model: await this.createModel(route),
+                model: await this.createModel(route, { fetch: route.via === 'backend' ? this.account.fetchWithToken : undefined }),
                 images: this.model.images,
                 tools: this.tools,
                 system: SYSTEM_PROMPT,
@@ -174,6 +182,9 @@ class AgentSession {
         } finally {
             this.abort = null;
             this.post({ type: 'agent:busy', busy: false });
+            if (route.via === 'backend') {
+                void this.account.refreshBalance().catch(() => {});
+            }
         }
     }
 }
