@@ -109,6 +109,32 @@ describe('the agent loop', () => {
         expect(model.doStreamCalls[0].prompt.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'user']);
     });
 
+    test('the model\'s reasoning is passed on as it streams', async () => {
+        const model = scripted([
+            { type: 'reasoning-start', id: 'r' }, { type: 'reasoning-delta', id: 'r', delta: 'Hmm.' }, { type: 'reasoning-end', id: 'r' },
+            ...say('1', 'Done.'), finish('stop'),
+        ]);
+        const { events } = await turn(model);
+        expect(events[0]).toEqual({ type: 'agent:reasoning', text: 'Hmm.' });
+    });
+
+    test('a turn cut short says so', async () => {
+        const { events } = await turn(scripted([...say('1', 'Half a'), finish('length')]));
+        expect(events.at(-1)).toEqual({ type: 'agent:notice', text: expect.stringContaining('output limit') });
+    });
+
+    test('a failing step keeps the steps before it, for asking again', async () => {
+        let calls = 0;
+        const model = new MockLanguageModelV4({ doStream: async () => {
+            calls += 1;
+            if (calls > 1) throw Object.assign(new Error('One request at a time.'), { statusCode: 400 });
+            return { stream: convertArrayToReadableStream([call('c1', 'look'), finish('tool-calls')]) };
+        } });
+        const failed = await turn(model).catch((error) => error);
+        expect(failed.message).toContain('One request at a time');
+        expect(failed.history.map((message) => message.role)).toEqual(['user', 'assistant', 'tool']);
+    });
+
     test('a model that cannot see gets a note instead of an image', () => {
         const content = [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }];
         expect(toModelContent(content, false).value[0]).toMatchObject({ type: 'text' });
@@ -157,7 +183,14 @@ describe('the file tools', () => {
 
     test('reads with line numbers', async () => {
         const [read] = await named('read_file').run({ file_path: 'frame.py', offset: 2, limit: 1 });
-        expect(read.text).toBe('2\tb = 2\n(4 lines in all)');
+        expect(read.text).toBe('2\tb = 2\n(4 lines in all; read on from line 3)');
+    });
+
+    test('a long file is read a part at a time, saying where to go on', async () => {
+        fs.writeFileSync(path.join(root, 'big.py'), Array.from({ length: 1500 }, () => 'x'.repeat(60)).join('\n'));
+        const [read] = await named('read_file').run({ file_path: 'big.py' });
+        expect(read.text.length).toBeLessThan(45000);
+        expect(read.text).toMatch(/1500 lines in all; read on from line \d+\)$/);
     });
 });
 

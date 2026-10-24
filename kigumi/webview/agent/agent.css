@@ -191,6 +191,18 @@ textarea {
     white-space: nowrap;
 }
 
+.tool-chip.is-running .tool-name::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border: 1.5px solid var(--ka-muted);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
 .tool-chip.is-done .tool-name::before {
     content: "✓ ";
     color: var(--ka-accent);
@@ -260,10 +272,6 @@ textarea {
     font-style: italic;
 }
 
-.agent-messages.is-busy::after {
-    content: "…";
-    color: var(--ka-muted);
-}
 
 .agent-actions {
     display: flex;
@@ -303,4 +311,104 @@ textarea {
 
 .link-btn:hover {
     text-decoration: underline;
+}
+
+.tool-chip details {
+    min-width: 0;
+}
+
+.tool-chip summary {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    cursor: pointer;
+    list-style: none;
+}
+
+.tool-chip summary::-webkit-details-marker {
+    display: none;
+}
+
+.tool-body {
+    margin-top: 6px;
+}
+
+.tool-body pre {
+    margin: 4px 0 0;
+    max-height: 240px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--ka-mono);
+    font-size: 11px;
+    color: var(--ka-fg);
+}
+
+.tool-body .tool-output {
+    border-top: 1px solid var(--ka-border);
+    padding-top: 4px;
+}
+
+.thinking details summary {
+    cursor: pointer;
+    color: var(--ka-muted);
+    font-size: 12px;
+}
+
+.thinking.is-live details summary::after {
+    content: "…";
+}
+
+.thinking-body {
+    margin-top: 4px;
+    padding-left: 10px;
+    border-left: 2px solid var(--ka-border);
+    color: var(--ka-muted);
+    font-size: 12px;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow: auto;
+}
+
+.activity {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--ka-muted);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.activity[hidden] {
+    display: none;
+}
+
+.dots {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 2px;
+}
+
+.dots i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: blink 1.2s infinite ease-in-out both;
+}
+
+.dots i:nth-child(2) { animation-delay: 0.2s; }
+.dots i:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+    0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .dots i, .tool-chip.is-running .tool-name::before { animation: none; opacity: 0.6; }
 }

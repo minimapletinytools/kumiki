@@ -13,6 +13,8 @@ const text = (value) => [{ type: 'text', text: value }];
 const SKIPPED = new Set(['.git', 'node_modules', '.venv', '__pycache__', '.kigumi']);
 const MAX_LISTED = 500;
 const MAX_READ_LINES = 2000;
+/** A read's most characters: every read stays in the conversation, which goes with every step. */
+const MAX_READ_CHARS = 40000;
 
 /**
  * @param {object} options
@@ -61,7 +63,7 @@ function createFileTools({ root }) {
         },
         {
             name: 'read_file',
-            description: `Read a text file of the project, with line numbers; at most ${MAX_READ_LINES} lines at a time.`,
+            description: `Read a text file of the project, with line numbers; at most ${MAX_READ_LINES} lines or ${MAX_READ_CHARS} characters at a time.`,
             shape: {
                 file_path: filePath,
                 offset: z.number().int().min(1).optional().describe('The first line to read (1-based).'),
@@ -70,9 +72,16 @@ function createFileTools({ root }) {
             readOnly: true,
             run: async ({ file_path: file, offset = 1, limit = MAX_READ_LINES }) => {
                 const lines = (await fs.promises.readFile(resolve(file), 'utf8')).split('\n');
-                const shown = lines.slice(offset - 1, offset - 1 + Math.min(limit, MAX_READ_LINES));
+                const shown = [];
+                let size = 0;
+                for (const line of lines.slice(offset - 1, offset - 1 + Math.min(limit, MAX_READ_LINES))) {
+                    size += line.length + 8;
+                    if (size > MAX_READ_CHARS && shown.length) break;
+                    shown.push(line);
+                }
+                const next = offset + shown.length;
                 return text(shown.map((line, i) => `${offset + i}\t${line}`).join('\n')
-                    + (offset - 1 + shown.length < lines.length ? `\n(${lines.length} lines in all)` : ''));
+                    + (next - 1 < lines.length ? `\n(${lines.length} lines in all; read on from line ${next})` : ''));
             },
         },
         {

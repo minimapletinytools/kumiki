@@ -1,5 +1,6 @@
-// The agent panel's page: the conversation as it streams in, tool calls as chips, and asking
-// before a tool that changes something runs. The conversation itself lives in the app (see
+// The agent panel's page: the conversation as it streams in, the model's thinking and tool calls
+// (each opens to show what went in and came out), what it is doing now, and asking before a tool
+// that changes something runs. The conversation itself lives in the app (see
 // agent/agent-session.js); this only draws it and sends what the user types.
 (function () {
     'use strict';
@@ -13,6 +14,8 @@
     const clearBtn = $('btn-clear');
     const modelSelect = $('model-select');
     const routeNote = $('route-note');
+    const activity = $('activity');
+    const activityLabel = $('activity-label');
     const welcomeHtml = $('welcome').outerHTML;
 
     let busy = false;
@@ -33,11 +36,44 @@
         return element;
     }
 
+    /** What the agent is doing now, under the conversation while it works. */
+    function setActivity(label) {
+        activityLabel.textContent = label;
+    }
+
+    // Thinking streamed in a row is one block, closed unless opened, until something else comes.
+    let thinking = null;
+
+    function endThinking() {
+        if (!thinking) return;
+        thinking.querySelector('summary').textContent = 'Thought';
+        thinking.classList.remove('is-live');
+        thinking = null;
+    }
+
+    function appendReasoning(text) {
+        if (!thinking) {
+            thinking = add('thinking is-live');
+            const details = document.createElement('details');
+            const summary = document.createElement('summary');
+            summary.textContent = 'Thinking';
+            const body = document.createElement('div');
+            body.className = 'thinking-body';
+            details.append(summary, body);
+            thinking.appendChild(details);
+        }
+        thinking.querySelector('.thinking-body').textContent += text;
+        setActivity('Thinking');
+        scrollToEnd();
+    }
+
     // Streamed text joins the reply being written, until something else (a tool) comes between.
     function appendText(text) {
+        endThinking();
         const last = messagesEl.lastElementChild;
         const bubble = last && last.classList.contains('assistant') ? last : add('message-bubble assistant', '');
         bubble.textContent += text;
+        setActivity('Writing');
         scrollToEnd();
     }
 
@@ -47,23 +83,43 @@
         return first ? first.split('\n')[0].slice(0, 80) : '';
     }
 
+    function pre(className, text) {
+        const element = document.createElement('pre');
+        element.className = className;
+        element.textContent = text;
+        return element;
+    }
+
+    // A chip that opens to show what the tool was given and what it gave back.
     function addTool(id, name, input) {
-        const chip = add('tool-chip');
+        endThinking();
+        const shown = name.replace(/^mcp__kigumi__/, '');
+        const chip = add('tool-chip is-running');
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
         const label = document.createElement('span');
         label.className = 'tool-name';
-        label.textContent = name.replace(/^mcp__kigumi__/, '');
+        label.textContent = shown;
         const detail = document.createElement('span');
         detail.className = 'tool-detail';
         detail.textContent = summarise(input);
-        chip.append(label, detail);
+        summary.append(label, detail);
+        const body = document.createElement('div');
+        body.className = 'tool-body';
+        body.appendChild(pre('tool-input', JSON.stringify(input || {}, null, 2).slice(0, 4000)));
+        details.append(summary, body);
+        chip.appendChild(details);
         toolChips.set(id, chip);
+        setActivity(`Running ${shown}`);
     }
 
     function finishTool(id, isError, text) {
         const chip = toolChips.get(id);
         if (!chip) return;
+        chip.classList.remove('is-running');
         chip.classList.add(isError ? 'is-error' : 'is-done');
-        chip.title = text || '';
+        chip.querySelector('.tool-body').appendChild(pre('tool-output', text || '(nothing)'));
+        setActivity('Thinking');
     }
 
     function askPermission(requestId, toolName, input) {
@@ -80,19 +136,23 @@
             button.className = allow ? 'allow' : 'deny';
             button.addEventListener('click', () => {
                 vscode.postMessage({ type: 'agent:permissionAnswer', requestId, allow });
+                setActivity('Thinking');
                 card.classList.add(allow ? 'is-allowed' : 'is-denied');
                 buttons.remove();
             });
             buttons.appendChild(button);
         }
         card.append(question, detail, buttons);
+        setActivity('Waiting for you');
     }
 
     function setBusy(next) {
         busy = next;
         sendBtn.title = busy ? 'Stop' : 'Send message';
         sendBtn.firstElementChild.className = `codicon codicon-${busy ? 'debug-stop' : 'send'}`;
-        messagesEl.classList.toggle('is-busy', busy);
+        activity.hidden = !busy;
+        if (busy) setActivity('Thinking');
+        else endThinking();
     }
 
     function sendPrompt(text) {
@@ -183,6 +243,13 @@
                 break;
             case 'agent:text':
                 appendText(message.text || '');
+                break;
+            case 'agent:reasoning':
+                appendReasoning(message.text || '');
+                break;
+            case 'agent:notice':
+                endThinking();
+                add('agent-note', message.text || '');
                 break;
             case 'agent:tool':
                 addTool(message.id, message.name || 'tool', message.input);

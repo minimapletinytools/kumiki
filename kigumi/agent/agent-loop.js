@@ -71,6 +71,20 @@ function toToolSet(tools, { images, askPermission }) {
     })]));
 }
 
+/** Why a turn ended other than by the model finishing, for the panel; or null. */
+function earlyEnd(steps) {
+    const last = steps[steps.length - 1];
+    if (!last) return null;
+    if (last.finishReason === 'tool-calls' && steps.length >= MAX_STEPS) {
+        return `Stopped after ${MAX_STEPS} steps. Say "continue" to carry on.`;
+    }
+    if (last.finishReason === 'length') {
+        return 'Stopped at the output limit for one step. Say "continue" to carry on.';
+    }
+    if (['stop', 'tool-calls'].includes(last.finishReason)) return null;
+    return `The model stopped unexpectedly (${last.rawFinishReason || last.finishReason}). Say "continue" to carry on.`;
+}
+
 /**
  * Run one user turn.
  *
@@ -84,10 +98,12 @@ function toToolSet(tools, { images, askPermission }) {
  * @param {AbortSignal} [options.abortSignal]
  * @param {(toolName: string, input: object) => Promise<boolean>} options.askPermission
  * @param {(event: object) => void} options.onEvent   panel events
- * @returns {Promise<{ history: object[], costUsd?: number }>} the conversation after the turn
+ * @returns {Promise<{ history: object[], costUsd?: number }>} the conversation after the turn. A turn
+ *     that fails throws, with the conversation as far as it got as the error's `history`.
  */
 async function runTurn({ model, images, tools, system, history, prompt, abortSignal, askPermission, onEvent }) {
     const messages = [...history, { role: 'user', content: prompt }];
+    const steps = [];
     let failure = null;
     const result = streamText({
         model,
@@ -100,31 +116,40 @@ async function runTurn({ model, images, tools, system, history, prompt, abortSig
         // A request refused or failed (busy, rate limited, an upstream error) is never charged, so
         // retrying one costs nothing.
         maxRetries: 2,
+        onStepEnd: (step) => { steps.push(step); },
         onError: ({ error }) => { failure = error; },
     });
-    for await (const part of result.fullStream) {
-        if (part.type === 'text-delta') {
-            onEvent({ type: 'agent:text', text: part.text });
-        } else if (part.type === 'tool-call') {
-            onEvent({ type: 'agent:tool', id: part.toolCallId, name: part.toolName, input: part.input });
-        } else if (part.type === 'tool-result') {
-            onEvent({ type: 'agent:toolResult', id: part.toolCallId, isError: false, text: summarise(part.output).slice(0, 2000) });
-        } else if (part.type === 'tool-error') {
-            const error = part.error;
-            onEvent({ type: 'agent:toolResult', id: part.toolCallId, isError: true, text: String((error && error.message) || error) });
-        } else if (part.type === 'error') {
-            failure = failure || part.error;
+    const sofar = () => [...messages, ...steps.flatMap((step) => step.response.messages)];
+    try {
+        for await (const part of result.fullStream) {
+            if (part.type === 'text-delta') {
+                onEvent({ type: 'agent:text', text: part.text });
+            } else if (part.type === 'reasoning-delta') {
+                onEvent({ type: 'agent:reasoning', text: part.text });
+            } else if (part.type === 'tool-call') {
+                onEvent({ type: 'agent:tool', id: part.toolCallId, name: part.toolName, input: part.input });
+            } else if (part.type === 'tool-result') {
+                onEvent({ type: 'agent:toolResult', id: part.toolCallId, isError: false, text: summarise(part.output).slice(0, 2000) });
+            } else if (part.type === 'tool-error') {
+                const error = part.error;
+                onEvent({ type: 'agent:toolResult', id: part.toolCallId, isError: true, text: String((error && error.message) || error) });
+            } else if (part.type === 'error') {
+                failure = failure || part.error;
+            }
         }
+    } catch (error) {
+        failure = failure || error;
     }
     if (failure) {
-        throw failure;
+        throw Object.assign(failure, { history: sofar() });
     }
-    const steps = await result.steps;
+    const notice = earlyEnd(steps);
+    if (notice) onEvent({ type: 'agent:notice', text: notice });
     const costs = steps.map((step) => step.providerMetadata && step.providerMetadata.openrouter
         && step.providerMetadata.openrouter.usage && step.providerMetadata.openrouter.usage.cost)
         .filter((cost) => typeof cost === 'number');
     return {
-        history: [...messages, ...steps.flatMap((step) => step.response.messages)],
+        history: sofar(),
         costUsd: costs.length ? costs.reduce((sum, cost) => sum + cost, 0) : undefined,
     };
 }

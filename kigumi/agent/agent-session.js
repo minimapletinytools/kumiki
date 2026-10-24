@@ -7,7 +7,8 @@
  *                   agent:permissionAnswer {requestId, allow}, agent:setModel {id},
  *                   agent:signIn {provider}, agent:signOut
  *   here -> panel:  agent:state {models, model, via, account}, agent:busy {busy}, agent:text {text} (streamed),
- *                   agent:tool {id, name, input}, agent:toolResult {id, isError, text},
+ *                   agent:reasoning {text} (streamed), agent:tool {id, name, input},
+ *                   agent:toolResult {id, isError, text}, agent:notice {text},
  *                   agent:permission {requestId, toolName, input}, agent:done {isError, error?, costUsd?},
  *                   agent:error {message}
  *
@@ -25,7 +26,8 @@ const SYSTEM_PROMPT = [
     'Use describe_panel to see what they are looking at and have selected (start there when they say',
     '"this" or "the selected"). Read and edit the project\'s files with the file tools; after editing a',
     'frame file, refresh_view and read_view_log to check it built, and screenshot to look at the result.',
-    'The kumiki docs are in .kigumi/docs/ in the project. Sizes from the tools are in metres, in world',
+    'The kumiki docs are in .kigumi/docs/ in the project; read those and the project\'s patterns, not the',
+    'kumiki package\'s source in .venv, which is large. Sizes from the tools are in metres, in world',
     'space. Keep replies short.',
 ].join(' ');
 
@@ -173,6 +175,8 @@ class AgentSession {
             this.history = history;
             this.post({ type: 'agent:done', isError: false, costUsd });
         } catch (error) {
+            // Keep what the turn did before it failed, so asking again carries on from there.
+            if (error && Array.isArray(error.history)) this.history = error.history;
             if (abort.signal.aborted) {
                 this.post({ type: 'agent:done', isError: false, stopped: true });
             } else {
