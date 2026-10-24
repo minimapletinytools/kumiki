@@ -1,0 +1,144 @@
+---
+import LegalPage from '../components/LegalPage.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<LegalPage
+  title="Privacy Policy — Kumiki & Kigumi"
+  description="What the Kumiki website, the Kigumi app and the Kigumi account collect, why, who processes it, and how to have it deleted."
+  canonicalPath="/privacy"
+  heading="Privacy Policy"
+  updated="October 24, 2026"
+>
+  <p>
+    Kumiki and Kigumi are made by minimaple ("we", "us"). This policy covers the website at
+    kumiki.build, the Kigumi app (the standalone app and the VS Code extension), and the optional
+    Kigumi account that the app's built-in agent can use. Questions:
+    <a href="mailto:minimapletinytools@gmail.com">minimapletinytools@gmail.com</a>.
+  </p>
+
+  <h2>The short version</h2>
+  <ul>
+    <li>The website uses no cookies, analytics or tracking.</li>
+    <li>Your projects stay on your computer. The app doesn't send them to us.</li>
+    <li>
+      Only if you sign in to a Kigumi account do we hold anything about you: your email, name,
+      credit balance and a record of what your requests cost.
+    </li>
+    <li>
+      When the built-in agent works through your account, what it sends to the AI model passes
+      through our server to the model provider. We don't keep the content of those requests.
+    </li>
+    <li>We don't sell your data, show ads, or train AI models on it.</li>
+  </ul>
+
+  <h2>The website</h2>
+  <p>
+    kumiki.build sets no cookies and runs no analytics or tracking scripts. It is hosted on GitHub
+    Pages, which may record standard request information, such as IP addresses, as described in
+    <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noreferrer">GitHub's privacy statement</a>.
+  </p>
+
+  <h2>The Kigumi app</h2>
+  <p>
+    Kigumi runs on your computer. Your projects, files, designs and agent conversations are kept
+    there and are not sent to us. To set up a project, the app downloads Python packages, including
+    Kumiki, from the Python Package Index (PyPI). It can also check PyPI for newer versions.
+  </p>
+  <p>
+    If you use the built-in agent with <strong>your own API key</strong> (Anthropic or
+    OpenRouter), its requests go directly from your computer to that provider, under that
+    provider's terms and privacy policy. We don't see them.
+  </p>
+  <p>
+    The app's MCP server, if you turn it on, listens only on your own computer, for agents you run
+    there.
+  </p>
+
+  <h2>The Kigumi account</h2>
+  <p>
+    The account is optional. It lets the built-in agent work without an API key of your own, using
+    credit on the account.
+  </p>
+
+  <h3>What we receive and store</h3>
+  <ul>
+    <li>
+      <strong>From signing in with Google or GitHub:</strong> your email address, your name and
+      profile picture, and an identifier for your account with that provider. We ask Google only for
+      the basic sign-in permissions (your email address and basic profile).
+    </li>
+    <li><strong>Your credit:</strong> your balance, and any credit we grant you.</li>
+    <li>
+      <strong>Usage records:</strong> for each agent request, the model used, what it cost and when.
+      These records don't include the content of the request.
+    </li>
+  </ul>
+  <p>
+    The app keeps your sign-in session on your computer, encrypted with your operating system's
+    keychain.
+  </p>
+
+  <h3>Agent requests made through your account</h3>
+  <p>
+    When you use the built-in agent through your account, it sends the AI model what it needs to
+    help you. That includes your messages, and the parts of your project it works with: files it
+    reads, descriptions of what you have selected, build logs and screenshots of the view. These
+    requests pass through our server to
+    <a href="https://openrouter.ai/privacy" target="_blank" rel="noreferrer">OpenRouter</a>, which
+    forwards them to the provider running the model you chose (for example a host of a DeepSeek
+    model, Anthropic, or OpenAI). Those providers process the requests under their own policies,
+    and some may keep them for a limited time.
+  </p>
+  <p>
+    Our server passes requests through and does not store their content. It keeps short-lived
+    operational logs of request details (your account identifier, the model, the size of the
+    request, how long it took and what it cost) to run the service, charge credit and fix problems.
+  </p>
+
+  <h3>Why we use it</h3>
+  <p>
+    To sign you in, keep your credit balance and charge it for your requests, prevent abuse (such as
+    too many requests too fast), and find and fix problems. We may email you about your account
+    or about important changes to the service. We don't use your information for advertising, and
+    we don't sell it.
+  </p>
+
+  <h3>Google user data</h3>
+  <p>
+    Kigumi's use and transfer of information received from Google APIs adheres to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">Google API Services User Data Policy</a>,
+    including the Limited Use requirements. We use the email address, name and profile picture
+    Google gives us only to create your account, sign you in and contact you about it. We don't
+    transfer them to others except the service providers below that run the account, and we never
+    use them for advertising or to train AI models.
+  </p>
+
+  <h2>Service providers</h2>
+  <p>These services run parts of the Kigumi account for us, and process data only for that:</p>
+  <ul>
+    <li><strong>Supabase:</strong> sign-in, and the database holding accounts, balances and usage records.</li>
+    <li><strong>Cloudflare:</strong> the server that carries agent requests, and its logs.</li>
+    <li><strong>OpenRouter and the model providers it routes to:</strong> running the AI models.</li>
+    <li><strong>Google and GitHub:</strong> signing in, if you choose them.</li>
+  </ul>
+
+  <h2>Keeping and deleting your data</h2>
+  <p>
+    We keep your account information while your account exists, and usage records as long as we
+    need them to account for credit. To delete your account and everything we hold about it, email
+    <a href="mailto:minimapletinytools@gmail.com">minimapletinytools@gmail.com</a> from the address
+    you sign in with. You can also ask us what we hold about you, or to correct it. Conversations
+    and projects on your computer are yours to delete.
+  </p>
+
+  <h2>Children</h2>
+  <p>Kigumi accounts aren't meant for children under 13, and we don't knowingly collect their data.</p>
+
+  <h2>Changes</h2>
+  <p>
+    If this policy changes, we'll update it here and change the date at the top. For significant
+    changes, we'll tell account holders by email.
+  </p>
+
+  <p>See also the <a href={`${base}/terms`}>Terms of Service</a>.</p>
+</LegalPage>

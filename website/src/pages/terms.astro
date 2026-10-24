@@ -1,0 +1,103 @@
+---
+import LegalPage from '../components/LegalPage.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<LegalPage
+  title="Terms of Service — Kumiki & Kigumi"
+  description="The terms for using the Kumiki website, the Kigumi app's account and its built-in AI agent."
+  canonicalPath="/terms"
+  heading="Terms of Service"
+  updated="October 24, 2026"
+>
+  <p>
+    These terms are between you and minimaple ("we", "us"), who make Kumiki and Kigumi. They cover
+    the website at kumiki.build and the online services behind the Kigumi app: the Kigumi account
+    and the credit its built-in agent uses. By using them you agree to these terms. Questions:
+    <a href="mailto:minimapletinytools@gmail.com">minimapletinytools@gmail.com</a>.
+  </p>
+
+  <h2>The software</h2>
+  <p>
+    Kumiki and Kigumi are open source, under the
+    <a href="https://www.mozilla.org/en-US/MPL/2.0/" target="_blank" rel="noreferrer">Mozilla Public License 2.0</a>.
+    That license, not these terms, governs your use of the software itself. These terms cover only
+    the online services.
+  </p>
+
+  <h2>Your account</h2>
+  <ul>
+    <li>An account is for one person. Keep your sign-in secure; you're responsible for what's done with your account.</li>
+    <li>You must be at least 13, and old enough where you live to agree to these terms.</li>
+    <li>We may suspend or close accounts used against these terms, or to protect the service and other people.</li>
+  </ul>
+
+  <h2>Credit</h2>
+  <ul>
+    <li>
+      New accounts get some free credit, which the built-in agent spends on AI model requests. What
+      a request costs depends on the model and how much it sends and receives. The app shows each
+      turn's cost and your balance.
+    </li>
+    <li>
+      Credit has no cash value. It can't be exchanged for money or moved to another account. We may
+      change how much free credit there is, which models are offered, prices and limits.
+    </li>
+    <li>Credit can't currently be bought. If that changes, purchases will come with their own terms.</li>
+  </ul>
+
+  <h2>Acceptable use</h2>
+  <p>Don't use the services to:</p>
+  <ul>
+    <li>break the law, or harm or harass anyone;</li>
+    <li>get around credit, rate or other limits, or probe, overload or attack the service;</li>
+    <li>resell or share access to the agent or the models behind it;</li>
+    <li>
+      go against the usage policies of the AI model providers, which apply to the requests sent to
+      them, for example those of <a href="https://openrouter.ai/terms" target="_blank" rel="noreferrer">OpenRouter</a>.
+    </li>
+  </ul>
+
+  <h2>Your work</h2>
+  <p>
+    Your projects, designs and files are yours. You give us only the permission needed to carry the
+    agent's requests to the model and return its answers. See the
+    <a href={`${base}/privacy`}>Privacy Policy</a> for what happens to them.
+  </p>
+
+  <h2>AI output, and building things</h2>
+  <p>
+    The agent's answers and edits can be wrong. Check them. Kumiki and Kigumi help you design timber
+    frames, but they don't check that a design is structurally sound, safe or up to building codes,
+    and nothing they produce is an engineering review. Before you build anything people will rely
+    on, have it checked by a qualified engineer or builder.
+  </p>
+
+  <h2>No warranty</h2>
+  <p>
+    The services are provided "as is" and "as available", without warranties of any kind, including
+    that they will be uninterrupted, error-free or fit for a particular purpose. We may change,
+    pause or end them at any time.
+  </p>
+
+  <h2>Limitation of liability</h2>
+  <p>
+    As far as the law allows, we aren't liable for indirect, incidental or consequential damages, or
+    for lost data, profits or work, arising from your use of the services. Our total liability for
+    any claim about the services is limited to the greater of what you paid us for them in the
+    twelve months before the claim and US$10.
+  </p>
+
+  <h2>Ending</h2>
+  <p>
+    You can stop using the services at any time, and ask us to delete your account. We may end your
+    access if you break these terms. The sections on your work, AI output, no warranty and
+    limitation of liability continue after that.
+  </p>
+
+  <h2>Changes</h2>
+  <p>
+    We may update these terms. We'll post the new version here and change the date at the top, and
+    tell account holders by email about significant changes. Using the services after a change
+    means you accept it.
+  </p>
+</LegalPage>

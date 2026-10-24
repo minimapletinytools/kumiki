@@ -1,0 +1,70 @@
+---
+// The privacy policy's and terms' shared page: a title, the date they last changed, and the text.
+import Layout from '../layouts/Layout.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath: string;
+  heading: string;
+  updated: string;
+}
+
+const { title, description, canonicalPath, heading, updated } = Astro.props;
+---
+<Layout title={title} description={description} canonicalPath={canonicalPath}>
+  <article class="legal">
+    <p class="eyebrow">Legal</p>
+    <h1>{heading}</h1>
+    <p class="updated">Last updated {updated}</p>
+    <div class="prose">
+      <slot />
+    </div>
+  </article>
+</Layout>
+
+<style>
+  .legal {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 0 2rem;
+  }
+  .legal h1 {
+    font-size: clamp(2rem, 4vw, 2.6rem);
+    margin: 0 0 0.4rem;
+  }
+  .updated {
+    color: var(--ink-soft);
+    margin: 0 0 2rem;
+  }
+  .prose :global(h2) {
+    font-size: 1.3rem;
+    margin: 2.2rem 0 0.7rem;
+  }
+  .prose :global(h3) {
+    font-size: 1.05rem;
+    margin: 1.4rem 0 0.5rem;
+  }
+  .prose :global(p),
+  .prose :global(li) {
+    color: var(--ink-soft);
+    font-size: 1.02rem;
+  }
+  .prose :global(p) {
+    margin: 0 0 1rem;
+  }
+  .prose :global(ul) {
+    margin: 0 0 1rem;
+    padding-left: 1.3rem;
+  }
+  .prose :global(li) {
+    margin: 0 0 0.4rem;
+  }
+  .prose :global(strong) {
+    color: var(--ink);
+  }
+  .prose :global(a) {
+    color: inherit;
+    text-decoration: underline;
+  }
+</style>

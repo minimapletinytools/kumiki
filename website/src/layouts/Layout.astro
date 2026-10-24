@@ -188,7 +188,7 @@ const structuredData = {
         </div>
       </div>
       <div class="footer-bottom">
-        <span>&copy; 2026 minimaple &middot; Open source under MPL-2.0</span>
+        <span>&copy; 2026 minimaple &middot; Open source under MPL-2.0 &middot; <a href={`${base}/privacy`}>Privacy</a> &middot; <a href={`${base}/terms`}>Terms</a></span>
         <span>Kumiki &amp; Kigumi</span>
       </div>
     </footer>
@@ -315,6 +315,9 @@ const structuredData = {
       }
       .footer-col a:hover {
         color: var(--accent);
+      }
+      .footer-bottom a {
+        color: inherit;
       }
       .footer-bottom {
         display: flex;
