@@ -62,11 +62,14 @@ take their accelerators from it. Not configurable yet.
 
 ## Agent and MCP
 
-- **Agent panel** (the sparkle button, or Kigumi > Toggle Agent): the Claude Agent SDK, run in the
-  app's main process (`../../agent/agent-session.js`). It uses `agent.apiKey` from settings if set,
-  else the Claude login on this machine; `agent.model` picks a model. Tools that only look run without
-  asking; anything else (editing files, running commands, moving the camera) asks in the panel.
-  Hiding the panel keeps the conversation; the clear button starts a new one.
+- **Agent panel** (the sparkle button, or Kigumi > Toggle Agent): Kigumi's own agent loop on the
+  Vercel AI SDK (`../../agent/agent-loop.js`), run in the app's main process
+  (`../../agent/agent-session.js`). Its tools are Kigumi's plus reading, listing, writing and editing
+  files inside the project; no shell. The model is picked in the panel (`agent.model`, an id from
+  `../../agent/models.js`). Requests go with `agent.apiKey` (an Anthropic key) or
+  `agent.openrouterApiKey` if set, else through the Kigumi account. Tools that only look run without
+  asking; anything else (editing files, moving the camera) asks in the panel. Hiding the panel keeps
+  the conversation; the clear button starts a new one.
 - **MCP server** (`../../agent/mcp-http.js`): with `mcp.enabled` on, Kigumi's tools are served at
   `http://127.0.0.1:<mcp.port>/mcp` (default port 7345) to any agent holding `mcp.token`, which is
   generated the first time. Turn it on from a view's options (beta features > MCP server); the MCP

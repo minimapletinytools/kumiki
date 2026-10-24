@@ -11,6 +11,8 @@
     const inputEl = $('prompt-input');
     const sendBtn = $('send-btn');
     const clearBtn = $('btn-clear');
+    const modelSelect = $('model-select');
+    const routeNote = $('route-note');
     const welcomeHtml = $('welcome').outerHTML;
 
     let busy = false;
@@ -121,6 +123,26 @@
         messagesEl.innerHTML = welcomeHtml;
     });
 
+    modelSelect.addEventListener('change', () => vscode.postMessage({ type: 'agent:setModel', id: modelSelect.value }));
+
+    const ROUTE_NOTES = {
+        anthropic: 'Using your Anthropic key.',
+        openrouter: 'Using your OpenRouter key.',
+        backend: '',
+    };
+
+    // The models to choose from, and where requests for the chosen one go.
+    function showState({ models = [], model, via }) {
+        modelSelect.replaceChildren(...models.map(({ id, label }) => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = label;
+            return option;
+        }));
+        modelSelect.value = model;
+        routeNote.textContent = via ? ROUTE_NOTES[via] || '' : 'Sign in, or set an API key in settings, to use the agent.';
+    }
+
     messagesEl.addEventListener('click', (event) => {
         if (event.target.classList.contains('suggestion-chip')) {
             sendPrompt(event.target.textContent);
@@ -131,6 +153,9 @@
         const message = event.data;
         if (!message || typeof message.type !== 'string') return;
         switch (message.type) {
+            case 'agent:state':
+                showState(message);
+                break;
             case 'agent:busy':
                 setBusy(Boolean(message.busy));
                 break;
@@ -148,6 +173,9 @@
                 break;
             case 'agent:done':
                 if (message.stopped) add('agent-note', 'Stopped.');
+                else if (!message.isError && typeof message.costUsd === 'number') {
+                    add('agent-note', `$${message.costUsd < 0.01 ? message.costUsd.toFixed(4) : message.costUsd.toFixed(2)}`);
+                }
                 else if (message.isError) add('agent-error', message.error || 'The agent stopped with an error.');
                 break;
             case 'agent:error':
@@ -157,4 +185,6 @@
                 break;
         }
     });
+
+    vscode.postMessage({ type: 'agent:ready' });
 })();
