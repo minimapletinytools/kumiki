@@ -83,6 +83,23 @@ function onlyLatestImage(messages) {
     return out;
 }
 
+const CACHE_HERE = { type: 'ephemeral' };
+
+/**
+ * `messages` with a prompt-cache mark on the last two and none elsewhere: each step then reads the
+ * conversation so far from the cache. Marks carry forward between steps, and Anthropic takes four.
+ */
+function cacheMarked(messages) {
+    return messages.map((message, i) => {
+        const { openrouter, anthropic, ...others } = message.providerOptions || {};
+        const rest = Object.keys(others).length ? others : undefined;
+        if (i < messages.length - 2) {
+            return { ...message, providerOptions: rest };
+        }
+        return { ...message, providerOptions: { ...others, openrouter: { cacheControl: CACHE_HERE }, anthropic: { cacheControl: CACHE_HERE } } };
+    });
+}
+
 /** Kigumi's tools as an AI SDK tool set. */
 function toToolSet(tools, { images, askPermission }) {
     return Object.fromEntries(tools.map((kigumiTool) => [kigumiTool.name, tool({
@@ -118,6 +135,7 @@ function earlyEnd(steps) {
  * @param {object} options
  * @param {object} options.model         an AI SDK language model (languageModelFor)
  * @param {boolean} options.images       whether the model can look at images
+ * @param {boolean} [options.cacheMarks] whether to mark where its prompt cache should hold (models.js)
  * @param {object[]} options.tools       Kigumi tools
  * @param {string} options.system
  * @param {object[]} options.history     the conversation so far, as model messages
@@ -128,7 +146,7 @@ function earlyEnd(steps) {
  * @returns {Promise<{ history: object[], costUsd?: number }>} the conversation after the turn. A turn
  *     that fails throws, with the conversation as far as it got as the error's `history`.
  */
-async function runTurn({ model, images, tools, system, history, prompt, abortSignal, askPermission, onEvent }) {
+async function runTurn({ model, images, cacheMarks = false, tools, system, history, prompt, abortSignal, askPermission, onEvent }) {
     const messages = [...history, { role: 'user', content: prompt }];
     const steps = [];
     let failure = null;
@@ -143,7 +161,10 @@ async function runTurn({ model, images, tools, system, history, prompt, abortSig
         // A request refused or failed (busy, rate limited, an upstream error) is never charged, so
         // retrying one costs nothing.
         maxRetries: 2,
-        prepareStep: ({ messages: sending }) => ({ messages: onlyLatestImage(sending) }),
+        prepareStep: ({ messages: sending }) => {
+            const trimmed = onlyLatestImage(sending);
+            return { messages: cacheMarks ? cacheMarked(trimmed) : trimmed };
+        },
         onStepEnd: (step) => { steps.push(step); },
         onError: ({ error }) => { failure = error; },
     });
@@ -182,4 +203,4 @@ async function runTurn({ model, images, tools, system, history, prompt, abortSig
     };
 }
 
-module.exports = { runTurn, languageModelFor, toModelContent, summarise, onlyLatestImage, MAX_STEPS, MAX_OUTPUT_TOKENS };
+module.exports = { runTurn, languageModelFor, toModelContent, summarise, onlyLatestImage, cacheMarked, MAX_STEPS, MAX_OUTPUT_TOKENS };

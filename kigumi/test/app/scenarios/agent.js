@@ -1,9 +1,9 @@
 // The agent panel: it lists the models, offers signing in when there is no key, and a model picked
-// there is kept; with a key set, it says it is using it.
+// there is kept; with a key set, it says it is using it. And the build an agent's edit runs.
 
 module.exports = {
     name: 'agent',
-    async run({ check, inShell, waitFor, settings }) {
+    async run({ check, inShell, waitFor, settings, openFrame, runAppCommand, FRAME }) {
         const agentDoc = 'document.querySelector("#slot-right iframe").contentDocument';
         const read = (script) => inShell(`(() => { const doc = ${agentDoc}; return ${script}; })()`);
 
@@ -21,5 +21,11 @@ module.exports = {
             .then((text) => (text.includes('OpenRouter key') ? text : null)), { timeoutMs: 5000 }).catch(() => '');
         check('a model picked in the panel is kept, and the panel says which key it uses',
             settings.get('agent.model') === 'claude-haiku-4.5' && Boolean(using), `${settings.get('agent.model')}; ${using}`);
+
+        // What an edit by the agent runs: the view's file built as it is, and that build's problems.
+        await openFrame(FRAME);
+        const report = await runAppCommand('kigumi.automationBuildReport', { filePath: FRAME, graceMs: 0 });
+        check('a view\'s file builds on request, reporting that build\'s problems',
+            report && report.ok === true && Array.isArray(report.entries) && report.entries.length === 0, JSON.stringify(report).slice(0, 200));
     },
 };

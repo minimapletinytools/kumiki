@@ -6,6 +6,7 @@
 
 const path = require('path');
 const { createPanelDirectory } = require('./agent/panel-directory');
+const { buildReport } = require('./build-report');
 const fs = require('fs');
 const { FrameViewSession } = require('./frame-view-session');
 const { PythonRunnerSession } = require('./runner-session');
@@ -305,6 +306,9 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                 lastRefreshReason: session.lastRefreshReason,
             };
         }),
+
+        'kigumi.automationBuildReport': async (options = {}) => withSession(options,
+            (session) => buildReport(session, options), { entries: [] }),
 
         'kigumi.automationReadSessionLogs': async (options = {}) => withSession(options, async (session) => {
             const snapshot = session.getLogSnapshot({

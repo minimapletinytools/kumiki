@@ -4,14 +4,15 @@
  *
  * Each model has its OpenRouter id (through Kigumi's backend, or an OpenRouter key) and, for
  * Anthropic's, its Anthropic id (an Anthropic key). `images`: it can look at screenshots.
+ * `cacheMarks`: its prompt cache needs telling where to cache (Anthropic's); others cache by themselves.
  */
 
 const MODELS = [
     // Cheapest; the free tier's. The dated -1017 costs more, so this is the undated id, not ~latest.
     { id: 'deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', openrouter: 'deepseek/deepseek-v4.1-flash', images: true },
     { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', openrouter: 'openai/gpt-5.6-luna', images: true },
-    { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5', openrouter: 'anthropic/claude-haiku-4.5', anthropic: 'claude-haiku-4-5', images: true },
-    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', openrouter: 'anthropic/claude-sonnet-5', anthropic: 'claude-sonnet-5', images: true },
+    { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5', openrouter: 'anthropic/claude-haiku-4.5', anthropic: 'claude-haiku-4-5', images: true, cacheMarks: true },
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', openrouter: 'anthropic/claude-sonnet-5', anthropic: 'claude-sonnet-5', images: true, cacheMarks: true },
 ];
 
 const DEFAULT_MODEL_ID = MODELS[0].id;

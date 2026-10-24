@@ -3,10 +3,10 @@ const os = require('os');
 const path = require('path');
 
 const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test');
-const { runTurn, toModelContent } = require('../agent/agent-loop');
+const { runTurn, toModelContent, cacheMarked } = require('../agent/agent-loop');
 const { MODELS, findModel, routeModel } = require('../agent/models');
 const { createFileTools } = require('../agent/file-tools');
-const { AgentSession, describeFailure } = require('../agent/agent-session');
+const { AgentSession, describeFailure, withContext, describeBuild } = require('../agent/agent-session');
 const { z } = require('zod');
 
 const USAGE = { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } };
@@ -151,6 +151,26 @@ describe('the agent loop', () => {
         expect(JSON.stringify(history)).toContain('earlier screenshot');
     });
 
+        test('Claude models get a cache mark on the last two messages only, however many steps pass', () => {
+        const marked = (messages) => messages.filter((message) => message.providerOptions
+            && message.providerOptions.openrouter && message.providerOptions.openrouter.cacheControl).length;
+        let messages = [1, 2, 3].map((n) => ({ role: 'user', content: `m${n}` }));
+        for (let step = 0; step < 3; step++) {
+            messages = cacheMarked([...messages, { role: 'assistant', content: `a${step}` }]);
+        }
+        expect(marked(messages)).toBe(2);
+        expect(messages.at(-1).providerOptions.anthropic.cacheControl).toEqual({ type: 'ephemeral' });
+        expect(messages[0].providerOptions).toBeUndefined();
+    });
+
+    test('Claude models are marked for caching; the others cache by themselves', async () => {
+        const model = scripted([...say('1', 'Hi.'), finish('stop')]);
+        const events = [];
+        await runTurn({ model, images: true, cacheMarks: true, tools: [], system: 's', history: [], prompt: 'go',
+            askPermission: async () => true, onEvent: (event) => events.push(event) });
+        expect(model.doStreamCalls[0].prompt.at(-1).providerOptions.openrouter.cacheControl).toEqual({ type: 'ephemeral' });
+    });
+
         test('a model that cannot see gets a note instead of an image', () => {
         const content = [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }];
         expect(toModelContent(content, false).value[0]).toMatchObject({ type: 'text' });
@@ -175,7 +195,7 @@ describe('the file tools', () => {
 
     test('read and list only look; write and edit ask', () => {
         expect(tools.map((tool) => [tool.name, tool.readOnly])).toEqual([
-            ['list_files', true], ['read_file', true], ['write_file', false], ['edit_file', false],
+            ['list_files', true], ['search_files', true], ['read_file', true], ['write_file', false], ['edit_file', false],
         ]);
     });
 
@@ -197,7 +217,18 @@ describe('the file tools', () => {
         expect(fs.readFileSync(path.join(root, 'frame.py'), 'utf8')).toBe('a = 5\nb = 3\nb = 3\n');
     });
 
-    test('reads with line numbers', async () => {
+    test('searches the project for a pattern, by file name too, leaving out dependency folders', async () => {
+        fs.writeFileSync(path.join(root, 'notes.md'), 'b = 2 in notes\n');
+        fs.writeFileSync(path.join(root, 'node_modules', 'x.js'), 'b = 2\n');
+        const [all] = await named('search_files').run({ pattern: 'b = \\d' });
+        expect(all.text.split('\n').sort()).toEqual(['frame.py:2: b = 2', 'frame.py:3: b = 2', 'notes.md:1: b = 2 in notes']);
+        const [python] = await named('search_files').run({ pattern: 'B = 2', ignore_case: true, file_glob: '*.py' });
+        expect(python.text).toBe('frame.py:2: b = 2\nframe.py:3: b = 2');
+        const [none] = await named('search_files').run({ pattern: 'nothing like this' });
+        expect(none.text).toBe('No matches.');
+    });
+
+        test('reads with line numbers', async () => {
         const [read] = await named('read_file').run({ file_path: 'frame.py', offset: 2, limit: 1 });
         expect(read.text).toBe('2\tb = 2\n(4 lines in all; read on from line 3)');
     });
@@ -265,7 +296,39 @@ describe('the agent session', () => {
         expect(account.refreshBalance).toHaveBeenCalled();
     });
 
-    test('out of credit says so', () => {
+    test('a message goes with what the user is looking at', () => {
+        expect(withContext('fix this', { kind: 'viewer', fileName: 'a.py' }))
+            .toBe('[What I\'m looking at in Kigumi: {"kind":"viewer","fileName":"a.py"}]\n\nfix this');
+        expect(withContext('hi', null)).toBe('hi');
+        expect(withContext('hi', { text: 'x'.repeat(5000) }).length).toBeLessThan(2100);
+    });
+
+    test('editing a file a view shows rebuilds it, and the edit says whether it built', async () => {
+        const reports = [];
+        const editTool = { name: 'edit_file', shape: {}, readOnly: false, run: async () => [{ type: 'text', text: 'Edited a.py.' }] };
+        const agent = new AgentSession({
+            panels: { ...panels, list: () => [{ kind: 'viewer', filePath: '/project/a.py' }] },
+            run: async (id, args) => {
+                reports.push([id, args.filePath]);
+                return { ok: false, entries: [{ level: 'error', message: 'NameError: brace' }] };
+            },
+            post: () => {}, cwd: () => '/project', setting: (key, fallback) => fallback, fileTools: [editTool],
+        });
+        const edit = agent.tools.find((tool) => tool.name === 'edit_file');
+
+        expect(await edit.run({ file_path: 'a.py' })).toEqual([
+            { type: 'text', text: 'Edited a.py.' },
+            { type: 'text', text: 'The view of this file rebuilt with errors:\nerror: NameError: brace' },
+        ]);
+        expect(reports).toEqual([['kigumi.automationBuildReport', '/project/a.py']]);
+        // A file no view shows is just edited.
+        reports.length = 0;
+        await edit.run({ file_path: 'b.py' });
+        expect(reports).toEqual([]);
+        expect(describeBuild({ ok: true, entries: [] })).toBe('The view of this file rebuilt without errors.');
+    });
+
+        test('out of credit says so', () => {
         expect(describeFailure({ statusCode: 402, message: 'Payment Required' })).toBe('Out of credit.');
     });
 

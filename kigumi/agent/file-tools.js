@@ -1,6 +1,6 @@
 /**
- * The built-in agent's file tools, in the same shape as Kigumi's (agent/tools.js): read, list, write
- * and edit files, inside the project folder only. Node's; a web host would supply its own.
+ * The built-in agent's file tools, in the same shape as Kigumi's (agent/tools.js): list, search, read,
+ * write and edit files, inside the project folder only. Node's; a web host would supply its own.
  */
 
 const fs = require('fs');
@@ -12,6 +12,9 @@ const text = (value) => [{ type: 'text', text: value }];
 /** Folders list_files never walks into. */
 const SKIPPED = new Set(['.git', 'node_modules', '.venv', '__pycache__', '.kigumi']);
 const MAX_LISTED = 500;
+const MAX_MATCHES = 100;
+/** Files larger than this are skipped by search_files (generated output, not source). */
+const MAX_SEARCHED_BYTES = 1024 * 1024;
 const MAX_READ_LINES = 2000;
 /** A read's most characters: every read stays in the conversation, which goes with every step. */
 const MAX_READ_CHARS = 40000;
@@ -37,6 +40,30 @@ function createFileTools({ root }) {
 
     const filePath = z.string().describe('A path relative to the project folder (or absolute, inside it).');
 
+    /** Every file under `start`, skipping dependency folders, up to `limit`. */
+    async function walkFiles(start, limit) {
+        const found = [];
+        const walk = async (dir) => {
+            for (const entry of await fs.promises.readdir(dir, { withFileTypes: true })) {
+                if (found.length >= limit) return;
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    if (!SKIPPED.has(entry.name)) await walk(full);
+                } else {
+                    found.push(full);
+                }
+            }
+        };
+        await walk(start);
+        return found;
+    }
+
+    /** A glob on file names (`*.py`), as a RegExp. */
+    function globPattern(glob) {
+        const escaped = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+        return new RegExp(`^${escaped}$`, 'i');
+    }
+
     return [
         {
             name: 'list_files',
@@ -44,21 +71,42 @@ function createFileTools({ root }) {
             shape: { folder: z.string().optional().describe('A folder relative to the project folder.') },
             readOnly: true,
             run: async ({ folder }) => {
-                const start = resolve(folder);
-                const found = [];
-                const walk = async (dir) => {
-                    for (const entry of await fs.promises.readdir(dir, { withFileTypes: true })) {
-                        if (found.length >= MAX_LISTED) return;
-                        const full = path.join(dir, entry.name);
-                        if (entry.isDirectory()) {
-                            if (!SKIPPED.has(entry.name)) await walk(full);
-                        } else {
-                            found.push(path.relative(root(), full));
+                const found = (await walkFiles(resolve(folder), MAX_LISTED)).map((file) => path.relative(root(), file));
+                return text(found.join('\n') + (found.length >= MAX_LISTED ? `\n(first ${MAX_LISTED} only)` : ''));
+            },
+        },
+        {
+            name: 'search_files',
+            description: 'Search the project\'s files for a regular expression, giving each matching line with its '
+                + `file and line number (at most ${MAX_MATCHES}). Cheaper than reading whole files to find something.`,
+            shape: {
+                pattern: z.string().describe('A JavaScript regular expression, e.g. "def cut_.*tenon".'),
+                folder: z.string().optional().describe('A folder relative to the project folder; the whole project by default.'),
+                file_glob: z.string().optional().describe('Only files whose name matches, e.g. "*.py".'),
+                ignore_case: z.boolean().optional(),
+            },
+            readOnly: true,
+            run: async ({ pattern, folder, file_glob: fileGlob, ignore_case: ignoreCase }) => {
+                const matcher = new RegExp(pattern, ignoreCase ? 'i' : '');
+                const names = fileGlob ? globPattern(fileGlob) : null;
+                const matches = [];
+                for (const file of await walkFiles(resolve(folder), 20000)) {
+                    if (names && !names.test(path.basename(file))) continue;
+                    const stat = await fs.promises.stat(file);
+                    if (stat.size > MAX_SEARCHED_BYTES) continue;
+                    const content = await fs.promises.readFile(file, 'utf8');
+                    if (content.includes('\u0000')) continue; // binary
+                    const lines = content.split('\n');
+                    for (let i = 0; i < lines.length && matches.length < MAX_MATCHES; i++) {
+                        if (matcher.test(lines[i])) {
+                            matches.push(`${path.relative(root(), file)}:${i + 1}: ${lines[i].trim().slice(0, 200)}`);
                         }
                     }
-                };
-                await walk(start);
-                return text(found.join('\n') + (found.length >= MAX_LISTED ? `\n(first ${MAX_LISTED} only)` : ''));
+                    if (matches.length >= MAX_MATCHES) break;
+                }
+                return text(matches.length
+                    ? matches.join('\n') + (matches.length >= MAX_MATCHES ? `\n(first ${MAX_MATCHES} matches only)` : '')
+                    : 'No matches.');
             },
         },
         {

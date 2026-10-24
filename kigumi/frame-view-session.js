@@ -40,7 +40,8 @@ function normalizeViewerLogLevel(level) {
     if (typeof level !== 'string') {
         return 'info';
     }
-    const normalized = level.toLowerCase();
+    // "warning" too: the agent's read_view_log offers it, and it was read as info.
+    const normalized = level.toLowerCase() === 'warning' ? 'warn' : level.toLowerCase();
     if (!Object.prototype.hasOwnProperty.call(VIEWER_LOG_LEVEL_ORDER, normalized)) {
         return 'info';
     }

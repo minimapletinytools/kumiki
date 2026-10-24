@@ -16,6 +16,8 @@
  * else Kigumi's backend when signed in.
  */
 
+const path = require('path');
+
 const { createKigumiTools } = require('./tools');
 const { MODELS, findModel, routeModel } = require('./models');
 const { runTurn, languageModelFor } = require('./agent-loop');
@@ -26,13 +28,34 @@ const PANEL_SETTINGS = { 'agent.bypassPermissions': false, 'agent.showOnStartup'
 const SYSTEM_PROMPT = [
     'You are the agent inside Kigumi, an app for designing timber frames in Python with the kumiki',
     'library. The user sees their frame in 3D views and drawings while you work.',
-    'Use describe_panel to see what they are looking at and have selected (start there when they say',
-    '"this" or "the selected"). Read and edit the project\'s files with the file tools; after editing a',
-    'frame file, refresh_view and read_view_log to check it built, and screenshot to look at the result.',
+    'Each message comes with what they are looking at (the active panel and its selection); use',
+    'describe_panel for more. Find things with search_files rather than reading whole files. Editing a',
+    'file a view shows rebuilds it, and the edit\'s result says whether it built; screenshot to look at it.',
     'The kumiki docs are in .kigumi/docs/ in the project; read those and the project\'s patterns, not the',
     'kumiki package\'s source in .venv, which is large. Sizes from the tools are in metres, in world',
     'space. Keep replies short.',
 ].join(' ');
+
+/** The most of the active panel's description sent with a message. */
+const MAX_CONTEXT_CHARS = 2000;
+
+/** A message as sent: what the user is looking at, then what they wrote. */
+function withContext(text, described) {
+    if (!described) return text;
+    const context = JSON.stringify(described);
+    const shown = context.length > MAX_CONTEXT_CHARS ? `${context.slice(0, MAX_CONTEXT_CHARS)}…` : context;
+    return `[What I'm looking at in Kigumi: ${shown}]\n\n${text}`;
+}
+
+/** The build report's result as text for the agent, appended to an edit's own. */
+function describeBuild(report) {
+    if (!report || report.reason === 'session-not-found') return null;
+    const lines = (report.entries || []).map((entry) => `${entry.level}: ${entry.message}`);
+    if (report.error) lines.unshift(`error: ${report.error}`);
+    return report.ok
+        ? `The view of this file rebuilt without errors.${lines.length ? `\n${lines.join('\n')}` : ''}`
+        : `The view of this file rebuilt with errors:\n${lines.join('\n').slice(0, 4000)}`;
+}
 
 /** What to tell the user for a failed request. */
 function describeFailure(error) {
@@ -63,7 +86,9 @@ class AgentSession {
      */
     constructor({ panels, run, post, cwd, setting, setSetting = () => {}, fileTools = [], account = null,
         createModel = languageModelFor, log = () => {} }) {
-        this.tools = [...createKigumiTools({ panels, run, workspaceFolders: () => [cwd()].filter(Boolean) }), ...fileTools];
+        this.tools = [...createKigumiTools({ panels, run, workspaceFolders: () => [cwd()].filter(Boolean) }),
+            ...fileTools.map((tool) => this._buildingAfterEdits(tool, { panels, run, cwd }))];
+        this.panels = panels;
         this.post = post;
         this.setting = setting;
         this.setSetting = setSetting;
@@ -74,6 +99,28 @@ class AgentSession {
         this.abort = null;
         this.pendingPermissions = new Map();
         this.nextPermission = 1;
+    }
+
+    /**
+     * `tool`, and when it writes or edits a file a view shows, that view rebuilt with the build's
+     * result: one step for the agent where it took three (edit, refresh, read the log).
+     */
+    _buildingAfterEdits(tool, { panels, run, cwd }) {
+        if (!['write_file', 'edit_file'].includes(tool.name)) return tool;
+        return {
+            ...tool,
+            run: async (args) => {
+                const result = await tool.run(args);
+                const target = path.resolve(cwd() || '', args.file_path || '');
+                const shown = panels.list().some((panel) => panel.kind === 'viewer' && panel.filePath
+                    && path.resolve(panel.filePath) === target);
+                if (!shown) return result;
+                const report = await run('kigumi.automationBuildReport', { filePath: target, reason: 'agent edit' })
+                    .catch((error) => ({ ok: false, error: error.message, entries: [] }));
+                const built = describeBuild(report);
+                return built ? [...result, { type: 'text', text: built }] : result;
+            },
+        };
     }
 
     get busy() {
@@ -175,10 +222,11 @@ class AgentSession {
             const { history, costUsd } = await runTurn({
                 model: await this.createModel(route, { fetch: route.via === 'backend' ? this.account.fetchWithToken : undefined }),
                 images: this.model.images,
+                cacheMarks: Boolean(this.model.cacheMarks),
                 tools: this.tools,
                 system: SYSTEM_PROMPT,
                 history: this.history,
-                prompt: text,
+                prompt: withContext(text, await this.panels.describe().catch(() => null)),
                 abortSignal: abort.signal,
                 askPermission: (toolName, input) => this._askPermission(toolName, input),
                 onEvent: (event) => this.post(event),
@@ -204,4 +252,4 @@ class AgentSession {
     }
 }
 
-module.exports = { AgentSession, SYSTEM_PROMPT, describeFailure };
+module.exports = { AgentSession, SYSTEM_PROMPT, describeFailure, withContext, describeBuild };
