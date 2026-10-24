@@ -3,8 +3,9 @@
  *
  * On macOS the menu bar and the Dock take the app's name (and the Dock its icon) from the bundle
  * that runs, which the app can't change once running. So this runs a copy of Electron's bundle
- * named Kigumi, with Kigumi's icon, made once per Electron version under build-app/dev/. Elsewhere,
- * or if that copy can't be made, it runs Electron as it is.
+ * named Kigumi, with Kigumi's icon, made once per Electron version under build-app/dev/. It also
+ * claims kigumi:// links, as a build does, so signing in comes back to it. Elsewhere, or if that copy
+ * can't be made, it runs Electron as it is.
  */
 
 const { spawn, execFileSync } = require('child_process');
@@ -16,6 +17,9 @@ const electron = require('electron');
 const ROOT = path.join(__dirname, '..');
 const DEV_DIR = path.join(ROOT, 'build-app', 'dev');
 const ICON = path.join(ROOT, 'templogo.png');
+// Changes when the bundle is made differently, so an older copy is made again.
+const BUNDLE_FORMAT = 2;
+const LSREGISTER = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
 
 function run(command, args) {
     execFileSync(command, args, { stdio: 'ignore' });
@@ -45,7 +49,7 @@ function replaceIcon(resources) {
 /** Returns the executable of the Kigumi-named copy of Electron's bundle, making it if needed. */
 function macBundle() {
     const source = path.resolve(electron, '..', '..', '..');
-    const version = require('electron/package.json').version;
+    const version = `${require('electron/package.json').version} (bundle ${BUNDLE_FORMAT})`;
     const bundle = path.join(DEV_DIR, 'Kigumi.app');
     const stamp = path.join(DEV_DIR, 'electron-version');
     const executable = path.join(bundle, 'Contents', 'MacOS', 'Kigumi');
@@ -77,9 +81,17 @@ function macBundle() {
         setPlist(helperPlist, 'CFBundleExecutable', name);
         setPlist(helperPlist, 'CFBundleName', name);
     }
+    // kigumi:// links (sign-in coming back from the browser) open this copy; macOS reads the schemes
+    // an app claims from its bundle only.
+    for (const command of ['Add :CFBundleURLTypes array', 'Add :CFBundleURLTypes:0 dict',
+        'Add :CFBundleURLTypes:0:CFBundleURLName string Kigumi', 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array',
+        'Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string kigumi']) {
+        run('/usr/libexec/PlistBuddy', ['-c', command, plist]);
+    }
     replaceIcon(path.join(bundle, 'Contents', 'Resources'));
     // The edits break the bundle's signature, which Apple silicon won't run without.
     run('codesign', ['--force', '--deep', '--sign', '-', bundle]);
+    run(LSREGISTER, ['-f', bundle]);
     fs.writeFileSync(stamp, version);
     return executable;
 }

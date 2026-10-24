@@ -391,11 +391,12 @@ function handleAuthLink(url) {
         pendingAuthLink = url;
         return;
     }
+    logChannel.appendLine('[account] sign-in link received');
     if (mainWindow && !mainWindow.isDestroyed()) {
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.focus();
     }
-    account.completeSignIn(url).catch((error) => {
+    account.completeSignIn(url).then(() => logChannel.appendLine('[account] signed in')).catch((error) => {
         logChannel.appendLine(`[account] sign-in failed: ${error.message}`);
         setStatus('error', `Could not sign in: ${error.message}`);
     });
