@@ -1,5 +1,5 @@
-// The agent panel: it lists the models, says how to start with no key and no account, and a model
-// picked there is kept; with a key set, it says it is using it.
+// The agent panel: it lists the models, offers signing in when there is no key, and a model picked
+// there is kept; with a key set, it says it is using it.
 
 module.exports = {
     name: 'agent',
@@ -11,8 +11,8 @@ module.exports = {
         const models = await waitFor(() => read(`doc && doc.querySelectorAll('#model-select option').length`)
             .catch(() => 0), { timeoutMs: 10000 }).catch(() => 0);
         const note = await read(`doc.getElementById('route-note').textContent`);
-        check('the agent lists the models and, with no key or account, says how to start',
-            models >= 4 && note.includes('agent.openrouterApiKey'), `${models} models; ${note}`);
+        check('the agent lists the models and, with no key, offers signing in',
+            models >= 4 && note.includes('Sign in') && note.includes('GitHub'), `${models} models; ${note}`);
 
         settings.set('agent.openrouterApiKey', 'sk-or-test');
         await read(`(() => { const select = doc.getElementById('model-select'); select.value = 'claude-haiku-4.5';
