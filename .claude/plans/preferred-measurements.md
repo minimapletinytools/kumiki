@@ -63,4 +63,9 @@ Done (first PR): shoulder as canonical carrier; `Datum` and `preferred_datum`; `
 mortise and tenon declaring its cheeks, tip and mortise walls. The patterns' `_end_datum` skips `AVOID`
 faces, so a piece's length isn't measured from a tenon's tip.
 
-Next: declare pairs on the other joints (tongue and fork, dovetails, scarfs, ...).
+Second PR: `measured_against` in cutcsg for every joint; pairs on tongue and fork (butt: the
+tongue's width and thickness; corner: its thickness), the cross lap (the lap's width either way)
+and the half-blind scarf (the stub tenon's cheeks). `tests/test_measurement_pairs.py` checks each
+names a feature in its own joint, and that a pair names back.
+
+Next: joints whose faces aren't named yet (dovetails, the fork's slot), which need names first.

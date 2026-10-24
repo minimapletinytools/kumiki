@@ -1744,6 +1744,12 @@ class FeatureOverride:
         )
 
 
+def measured_against(properties: FeatureProperties, partner: str, datum: Datum = Datum.NEUTRAL) -> FeatureProperties:
+    """Return `properties` marked relative to the feature named `partner` (FeatureMarkingSpec):
+    auto dimensioning prefers measuring between them. Two naming each other are a symmetric pair."""
+    return replace(properties, marking_override=FeatureMarkingSpec(mark_relative_to=partner), datum=datum)
+
+
 def shoulder_override(key: FeatureKey, name: Optional[str] = None,
                       group: FeatureGroup = FeatureGroup.NONE) -> FeatureOverride:
     """Return an override marking the default at `key` as a shoulder plane, in group `group`."""

@@ -7,6 +7,7 @@ from typing import Optional
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
+from kumiki.csg.cutcsg import measured_against
 from kumiki.measuring import (
     get_center_point_on_face_global,
     mark_distance_from_end_along_centerline,
@@ -150,8 +151,8 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         # naming them as well derives the same line twice (see
         # _drop_duplicate_derived).
         feature_overrides=[
-            FeatureOverride(prism_face_key(PrismFace.FRONT), "tongue_front", _TONGUE_FACE),
-            FeatureOverride(prism_face_key(PrismFace.BACK), "tongue_back", _TONGUE_FACE),
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "tongue_front", measured_against(_TONGUE_FACE, "tongue_back")),
+            FeatureOverride(prism_face_key(PrismFace.BACK), "tongue_back", measured_against(_TONGUE_FACE, "tongue_front")),
         ],
     )
 
