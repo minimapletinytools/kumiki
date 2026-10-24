@@ -613,3 +613,104 @@ textarea {
     text-decoration: underline;
     text-decoration-style: dotted;
 }
+
+.settings-heading {
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.always-allowed {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin: 2px 0 6px;
+}
+
+.always-allowed:empty {
+    display: none;
+}
+
+.allowed-tool {
+    font-family: var(--ka-mono);
+    border: 1px solid var(--ka-border);
+    border-radius: 10px;
+    padding: 0 2px 0 8px;
+}
+
+.allowed-tool button {
+    background: none;
+    border: none;
+    color: var(--ka-muted);
+    cursor: pointer;
+}
+
+.diff {
+    font-family: var(--ka-mono);
+    font-size: 11px;
+    max-height: 260px;
+    overflow: auto;
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.diff > div {
+    white-space: pre;
+    padding: 0 6px;
+}
+
+.diff .diff-file {
+    font-weight: 600;
+    background: var(--ka-chrome-bg);
+    border-bottom: 1px solid var(--ka-border);
+    white-space: normal;
+}
+
+.diff .diff-add {
+    background: rgba(46, 160, 67, 0.15);
+}
+
+.diff .diff-del {
+    background: rgba(248, 81, 73, 0.15);
+}
+
+.diff .diff-same {
+    color: var(--ka-muted);
+}
+
+.permission-buttons button.always {
+    background: transparent;
+    border: 1px solid var(--ka-border);
+    color: var(--ka-fg);
+}
+
+.message-bubble.is-queued {
+    opacity: 0.6;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+}
+
+.queued-tag {
+    font-size: 11px;
+    font-style: italic;
+}
+
+.queued-cancel {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+}
+
+.checkpoint-note {
+    color: var(--ka-muted);
+    font-size: 12px;
+}
+
+.checkpoint-note.is-undone {
+    text-decoration: line-through;
+}

@@ -6,7 +6,7 @@ const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test')
 const { runTurn, toModelContent, cacheMarked, trimOldToolResults, estimateTokens, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
 const { MODELS, findModel, routeModel } = require('../agent/models');
 const { createFileTools } = require('../agent/file-tools');
-const { AgentSession, describeFailure, withContext, describeBuild } = require('../agent/agent-session');
+const { AgentSession, RETRY_PROMPT, describeFailure, withContext, describeBuild } = require('../agent/agent-session');
 const { z } = require('zod');
 
 const USAGE = { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } };
@@ -317,7 +317,7 @@ describe('the agent session', () => {
         expect(posted.pop()).toEqual({
             type: 'agent:state', models: MODELS.map(({ id, label }) => ({ id, label })), model: 'claude-sonnet-5', via: 'openrouter',
             account: { configured: false },
-            settings: { 'agent.bypassPermissions': false, 'agent.showOnStartup': true },
+            settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true },
         });
     });
 
@@ -404,18 +404,114 @@ describe('the agent session', () => {
         expect(saved.size).toBe(2);
     });
 
+        test('a request made while the agent works waits, then runs; one can be taken back', async () => {
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const prompts = [];
+        let calls = 0;
+        const model = new MockLanguageModelV4({ doStream: async ({ prompt }) => {
+            calls += 1;
+            prompts.push(prompt.filter((message) => message.role === 'user').at(-1).content[0].text);
+            if (calls === 1) await gate;
+            return { stream: convertArrayToReadableStream([...say(String(calls), 'ok'), finish('stop')]) };
+        } });
+        const { agent, posted } = session({ settings: { 'agent.openrouterApiKey': 'sk-or' }, model });
+
+        const first = agent.prompt('first');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        agent.handle({ type: 'agent:prompt', text: 'second' });
+        agent.handle({ type: 'agent:prompt', text: 'third' });
+        const third = posted.filter((message) => message.type === 'agent:queued')[1];
+        agent.handle({ type: 'agent:unqueue', id: third.id });
+        release();
+        await first;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(prompts).toEqual(['first', 'second']);
+        expect(posted).toContainEqual({ type: 'agent:userMessage', text: 'second' });
+        expect(posted).toContainEqual({ type: 'agent:dequeued', id: third.id });
+    });
+
+    test('a turn that changed files can be undone, putting them back as they were', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-undo-'));
+        fs.writeFileSync(path.join(root, 'frame.py'), 'legs = 4\n');
+        const model = scripted(
+            [call('c1', 'edit_file', { file_path: 'frame.py', old_string: 'legs = 4', new_string: 'legs = 3' }),
+                call('c2', 'write_file', { file_path: 'brace.py', content: 'brace = 1\n' }), finish('tool-calls')],
+            [...say('1', 'Done.'), finish('stop')],
+        );
+        const posted = [];
+        const agent = new AgentSession({
+            panels, run: async () => ({}), post: (message) => posted.push(message), cwd: () => root,
+            setting: (key, fallback) => ({ 'agent.openrouterApiKey': 'sk-or', 'agent.permissionMode': 'all' }[key] ?? fallback),
+            fileTools: createFileTools({ root: () => root }), createModel: async () => model,
+        });
+
+        await agent.prompt('three legs and a brace');
+
+        expect(fs.readFileSync(path.join(root, 'frame.py'), 'utf8')).toBe('legs = 3\n');
+        const checkpoint = posted.find((message) => message.type === 'agent:checkpoint');
+        expect(checkpoint).toEqual({ type: 'agent:checkpoint', turn: 1, files: ['frame.py', 'brace.py'] });
+
+        agent.handle({ type: 'agent:restore', turn: 1 });
+
+        expect(fs.readFileSync(path.join(root, 'frame.py'), 'utf8')).toBe('legs = 4\n');
+        expect(fs.existsSync(path.join(root, 'brace.py'))).toBe(false);
+        expect(posted).toContainEqual({ type: 'agent:restored', turn: 1 });
+        expect(agent.history.at(-2).content).toContain('I undid your changes to frame.py, brace.py');
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    test('after a failed turn, trying again carries on', async () => {
+        const { agent } = session({ settings: { 'agent.openrouterApiKey': 'sk-or' } });
+        const asked = [];
+        agent.prompt = async (text) => { asked.push(text); };
+        agent.handle({ type: 'agent:retry' });
+        expect(asked).toEqual([RETRY_PROMPT]);
+    });
+
         test('out of credit says so', () => {
         expect(describeFailure({ statusCode: 402, message: 'Payment Required' })).toBe('Out of credit.');
     });
 
-    test('with permissions bypassed, a tool that changes something runs without asking', async () => {
+    test('permission modes: ask every time, edit files without asking, or do everything', async () => {
         const { agent, posted, values } = session();
-        agent.handle({ type: 'agent:setSetting', key: 'agent.bypassPermissions', value: true });
-        agent.handle({ type: 'agent:setSetting', key: 'agent.apiKey', value: 'not one the panel sets' });
+        const asked = () => posted.filter((message) => message.type === 'agent:permission').length;
 
+        void agent._askPermission('edit_file', {});
+        expect(asked()).toBe(1);
+
+        agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'edits' });
         await expect(agent._askPermission('edit_file', {})).resolves.toBe(true);
-        expect(posted.some((message) => message.type === 'agent:permission')).toBe(false);
+        void agent._askPermission('set_camera', {});
+        expect(asked()).toBe(2);
+
+        agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'all' });
+        await expect(agent._askPermission('set_camera', {})).resolves.toBe(true);
+        expect(asked()).toBe(2);
+
+        // Only the panel's own settings, and only sensible values.
+        agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'whatever' });
+        agent.handle({ type: 'agent:setSetting', key: 'agent.apiKey', value: 'not one the panel sets' });
+        expect(values['agent.permissionMode']).toBe('all');
         expect(values['agent.apiKey']).toBeUndefined();
+    });
+
+    test('the old bypass switch reads as doing everything without asking', () => {
+        const { agent } = session({ settings: { 'agent.bypassPermissions': true } });
+        expect(agent.panelSetting('agent.permissionMode')).toBe('all');
+    });
+
+    test('"always allow" from a permission card holds for that tool from then on', async () => {
+        const { agent, posted, values } = session();
+        const first = agent._askPermission('set_camera', {});
+        const { requestId } = posted.find((message) => message.type === 'agent:permission');
+        agent.handle({ type: 'agent:permissionAnswer', requestId, allow: true, always: true });
+
+        await expect(first).resolves.toBe(true);
+        expect(values['agent.alwaysAllow']).toEqual(['set_camera']);
+        await expect(agent._askPermission('set_camera', {})).resolves.toBe(true);
+        expect(posted.filter((message) => message.type === 'agent:permission')).toHaveLength(1);
     });
 
     test('a tool waiting for the user is answered from the panel, and stopping says no', async () => {

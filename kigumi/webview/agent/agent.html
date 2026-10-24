@@ -22,8 +22,11 @@
         </header>
 
         <div id="settings-menu" class="settings-menu" hidden>
-            <label><input id="setting-bypass" type="checkbox"> Don't ask before changes</label>
-            <div class="settings-hint">The agent edits files and moves views without asking first.</div>
+            <div class="settings-heading">Before the agent changes something</div>
+            <label><input type="radio" name="permission-mode" value="ask"> Ask every time</label>
+            <label><input type="radio" name="permission-mode" value="edits"> Edit files without asking</label>
+            <label><input type="radio" name="permission-mode" value="all"> Do everything without asking</label>
+            <div id="always-allowed" class="always-allowed"></div>
             <label><input id="setting-startup" type="checkbox"> Open the agent when Kigumi starts</label>
         </div>
         <div id="history-menu" class="history-menu" hidden>

@@ -21,21 +21,16 @@ shell sandboxing, subagents and background agents are left out.
   at the start of a turn; a context meter.
 - Conversation history, kept per project; the latest comes back when the panel opens.
 - Markdown in replies (code blocks with copy).
+- Permission modes (ask, edit files without asking, everything) and "always allow" per tool; edits
+  shown as diffs; a turn's file changes undone in one click; requests queued while the agent works;
+  "try again" after a failure; Esc stops, Up recalls the last request.
 
 ## Then: the usual agent panel
 
-5. **Permission modes** in place of one bypass: *Ask*, *Allow edits* (file writes without asking;
-   camera and other changes still ask), *Allow all*; and per tool "always allow".
-6. **Edits shown as diffs** in the permission card and the chip, not the raw input.
-7. **Checkpoints and undo**: before each turn's first edit, keep the files it touches; "Restore"
-   on a message rolls the project's files back to before it.
-8. **Queued messages**: type the next request while the agent works; it runs when the turn ends.
-9. **Edit and resend, retry** the last message.
 10. **@-mentions**: `@file` to attach a file, `@selection` for what is selected in the view.
 11. **Paste or drop images** (a sketch, a photo of a joint) into the prompt.
 12. **A to-do list** the agent keeps for a long task, shown pinned above the input.
 13. **Plan mode**: read-only; the agent proposes, then you let it go ahead.
-14. **Keyboard**: Esc stops, Cmd+Enter sends, Up recalls the last message.
 
 ## Kigumi's own
 

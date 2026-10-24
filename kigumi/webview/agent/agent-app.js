@@ -17,7 +17,8 @@
     const activity = $('activity');
     const settingsBtn = $('btn-settings');
     const settingsMenu = $('settings-menu');
-    const bypassToggle = $('setting-bypass');
+    const modeRadios = [...document.querySelectorAll('input[name="permission-mode"]')];
+    const alwaysAllowed = $('always-allowed');
     const startupToggle = $('setting-startup');
     const bypassBanner = $('bypass-banner');
     const historyBtn = $('btn-history');
@@ -101,6 +102,63 @@
         return element;
     }
 
+    /** A line diff of `before` and `after` (longest common subsequence): [[' '|'-'|'+', line], ...]. */
+    function lineDiff(before, after) {
+        const a = before.split('\n');
+        const b = after.split('\n');
+        if (a.length * b.length > 250000) {
+            return [...a.map((line) => ['-', line]), ...b.map((line) => ['+', line])];
+        }
+        const common = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+        for (let i = a.length - 1; i >= 0; i--) {
+            for (let j = b.length - 1; j >= 0; j--) {
+                common[i][j] = a[i] === b[j] ? common[i + 1][j + 1] + 1 : Math.max(common[i + 1][j], common[i][j + 1]);
+            }
+        }
+        const out = [];
+        let i = 0;
+        let j = 0;
+        while (i < a.length || j < b.length) {
+            if (i < a.length && j < b.length && a[i] === b[j]) {
+                out.push([' ', a[i++]]);
+                j++;
+            } else if (j < b.length && (i === a.length || common[i][j + 1] > common[i + 1][j])) {
+                // On a tie the removed line goes first, as diffs are read.
+                out.push(['+', b[j++]]);
+            } else {
+                out.push(['-', a[i++]]);
+            }
+        }
+        return out;
+    }
+
+    function diffView(before, after) {
+        const view = document.createElement('div');
+        view.className = 'diff';
+        for (const [op, line] of lineDiff(before, after).slice(0, 400)) {
+            const row = document.createElement('div');
+            row.className = op === '+' ? 'diff-add' : op === '-' ? 'diff-del' : 'diff-same';
+            row.textContent = `${op} ${line}`;
+            view.appendChild(row);
+        }
+        return view;
+    }
+
+    /** What a tool was given: an edit as a diff, a written file as its text, else the input. */
+    function toolInputView(name, input) {
+        if (name === 'edit_file' && input && typeof input.old_string === 'string') {
+            const view = diffView(input.old_string, input.new_string || '');
+            view.prepend(Object.assign(document.createElement('div'), { className: 'diff-file', textContent: input.file_path || '' }));
+            return view;
+        }
+        if (name === 'write_file' && input && typeof input.content === 'string') {
+            const view = diffView('', input.content);
+            view.prepend(Object.assign(document.createElement('div'), { className: 'diff-file', textContent: `${input.file_path || ''} (whole file)` }));
+            return view;
+        }
+        return pre('tool-input', JSON.stringify(input || {}, null, 2).slice(0, 4000));
+    }
+
     // A chip that opens to show what the tool was given and what it gave back.
     function addTool(id, name, input) {
         endThinking();
@@ -117,7 +175,7 @@
         summary.append(label, detail);
         const body = document.createElement('div');
         body.className = 'tool-body';
-        body.appendChild(pre('tool-input', JSON.stringify(input || {}, null, 2).slice(0, 4000)));
+        body.appendChild(toolInputView(shown, input));
         details.append(summary, body);
         chip.appendChild(details);
         toolChips.set(id, chip);
@@ -137,16 +195,16 @@
         const card = add('permission-card');
         const question = document.createElement('div');
         question.textContent = `Allow ${toolName.replace(/^mcp__kigumi__/, '')}?`;
-        const detail = document.createElement('pre');
-        detail.textContent = JSON.stringify(input, null, 2).slice(0, 1200);
+        const shown = toolName.replace(/^mcp__kigumi__/, '');
+        const detail = toolInputView(shown, input);
         const buttons = document.createElement('div');
         buttons.className = 'permission-buttons';
-        for (const [label, allow] of [['Allow', true], ['Deny', false]]) {
+        for (const [label, allow, always] of [['Allow', true, false], [`Always allow ${shown}`, true, true], ['Deny', false, false]]) {
             const button = document.createElement('button');
             button.textContent = label;
-            button.className = allow ? 'allow' : 'deny';
+            button.className = always ? 'always' : allow ? 'allow' : 'deny';
             button.addEventListener('click', () => {
-                vscode.postMessage({ type: 'agent:permissionAnswer', requestId, allow });
+                vscode.postMessage({ type: 'agent:permissionAnswer', requestId, allow, always });
                 setActivity('Thinking');
                 card.classList.add(allow ? 'is-allowed' : 'is-denied');
                 buttons.remove();
@@ -166,21 +224,81 @@
         else endThinking();
     }
 
+    let lastSent = '';
+
+    // While the agent works, a request waits its turn (agent:queued) rather than starting.
     function sendPrompt(text) {
         const prompt = (text !== undefined ? text : inputEl.value).trim();
-        if (!prompt || busy) return;
-        add('message-bubble user', prompt);
+        if (!prompt) return;
+        if (!busy) add('message-bubble user', prompt);
+        lastSent = prompt;
         inputEl.value = '';
         inputEl.style.height = 'auto';
         vscode.postMessage({ type: 'agent:prompt', text: prompt });
     }
 
+    // Enter sends; Escape stops the agent; Up, in an empty box, brings back the last request to edit.
     inputEl.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             sendPrompt();
+        } else if (event.key === 'Escape' && busy) {
+            event.preventDefault();
+            vscode.postMessage({ type: 'agent:stop' });
+        } else if (event.key === 'ArrowUp' && !inputEl.value && lastSent) {
+            event.preventDefault();
+            inputEl.value = lastSent;
         }
     });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && busy && event.target !== inputEl) vscode.postMessage({ type: 'agent:stop' });
+    });
+
+    const queuedBubbles = new Map();
+
+    function showQueued(id, text) {
+        const bubble = add('message-bubble user is-queued', '');
+        const label = Object.assign(document.createElement('span'), { textContent: text });
+        const tag = Object.assign(document.createElement('span'), { className: 'queued-tag', textContent: 'waiting' });
+        const cancel = Object.assign(document.createElement('button'), { type: 'button', className: 'queued-cancel', title: 'Don\'t send', textContent: '×' });
+        cancel.addEventListener('click', () => vscode.postMessage({ type: 'agent:unqueue', id }));
+        bubble.append(label, tag, cancel);
+        queuedBubbles.set(id, bubble);
+    }
+
+    // A request that has started, or that was dropped: no longer shown as waiting.
+    function dropQueued(id) {
+        const bubble = queuedBubbles.get(id);
+        if (bubble) bubble.remove();
+        queuedBubbles.delete(id);
+    }
+
+    // After a turn that changed files: a way to put them back.
+    const undoNotes = new Map();
+
+    function showCheckpoint(turn, files) {
+        endThinking();
+        const note = add('checkpoint-note');
+        const text = Object.assign(document.createElement('span'), {
+            textContent: `Changed ${files.length} file${files.length === 1 ? '' : 's'}: ${files.join(', ')}`,
+        });
+        const undo = Object.assign(document.createElement('button'), { type: 'button', className: 'link-btn', textContent: 'Undo' });
+        undo.title = 'Put these files back as they were before this request (and undo later requests\' changes too)';
+        undo.addEventListener('click', () => vscode.postMessage({ type: 'agent:restore', turn }));
+        note.append(text, ' · ', undo);
+        undoNotes.set(turn, note);
+    }
+
+    function showRestored(turn) {
+        for (const [noted, note] of undoNotes) {
+            if (noted >= turn) {
+                note.classList.add('is-undone');
+                const button = note.querySelector('button');
+                if (button) button.remove();
+                undoNotes.delete(noted);
+            }
+        }
+    }
     inputEl.addEventListener('input', () => {
         inputEl.style.height = 'auto';
         inputEl.style.height = `${Math.min(inputEl.scrollHeight, 200)}px`;
@@ -287,17 +405,34 @@
         settingsMenu.hidden = !settingsMenu.hidden;
         settingsBtn.setAttribute('aria-expanded', String(!settingsMenu.hidden));
     });
-    bypassToggle.addEventListener('change', () => vscode.postMessage({
-        type: 'agent:setSetting', key: 'agent.bypassPermissions', value: bypassToggle.checked,
-    }));
+    for (const radio of modeRadios) {
+        radio.addEventListener('change', () => vscode.postMessage({ type: 'agent:setSetting', key: 'agent.permissionMode', value: radio.value }));
+    }
+    let allowedTools = [];
     startupToggle.addEventListener('change', () => vscode.postMessage({
         type: 'agent:setSetting', key: 'agent.showOnStartup', value: startupToggle.checked,
     }));
 
+    const MODE_BANNERS = { edits: 'Editing files without asking', all: 'Not asking before changes' };
+
     function showSettings(settings) {
-        bypassToggle.checked = settings['agent.bypassPermissions'] === true;
+        const mode = settings['agent.permissionMode'] || 'ask';
+        for (const radio of modeRadios) radio.checked = radio.value === mode;
         startupToggle.checked = settings['agent.showOnStartup'] !== false;
-        bypassBanner.hidden = !bypassToggle.checked;
+        bypassBanner.hidden = mode === 'ask';
+        bypassBanner.textContent = MODE_BANNERS[mode] || '';
+        // Tools allowed for good from a permission card, each with a way to take it back.
+        allowedTools = settings['agent.alwaysAllow'] || [];
+        alwaysAllowed.replaceChildren(...(allowedTools.length ? [Object.assign(document.createElement('div'), {
+            className: 'settings-hint', textContent: 'Always allowed:' })] : []), ...allowedTools.map((name) => {
+            const chip = Object.assign(document.createElement('span'), { className: 'allowed-tool', textContent: name });
+            const remove = Object.assign(document.createElement('button'), { type: 'button', textContent: '×', title: `Ask again before ${name}` });
+            remove.addEventListener('click', () => vscode.postMessage({
+                type: 'agent:setSetting', key: 'agent.alwaysAllow', value: allowedTools.filter((tool) => tool !== name),
+            }));
+            chip.appendChild(remove);
+            return chip;
+        }));
     }
 
     // The models to choose from, and where requests for the chosen one go.
@@ -323,15 +458,12 @@
     function replay(events) {
         resetMessages();
         contextMeter.textContent = '';
-        for (const event of events) {
-            if (event.type === 'agent:userMessage') {
-                endThinking();
-                add('message-bubble user', event.text || '');
-            } else {
-                handle(event);
-            }
-        }
+        undoNotes.clear();
+        for (const event of events) handle(event);
         for (const chip of toolChips.values()) chip.classList.remove('is-running');
+        // Only the latest failure can be tried again.
+        const retries = [...messagesEl.querySelectorAll('.retry-btn')];
+        for (const button of retries.slice(0, -1)) button.remove();
         endThinking();
     }
 
@@ -380,8 +512,31 @@
                 if (message.stopped) add('agent-note', 'Stopped.');
                 else if (!message.isError && typeof message.costUsd === 'number') {
                     add('agent-note', `$${message.costUsd < 0.01 ? message.costUsd.toFixed(4) : message.costUsd.toFixed(2)}`);
+                } else if (message.isError) {
+                    const failed = add('agent-error', message.error || 'The agent stopped with an error.');
+                    const again = Object.assign(document.createElement('button'), { type: 'button', className: 'link-btn retry-btn', textContent: 'Try again' });
+                    again.addEventListener('click', () => {
+                        again.remove();
+                        vscode.postMessage({ type: 'agent:retry' });
+                    });
+                    failed.append(' ', again);
                 }
-                else if (message.isError) add('agent-error', message.error || 'The agent stopped with an error.');
+                break;
+            case 'agent:userMessage':
+                endThinking();
+                add('message-bubble user', message.text || '');
+                break;
+            case 'agent:queued':
+                showQueued(message.id, message.text || '');
+                break;
+            case 'agent:dequeued':
+                dropQueued(message.id);
+                break;
+            case 'agent:checkpoint':
+                showCheckpoint(message.turn, message.files || []);
+                break;
+            case 'agent:restored':
+                showRestored(message.turn);
                 break;
             case 'agent:error':
                 add('agent-error', message.message || 'Something went wrong.');
