@@ -93,7 +93,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 from kumiki import *
 from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
 from kumiki.csg.carriers import Row
-from kumiki.csg.cutcsg import MidplaneFeature, OwnedFeatureHit, measured_by_default
+from kumiki.csg.cutcsg import Datum, MidplaneFeature, OwnedFeatureHit, measured_by_default
 from kumiki.csg.feature_paths import FeatureHandle, hit_identity
 from kumiki.csg.required_features import planning_features, required_features
 from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Policy, auto_dimension, derived_edge_anchors,
@@ -2076,12 +2076,13 @@ def _shop_sheets(timber: PerfectTimberWithin) -> Dict[str, Tuple[ViewAxes, Trans
 
 
 def _end_datum(targets: Sequence[FeatureHandle], timber: PerfectTimberWithin) -> FeatureHandle:
-    """The face nearest the bottom end square to the length: where a piece's length is measured from."""
+    """The face nearest the bottom end square to the length, other than one to avoid measuring from (a
+    tenon's tip): where a piece's length is measured from."""
     along = [float(v) for v in timber.get_length_direction_global()]
     ends = []
     for handle in targets:
         plane = handle.feature.locate_simple_unbounded(handle.owner)
-        if not isinstance(plane, Plane):
+        if not isinstance(plane, Plane) or handle.feature.properties.datum is Datum.AVOID:
             continue
         normal = [float(v) for v in timber.transform.local_to_global_direction(plane.normal)]
         if abs(abs(sum(a * b for a, b in zip(normal, along))) - 1) > 1e-9:

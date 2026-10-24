@@ -3,7 +3,9 @@
 import contextlib
 import io
 import runpy
+import warnings
 from pathlib import Path as FilePath
+from typing import List
 
 import pytest
 
@@ -30,6 +32,11 @@ def solve(pattern):
 def _from_a_reference(pick) -> bool:
     measure = pick.candidate.measure
     return is_reference(measure.anchor_a) or is_reference(measure.anchor_b)
+
+
+def _names(pick) -> List[str]:
+    measure = pick.candidate.measure
+    return sorted((measure.anchor_a.feature.name, measure.anchor_b.feature.name))
 
 
 class TestIsReference:
@@ -67,11 +74,17 @@ class TestTheGround:
 
 class TestPolicy:
 
-    def test_by_default_every_dimension_is_from_a_reference_and_all_is_solved(self, solve):
+    def test_by_default_every_dimension_is_from_a_reference_or_a_shoulder_and_all_is_solved(self, solve):
         _, result, _ = solve()
 
         assert result.left_after == 0 and not result.unsolved
-        assert all(_from_a_reference(pick) for pick in result.picks)
+        assert all(_from_a_reference(pick) or _names(pick) == ["shoulder", "shoulder"] for pick in result.picks)
+
+    def test_a_cross_is_measured_shoulder_to_shoulder(self, solve):
+        _, result, _ = solve()
+
+        assert any(_names(pick) == ["shoulder", "shoulder"] and pick.candidate.measure.anchor_a.timber
+                   is pick.candidate.measure.anchor_b.timber for pick in result.picks)
 
     def test_without_the_preference_one_is_not(self, solve):
         # The old rule: chain from what is solved, then shortest. A shoulder to shoulder is picked.
@@ -129,6 +142,39 @@ class TestEachTimber:
         assert "Back Cross ×2 (generated)" in names and "Left Side ×2 (generated)" in names
         assert "Back Cross (generated)" in ids and "Left Side (generated)" in ids
         assert len(frame.drawings) == 3
+
+
+class TestPreferredMeasurements:
+    """Features marked relative to another (a tenon's cheeks, its tip and shoulder, a mortise's walls) are
+    measured against it; a tenon's tip from nothing else."""
+
+    @pytest.fixture(scope="class")
+    def picks(self, pattern):
+        frame = pattern["_load_cute_frame"]()()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return {cut.timber.ticket.path: pattern["solve_timber"](cut, onto_edges=False)[0].picks
+                    for cut in frame.cut_timbers}
+
+    def test_a_tenon_is_measured_cheek_to_cheek_both_ways(self, picks):
+        names = [_names(pick) for pick in picks["Back Cross"]]
+        assert ["tenon_left", "tenon_right"] in names and ["tenon_back", "tenon_front"] in names
+
+    def test_each_tenon_s_length_is_from_its_own_shoulder(self, picks):
+        lengths = [pick.candidate.length for pick in picks["Back Cross"]
+                   if _names(pick) in (["shoulder", "tenon_top"], ["shoulder", "tenon_bot"])]
+        assert lengths and all(length == pytest.approx(lengths[0]) for length in lengths)
+        assert lengths[0] < 0.1
+
+    def test_a_tenon_s_tip_is_measured_from_nothing_but_its_shoulder(self, picks):
+        for pick in picks["Back Cross"]:
+            names = _names(pick)
+            if "tenon_top" in names or "tenon_bot" in names:
+                assert "shoulder" in names, names
+
+    def test_a_mortise_is_measured_wall_to_wall(self, picks):
+        names = [_names(pick) for pick in picks["Left Side"]]
+        assert ["mortise_back", "mortise_front"] in names or ["mortise_left", "mortise_right"] in names
 
 
 class TestDerivedEdges:

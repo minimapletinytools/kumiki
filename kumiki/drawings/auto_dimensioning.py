@@ -15,8 +15,8 @@ import numpy as np
 from ..csg.assumptions import Assumption
 from ..csg.carriers import CarrierMap, CarrierPlane, CarrierRef, Row
 from ..csg.dof_solver import rank_svd, remaining, rows_matrix
-from ..csg.cutcsg import (CutCSG, DerivedEdgeFeature, EdgeFeature, FaceFeature, OwnedFeatureHit, derive_edge_hits,
-                         shared_ancestor)
+from ..csg.cutcsg import (CutCSG, Datum, DerivedEdgeFeature, EdgeFeature, FaceFeature, HasFeatures, OwnedFeatureHit,
+                         csg_children, derive_edge_hits, shared_ancestor)
 from ..csg.feature_extent import FeatureExtent, extents_of
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
@@ -170,10 +170,85 @@ def shortest(candidate: DimensionCandidate, context: PickContext) -> float:
     return candidate.length
 
 
+@fixed
+def declared_pairs(candidate: DimensionCandidate, context: PickContext) -> float:
+    """Criterion: between a feature and the one it is marked relative to (FeatureMarkingSpec.mark_relative_to),
+    e.g. a tenon's two cheeks, or its tip and its shoulder."""
+    a, b = _ends(candidate)
+    return 0.0 if _marked_relative(a, b, candidate.solve) or _marked_relative(b, a, candidate.solve) else 1.0
+
+
+@fixed
+def preferred_datum(candidate: DimensionCandidate, context: PickContext) -> float:
+    """Criterion: how much its ends are to be measured from (Datum), between features of one member.
+    Measurements between members score as two neutral ends."""
+    a, b = _ends(candidate)
+    if a.timber is not b.timber:
+        return 2.0 * Datum.NEUTRAL.value
+    return float(_datum(a.feature).value + _datum(b.feature).value)
+
+
+def _datum(feature) -> Datum:
+    """Return a feature's Datum; a derived edge's is its better parent's (a shoulder's line on a face)."""
+    if feature.is_derived():
+        return min((_datum(parent.feature) for parent in feature.parents), key=lambda datum: datum.value)
+    return feature.properties.datum
+
+
+def _marked_relative(one: FeatureHandle, other: FeatureHandle, solve: DrawingSolve) -> bool:
+    """Return whether `other` is (or is coincident with) the feature `one` is marked relative to: the nearest
+    of that name in the timber's tree, so each tenon's tip finds its own shoulder."""
+    marking = None if one.feature.is_derived() else one.feature.properties.marking_override
+    if marking is None or marking.mark_relative_to is None or other.timber is not one.timber:
+        return False
+    cut = next((cut for cut in solve.cut_timbers if cut.timber is one.timber), None)
+    if cut is None:
+        return False
+    partners = _nearest_named(cut.render_timber_with_cuts_csg_local(), id(one.owner), marking.mark_relative_to)
+    carriers = _solving_carriers(other, solve.carriers)
+    return any(carriers and _solving_carriers(partner, solve.carriers) == carriers
+               for partner in (FeatureHandle(timber=one.timber, hit=hit) for hit in partners))
+
+
+def _solving_carriers(handle: FeatureHandle, carriers: CarrierMap) -> FrozenSet[CarrierRef]:
+    return frozenset(_canonical(part, carriers) for part in (handle.feature.solve_recipe(handle.owner) or ())
+                     if isinstance(part, CarrierRef))
+
+
+@memo_by_identity
+def _nearest_named(root: CutCSG, owner: int, name: str) -> List[OwnedFeatureHit]:
+    """Return the features named `name` under the deepest ancestor of the node with id `owner` (in `root`)
+    that has any."""
+    for ancestor in reversed(_trail(root, owner) or []):
+        found = [OwnedFeatureHit(feature=feature, owner=node) for node in _below(ancestor)
+                 if isinstance(node, HasFeatures) for feature in node.get_declared_features()
+                 if feature.name == name]
+        if found:
+            return found
+    return []
+
+
+def _trail(node: CutCSG, target: int) -> Optional[List[CutCSG]]:
+    """Return the nodes from `node` down to the one with id `target`, or None if it isn't below."""
+    if id(node) == target:
+        return [node]
+    for child in csg_children(node):
+        below = _trail(child, target)
+        if below is not None:
+            return [node, *below]
+    return None
+
+
+def _below(node: CutCSG) -> List[CutCSG]:
+    return [node, *(deeper for child in csg_children(node) for deeper in _below(child))]
+
+
 #: The default order of preference, first to last; reorder or drop lines to try another.
 PREFERENCE_ORDER: Tuple[Criterion, ...] = (
     angles_first,
     angles_from_the_timber,
+    declared_pairs,
+    preferred_datum,
     edges_over_faces,
     from_reference,
     perfect_over_rough,

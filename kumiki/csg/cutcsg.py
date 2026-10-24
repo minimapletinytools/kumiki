@@ -314,7 +314,8 @@ class FeatureMarkingStatus(Enum):
 class FeatureMarkingSpec:
     """How to mark a feature on a drawing, when not the default.
 
-    `mark_relative_to` names the feature to dimension it from. Not yet read.
+    `mark_relative_to` names the feature to dimension it from: the nearest feature of that name in the
+    CSG tree. Auto dimensioning prefers that measurement; naming each other makes a symmetric pair.
     """
 
     mark: FeatureMarkingStatus = FeatureMarkingStatus.OPTIONAL
@@ -332,6 +333,14 @@ class FeaturePurpose(Enum):
     # A rough timber's own face, arris or corner where it is not the perfect timber within's
     # (rough.*; see timber.ROUGH_FACE_PREFIX): as sawn, so nothing is measured from it.
     ROUGH_FACE = 3
+
+
+class Datum(Enum):
+    """How much auto dimensioning likes measuring from a feature (within its member). Lower is better."""
+
+    PREFERRED = 0   # e.g. a shoulder plane
+    NEUTRAL = 1
+    AVOID = 2       # e.g. a tenon's tip, measured to its shoulder and from nothing else
 
 
 def measured_by_default(purpose: FeaturePurpose) -> bool:
@@ -360,8 +369,9 @@ class FeatureProperties:
         group: which features this one may derive edges with (FeatureGroup). NONE by default.
         priority: lower wins when several features claim a point.
         nature: FeatureNature. Only REAL features are tested against the triangulated result.
-        marking_override: how to mark it on a drawing (not yet read).
+        marking_override: how to mark it on a drawing.
         purpose: what it is for (FeaturePurpose).
+        datum: how much to measure from it (Datum).
     """
 
     group: FeatureGroup = FeatureGroup.NONE
@@ -369,6 +379,7 @@ class FeatureProperties:
     nature: FeatureNature = FeatureNature.REAL
     marking_override: Optional[FeatureMarkingSpec] = None
     purpose: FeaturePurpose = FeaturePurpose.NOT_SPECIFIED
+    datum: Datum = Datum.NEUTRAL
 
     @property
     def real(self) -> bool:
@@ -1736,7 +1747,8 @@ class FeatureOverride:
 def shoulder_override(key: FeatureKey, name: Optional[str] = None,
                       group: FeatureGroup = FeatureGroup.NONE) -> FeatureOverride:
     """Return an override marking the default at `key` as a shoulder plane, in group `group`."""
-    return FeatureOverride(key, name, FeatureProperties(group=group, purpose=FeaturePurpose.SHOULDER))
+    return FeatureOverride(key, name, FeatureProperties(group=group, purpose=FeaturePurpose.SHOULDER,
+                                                        datum=Datum.PREFERRED))
 
 
 #TODO this should an ABC? or is that not allowed for dual inheritance or osemtihng?
@@ -2276,9 +2288,13 @@ def carrier_map(root: CutCSG) -> CarrierMap:
         yield node
         for child in csg_children(node):
             yield from walk(child)
-    carriers = {CarrierRef(node, key): carrier
-                for node in walk(root) for key, carrier in node.carriers().items()}
-    return CarrierMap(carriers, merge_coincident_planes(carriers))
+    nodes = list(walk(root))
+    carriers = {CarrierRef(node, key): carrier for node in nodes for key, carrier in node.carriers().items()}
+    # Coincident planes are solved as the one best to measure from, e.g. a shoulder flush with a face.
+    rank = {CarrierRef(node, feature.feature_key()): feature.properties.datum.value - Datum.NEUTRAL.value
+            for node in nodes if isinstance(node, HasFeatures) for feature in node.get_declared_features()
+            if feature.feature_key() is not None and feature.properties.datum is not Datum.NEUTRAL}
+    return CarrierMap(carriers, merge_coincident_planes(carriers, rank))
 
 
 @dataclass(frozen=True)

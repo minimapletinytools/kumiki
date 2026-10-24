@@ -12,7 +12,7 @@ from kumiki.csg.cutcsg import (
     EdgeFeature, FaceFeature, hit_of_kind,
     CYLINDER_AXIS, CYLINDER_BARREL, HALF_SPACE_PLANE, ConvexPolygonExtrusion, Cylinder, CylinderAxisFeature, DerivedEdgeFeature,
     DerivedPointFeature, Difference, HalfSpace, OwnedFeatureHit, MidplaneFeature, PrismFace, RectangularPrism,
-    SolidUnion, prism_arris_key, prism_corner_key, prism_face_key, carrier_map,
+    SolidUnion, prism_arris_key, prism_corner_key, prism_face_key, carrier_map, shoulder_override,
 )
 from kumiki.geometry import Line, Plane, Point, lines_are_coincident, planes_are_coincident
 from kumiki.rule import Matrix, Orientation, Transform, create_v2, create_v3, scalar
@@ -294,6 +294,14 @@ class TestMergedPlanes:
         carriers = carrier_map(root)
         back = CarrierRef(tenon, prism_face_key(PrismFace.BOTTOM))
         assert carriers.canonical(back) == carriers.canonical(CarrierRef(shoulder, HALF_SPACE_PLANE))
+
+    def test_a_shoulder_listed_after_a_face_it_is_flush_with_is_still_what_they_solve_as(self):
+        tenon = _box(size=(1, 1), start=0.0, end=3.0)
+        shoulder = HalfSpace(normal=_v(0, 0, 1), offset=scalar(0),
+                             feature_overrides=[shoulder_override(HALF_SPACE_PLANE, name="shoulder")])
+        carriers = carrier_map(Difference(base=tenon, subtract=[shoulder]))
+        back = CarrierRef(tenon, prism_face_key(PrismFace.BOTTOM))
+        assert carriers.canonical(back) == CarrierRef(shoulder, HALF_SPACE_PLANE)
 
     def test_a_back_face_corner_measures_the_shoulder(self):
         shoulder, tenon, root = self._tenon()

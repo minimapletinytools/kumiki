@@ -6,7 +6,7 @@ produce it (`CSGFeature.solve_recipe`). Rows over the unknowns are in csg/solve_
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, Dict, List, Sequence, Tuple, Type, Union
+from typing import TYPE_CHECKING, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
 from ..geometry import Line, Plane, planes_are_coincident
 from ..rule import Numeric, V3
@@ -111,19 +111,25 @@ Column = Tuple[CarrierRef, Coord]
 Row = Dict[Column, float]
 
 
-def merge_coincident_planes(carriers: Dict[CarrierRef, Carrier]) -> Dict[CarrierRef, CarrierRef]:
-    """Map each carrier to its solving carrier: coincident planes (facing either way) share the first; others map to themselves."""
+def merge_coincident_planes(carriers: Dict[CarrierRef, Carrier],
+                            rank: Optional[Mapping[CarrierRef, int]] = None) -> Dict[CarrierRef, CarrierRef]:
+    """Map each carrier to its solving carrier: coincident planes (facing either way) share the one ranked
+    lowest in `rank` (unranked count as 0), else the first; others map to themselves."""
     canonical: Dict[CarrierRef, CarrierRef] = {}
-    planes: List[Tuple[CarrierRef, Plane]] = []
+    groups: List[Tuple[Plane, List[CarrierRef]]] = []
     for ref, carrier in carriers.items():
         canonical[ref] = ref
         if not isinstance(carrier, CarrierPlane):
             continue
-        same = next((other for other, plane in planes if planes_are_coincident(plane, carrier.plane)), None)
+        same = next((group for plane, group in groups if planes_are_coincident(plane, carrier.plane)), None)
         if same is None:
-            planes.append((ref, carrier.plane))
+            groups.append((carrier.plane, [ref]))
         else:
-            canonical[ref] = same
+            same.append(ref)
+    for _, group in groups:
+        best = min(group, key=lambda ref: (rank or {}).get(ref, 0))
+        for ref in group:
+            canonical[ref] = best
     return canonical
 
 
