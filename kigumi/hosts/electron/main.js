@@ -403,11 +403,14 @@ function handleAuthLink(url) {
 }
 
 function createAppAccount() {
+    const config = backendConfig(process.env);
     account = createAccount({
-        ...backendConfig(process.env),
+        ...config,
         storage: new SecureStorage(path.join(app.getPath('userData'), 'account'), safeStorage,
             (line) => logChannel.appendLine(line)),
-        redirectTo: 'kigumi://auth',
+        // A page of the backend's, which opens kigumi://auth with the code: ending on kigumi:// itself
+        // leaves the browser tab loading forever.
+        redirectTo: `${config.backendUrl.replace(/\/$/, '')}/auth/callback`,
         openExternal: (url) => electronShell.openExternal(url),
         onChange: () => agentSession && agentSession.postState(),
     });

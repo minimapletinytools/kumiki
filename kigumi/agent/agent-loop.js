@@ -97,8 +97,9 @@ async function runTurn({ model, images, tools, system, history, prompt, abortSig
         stopWhen: stepCountIs(MAX_STEPS),
         maxOutputTokens: MAX_OUTPUT_TOKENS,
         abortSignal,
-        // Retries would repeat a charge; a failure is shown and the user can ask again.
-        maxRetries: 0,
+        // A request refused or failed (busy, rate limited, an upstream error) is never charged, so
+        // retrying one costs nothing.
+        maxRetries: 2,
         onError: ({ error }) => { failure = error; },
     });
     for await (const part of result.fullStream) {
