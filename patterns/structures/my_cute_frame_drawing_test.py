@@ -19,7 +19,7 @@ from pathlib import Path as FilePath
 from typing import Dict, List, Sequence, Tuple
 
 from kumiki import *
-from kumiki.csg.cutcsg import MidplaneFeature, OwnedFeatureHit, measured_by_default
+from kumiki.csg.cutcsg import Datum, MidplaneFeature, OwnedFeatureHit, measured_by_default
 from kumiki.csg.carriers import Row
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
@@ -156,12 +156,13 @@ def _shop_sheets(timber) -> Dict[str, Tuple[ViewAxes, Transform]]:
 
 
 def _end_datum(targets: Sequence[FeatureHandle], timber) -> FeatureHandle:
-    """The face nearest the bottom end square to the length: where a piece's length is measured from."""
+    """The face nearest the bottom end square to the length, other than one to avoid measuring from (a
+    tenon's tip): where a piece's length is measured from."""
     along = [float(v) for v in timber.get_length_direction_global()]
     ends = []
     for handle in targets:
         plane = handle.feature.locate_simple_unbounded(handle.owner)
-        if not isinstance(plane, Plane):
+        if not isinstance(plane, Plane) or handle.feature.properties.datum is Datum.AVOID:
             continue
         normal = [float(v) for v in timber.transform.local_to_global_direction(plane.normal)]
         if abs(abs(sum(a * b for a, b in zip(normal, along))) - 1) > 1e-9:
@@ -171,8 +172,9 @@ def _end_datum(targets: Sequence[FeatureHandle], timber) -> FeatureHandle:
     return min(ends, key=lambda end: end[0])[1]
 
 
-def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
-    """Every required feature of one timber, dimensioned from its reference faces and its bottom end."""
+def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY, onto_edges: bool = True):
+    """Every required feature of one timber, dimensioned from its reference faces and its bottom end (then,
+    with `onto_edges`, picked faces moved onto their nearest edges)."""
     solve = DrawingSolve([cut])
     carriers = solve.carriers
     targets = list({(id(r.handle.owner), r.handle.feature.name): r.handle for r in required_features(cut)}.values())
@@ -188,8 +190,9 @@ def solve_timber(cut: CutTimber, policy: Policy = DEFAULT_POLICY):
     assumptions += coincidence_assumptions(visible, views, solve)
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
     candidates = sheet_candidates(visible, views, solve)
-    result = faces_to_edges(auto_dimension(candidates, targets, known_rows, solve, policy), [cut], targets, views,
-                            solve.carriers)
+    result = auto_dimension(candidates, targets, known_rows, solve, policy)
+    if onto_edges:
+        result = faces_to_edges(result, [cut], targets, views, solve.carriers)
 
     report = [f"{cut.timber.ticket.path}: {len(targets)} features, from {[_name(h) for h in known]}, "
               f"{len(candidates)} candidates, {result.left_before} left before"]

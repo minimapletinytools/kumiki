@@ -54,7 +54,8 @@ The unknowns for a solve.
 
 - Collect every primitive's carriers in each timber's drawn tree.
 - Merge planes that coincide (facing either way) within a timber into one carrier, so a face flush
-  with another face needs no dimension of its own. Never merge across timbers.
+  with another face needs no dimension of its own. Never merge across timbers. The merged carrier is
+  the plane best to measure from (its feature's `Datum`), e.g. a shoulder flush with a face.
 - `Solve` keeps the merged carriers and each feature's rows for the length of one solve.
 
 ## Entry point: `feature_dof_rows(recipe, carriers)` (`csg/solve_recipe.py`)
@@ -157,9 +158,18 @@ Picks dimensions one at a time until every target is solved.
 - Take the targets' rows, with everything already known projected out.
 - Repeat while any target is unsolved:
   - Sort the remaining candidates by the policy's preferences, compared one after another (by
-    default `PREFERENCE_ORDER`: angles first, angles from the timber, fewer face ends, from a reference
-    face, perfect faces over rough ones, declared over derived, from something already solved, then
-    shortest).
+    default `PREFERENCE_ORDER`: angles first, angles from the timber, declared pairs, preferred datums,
+    fewer face ends, from a reference face, perfect faces over rough ones, declared over derived, from
+    something already solved, then shortest).
+  - **Declared pairs**: a feature whose `FeatureMarkingSpec.mark_relative_to` names another wants to be
+    measured against it: the nearest feature of that name in the timber's tree, or one coincident
+    with it. Two features naming each other (a tenon's cheeks, a mortise's walls) are a symmetric
+    pair; one naming the other (a tenon's tip, its shoulder) is one-way. A pair is only preferred: a
+    redundant one is not added.
+  - **Preferred datums**: `FeatureProperties.datum` -- `PREFERRED` (shoulders), `NEUTRAL`, `AVOID` (a
+    tenon's tip, measured to its shoulder and from nothing else) -- ranks the ends of a measurement
+    within one member. Between members both ends count as neutral, so a shoulder doesn't draw
+    measurements from across the frame.
   - Walk down that order and take the first candidate that **helps**: its row adds something new,
     and all of what it adds is still unsolved. It must also pass the policy's rules; if no helpful
     candidate passes them, take the first helpful one anyway and say so.
@@ -211,6 +221,8 @@ A square tenon on the end of a timber, with its directions square to the timber:
     solves anything; the rank sees the pair;
   - tenon width, plus one edge cheek from the other reference face: the other two cheeks;
   - tenon length from the shoulder: the tip.
+- The joint declares these: the cheeks and the tip are marked relative to each other and to the
+  shoulder, so auto dimensioning picks this set rather than locating each cheek from a face.
 - Leave out the length and the tip reports 1 remaining DOF: the picker's cue to add it.
 - A barefaced tenon has a cheek flush with a timber face. That cheek merges with the known face,
   so it needs no dimension, and the count drops to 5.

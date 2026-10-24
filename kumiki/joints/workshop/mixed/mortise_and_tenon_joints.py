@@ -26,7 +26,10 @@ from kumiki.csg.cutcsg import (
     PrismFace,
     Cylinder,
     CylinderAxisFeature,
+    Datum,
+    FeatureMarkingSpec,
     FeatureOverride,
+    FeatureProperties,
     prism_face_key,
     HALF_SPACE_PLANE,
     shoulder_override,
@@ -107,6 +110,23 @@ class InsetShoulderReliefStyle(Enum):
 #: (an edge nobody asked for), and its own arrises are the prism's defaults, so a
 #: derived pair of cheeks would name those twice.
 _TENON_FACE = FeatureProperties(group=FeatureGroup.TENON)
+
+
+def _against(properties: FeatureProperties, partner: str, datum: Datum = Datum.NEUTRAL) -> FeatureProperties:
+    """Return `properties` marked relative to `partner`: auto dimensioning prefers measuring between them."""
+    return replace(properties, marking_override=FeatureMarkingSpec(mark_relative_to=partner), datum=datum)
+
+
+def _mortise_walls() -> List[FeatureOverride]:
+    """The mortise hole's walls, each measured against the opposite one, and its bottom."""
+    wall = FeatureProperties()
+    return [
+        FeatureOverride(prism_face_key(PrismFace.RIGHT), "mortise_right", _against(wall, "mortise_left")),
+        FeatureOverride(prism_face_key(PrismFace.LEFT), "mortise_left", _against(wall, "mortise_right")),
+        FeatureOverride(prism_face_key(PrismFace.FRONT), "mortise_front", _against(wall, "mortise_back")),
+        FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back", _against(wall, "mortise_front")),
+        FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom"),
+    ]
 
 
 def cut_mortise_and_tenon_joint(
@@ -240,11 +260,14 @@ def cut_mortise_and_tenon_joint(
             start_distance=-back_extension,
             end_distance=tenon_length,
             feature_overrides=[
-                FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_right", _TENON_FACE),
-                FeatureOverride(prism_face_key(PrismFace.LEFT), "tenon_left", _TENON_FACE),
-                FeatureOverride(prism_face_key(PrismFace.FRONT), "tenon_front", _TENON_FACE),
-                FeatureOverride(prism_face_key(PrismFace.BACK), "tenon_back", _TENON_FACE),
-                FeatureOverride(prism_face_key(PrismFace.TOP), tenon_tip_name, _TENON_FACE),
+                # Cheek to cheek is the tenon's thickness; tip to shoulder its length, and the tip
+                # is measured from nothing else.
+                FeatureOverride(prism_face_key(PrismFace.RIGHT), "tenon_right", _against(_TENON_FACE, "tenon_left")),
+                FeatureOverride(prism_face_key(PrismFace.LEFT), "tenon_left", _against(_TENON_FACE, "tenon_right")),
+                FeatureOverride(prism_face_key(PrismFace.FRONT), "tenon_front", _against(_TENON_FACE, "tenon_back")),
+                FeatureOverride(prism_face_key(PrismFace.BACK), "tenon_back", _against(_TENON_FACE, "tenon_front")),
+                FeatureOverride(prism_face_key(PrismFace.TOP), tenon_tip_name,
+                                _against(_TENON_FACE, "shoulder", Datum.AVOID)),
             ],
             label=CutCSGLabel("tenon"),
         )
@@ -343,13 +366,7 @@ def cut_mortise_and_tenon_joint(
                 transform=mortise_hole_transform,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
-                feature_overrides=[
-                    FeatureOverride(prism_face_key(PrismFace.RIGHT), "mortise_right"),
-                    FeatureOverride(prism_face_key(PrismFace.LEFT), "mortise_left"),
-                    FeatureOverride(prism_face_key(PrismFace.FRONT), "mortise_front"),
-                    FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back"),
-                    FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom"),
-                ],
+                feature_overrides=_mortise_walls(),
                 label=CutCSGLabel("mortise_hole"),
             )
     else:
@@ -370,13 +387,7 @@ def cut_mortise_and_tenon_joint(
                 transform=marking_space.transform,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
-                feature_overrides=[
-                    FeatureOverride(prism_face_key(PrismFace.RIGHT), "mortise_right"),
-                    FeatureOverride(prism_face_key(PrismFace.LEFT), "mortise_left"),
-                    FeatureOverride(prism_face_key(PrismFace.FRONT), "mortise_front"),
-                    FeatureOverride(prism_face_key(PrismFace.BACK), "mortise_back"),
-                    FeatureOverride(prism_face_key(PrismFace.TOP), "mortise_bottom"),
-                ],
+                feature_overrides=_mortise_walls(),
                 label=CutCSGLabel("mortise_hole"),
             )
 
