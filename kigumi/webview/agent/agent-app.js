@@ -15,6 +15,11 @@
     const modelSelect = $('model-select');
     const routeNote = $('route-note');
     const activity = $('activity');
+    const settingsBtn = $('btn-settings');
+    const settingsMenu = $('settings-menu');
+    const bypassToggle = $('setting-bypass');
+    const startupToggle = $('setting-startup');
+    const bypassBanner = $('bypass-banner');
     const activityLabel = $('activity-label');
     const welcomeHtml = $('welcome').outerHTML;
 
@@ -213,8 +218,26 @@
         routeNote.replaceChildren(...parts);
     }
 
+    settingsBtn.addEventListener('click', () => {
+        settingsMenu.hidden = !settingsMenu.hidden;
+        settingsBtn.setAttribute('aria-expanded', String(!settingsMenu.hidden));
+    });
+    bypassToggle.addEventListener('change', () => vscode.postMessage({
+        type: 'agent:setSetting', key: 'agent.bypassPermissions', value: bypassToggle.checked,
+    }));
+    startupToggle.addEventListener('change', () => vscode.postMessage({
+        type: 'agent:setSetting', key: 'agent.showOnStartup', value: startupToggle.checked,
+    }));
+
+    function showSettings(settings) {
+        bypassToggle.checked = settings['agent.bypassPermissions'] === true;
+        startupToggle.checked = settings['agent.showOnStartup'] !== false;
+        bypassBanner.hidden = !bypassToggle.checked;
+    }
+
     // The models to choose from, and where requests for the chosen one go.
-    function showState({ models = [], model, via, account = { configured: false } }) {
+    function showState({ models = [], model, via, account = { configured: false }, settings = {} }) {
+        showSettings(settings);
         modelSelect.replaceChildren(...models.map(({ id, label }) => {
             const option = document.createElement('option');
             option.value = id;

@@ -56,6 +56,33 @@ function toModelContent(content, images) {
     return { type: 'content', value: parts };
 }
 
+const EARLIER_IMAGE = '[An earlier screenshot, dropped: only the latest is kept. Take another to look again.]';
+
+/**
+ * `messages` with every image but the latest replaced by a note. A screenshot is about a megabyte,
+ * and each step resends the whole conversation: kept, they made steps 2.5 MB and cost 40 times more.
+ */
+function onlyLatestImage(messages) {
+    let kept = false;
+    const out = [...messages];
+    for (let i = out.length - 1; i >= 0; i--) {
+        const message = out[i];
+        if (message.role !== 'tool' || !Array.isArray(message.content)) continue;
+        const content = message.content.map((part) => {
+            const output = part && part.type === 'tool-result' && part.output;
+            if (!output || output.type !== 'content' || !output.value.some((item) => item.type === 'file')) return part;
+            if (!kept) {
+                kept = true;
+                return part;
+            }
+            const value = output.value.map((item) => (item.type === 'file' ? { type: 'text', text: EARLIER_IMAGE } : item));
+            return { ...part, output: { ...output, value } };
+        });
+        out[i] = { ...message, content };
+    }
+    return out;
+}
+
 /** Kigumi's tools as an AI SDK tool set. */
 function toToolSet(tools, { images, askPermission }) {
     return Object.fromEntries(tools.map((kigumiTool) => [kigumiTool.name, tool({
@@ -116,10 +143,11 @@ async function runTurn({ model, images, tools, system, history, prompt, abortSig
         // A request refused or failed (busy, rate limited, an upstream error) is never charged, so
         // retrying one costs nothing.
         maxRetries: 2,
+        prepareStep: ({ messages: sending }) => ({ messages: onlyLatestImage(sending) }),
         onStepEnd: (step) => { steps.push(step); },
         onError: ({ error }) => { failure = error; },
     });
-    const sofar = () => [...messages, ...steps.flatMap((step) => step.response.messages)];
+    const sofar = () => onlyLatestImage([...messages, ...steps.flatMap((step) => step.response.messages)]);
     try {
         for await (const part of result.fullStream) {
             if (part.type === 'text-delta') {
@@ -154,4 +182,4 @@ async function runTurn({ model, images, tools, system, history, prompt, abortSig
     };
 }
 
-module.exports = { runTurn, languageModelFor, toModelContent, summarise, MAX_STEPS, MAX_OUTPUT_TOKENS };
+module.exports = { runTurn, languageModelFor, toModelContent, summarise, onlyLatestImage, MAX_STEPS, MAX_OUTPUT_TOKENS };

@@ -135,7 +135,23 @@ describe('the agent loop', () => {
         expect(failed.history.map((message) => message.role)).toEqual(['user', 'assistant', 'tool']);
     });
 
-    test('a model that cannot see gets a note instead of an image', () => {
+    test('only the latest screenshot is sent; earlier ones become a note', async () => {
+        const model = scripted(
+            [call('c1', 'look'), finish('tool-calls')],
+            [call('c2', 'look'), finish('tool-calls')],
+            [...say('1', 'Done.'), finish('stop')],
+        );
+        const { history } = await turn(model);
+
+        const imagesIn = (messages) => messages.filter((message) => message.role === 'tool')
+            .flatMap((message) => message.content).flatMap((part) => part.output.value)
+            .filter((item) => item.type === 'file').length;
+        expect(imagesIn(model.doStreamCalls[2].prompt)).toBe(1);
+        expect(imagesIn(history)).toBe(1);
+        expect(JSON.stringify(history)).toContain('earlier screenshot');
+    });
+
+        test('a model that cannot see gets a note instead of an image', () => {
         const content = [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }];
         expect(toModelContent(content, false).value[0]).toMatchObject({ type: 'text' });
         expect(toModelContent(content, true).value[0]).toMatchObject({ type: 'file' });
@@ -233,6 +249,7 @@ describe('the agent session', () => {
         expect(posted.pop()).toEqual({
             type: 'agent:state', models: MODELS.map(({ id, label }) => ({ id, label })), model: 'claude-sonnet-5', via: 'openrouter',
             account: { configured: false },
+            settings: { 'agent.bypassPermissions': false, 'agent.showOnStartup': true },
         });
     });
 
@@ -250,6 +267,16 @@ describe('the agent session', () => {
 
     test('out of credit says so', () => {
         expect(describeFailure({ statusCode: 402, message: 'Payment Required' })).toBe('Out of credit.');
+    });
+
+    test('with permissions bypassed, a tool that changes something runs without asking', async () => {
+        const { agent, posted, values } = session();
+        agent.handle({ type: 'agent:setSetting', key: 'agent.bypassPermissions', value: true });
+        agent.handle({ type: 'agent:setSetting', key: 'agent.apiKey', value: 'not one the panel sets' });
+
+        await expect(agent._askPermission('edit_file', {})).resolves.toBe(true);
+        expect(posted.some((message) => message.type === 'agent:permission')).toBe(false);
+        expect(values['agent.apiKey']).toBeUndefined();
     });
 
     test('a tool waiting for the user is answered from the panel, and stopping says no', async () => {

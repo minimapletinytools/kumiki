@@ -15,10 +15,17 @@
             <span class="agent-title"><span class="codicon codicon-sparkle"></span> Agent</span>
             <div class="agent-actions">
                 <select id="model-select" class="model-select" title="Model"></select>
+                <button id="btn-settings" class="icon-btn" title="Agent settings" aria-haspopup="true" aria-expanded="false"><span class="codicon codicon-settings-gear"></span></button>
                 <button id="btn-clear" class="icon-btn" title="Clear chat"><span class="codicon codicon-clear-all"></span></button>
             </div>
         </header>
 
+        <div id="settings-menu" class="settings-menu" hidden>
+            <label><input id="setting-bypass" type="checkbox"> Don't ask before changes</label>
+            <div class="settings-hint">The agent edits files and moves views without asking first.</div>
+            <label><input id="setting-startup" type="checkbox"> Open the agent when Kigumi starts</label>
+        </div>
+        <div id="bypass-banner" class="bypass-banner" hidden>Not asking before changes</div>
         <div id="messages" class="agent-messages">
             <div class="agent-welcome" id="welcome">
                 <h3>Kigumi Agent</h3>

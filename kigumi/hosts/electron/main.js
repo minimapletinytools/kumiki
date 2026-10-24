@@ -44,6 +44,9 @@ const APP_DEFAULTS = {
     'agent.apiKey': '',
     'agent.openrouterApiKey': '',
     'agent.model': '',
+    // Run tools that change something without asking (the agent panel's settings).
+    'agent.bypassPermissions': false,
+    'agent.showOnStartup': true,
     // Kigumi's tools for any agent, over MCP on this machine only. See agent/mcp-http.js.
     'mcp.enabled': false,
     'mcp.port': 7345,
@@ -705,6 +708,9 @@ async function start() {
         bundledUv: bundledUvPath(),
     });
     kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
+    if (settings.get('agent.showOnStartup', true)) {
+        toggleAgentPanel();
+    }
 
     settings.onChange(() => {
         buildMenu();

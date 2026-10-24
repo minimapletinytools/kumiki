@@ -5,8 +5,8 @@
  * The panel and this talk in messages:
  *   panel -> here:  agent:ready, agent:prompt {text}, agent:stop, agent:clear,
  *                   agent:permissionAnswer {requestId, allow}, agent:setModel {id},
- *                   agent:signIn {provider}, agent:signOut
- *   here -> panel:  agent:state {models, model, via, account}, agent:busy {busy}, agent:text {text} (streamed),
+ *                   agent:signIn {provider}, agent:signOut, agent:setSetting {key, value}
+ *   here -> panel:  agent:state {models, model, via, account, settings}, agent:busy {busy}, agent:text {text} (streamed),
  *                   agent:reasoning {text} (streamed), agent:tool {id, name, input},
  *                   agent:toolResult {id, isError, text}, agent:notice {text},
  *                   agent:permission {requestId, toolName, input}, agent:done {isError, error?, costUsd?},
@@ -19,6 +19,9 @@
 const { createKigumiTools } = require('./tools');
 const { MODELS, findModel, routeModel } = require('./models');
 const { runTurn, languageModelFor } = require('./agent-loop');
+
+/** The settings the panel's own menu sets, with their defaults. */
+const PANEL_SETTINGS = { 'agent.bypassPermissions': false, 'agent.showOnStartup': true };
 
 const SYSTEM_PROMPT = [
     'You are the agent inside Kigumi, an app for designing timber frames in Python with the kumiki',
@@ -98,6 +101,8 @@ class AgentSession {
             model: this.model.id,
             via: route ? route.via : null,
             account: this.account ? this.account.state() : { configured: false },
+            settings: Object.fromEntries(Object.entries(PANEL_SETTINGS)
+                .map(([key, fallback]) => [key, this.setting(key, fallback) === true])),
         });
     }
 
@@ -117,6 +122,9 @@ class AgentSession {
             if (answer) answer(Boolean(message.allow));
         } else if (message.type === 'agent:setModel' && typeof message.id === 'string') {
             this.setSetting('agent.model', findModel(message.id).id);
+            this.postState();
+        } else if (message.type === 'agent:setSetting' && message.key in PANEL_SETTINGS) {
+            this.setSetting(message.key, Boolean(message.value));
             this.postState();
         } else if (message.type === 'agent:ready') {
             this.postState();
@@ -139,6 +147,9 @@ class AgentSession {
     }
 
     _askPermission(toolName, input) {
+        if (this.setting('agent.bypassPermissions', false) === true) {
+            return Promise.resolve(true);
+        }
         const requestId = this.nextPermission++;
         return new Promise((resolve) => {
             this.pendingPermissions.set(requestId, resolve);
