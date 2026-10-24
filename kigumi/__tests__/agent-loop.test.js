@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 
 const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test');
-const { runTurn, toModelContent, cacheMarked } = require('../agent/agent-loop');
+const { runTurn, toModelContent, cacheMarked, trimOldToolResults, estimateTokens, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
 const { MODELS, findModel, routeModel } = require('../agent/models');
 const { createFileTools } = require('../agent/file-tools');
 const { AgentSession, describeFailure, withContext, describeBuild } = require('../agent/agent-session');
@@ -73,7 +73,7 @@ describe('the agent loop', () => {
 
         const { events, history, costUsd } = await turn(model);
 
-        expect(events).toEqual([
+        expect(events.filter((event) => event.type !== 'agent:context')).toEqual([
             { type: 'agent:text', text: 'Looking. ' },
             { type: 'agent:tool', id: 'c1', name: 'look', input: {} },
             { type: 'agent:toolResult', id: 'c1', isError: false, text: 'a frame\n[image]' },
@@ -169,6 +169,43 @@ describe('the agent loop', () => {
         await runTurn({ model, images: true, cacheMarks: true, tools: [], system: 's', history: [], prompt: 'go',
             askPermission: async () => true, onEvent: (event) => events.push(event) });
         expect(model.doStreamCalls[0].prompt.at(-1).providerOptions.openrouter.cacheControl).toEqual({ type: 'ephemeral' });
+    });
+
+        test('older tool results are cut down; the last few stay whole', () => {
+        const result = (id, text) => ({ role: 'tool', content: [{ type: 'tool-result', toolCallId: id, toolName: 'read_file',
+            output: { type: 'content', value: [{ type: 'text', text }] } }] });
+        const long = 'x'.repeat(5000);
+        const messages = Array.from({ length: 10 }, (_, i) => result(`c${i}`, long));
+
+        const trimmed = trimOldToolResults(messages);
+
+        const lengths = trimmed.map((message) => message.content[0].output.value[0].text.length);
+        expect(lengths.slice(2)).toEqual(Array(8).fill(5000));
+        expect(lengths[0]).toBeLessThan(500);
+        expect(trimmed[0].content[0].output.value[0].text).toContain('run the tool again');
+        expect(estimateTokens(trimmed)).toBeLessThan(estimateTokens(messages));
+    });
+
+    test('a large conversation is summarised at the start of a turn; the new request is kept as it is', async () => {
+        const model = scripted(
+            [...say('s', 'They want a sawhorse; frame.py has legs.'), finish('stop', 0.001)],
+            [...say('1', 'Carrying on.'), finish('stop', 0.002)],
+        );
+        const big = [{ role: 'user', content: 'x'.repeat(SUMMARISE_AT_TOKENS * 4 + 100) }, { role: 'assistant', content: 'ok' }];
+
+        const { events, history, costUsd } = await turn(model, { history: big });
+
+        expect(events).toContainEqual({ type: 'agent:notice', text: expect.stringContaining('summarised') });
+        expect(history[0].content).toContain('They want a sawhorse');
+        expect(history[2]).toEqual({ role: 'user', content: 'go' });
+        expect(costUsd).toBeCloseTo(0.003);
+    });
+
+    test('each step reports how full the conversation is', async () => {
+        const events = [];
+        await runTurn({ model: scripted([...say('1', 'Hi.'), finish('stop')]), images: true, contextWindow: 200000, tools: [],
+            system: 's', history: [], prompt: 'go', askPermission: async () => true, onEvent: (event) => events.push(event) });
+        expect(events).toContainEqual({ type: 'agent:context', tokens: 10, window: 200000 });
     });
 
         test('a model that cannot see gets a note instead of an image', () => {
@@ -326,6 +363,45 @@ describe('the agent session', () => {
         await edit.run({ file_path: 'b.py' });
         expect(reports).toEqual([]);
         expect(describeBuild({ ok: true, entries: [] })).toBe('The view of this file rebuilt without errors.');
+    });
+
+        test('a conversation is saved after each turn, and comes back when the panel opens again', async () => {
+        const saved = new Map();
+        const conversations = {
+            list: () => [...saved.values()].map(({ id, title, updatedAt }) => ({ id, title, updatedAt })),
+            load: (_project, id) => JSON.parse(JSON.stringify(saved.get(id) || null)),
+            save: (_project, conversation) => saved.set(conversation.id, JSON.parse(JSON.stringify(conversation))),
+            remove: (_project, id) => saved.delete(id),
+        };
+        const posted = [];
+        const make = (model) => new AgentSession({
+            panels, run: async () => ({}), post: (message) => posted.push(message), cwd: () => '/project',
+            setting: (key, fallback) => (key === 'agent.openrouterApiKey' ? 'sk-or' : fallback), conversations,
+            createModel: async () => model,
+        });
+
+        await make(scripted([...say('1', 'A sawhorse, then.'), finish('stop')])).prompt('make me a sawhorse');
+
+        const [only] = saved.values();
+        expect(only.title).toBe('make me a sawhorse');
+        expect(only.history.map((message) => message.role)).toEqual(['user', 'assistant']);
+
+        // A new session, as after a restart: the panel gets the conversation drawn again.
+        posted.length = 0;
+        const again = make(scripted([...say('2', 'Longer legs.'), finish('stop')]));
+        again.handle({ type: 'agent:ready' });
+        const replay = posted.find((message) => message.type === 'agent:replay');
+        expect(replay.events[0]).toEqual({ type: 'agent:userMessage', text: 'make me a sawhorse' });
+        expect(replay.events).toContainEqual({ type: 'agent:text', text: 'A sawhorse, then.' });
+
+        // It carries on the same conversation; a new one starts empty.
+        await again.prompt('longer legs');
+        expect(saved.size).toBe(1);
+        expect(saved.get(only.id).history).toHaveLength(4);
+        again.handle({ type: 'agent:clear' });
+        expect(again.history).toEqual([]);
+        await again.prompt('something else').catch(() => {});
+        expect(saved.size).toBe(2);
     });
 
         test('out of credit says so', () => {

@@ -15,18 +15,12 @@ shell sandboxing, subagents and background agents are left out.
 - A failed turn keeps its steps, so "continue" carries on; a turn cut short says why.
 - Only the latest screenshot is resent (each is about a megabyte).
 - Open the agent at startup (setting).
-
-## Next: fixes what has been hit
-
-1. **A `search_files` tool** (grep over the project, with line numbers). The agent read whole
-   files to find things, and every read is resent with every later step: searching is far cheaper.
-2. **Context meter and auto-compaction.** Show how full the conversation is; when it passes a
-   threshold, summarize older steps and continue, keeping the latest request word for word. Long
-   turns grew to 2.5 MB.
-3. **Conversation history**, kept locally per project: reopen, rename, delete; the last one comes
-   back after a restart. In the backend later, with cloud projects (kigumi-backend plan
-   `cloud-projects.md`).
-4. **Markdown in replies**: code blocks with copy, lists, links to files that open them.
+- `search_files`; what you are looking at goes with each message; editing a file a view shows
+  rebuilds it and says whether it built; prompt-cache marks for Claude models.
+- Older tool results cut down (the last 8 kept whole); a conversation past ~100k tokens summarised
+  at the start of a turn; a context meter.
+- Conversation history, kept per project; the latest comes back when the panel opens.
+- Markdown in replies (code blocks with copy).
 
 ## Then: the usual agent panel
 

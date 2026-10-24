@@ -5,10 +5,11 @@
  * The panel and this talk in messages:
  *   panel -> here:  agent:ready, agent:prompt {text}, agent:stop, agent:clear,
  *                   agent:permissionAnswer {requestId, allow}, agent:setModel {id},
- *                   agent:signIn {provider}, agent:signOut, agent:setSetting {key, value}
+ *                   agent:signIn {provider}, agent:signOut, agent:setSetting {key, value},
+ *                   agent:listConversations, agent:openConversation {id}, agent:deleteConversation {id}
  *   here -> panel:  agent:state {models, model, via, account, settings}, agent:busy {busy}, agent:text {text} (streamed),
  *                   agent:reasoning {text} (streamed), agent:tool {id, name, input},
- *                   agent:toolResult {id, isError, text}, agent:notice {text},
+ *                   agent:toolResult {id, isError, text}, agent:notice {text}, agent:context {tokens, window},
  *                   agent:permission {requestId, toolName, input}, agent:done {isError, error?, costUsd?},
  *                   agent:error {message}
  *
@@ -17,6 +18,8 @@
  */
 
 const path = require('path');
+
+const crypto = require('crypto');
 
 const { createKigumiTools } = require('./tools');
 const { MODELS, findModel, routeModel } = require('./models');
@@ -35,6 +38,13 @@ const SYSTEM_PROMPT = [
     'kumiki package\'s source in .venv, which is large. Sizes from the tools are in metres, in world',
     'space. Keep replies short.',
 ].join(' ');
+
+/** What the panel shows that a reopened conversation shows again. */
+const SHOWN = new Set(['agent:userMessage', 'agent:text', 'agent:reasoning', 'agent:tool', 'agent:toolResult',
+    'agent:notice', 'agent:done', 'agent:error']);
+
+/** A conversation's title: the start of its first request. */
+const titleOf = (text) => (text.length > 60 ? `${text.slice(0, 57)}…` : text);
 
 /** The most of the active panel's description sent with a message. */
 const MAX_CONTEXT_CHARS = 2000;
@@ -80,16 +90,27 @@ class AgentSession {
      * @param {(key: string, value: any) => void} [options.setSetting]
      * @param {object[]} [options.fileTools]   tools for the project's files (agent/file-tools.js)
      * @param {object|null} [options.account]  the Kigumi account (agent/account.js)
+     * @param {object|null} [options.conversations]  where past conversations are kept (conversation-store.js)
      * @param {(route: object, options: {fetch?: typeof fetch}) => Promise<object>} [options.createModel]
      *     a language model for a route
      * @param {(line: string) => void} [options.log]
      */
     constructor({ panels, run, post, cwd, setting, setSetting = () => {}, fileTools = [], account = null,
-        createModel = languageModelFor, log = () => {} }) {
+        conversations = null, createModel = languageModelFor, log = () => {} }) {
         this.tools = [...createKigumiTools({ panels, run, workspaceFolders: () => [cwd()].filter(Boolean) }),
             ...fileTools.map((tool) => this._buildingAfterEdits(tool, { panels, run, cwd }))];
         this.panels = panels;
-        this.post = post;
+        // Everything the panel shows of a conversation is also kept, to show it again when reopened.
+        this.post = (message) => {
+            if (SHOWN.has(message.type)) this.transcript.push(message);
+            post(message);
+        };
+        this.postRaw = post;
+        this.cwd = cwd;
+        this.conversations = conversations;
+        this.conversation = null;
+        this.transcript = [];
+        this.restored = false;
         this.setting = setting;
         this.setSetting = setSetting;
         this.account = account;
@@ -162,7 +183,7 @@ class AgentSession {
             this.stop();
         } else if (message.type === 'agent:clear') {
             this.stop();
-            this.history = [];
+            this.startConversation();
         } else if (message.type === 'agent:permissionAnswer') {
             const answer = this.pendingPermissions.get(message.requestId);
             this.pendingPermissions.delete(message.requestId);
@@ -173,13 +194,72 @@ class AgentSession {
         } else if (message.type === 'agent:setSetting' && message.key in PANEL_SETTINGS) {
             this.setSetting(message.key, Boolean(message.value));
             this.postState();
+        } else if (message.type === 'agent:listConversations') {
+            this.postConversations();
+        } else if (message.type === 'agent:openConversation' && typeof message.id === 'string') {
+            if (!this.busy) this.openConversation(message.id);
+        } else if (message.type === 'agent:deleteConversation' && typeof message.id === 'string') {
+            this._project() && this.conversations.remove(this._project(), message.id);
+            if (this.conversation && this.conversation.id === message.id) this.startConversation();
+            this.postConversations();
         } else if (message.type === 'agent:ready') {
             this.postState();
+            // The panel (re)loaded: show what it had, or, the first time, the latest conversation.
+            if (this.transcript.length) {
+                this.postRaw({ type: 'agent:replay', events: this.transcript });
+            } else if (!this.restored) {
+                const latest = this._project() && this.conversations.list(this._project())[0];
+                if (latest) this.openConversation(latest.id);
+            }
+            this.restored = true;
         } else if (message.type === 'agent:signIn' && this.account) {
             this.account.signIn(message.provider === 'google' ? 'google' : 'github')
                 .catch((error) => this.post({ type: 'agent:error', message: `Could not sign in: ${error.message}` }));
         } else if (message.type === 'agent:signOut' && this.account) {
             void this.account.signOut().then(() => this.postState());
+        }
+    }
+
+    /** The project conversations are kept for, when there is somewhere to keep them. */
+    _project() {
+        return this.conversations ? this.cwd() : null;
+    }
+
+    startConversation() {
+        this.history = [];
+        this.transcript = [];
+        this.conversation = null;
+    }
+
+    openConversation(id) {
+        const found = this._project() && this.conversations.load(this._project(), id);
+        if (!found) return;
+        this.conversation = found;
+        this.history = found.history || [];
+        this.transcript = found.transcript || [];
+        this.postRaw({ type: 'agent:replay', events: this.transcript });
+    }
+
+    postConversations() {
+        this.postRaw({
+            type: 'agent:conversations',
+            items: this._project() ? this.conversations.list(this._project()) : [],
+            current: this.conversation ? this.conversation.id : null,
+        });
+    }
+
+    _saveConversation(firstText) {
+        const project = this._project();
+        if (!project) return;
+        const now = new Date().toISOString();
+        if (!this.conversation) {
+            this.conversation = { id: crypto.randomUUID(), title: titleOf(firstText), createdAt: now };
+        }
+        Object.assign(this.conversation, { model: this.model.id, updatedAt: now, history: this.history, transcript: this.transcript });
+        try {
+            this.conversations.save(project, this.conversation);
+        } catch (error) {
+            this.log(`[agent] could not save the conversation: ${error.message}`);
         }
     }
 
@@ -217,12 +297,14 @@ class AgentSession {
         }
         const abort = new AbortController();
         this.abort = abort;
+        this.transcript.push({ type: 'agent:userMessage', text });
         this.post({ type: 'agent:busy', busy: true });
         try {
             const { history, costUsd } = await runTurn({
                 model: await this.createModel(route, { fetch: route.via === 'backend' ? this.account.fetchWithToken : undefined }),
                 images: this.model.images,
                 cacheMarks: Boolean(this.model.cacheMarks),
+                contextWindow: this.model.contextWindow,
                 tools: this.tools,
                 system: SYSTEM_PROMPT,
                 history: this.history,
@@ -248,6 +330,7 @@ class AgentSession {
             if (route.via === 'backend') {
                 void this.account.refreshBalance().catch(() => {});
             }
+            this._saveConversation(text);
         }
     }
 }

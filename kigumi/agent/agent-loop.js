@@ -100,6 +100,75 @@ function cacheMarked(messages) {
     });
 }
 
+/** Tool results kept whole; older ones are cut down (trimOldToolResults). */
+const KEEP_TOOL_RESULTS = 8;
+/** What an older tool result is cut to, in characters. */
+const TRIMMED_TO = 300;
+/** Past this many tokens (estimated) at the start of a turn, the conversation before it is summarised. */
+const SUMMARISE_AT_TOKENS = 100000;
+
+/** A rough token count: about four characters a token. */
+function estimateTokens(messages) {
+    return Math.round(JSON.stringify(messages).length / 4);
+}
+
+const TRIMMED_NOTE = '\n[… cut down to keep the conversation small; run the tool again if you need the rest.]';
+
+/** A tool result's output cut to its first characters. */
+function trimmedOutput(output) {
+    const parts = output.type === 'content' ? output.value : [{ type: 'text', text: typeof output.value === 'string' ? output.value : JSON.stringify(output.value) }];
+    const text = parts.filter((part) => part.type === 'text').map((part) => part.text).join('\n');
+    if (text.length <= TRIMMED_TO + TRIMMED_NOTE.length) return output;
+    return { type: 'content', value: [{ type: 'text', text: text.slice(0, TRIMMED_TO) + TRIMMED_NOTE }] };
+}
+
+/**
+ * `messages` with all but the last few tool results cut down. Every step resends the whole
+ * conversation, and tool results (files read, logs) are most of it.
+ */
+function trimOldToolResults(messages, keep = KEEP_TOOL_RESULTS) {
+    let seen = 0;
+    const out = [...messages];
+    for (let i = out.length - 1; i >= 0; i--) {
+        const message = out[i];
+        if (message.role !== 'tool' || !Array.isArray(message.content)) continue;
+        out[i] = { ...message, content: message.content.map((part) => {
+            if (!part || part.type !== 'tool-result' || !part.output) return part;
+            seen += 1;
+            return seen > keep ? { ...part, output: trimmedOutput(part.output) } : part;
+        }) };
+    }
+    return out;
+}
+
+const SUMMARY_REQUEST = 'Summarise our conversation so far for carrying on the work: what the user wants, what '
+    + 'has been done (files changed and how), what was found, and what is left. Keep file paths, names and '
+    + 'numbers exact. Plain text, as short as it can be while keeping all of that.';
+
+/**
+ * `history` summarised by the model into one exchange, when it is large; else as it is. Returns
+ * { history, summarised, costUsd }.
+ */
+async function summariseIfLarge(model, system, history, abortSignal) {
+    if (estimateTokens(history) < SUMMARISE_AT_TOKENS) return { history, summarised: false };
+    // Streamed like every other request, which is all the backend carries cost reports for.
+    const result = streamText({
+        model, system, abortSignal, maxRetries: 2, maxOutputTokens: MAX_OUTPUT_TOKENS,
+        messages: [...trimOldToolResults(onlyLatestImage(history), 0), { role: 'user', content: SUMMARY_REQUEST }],
+    });
+    const summary = await result.text;
+    const metadata = await result.providerMetadata;
+    const openrouter = metadata && metadata.openrouter;
+    return {
+        history: [
+            { role: 'user', content: `[A summary of our conversation so far]\n${summary}` },
+            { role: 'assistant', content: 'Understood; I will carry on from there.' },
+        ],
+        summarised: true,
+        costUsd: openrouter && openrouter.usage && openrouter.usage.cost,
+    };
+}
+
 /** Kigumi's tools as an AI SDK tool set. */
 function toToolSet(tools, { images, askPermission }) {
     return Object.fromEntries(tools.map((kigumiTool) => [kigumiTool.name, tool({
@@ -136,6 +205,7 @@ function earlyEnd(steps) {
  * @param {object} options.model         an AI SDK language model (languageModelFor)
  * @param {boolean} options.images       whether the model can look at images
  * @param {boolean} [options.cacheMarks] whether to mark where its prompt cache should hold (models.js)
+ * @param {number} [options.contextWindow] the model's, for the panel's context meter
  * @param {object[]} options.tools       Kigumi tools
  * @param {string} options.system
  * @param {object[]} options.history     the conversation so far, as model messages
@@ -146,8 +216,13 @@ function earlyEnd(steps) {
  * @returns {Promise<{ history: object[], costUsd?: number }>} the conversation after the turn. A turn
  *     that fails throws, with the conversation as far as it got as the error's `history`.
  */
-async function runTurn({ model, images, cacheMarks = false, tools, system, history, prompt, abortSignal, askPermission, onEvent }) {
-    const messages = [...history, { role: 'user', content: prompt }];
+async function runTurn({ model, images, cacheMarks = false, contextWindow, tools, system, history, prompt, abortSignal,
+    askPermission, onEvent }) {
+    const compacted = await summariseIfLarge(model, system, history, abortSignal);
+    if (compacted.summarised) {
+        onEvent({ type: 'agent:notice', text: 'The earlier conversation was summarised, to keep each step small.' });
+    }
+    const messages = [...compacted.history, { role: 'user', content: prompt }];
     const steps = [];
     let failure = null;
     const result = streamText({
@@ -162,13 +237,17 @@ async function runTurn({ model, images, cacheMarks = false, tools, system, histo
         // retrying one costs nothing.
         maxRetries: 2,
         prepareStep: ({ messages: sending }) => {
-            const trimmed = onlyLatestImage(sending);
+            const trimmed = trimOldToolResults(onlyLatestImage(sending));
             return { messages: cacheMarks ? cacheMarked(trimmed) : trimmed };
         },
-        onStepEnd: (step) => { steps.push(step); },
+        onStepEnd: (step) => {
+            steps.push(step);
+            const tokens = step.usage && step.usage.inputTokens;
+            if (typeof tokens === 'number') onEvent({ type: 'agent:context', tokens, window: contextWindow || null });
+        },
         onError: ({ error }) => { failure = error; },
     });
-    const sofar = () => onlyLatestImage([...messages, ...steps.flatMap((step) => step.response.messages)]);
+    const sofar = () => trimOldToolResults(onlyLatestImage([...messages, ...steps.flatMap((step) => step.response.messages)]));
     try {
         for await (const part of result.fullStream) {
             if (part.type === 'text-delta') {
@@ -197,10 +276,12 @@ async function runTurn({ model, images, cacheMarks = false, tools, system, histo
     const costs = steps.map((step) => step.providerMetadata && step.providerMetadata.openrouter
         && step.providerMetadata.openrouter.usage && step.providerMetadata.openrouter.usage.cost)
         .filter((cost) => typeof cost === 'number');
+    if (typeof compacted.costUsd === 'number') costs.push(compacted.costUsd);
     return {
         history: sofar(),
         costUsd: costs.length ? costs.reduce((sum, cost) => sum + cost, 0) : undefined,
     };
 }
 
-module.exports = { runTurn, languageModelFor, toModelContent, summarise, onlyLatestImage, cacheMarked, MAX_STEPS, MAX_OUTPUT_TOKENS };
+module.exports = { runTurn, languageModelFor, toModelContent, summarise, onlyLatestImage, cacheMarked, trimOldToolResults,
+    estimateTokens, summariseIfLarge, SUMMARISE_AT_TOKENS, MAX_STEPS, MAX_OUTPUT_TOKENS };

@@ -21,6 +21,7 @@ const { LogChannel } = require('./log-channel');
 const { AgentSession } = require('../../agent/agent-session');
 const { createFileTools } = require('../../agent/file-tools');
 const { createAccount } = require('../../agent/account');
+const { createConversationStore } = require('../../agent/conversation-store');
 const { backendConfig } = require('../../agent/backend-config');
 const { SecureStorage } = require('./secure-storage');
 const { createKigumiTools } = require('../../agent/tools');
@@ -438,6 +439,7 @@ function toggleAgentPanel() {
         setSetting: (key, value) => settings.set(key, value),
         fileTools: createFileTools({ root: () => workspaceFolder }),
         account,
+        conversations: createConversationStore(path.join(app.getPath('userData'), 'conversations')),
         log: (line) => logChannel.appendLine(line),
     });
     surface.onMessage((message) => agentSession && agentSession.handle(message));

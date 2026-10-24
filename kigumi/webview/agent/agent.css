@@ -450,3 +450,166 @@ textarea {
 .bypass-banner::before {
     content: "⚠ ";
 }
+
+.footer-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.context-meter {
+    color: var(--ka-muted);
+    font-size: 11px;
+    white-space: nowrap;
+    margin-top: 6px;
+}
+
+.context-meter.is-high {
+    color: var(--ka-error);
+}
+
+.history-menu {
+    max-height: 50%;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--ka-border);
+    background: var(--ka-chrome-bg);
+    font-size: 12px;
+}
+
+.history-menu[hidden] {
+    display: none;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+}
+
+.history-item.is-current .history-title {
+    font-weight: 600;
+}
+
+.history-open {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    color: var(--ka-fg);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.history-open:hover {
+    background: var(--ka-hover);
+}
+
+.history-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.history-when {
+    color: var(--ka-muted);
+    white-space: nowrap;
+}
+
+.history-delete {
+    margin-right: 8px;
+}
+
+.history-empty {
+    padding: 8px 12px;
+    color: var(--ka-muted);
+}
+
+/* Markdown in replies (markdown.js) */
+.message-bubble.md {
+    white-space: normal;
+}
+
+.message-bubble.md > :first-child { margin-top: 0; }
+.message-bubble.md > :last-child { margin-bottom: 0; }
+
+.message-bubble.md p,
+.message-bubble.md ul,
+.message-bubble.md ol,
+.message-bubble.md blockquote {
+    margin: 0 0 8px;
+}
+
+.message-bubble.md ul,
+.message-bubble.md ol {
+    padding-left: 20px;
+}
+
+.message-bubble.md h3,
+.message-bubble.md h4,
+.message-bubble.md h5,
+.message-bubble.md h6 {
+    margin: 10px 0 6px;
+    font-size: 13px;
+}
+
+.message-bubble.md blockquote {
+    padding-left: 10px;
+    border-left: 2px solid var(--ka-border);
+    color: var(--ka-muted);
+}
+
+.message-bubble.md code {
+    font-family: var(--ka-mono);
+    font-size: 12px;
+    background: var(--ka-chrome-bg);
+    padding: 1px 4px;
+    border-radius: 4px;
+}
+
+.md-code {
+    position: relative;
+    margin: 0 0 8px;
+}
+
+.md-code pre {
+    margin: 0;
+    padding: 8px 10px;
+    overflow-x: auto;
+    background: var(--ka-chrome-bg);
+    border: 1px solid var(--ka-border);
+    border-radius: 6px;
+}
+
+.md-code pre code {
+    background: none;
+    padding: 0;
+    white-space: pre;
+}
+
+.md-copy {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    background: var(--ka-bg);
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    color: var(--ka-muted);
+    cursor: pointer;
+    opacity: 0;
+}
+
+.md-code:hover .md-copy {
+    opacity: 1;
+}
+
+.md-link {
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}

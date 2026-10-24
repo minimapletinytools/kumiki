@@ -20,6 +20,10 @@
     const bypassToggle = $('setting-bypass');
     const startupToggle = $('setting-startup');
     const bypassBanner = $('bypass-banner');
+    const historyBtn = $('btn-history');
+    const historyMenu = $('history-menu');
+    const historyList = $('history-list');
+    const contextMeter = $('context-meter');
     const activityLabel = $('activity-label');
     const welcomeHtml = $('welcome').outerHTML;
 
@@ -76,8 +80,10 @@
     function appendText(text) {
         endThinking();
         const last = messagesEl.lastElementChild;
-        const bubble = last && last.classList.contains('assistant') ? last : add('message-bubble assistant', '');
-        bubble.textContent += text;
+        const bubble = last && last.classList.contains('assistant') ? last : add('message-bubble assistant md', '');
+        // The reply so far, rendered again as it grows (window.KigumiMarkdown, markdown.js).
+        bubble.dataset.raw = (bubble.dataset.raw || '') + text;
+        bubble.replaceChildren(window.KigumiMarkdown.render(bubble.dataset.raw));
         setActivity('Writing');
         scrollToEnd();
     }
@@ -182,11 +188,69 @@
 
     sendBtn.addEventListener('click', () => (busy ? vscode.postMessage({ type: 'agent:stop' }) : sendPrompt()));
 
+    function resetMessages() {
+        toolChips.clear();
+        thinking = null;
+        messagesEl.innerHTML = welcomeHtml;
+    }
+
     clearBtn.addEventListener('click', () => {
         vscode.postMessage({ type: 'agent:clear' });
-        toolChips.clear();
-        messagesEl.innerHTML = welcomeHtml;
+        resetMessages();
+        historyMenu.hidden = true;
     });
+
+    // Past conversations: open one, or delete it.
+    historyBtn.addEventListener('click', () => {
+        historyMenu.hidden = !historyMenu.hidden;
+        settingsMenu.hidden = true;
+        if (!historyMenu.hidden) vscode.postMessage({ type: 'agent:listConversations' });
+    });
+
+    function ago(time) {
+        const minutes = Math.round((Date.now() - new Date(time).getTime()) / 60000);
+        if (minutes < 1) return 'just now';
+        if (minutes < 60) return `${minutes} min ago`;
+        if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`;
+        return new Date(time).toLocaleDateString();
+    }
+
+    function showConversations({ items = [], current }) {
+        if (!items.length) {
+            historyList.replaceChildren(Object.assign(document.createElement('div'), { className: 'history-empty', textContent: 'No past conversations yet.' }));
+            return;
+        }
+        historyList.replaceChildren(...items.map((item) => {
+            const row = document.createElement('div');
+            row.className = 'history-item' + (item.id === current ? ' is-current' : '');
+            const open = document.createElement('button');
+            open.type = 'button';
+            open.className = 'history-open';
+            const title = Object.assign(document.createElement('span'), { className: 'history-title', textContent: item.title || 'Untitled' });
+            const when = Object.assign(document.createElement('span'), { className: 'history-when', textContent: ago(item.updatedAt) });
+            open.append(title, when);
+            open.addEventListener('click', () => {
+                vscode.postMessage({ type: 'agent:openConversation', id: item.id });
+                historyMenu.hidden = true;
+            });
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'icon-btn history-delete';
+            remove.title = 'Delete';
+            remove.innerHTML = '<span class="codicon codicon-trash"></span>';
+            remove.addEventListener('click', () => vscode.postMessage({ type: 'agent:deleteConversation', id: item.id }));
+            row.append(open, remove);
+            return row;
+        }));
+    }
+
+    /** How full the conversation is, from the last step's input tokens. */
+    function showContext({ tokens, window: size }) {
+        const short = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n));
+        contextMeter.textContent = size ? `Context ${short(tokens)} / ${short(size)}` : `Context ${short(tokens)}`;
+        contextMeter.title = 'Tokens the last step sent: the whole conversation goes with every step.';
+        contextMeter.classList.toggle('is-high', Boolean(size) && tokens > size * 0.5);
+    }
 
     modelSelect.addEventListener('change', () => vscode.postMessage({ type: 'agent:setModel', id: modelSelect.value }));
 
@@ -219,6 +283,7 @@
     }
 
     settingsBtn.addEventListener('click', () => {
+        historyMenu.hidden = true;
         settingsMenu.hidden = !settingsMenu.hidden;
         settingsBtn.setAttribute('aria-expanded', String(!settingsMenu.hidden));
     });
@@ -254,10 +319,38 @@
         }
     });
 
+    // A reopened conversation: drawn again from what the panel showed.
+    function replay(events) {
+        resetMessages();
+        contextMeter.textContent = '';
+        for (const event of events) {
+            if (event.type === 'agent:userMessage') {
+                endThinking();
+                add('message-bubble user', event.text || '');
+            } else {
+                handle(event);
+            }
+        }
+        for (const chip of toolChips.values()) chip.classList.remove('is-running');
+        endThinking();
+    }
+
     window.addEventListener('message', (event) => {
         const message = event.data;
-        if (!message || typeof message.type !== 'string') return;
+        if (message && typeof message.type === 'string') handle(message);
+    });
+
+    function handle(message) {
         switch (message.type) {
+            case 'agent:replay':
+                replay(message.events || []);
+                break;
+            case 'agent:conversations':
+                showConversations(message);
+                break;
+            case 'agent:context':
+                showContext(message);
+                break;
             case 'agent:state':
                 showState(message);
                 break;
@@ -296,7 +389,7 @@
             default:
                 break;
         }
-    });
+    }
 
     vscode.postMessage({ type: 'agent:ready' });
 })();
