@@ -291,3 +291,16 @@ textarea {
 .route-note:empty {
     display: none;
 }
+
+.link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--ka-link, var(--ka-focus));
+    font: inherit;
+    cursor: pointer;
+}
+
+.link-btn:hover {
+    text-decoration: underline;
+}

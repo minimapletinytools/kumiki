@@ -44,6 +44,10 @@ extraResources:
     filter:
       - "uv*"
 icon: templogo.png
+# Sign-in comes back from the browser on kigumi://auth.
+protocols:
+  - name: Kigumi
+    schemes: [kigumi]
 mac:
   category: public.app-category.graphics-design
   target:
