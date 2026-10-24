@@ -6,7 +6,6 @@ const { createPanelDirectory } = require('../agent/panel-directory');
 const { createKigumiTools } = require('../agent/tools');
 const { startMcpHttpServer } = require('../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../agent/mcp-setup');
-const { AgentSession, toPanelEvents } = require('../agent/agent-session');
 
 function view(filePath, { active = false, visible = true, description = {}, patternName = null } = {}) {
     return {
@@ -190,51 +189,5 @@ describe('the MCP server', () => {
         }
         expect(JSON.parse(mcpSetupText('vscode', server.url, token)).servers.kigumi.type).toBe('http');
         expect(mcpSetupText('nobody', server.url, token)).toBeNull();
-    });
-});
-
-describe('the agent session', () => {
-    test('streamed text, tool calls and their results become panel messages', () => {
-        expect(toPanelEvents({
-            type: 'stream_event', parent_tool_use_id: null,
-            event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hi' } },
-        })).toEqual([{ type: 'agent:text', text: 'Hi' }]);
-
-        expect(toPanelEvents({
-            type: 'assistant', parent_tool_use_id: null,
-            message: { content: [{ type: 'text', text: 'ignored, it streamed' }, { type: 'tool_use', id: 't1', name: 'mcp__kigumi__screenshot', input: {} }] },
-        })).toEqual([{ type: 'agent:tool', id: 't1', name: 'mcp__kigumi__screenshot', input: {} }]);
-
-        expect(toPanelEvents({
-            type: 'user', parent_tool_use_id: null,
-            message: { content: [{ type: 'tool_result', tool_use_id: 't1', is_error: false, content: [{ type: 'text', text: 'done' }] }] },
-        })).toEqual([{ type: 'agent:toolResult', id: 't1', isError: false, text: 'done' }]);
-
-        expect(toPanelEvents({ type: 'result', subtype: 'success', is_error: false, total_cost_usd: 0.01 }))
-            .toEqual([{ type: 'agent:done', isError: false, error: undefined, costUsd: 0.01 }]);
-    });
-
-    test('what a subagent does inside a tool is not the conversation', () => {
-        expect(toPanelEvents({
-            type: 'stream_event', parent_tool_use_id: 'task-1',
-            event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'inner' } },
-        })).toEqual([]);
-    });
-
-    test('a tool waiting for the user is answered from the panel, and stopping says no', async () => {
-        const posted = [];
-        const session = new AgentSession({
-            panels: directory(), run: async () => ({}), post: (message) => posted.push(message),
-            cwd: () => null, setting: (key, fallback) => fallback,
-        });
-
-        const first = session._askPermission('Edit', { file_path: '/a.py' });
-        const { requestId } = posted.find((message) => message.type === 'agent:permission');
-        session.handle({ type: 'agent:permissionAnswer', requestId, allow: true });
-        await expect(first).resolves.toBe(true);
-
-        const second = session._askPermission('Write', {});
-        session.stop();
-        await expect(second).resolves.toBe(false);
     });
 });

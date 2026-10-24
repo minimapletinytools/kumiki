@@ -14,6 +14,7 @@
         <header class="agent-header">
             <span class="agent-title"><span class="codicon codicon-sparkle"></span> Agent</span>
             <div class="agent-actions">
+                <select id="model-select" class="model-select" title="Model"></select>
                 <button id="btn-clear" class="icon-btn" title="Clear chat"><span class="codicon codicon-clear-all"></span></button>
             </div>
         </header>
@@ -34,6 +35,7 @@
                 <textarea id="prompt-input" placeholder="Ask about your frame…" rows="1"></textarea>
                 <button id="send-btn" class="send-btn" title="Send message"><span class="codicon codicon-send"></span></button>
             </div>
+            <div id="route-note" class="route-note"></div>
         </footer>
     </div>
     <script src="agent-app.js"></script>

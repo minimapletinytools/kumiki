@@ -264,3 +264,30 @@ textarea {
     content: "…";
     color: var(--ka-muted);
 }
+
+.agent-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.model-select {
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 4px;
+    max-width: 160px;
+}
+
+.route-note {
+    color: var(--ka-muted);
+    font-size: 11px;
+    margin-top: 6px;
+}
+
+.route-note:empty {
+    display: none;
+}

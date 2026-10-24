@@ -19,6 +19,7 @@ const { createElectronHost } = require('./electron-host');
 const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
 const { AgentSession } = require('../../agent/agent-session');
+const { createFileTools } = require('../../agent/file-tools');
 const { createKigumiTools } = require('../../agent/tools');
 const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../../agent/mcp-setup');
@@ -35,8 +36,10 @@ const APP_DEFAULTS = {
     'app.editorCommand': '',
     // Names the explorer's "All files" leaves out; `*` matches anything.
     'app.filesExclude': [...DEFAULT_FILES_EXCLUDE],
-    // The agent panel. With no key it uses the Claude login on this machine, if there is one.
+    // The agent panel: an Anthropic key, an OpenRouter key, or neither (then the Kigumi account).
+    // The model is an id from agent/models.js.
     'agent.apiKey': '',
+    'agent.openrouterApiKey': '',
     'agent.model': '',
     // Kigumi's tools for any agent, over MCP on this machine only. See agent/mcp-http.js.
     'mcp.enabled': false,
@@ -389,7 +392,8 @@ function toggleAgentPanel() {
         post: (message) => void surface.postMessage(message),
         cwd: () => workspaceFolder,
         setting: (key, fallback) => settings.get(key, fallback),
-        version: packageJson.version,
+        setSetting: (key, value) => settings.set(key, value),
+        fileTools: createFileTools({ root: () => workspaceFolder }),
         log: (line) => logChannel.appendLine(line),
     });
     surface.onMessage((message) => agentSession && agentSession.handle(message));

@@ -1,79 +1,43 @@
 /**
- * The agent panel's conversation: the Claude Agent SDK, run in the app's own process (never the
- * page), with Kigumi's tools served in process.
+ * The agent panel's conversation, run in the app's own process (never the page) on the built-in
+ * agent loop (agent/agent-loop.js), with Kigumi's tools and the project's files.
  *
  * The panel and this talk in messages:
- *   panel -> here:  agent:prompt {text}, agent:stop, agent:clear, agent:permissionAnswer {requestId, allow}
- *   here -> panel:  agent:busy {busy}, agent:text {text} (streamed), agent:tool {id, name, input},
- *                   agent:toolResult {id, isError, text}, agent:permission {requestId, toolName, input},
- *                   agent:done {isError, error?, costUsd?}, agent:error {message}
+ *   panel -> here:  agent:ready, agent:prompt {text}, agent:stop, agent:clear,
+ *                   agent:permissionAnswer {requestId, allow}, agent:setModel {id}
+ *   here -> panel:  agent:state {models, model, via}, agent:busy {busy}, agent:text {text} (streamed),
+ *                   agent:tool {id, name, input}, agent:toolResult {id, isError, text},
+ *                   agent:permission {requestId, toolName, input}, agent:done {isError, error?, costUsd?},
+ *                   agent:error {message}
  *
- * Auth is the SDK's: an API key from settings or the environment, else the user's Claude login.
+ * Requests go where agent/models.js routeModel says: an Anthropic or OpenRouter key from settings,
+ * else Kigumi's backend when signed in.
  */
 
 const { createKigumiTools } = require('./tools');
+const { MODELS, findModel, routeModel } = require('./models');
+const { runTurn, languageModelFor } = require('./agent-loop');
 
-/** Kigumi tools that only look, and the agent's own read-only tools: run without asking. */
-const BUILT_IN_READ_ONLY = ['Read', 'Glob', 'Grep'];
-
-const SYSTEM_PROMPT_APPEND = [
+const SYSTEM_PROMPT = [
     'You are the agent inside Kigumi, an app for designing timber frames in Python with the kumiki',
-    'library. The user sees their frame in 3D views and drawings while you work. Use the kigumi tools:',
-    'describe_panel to see what they are looking at and have selected (start there when they say',
-    '"this" or "the selected"), refresh_view after editing a frame file and read_view_log to check it',
-    'built, screenshot to look at the result. Sizes from the tools are in metres, in world space.',
+    'library. The user sees their frame in 3D views and drawings while you work.',
+    'Use describe_panel to see what they are looking at and have selected (start there when they say',
+    '"this" or "the selected"). Read and edit the project\'s files with the file tools; after editing a',
+    'frame file, refresh_view and read_view_log to check it built, and screenshot to look at the result.',
+    'The kumiki docs are in .kigumi/docs/ in the project. Sizes from the tools are in metres, in world',
+    'space. Keep replies short.',
 ].join(' ');
 
-function summarise(content) {
-    if (typeof content === 'string') {
-        return content;
+/** What to tell the user for a failed request. */
+function describeFailure(error) {
+    const status = error && (error.statusCode || (error.lastError && error.lastError.statusCode));
+    if (status === 402) {
+        return 'Out of credit.';
     }
-    if (Array.isArray(content)) {
-        return content.map((part) => (part && part.type === 'text' ? part.text : part && part.type === 'image' ? '[image]' : ''))
-            .filter(Boolean).join('\n');
+    if (status === 401) {
+        return 'Not signed in, or the API key was refused.';
     }
-    return '';
-}
-
-/**
- * What one SDK message means for the panel, as zero or more panel messages. Text arrives as stream
- * deltas, so a finished assistant message contributes only its tool calls.
- */
-function toPanelEvents(message) {
-    if (!message || typeof message !== 'object') {
-        return [];
-    }
-    if (message.type === 'stream_event' && !message.parent_tool_use_id) {
-        const event = message.event || {};
-        if (event.type === 'content_block_delta' && event.delta && event.delta.type === 'text_delta') {
-            return [{ type: 'agent:text', text: event.delta.text }];
-        }
-        return [];
-    }
-    if (message.type === 'assistant' && !message.parent_tool_use_id) {
-        return ((message.message && message.message.content) || [])
-            .filter((block) => block.type === 'tool_use')
-            .map((block) => ({ type: 'agent:tool', id: block.id, name: block.name, input: block.input }));
-    }
-    if (message.type === 'user' && !message.parent_tool_use_id) {
-        const content = (message.message && message.message.content) || [];
-        return (Array.isArray(content) ? content : [])
-            .filter((block) => block.type === 'tool_result')
-            .map((block) => ({
-                type: 'agent:toolResult', id: block.tool_use_id, isError: Boolean(block.is_error),
-                text: summarise(block.content).slice(0, 2000),
-            }));
-    }
-    if (message.type === 'result') {
-        const isError = message.subtype !== 'success' || Boolean(message.is_error);
-        return [{
-            type: 'agent:done',
-            isError,
-            error: isError ? (summarise(message.result) || (message.errors || []).join('\n') || message.subtype) : undefined,
-            costUsd: typeof message.total_cost_usd === 'number' ? message.total_cost_usd : undefined,
-        }];
-    }
-    return [];
+    return String((error && error.message) || error);
 }
 
 class AgentSession {
@@ -84,17 +48,22 @@ class AgentSession {
      * @param {(message: object) => void} options.post  to the agent panel
      * @param {() => string|null} options.cwd           the workspace folder
      * @param {(key: string, fallback: any) => any} options.setting
-     * @param {string} [options.version]
+     * @param {(key: string, value: any) => void} [options.setSetting]
+     * @param {object[]} [options.fileTools]   tools for the project's files (agent/file-tools.js)
+     * @param {() => {url: string, token: string}|null} [options.backend]  signed in to Kigumi's backend
+     * @param {(route: object) => Promise<object>} [options.createModel]  a language model for a route
      * @param {(line: string) => void} [options.log]
      */
-    constructor({ panels, run, post, cwd, setting, version = '0.0.0', log = () => {} }) {
-        this.tools = createKigumiTools({ panels, run, workspaceFolders: () => [cwd()].filter(Boolean) });
+    constructor({ panels, run, post, cwd, setting, setSetting = () => {}, fileTools = [], backend = () => null,
+        createModel = languageModelFor, log = () => {} }) {
+        this.tools = [...createKigumiTools({ panels, run, workspaceFolders: () => [cwd()].filter(Boolean) }), ...fileTools];
         this.post = post;
-        this.cwd = cwd;
         this.setting = setting;
-        this.version = version;
+        this.setSetting = setSetting;
+        this.backend = backend;
+        this.createModel = createModel;
         this.log = log;
-        this.sessionId = null;
+        this.history = [];
         this.abort = null;
         this.pendingPermissions = new Map();
         this.nextPermission = 1;
@@ -102,6 +71,29 @@ class AgentSession {
 
     get busy() {
         return this.abort !== null;
+    }
+
+    get model() {
+        return findModel(this.setting('agent.model', ''));
+    }
+
+    /** Where requests for the chosen model go, or null. */
+    route() {
+        return routeModel(this.model, {
+            anthropicKey: this.setting('agent.apiKey', ''),
+            openrouterKey: this.setting('agent.openrouterApiKey', ''),
+            backend: this.backend(),
+        });
+    }
+
+    postState() {
+        const route = this.route();
+        this.post({
+            type: 'agent:state',
+            models: MODELS.map(({ id, label }) => ({ id, label })),
+            model: this.model.id,
+            via: route ? route.via : null,
+        });
     }
 
     /** Messages from the panel. */
@@ -113,11 +105,16 @@ class AgentSession {
             this.stop();
         } else if (message.type === 'agent:clear') {
             this.stop();
-            this.sessionId = null;
+            this.history = [];
         } else if (message.type === 'agent:permissionAnswer') {
             const answer = this.pendingPermissions.get(message.requestId);
             this.pendingPermissions.delete(message.requestId);
             if (answer) answer(Boolean(message.allow));
+        } else if (message.type === 'agent:setModel' && typeof message.id === 'string') {
+            this.setSetting('agent.model', findModel(message.id).id);
+            this.postState();
+        } else if (message.type === 'agent:ready') {
+            this.postState();
         }
     }
 
@@ -144,57 +141,35 @@ class AgentSession {
             this.post({ type: 'agent:error', message: 'Still working on the last message. Stop it first.' });
             return;
         }
+        const route = this.route();
+        if (!route) {
+            this.post({ type: 'agent:error', message: 'Sign in to use the agent, or set agent.openrouterApiKey '
+                + '(or agent.apiKey, an Anthropic key) in settings.' });
+            return;
+        }
         const abort = new AbortController();
         this.abort = abort;
         this.post({ type: 'agent:busy', busy: true });
         try {
-            const sdk = await import('@anthropic-ai/claude-agent-sdk');
-            const kigumi = sdk.createSdkMcpServer({
-                name: 'kigumi',
-                version: this.version,
-                tools: this.tools.map((tool) => sdk.tool(tool.name, tool.description, tool.shape,
-                    async (args) => ({ content: await tool.run(args || {}) }))),
+            const { history, costUsd } = await runTurn({
+                model: await this.createModel(route),
+                images: this.model.images,
+                tools: this.tools,
+                system: SYSTEM_PROMPT,
+                history: this.history,
+                prompt: text,
+                abortSignal: abort.signal,
+                askPermission: (toolName, input) => this._askPermission(toolName, input),
+                onEvent: (event) => this.post(event),
             });
-            const readOnly = new Set([
-                ...BUILT_IN_READ_ONLY,
-                ...this.tools.filter((tool) => tool.readOnly).map((tool) => `mcp__kigumi__${tool.name}`),
-            ]);
-            const apiKey = this.setting('agent.apiKey', '');
-            const model = this.setting('agent.model', '');
-            const options = {
-                abortController: abort,
-                cwd: this.cwd() || undefined,
-                mcpServers: { kigumi },
-                includePartialMessages: true,
-                permissionMode: 'default',
-                settingSources: ['project'],
-                // Looking is allowed; anything else asks the user in the panel.
-                canUseTool: async (toolName, input) => (readOnly.has(toolName) || await this._askPermission(toolName, input)
-                    ? { behavior: 'allow', updatedInput: input }
-                    : { behavior: 'deny', message: 'The user said no.' }),
-                systemPrompt: { type: 'preset', preset: 'claude_code', append: SYSTEM_PROMPT_APPEND },
-                env: {
-                    ...process.env,
-                    CLAUDE_AGENT_SDK_CLIENT_APP: `kigumi/${this.version}`,
-                    ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
-                },
-                ...(model ? { model } : {}),
-                ...(this.sessionId ? { resume: this.sessionId } : {}),
-            };
-            for await (const message of sdk.query({ prompt: text, options })) {
-                if (message.type === 'system' && message.subtype === 'init' && message.session_id) {
-                    this.sessionId = message.session_id;
-                }
-                for (const event of toPanelEvents(message)) {
-                    this.post(event);
-                }
-            }
+            this.history = history;
+            this.post({ type: 'agent:done', isError: false, costUsd });
         } catch (error) {
             if (abort.signal.aborted) {
                 this.post({ type: 'agent:done', isError: false, stopped: true });
             } else {
                 this.log(`[agent] ${(error && error.stack) || error}`);
-                this.post({ type: 'agent:error', message: String((error && error.message) || error) });
+                this.post({ type: 'agent:done', isError: true, error: describeFailure(error) });
             }
         } finally {
             this.abort = null;
@@ -203,4 +178,4 @@ class AgentSession {
     }
 }
 
-module.exports = { AgentSession, toPanelEvents, SYSTEM_PROMPT_APPEND };
+module.exports = { AgentSession, SYSTEM_PROMPT, describeFailure };
