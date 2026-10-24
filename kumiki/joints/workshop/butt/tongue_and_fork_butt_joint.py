@@ -38,6 +38,7 @@ from kumiki.measuring import (
 )
 from kumiki.csg.cutcsg import (
     CutCSG,
+    measured_against,
     CutCSGLabel,
     FeatureGroup,
     FeatureOverride,
@@ -274,8 +275,8 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         # The two faces of the waste that become the tongue's own ends: the tongue
         # runs the timber's full width, so these are what it is edged by.
         feature_overrides=[
-            FeatureOverride(prism_face_key(PrismFace.RIGHT), "tongue_right", _TONGUE_FACE),
-            FeatureOverride(prism_face_key(PrismFace.LEFT), "tongue_left", _TONGUE_FACE),
+            FeatureOverride(prism_face_key(PrismFace.RIGHT), "tongue_right", measured_against(_TONGUE_FACE, "tongue_left")),
+            FeatureOverride(prism_face_key(PrismFace.LEFT), "tongue_left", measured_against(_TONGUE_FACE, "tongue_right")),
         ],
     )
     tongue_cheek_box_local = adopt_csg(None, tongue_timber.transform, tongue_cheek_box_global)
@@ -288,8 +289,8 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         # The tongue itself. Its two long faces are the cheeks, which is what the
         # fork slot grips; the other two are buried in the timber it stands on.
         feature_overrides=[
-            FeatureOverride(prism_face_key(PrismFace.FRONT), "tongue_front", _TONGUE_FACE),
-            FeatureOverride(prism_face_key(PrismFace.BACK), "tongue_back", _TONGUE_FACE),
+            FeatureOverride(prism_face_key(PrismFace.FRONT), "tongue_front", measured_against(_TONGUE_FACE, "tongue_back")),
+            FeatureOverride(prism_face_key(PrismFace.BACK), "tongue_back", measured_against(_TONGUE_FACE, "tongue_front")),
         ],
     )
     tongue_central_prism_local = adopt_csg(None, tongue_timber.transform, tongue_central_prism_global)
