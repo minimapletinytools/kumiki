@@ -199,13 +199,59 @@ function trimOldToolResults(messages, keep = KEEP_TOOL_RESULTS) {
 
 const SUMMARY_REQUEST = 'Summarise our conversation so far for carrying on the work: what the user wants, what '
     + 'has been done (files changed and how), what was found, and what is left. Keep file paths, names and '
-    + 'numbers exact. Plain text, as short as it can be while keeping all of that.';
+    + 'numbers exact. Say only what the conversation shows; mark anything you did not confirm as a guess. Plain '
+    + 'text, as short as it can be while keeping all of that.';
+
+/** The most of each changed file, and of all of them, a summary carries. */
+const MAX_CHANGED_FILE_CHARS = 20000;
+const MAX_CHANGED_CHARS = 60000;
+const CHANGED_FILE_HEADING = /^\[The file (.+) as it is now\]$/gm;
 
 /**
- * `history` summarised by the model into one exchange, when it is large; else as it is. Returns
- * { history, summarised, costUsd }.
+ * The files `history` wrote or edited: by write_file and edit_file calls, and in an earlier
+ * summary, by the files it carried.
  */
-async function summariseIfLarge(model, system, history, abortSignal) {
+function changedFiles(history) {
+    const files = new Set();
+    for (const message of history) {
+        if (message.role === 'assistant' && Array.isArray(message.content)) {
+            for (const part of message.content) {
+                if (part.type === 'tool-call' && ['write_file', 'edit_file'].includes(part.toolName) && part.input && part.input.file_path) {
+                    files.add(part.input.file_path);
+                }
+            }
+        } else if (message.role === 'user' && typeof message.content === 'string') {
+            for (const [, file] of message.content.matchAll(CHANGED_FILE_HEADING)) files.add(file);
+        }
+    }
+    return [...files];
+}
+
+/**
+ * The changed files as they are now, for a summary: it can be wrong about what is in them (one
+ * said a bug was still there after it was fixed), and this is what the model goes by.
+ */
+async function changedFilesNow(history, files) {
+    if (!files) return '';
+    const shown = [];
+    let total = 0;
+    for (const file of changedFiles(history)) {
+        const content = await files.read(file).catch(() => null);
+        if (content === null || total >= MAX_CHANGED_CHARS) continue;
+        const cut = content.length > MAX_CHANGED_FILE_CHARS ? `${content.slice(0, MAX_CHANGED_FILE_CHARS)}\n[…cut off]` : content;
+        total += cut.length;
+        shown.push(`[The file ${file} as it is now]\n\`\`\`\n${cut}\n\`\`\``);
+    }
+    return shown.length
+        ? `\n\n[The files changed so far, as they are now. Where the summary disagrees with them, they are right.]\n\n${shown.join('\n\n')}`
+        : '';
+}
+
+/**
+ * `history` summarised by the model into one exchange, when it is large; else as it is, with the
+ * files it changed as they are now (`files`, project-files.js). Returns { history, summarised, costUsd }.
+ */
+async function summariseIfLarge(model, system, history, abortSignal, files = null) {
     if (estimateTokens(history) < SUMMARISE_AT_TOKENS) return { history, summarised: false };
     // Streamed like every other request, which is all the backend carries cost reports for.
     const result = streamText({
@@ -217,7 +263,7 @@ async function summariseIfLarge(model, system, history, abortSignal) {
     const openrouter = metadata && metadata.openrouter;
     return {
         history: [
-            { role: 'user', content: `[A summary of our conversation so far]\n${summary}` },
+            { role: 'user', content: `[A summary of our conversation so far]\n${summary}${await changedFilesNow(history, files)}` },
             { role: 'assistant', content: 'Understood; I will carry on from there.' },
         ],
         summarised: true,
@@ -280,6 +326,7 @@ function earlyEnd(steps) {
  * @param {number} [options.contextWindow] the model's, for the panel's context meter
  * @param {number} [options.maxOutputTokens] the most one step may write
  * @param {object[]} options.tools       Kigumi tools
+ * @param {object} [options.files]       the project's files (project-files.js), for a summary to carry changed ones
  * @param {string} options.system
  * @param {object[]} options.history     the conversation so far, as model messages
  * @param {string|object[]} options.prompt  text, or content parts (text and images)
@@ -289,9 +336,9 @@ function earlyEnd(steps) {
  * @returns {Promise<{ history: object[], costUsd?: number }>} the conversation after the turn. A turn
  *     that fails throws, with the conversation as far as it got as the error's `history`.
  */
-async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS, tools, system,
-    history, prompt, abortSignal, askPermission, onEvent }) {
-    const compacted = await summariseIfLarge(model, system, history, abortSignal);
+async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS, tools, files = null,
+    system, history, prompt, abortSignal, askPermission, onEvent }) {
+    const compacted = await summariseIfLarge(model, system, history, abortSignal, files);
     if (compacted.summarised) {
         onEvent({ type: 'agent:notice', key: 'agent.notice.summarised', text: 'The earlier conversation was summarised, to keep each step small.' });
     }

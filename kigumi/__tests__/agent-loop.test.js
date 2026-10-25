@@ -262,6 +262,35 @@ describe('the agent loop', () => {
         expect(costUsd).toBeCloseTo(0.003);
     });
 
+    test('a summary carries the files the conversation changed, as they are now, and again at the next summary', async () => {
+        const model = scripted(
+            [...say('s', 'Line 98 still reads bottom_position.'), finish('stop')],
+            [...say('1', 'Carrying on.'), finish('stop')],
+            [...say('s2', 'Still on the sawhorse.'), finish('stop')],
+            [...say('2', 'Carrying on.'), finish('stop')],
+        );
+        const disk = { 'frame.py': 'x_pos = x\n', 'gone.py': null };
+        const files = { read: async (file) => disk[file] ?? null };
+        const edit = (id, file) => [
+            { role: 'assistant', content: [{ type: 'tool-call', toolCallId: id, toolName: 'edit_file', input: { file_path: file } }] },
+            { role: 'tool', content: [{ type: 'tool-result', toolCallId: id, toolName: 'edit_file', output: { type: 'text', value: 'Edited.' } }] },
+        ];
+        const big = [{ role: 'user', content: 'x'.repeat(SUMMARISE_AT_TOKENS * 4 + 100) }, ...edit('e1', 'frame.py'), ...edit('e2', 'gone.py'),
+            { role: 'assistant', content: 'ok' }];
+        const run = (history) => runTurn({ model, images: true, tools: [], files, system: 's', history, prompt: 'go',
+            askPermission: async () => true, onEvent: () => {} });
+
+        const { history } = await run(big);
+        expect(history[0].content).toContain('Line 98 still reads bottom_position.');
+        expect(history[0].content).toContain('Where the summary disagrees with them, they are right.');
+        expect(history[0].content).toContain('[The file frame.py as it is now]\n```\nx_pos = x\n');
+        expect(history[0].content).not.toContain('gone.py');
+
+        disk['frame.py'] = 'x_pos = x  # newer\n';
+        const again = await run([{ role: 'user', content: `${history[0].content}${'y'.repeat(SUMMARISE_AT_TOKENS * 4)}` }, ...history.slice(1)]);
+        expect(again.history[0].content).toContain('x_pos = x  # newer');
+    });
+
     test('each step reports how full the conversation is', async () => {
         const events = [];
         await runTurn({ model: scripted([...say('1', 'Hi.'), finish('stop')]), images: true, contextWindow: 200000, tools: [],

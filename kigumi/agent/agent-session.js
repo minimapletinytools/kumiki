@@ -397,6 +397,7 @@ class AgentSession {
                 contextWindow: this.model.contextWindow,
                 maxOutputTokens: this.panelSetting('agent.maxOutputTokens'),
                 tools: this.tools,
+                files: this.files.root() ? this.files : null,
                 system: this.panelSetting('agent.planMode')
                     ? `${systemPrompt(this.kumikiSource())}\n\n${PLAN_MODE_NOTE}` : systemPrompt(this.kumikiSource()),
                 history: this.history,
