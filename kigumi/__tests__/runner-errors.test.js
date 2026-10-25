@@ -18,6 +18,17 @@ test('the innermost traceback line in a file that exists is where it happened', 
   expect(parseTracebackLocation(null)).toBeNull();
 });
 
+test('a traceback goes to the view\'s file first, then to a file not from installed packages', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-tb-'));
+  const [frame, helper, library] = ['frame.py', 'helper.py', 'site-packages/lib.py'].map((name) => path.join(dir, name));
+  fs.mkdirSync(path.dirname(library));
+  for (const file of [frame, helper, library]) fs.writeFileSync(file, '');
+  const traceback = `File "${frame}", line 3\nFile "${helper}", line 5\nFile "${library}", line 7`;
+  expect(parseTracebackLocation(traceback, { prefer: frame })).toEqual({ filePath: frame, lineNumber: 3 });
+  expect(parseTracebackLocation(traceback)).toEqual({ filePath: helper, lineNumber: 5 });
+  expect(parseTracebackLocation(`File "${library}", line 7`)).toEqual({ filePath: library, lineNumber: 7 });
+});
+
 test('a view says what went wrong plainly', () => {
   expect(deriveViewerErrorMessage({ message: '' })).toBe('Unable to render this file in Kigumi viewer.');
   expect(deriveViewerErrorMessage({ message: 'No patternbook found in x' })).toMatch(/does not define a patternbook/);

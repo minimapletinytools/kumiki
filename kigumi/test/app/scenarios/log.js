@@ -1,15 +1,18 @@
 // The app's one log, in its Log tab: a view has no log of its own, and its "view log" button opens
 // the Log tab showing that view's file, with a failed build's traceback whose frames open their lines.
+// A failed build's overlay also goes straight to the line that raised.
 
 const fs = require('fs');
 const path = require('path');
 
 module.exports = {
     name: 'log',
-    async run({ check, inShell, waitFor, openFrame, viewDoc, connection, FRAME }) {
+    async run({ check, inShell, waitFor, capture, openFrame, viewDoc, connection, FRAME }) {
         const read = (script) => inShell(`(() => { const doc = ${viewDoc}; return ${script}; })()`);
 
         await openFrame(FRAME);
+        const idleButtons = await read(`Boolean(doc.getElementById('output-btn'))`);
+        check('a view that built shows no error buttons', !idleButtons, `buttons ${idleButtons}`);
         const viewLog = await read(`Boolean(doc.querySelector('.vsb-tab[data-tab="log"]') || doc.getElementById('log-panel-box'))`);
         check('a view has no Log tab of its own', !viewLog, `view log ${viewLog}`);
 
@@ -19,8 +22,21 @@ module.exports = {
         fs.writeFileSync(broken, 'from kumiki import *\n\n\ndef build_frame():\n    raise NameError("brace is not defined")\n');
         try {
             await openFrame(broken);
-            const button = await waitFor(() => read(`(() => { const b = doc.getElementById('output-btn'); return b && b.style.display !== 'none'; })()`),
+            const button = await waitFor(() => read(`Boolean(doc.getElementById('output-btn') && doc.getElementById('go-to-error-btn'))`),
                 { timeoutMs: 30000 }).catch(() => false);
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            await capture('log-error-overlay');
+            // The overlay's "go to error" opens the frame at the line that raised.
+            const viewTab = connection().activePanel;
+            await read(`doc.getElementById('go-to-error-btn').click()`);
+            const atError = await waitFor(() => {
+                const active = connection().activePanel;
+                return active && active.type === 'editor' ? active : null;
+            }, { timeoutMs: 10000 }).catch(() => null);
+            check('a failed build\'s "go to error" opens its file', atError && atError.filePath === broken, atError && atError.filePath);
+            atError.dispose();
+            viewTab.reveal();
+
             await read(`doc.getElementById('output-btn').click()`);
             const logTab = await waitFor(() => {
                 const active = connection().activePanel;

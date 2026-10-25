@@ -292,8 +292,12 @@ class FrameViewSession {
             const startDetails = extractRunnerErrorDetails(startError);
             this.logBlock('error', `Runner startup failed: ${startDetails.type ? `${startDetails.type}: ` : ''}${startDetails.message}`
                 + (startDetails.traceback ? `\n${startDetails.traceback}` : ''));
-            const errorMessage = 'Failed to start Python runner. See the log for details.';
-            this.pushViewerErrorStateWithLink(errorMessage, `Kigumi Python Runner Error: ${startError && startError.message ? startError.message : 'unknown'}`);
+            // A frame that raised while loading says so, as a failed refresh does.
+            const errorMessage = startDetails.traceback
+                ? deriveViewerErrorMessage(startDetails)
+                : 'Failed to start Python runner. See the log for details.';
+            this.pushViewerErrorStateWithLink(errorMessage, `Kigumi Python Runner Error: ${startError && startError.message ? startError.message : 'unknown'}`,
+                startDetails.traceback);
             throw startError;
         }
         this.profiler.markTiming(initTiming, 'initialize.runner.end');
@@ -1402,14 +1406,15 @@ class FrameViewSession {
                 keepLoading: true,
                 refreshToken,
                 error: details && typeof details.message === 'string' ? details.message : null,
-                showOutputLink: false,
+                // For the overlay's "go to error".
+                errorLocation: parseTracebackLocation(details && details.traceback, { prefer: this.filePath }),
             },
         }).catch((postError) => {
             this.log(`[webview] Failed to post error state: ${postError.message || postError}`);
         });
     }
 
-    pushViewerErrorStateWithLink(displayMessage, fullError) {
+    pushViewerErrorStateWithLink(displayMessage, fullError, traceback = null) {
         if (!this.panel) {
             return;
         }
@@ -1423,7 +1428,7 @@ class FrameViewSession {
                 keepLoading: true,
                 refreshToken,
                 error: fullError,
-                showOutputLink: true,
+                errorLocation: parseTracebackLocation(traceback, { prefer: this.filePath }),
             },
         }).catch((postError) => {
             this.log(`[webview] Failed to post error state with link: ${postError.message || postError}`);

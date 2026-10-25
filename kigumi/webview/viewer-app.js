@@ -250,7 +250,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 <svg id="measurement-overlay" aria-hidden="true"></svg>
                 <div id="loading-overlay" class=${this.overlayClasses()}>
                     <div id="loading-text">${this.viewState.loadingText}</div>
-                    <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
+                    ${this.viewState.phase === ViewerPhase.ERROR ? this.renderErrorActions() : ''}
                 </div>
                 <div id="gizmo-panel" class=${this.cameraPanelCollapsed ? 'is-collapsed' : ''}
                      aria-label=${t('viewer.chrome.gizmoPanel.ariaLabel')}>
@@ -572,13 +572,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             this.setProjectionMode(!this.isOrthographic);
         });
 
-        const outputBtn = this.renderRoot.querySelector('#output-btn');
-        if (outputBtn) {
-            // The host's log, showing this view's: the app's Log tab, or VS Code's Output.
-            outputBtn.addEventListener('click', () => {
-                if (vscode) vscode.postMessage({ type: 'openKigumiOutput' });
-            });
-        }
 
         lightDialCanvas.addEventListener('pointerdown', (event) => {
             event.preventDefault();
@@ -1345,6 +1338,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 this.setViewPhase(uiState.phase, uiState.loadingText, {
                     refreshToken: uiState.refreshToken,
                     error: uiState.error,
+                    errorLocation: uiState.errorLocation,
                 });
                 return;
             }
@@ -2587,7 +2581,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             ? next.refreshToken
             : this.activeRefreshToken;
         const error = typeof next.error === 'string' && next.error ? next.error : null;
-        const showOutputLink = Boolean(next.showOutputLink);
+        const location = next.errorLocation;
+        const errorLocation = location && typeof location.filePath === 'string' && Number.isInteger(location.lineNumber)
+            ? { filePath: location.filePath, lineNumber: location.lineNumber }
+            : null;
         const sourceHasPendingChanges = Boolean(next.sourceHasPendingChanges);
 
         return {
@@ -2595,7 +2592,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             loadingText,
             refreshToken,
             error,
-            showOutputLink,
+            errorLocation,
             sourceHasPendingChanges,
             keepLoading: Boolean(next.keepLoading),
         };
@@ -2615,6 +2612,18 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return t('viewer.chrome.loading.viewerError');
         }
         return '';
+    }
+
+    /** An error's buttons: to where it went wrong, if known, and to the log (the app's Log tab, or VS Code's Output). */
+    renderErrorActions() {
+        const location = this.viewState.errorLocation;
+        return html`<div class="error-actions">
+            ${location ? html`<button id="go-to-error-btn" type="button"
+                title=${t('viewer.chrome.goToError.title', { file: location.filePath.split(/[\\/]/).pop(), line: location.lineNumber })}
+                @click=${() => vscode && vscode.postMessage({ type: 'openLogLocation', ...location })}>${t('viewer.chrome.goToError')}</button>` : ''}
+            <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')}
+                @click=${() => vscode && vscode.postMessage({ type: 'openKigumiOutput' })}>${t('viewer.chrome.viewOutput')}</button>
+        </div>`;
     }
 
     isOverlayVisible() {
@@ -2645,6 +2654,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.setViewState({
             phase,
             loadingText: loadingText || this.defaultLoadingTextForPhase(phase),
+            errorLocation: null,
             ...extra,
         });
     }
@@ -2725,7 +2735,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.setKiwariFromFrame(frameData);
 
         if (uiState.keepLoading) {
-            this.setViewPhase(uiState.phase, uiState.loadingText, { refreshToken, error: uiState.error });
+            this.setViewPhase(uiState.phase, uiState.loadingText, { refreshToken, error: uiState.error, errorLocation: uiState.errorLocation });
             this.selectionPanel.updateInfo(frameData);
             this.updateDebug(geometryData, profiling);
             return;

@@ -22,25 +22,23 @@ function extractRunnerErrorDetails(error) {
     return { message, traceback, type };
 }
 
-/** Returns the innermost `{ filePath, lineNumber }` of a traceback that exists on disk, or null. */
-function parseTracebackLocation(traceback) {
+/**
+ * Where a traceback went wrong, as `{ filePath, lineNumber }`: its innermost line in `prefer` (the
+ * view's file), else in a file not from installed packages, else in any file that exists; or null.
+ */
+function parseTracebackLocation(traceback, { prefer } = {}) {
     if (!traceback || typeof traceback !== 'string') {
         return null;
     }
-    const fileLineRegex = /File "([^"]+)", line (\d+)/g;
-    const candidates = [];
-    let match = fileLineRegex.exec(traceback);
-    while (match) {
-        candidates.push({ filePath: match[1], lineNumber: Number(match[2]) });
-        match = fileLineRegex.exec(traceback);
-    }
-    for (let index = candidates.length - 1; index >= 0; index -= 1) {
-        const candidate = candidates[index];
-        if (candidate.filePath && fs.existsSync(candidate.filePath) && Number.isFinite(candidate.lineNumber)) {
-            return candidate;
-        }
-    }
-    return null;
+    const candidates = [...traceback.matchAll(/File "([^"]+)", line (\d+)/g)]
+        .map((match) => ({ filePath: match[1], lineNumber: Number(match[2]) }))
+        .filter((candidate) => Number.isFinite(candidate.lineNumber) && fs.existsSync(candidate.filePath))
+        .reverse();
+    const installed = /[\\/](site|dist)-packages[\\/]|[\\/]runner\.py$/;
+    return candidates.find((candidate) => prefer && candidate.filePath === prefer)
+        || candidates.find((candidate) => !installed.test(candidate.filePath))
+        || candidates[0]
+        || null;
 }
 
 /** Returns the line a view shows for a runner error (extractRunnerErrorDetails's result). */

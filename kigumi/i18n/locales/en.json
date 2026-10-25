@@ -123,6 +123,8 @@
   "viewer.chrome.loading.raisingFrame": "raising frame",
   "viewer.chrome.loading.cuttingJoints": "cutting joints {processed}/{total}",
   "viewer.chrome.loading.viewerError": "viewer error",
+  "viewer.chrome.goToError": "go to error",
+  "viewer.chrome.goToError.title": "Open {file} at line {line}",
   "viewer.chrome.viewOutput": "view log",
   "viewer.chrome.viewOutput.title": "Show the log",
   "viewer.chrome.gizmoPanel.ariaLabel": "Camera and light gizmos",

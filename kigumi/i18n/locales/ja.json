@@ -123,6 +123,8 @@
   "viewer.chrome.loading.raisingFrame": "フレームを構築中",
   "viewer.chrome.loading.cuttingJoints": "仕口を加工中 {processed}/{total}",
   "viewer.chrome.loading.viewerError": "ビューアーエラー",
+  "viewer.chrome.goToError": "エラー箇所へ",
+  "viewer.chrome.goToError.title": "{file} の {line} 行目を開きます",
   "viewer.chrome.viewOutput": "ログを表示",
   "viewer.chrome.viewOutput.title": "ログを表示します",
   "viewer.chrome.gizmoPanel.ariaLabel": "カメラとライトのギズモ",

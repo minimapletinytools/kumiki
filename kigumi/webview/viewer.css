@@ -93,7 +93,11 @@
 #loading-text {
     pointer-events: none;
 }
-#loading-overlay #output-btn {
+.error-actions {
+    display: flex;
+    gap: 8px;
+}
+#loading-overlay .error-actions button {
     pointer-events: all;
     cursor: pointer;
     padding: 8px 16px;
@@ -106,10 +110,10 @@
     text-transform: lowercase;
     transition: background 0.2s ease;
 }
-#loading-overlay #output-btn:hover {
+#loading-overlay .error-actions button:hover {
     background: var(--hv-error-hover);
 }
-#loading-overlay #output-btn:active {
+#loading-overlay .error-actions button:active {
     background: var(--hv-error-active);
 }
 #loading-overlay.visible {
