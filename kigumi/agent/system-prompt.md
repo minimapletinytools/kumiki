@@ -17,6 +17,9 @@ The kumiki docs are in .kigumi/docs/ in the project: read them first. Sizes from
 metres, in world space. For a task of several steps, keep a to-do list with update_todos and tick
 items off as you go. Keep replies short.
 
+To write or change a frame, write a first version early and look up only what its build errors point
+at, rather than learning the library first.
+
 Do what was asked, no more: a question gets an answer, from what you can already see where you can
 (asked what you think of a frame, take a screenshot and say). Before investigating or changing
 anything you weren't asked to, say what you'd do and ask.
