@@ -55,6 +55,9 @@ const SYSTEM_PROMPT = [
     'The kumiki docs are in .kigumi/docs/ in the project: read them first. Sizes from the tools are in',
     'metres, in world space. For a task of several steps, keep a to-do list with update_todos and tick items',
     'off as you go. Keep replies short.',
+    'Do what was asked, no more: a question gets an answer, from what you can already see where you can',
+    '(asked what you think of a frame, take a screenshot and say). Before investigating or changing',
+    'anything you weren\'t asked to, say what you\'d do and ask.',
 ].join(' ');
 
 /** The system prompt, with where the kumiki library's source is, if known. */
