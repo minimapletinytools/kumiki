@@ -36,6 +36,15 @@ agent/agent-session.js
 agent/agent-loop.js
 agent/models.js
 agent/file-tools.js
+agent/checkpoints.js
+agent/permissions.js
+agent/project-files.js
+agent/prompt-content.js
+agent/search-worker.js
+agent/session-tools.js
+agent/account.js
+agent/backend-config.js
+agent/conversation-store.js
 agent/tools.js
 agent/mcp-http.js
 agent/mcp-setup.js
