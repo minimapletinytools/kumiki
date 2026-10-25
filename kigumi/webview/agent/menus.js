@@ -1,5 +1,5 @@
 // The panel's two menus: settings (how freely the agent changes things, tools always allowed,
-// opening at startup) and past conversations; and the banner saying when it isn't asking.
+// the longest step, opening at startup) and past conversations; and the banner saying when it isn't asking.
 import { t } from './i18n.js';
 
 const MODE_BANNERS = { edits: 'agent.banner.edits', all: 'agent.banner.all' };
@@ -13,8 +13,8 @@ function ago(time) {
 }
 
 export class Menus {
-    constructor({ settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, banner }, { post }) {
-        Object.assign(this, { settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, banner, post });
+    constructor({ settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, outputLimit, banner }, { post }) {
+        Object.assign(this, { settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, outputLimit, banner, post });
         this.modeRadios = [...settingsMenu.querySelectorAll('input[name="permission-mode"]')];
         this.allowedTools = [];
         settingsButton.addEventListener('click', () => {
@@ -31,6 +31,7 @@ export class Menus {
             radio.addEventListener('change', () => post({ type: 'agent:setSetting', key: 'agent.permissionMode', value: radio.value }));
         }
         startupToggle.addEventListener('change', () => post({ type: 'agent:setSetting', key: 'agent.showOnStartup', value: startupToggle.checked }));
+        outputLimit.addEventListener('change', () => post({ type: 'agent:setSetting', key: 'agent.maxOutputTokens', value: Number(outputLimit.value) }));
     }
 
     closeHistory() {
@@ -41,6 +42,7 @@ export class Menus {
         const mode = settings['agent.permissionMode'] || 'ask';
         for (const radio of this.modeRadios) radio.checked = radio.value === mode;
         this.startupToggle.checked = settings['agent.showOnStartup'] !== false;
+        this.outputLimit.value = String(settings['agent.maxOutputTokens'] || 8000);
         const planning = settings['agent.planMode'] === true;
         this.banner.hidden = !planning && mode === 'ask';
         this.banner.textContent = planning ? t('agent.banner.plan') : MODE_BANNERS[mode] ? t(MODE_BANNERS[mode]) : '';

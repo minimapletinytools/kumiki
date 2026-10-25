@@ -23,7 +23,7 @@ const composer = new Composer({
 }, { post, isBusy: () => busy, onSent: (text, imageUrls) => conversation.userBubble(text, imageUrls) });
 const menus = new Menus({
     settingsButton: $('btn-settings'), settingsMenu: $('settings-menu'), historyButton: $('btn-history'), historyMenu: $('history-menu'),
-    historyList: $('history-list'), alwaysAllowed: $('always-allowed'), startupToggle: $('setting-startup'), banner: $('bypass-banner'),
+    historyList: $('history-list'), alwaysAllowed: $('always-allowed'), startupToggle: $('setting-startup'), outputLimit: $('setting-output-limit'), banner: $('bypass-banner'),
 }, { post });
 
 function reset() {

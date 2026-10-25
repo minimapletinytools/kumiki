@@ -398,7 +398,8 @@ describe('the agent session', () => {
         expect(posted.pop()).toEqual({
             type: 'agent:state', models: MODELS.map(({ id, label }) => ({ id, label })), model: 'claude-sonnet-5', via: 'openrouter',
             account: { configured: false },
-            settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false },
+            settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
+                'agent.maxOutputTokens': 8000 },
             strings: {},
         });
     });
@@ -568,6 +569,15 @@ describe('the agent session', () => {
         expect(result.text).toBe('To-do list updated: 1 of 2 left.');
         expect(posted).toContainEqual({ type: 'agent:todos', items: [{ text: 'legs', done: true }, { text: 'beam', done: false }] });
         expect(agent.transcript.at(-1).type).toBe('agent:todos');
+    });
+
+    test('the longest step is the setting, if it is one offered; else 8k', async () => {
+        for (const [setting, sent] of [[32000, 32000], [999999, 8000]]) {
+            const model = scripted([...say('1', 'ok'), finish('stop')]);
+            const { agent } = session({ settings: { 'agent.openrouterApiKey': 'sk-or', 'agent.maxOutputTokens': setting }, model });
+            await agent.prompt('hi');
+            expect(model.doStreamCalls[0].maxOutputTokens).toBe(sent);
+        }
     });
 
     test('in plan mode, nothing that changes anything runs, and the model is told why', async () => {

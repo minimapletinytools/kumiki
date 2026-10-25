@@ -1,9 +1,10 @@
 // The agent panel: it lists the models, offers signing in when there is no key, and a model picked
-// there is kept; with a key set, it says it is using it. And the build an agent's edit runs.
+// there is kept; with a key set, it says it is using it. Its settings set the longest step. And the
+// build an agent's edit runs.
 
 module.exports = {
     name: 'agent',
-    async run({ check, inShell, waitFor, settings, openFrame, runAppCommand, FRAME }) {
+    async run({ check, inShell, waitFor, capture, settings, openFrame, runAppCommand, FRAME }) {
         const agentDoc = 'document.querySelector("#slot-right iframe").contentDocument';
         const read = (script) => inShell(`(() => { const doc = ${agentDoc}; return ${script}; })()`);
 
@@ -21,6 +22,16 @@ module.exports = {
             .then((text) => (text.includes('OpenRouter key') ? text : null)), { timeoutMs: 5000 }).catch(() => '');
         check('a model picked in the panel is kept, and the panel says which key it uses',
             settings.get('agent.model') === 'claude-haiku-4.5' && Boolean(using), `${settings.get('agent.model')}; ${using}`);
+
+        await read(`doc.getElementById('btn-settings').click()`);
+        const shown = await read(`doc.getElementById('setting-output-limit').value`);
+        await read(`(() => { const select = doc.getElementById('setting-output-limit'); select.value = '32000';
+            select.dispatchEvent(new Event('change')); })()`);
+        const limit = await waitFor(() => settings.get('agent.maxOutputTokens') === 32000, { timeoutMs: 5000 }).catch(() => false);
+        await capture('agent-settings');
+        await read(`doc.getElementById('btn-settings').click()`);
+        settings.set('agent.maxOutputTokens', 8000);
+        check('the settings menu sets the longest step', shown === '8000' && limit, `shown ${shown}, now ${settings.get('agent.maxOutputTokens')}`);
 
         // What an edit by the agent runs: the view's file built as it is, and that build's problems.
         await openFrame(FRAME);

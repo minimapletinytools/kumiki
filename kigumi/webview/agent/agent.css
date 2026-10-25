@@ -435,6 +435,18 @@ textarea {
     gap: 6px;
     cursor: pointer;
 }
+.settings-menu .settings-select {
+    justify-content: space-between;
+    margin-top: 6px;
+}
+.settings-select select {
+    font: inherit;
+    color: inherit;
+    background: var(--ka-bg);
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    padding: 1px 4px;
+}
 
 .settings-hint {
     color: var(--ka-muted);

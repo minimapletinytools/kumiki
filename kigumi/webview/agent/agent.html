@@ -27,6 +27,12 @@
             <label><input type="radio" name="permission-mode" value="edits"> <span data-i18n="agent.settings.edits">Edit files without asking</span></label>
             <label><input type="radio" name="permission-mode" value="all"> <span data-i18n="agent.settings.all">Do everything without asking</span></label>
             <div id="always-allowed" class="always-allowed"></div>
+            <label class="settings-select"><span data-i18n="agent.settings.outputLimit">Longest step</span>
+                <select id="setting-output-limit">
+                    <option value="8000" data-i18n="agent.settings.outputLimit.8000">8k tokens</option>
+                    <option value="16000" data-i18n="agent.settings.outputLimit.16000">16k tokens</option>
+                    <option value="32000" data-i18n="agent.settings.outputLimit.32000">32k tokens</option>
+                </select></label>
             <label><input id="setting-startup" type="checkbox"> <span data-i18n="agent.settings.startup">Open the agent when Kigumi starts</span></label>
         </div>
         <div id="history-menu" class="history-menu" hidden>

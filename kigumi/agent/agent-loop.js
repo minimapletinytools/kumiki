@@ -14,7 +14,7 @@ const { z } = require('zod');
 
 /** Steps in one turn, each a model call and the tools it asks for. */
 const MAX_STEPS = 40;
-/** Per step. Unset, a provider may reserve its maximum (64k for Haiku) against the balance. */
+/** Per step, unless the user's setting says more. Unset, a provider may reserve its maximum (64k for Haiku) against the balance. */
 const MAX_OUTPUT_TOKENS = 8000;
 
 /** Return the AI SDK language model a route (agent/models.js routeModel) names. */
@@ -216,7 +216,7 @@ function earlyEnd(steps) {
         return { key: 'agent.notice.maxSteps', params: { steps: MAX_STEPS }, text: `Stopped after ${MAX_STEPS} steps. Say "continue" to carry on.` };
     }
     if (last.finishReason === 'length') {
-        return { key: 'agent.notice.outputLimit', text: 'Stopped at the output limit for one step. Say "continue" to carry on.' };
+        return { key: 'agent.notice.outputLimit', text: 'Stopped at the output limit for one step. Say "continue" to carry on, or raise the limit in settings.' };
     }
     if (['stop', 'tool-calls'].includes(last.finishReason)) return null;
     const reason = last.rawFinishReason || last.finishReason;
@@ -231,6 +231,7 @@ function earlyEnd(steps) {
  * @param {boolean} options.images       whether the model can look at images
  * @param {boolean} [options.cacheMarks] whether to mark where its prompt cache should hold (models.js)
  * @param {number} [options.contextWindow] the model's, for the panel's context meter
+ * @param {number} [options.maxOutputTokens] the most one step may write
  * @param {object[]} options.tools       Kigumi tools
  * @param {string} options.system
  * @param {object[]} options.history     the conversation so far, as model messages
@@ -241,8 +242,8 @@ function earlyEnd(steps) {
  * @returns {Promise<{ history: object[], costUsd?: number }>} the conversation after the turn. A turn
  *     that fails throws, with the conversation as far as it got as the error's `history`.
  */
-async function runTurn({ model, images, cacheMarks = false, contextWindow, tools, system, history, prompt, abortSignal,
-    askPermission, onEvent }) {
+async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS, tools, system,
+    history, prompt, abortSignal, askPermission, onEvent }) {
     const compacted = await summariseIfLarge(model, system, history, abortSignal);
     if (compacted.summarised) {
         onEvent({ type: 'agent:notice', key: 'agent.notice.summarised', text: 'The earlier conversation was summarised, to keep each step small.' });
@@ -256,7 +257,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, tools
         messages,
         tools: toToolSet(tools, { images, askPermission }),
         stopWhen: stepCountIs(MAX_STEPS),
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        maxOutputTokens,
         abortSignal,
         // A request refused or failed (busy, rate limited, an upstream error) is never charged, so
         // retrying one costs nothing.

@@ -39,6 +39,8 @@ const PANEL_SETTINGS = {
     'agent.alwaysAllow': { fallback: [], valid: (value) => Array.isArray(value) && value.every((name) => typeof name === 'string') },
     'agent.showOnStartup': { fallback: true, valid: (value) => typeof value === 'boolean' },
     'agent.planMode': { fallback: false, valid: (value) => typeof value === 'boolean' },
+    // The most one step may write, in tokens; the backend allows up to 32k.
+    'agent.maxOutputTokens': { fallback: 8000, valid: (value) => [8000, 16000, 32000].includes(value) },
 };
 
 /** What the agent says to carry on after a turn that failed. */
@@ -383,6 +385,7 @@ class AgentSession {
                 images: this.model.images,
                 cacheMarks: Boolean(this.model.cacheMarks),
                 contextWindow: this.model.contextWindow,
+                maxOutputTokens: this.panelSetting('agent.maxOutputTokens'),
                 tools: this.tools,
                 system: this.panelSetting('agent.planMode') ? `${SYSTEM_PROMPT}\n\n${PLAN_MODE_NOTE}` : SYSTEM_PROMPT,
                 history: this.history,
