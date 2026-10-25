@@ -107,9 +107,8 @@ describe('Kigumi initial state validation', () => {
     assert.ok(panelSnapshot.hasRenderControls, 'Expected options panel controls to be rendered');
     assert.ok(panelSnapshot.hasMemberListPanel, 'Expected Member List panel to be rendered');
     assert.ok(panelSnapshot.hasMemberTableBody, 'Expected member table body to be rendered');
-    assert.ok(panelSnapshot.hasLogOutputPanel, 'Expected Log Output panel to be rendered');
-    assert.ok(panelSnapshot.hasRawPythonOutputPanel, 'Expected Raw Python Output panel to be rendered');
-    assert.ok(panelSnapshot.isRawPythonOutputPanelLast, 'Expected Raw Python Output panel to be at the bottom');
+    // VS Code has its Output panel, so the view shows no log of its own.
+    assert.ok(!panelSnapshot.hasLogPanel, 'Expected no Log panel in VS Code');
 
   });
 });

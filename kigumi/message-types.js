@@ -21,6 +21,7 @@ const TO_EXTENSION = Object.freeze([
     'findCSGAtPoint',
     'hoverFeatureAtPoint',
     'openKigumiOutput',
+    'openLogLocation',
     'openOutputChannel',
     'requestCSGByPath',
     'requestCSGTree',

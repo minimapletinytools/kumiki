@@ -18,6 +18,7 @@
     --hv-overlay-bg: rgba(255, 255, 255, 0.46);
     --hv-overlay-error-bg: rgba(255, 236, 236, 0.78);
     --hv-error: #8a2b2b;
+    --hv-warn: #8a5a00;
     --hv-error-hover: #a63535;
     --hv-error-active: #6d1f1f;
     --hv-error-fg: #fefefe;

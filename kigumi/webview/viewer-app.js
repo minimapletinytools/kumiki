@@ -1,4 +1,5 @@
 import { LitElement, html } from 'lit';
+import { LogPanel } from './log-panel.js';
 import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
@@ -93,7 +94,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.assemblyScrubValue = 0;
         this._assemblyOffsetsByKey = new Map();
         this._assemblyRotationsByKey = new Map();
-        this.logFilterText = '';
 
         this.lightAzimuth = 0;
         this.lightElevation = 0.8;
@@ -184,6 +184,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         // Kigumi's MCP server as the host last said it is (frame-view-session.js), or null.
         this.mcpState = null;
         this.sidebar = new ViewSidebar({ requestUpdate: () => this.requestUpdate(), store: vscode });
+        // The view's own log, where the host has none (VS Code has its Output panel).
+        this.hostHasLog = INITIAL_PAYLOAD.hostHasLog === true;
+        this.logPanel = new LogPanel(this, { t, post: (message) => vscode && vscode.postMessage(message) });
         this.selectionPanel = new SelectionPanel(this, {
             t,
             csgTreeView: CsgTreeView,
@@ -313,26 +316,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 content: this.kiwariPanel.render() || html`<div class="vsb-empty">${t('viewer.sidebar.noParameters')}</div>`,
             },
             { id: 'members', label: t('viewer.sidebar.tab.members'), badge: memberCount || '', content: this.memberListPanel.render() },
-            {
+            ...(this.hostHasLog ? [] : [{
                 id: 'log',
                 label: t('viewer.sidebar.tab.log'),
-                content: html`
-                    <div id="log-panel-box" class="panel-box">
-                        <div class="panel-title">
-                            ${t('viewer.log.title')}
-                            <div id="log-panel-toolbar">
-                                <input id="log-filter" type="text" placeholder=${t('viewer.log.filter.placeholder')}>
-                                <button id="log-clear-btn" type="button">${t('viewer.log.clear')}</button>
-                                <button id="log-open-output-btn" type="button">${t('viewer.log.openOutput')}</button>
-                            </div>
-                        </div>
-                        <div id="log-output"></div>
-                    </div>
-                    <div class="panel-box">
-                        <div class="panel-title">${t('viewer.rawOutput.title')}</div>
-                        <pre id="raw-output"></pre>
-                    </div>`,
-            },
+                badge: this.logPanel.counts.errors || '',
+                content: this.logPanel.render(),
+            }]),
         ];
     }
 
@@ -594,8 +583,13 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
         const outputBtn = this.renderRoot.querySelector('#output-btn');
         if (outputBtn) {
+            // The host's log (VS Code's Output), else the view's own.
             outputBtn.addEventListener('click', () => {
-                if (vscode) { vscode.postMessage({ type: 'openKigumiOutput' }); }
+                if (this.hostHasLog) {
+                    if (vscode) vscode.postMessage({ type: 'openKigumiOutput' });
+                } else {
+                    this.showLog();
+                }
             });
         }
 
@@ -608,15 +602,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
         this.settingsPanel.bindEvents(this.renderRoot);
 
-        const logClearBtn = this.renderRoot.querySelector('#log-clear-btn');
-        const logFilterInput = this.renderRoot.querySelector('#log-filter');
-        const logOpenOutputBtn = this.renderRoot.querySelector('#log-open-output-btn');
-
-        logClearBtn.addEventListener('click', () => { this.clearLog(); });
-        logFilterInput.addEventListener('input', (event) => { this.applyLogFilter(event.target.value); });
-        logOpenOutputBtn.addEventListener('click', () => {
-            if (vscode) { vscode.postMessage({ type: 'openOutputChannel' }); }
-        });
+        if (!this.hostHasLog) this.logPanel.bindEvents(this.renderRoot);
 
         this.memberListPanel.bindEvents(this.renderRoot);
         this.memberListPanel.applyOptionVisibility();
@@ -1078,32 +1064,14 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         console.info('[Kigumi]', payload);
     }
 
-    appendLogLine(text) {
-        const container = this.renderRoot.querySelector('#log-output');
-        if (!container) { return; }
-        const line = document.createElement('div');
-        line.className = 'log-line';
-        line.textContent = text;
-        if (this.logFilterText && !text.toLowerCase().includes(this.logFilterText)) {
-            line.classList.add('log-filtered-out');
-        }
-        container.appendChild(line);
-        container.scrollTop = container.scrollHeight;
+    appendLogLine(text, level, timestamp) {
+        if (!this.hostHasLog) this.logPanel.add({ text, level, timestamp });
     }
 
-    clearLog() {
-        const container = this.renderRoot.querySelector('#log-output');
-        if (container) { container.innerHTML = ''; }
-    }
-
-    applyLogFilter(filterText) {
-        this.logFilterText = filterText.toLowerCase();
-        const container = this.renderRoot.querySelector('#log-output');
-        if (!container) { return; }
-        for (const line of container.querySelectorAll('.log-line')) {
-            const match = !this.logFilterText || line.textContent.toLowerCase().includes(this.logFilterText);
-            line.classList.toggle('log-filtered-out', !match);
-        }
+    /** The view's log, in front. */
+    showLog() {
+        this.sidebar.setCollapsed(false);
+        this.sidebar.show('log');
     }
 
     // ------------------------------------------------------------------
@@ -1447,7 +1415,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
         if (message.type === 'logEntry') {
             const text = typeof message.text === 'string' ? message.text : String(message.text);
-            this.appendLogLine(text);
+            this.appendLogLine(text, message.level, message.timestamp);
             return;
         }
 
@@ -1635,12 +1603,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             const titles = Array.from(this.renderRoot.querySelectorAll('#view-sidebar .panel-title'))
                 .map((element) => (element.textContent || '').replace(/\s+/g, ' ').trim())
                 .filter((label) => label.length > 0);
-            const rawPanelIndex = titles.indexOf('Raw Python Output');
             const memberRowsElement = this.renderRoot.querySelector('#timber-rows');
             const memberRows = this.renderRoot.querySelectorAll('#timber-rows tr').length;
-            const logText = this.renderRoot.querySelector('#log-output')
-                ? this.renderRoot.querySelector('#log-output').textContent || ''
-                : '';
+            const logText = this.logPanel.text();
 
             vscode.postMessage({
                 type: 'capturePanelSnapshotResult',
@@ -1651,10 +1616,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                     panelCount: titles.length,
                     hasMemberListPanel: titles.includes('Member List'),
                     hasMemberTableBody: Boolean(memberRowsElement),
-                    hasLogOutputPanel: titles.some((label) => label.startsWith('Log Output')),
-                    hasRawPythonOutputPanel: rawPanelIndex >= 0,
-                    rawPythonOutputPanelIndex: rawPanelIndex,
-                    isRawPythonOutputPanelLast: rawPanelIndex >= 0 && rawPanelIndex === titles.length - 1,
+                    hasLogPanel: Boolean(this.renderRoot.querySelector('#log-panel-box')),
                     hasRenderControls: Boolean(this.renderRoot.querySelector('#render-controls')),
                     hasKiwariControls: Boolean(this.renderRoot.querySelector('#kiwari-controls')),
                     kiwariKeys: Array.from(this.renderRoot.querySelectorAll('#kiwari-controls .kiwari-key'))
@@ -2803,10 +2765,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             this.setViewPhase(uiState.phase, uiState.loadingText, { refreshToken, error: uiState.error });
             this.selectionPanel.updateInfo(frameData);
             this.updateDebug(geometryData, profiling);
-            this.renderRoot.querySelector('#raw-output').textContent = JSON.stringify({
-                frame: frameData,
-                geometry: geometryData,
-            }, null, 2);
             return;
         }
 
@@ -2835,11 +2793,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             ? { ...profiling, webview_apply_ms: applyElapsedMs, webview_mesh_ms: this._lastMeshBuildMs || 0 }
             : null;
         this.updateDebug(geometryData, enrichedProfiling);
-
-        this.renderRoot.querySelector('#raw-output').textContent = JSON.stringify({
-            frame: frameData,
-            geometry: geometryData,
-        }, null, 2);
 
         const bounds = this.getSceneBounds();
         this.lastBounds = bounds;

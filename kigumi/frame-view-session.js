@@ -280,8 +280,10 @@ class FrameViewSession {
                 message: startError && startError.message ? startError.message : String(startError),
             });
             this.channel.appendLine(`[${path.basename(this.filePath)}] Runner startup failed: ${startError && startError.message ? startError.message : String(startError)}`);
-            this.channel.show(true);
-            const errorMessage = `Failed to start Python runner. Check the output channel for details.`;
+            const startDetails = extractRunnerErrorDetails(startError);
+            this.logBlock('error', `Runner startup failed: ${startDetails.type ? `${startDetails.type}: ` : ''}${startDetails.message}`
+                + (startDetails.traceback ? `\n${startDetails.traceback}` : ''));
+            const errorMessage = 'Failed to start Python runner. See the log for details.';
             this.pushViewerErrorStateWithLink(errorMessage, `Kigumi Python Runner Error: ${startError && startError.message ? startError.message : 'unknown'}`);
             throw startError;
         }
@@ -382,6 +384,12 @@ class FrameViewSession {
             }
             if (message.type === 'openOutputChannel' || message.type === 'openKigumiOutput') {
                 this.channel.show(true);
+                return;
+            }
+            if (message.type === 'openLogLocation') {
+                if (typeof message.filePath === 'string' && Number.isInteger(message.lineNumber)) {
+                    void this.openTracebackLocation({ filePath: message.filePath, lineNumber: message.lineNumber });
+                }
                 return;
             }
             if (message.type === 'copySelectionForAI') {
@@ -1431,29 +1439,11 @@ class FrameViewSession {
                 this.channel.appendLine(`[${path.basename(this.filePath)}] ${tracebackLine}`);
             }
             this.channel.appendLine(`[${path.basename(this.filePath)}] [traceback] END`);
+            // One entry in the view's log, whose frames open at their lines, and in the session
+            // log an agent's build report reads.
+            this.logBlock('error', `${errorTypePart}${details.message}\n${details.traceback}`);
         }
-
-        this.channel.show(true);
-        const location = parseTracebackLocation(details.traceback);
-        const openOutputAction = t('message.action.openKigumiOutput');
-        const goToErrorAction = t('message.action.goToError');
-        const actions = [openOutputAction];
-        if (location) {
-            actions.push(goToErrorAction);
-        }
-
-        const choice = await getHost().showMessage(
-            'error',
-            `Kigumi Python error: ${details.message}`,
-            ...actions
-        );
-
-        if (choice === openOutputAction) {
-            this.channel.show(true);
-        }
-        if (choice === goToErrorAction && location) {
-            await this.openTracebackLocation(location);
-        }
+        // No pop-up: the view shows the error itself, and a dialog would stop an agent at work.
 
         if (error && typeof error === 'object') {
             error.kigumiErrorNotified = true;
@@ -1507,7 +1497,8 @@ class FrameViewSession {
     log(message) {
         const formatted = `[${path.basename(this.filePath)}] ${message}`;
         const match = /\[(debug|info|warn|error)\]/i.exec(String(message));
-        const level = normalizeViewerLogLevel(match ? match[1] : 'info');
+        // Timings are for looking into speed, not for reading: debug unless they say otherwise.
+        const level = normalizeViewerLogLevel(match ? match[1] : /\[timing\]/.test(message) ? 'debug' : 'info');
         const entry = {
             timestamp: new Date().toISOString(),
             level,
@@ -1525,7 +1516,32 @@ class FrameViewSession {
         }
         this.channel.appendLine(formatted);
         if (this.panel) {
-            this.panel.postMessage({ type: 'logEntry', text: formatted }).catch(() => {});
+            this.panel.postMessage({ type: 'logEntry', text: formatted, level, timestamp: entry.timestamp }).catch(() => {});
+        }
+    }
+
+    /**
+     * Several lines as one entry of the view's log and session log (a traceback), at `level`.
+     * The host's log channel gets them line by line, as it always has.
+     */
+    logBlock(level, text) {
+        const entry = {
+            timestamp: new Date().toISOString(),
+            level: normalizeViewerLogLevel(level),
+            message: `[${path.basename(this.filePath)}] ${text}`,
+            filePath: this.filePath,
+            slotName: this.slotName,
+            sessionType: this.sessionType,
+        };
+        try {
+            const logPath = this.getSessionLogPath();
+            fs.mkdirSync(path.dirname(logPath), { recursive: true });
+            fs.appendFile(logPath, `${JSON.stringify(entry)}\n`, 'utf8', () => {});
+        } catch (_error) {
+            // Logging must not break the viewer session.
+        }
+        if (this.panel) {
+            this.panel.postMessage({ type: 'logEntry', text: entry.message, level: entry.level, timestamp: entry.timestamp }).catch(() => {});
         }
     }
 

@@ -40,7 +40,7 @@ const ENVIRONMENT = [
     'window', 'document', 'console', 'module', 'require', 'globalThis',
     'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
     'requestAnimationFrame', 'cancelAnimationFrame', 'performance',
-    'CustomEvent', 'Event', 'CSS', 'HTMLElement', 'customElements',
+    'CustomEvent', 'Event', 'CSS', 'HTMLElement', 'customElements', 'navigator', 'ResizeObserver',
     'acquireVsCodeApi', 'THREE',
 ];
 
