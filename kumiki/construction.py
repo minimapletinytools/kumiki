@@ -1600,8 +1600,8 @@ class ButtJointTimberArrangement:
             self.butt_timber.get_face_direction_global(self.front_face_on_butt_timber),
             self.compute_normalized_timber_cross_product(),
         ):
-            return (f"front_face_on_butt_timber is {self.front_face_on_butt_timber.name}, which is not parallel to the "
-                    f"joint alignment plane (the plane both timbers lie in); use {self._faces_named(parallel=True)}.")
+            return (f"front_face_on_butt_timber ({self.front_face_on_butt_timber.name}) is not parallel to the joint "
+                    f"alignment plane; use {self._faces_named(parallel=True)}")
         return None
 
     def _faces_named(self, parallel: bool) -> str:
@@ -1618,8 +1618,8 @@ class ButtJointTimberArrangement:
             self.butt_timber.get_face_direction_global(self.top_face_on_butt_timber),
             self.compute_normalized_timber_cross_product(),
         ):
-            return (f"top_face_on_butt_timber is {self.top_face_on_butt_timber.name}, but it must not be parallel to the "
-                    f"joint alignment plane (the plane both timbers lie in); use {self._faces_named(parallel=False)}.")
+            return (f"top_face_on_butt_timber ({self.top_face_on_butt_timber.name}) must not be parallel to the joint "
+                    f"alignment plane; use {self._faces_named(parallel=False)}")
         return None
 
     def check_plane_aligned(self) -> Optional[str]:

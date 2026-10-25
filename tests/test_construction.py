@@ -2393,6 +2393,6 @@ def test_a_wrong_butt_face_names_the_faces_that_would_work():
 
     assert check(front_face_on_butt_timber=TimberLongFace.RIGHT) is None
     assert check(front_face_on_butt_timber=TimberLongFace.FRONT) == (
-        "front_face_on_butt_timber is FRONT, which is not parallel to the joint alignment plane "
-        "(the plane both timbers lie in); use RIGHT or LEFT.")
-    assert check(top_face_on_butt_timber=TimberLongFace.RIGHT).endswith("lie in); use FRONT or BACK.")
+        "front_face_on_butt_timber (FRONT) is not parallel to the joint alignment plane; use RIGHT or LEFT")
+    assert check(top_face_on_butt_timber=TimberLongFace.RIGHT) == (
+        "top_face_on_butt_timber (RIGHT) must not be parallel to the joint alignment plane; use FRONT or BACK")
