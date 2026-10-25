@@ -5,18 +5,18 @@
  * Host-neutral: the project's files come in as an interface (agent/project-files.js for Node), so
  * a web host can run the same session over its own storage.
  *
- * The panel and this talk in messages (agent/panel-protocol.js lists them):
+ * The panel and this talk in messages (webview/agent/protocol.js lists them):
  *   panel -> here:  agent:ready, agent:prompt {text, images?: [{mediaType, data}]}, agent:stop,
  *                   agent:clear, agent:permissionAnswer {requestId, allow, always?}, agent:setModel {id},
  *                   agent:restore {turn, force?}, agent:unqueue {id}, agent:retry, agent:listFiles,
  *                   agent:signIn {provider}, agent:signOut, agent:setSetting {key, value},
  *                   agent:listConversations, agent:openConversation {id}, agent:deleteConversation {id}
- *   here -> panel:  agent:state {models, model, via, account, settings}, agent:busy {busy},
+ *   here -> panel:  agent:state {models, model, via, account, settings, strings}, agent:busy {busy},
  *                   agent:text {text}, agent:reasoning {text} (both streamed), agent:tool {id, name, input},
  *                   agent:toolResult {id, isError, text}, agent:toolImages {id, before, after},
- *                   agent:notice {text}, agent:context {tokens, window},
+ *                   agent:notice {text, key?, params?}, agent:context {tokens, window},
  *                   agent:permission {requestId, toolName, input}, agent:done {isError, error?, costUsd?},
- *                   agent:error {message}, agent:conversations {items, current}, agent:replay {events},
+ *                   agent:error {message, key?, params?}, agent:conversations {items, current}, agent:replay {events},
  *                   agent:checkpoint {turn, files}, agent:restored {turn}, agent:restoreConflict {turn, files},
  *                   agent:queued {id, text}, agent:dequeued {id}, agent:userMessage {text, images},
  *                   agent:todos {items}, agent:files {files}
@@ -63,16 +63,16 @@ const SHOWN = new Set(['agent:userMessage', 'agent:text', 'agent:reasoning', 'ag
 /** A conversation's title: the start of its first request. */
 const titleOf = (text) => (text.length > 60 ? `${text.slice(0, 57)}…` : text);
 
-/** What to tell the user for a failed request. */
+/** What to tell the user for a failed request: {key, text}, the key for the panel to show it in its language. */
 function describeFailure(error) {
     const status = error && (error.statusCode || (error.lastError && error.lastError.statusCode));
     if (status === 402) {
-        return 'Out of credit.';
+        return { key: 'agent.error.noCredit', text: 'Out of credit.' };
     }
     if (status === 401) {
-        return 'Not signed in, or the API key was refused.';
+        return { key: 'agent.error.refused', text: 'Not signed in, or the API key was refused.' };
     }
-    return String((error && error.message) || error);
+    return { text: String((error && error.message) || error) };
 }
 
 class AgentSession {
@@ -89,9 +89,11 @@ class AgentSession {
      * @param {object|null} [options.conversations]  where past conversations are kept (conversation-store.js)
      * @param {(route: object, options: {fetch?: typeof fetch}) => Promise<object>} [options.createModel]
      * @param {(line: string) => void} [options.log]
+     * @param {object} [options.strings]   the panel's strings in the app's language (the agent.* keys of i18n/locales)
      */
     constructor({ panels, run, post, files = null, fileTools = [], setting, setSetting = () => {}, account = null,
-        conversations = null, createModel = languageModelFor, log = () => {} }) {
+        conversations = null, createModel = languageModelFor, log = () => {}, strings = {} }) {
+        this.strings = Object.fromEntries(Object.entries(strings).filter(([key]) => key.startsWith('agent.')));
         this.files = files || { root: () => null };
         this.fileTools = fileTools;
         this.panels = panels;
@@ -153,6 +155,7 @@ class AgentSession {
             via: route ? route.via : null,
             account: this.account ? this.account.state() : { configured: false },
             settings: Object.fromEntries(Object.keys(PANEL_SETTINGS).map((key) => [key, this.panelSetting(key)])),
+            strings: this.strings,
         });
     }
 
@@ -222,7 +225,8 @@ class AgentSession {
             this.restored = true;
         } else if (message.type === 'agent:signIn' && this.account) {
             this.account.signIn(message.provider === 'google' ? 'google' : 'github')
-                .catch((error) => this.post({ type: 'agent:error', message: `Could not sign in: ${error.message}` }));
+                .catch((error) => this.post({ type: 'agent:error', key: 'agent.error.signIn', params: { error: error.message },
+                    message: `Could not sign in: ${error.message}` }));
         } else if (message.type === 'agent:signOut' && this.account) {
             void this.account.signOut().then(() => this.postState());
         }
@@ -245,8 +249,8 @@ class AgentSession {
             return;
         }
         this.post({ type: 'agent:restored', turn });
-        this.post({ type: 'agent:notice', text: `Put back ${restored.length} file${restored.length === 1 ? '' : 's'} as `
-            + 'they were before that request. The agent is told so with your next message.' });
+        this.post({ type: 'agent:notice', key: 'agent.notice.restored', params: { files: restored.join(', ') },
+            text: `Put back as they were before that request: ${restored.join(', ')}. The agent is told so with your next message.` });
         // The model still thinks its edits are there; say otherwise when the conversation carries on.
         this.history.push({ role: 'user', content: `[I undid your changes to ${restored.join(', ')}: those files are back as they were before.]` },
             { role: 'assistant', content: 'Understood.' });
@@ -356,8 +360,8 @@ class AgentSession {
         }
         const route = this.route();
         if (!route) {
-            this.post({ type: 'agent:error', message: 'Sign in to use the agent, or set agent.openrouterApiKey '
-                + '(or agent.apiKey, an Anthropic key) in settings.' });
+            this.post({ type: 'agent:error', key: 'agent.route.setKey', message: 'Sign in to use the agent, or set '
+                + 'agent.openrouterApiKey (or agent.apiKey, an Anthropic key) in settings.' });
             return;
         }
         const abort = new AbortController();
@@ -398,7 +402,8 @@ class AgentSession {
                     this.post({ type: 'agent:done', isError: false, stopped: true });
                 } else {
                     this.log(`[agent] ${(error && error.stack) || error}`);
-                    this.post({ type: 'agent:done', isError: true, error: describeFailure(error) });
+                    const failure = describeFailure(error);
+                    this.post({ type: 'agent:done', isError: true, error: failure.text, errorKey: failure.key });
                 }
             }
         } finally {

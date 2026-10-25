@@ -208,18 +208,19 @@ function toToolSet(tools, { images, askPermission }) {
     })]));
 }
 
-/** Why a turn ended other than by the model finishing, for the panel; or null. */
+/** Why a turn ended other than by the model finishing, for the panel ({key, params, text}); or null. */
 function earlyEnd(steps) {
     const last = steps[steps.length - 1];
     if (!last) return null;
     if (last.finishReason === 'tool-calls' && steps.length >= MAX_STEPS) {
-        return `Stopped after ${MAX_STEPS} steps. Say "continue" to carry on.`;
+        return { key: 'agent.notice.maxSteps', params: { steps: MAX_STEPS }, text: `Stopped after ${MAX_STEPS} steps. Say "continue" to carry on.` };
     }
     if (last.finishReason === 'length') {
-        return 'Stopped at the output limit for one step. Say "continue" to carry on.';
+        return { key: 'agent.notice.outputLimit', text: 'Stopped at the output limit for one step. Say "continue" to carry on.' };
     }
     if (['stop', 'tool-calls'].includes(last.finishReason)) return null;
-    return `The model stopped unexpectedly (${last.rawFinishReason || last.finishReason}). Say "continue" to carry on.`;
+    const reason = last.rawFinishReason || last.finishReason;
+    return { key: 'agent.notice.unexpected', params: { reason }, text: `The model stopped unexpectedly (${reason}). Say "continue" to carry on.` };
 }
 
 /**
@@ -244,7 +245,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, tools
     askPermission, onEvent }) {
     const compacted = await summariseIfLarge(model, system, history, abortSignal);
     if (compacted.summarised) {
-        onEvent({ type: 'agent:notice', text: 'The earlier conversation was summarised, to keep each step small.' });
+        onEvent({ type: 'agent:notice', key: 'agent.notice.summarised', text: 'The earlier conversation was summarised, to keep each step small.' });
     }
     const messages = [...compacted.history, { role: 'user', content: prompt }];
     const steps = [];
@@ -296,7 +297,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, tools
         throw Object.assign(failure, { history: sofar() });
     }
     const notice = earlyEnd(steps);
-    if (notice) onEvent({ type: 'agent:notice', text: notice });
+    if (notice) onEvent({ type: 'agent:notice', ...notice });
     const costs = steps.map((step) => step.providerMetadata && step.providerMetadata.openrouter
         && step.providerMetadata.openrouter.usage && step.providerMetadata.openrouter.usage.cost)
         .filter((cost) => typeof cost === 'number');

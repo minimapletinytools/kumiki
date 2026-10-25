@@ -122,7 +122,7 @@ describe('the agent loop', () => {
 
     test('a turn cut short says so', async () => {
         const { events } = await turn(scripted([...say('1', 'Half a'), finish('length')]));
-        expect(events.at(-1)).toEqual({ type: 'agent:notice', text: expect.stringContaining('output limit') });
+        expect(events.at(-1)).toMatchObject({ type: 'agent:notice', key: 'agent.notice.outputLimit', text: expect.stringContaining('output limit') });
     });
 
     test('a failing step keeps the steps before it, for asking again', async () => {
@@ -197,7 +197,7 @@ describe('the agent loop', () => {
 
         const { events, history, costUsd } = await turn(model, { history: big });
 
-        expect(events).toContainEqual({ type: 'agent:notice', text: expect.stringContaining('summarised') });
+        expect(events).toContainEqual(expect.objectContaining({ type: 'agent:notice', key: 'agent.notice.summarised' }));
         expect(history[0].content).toContain('They want a sawhorse');
         expect(history[2]).toEqual({ role: 'user', content: 'go' });
         expect(costUsd).toBeCloseTo(0.003);
@@ -361,7 +361,7 @@ describe('the agent session', () => {
     test('says what to do when nothing can carry a request', async () => {
         const { agent, posted } = session();
         await agent.prompt('hi');
-        expect(posted).toEqual([{ type: 'agent:error', message: expect.stringContaining('Sign in') }]);
+        expect(posted).toEqual([{ type: 'agent:error', key: 'agent.route.setKey', message: expect.stringContaining('Sign in') }]);
     });
 
     test('tells the panel the models, the one chosen, and where its requests go', () => {
@@ -374,6 +374,7 @@ describe('the agent session', () => {
             type: 'agent:state', models: MODELS.map(({ id, label }) => ({ id, label })), model: 'claude-sonnet-5', via: 'openrouter',
             account: { configured: false },
             settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false },
+            strings: {},
         });
     });
 
@@ -625,7 +626,7 @@ describe('the agent session', () => {
     });
 
         test('out of credit says so', () => {
-        expect(describeFailure({ statusCode: 402, message: 'Payment Required' })).toBe('Out of credit.');
+        expect(describeFailure({ statusCode: 402, message: 'Payment Required' })).toEqual({ key: 'agent.error.noCredit', text: 'Out of credit.' });
     });
 
     test('permission modes: ask every time, edit files without asking, or do everything', async () => {

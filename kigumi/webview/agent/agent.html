@@ -12,22 +12,22 @@
 <body>
     <div class="agent-panel">
         <header class="agent-header">
-            <span class="agent-title"><span class="codicon codicon-sparkle"></span> Agent</span>
+            <span class="agent-title"><span class="codicon codicon-sparkle"></span> <span data-i18n="agent.title">Agent</span></span>
             <div class="agent-actions">
-                <select id="model-select" class="model-select" title="Model"></select>
-                <button id="btn-history" class="icon-btn" title="Past conversations"><span class="codicon codicon-history"></span></button>
-                <button id="btn-settings" class="icon-btn" title="Agent settings" aria-haspopup="true" aria-expanded="false"><span class="codicon codicon-settings-gear"></span></button>
-                <button id="btn-clear" class="icon-btn" title="New conversation"><span class="codicon codicon-add"></span></button>
+                <select id="model-select" class="model-select" title="Model" data-i18n-title="agent.model"></select>
+                <button id="btn-history" class="icon-btn" title="Past conversations" data-i18n-title="agent.history"><span class="codicon codicon-history"></span></button>
+                <button id="btn-settings" class="icon-btn" title="Agent settings" data-i18n-title="agent.settings" aria-haspopup="true" aria-expanded="false"><span class="codicon codicon-settings-gear"></span></button>
+                <button id="btn-clear" class="icon-btn" title="New conversation" data-i18n-title="agent.new"><span class="codicon codicon-add"></span></button>
             </div>
         </header>
 
         <div id="settings-menu" class="settings-menu" hidden>
-            <div class="settings-heading">Before the agent changes something</div>
-            <label><input type="radio" name="permission-mode" value="ask"> Ask every time</label>
-            <label><input type="radio" name="permission-mode" value="edits"> Edit files without asking</label>
-            <label><input type="radio" name="permission-mode" value="all"> Do everything without asking</label>
+            <div class="settings-heading" data-i18n="agent.settings.heading">Before the agent changes something</div>
+            <label><input type="radio" name="permission-mode" value="ask"> <span data-i18n="agent.settings.ask">Ask every time</span></label>
+            <label><input type="radio" name="permission-mode" value="edits"> <span data-i18n="agent.settings.edits">Edit files without asking</span></label>
+            <label><input type="radio" name="permission-mode" value="all"> <span data-i18n="agent.settings.all">Do everything without asking</span></label>
             <div id="always-allowed" class="always-allowed"></div>
-            <label><input id="setting-startup" type="checkbox"> Open the agent when Kigumi starts</label>
+            <label><input id="setting-startup" type="checkbox"> <span data-i18n="agent.settings.startup">Open the agent when Kigumi starts</span></label>
         </div>
         <div id="history-menu" class="history-menu" hidden>
             <div id="history-list"></div>
@@ -35,26 +35,26 @@
         <div id="bypass-banner" class="bypass-banner" hidden>Not asking before changes</div>
         <div id="messages" class="agent-messages">
             <div class="agent-welcome" id="welcome">
-                <h3>Kigumi Agent</h3>
-                <p>Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
+                <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
+                <p data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
                 <div class="suggestions">
-                    <button class="suggestion-chip">What do I have selected?</button>
-                    <button class="suggestion-chip">Why didn't this frame build?</button>
-                    <button class="suggestion-chip">Take a screenshot and describe the frame</button>
+                    <button class="suggestion-chip" data-i18n="agent.suggest.selected">What do I have selected?</button>
+                    <button class="suggestion-chip" data-i18n="agent.suggest.build">Why didn't this frame build?</button>
+                    <button class="suggestion-chip" data-i18n="agent.suggest.screenshot">Take a screenshot and describe the frame</button>
                 </div>
             </div>
         </div>
         <footer class="agent-footer">
             <div id="activity" class="activity" hidden>
-                <span id="activity-label">Thinking</span><span class="dots"><i></i><i></i><i></i></span>
+                <span id="activity-label" data-i18n="agent.activity.thinking">Thinking</span><span class="dots"><i></i><i></i><i></i></span>
             </div>
             <div id="todos" class="todos" hidden></div>
             <div id="mentions" class="mentions" hidden></div>
             <div id="attachments" class="attachments" hidden></div>
             <div class="input-box">
-                <textarea id="prompt-input" placeholder="Ask about your frame… (@ for a file, paste an image)" rows="1"></textarea>
-                <button id="plan-toggle" class="plan-toggle" title="Plan mode: the agent looks and proposes, and changes nothing" aria-pressed="false">Plan</button>
-                <button id="send-btn" class="send-btn" title="Send message"><span class="codicon codicon-send"></span></button>
+                <textarea id="prompt-input" placeholder="Ask about your frame… (@ for a file, paste an image)" data-i18n-placeholder="agent.placeholder" rows="1"></textarea>
+                <button id="plan-toggle" class="plan-toggle" title="Plan mode: the agent looks and proposes, and changes nothing" data-i18n-title="agent.plan.title" aria-pressed="false" data-i18n="agent.plan">Plan</button>
+                <button id="send-btn" class="send-btn" title="Send message" data-i18n-title="agent.send"><span class="codicon codicon-send"></span></button>
             </div>
             <div class="footer-row">
                 <div id="route-note" class="route-note"></div>
@@ -62,7 +62,6 @@
             </div>
         </footer>
     </div>
-    <script src="markdown.js"></script>
-    <script src="agent-app.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>
