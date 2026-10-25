@@ -33,6 +33,8 @@ class PythonRunnerSession {
         this.startPromise = null;
         this.ready = false;
         this.onMilestone = null;
+        // What the runner and the frame print (stderr; stdout is the protocol), else to the channel.
+        this.onOutput = null;
         const env = this.resolveEnvironment(filePath);
         this.projectRoot = env.projectRoot;
         this.isLocalDev = env.isLocalDev;
@@ -297,7 +299,8 @@ class PythonRunnerSession {
                 });
 
                 this.process.stderr.on('data', (chunk) => {
-                    this.channel.append(chunk.toString());
+                    if (typeof this.onOutput === 'function') this.onOutput(chunk.toString());
+                    else this.channel.append(chunk.toString());
                 });
 
                 this.process.on('error', (error) => {

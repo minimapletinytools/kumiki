@@ -17,6 +17,14 @@ const MAX_READ_CHARS = 40000;
 /** @param {{files: object}} options  the project's files (agent/project-files.js) */
 function createFileTools({ files }) {
     const filePath = z.string().describe('A path relative to the project folder (or absolute, inside it).');
+    // Writes and edits one at a time: a model asks for several at once, and two edits of a file at
+    // once would each write their own copy, losing one, or interleave into garbage.
+    let changing = Promise.resolve();
+    const oneAtATime = (change) => {
+        const done = changing.then(change);
+        changing = done.catch(() => {});
+        return done;
+    };
 
     return [
         {
@@ -77,10 +85,10 @@ function createFileTools({ files }) {
             description: 'Create a file in the project, or replace one whole. Prefer edit_file to change part of a file.',
             shape: { file_path: filePath, content: z.string() },
             readOnly: false,
-            run: async ({ file_path: file, content }) => {
+            run: ({ file_path: file, content }) => oneAtATime(async () => {
                 const target = await files.write(file, content);
                 return text(`Wrote ${files.relative(target)}.`);
-            },
+            }),
         },
         {
             name: 'edit_file',
@@ -92,7 +100,7 @@ function createFileTools({ files }) {
                 replace_all: z.boolean().optional(),
             },
             readOnly: false,
-            run: async ({ file_path: file, old_string: before, new_string: after, replace_all: all }) => {
+            run: ({ file_path: file, old_string: before, new_string: after, replace_all: all }) => oneAtATime(async () => {
                 files.resolve(file, { write: true });
                 const content = await files.read(file);
                 if (content === null) throw new Error(`${file} doesn't exist.`);
@@ -105,7 +113,7 @@ function createFileTools({ files }) {
                 }
                 const target = await files.write(file, content.split(before).join(after));
                 return text(`Edited ${files.relative(target)} (${all ? count : 1} replacement${all && count > 1 ? 's' : ''}).`);
-            },
+            }),
         },
     ];
 }

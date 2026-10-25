@@ -52,11 +52,18 @@ const SYSTEM_PROMPT = [
     'Each message comes with what they are looking at (the active panel and its selection); use',
     'describe_panel for more. Find things with search_files rather than reading whole files. Editing a',
     'file a view shows rebuilds it, and the edit\'s result says whether it built; screenshot to look at it.',
-    'The kumiki docs are in .kigumi/docs/ in the project; read those and the project\'s patterns, not the',
-    'kumiki package\'s source in .venv, which is large. Sizes from the tools are in metres, in world',
-    'space. For a task of several steps, keep a to-do list with update_todos and tick items off as you go.',
-    'Keep replies short.',
+    'The kumiki docs are in .kigumi/docs/ in the project: read them first. Sizes from the tools are in',
+    'metres, in world space. For a task of several steps, keep a to-do list with update_todos and tick items',
+    'off as you go. Keep replies short.',
 ].join(' ');
+
+/** The system prompt, with where the kumiki library's source is, if known. */
+function systemPrompt(kumikiSource) {
+    if (!kumikiSource) return SYSTEM_PROMPT;
+    return `${SYSTEM_PROMPT} The kumiki library's source is at ${kumikiSource} (read-only). For a function's or `
+        + 'class\'s exact arguments and what they mean, search there for its def (search_files with that folder) '
+        + 'and read just that part, rather than guessing; print() in a frame shows in read_view_log.';
+}
 
 /** What the panel shows that a reopened conversation shows again. */
 const SHOWN = new Set(['agent:userMessage', 'agent:text', 'agent:reasoning', 'agent:tool', 'agent:toolResult',
@@ -89,13 +96,15 @@ class AgentSession {
      * @param {(key: string, value: any) => void} [options.setSetting]
      * @param {object|null} [options.account]  the Kigumi account (agent/account.js)
      * @param {{list: () => object[]}} [options.models]  the models offered (models.js createModelList)
+     * @param {() => string|null} [options.kumikiSource]  where the kumiki library's source is, for the agent to read
      * @param {object|null} [options.conversations]  where past conversations are kept (conversation-store.js)
      * @param {(route: object, options: {fetch?: typeof fetch}) => Promise<object>} [options.createModel]
      * @param {(line: string) => void} [options.log]
      * @param {object} [options.strings]   the panel's strings in the app's language (the agent.* keys of i18n/locales)
      */
     constructor({ panels, run, post, files = null, fileTools = [], setting, setSetting = () => {}, account = null,
-        conversations = null, createModel = languageModelFor, log = () => {}, strings = {}, models = { list: () => MODELS } }) {
+        conversations = null, createModel = languageModelFor, log = () => {}, strings = {}, models = { list: () => MODELS },
+        kumikiSource = () => null }) {
         this.strings = Object.fromEntries(Object.entries(strings).filter(([key]) => key.startsWith('agent.')));
         this.files = files || { root: () => null };
         this.fileTools = fileTools;
@@ -119,6 +128,7 @@ class AgentSession {
         this.setSetting = setSetting;
         this.account = account;
         this.models = models;
+        this.kumikiSource = kumikiSource;
         this.createModel = createModel;
         this.log = log;
         this.abort = null;
@@ -387,7 +397,8 @@ class AgentSession {
                 contextWindow: this.model.contextWindow,
                 maxOutputTokens: this.panelSetting('agent.maxOutputTokens'),
                 tools: this.tools,
-                system: this.panelSetting('agent.planMode') ? `${SYSTEM_PROMPT}\n\n${PLAN_MODE_NOTE}` : SYSTEM_PROMPT,
+                system: this.panelSetting('agent.planMode')
+                    ? `${systemPrompt(this.kumikiSource())}\n\n${PLAN_MODE_NOTE}` : systemPrompt(this.kumikiSource()),
                 history: this.history,
                 prompt: await promptContent({ text, images, files: this.files, describe: () => this.panels.describe(),
                     modelSeesImages: this.model.images }),

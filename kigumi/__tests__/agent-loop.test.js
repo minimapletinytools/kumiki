@@ -108,9 +108,12 @@ describe('the agent loop', () => {
         ]);
         expect(history.map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'assistant']);
         expect(costUsd).toBeCloseTo(0.003);
-        // The second step saw the screenshot as an image.
-        const sent = model.doStreamCalls[1].prompt.find((message) => message.role === 'tool').content[0].output;
-        expect(sent.value[1]).toMatchObject({ type: 'file', mediaType: 'image/png' });
+        // The second step saw the screenshot as an image, in a user message after the tool result.
+        const prompt = model.doStreamCalls[1].prompt;
+        const tool = prompt.findIndex((message) => message.role === 'tool');
+        expect(prompt[tool].content[0].output.value[1]).toEqual({ type: 'text', text: '[The image is in the next message.]' });
+        expect(prompt[tool + 1].role).toBe('user');
+        expect(prompt[tool + 1].content[1]).toMatchObject({ type: 'file', mediaType: 'image/png' });
     });
 
     test('a tool that changes something waits for permission; refused, the model is told so', async () => {
@@ -173,7 +176,14 @@ describe('the agent loop', () => {
         const imagesIn = (messages) => messages.filter((message) => message.role === 'tool')
             .flatMap((message) => message.content).flatMap((part) => part.output.value)
             .filter((item) => item.type === 'file').length;
-        expect(imagesIn(model.doStreamCalls[2].prompt)).toBe(1);
+        const sent = model.doStreamCalls[2].prompt;
+        // Sent in a user message after the tool result, as hosts take images only from the user.
+        expect(imagesIn(sent)).toBe(0);
+        const shown = sent.filter((message) => message.role === 'user' && Array.isArray(message.content))
+            .flatMap((message) => message.content).filter((part) => part.type === 'file');
+        expect(shown).toHaveLength(1);
+        expect(shown[0].mediaType).toBe('image/png');
+        expect(sent.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'tool', 'user', 'assistant', 'tool', 'user']);
         expect(imagesIn(history)).toBe(1);
         expect(JSON.stringify(history)).toContain('An earlier image, dropped');
     });
@@ -282,6 +292,30 @@ describe('the file tools', () => {
     test('nothing outside the project folder', async () => {
         await expect(named('read_file').run({ file_path: '../elsewhere.txt' })).rejects.toThrow('outside the project');
         await expect(named('write_file').run({ file_path: '/etc/hosts', content: '' })).rejects.toThrow('outside the project');
+    });
+
+    test('edits asked for at once all land, one after another', async () => {
+        fs.writeFileSync(path.join(root, 'frame.py'), `legs.append(leg)\n${'# padding\n'.repeat(2000)}x = leg.bottom\nexample = build_frame\n`);
+        const edit = (before, after) => named('edit_file').run({ file_path: 'frame.py', old_string: before, new_string: after });
+        await Promise.all([edit('legs.append(leg)', 'legs.append((leg, x))'), edit('x = leg.bottom', 'x = x_pos'),
+            edit('example = build_frame', 'example = build_frame  # the frame')]);
+        expect(fs.readFileSync(path.join(root, 'frame.py'), 'utf8'))
+            .toBe(`legs.append((leg, x))\n${'# padding\n'.repeat(2000)}x = x_pos\nexample = build_frame  # the frame\n`);
+    });
+
+    test('a read-only folder outside the project can be read and searched, never written', async () => {
+        const library = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-lib-'));
+        fs.writeFileSync(path.join(library, 'timber.py'), 'def create_axis_aligned_timber(bottom_position, length):\n');
+        tools = createFileTools({ files: createProjectFiles({ root: () => root, readOnly: () => [library] }) });
+        const source = fs.realpathSync(path.join(library, 'timber.py'));
+
+        const [found] = await named('search_files').run({ pattern: 'def create_axis', folder: library });
+        expect(found.text).toBe(`${source}:1: def create_axis_aligned_timber(bottom_position, length):`);
+        const [read] = await named('read_file').run({ file_path: source });
+        expect(read.text).toContain('bottom_position');
+        await expect(named('write_file').run({ file_path: source, content: '' })).rejects.toThrow('outside the project');
+        await expect(named('edit_file').run({ file_path: source, old_string: 'def', new_string: 'x' })).rejects.toThrow('outside the project');
+        fs.rmSync(library, { recursive: true, force: true });
     });
 
     test('lists the project, leaving out dependency folders', async () => {

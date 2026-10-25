@@ -1565,6 +1565,15 @@ class FrameViewSession {
         if (!this.runnerSession) {
             return;
         }
+        // What the frame prints goes in this view's log, where the agent's read_view_log finds it.
+        let partial = '';
+        this.runnerSession.onOutput = (text) => {
+            const lines = (partial + text).split('\n');
+            partial = lines.pop();
+            for (const line of lines) {
+                if (line.trim()) this.log(`[python] ${line}`);
+            }
+        };
         this.runnerSession.onMilestone = (milestone) => {
             const name = typeof milestone.name === 'string' ? milestone.name : 'milestone';
             this.profiler.addMilestone(name);

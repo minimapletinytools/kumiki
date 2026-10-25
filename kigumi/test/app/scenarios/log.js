@@ -19,7 +19,7 @@ module.exports = {
         // A frame that fails: kept in the repository while it runs, so it builds with the repo's venv.
         const broken = path.join(path.dirname(FRAME), '_log_scenario_broken_frame.py');
         const name = path.basename(broken);
-        fs.writeFileSync(broken, 'from kumiki import *\n\n\ndef build_frame():\n    raise NameError("brace is not defined")\n');
+        fs.writeFileSync(broken, 'from kumiki import *\n\n\ndef build_frame():\n    print("probe 42")\n    raise NameError("brace is not defined")\n');
         try {
             await openFrame(broken);
             const button = await waitFor(() => read(`Boolean(doc.getElementById('output-btn') && doc.getElementById('go-to-error-btn'))`),
@@ -45,10 +45,11 @@ module.exports = {
             const shown = await waitFor(() => read(`(() => {
                 const lines = [...doc.querySelectorAll('#entries .log-line')].filter((line) => !line.hidden);
                 const error = lines.find((line) => line.classList.contains('log-error') && line.textContent.includes('brace is not defined'));
-                return error ? { source: doc.getElementById('source').value, links: error.querySelectorAll('.log-location').length } : null;
+                const printed = lines.some((line) => line.textContent.includes('[python] probe 42'));
+                return error ? { source: doc.getElementById('source').value, links: error.querySelectorAll('.log-location').length, printed } : null;
             })()`), { timeoutMs: 10000 }).catch(() => null);
-            check("the view's log button opens the Log tab showing its file, with the traceback linked to its lines",
-                button && logTab && shown && shown.source === name && shown.links > 0,
+            check("the view's log button opens the Log tab showing its file: what it printed, and the traceback linked to its lines",
+                button && logTab && shown && shown.source === name && shown.links > 0 && shown.printed,
                 `button ${button}, log tab ${Boolean(logTab)}, ${JSON.stringify(shown)}`);
 
             await read(`doc.querySelector('#levels [data-level="error"]').click()`);

@@ -68,9 +68,10 @@ function onlyLatestImage(messages) {
     for (let i = out.length - 1; i >= 0; i--) {
         const message = out[i];
         if (message.role === 'user' && Array.isArray(message.content)) {
-            // An image the user attached counts too.
+            // An image the user attached counts too, and one moved out of a tool result (imagesAfterToolResults).
             out[i] = { ...message, content: message.content.map((part) => {
-                if (!part || part.type !== 'image') return part;
+                const image = part && (part.type === 'image' || (part.type === 'file' && /^image\//.test(part.mediaType || '')));
+                if (!image) return part;
                 if (!kept) {
                     kept = true;
                     return part;
@@ -91,6 +92,37 @@ function onlyLatestImage(messages) {
             return { ...part, output: { ...output, value } };
         });
         out[i] = { ...message, content };
+    }
+    return out;
+}
+
+const IMAGE_BELOW = '[The image is in the next message.]';
+
+/**
+ * `messages` with each tool result's images moved into a user message after it. Chat-completions
+ * hosts take images only from the user: one in a tool result reaches DeepSeek's cheapest host as
+ * nothing at all.
+ */
+function imagesAfterToolResults(messages) {
+    const out = [];
+    for (const message of messages) {
+        if (message.role !== 'tool' || !Array.isArray(message.content)) {
+            out.push(message);
+            continue;
+        }
+        const images = [];
+        const content = message.content.map((part) => {
+            const output = part && part.type === 'tool-result' && part.output;
+            if (!output || output.type !== 'content' || !output.value.some((item) => item.type === 'file')) return part;
+            const value = output.value.map((item) => {
+                if (item.type !== 'file') return item;
+                images.push({ type: 'file', data: item.data, mediaType: item.mediaType });
+                return { type: 'text', text: IMAGE_BELOW };
+            });
+            return { ...part, output: { ...output, value } };
+        });
+        out.push({ ...message, content });
+        if (images.length) out.push({ role: 'user', content: [{ type: 'text', text: '[The image from the tool result above.]' }, ...images] });
     }
     return out;
 }
@@ -178,7 +210,7 @@ async function summariseIfLarge(model, system, history, abortSignal) {
     // Streamed like every other request, which is all the backend carries cost reports for.
     const result = streamText({
         model, system, abortSignal, maxRetries: 2, maxOutputTokens: MAX_OUTPUT_TOKENS,
-        messages: [...trimOldToolResults(onlyLatestImage(history), 0), { role: 'user', content: SUMMARY_REQUEST }],
+        messages: [...imagesAfterToolResults(trimOldToolResults(onlyLatestImage(history), 0)), { role: 'user', content: SUMMARY_REQUEST }],
     });
     const summary = await result.text;
     const metadata = await result.providerMetadata;
@@ -263,7 +295,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
         // retrying one costs nothing.
         maxRetries: 2,
         prepareStep: ({ messages: sending }) => {
-            const trimmed = trimOldToolResults(onlyLatestImage(sending));
+            const trimmed = imagesAfterToolResults(trimOldToolResults(onlyLatestImage(sending)));
             return { messages: cacheMarks ? cacheMarked(trimmed) : trimmed };
         },
         onStepEnd: (step) => {

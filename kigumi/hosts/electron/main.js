@@ -26,6 +26,7 @@ const { createConversationStore } = require('../../agent/conversation-store');
 const { loadCatalog, resolveLocale } = require('../../i18n');
 const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
+const { findKumikiSource } = require('../../agent/kumiki-source');
 const { SecureStorage } = require('./secure-storage');
 const { createKigumiTools } = require('../../agent/tools');
 const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
@@ -457,7 +458,19 @@ function toggleAgentPanel() {
         return;
     }
     const surface = connection.createPanel('agent', { title: 'Agent' });
-    const projectFiles = createProjectFiles({ root: () => workspaceFolder });
+    // The kumiki library's source, which the agent may read: found once per project.
+    let kumikiSource = null;
+    let kumikiSourceFor = null;
+    const knowKumikiSource = () => {
+        if (kumikiSourceFor === workspaceFolder) return;
+        kumikiSourceFor = workspaceFolder;
+        kumikiSource = null;
+        void findKumikiSource(workspaceFolder).then((folder) => {
+            if (kumikiSourceFor === workspaceFolder) kumikiSource = folder;
+        });
+    };
+    knowKumikiSource();
+    const projectFiles = createProjectFiles({ root: () => workspaceFolder, readOnly: () => (kumikiSource ? [kumikiSource] : []) });
     agentSession = new AgentSession({
         panels: kigumiApp.panels,
         run: runToolCommand,
@@ -468,6 +481,10 @@ function toggleAgentPanel() {
         fileTools: createFileTools({ files: projectFiles }),
         account,
         models: modelList,
+        kumikiSource: () => {
+            knowKumikiSource();
+            return kumikiSource;
+        },
         conversations: createConversationStore(path.join(app.getPath('userData'), 'conversations')),
         strings: loadCatalog(resolveLocale(app.getLocale())),
         log: (line) => logChannel.appendLine(line),
