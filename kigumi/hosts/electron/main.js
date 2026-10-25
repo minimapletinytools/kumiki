@@ -25,6 +25,7 @@ const { createAccount } = require('../../agent/account');
 const { createConversationStore } = require('../../agent/conversation-store');
 const { loadCatalog, resolveLocale } = require('../../i18n');
 const { backendConfig } = require('../../agent/backend-config');
+const { createModelList } = require('../../agent/models');
 const { SecureStorage } = require('./secure-storage');
 const { createKigumiTools } = require('../../agent/tools');
 const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
@@ -393,6 +394,7 @@ function runToolCommand(id, args) {
 
 let agentSession = null;
 let account = null;
+let modelList = null;
 // A kigumi://auth link that came before the account existed (a cold start from the browser).
 let pendingAuthLink = null;
 
@@ -411,6 +413,24 @@ function handleAuthLink(url) {
         logChannel.appendLine(`[account] sign-in failed: ${error.message}`);
         setStatus('error', `Could not sign in: ${error.message}`);
     });
+}
+
+// The models offered, as the backend lists them, the last list kept for starting offline.
+function createAppModelList() {
+    const file = path.join(app.getPath('userData'), 'models.json');
+    modelList = createModelList({
+        backendUrl: backendConfig(process.env).backendUrl,
+        storage: {
+            load: () => JSON.parse(fs.readFileSync(file, 'utf8')),
+            save: (models) => fs.writeFileSync(file, JSON.stringify(models, null, 1)),
+        },
+        onChange: () => agentSession && agentSession.postState(),
+    });
+    refreshModels();
+}
+
+function refreshModels() {
+    modelList.refresh().catch((error) => logChannel.appendLine(`[agent] [warn] couldn't fetch the model list: ${error.message}`));
 }
 
 function createAppAccount() {
@@ -447,6 +467,7 @@ function toggleAgentPanel() {
         files: projectFiles,
         fileTools: createFileTools({ files: projectFiles }),
         account,
+        models: modelList,
         conversations: createConversationStore(path.join(app.getPath('userData'), 'conversations')),
         strings: loadCatalog(resolveLocale(app.getLocale())),
         log: (line) => logChannel.appendLine(line),
@@ -458,6 +479,7 @@ function toggleAgentPanel() {
     });
     surface.loadUrl(`${ORIGIN}/webview/agent/agent.html`);
     connection.setSideShown('right', true);
+    refreshModels();
 }
 
 let mcpServer = null;
@@ -664,6 +686,7 @@ async function start() {
     const log = (line) => logChannel.appendLine(line);
     const appWindow = createAppWindow({ origin: ORIGIN, log });
     createAppAccount();
+    createAppModelList();
     mainWindow = appWindow.window;
     pages = new PageStore({ origin: ORIGIN, webviewDir });
     connection = new ShellConnection({

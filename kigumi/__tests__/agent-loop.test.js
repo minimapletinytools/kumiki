@@ -4,7 +4,7 @@ const path = require('path');
 
 const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test');
 const { runTurn, toModelContent, cacheMarked, trimOldToolResults, estimateTokens, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
-const { MODELS, findModel, routeModel } = require('../agent/models');
+const { MODELS, findModel, createModelList, routeModel } = require('../agent/models');
 const { createFileTools } = require('../agent/file-tools');
 const { createProjectFiles } = require('../agent/project-files');
 const { withContext, withMentions, promptContent } = require('../agent/prompt-content');
@@ -63,6 +63,31 @@ describe('the model table', () => {
             { via: 'backend', modelId: 'deepseek/deepseek-v4.1-flash', baseURL: 'https://api.example/v1' });
         expect(routeModel(deepseek, { openrouterKey: 'sk-or', backend }).via).toBe('openrouter');
         expect(routeModel(deepseek, {})).toBeNull();
+    });
+
+    test("the list is the backend's once heard, kept for next time; the saved one, else the bundled one, till then", async () => {
+        const listed = [{ id: 'new-model', label: 'New', openrouter: 'x/new', images: false, contextWindow: 1000, maxPrice: 9 },
+            { id: 'broken' }];
+        let saved = null;
+        const onChange = jest.fn();
+        const fetch = jest.fn(async () => ({ ok: true, json: async () => ({ models: listed }) }));
+        const models = createModelList({ backendUrl: 'https://api.example/', fetch, storage: { load: () => saved, save: (list) => { saved = list; } }, onChange });
+
+        expect(models.list()).toBe(MODELS);
+        await models.refresh();
+        expect(fetch).toHaveBeenCalledWith('https://api.example/models');
+        expect(models.list()).toEqual([{ id: 'new-model', label: 'New', openrouter: 'x/new', images: false, contextWindow: 1000 }]);
+        expect(saved).toEqual(models.list());
+        expect(onChange).toHaveBeenCalledTimes(1);
+        await models.refresh();
+        expect(onChange).toHaveBeenCalledTimes(1);
+        expect(findModel('claude-haiku-4.5', models.list()).id).toBe('new-model');
+
+        const offline = createModelList({ backendUrl: 'https://api.example', fetch: async () => { throw new Error('offline'); },
+            storage: { load: () => saved, save: () => {} } });
+        expect(offline.list()).toEqual(saved);
+        await expect(offline.refresh()).rejects.toThrow('offline');
+        expect(offline.list()).toEqual(saved);
     });
 });
 

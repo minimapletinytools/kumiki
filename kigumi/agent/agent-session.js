@@ -86,13 +86,14 @@ class AgentSession {
      * @param {(key: string, fallback: any) => any} options.setting
      * @param {(key: string, value: any) => void} [options.setSetting]
      * @param {object|null} [options.account]  the Kigumi account (agent/account.js)
+     * @param {{list: () => object[]}} [options.models]  the models offered (models.js createModelList)
      * @param {object|null} [options.conversations]  where past conversations are kept (conversation-store.js)
      * @param {(route: object, options: {fetch?: typeof fetch}) => Promise<object>} [options.createModel]
      * @param {(line: string) => void} [options.log]
      * @param {object} [options.strings]   the panel's strings in the app's language (the agent.* keys of i18n/locales)
      */
     constructor({ panels, run, post, files = null, fileTools = [], setting, setSetting = () => {}, account = null,
-        conversations = null, createModel = languageModelFor, log = () => {}, strings = {} }) {
+        conversations = null, createModel = languageModelFor, log = () => {}, strings = {}, models = { list: () => MODELS } }) {
         this.strings = Object.fromEntries(Object.entries(strings).filter(([key]) => key.startsWith('agent.')));
         this.files = files || { root: () => null };
         this.fileTools = fileTools;
@@ -115,6 +116,7 @@ class AgentSession {
         this.setting = setting;
         this.setSetting = setSetting;
         this.account = account;
+        this.models = models;
         this.createModel = createModel;
         this.log = log;
         this.abort = null;
@@ -134,7 +136,7 @@ class AgentSession {
     }
 
     get model() {
-        return findModel(this.setting('agent.model', ''));
+        return findModel(this.setting('agent.model', ''), this.models.list());
     }
 
     /** Where requests for the chosen model go, or null. */
@@ -150,7 +152,7 @@ class AgentSession {
         const route = this.route();
         this.post({
             type: 'agent:state',
-            models: MODELS.map(({ id, label }) => ({ id, label })),
+            models: this.models.list().map(({ id, label }) => ({ id, label })),
             model: this.model.id,
             via: route ? route.via : null,
             account: this.account ? this.account.state() : { configured: false },
@@ -197,7 +199,7 @@ class AgentSession {
             }
             if (pending) pending.answer(Boolean(message.allow));
         } else if (message.type === 'agent:setModel' && typeof message.id === 'string') {
-            this.setSetting('agent.model', findModel(message.id).id);
+            this.setSetting('agent.model', findModel(message.id, this.models.list()).id);
             this.postState();
         } else if (message.type === 'agent:setSetting' && message.key in PANEL_SETTINGS) {
             if (PANEL_SETTINGS[message.key].valid(message.value)) this.setSetting(message.key, message.value);
