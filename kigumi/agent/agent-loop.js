@@ -96,6 +96,28 @@ function onlyLatestImage(messages) {
     return out;
 }
 
+/** Tool calls in a row without a write or edit before the model is nudged to write. */
+const LOOKS_BEFORE_NUDGE = 25;
+const WRITE_TOOLS = new Set(['write_file', 'edit_file']);
+const WRITE_EARLY = `[From Kigumi: that's ${LOOKS_BEFORE_NUDGE} tool calls without changing anything. If the task is to `
+    + 'write or change a frame, write a first version now, from the nearest example, and let the build\'s errors '
+    + 'show what to look up next.]';
+
+/**
+ * Whether the model has looked `LOOKS_BEFORE_NUDGE` times since it last wrote (or since the turn
+ * began). A model given a library to learn can read for 60 steps before writing a line, where a
+ * first version's build errors would have shown what it needed.
+ */
+function lookedTooLong(steps) {
+    let looks = 0;
+    for (let i = steps.length - 1; i >= 0; i--) {
+        const calls = steps[i].toolCalls || [];
+        if (calls.some((call) => WRITE_TOOLS.has(call.toolName))) break;
+        looks += calls.length;
+    }
+    return looks >= LOOKS_BEFORE_NUDGE;
+}
+
 const IMAGE_BELOW = '[The image is in the next message.]';
 
 /**
@@ -345,6 +367,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
     }
     const messages = [...compacted.history, { role: 'user', content: prompt }];
     const steps = [];
+    let nudged = false;
     let failure = null;
     const result = streamText({
         model,
@@ -359,10 +382,16 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
         maxRetries: 2,
         prepareStep: ({ messages: sending }) => {
             const trimmed = imagesAfterToolResults(trimOldToolResults(onlyLatestImage(sending)));
+            // Once in each stretch of looking: the note stays in the conversation, so it isn't added again.
+            if (!nudged && lookedTooLong(steps)) {
+                nudged = true;
+                trimmed.push({ role: 'user', content: WRITE_EARLY });
+            }
             return { messages: cacheMarks ? cacheMarked(trimmed) : trimmed };
         },
         onStepEnd: (step) => {
             steps.push(step);
+            if ((step.toolCalls || []).some((call) => WRITE_TOOLS.has(call.toolName))) nudged = false;
             const tokens = step.usage && step.usage.inputTokens;
             if (typeof tokens === 'number') onEvent({ type: 'agent:context', tokens, window: contextWindow || null });
         },

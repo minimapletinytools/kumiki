@@ -189,6 +189,19 @@ describe('the agent loop', () => {
         expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('You made this same call');
     });
 
+    test('after 25 looks without writing, the model is told once to write a first version', async () => {
+        const readTool = { name: 'read', description: 'Read.', shape: { n: z.number().optional() }, readOnly: true,
+            run: async ({ n }) => [{ type: 'text', text: `line ${n}` }] };
+        const looks = (from, count) => Array.from({ length: count }, (_, i) => [call(`c${from + i}`, 'read', { n: from + i }), finish('tool-calls')]);
+        const model = scripted(...looks(0, 30), [...say('1', 'Done.'), finish('stop')]);
+        await runTurn({ model, images: true, tools: [readTool], system: 'sys', history: [], prompt: 'go', askPermission: async () => true,
+            onEvent: () => {} });
+        const told = (i) => (JSON.stringify(model.doStreamCalls[i].prompt).match(/without changing anything/g) || []).length;
+        expect(told(24)).toBe(0);
+        expect(told(25)).toBe(1);
+        expect(told(30)).toBe(1);
+    });
+
     test('only the latest screenshot is sent; earlier ones become a note', async () => {
         const model = scripted(
             [call('c1', 'look'), finish('tool-calls')],
