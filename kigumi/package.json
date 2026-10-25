@@ -258,7 +258,8 @@
     "app:start": "node scripts/start-app.js",
     "app:fetch-uv": "node scripts/fetch-uv.js",
     "app:dist": "npm run prepare:instructions && node scripts/bundle-docs.js && node scripts/fetch-uv.js && electron-builder --config electron-builder.yml",
-    "test:app": "node test/app/run-app-tests.js"
+    "test:app": "node test/app/run-app-tests.js",
+    "eval": "node test/evals/run-evals.js"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
