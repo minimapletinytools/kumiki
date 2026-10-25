@@ -83,6 +83,8 @@ async function runOne(task, modelId, key) {
     const model = findModel(modelId);
     const tools = [];
     const notices = [];
+    // Each call with its arguments, for seeing what a model spends its steps on.
+    const calls = [];
     const started = Date.now();
     let costUsd = 0;
     let failure = null;
@@ -92,7 +94,10 @@ async function runOne(task, modelId, key) {
             cacheMarks: Boolean(model.cacheMarks), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: evalTools(files), files, system: loadSystemPrompt()(kumikiSource),
             history: [], prompt: task.prompt, askPermission: async () => true,
             onEvent: (event) => {
-                if (event.type === 'agent:tool') tools.push(event.name);
+                if (event.type === 'agent:tool') {
+                    tools.push(event.name);
+                    calls.push({ name: event.name, input: event.input });
+                }
                 if (event.type === 'agent:notice') notices.push(event.text);
             },
         });
@@ -109,7 +114,7 @@ async function runOne(task, modelId, key) {
     return {
         task: task.name, model: modelId, ...(process.argv.includes('--keep') ? { project: root } : {}), passed: !failure && checks.every((check) => check.passed), checks,
         tools: tools.length, toolsUsed: Object.fromEntries([...new Set(tools)].map((name) => [name, tools.filter((t) => t === name).length])),
-        notices, costUsd, seconds: Math.round((Date.now() - started) / 1000), failure,
+        notices, calls, costUsd, seconds: Math.round((Date.now() - started) / 1000), failure,
     };
 }
 
