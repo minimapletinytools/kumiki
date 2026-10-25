@@ -22,6 +22,7 @@ const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { createProjectFiles } = require('../../agent/project-files');
 const { createFileTools } = require('../../agent/file-tools');
 const { todoTool } = require('../../agent/session-tools');
+const { createKumikiApiTool } = require('../../agent/kumiki-api');
 const { TASKS } = require('./tasks');
 
 const REPO = path.resolve(__dirname, '..', '..', '..');
@@ -64,7 +65,7 @@ function evalTools(files) {
             return [...result, { type: 'text', text: describeReport(await buildFrame(files.resolve(args.file_path))) }];
         },
     } : tool));
-    return [...fileTools, todoTool(() => {}), {
+    return [...fileTools, todoTool(() => {}), createKumikiApiTool({ python: () => PYTHON, env: { PYTHONPATH: REPO } }), {
         name: 'check_frame',
         description: 'Build a Python frame file and say whether it built, with its warnings and errors.',
         shape: { file_path: require('zod').z.string().describe('A path in the project.') },

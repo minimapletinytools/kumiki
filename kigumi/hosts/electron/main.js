@@ -26,7 +26,8 @@ const { createConversationStore } = require('../../agent/conversation-store');
 const { loadCatalog, resolveLocale } = require('../../i18n');
 const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
-const { findKumikiSource, kumikiExamples } = require('../../agent/kumiki-source');
+const { findKumikiSource, kumikiExamples, projectPython } = require('../../agent/kumiki-source');
+const { createKumikiApiTool } = require('../../agent/kumiki-api');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { SecureStorage } = require('./secure-storage');
 const { createKigumiTools } = require('../../agent/tools');
@@ -480,7 +481,8 @@ function toggleAgentPanel() {
         setting: (key, fallback) => settings.get(key, fallback),
         setSetting: (key, value) => settings.set(key, value),
         files: projectFiles,
-        fileTools: createFileTools({ files: projectFiles }),
+        fileTools: [...createFileTools({ files: projectFiles }),
+            createKumikiApiTool({ python: () => projectPython(workspaceFolder), cwd: () => workspaceFolder })],
         account,
         models: modelList,
         systemPrompt: loadSystemPrompt(),

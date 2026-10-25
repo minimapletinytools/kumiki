@@ -14,7 +14,8 @@ describe_panel for more. Find things with search_files rather than reading whole
 file a view shows rebuilds it, and the edit's result says whether it built; screenshot to look at it,
 and describe_frame for where its timbers are and whether they meet.
 
-The kumiki docs are in .kigumi/docs/ in the project: read them first. Sizes from the tools are in
+The kumiki docs are in .kigumi/docs/ in the project: read them first. For a kumiki function's or
+class's exact arguments, ask kumiki_api rather than guessing or reading kumiki's source. Sizes from the tools are in
 metres, in world space. For a task of several steps, keep a to-do list with update_todos and tick
 items off as you go. Keep replies short.
 
@@ -27,8 +28,7 @@ anything you weren't asked to, say what you'd do and ask.
 
 ---
 
-The kumiki library's source is at {kumikiSource} (read-only). For a function's or class's exact
-arguments and what they mean, search there for its def (search_files with that folder) and read
-just that part, rather than guessing; print() in a frame shows in read_view_log. Example frames are
-in {kumikiExamples}/structures (read-only): to write a new frame, start from the nearest one (the
-docs list what each shows) rather than working the library out from its source.
+The kumiki library's source is at {kumikiSource} (read-only), for when you need to see how
+something works; print() in a frame shows in read_view_log. Example frames are in
+{kumikiExamples}/structures (read-only): to write a new frame, start from the nearest one (the docs
+list what each shows) rather than working the library out from its source.
