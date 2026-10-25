@@ -89,6 +89,25 @@ Timbers for a typical structure are usually defined
 
 `bottom_position` is the center of the timber's bottom end, not a corner (concepts.md, "timber position and orientation"): a timber lying on the ground at Z = 0 is half below it. Raise it by half its height.
 
+## Example frames
+
+Kumiki ships example frames in `patterns/structures/` (in the installed package, `kumiki/patterns/structures/`). To write a new frame, start from the nearest one:
+
+- `my_cute_frame.py`: the smallest complete frame, four timbers in an H with pegged mortise and tenon joints.
+- `horsey_example.py`: a sawhorse: feet, posts, a stretcher and a top plate, all pegged mortise and tenons.
+- `doublesawhorseworkbench.py`: a double sawhorse workbench.
+- `dovetailed_sawhorse.py`: a beam on edge with four splayed legs in sliding dovetails, sized by kiwari parameters.
+- `coffee_table.py`: a small table.
+- `cat_corner_cot.py`: a cot built against a corner.
+- `oscarshed.py`: a shed with posts on mudsills.
+- `tinyhouse120.py`: a tiny house with posts on the ground and floor beams into them.
+- `learn_to_timber_frame_shed.py`: a shed's base, floor joists and mudsill joints.
+- `multiple_frames.py`: several frames in one file.
+- `assembly_preview_demo.py`: an H-frame with a disassembly sequence.
+- `multi_cross_lap_post.py`: a round post capped by three crossing boards, in cross laps.
+- `half_blind_tenoned_dadoed_rabbeted_scarf_joint.py`: a scarf joint (Kanawa Tsugi style).
+- `my_cute_frame_drawing_test.py`: drawings dimensioned automatically.
+
 ## Cutting Joints
 
 Once timbers have been laid out, use the various `cut_*` methods to cut joints joining the timbers. There are many types of joints.
@@ -450,7 +469,7 @@ A mortise timber may have several mortise and tenon joints coming into it from d
 
 ### posts on mudsills
 
-A very common pattern for a timber framed structure is to lay out mudsills on the perimeter of the footprint with posts on top. See `examples/oscarshed.py` for a structure built witth this pattern.
+A very common pattern for a timber framed structure is to lay out mudsills on the perimeter of the footprint with posts on top. See `patterns/structures/oscarshed.py` for a structure built witth this pattern.
 
 Posts in the middle of mudsills are joined with mortise and tenon joints without pegs, the tenon size must be longer in the length direction of the mudsill and typically 1/3rd the width of the mudsill in the other dimension.
 
@@ -462,7 +481,7 @@ For posts on top of a corner joint, you have a few options:
 
 ### posts on ground with floor beams into posts
 
-A less common and more complex pattern is to have posts directly touching the ground as if the house is on stilts. See `examples/tinyhouse120.py` for an example of this pattern
+A less common and more complex pattern is to have posts directly touching the ground as if the house is on stilts. See `patterns/structures/tinyhouse120.py` for an example of this pattern
 
 Floor beams connecting into corner posts can be joined with mortise and tenon joints, offsetting the tennons on each beam by a bit so that they do not intersect each other (this is what we did in tinyhouse120)
 
@@ -473,16 +492,16 @@ For beams connecting into non-corner posts, you have a few options:
 
 ### girts between vertical members
 
-`examples/tinyhouse120.py` uses this pattern
+`patterns/structures/tinyhouse120.py` uses this pattern
 
 ### top plates on posts
 
-`examples/tinyhouse120.py` and `examples/oscarshed.py` use this pattern
+`patterns/structures/tinyhouse120.py` and `patterns/structures/oscarshed.py` use this pattern
 
 ### studs go between horizontal members
 
 TODO 
-`examples/tinyhouse120.py` and `examples/oscarshed.py` use this pattern
+`patterns/structures/tinyhouse120.py` and `patterns/structures/oscarshed.py` use this pattern
 
 ### braces go between vertical and horizontal members
 

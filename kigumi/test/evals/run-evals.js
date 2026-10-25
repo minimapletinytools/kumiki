@@ -79,7 +79,8 @@ async function runOne(task, modelId, key) {
     for (const doc of DOCS) fs.copyFileSync(path.join(REPO, 'docs', doc), path.join(root, '.kigumi', 'docs', doc));
     for (const [name, content] of Object.entries(task.files)) fs.writeFileSync(path.join(root, name), content);
     const kumikiSource = path.join(REPO, 'kumiki');
-    const files = createProjectFiles({ root: () => root, readOnly: () => [kumikiSource] });
+    const examples = path.join(REPO, 'patterns');
+    const files = createProjectFiles({ root: () => root, readOnly: () => [kumikiSource, examples] });
     const model = findModel(modelId);
     const tools = [];
     const notices = [];
@@ -91,7 +92,7 @@ async function runOne(task, modelId, key) {
     try {
         const result = await runTurn({
             model: await languageModelFor(routeModel(model, { openrouterKey: key })), images: model.images,
-            cacheMarks: Boolean(model.cacheMarks), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: evalTools(files), files, system: loadSystemPrompt()(kumikiSource),
+            cacheMarks: Boolean(model.cacheMarks), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: evalTools(files), files, system: loadSystemPrompt()(kumikiSource, examples),
             history: [], prompt: task.prompt, askPermission: async () => true,
             onEvent: (event) => {
                 if (event.type === 'agent:tool') {

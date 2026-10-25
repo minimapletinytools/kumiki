@@ -78,7 +78,8 @@ class AgentSession {
      * @param {object|null} [options.account]  the Kigumi account (agent/account.js)
      * @param {{list: () => object[]}} [options.models]  the models offered (models.js createModelList)
      * @param {() => string|null} [options.kumikiSource]  where the kumiki library's source is, for the agent to read
-     * @param {(kumikiSource: string|null) => string} [options.systemPrompt]  the agent's instructions
+     * @param {() => string|null} [options.kumikiExamples]  where kumiki's example frames are, for the agent to read
+     * @param {(kumikiSource: string|null, kumikiExamples: string|null) => string} [options.systemPrompt]  the agent's instructions
      *     (agent/system-prompt.js loadSystemPrompt)
      * @param {object|null} [options.conversations]  where past conversations are kept (conversation-store.js)
      * @param {(route: object, options: {fetch?: typeof fetch}) => Promise<object>} [options.createModel]
@@ -87,7 +88,7 @@ class AgentSession {
      */
     constructor({ panels, run, post, files = null, fileTools = [], setting, setSetting = () => {}, account = null,
         conversations = null, createModel = languageModelFor, log = () => {}, strings = {}, models = { list: () => MODELS },
-        kumikiSource = () => null, systemPrompt = () => '' }) {
+        kumikiSource = () => null, kumikiExamples = () => null, systemPrompt = () => '' }) {
         this.strings = Object.fromEntries(Object.entries(strings).filter(([key]) => key.startsWith('agent.')));
         this.files = files || { root: () => null };
         this.fileTools = fileTools;
@@ -112,6 +113,7 @@ class AgentSession {
         this.account = account;
         this.models = models;
         this.kumikiSource = kumikiSource;
+        this.kumikiExamples = kumikiExamples;
         this.systemPrompt = systemPrompt;
         this.createModel = createModel;
         this.log = log;
@@ -383,7 +385,8 @@ class AgentSession {
                 tools: this.tools,
                 files: this.files.root() ? this.files : null,
                 system: this.panelSetting('agent.planMode')
-                    ? `${this.systemPrompt(this.kumikiSource())}\n\n${PLAN_MODE_NOTE}` : this.systemPrompt(this.kumikiSource()),
+                    ? `${this.systemPrompt(this.kumikiSource(), this.kumikiExamples())}\n\n${PLAN_MODE_NOTE}`
+                    : this.systemPrompt(this.kumikiSource(), this.kumikiExamples()),
                 history: this.history,
                 prompt: await promptContent({ text, images, files: this.files, describe: () => this.panels.describe(),
                     modelSeesImages: this.model.images }),

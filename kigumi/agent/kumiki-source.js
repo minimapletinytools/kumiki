@@ -4,6 +4,7 @@
  */
 
 const fs = require('fs');
+const path = require('path');
 const { execFile } = require('child_process');
 const { getVenvPythonCandidates } = require('../python-env');
 
@@ -21,4 +22,14 @@ function findKumikiSource(projectRoot) {
     });
 }
 
-module.exports = { findKumikiSource };
+/**
+ * The example frames' folder for a kumiki package at `source`: inside it for an installed kumiki, or
+ * the checkout's patterns/ beside it for an editable one. Null if neither.
+ */
+function kumikiExamples(source) {
+    if (!source) return null;
+    return [path.join(source, 'patterns'), path.join(source, '..', 'patterns')]
+        .map((folder) => path.resolve(folder)).find((folder) => fs.existsSync(path.join(folder, 'structures'))) || null;
+}
+
+module.exports = { findKumikiSource, kumikiExamples };

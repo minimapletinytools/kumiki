@@ -26,7 +26,7 @@ const { createConversationStore } = require('../../agent/conversation-store');
 const { loadCatalog, resolveLocale } = require('../../i18n');
 const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
-const { findKumikiSource } = require('../../agent/kumiki-source');
+const { findKumikiSource, kumikiExamples } = require('../../agent/kumiki-source');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { SecureStorage } = require('./secure-storage');
 const { createKigumiTools } = require('../../agent/tools');
@@ -471,7 +471,8 @@ function toggleAgentPanel() {
         });
     };
     knowKumikiSource();
-    const projectFiles = createProjectFiles({ root: () => workspaceFolder, readOnly: () => (kumikiSource ? [kumikiSource] : []) });
+    const projectFiles = createProjectFiles({ root: () => workspaceFolder,
+        readOnly: () => [kumikiSource, kumikiExamples(kumikiSource)].filter(Boolean) });
     agentSession = new AgentSession({
         panels: kigumiApp.panels,
         run: runToolCommand,
@@ -487,6 +488,7 @@ function toggleAgentPanel() {
             knowKumikiSource();
             return kumikiSource;
         },
+        kumikiExamples: () => kumikiExamples(kumikiSource),
         conversations: createConversationStore(path.join(app.getPath('userData'), 'conversations')),
         strings: loadCatalog(resolveLocale(app.getLocale())),
         log: (line) => logChannel.appendLine(line),

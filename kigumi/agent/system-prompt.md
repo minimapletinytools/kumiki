@@ -1,7 +1,8 @@
 <!--
 The built-in agent's instructions, sent as its system prompt (agent/system-prompt.js reads this
 file). Comments like this one are left out. The part after the line of three dashes is added when
-the kumiki library's source has been found; {kumikiSource} becomes its folder. Line breaks and
+the kumiki library's source has been found; {kumikiSource} becomes its folder, and
+{kumikiExamples} the folder of its example frames. Line breaks and
 paragraphs are joined into one line when it's sent.
 -->
 
@@ -28,4 +29,6 @@ anything you weren't asked to, say what you'd do and ask.
 
 The kumiki library's source is at {kumikiSource} (read-only). For a function's or class's exact
 arguments and what they mean, search there for its def (search_files with that folder) and read
-just that part, rather than guessing; print() in a frame shows in read_view_log.
+just that part, rather than guessing; print() in a frame shows in read_view_log. Example frames are
+in {kumikiExamples}/structures (read-only): to write a new frame, start from the nearest one (the
+docs list what each shows) rather than working the library out from its source.
