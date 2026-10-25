@@ -39,7 +39,9 @@ The *bottom point* of a timber is on the bottom face of the timber and in the ce
 
 The *centerline* of the timber is the line that runs from bottom to top.
 
-By default, a timber is oriented with its bottom cross section centered on the XY plane and running up in the Y direction. We use the following names for each axis
+`bottom_position` (in `create_timber`, `create_axis_aligned_timber` and the like) is this bottom point, in world space: the center of the timber's bottom end, not a corner. For a timber lying flat, its Z is the height of the centerline, so a timber 200 mm tall resting on the ground has a `bottom_position` Z of 100 mm (at Z = 0 it would sit half below the ground), and its X and Y are the middle of its end. `size` is `(width, height)`: the width runs along `width_direction`, the height along the third axis.
+
+By default, a timber is oriented with its bottom cross section centered on the XY plane and running up in the Z direction. We use the following names for each axis
 
 - Z axis: *length axis* of the timber, and the *length* of the timber is its dimension in this axis
 - X axis: *width axis* of the timber, and the *width* of the timber is its dimension in this axis

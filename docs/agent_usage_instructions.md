@@ -85,6 +85,8 @@ Timbers for a typical structure are usually defined
     - `create_axis_aligned_timber` for timbers aligned to cartesian axis
     - `create_timber` for arbitrarily aligned timbers
 
+`bottom_position` is the center of the timber's bottom end, not a corner (concepts.md, "timber position and orientation"): a timber lying on the ground at Z = 0 is half below it. Raise it by half its height.
+
 ## Cutting Joints
 
 Once timbers have been laid out, use the various `cut_*` methods to cut joints joining the timbers. There are many types of joints.
@@ -94,6 +96,13 @@ Most plain joints have a `cut_basic_plain_*` variation inside of basic_joints.py
 ### finding joint parameters
 
 Joint parameters are always set relative to one of the features on one of the timbers in the arrangement. Oftentimes the user will want to set the parameter relative to some other feature. Use the methods in measuring.py to convert measurements between features.
+
+### butt joint arrangements
+
+A `ButtJointTimberArrangement` names the timber that butts (`butt_timber`, and which end of it, `butt_timber_end`) into the one that receives it (`receiving_timber`). The two timbers' centerlines lie in one plane, the *joint alignment plane*.
+
+- `front_face_on_butt_timber` is a long face of the butt timber parallel to that plane: the face you see when looking straight at the joint, and the one a peg goes through. For a post standing on a sill that runs along Y, those are the post's faces that look along X (`RIGHT` or `LEFT` for a post made with `width_direction=TimberFace.RIGHT`). Pegged joints need it; the error for a wrong one names the faces that would work.
+- `top_face_on_butt_timber` must not be parallel to that plane.
 
 ### default joints for generic designs
 
