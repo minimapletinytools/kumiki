@@ -42,6 +42,26 @@ Everything planned here is in. Ideas from using it go here.
   guessed at `bottom_position` and `front_face_on_butt_timber` for many steps; the docs don't
   give either.
 
+From the same session, most useful first:
+
+1. **Model evals.** A few real tasks (fix a broken frame, build from a description, change a
+   joint) run against each model, scored on whether it builds, steps and cost. Picks the default
+   model, and shows whether a change helped.
+2. **Seeing where timbers are.** A `describe_frame` tool: each timber's world bounding box, and
+   whether each joint's timbers touch. kumiki side: warn when a joint's timbers don't meet (the
+   sawhorse's leg tenons cut into air, and it built).
+3. **kumiki errors that say how to fix them.** "front_face_on_butt_timber must be parallel to the
+   joint alignment plane" cost dozens of steps; naming the faces that would work makes it one.
+4. **Do what was asked.** Asked for a screenshot and an opinion, it investigated for 40 steps: answer
+   questions directly, and ask before investigating or editing unasked.
+5. **Guards for small models.** A call repeated with the same arguments is told so (read_file
+   without offset, ten times).
+6. **Summaries that can't mislead.** A summary said a fixed bug was still there; attach the current
+   content of files the conversation changed.
+7. **Docs.** concepts.md contradicts itself on which way a timber runs; nothing says what
+   `bottom_position` is or what the joint face arguments mean.
+8. **"Internal Server Error" failures.** Two turns died on them, apart from the slot problem.
+
 ## Sources
 
 - Cursor agent: checkpoints, auto-run modes, to-do list, queued messages, summarizing at the
