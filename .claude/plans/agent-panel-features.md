@@ -33,6 +33,15 @@ shell sandboxing, subagents and background agents are left out.
 
 Everything planned here is in. Ideas from using it go here.
 
+- **`kumiki_api` tool** (not started). Asks the project's Python about a kumiki name rather than
+  searching source text: `kumiki_api("create_axis_aligned_timber")` gives the signature (defaults,
+  type hints), the docstring, and the file and line; the source on request; `members=True` on a
+  module lists what it exports. Exact and short, finds re-exported names (`from kumiki import *`
+  hides where they live), and works for any install. Keep the read-only source access alongside,
+  for reading an implementation. Why: in a DeepSeek V4.1 Flash session (2026-10-24) the agent
+  guessed at `bottom_position` and `front_face_on_butt_timber` for many steps; the docs don't
+  give either.
+
 ## Sources
 
 - Cursor agent: checkpoints, auto-run modes, to-do list, queued messages, summarizing at the
