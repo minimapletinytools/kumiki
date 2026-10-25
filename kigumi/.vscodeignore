@@ -42,6 +42,8 @@ agent/project-files.js
 agent/prompt-content.js
 agent/search-worker.js
 agent/kumiki-source.js
+agent/system-prompt.js
+agent/system-prompt.md
 agent/session-tools.js
 agent/account.js
 agent/backend-config.js

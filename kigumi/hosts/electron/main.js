@@ -27,6 +27,7 @@ const { loadCatalog, resolveLocale } = require('../../i18n');
 const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
 const { findKumikiSource } = require('../../agent/kumiki-source');
+const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { SecureStorage } = require('./secure-storage');
 const { createKigumiTools } = require('../../agent/tools');
 const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
@@ -481,6 +482,7 @@ function toggleAgentPanel() {
         fileTools: createFileTools({ files: projectFiles }),
         account,
         models: modelList,
+        systemPrompt: loadSystemPrompt(),
         kumikiSource: () => {
             knowKumikiSource();
             return kumikiSource;
