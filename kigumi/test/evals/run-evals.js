@@ -26,7 +26,7 @@ const { TASKS } = require('./tasks');
 
 const REPO = path.resolve(__dirname, '..', '..', '..');
 const PYTHON = path.join(REPO, '.venv', 'bin', 'python');
-const DOCS = ['agent_usage_instructions.md', 'concepts.md', 'patternbook.md'];
+const DOCS = ['agent_usage_instructions.md', 'concepts.md', 'patternbook.md', 'api_cheat_sheet.md'];
 
 function option(name, fallback) {
     const at = process.argv.indexOf(`--${name}`);

@@ -17,6 +17,8 @@ Unless the user is specific about what they want, always follow the following im
 - iterate with the user until they are satisfied
 
 
+For the signatures of what a frame most often uses, and a complete small frame, see `api_cheat_sheet.md`.
+
 In addition, validate changes you make:
 
 - run the frame code using python to ensure there are no errors
