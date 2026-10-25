@@ -6,6 +6,7 @@
 
 const path = require('path');
 const { createPanelDirectory } = require('./agent/panel-directory');
+const { describeFrame } = require('./frame-description');
 const { buildReport } = require('./build-report');
 const fs = require('fs');
 const { FrameViewSession } = require('./frame-view-session');
@@ -309,6 +310,11 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
 
         'kigumi.automationBuildReport': async (options = {}) => withSession(options,
             (session) => buildReport(session, options), { entries: [] }),
+
+        // Where the view's timbers are, and which touch (frame-description.js).
+        'kigumi.automationDescribeFrame': async (options = {}) => withSession(options, async (session) => (session._lastFrameData
+            ? { ok: true, filePath: session.filePath, ...describeFrame(session._lastFrameData) }
+            : { ok: false, reason: 'not-built', filePath: session.filePath })),
 
         'kigumi.automationReadSessionLogs': async (options = {}) => withSession(options, async (session) => {
             const snapshot = session.getLogSnapshot({

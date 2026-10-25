@@ -36,6 +36,11 @@ module.exports = {
         // What an edit by the agent runs: the view's file built as it is, and that build's problems.
         await openFrame(FRAME);
         const report = await runAppCommand('kigumi.automationBuildReport', { filePath: FRAME, graceMs: 0 });
+        const described = await runAppCommand('kigumi.automationDescribeFrame', { filePath: FRAME });
+        check("describe_frame gives a view's timbers with what each touches, all one group for a frame that holds together",
+            described && described.ok && described.timbers.length === 4 && described.groups.length === 1
+                && described.timbers.every((one) => one.min && one.touches.length > 0),
+            JSON.stringify(described && { groups: described.groups, first: described.timbers && described.timbers[0] }).slice(0, 300));
         check('a view\'s file builds on request, reporting that build\'s problems',
             report && report.ok === true && Array.isArray(report.entries) && report.entries.length === 0, JSON.stringify(report).slice(0, 200));
     },

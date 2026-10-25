@@ -87,6 +87,15 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             })),
         },
         {
+            name: 'describe_frame',
+            description: "Where a view's timbers are: each one's world bounding box (metres, Z up) and the timbers "
+                + 'it touches, and whether the frame holds together or falls into groups that touch nothing joining '
+                + 'them. Use it to check that timbers meet where joints join them.',
+            shape: { panel_id: panelId },
+            readOnly: true,
+            run: async ({ panel_id: id }) => text(await run('kigumi.automationDescribeFrame', viewOptions(id))),
+        },
+        {
             name: 'read_view_log',
             description: "A view's log: what the Python runner printed building the frame, including errors "
                 + 'and tracebacks.',
