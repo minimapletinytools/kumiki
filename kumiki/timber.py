@@ -2454,6 +2454,64 @@ class Sticker(Accessory):
     transform: Transform
     size: Numeric = inches(1)
 
+class FrameWarning(UserWarning):
+    """A problem with a frame's design that still builds, e.g. a joint whose timbers don't meet."""
+
+
+# Shown every build, not once: Kigumi's runner builds a frame many times in one process.
+warnings.filterwarnings("always", category=FrameWarning)
+
+# Two timbers further apart than this, in metres, don't meet.
+_MEET_TOLERANCE = 0.001
+
+
+def _timber_box(timber: 'PerfectTimberWithin') -> Optional[Tuple[List[float], List[float]]]:
+    """The timber's uncut world bounding box as (min, max), or None if its numbers aren't plain."""
+    try:
+        p = [float(v) for v in timber.get_bottom_position_global()]
+        axes = [[float(v) for v in d] for d in (timber.get_length_direction_global(),
+                                                 timber.get_width_direction_global(),
+                                                 timber.get_height_direction_global())]
+        length, width, height = float(timber.length), float(timber.size[0]), float(timber.size[1])
+    except (TypeError, ValueError):
+        return None
+    corners = [[p[i] + a * axes[0][i] + b * axes[1][i] + c * axes[2][i] for i in range(3)]
+               for a in (0.0, length) for b in (-width / 2, width / 2) for c in (-height / 2, height / 2)]
+    return [min(c[i] for c in corners) for i in range(3)], [max(c[i] for c in corners) for i in range(3)]
+
+
+def _gap_between(a: Tuple[List[float], List[float]], b: Tuple[List[float], List[float]]) -> float:
+    """How far apart two boxes are, in metres; 0 if they touch or overlap."""
+    return max(0.0, *(max(a[0][i] - b[1][i], b[0][i] - a[1][i]) for i in range(3)))
+
+
+def warn_joints_whose_timbers_dont_meet(joints: Iterable['Joint']) -> None:
+    """A FrameWarning for each joint whose timbers don't hold together: one that touches none of the
+    others, so the joint cuts into air. A joint may cut many timbers that each meet one of them (rafters
+    on a plate). Boxes are axis-aligned, so timbers at an angle can be missed, never wrongly warned about."""
+    boxes: Dict[int, Optional[Tuple[List[float], List[float]]]] = {}
+    for joint in joints:
+        timbers = list({id(c.timber): c.timber for c in joint.cuttings.values()}.values())
+        found = [boxes.setdefault(id(t), _timber_box(t)) for t in timbers]
+        if len(timbers) < 2 or any(box is None for box in found):
+            continue
+        # Timbers that touch, transitively, from the first.
+        reached = {0}
+        frontier = [0]
+        while frontier:
+            i = frontier.pop()
+            for j in range(len(timbers)):
+                if j not in reached and _gap_between(found[i], found[j]) <= _MEET_TOLERANCE:
+                    reached.add(j)
+                    frontier.append(j)
+        for j in range(len(timbers)):
+            if j in reached:
+                continue
+            gap = min(_gap_between(found[i], found[j]) for i in reached)
+            warnings.warn(f"Joint '{joint.ticket.path}': {timbers[j].ticket.path} doesn't meet the joint's other timbers "
+                          f"(a {gap * 1000:.0f} mm gap), so the joint cuts into air.", FrameWarning, stacklevel=3)
+
+
     def get_csg_local(self) -> CutCSG:
         # Ball diameter = size, shaft diameter = size/2, shaft length = 2*size
         ball_radius = self.size / scalar(2)
@@ -2796,6 +2854,8 @@ class Frame:
                     timber_ref_to_cuttings[timber_id] = []
                 timber_ref_to_cuttings[timber_id].append(cutting)
         
+        warn_joints_whose_timbers_dont_meet(joints)
+
         # Check for name conflicts
         # Build a mapping from name to list of timber references
         name_to_timber_refs: Dict[str, List[PerfectTimberWithin]] = {}

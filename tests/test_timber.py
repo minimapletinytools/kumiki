@@ -4,7 +4,8 @@ Tests for Kumiki timber framing system
 
 import pytest
 from kumiki.rule import Orientation
-from kumiki.timber import _get_rough_size_and_offset
+import warnings
+from kumiki.timber import _get_rough_size_and_offset, FrameWarning
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -2494,3 +2495,26 @@ class TestRoughFacesLyingOnThePerfectTimber:
         # An arris or corner is perfect only if every face meeting there is.
         assert "rough.front_right" in names and "rough.bottom_right" in names and "rough.top_right_front" in names
         assert "rptw.front_left" in names and "rptw.bottom_left" in names and "rptw.top_front_left" in names
+
+
+class TestJointsWhoseTimbersDontMeet:
+    """Frame.from_joints warns of a joint with a timber that touches none of the joint's others."""
+
+    @staticmethod
+    def _post_on_sill(post_z):
+        sill = create_axis_aligned_timber(bottom_position=create_v3(0, -0.5, mm(50)), length=1, size=create_v2(mm(100), mm(100)),
+                                          length_direction=TimberFace.FRONT, width_direction=TimberFace.RIGHT, ticket="sill")
+        post = create_axis_aligned_timber(bottom_position=create_v3(0, 0, post_z), length=1, size=create_v2(mm(100), mm(100)),
+                                          length_direction=TimberFace.TOP, width_direction=TimberFace.RIGHT, ticket="post")
+        cut = lambda timber: Cutting(timber=timber, negative_csg=RectangularPrism(size=create_v2(mm(10), mm(10)), transform=Transform.identity(),
+                                                                                 start_distance=0, end_distance=mm(10)))
+        return Joint(cuttings={"sill": cut(sill), "post": cut(post)}, ticket=JointTicket(joint_type="post_on_sill"))
+
+    def test_a_post_resting_on_its_sill_meets_it(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", FrameWarning)
+            Frame.from_joints([self._post_on_sill(mm(100))])
+
+    def test_a_post_above_its_sill_is_warned_of(self):
+        with pytest.warns(FrameWarning, match=r"post doesn't meet the joint's other timbers \(a 50 mm gap\)"):
+            Frame.from_joints([self._post_on_sill(mm(150))])

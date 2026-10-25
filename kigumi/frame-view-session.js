@@ -1571,7 +1571,8 @@ class FrameViewSession {
             const lines = (partial + text).split('\n');
             partial = lines.pop();
             for (const line of lines) {
-                if (line.trim()) this.log(`[python] ${line}`);
+                // A Python warning ("file.py:12: FrameWarning: ...") counts as one, so an agent's edit reports it.
+                if (line.trim()) this.log(`${/\b[A-Z]\w*Warning: /.test(line) ? '[warn] ' : ''}[python] ${line}`);
             }
         };
         this.runnerSession.onMilestone = (milestone) => {
