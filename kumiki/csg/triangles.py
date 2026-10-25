@@ -32,7 +32,9 @@ from ..rule import Matrix, Numeric, Transform, V2, V3
 
 
 TRIANGLES_FLOAT_DIGITS = 8
-TRIANGLES_PRISM_INFINITE_EXTENT = 1000.0
+# Big enough for any frame, small enough for manifold: at 10 km a half space's box made long
+# sliver triangles that lost cuts (dovetailed sawhorse legs).
+TRIANGLES_PRISM_INFINITE_EXTENT = 100.0
 TRIANGLES_HALF_SPACE_INFINITE_EXTENT = TRIANGLES_PRISM_INFINITE_EXTENT * 10.0
 TRIANGLES_CYLINDER_SECTIONS = 32
 TRIANGLES_RAY_EPSILON = 1e-8
@@ -262,27 +264,34 @@ def _run_boolean(operation: str, meshes: Sequence[trimesh.Trimesh]) -> trimesh.T
 
     copied_meshes = [_finalize_mesh(mesh.copy()) for mesh in non_empty_meshes]
     try:
-        if operation == "union":
-            result = trimesh.boolean.union(copied_meshes, engine="manifold", check_volume=False)
-        elif operation == "difference":
-            result = trimesh.boolean.difference(copied_meshes, engine="manifold", check_volume=False)
-        elif operation == "intersection":
-            result = trimesh.boolean.intersection(copied_meshes, engine="manifold", check_volume=False)
-        else:
-            raise ValueError(f"Unsupported boolean operation: {operation}")
+        result = _manifold_boolean(operation, copied_meshes)
     except BaseException as exc:
-        raise RuntimeError(f"trimesh boolean {operation} failed: {exc}") from exc
-
-    if result is None:
-        raise RuntimeError(f"trimesh boolean {operation} returned no mesh")
-
-    if isinstance(result, trimesh.Scene):
-        geometry = list(result.geometry.values())
-        if not geometry:
-            raise RuntimeError(f"trimesh boolean {operation} returned an empty scene")
-        result = trimesh.util.concatenate(geometry)
-
+        raise RuntimeError(f"manifold boolean {operation} failed: {exc}") from exc
     return _finalize_mesh(result)
+
+
+def _manifold_boolean(operation: str, meshes: Sequence[trimesh.Trimesh]) -> trimesh.Trimesh:
+    """Run a boolean in manifold3d at float64.
+
+    Not trimesh.boolean: it hands manifold float32, and manifold's tolerance scales with a solid's
+    size, so a half space's kilometre-wide box gets a millimetre tolerance and loses fine cuts.
+    """
+    from manifold3d import Manifold, Mesh64, OpType
+
+    solids = [Manifold(Mesh64(vert_properties=np.asarray(mesh.vertices, dtype=np.float64),
+                              tri_verts=np.asarray(mesh.faces, dtype=np.uint64)))
+              for mesh in meshes]
+    if operation == "union":
+        solid = Manifold.batch_boolean(solids, OpType.Add)
+    elif operation == "difference":
+        solid = solids[0] - Manifold.batch_boolean(solids[1:], OpType.Add)
+    elif operation == "intersection":
+        solid = Manifold.batch_boolean(solids, OpType.Intersect)
+    else:
+        raise ValueError(f"Unsupported boolean operation: {operation}")
+    out = solid.to_mesh64()
+    return trimesh.Trimesh(vertices=np.asarray(out.vert_properties)[:, :3],
+                           faces=np.asarray(out.tri_verts, dtype=np.int64), process=False)
 
 
 def _mesh_rectangular_prism(prism: RectangularPrism) -> trimesh.Trimesh:
