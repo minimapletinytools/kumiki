@@ -119,9 +119,21 @@ const TRIMMED_TO = 300;
 /** Past this many tokens (estimated) at the start of a turn, the conversation before it is summarised. */
 const SUMMARISE_AT_TOKENS = 100000;
 
-/** A rough token count: about four characters a token. */
+/** What an image counts for in estimateTokens: about what a model reads one as, not its encoded size. */
+const IMAGE_TOKENS = 1500;
+
+/** A rough token count: about four characters a token, and images at what a model reads them as. */
 function estimateTokens(messages) {
-    return Math.round(JSON.stringify(messages).length / 4);
+    let images = 0;
+    const text = JSON.stringify(messages, (key, value) => {
+        // An image's data (a user's image, or a screenshot sent as a file) is hundreds of KB encoded.
+        if ((key === 'image' || key === 'data') && typeof value === 'string' && value.length > 1000) {
+            images += 1;
+            return '';
+        }
+        return value;
+    });
+    return Math.round(text.length / 4) + images * IMAGE_TOKENS;
 }
 
 const TRIMMED_NOTE = '\n[… cut down to keep the conversation small; run the tool again if you need the rest.]';

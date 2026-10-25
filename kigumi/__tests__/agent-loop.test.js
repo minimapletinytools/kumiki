@@ -6,7 +6,9 @@ const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test')
 const { runTurn, toModelContent, cacheMarked, trimOldToolResults, estimateTokens, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
 const { MODELS, findModel, routeModel } = require('../agent/models');
 const { createFileTools } = require('../agent/file-tools');
-const { AgentSession, RETRY_PROMPT, describeFailure, withContext, describeBuild } = require('../agent/agent-session');
+const { createProjectFiles } = require('../agent/project-files');
+const { withContext, withMentions, promptContent } = require('../agent/prompt-content');
+const { AgentSession, RETRY_PROMPT, describeFailure, describeBuild } = require('../agent/agent-session');
 const { z } = require('zod');
 
 const USAGE = { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } };
@@ -218,6 +220,12 @@ describe('the agent loop', () => {
         expect(latest.content[0].output.value[0].type).toBe('file');
     });
 
+        test('an image counts for its tokens, not its encoded size, in the size that decides summarising', () => {
+        const image = { role: 'user', content: [{ type: 'image', image: 'A'.repeat(800000), mediaType: 'image/png' }] };
+        expect(estimateTokens([image])).toBeLessThan(5000);
+        expect(estimateTokens([{ role: 'user', content: 'x'.repeat(400000) }])).toBeGreaterThan(SUMMARISE_AT_TOKENS - 1);
+    });
+
         test('a model that cannot see gets a note instead of an image', () => {
         const content = [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }];
         expect(toModelContent(content, false).value[0]).toMatchObject({ type: 'text' });
@@ -235,7 +243,7 @@ describe('the file tools', () => {
         fs.writeFileSync(path.join(root, 'frame.py'), 'a = 1\nb = 2\nb = 2\n');
         fs.mkdirSync(path.join(root, 'node_modules'));
         fs.writeFileSync(path.join(root, 'node_modules', 'x.js'), '');
-        tools = createFileTools({ root: () => root });
+        tools = createFileTools({ files: createProjectFiles({ root: () => root }) });
     });
 
     afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -275,6 +283,38 @@ describe('the file tools', () => {
         expect(none.text).toBe('No matches.');
     });
 
+        test('never writes in .git, .venv, node_modules or .kigumi', async () => {
+        fs.mkdirSync(path.join(root, '.git'));
+        await expect(named('write_file').run({ file_path: '.git/hooks/pre-commit', content: 'rm -rf ~' }))
+            .rejects.toThrow("which the agent doesn't change");
+        await expect(named('write_file').run({ file_path: 'pkg/.venv/lib/x.py', content: '' })).rejects.toThrow('.venv/');
+        expect(fs.existsSync(path.join(root, '.git', 'hooks'))).toBe(false);
+    });
+
+    test('a link out of the project is outside it', async () => {
+        const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-outside-'));
+        fs.writeFileSync(path.join(outside, 'secret.txt'), 'secret');
+        fs.symlinkSync(outside, path.join(root, 'linked'));
+        await expect(named('read_file').run({ file_path: 'linked/secret.txt' })).rejects.toThrow('outside the project');
+        await expect(named('write_file').run({ file_path: 'linked/new.txt', content: '' })).rejects.toThrow('outside the project');
+        fs.rmSync(outside, { recursive: true, force: true });
+    });
+
+    test('a pathological search pattern is stopped rather than hanging the app', async () => {
+        fs.writeFileSync(path.join(root, 'long.txt'), `${'a'.repeat(1900)}!\n`);
+        const started = Date.now();
+        let ticks = 0;
+        const timer = setInterval(() => { ticks += 1; }, 50);
+        const search = named('search_files').run({ pattern: '^(a+)+$' }).catch((error) => error);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        clearInterval(timer);
+        // The main thread kept running while it searched.
+        expect(ticks).toBeGreaterThan(2);
+        const result = await search;
+        expect(result.message || result[0].text).toMatch(/stopped|No matches/);
+        expect(Date.now() - started).toBeLessThan(20000);
+    }, 25000);
+
         test('reads with line numbers', async () => {
         const [read] = await named('read_file').run({ file_path: 'frame.py', offset: 2, limit: 1 });
         expect(read.text).toBe('2\tb = 2\n(4 lines in all; read on from line 3)');
@@ -287,6 +327,12 @@ describe('the file tools', () => {
         expect(read.text).toMatch(/1500 lines in all; read on from line \d+\)$/);
     });
 });
+
+/** Project files that only resolve paths (for sessions whose tools are fakes). */
+function fakeFiles(root) {
+    return { root: () => root, resolve: (file) => path.resolve(root, file), relative: (file) => path.relative(root, file),
+        read: async () => null, list: async () => [] };
+}
 
 describe('the agent session', () => {
     const panels = { list: () => [], active: () => null, describe: async () => null, viewSession: () => null };
@@ -304,7 +350,7 @@ describe('the agent session', () => {
         const values = { ...settings };
         const created = [];
         const agent = new AgentSession({
-            panels, run: async () => ({}), post: (message) => posted.push(message), cwd: () => null,
+            panels, run: async () => ({}), post: (message) => posted.push(message),
             setting: (key, fallback) => (key in values ? values[key] : fallback),
             setSetting: (key, value) => { values[key] = value; },
             account, createModel: async (route, options) => { created.push([route, options]); return model; },
@@ -360,7 +406,7 @@ describe('the agent session', () => {
                 reports.push([id, args.filePath]);
                 return { ok: false, entries: [{ level: 'error', message: 'NameError: brace' }] };
             },
-            post: () => {}, cwd: () => '/project', setting: (key, fallback) => fallback, fileTools: [editTool],
+            post: () => {}, files: fakeFiles('/project'), setting: (key, fallback) => fallback, fileTools: [editTool],
         });
         const edit = agent.tools.find((tool) => tool.name === 'edit_file');
 
@@ -386,7 +432,7 @@ describe('the agent session', () => {
         };
         const posted = [];
         const make = (model) => new AgentSession({
-            panels, run: async () => ({}), post: (message) => posted.push(message), cwd: () => '/project',
+            panels, run: async () => ({}), post: (message) => posted.push(message), files: fakeFiles('/project'),
             setting: (key, fallback) => (key === 'agent.openrouterApiKey' ? 'sk-or' : fallback), conversations,
             createModel: async () => model,
         });
@@ -446,6 +492,7 @@ describe('the agent session', () => {
     test('a turn that changed files can be undone, putting them back as they were', async () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-undo-'));
         fs.writeFileSync(path.join(root, 'frame.py'), 'legs = 4\n');
+        const projectFiles = createProjectFiles({ root: () => root });
         const model = scripted(
             [call('c1', 'edit_file', { file_path: 'frame.py', old_string: 'legs = 4', new_string: 'legs = 3' }),
                 call('c2', 'write_file', { file_path: 'brace.py', content: 'brace = 1\n' }), finish('tool-calls')],
@@ -453,23 +500,29 @@ describe('the agent session', () => {
         );
         const posted = [];
         const agent = new AgentSession({
-            panels, run: async () => ({}), post: (message) => posted.push(message), cwd: () => root,
+            panels, run: async () => ({}), post: (message) => posted.push(message), files: projectFiles,
             setting: (key, fallback) => ({ 'agent.openrouterApiKey': 'sk-or', 'agent.permissionMode': 'all' }[key] ?? fallback),
-            fileTools: createFileTools({ root: () => root }), createModel: async () => model,
+            fileTools: createFileTools({ files: projectFiles }), createModel: async () => model,
         });
 
         await agent.prompt('three legs and a brace');
 
         expect(fs.readFileSync(path.join(root, 'frame.py'), 'utf8')).toBe('legs = 3\n');
         const checkpoint = posted.find((message) => message.type === 'agent:checkpoint');
-        expect(checkpoint).toEqual({ type: 'agent:checkpoint', turn: 1, files: ['frame.py', 'brace.py'] });
+        expect({ ...checkpoint, files: checkpoint.files.sort() }).toEqual({ type: 'agent:checkpoint', turn: 1, files: ['brace.py', 'frame.py'] });
 
-        agent.handle({ type: 'agent:restore', turn: 1 });
+        // Changed since the agent left it: held back, and listed, until asked again.
+        fs.writeFileSync(path.join(root, 'frame.py'), 'legs = 3\n# mine\n');
+        await agent.restore(1);
+        expect(posted).toContainEqual({ type: 'agent:restoreConflict', turn: 1, files: ['frame.py'] });
+        expect(fs.readFileSync(path.join(root, 'frame.py'), 'utf8')).toBe('legs = 3\n# mine\n');
+
+        await agent.restore(1, { force: true });
 
         expect(fs.readFileSync(path.join(root, 'frame.py'), 'utf8')).toBe('legs = 4\n');
         expect(fs.existsSync(path.join(root, 'brace.py'))).toBe(false);
         expect(posted).toContainEqual({ type: 'agent:restored', turn: 1 });
-        expect(agent.history.at(-2).content).toContain('I undid your changes to frame.py, brace.py');
+        expect(agent.history.at(-2).content).toMatch(/I undid your changes to (frame\.py, brace\.py|brace\.py, frame\.py)/);
         fs.rmSync(root, { recursive: true, force: true });
     });
 
@@ -500,10 +553,8 @@ describe('the agent session', () => {
     test('an @-mentioned file goes with the request; anything outside the project does not', async () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-mention-'));
         fs.writeFileSync(path.join(root, 'frame.py'), 'legs = 4\n');
-        const agent = new AgentSession({ panels, run: async () => ({}), post: () => {}, cwd: () => root,
-            setting: (key, fallback) => fallback });
-
-        const sent = await agent._withMentions('fix @frame.py. and @../secret.txt and @missing.py');
+        const sent = await withMentions('fix @frame.py. and @../secret.txt and @missing.py',
+            { files: createProjectFiles({ root: () => root }), describe: async () => null });
 
         expect(sent).toContain('[The file frame.py]\n```\nlegs = 4\n');
         expect(sent).not.toContain('[The file ../secret.txt]');
@@ -512,14 +563,11 @@ describe('the agent session', () => {
     });
 
     test('images go with a request to a model that can see; one that can\'t is told they were there', async () => {
-        const seeing = session({ settings: { 'agent.model': 'claude-haiku-4.5' } }).agent;
-        const parts = await seeing._promptContent('this joint', [{ mediaType: 'image/jpeg', data: 'AAAA' }]);
+        const common = { text: 'this joint', files: { root: () => null }, describe: async () => null };
+        const parts = await promptContent({ ...common, images: [{ mediaType: 'image/jpeg', data: 'AAAA' }], modelSeesImages: true });
         expect(parts[1]).toEqual({ type: 'image', image: 'AAAA', mediaType: 'image/jpeg' });
 
-        const blind = session().agent;
-        blind.model.images = false;
-        const text = await blind._promptContent('this joint', [{ mediaType: 'image/png', data: 'AAAA' }]);
-        blind.model.images = true;
+        const text = await promptContent({ ...common, images: [{ mediaType: 'image/png', data: 'AAAA' }], modelSeesImages: false });
         expect(text).toContain("1 image attached, which this model can't see");
     });
 
@@ -531,8 +579,8 @@ describe('the agent session', () => {
         const editTool = { name: 'edit_file', shape: {}, readOnly: false, run: async () => [{ type: 'text', text: 'Edited.' }] };
         const agent = new AgentSession({
             panels: { ...panels, list: () => [{ kind: 'viewer', filePath: path.join(root, 'a.py') }] },
-            run: async (id) => (id === 'kigumi.captureScreenshot' ? { screenshotPath: shot } : { ok: true, entries: [] }),
-            post: (message) => posted.push(message), cwd: () => root, setting: (key, fallback) => fallback, fileTools: [editTool],
+            run: async (id) => (id === 'kigumi.captureScreenshot' ? { data: Buffer.from('png').toString('base64') } : { ok: true, entries: [] }),
+            post: (message) => posted.push(message), files: createProjectFiles({ root: () => root }), setting: (key, fallback) => fallback, fileTools: [editTool],
         });
 
         await agent.tools.find((tool) => tool.name === 'edit_file').run({ file_path: 'a.py' }, { toolCallId: 'c9' });
@@ -543,6 +591,37 @@ describe('the agent session', () => {
         // For the panel only: not kept in the conversation.
         expect(agent.transcript.some((event) => event.type === 'agent:toolImages')).toBe(false);
         fs.rmSync(root, { recursive: true, force: true });
+    });
+
+        test('a new conversation started while a turn runs stays new', async () => {
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const model = new MockLanguageModelV4({ doStream: async ({ abortSignal }) => {
+            await Promise.race([gate, new Promise((resolve) => abortSignal && abortSignal.addEventListener('abort', resolve))]);
+            if (abortSignal && abortSignal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+            return { stream: convertArrayToReadableStream([...say('1', 'old answer'), finish('stop')]) };
+        } });
+        const saved = [];
+        const { agent } = session({ settings: { 'agent.openrouterApiKey': 'sk-or' }, model });
+        agent.conversations = { list: () => [], save: (_project, conversation) => saved.push(JSON.parse(JSON.stringify(conversation))) };
+        agent.files = fakeFiles('/project');
+
+        const turn = agent.prompt('the old request');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        agent.handle({ type: 'agent:clear' });
+        release();
+        await turn;
+
+        expect(agent.history).toEqual([]);
+        expect(agent.transcript).toEqual([]);
+        expect(saved).toEqual([]);
+    });
+
+    test('through the account, a turn shows what it was charged: the cost times the markup', async () => {
+        const account = { ...signedIn(), state: () => ({ configured: true, signedIn: true, markup: 1.5 }) };
+        const { agent, posted } = session({ account, model: scripted([...say('1', 'Hi.'), finish('stop', 0.002)]) });
+        await agent.prompt('hi');
+        expect(posted.find((message) => message.type === 'agent:done').costUsd).toBeCloseTo(0.003);
     });
 
         test('out of credit says so', () => {

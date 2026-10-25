@@ -27,7 +27,7 @@ function fakeServers() {
             return new Response(null, { status: 204 });
         }
         if (url.origin === BACKEND && url.pathname === '/account') {
-            return Response.json({ balanceUsd: 0.97, usage: [] });
+            return Response.json({ balanceUsd: 0.97, markup: 1.4, usage: [] });
         }
         return Response.json({ echoed: true });
     };
@@ -57,7 +57,7 @@ function account(overrides = {}) {
 describe('the Kigumi account', () => {
     test('without a backend configured it offers nothing', () => {
         const unconfigured = createAccount({ supabaseUrl: '', supabaseKey: '', backendUrl: '', redirectTo: 'kigumi://auth', openExternal: () => {} });
-        expect(unconfigured.state()).toEqual({ configured: false, signedIn: false, email: null, balanceUsd: null });
+        expect(unconfigured.state()).toEqual({ configured: false, signedIn: false, email: null, balanceUsd: null, markup: null });
         expect(unconfigured.backend()).toBeNull();
     });
 
@@ -78,7 +78,7 @@ describe('the Kigumi account', () => {
         await signingIn.completeSignIn('kigumi://auth?code=good-code');
         await settle();
 
-        expect(signingIn.state()).toEqual({ configured: true, signedIn: true, email: 'maple@example.com', balanceUsd: 0.97 });
+        expect(signingIn.state()).toEqual({ configured: true, signedIn: true, email: 'maple@example.com', balanceUsd: 0.97, markup: 1.4 });
         expect(signingIn.backend()).toEqual({ url: BACKEND });
         expect(changes.length).toBeGreaterThan(0);
 

@@ -1,68 +1,22 @@
 /**
  * The built-in agent's file tools, in the same shape as Kigumi's (agent/tools.js): list, search, read,
- * write and edit files, inside the project folder only. Node's; a web host would supply its own.
+ * write and edit files, inside the project only, through a project-files interface
+ * (agent/project-files.js for Node; a web host gives its own).
  */
 
-const fs = require('fs');
-const path = require('path');
 const { z } = require('zod');
 
 const text = (value) => [{ type: 'text', text: value }];
 
-/** Folders list_files never walks into. */
-const SKIPPED = new Set(['.git', 'node_modules', '.venv', '__pycache__', '.kigumi']);
 const MAX_LISTED = 500;
 const MAX_MATCHES = 100;
-/** Files larger than this are skipped by search_files (generated output, not source). */
-const MAX_SEARCHED_BYTES = 1024 * 1024;
 const MAX_READ_LINES = 2000;
 /** A read's most characters: every read stays in the conversation, which goes with every step. */
 const MAX_READ_CHARS = 40000;
 
-/**
- * @param {object} options
- * @param {() => string|null} options.root  the project folder
- */
-function createFileTools({ root }) {
-    /** The absolute path of `relative` (or absolute) `file`, refusing anything outside the project. */
-    function resolve(file) {
-        const base = root();
-        if (!base) {
-            throw new Error('No project folder is open.');
-        }
-        const resolved = path.resolve(base, file || '.');
-        const inside = path.relative(base, resolved);
-        if (inside.startsWith('..') || path.isAbsolute(inside)) {
-            throw new Error(`${file} is outside the project folder.`);
-        }
-        return resolved;
-    }
-
+/** @param {{files: object}} options  the project's files (agent/project-files.js) */
+function createFileTools({ files }) {
     const filePath = z.string().describe('A path relative to the project folder (or absolute, inside it).');
-
-    /** Every file under `start`, skipping dependency folders, up to `limit`. */
-    async function walkFiles(start, limit) {
-        const found = [];
-        const walk = async (dir) => {
-            for (const entry of await fs.promises.readdir(dir, { withFileTypes: true })) {
-                if (found.length >= limit) return;
-                const full = path.join(dir, entry.name);
-                if (entry.isDirectory()) {
-                    if (!SKIPPED.has(entry.name)) await walk(full);
-                } else {
-                    found.push(full);
-                }
-            }
-        };
-        await walk(start);
-        return found;
-    }
-
-    /** A glob on file names (`*.py`), as a RegExp. */
-    function globPattern(glob) {
-        const escaped = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
-        return new RegExp(`^${escaped}$`, 'i');
-    }
 
     return [
         {
@@ -71,7 +25,7 @@ function createFileTools({ root }) {
             shape: { folder: z.string().optional().describe('A folder relative to the project folder.') },
             readOnly: true,
             run: async ({ folder }) => {
-                const found = (await walkFiles(resolve(folder), MAX_LISTED)).map((file) => path.relative(root(), file));
+                const found = await files.list(folder, MAX_LISTED);
                 return text(found.join('\n') + (found.length >= MAX_LISTED ? `\n(first ${MAX_LISTED} only)` : ''));
             },
         },
@@ -86,24 +40,8 @@ function createFileTools({ root }) {
                 ignore_case: z.boolean().optional(),
             },
             readOnly: true,
-            run: async ({ pattern, folder, file_glob: fileGlob, ignore_case: ignoreCase }) => {
-                const matcher = new RegExp(pattern, ignoreCase ? 'i' : '');
-                const names = fileGlob ? globPattern(fileGlob) : null;
-                const matches = [];
-                for (const file of await walkFiles(resolve(folder), 20000)) {
-                    if (names && !names.test(path.basename(file))) continue;
-                    const stat = await fs.promises.stat(file);
-                    if (stat.size > MAX_SEARCHED_BYTES) continue;
-                    const content = await fs.promises.readFile(file, 'utf8');
-                    if (content.includes('\u0000')) continue; // binary
-                    const lines = content.split('\n');
-                    for (let i = 0; i < lines.length && matches.length < MAX_MATCHES; i++) {
-                        if (matcher.test(lines[i])) {
-                            matches.push(`${path.relative(root(), file)}:${i + 1}: ${lines[i].trim().slice(0, 200)}`);
-                        }
-                    }
-                    if (matches.length >= MAX_MATCHES) break;
-                }
+            run: async ({ pattern, folder, file_glob: nameGlob, ignore_case: ignoreCase }) => {
+                const matches = await files.search(pattern, { folder, nameGlob, ignoreCase, maxMatches: MAX_MATCHES });
                 return text(matches.length
                     ? matches.join('\n') + (matches.length >= MAX_MATCHES ? `\n(first ${MAX_MATCHES} matches only)` : '')
                     : 'No matches.');
@@ -119,7 +57,9 @@ function createFileTools({ root }) {
             },
             readOnly: true,
             run: async ({ file_path: file, offset = 1, limit = MAX_READ_LINES }) => {
-                const lines = (await fs.promises.readFile(resolve(file), 'utf8')).split('\n');
+                const content = await files.read(file);
+                if (content === null) throw new Error(`${file} doesn't exist.`);
+                const lines = content.split('\n');
                 const shown = [];
                 let size = 0;
                 for (const line of lines.slice(offset - 1, offset - 1 + Math.min(limit, MAX_READ_LINES))) {
@@ -138,10 +78,8 @@ function createFileTools({ root }) {
             shape: { file_path: filePath, content: z.string() },
             readOnly: false,
             run: async ({ file_path: file, content }) => {
-                const target = resolve(file);
-                await fs.promises.mkdir(path.dirname(target), { recursive: true });
-                await fs.promises.writeFile(target, content, 'utf8');
-                return text(`Wrote ${path.relative(root(), target)}.`);
+                const target = await files.write(file, content);
+                return text(`Wrote ${files.relative(target)}.`);
             },
         },
         {
@@ -155,8 +93,9 @@ function createFileTools({ root }) {
             },
             readOnly: false,
             run: async ({ file_path: file, old_string: before, new_string: after, replace_all: all }) => {
-                const target = resolve(file);
-                const content = await fs.promises.readFile(target, 'utf8');
+                files.resolve(file, { write: true });
+                const content = await files.read(file);
+                if (content === null) throw new Error(`${file} doesn't exist.`);
                 const count = before ? content.split(before).length - 1 : 0;
                 if (count === 0) {
                     throw new Error('old_string was not found in the file.');
@@ -164,8 +103,8 @@ function createFileTools({ root }) {
                 if (count > 1 && !all) {
                     throw new Error(`old_string appears ${count} times; give more context, or set replace_all.`);
                 }
-                await fs.promises.writeFile(target, content.split(before).join(after), 'utf8');
-                return text(`Edited ${path.relative(root(), target)} (${all ? count : 1} replacement${all && count > 1 ? 's' : ''}).`);
+                const target = await files.write(file, content.split(before).join(after));
+                return text(`Edited ${files.relative(target)} (${all ? count : 1} replacement${all && count > 1 ? 's' : ''}).`);
             },
         },
     ];

@@ -740,6 +740,18 @@
             case 'agent:restored':
                 showRestored(message.turn);
                 break;
+            case 'agent:restoreConflict': {
+                // Files changed since the agent left them: undoing would lose those changes.
+                const note = add('agent-note', `${(message.files || []).join(', ')} changed since the agent left `
+                    + `${(message.files || []).length === 1 ? 'it' : 'them'}; undoing puts back the earlier version and loses that. `);
+                const anyway = Object.assign(document.createElement('button'), { type: 'button', className: 'link-btn', textContent: 'Undo anyway' });
+                anyway.addEventListener('click', () => {
+                    anyway.remove();
+                    vscode.postMessage({ type: 'agent:restore', turn: message.turn, force: true });
+                });
+                note.appendChild(anyway);
+                break;
+            }
             case 'agent:error':
                 add('agent-error', message.message || 'Something went wrong.');
                 break;

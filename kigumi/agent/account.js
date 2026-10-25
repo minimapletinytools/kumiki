@@ -22,6 +22,8 @@ function createAccount({ supabaseUrl, supabaseKey, backendUrl, storage, redirect
     const configured = Boolean(supabaseUrl && supabaseKey && backendUrl);
     let user = null;
     let balanceUsd = null;
+    // What a request is charged per dollar of model cost (from the backend's /account).
+    let markup = null;
 
     const client = configured ? createClient(supabaseUrl, supabaseKey, {
         auth: { flowType: 'pkce', storage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
@@ -39,7 +41,9 @@ function createAccount({ supabaseUrl, supabaseKey, backendUrl, storage, redirect
         if (!token) return;
         const response = await fetcher(`${backendUrl.replace(/\/$/, '')}/account`, { headers: { Authorization: `Bearer ${token}` } });
         if (response.ok) {
-            balanceUsd = (await response.json()).balanceUsd;
+            const account = await response.json();
+            balanceUsd = account.balanceUsd;
+            markup = typeof account.markup === 'number' ? account.markup : null;
             onChange();
         }
     }
@@ -65,7 +69,7 @@ function createAccount({ supabaseUrl, supabaseKey, backendUrl, storage, redirect
 
         /** For the panel. */
         state() {
-            return { configured, signedIn: Boolean(user), email: (user && user.email) || null, balanceUsd };
+            return { configured, signedIn: Boolean(user), email: (user && user.email) || null, balanceUsd, markup };
         },
 
         /** Where model requests go when signed in, for agent/models.js routeModel; else null. */

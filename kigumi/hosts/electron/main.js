@@ -20,6 +20,7 @@ const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
 const { AgentSession } = require('../../agent/agent-session');
 const { createFileTools } = require('../../agent/file-tools');
+const { createProjectFiles } = require('../../agent/project-files');
 const { createAccount } = require('../../agent/account');
 const { createConversationStore } = require('../../agent/conversation-store');
 const { backendConfig } = require('../../agent/backend-config');
@@ -430,14 +431,15 @@ function toggleAgentPanel() {
         return;
     }
     const surface = connection.createPanel('agent', { title: 'Agent' });
+    const projectFiles = createProjectFiles({ root: () => workspaceFolder });
     agentSession = new AgentSession({
         panels: kigumiApp.panels,
         run: runToolCommand,
         post: (message) => void surface.postMessage(message),
-        cwd: () => workspaceFolder,
         setting: (key, fallback) => settings.get(key, fallback),
         setSetting: (key, value) => settings.set(key, value),
-        fileTools: createFileTools({ root: () => workspaceFolder }),
+        files: projectFiles,
+        fileTools: createFileTools({ files: projectFiles }),
         account,
         conversations: createConversationStore(path.join(app.getPath('userData'), 'conversations')),
         log: (line) => logChannel.appendLine(line),

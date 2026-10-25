@@ -378,6 +378,8 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                 slotName: session.slotName,
                 screenshotPath,
                 screenshot: screenshotMeta,
+                // The PNG itself, base64, for a caller that can't read the file (the agent, anywhere).
+                ...(options.includeData ? { data: fs.readFileSync(screenshotPath).toString('base64') } : {}),
             };
         },
 

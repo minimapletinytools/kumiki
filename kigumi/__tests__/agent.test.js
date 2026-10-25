@@ -128,10 +128,16 @@ describe('the tools', () => {
         fs.writeFileSync(png, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
         try {
             const panels = directory({ views: [{ id: 'viewer:/a.py', session: view('/a.py', { active: true }) }] });
-            const tools = createKigumiTools({ panels, run: async () => ({ screenshotPath: png, filePath: '/a.py' }) });
+            const asked = [];
+            const tools = createKigumiTools({ panels, run: async (id, args) => {
+                asked.push(args.includeData);
+                return { screenshotPath: png, filePath: '/a.py', data: fs.readFileSync(png).toString('base64') };
+            } });
             const content = await tools.find((tool) => tool.name === 'screenshot').run({});
 
             expect(content[0]).toEqual({ type: 'image', data: Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64'), mimeType: 'image/png' });
+            // The command gives the picture's data, so the tool reads no file itself.
+            expect(asked).toEqual([true]);
         } finally {
             fs.rmSync(png, { force: true });
         }

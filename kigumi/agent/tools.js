@@ -9,7 +9,6 @@
  * Kigumi-specific only: reading and editing files is the agent's own job.
  */
 
-const fs = require('fs');
 const { z } = require('zod');
 
 const text = (value) => [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }];
@@ -140,10 +139,9 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             shape: { panel_id: panelId },
             readOnly: true,
             run: async ({ panel_id: id }) => {
-                const result = await run('kigumi.captureScreenshot', viewOptions(id));
-                const data = fs.readFileSync(result.screenshotPath).toString('base64');
+                const result = await run('kigumi.captureScreenshot', { ...viewOptions(id), includeData: true });
                 return [
-                    { type: 'image', data, mimeType: 'image/png' },
+                    { type: 'image', data: result.data, mimeType: 'image/png' },
                     ...text({ screenshotPath: result.screenshotPath, filePath: result.filePath }),
                 ];
             },

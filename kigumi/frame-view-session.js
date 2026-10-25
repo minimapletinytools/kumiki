@@ -15,6 +15,9 @@ const { exportFormats, exportMember, installCadqueryOcp, pushCadqueryStatus } = 
 // Resolved once from VS Code's own display language (no user override yet).
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
 
+/** The most a view's session log keeps; it is started afresh with each view. */
+const SESSION_LOG_MAX_BYTES = 1024 * 1024;
+
 const VIEWER_LOG_LEVEL_ORDER = {
     debug: 10,
     info: 20,
@@ -229,6 +232,13 @@ class FrameViewSession {
         if (this.panel) {
             return;
         }
+        // Each view starts its session log afresh; it would otherwise grow across every run of the app.
+        try {
+            fs.rmSync(this.getSessionLogPath(), { force: true });
+        } catch (_error) {
+            // Logging must not break the viewer session.
+        }
+        this.sessionLogBytes = 0;
 
         const initTiming = this.profiler.createTimingTracker({ stage: 'initialize' });
         this.profiler.markTiming(initTiming, 'initialize.start');
@@ -1494,6 +1504,28 @@ class FrameViewSession {
         }
     }
 
+    /**
+     * Add `entry` to the session log (getLogSnapshot, an agent's build report), keeping it under
+     * SESSION_LOG_MAX_BYTES: past that, the older half goes.
+     */
+    appendSessionLog(entry) {
+        try {
+            const logPath = this.getSessionLogPath();
+            fs.mkdirSync(path.dirname(logPath), { recursive: true });
+            const line = `${JSON.stringify(entry)}\n`;
+            this.sessionLogBytes = (this.sessionLogBytes || 0) + line.length;
+            if (this.sessionLogBytes > SESSION_LOG_MAX_BYTES) {
+                const kept = fs.readFileSync(logPath, 'utf8').split('\n');
+                const tail = kept.slice(Math.floor(kept.length / 2)).join('\n');
+                fs.writeFileSync(logPath, tail, 'utf8');
+                this.sessionLogBytes = tail.length;
+            }
+            fs.appendFileSync(logPath, line, 'utf8');
+        } catch (_error) {
+            // Logging must not break the viewer session.
+        }
+    }
+
     log(message) {
         const formatted = `[${path.basename(this.filePath)}] ${message}`;
         const match = /\[(debug|info|warn|error)\]/i.exec(String(message));
@@ -1507,13 +1539,7 @@ class FrameViewSession {
             slotName: this.slotName,
             sessionType: this.sessionType,
         };
-        try {
-            const logPath = this.getSessionLogPath();
-            fs.mkdirSync(path.dirname(logPath), { recursive: true });
-            fs.appendFile(logPath, `${JSON.stringify(entry)}\n`, 'utf8', () => {});
-        } catch (_error) {
-            // Logging must not break the viewer session.
-        }
+        this.appendSessionLog(entry);
         this.channel.appendLine(formatted);
         if (this.panel) {
             this.panel.postMessage({ type: 'logEntry', text: formatted, level, timestamp: entry.timestamp }).catch(() => {});
@@ -1533,13 +1559,7 @@ class FrameViewSession {
             slotName: this.slotName,
             sessionType: this.sessionType,
         };
-        try {
-            const logPath = this.getSessionLogPath();
-            fs.mkdirSync(path.dirname(logPath), { recursive: true });
-            fs.appendFile(logPath, `${JSON.stringify(entry)}\n`, 'utf8', () => {});
-        } catch (_error) {
-            // Logging must not break the viewer session.
-        }
+        this.appendSessionLog(entry);
         if (this.panel) {
             this.panel.postMessage({ type: 'logEntry', text: entry.message, level: entry.level, timestamp: entry.timestamp }).catch(() => {});
         }
