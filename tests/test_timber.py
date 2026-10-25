@@ -2497,24 +2497,25 @@ class TestRoughFacesLyingOnThePerfectTimber:
         assert "rptw.front_left" in names and "rptw.bottom_left" in names and "rptw.top_front_left" in names
 
 
-class TestJointsWhoseTimbersDontMeet:
-    """Frame.from_joints warns of a joint with a timber that touches none of the joint's others."""
+class TestJointsWhoseTimberExtendedRoughPrismsDontTouch:
+    """Frame.from_joints warns of a joint with a timber whose extended rough prism touches none of the others'."""
 
     @staticmethod
-    def _post_on_sill(post_z):
+    def _post_on_sill(post_x, post_z):
         sill = create_axis_aligned_timber(bottom_position=create_v3(0, -0.5, mm(50)), length=1, size=create_v2(mm(100), mm(100)),
                                           length_direction=TimberFace.FRONT, width_direction=TimberFace.RIGHT, ticket="sill")
-        post = create_axis_aligned_timber(bottom_position=create_v3(0, 0, post_z), length=1, size=create_v2(mm(100), mm(100)),
+        post = create_axis_aligned_timber(bottom_position=create_v3(post_x, 0, post_z), length=1, size=create_v2(mm(100), mm(100)),
                                           length_direction=TimberFace.TOP, width_direction=TimberFace.RIGHT, ticket="post")
         cut = lambda timber: Cutting(timber=timber, negative_csg=RectangularPrism(size=create_v2(mm(10), mm(10)), transform=Transform.identity(),
                                                                                  start_distance=0, end_distance=mm(10)))
         return Joint(cuttings={"sill": cut(sill), "post": cut(post)}, ticket=JointTicket(joint_type="post_on_sill"))
 
-    def test_a_post_resting_on_its_sill_meets_it(self):
+    def test_a_post_above_its_sill_touches_it_once_extended(self):
         with warnings.catch_warnings():
             warnings.simplefilter("error", FrameWarning)
-            Frame.from_joints([self._post_on_sill(mm(100))])
+            Frame.from_joints([self._post_on_sill(0, mm(100))])
+            Frame.from_joints([self._post_on_sill(0, mm(150))])
 
-    def test_a_post_above_its_sill_is_warned_of(self):
-        with pytest.warns(FrameWarning, match=r"post doesn't meet the joint's other timbers \(a 50 mm gap\)"):
-            Frame.from_joints([self._post_on_sill(mm(150))])
+    def test_a_post_beside_its_sill_is_warned_of(self):
+        with pytest.warns(FrameWarning, match=r"post doesn't touch the joint's other timbers, even extended past their ends \(a 100 mm gap\)"):
+            Frame.from_joints([self._post_on_sill(mm(200), mm(100))])

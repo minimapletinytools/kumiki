@@ -2455,62 +2455,95 @@ class Sticker(Accessory):
     size: Numeric = inches(1)
 
 class FrameWarning(UserWarning):
-    """A problem with a frame's design that still builds, e.g. a joint whose timbers don't meet."""
+    """A problem with a frame's design that still builds, e.g. a joint whose timbers don't touch."""
 
 
 # Shown every build, not once: Kigumi's runner builds a frame many times in one process.
 warnings.filterwarnings("always", category=FrameWarning)
 
-# Two timbers further apart than this, in metres, don't meet.
-_MEET_TOLERANCE = 0.001
+# Two timbers further apart than this, in metres, don't touch.
+_TOUCH_TOLERANCE = 0.001
+
+# A timber's extended rough prism in world space: center, length/width/height axes, half width, half height.
+_WorldPrism = Tuple[List[float], List[float], List[float], List[float], float, float]
 
 
-def _timber_box(timber: 'PerfectTimberWithin') -> Optional[Tuple[List[float], List[float]]]:
-    """The timber's uncut world bounding box as (min, max), or None if its numbers aren't plain."""
+def _extended_rough_prism(timber: 'PerfectTimberWithin') -> Optional[_WorldPrism]:
+    """The timber's rough body extended to infinity at both ends, in world space, or None if that
+    isn't a plain rectangular prism (round stock) or its numbers aren't plain."""
     try:
-        p = [float(v) for v in timber.get_bottom_position_global()]
-        axes = [[float(v) for v in d] for d in (timber.get_length_direction_global(),
-                                                 timber.get_width_direction_global(),
-                                                 timber.get_height_direction_global())]
-        length, width, height = float(timber.length), float(timber.size[0]), float(timber.size[1])
+        prism = timber.get_extended_actual_csg_local(extend_bot=True, extend_top=True, with_feature_labels=False)
+    except NotImplementedError:
+        return None
+    if not isinstance(prism, RectangularPrism):
+        return None
+    try:
+        outer = [[float(timber.transform.orientation.matrix[r, c]) for c in range(3)] for r in range(3)]
+        inner = [[float(prism.transform.orientation.matrix[r, c]) for c in range(3)] for r in range(3)]
+        offset = [float(v) for v in prism.transform.position]
+        position = [float(v) for v in timber.transform.position]
+        half_width, half_height = float(prism.size[0]) / 2, float(prism.size[1]) / 2
     except (TypeError, ValueError):
         return None
-    corners = [[p[i] + a * axes[0][i] + b * axes[1][i] + c * axes[2][i] for i in range(3)]
-               for a in (0.0, length) for b in (-width / 2, width / 2) for c in (-height / 2, height / 2)]
-    return [min(c[i] for c in corners) for i in range(3)], [max(c[i] for c in corners) for i in range(3)]
+    rotation = [[sum(outer[r][k] * inner[k][c] for k in range(3)) for c in range(3)] for r in range(3)]
+    center = [position[r] + sum(outer[r][k] * offset[k] for k in range(3)) for r in range(3)]
+    axis = lambda c: [rotation[r][c] for r in range(3)]
+    return center, axis(2), axis(0), axis(1), half_width, half_height
 
 
-def _gap_between(a: Tuple[List[float], List[float]], b: Tuple[List[float], List[float]]) -> float:
-    """How far apart two boxes are, in metres; 0 if they touch or overlap."""
-    return max(0.0, *(max(a[0][i] - b[1][i], b[0][i] - a[1][i]) for i in range(3)))
+def _dot(a: List[float], b: List[float]) -> float:
+    return sum(x * y for x, y in zip(a, b))
 
 
-def warn_joints_whose_timbers_dont_meet(joints: Iterable['Joint']) -> None:
-    """A FrameWarning for each joint whose timbers don't hold together: one that touches none of the
-    others, so the joint cuts into air. A joint may cut many timbers that each meet one of them (rafters
-    on a plate). Boxes are axis-aligned, so timbers at an angle can be missed, never wrongly warned about."""
-    boxes: Dict[int, Optional[Tuple[List[float], List[float]]]] = {}
+def _prism_gap(a: _WorldPrism, b: _WorldPrism) -> float:
+    """How far apart two infinite prisms are along an axis that separates them, in metres; 0 if they
+    touch. Separating axes: each cross-section's normals, and across both lengths."""
+    cross = [a[1][1] * b[1][2] - a[1][2] * b[1][1], a[1][2] * b[1][0] - a[1][0] * b[1][2], a[1][0] * b[1][1] - a[1][1] * b[1][0]]
+    norm = _dot(cross, cross) ** 0.5
+    axes = [a[2], a[3], b[2], b[3]] + ([[v / norm for v in cross]] if norm > 1e-9 else [])
+
+    def shadow(prism: _WorldPrism, axis: List[float]) -> Optional[Tuple[float, float]]:
+        if abs(_dot(prism[1], axis)) > 1e-9:
+            return None  # infinite along this axis
+        middle = _dot(prism[0], axis)
+        reach = prism[4] * abs(_dot(prism[2], axis)) + prism[5] * abs(_dot(prism[3], axis))
+        return middle - reach, middle + reach
+
+    gap = 0.0
+    for axis in axes:
+        one, other = shadow(a, axis), shadow(b, axis)
+        if one is not None and other is not None:
+            gap = max(gap, one[0] - other[1], other[0] - one[1])
+    return gap
+
+
+def warn_joints_whose_timber_extended_rough_prisms_dont_touch(joints: Iterable['Joint']) -> None:
+    """A FrameWarning for each joint whose timber's extended prisms don't touch. This is just a
+    permissive backstop. Instead, joints should do more specific checks but that's currently not
+    the case for all joints."""
+    prisms: Dict[int, Optional[_WorldPrism]] = {}
     for joint in joints:
         timbers = list({id(c.timber): c.timber for c in joint.cuttings.values()}.values())
-        maybe = [boxes.setdefault(id(t), _timber_box(t)) for t in timbers]
-        found = [box for box in maybe if box is not None]
+        maybe = [prisms.setdefault(id(t), _extended_rough_prism(t)) for t in timbers]
+        found = [prism for prism in maybe if prism is not None]
         if len(timbers) < 2 or len(found) < len(timbers):
             continue
-        # Timbers that touch, transitively, from the first.
+        # Timbers that touch, transitively, from the first: a joint may cut many (rafters on a plate).
         reached = {0}
         frontier = [0]
         while frontier:
             i = frontier.pop()
             for j in range(len(timbers)):
-                if j not in reached and _gap_between(found[i], found[j]) <= _MEET_TOLERANCE:
+                if j not in reached and _prism_gap(found[i], found[j]) <= _TOUCH_TOLERANCE:
                     reached.add(j)
                     frontier.append(j)
         for j in range(len(timbers)):
             if j in reached:
                 continue
-            gap = min(_gap_between(found[i], found[j]) for i in reached)
-            warnings.warn(f"Joint '{joint.ticket.path}': {timbers[j].ticket.path} doesn't meet the joint's other timbers "
-                          f"(a {gap * 1000:.0f} mm gap), so the joint cuts into air.", FrameWarning, stacklevel=3)
+            gap = min(_prism_gap(found[i], found[j]) for i in reached)
+            warnings.warn(f"Joint '{joint.ticket.path}': {timbers[j].ticket.path} doesn't touch the joint's other timbers, "
+                          f"even extended past their ends (a {gap * 1000:.0f} mm gap), so the joint cuts into air.",
+                          FrameWarning, stacklevel=3)
 
 
     def get_csg_local(self) -> CutCSG:
@@ -2855,7 +2888,7 @@ class Frame:
                     timber_ref_to_cuttings[timber_id] = []
                 timber_ref_to_cuttings[timber_id].append(cutting)
         
-        warn_joints_whose_timbers_dont_meet(joints)
+        warn_joints_whose_timber_extended_rough_prisms_dont_touch(joints)
 
         # Check for name conflicts
         # Build a mapping from name to list of timber references
