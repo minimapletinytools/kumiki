@@ -33,3 +33,17 @@ test('timbers that meet are one group; a position that is not a plain number is 
     expect(numberOf('-3/2')).toBe(-1.5);
     expect(numberOf(0.25)).toBe(0.25);
 });
+
+test("a timber's box is its cut mesh's, so a tenon reaching past its end meets the timber it enters", () => {
+    const frame = { timbers: [
+        timber('foot', ['0', '-1/2', '0'], '1', ['1/10', '1/10'], [0, 1, 0], [1, 0, 0]),
+        timber('post', ['0', '0', '1/10'], '1', ['1/10', '1/10'], [0, 0, 1], [1, 0, 0]),
+    ] };
+    // The post's mesh, with its tenon down into the foot: z from 0 (the tenon's tip) to 1.1.
+    const geometry = { meshes: [{ memberKey: 'post#0', vertices: [-0.05, -0.05, 0, 0.05, 0.05, 1.1] }] };
+
+    expect(describeFrame(frame).groups).toHaveLength(2);
+    const cut = describeFrame(frame, geometry);
+    expect(cut.timbers[1]).toMatchObject({ min: [-0.05, -0.05, 0], max: [0.05, 0.05, 1.1], touches: ['foot'] });
+    expect(cut.groups).toEqual([['foot', 'post']]);
+});

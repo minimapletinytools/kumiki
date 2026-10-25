@@ -1,7 +1,8 @@
 /**
  * Where a frame's timbers are, for an agent: each timber's world bounding box, which others it
  * touches, and whether the frame holds together or falls into separate groups (timbers that touch
- * nothing joining them to the rest). Read from a view's frame data (runner.py serialize_frame).
+ * nothing joining them to the rest). Read from a view's frame data (runner.py serialize_frame) and,
+ * for each timber's box as cut (a tenon reaches past the timber's end), its meshes.
  */
 
 /** Two boxes this close or closer touch, in metres. */
@@ -40,12 +41,39 @@ function boxOf(timber) {
 const touches = (a, b) => [0, 1, 2].every((i) => a.min[i] <= b.max[i] + TOUCHING && b.min[i] <= a.max[i] + TOUCHING);
 const rounded = (values) => values.map((value) => Math.round(value * 10000) / 10000);
 
+/** A mesh's world bounding box from its flat [x, y, z, ...] vertices, or null. */
+function meshBox(mesh) {
+    const vertices = mesh && mesh.vertices;
+    if (!Array.isArray(vertices) || vertices.length < 3) return null;
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < vertices.length; i++) {
+        min[i % 3] = Math.min(min[i % 3], vertices[i]);
+        max[i % 3] = Math.max(max[i % 3], vertices[i]);
+    }
+    return { min, max };
+}
+
+/** Each of the frame's timbers' meshes, by the "name#n" keys runner.py gives them in order. */
+function meshesByTimber(frame, geometry) {
+    const byKey = new Map((geometry && Array.isArray(geometry.meshes) ? geometry.meshes : []).map((mesh) => [mesh.memberKey, mesh]));
+    const seen = new Map();
+    return frame.timbers.map((timber) => {
+        const occurrence = seen.get(timber.name) || 0;
+        seen.set(timber.name, occurrence + 1);
+        return byKey.get(`${timber.name}#${occurrence}`) || null;
+    });
+}
+
 /**
- * The frame described: { name, timbers: [{ name, size, min, max, touches }], groups, note }. Boxes
- * are axis-aligned, so for a timber at an angle they are larger than the timber.
+ * The frame described: { name, timbers: [{ name, size, min, max, touches }], groups, note }. A
+ * timber's box is of its cut mesh when `geometry` has one, else of the uncut timber. Boxes are
+ * axis-aligned, so for a timber at an angle they are larger than the timber.
  */
-function describeFrame(frame) {
-    const timbers = (frame && Array.isArray(frame.timbers) ? frame.timbers : []).map((timber) => ({ timber, box: boxOf(timber) }));
+function describeFrame(frame, geometry = null) {
+    const listed = frame && Array.isArray(frame.timbers) ? frame.timbers : [];
+    const meshes = meshesByTimber({ timbers: listed }, geometry);
+    const timbers = listed.map((timber, i) => ({ timber, box: meshBox(meshes[i]) || boxOf(timber) }));
     const described = timbers.map(({ timber, box }, i) => ({
         name: timber.name,
         size: { length: numberOf(timber.length), width: numberOf(timber.width), height: numberOf(timber.height) },

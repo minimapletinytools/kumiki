@@ -313,7 +313,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
 
         // Where the view's timbers are, and which touch (frame-description.js).
         'kigumi.automationDescribeFrame': async (options = {}) => withSession(options, async (session) => (session._lastFrameData
-            ? { ok: true, filePath: session.filePath, ...describeFrame(session._lastFrameData) }
+            ? { ok: true, filePath: session.filePath, ...describeFrame(session._lastFrameData, session._lastGeometryData) }
             : { ok: false, reason: 'not-built', filePath: session.filePath })),
 
         'kigumi.automationReadSessionLogs': async (options = {}) => withSession(options, async (session) => {

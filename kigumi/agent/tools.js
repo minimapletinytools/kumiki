@@ -88,9 +88,9 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
         },
         {
             name: 'describe_frame',
-            description: "Where a view's timbers are: each one's world bounding box (metres, Z up) and the timbers "
-                + 'it touches, and whether the frame holds together or falls into groups that touch nothing joining '
-                + 'them. Use it to check that timbers meet where joints join them.',
+            description: "Lists each timber in a view with its bounding box (metres, Z up) and the timbers it "
+                + 'touches, and says whether every timber is connected to the rest. Use it to check that timbers '
+                + 'you joined actually meet.',
             shape: { panel_id: panelId },
             readOnly: true,
             run: async ({ panel_id: id }) => text(await run('kigumi.automationDescribeFrame', viewOptions(id))),
