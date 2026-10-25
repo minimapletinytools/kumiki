@@ -714,3 +714,157 @@ textarea {
 .checkpoint-note.is-undone {
     text-decoration: line-through;
 }
+
+.plan-toggle {
+    align-self: center;
+    border: 1px solid var(--ka-border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ka-muted);
+    font: inherit;
+    font-size: 11px;
+    padding: 1px 8px;
+    cursor: pointer;
+}
+
+.plan-toggle.is-on {
+    background: var(--ka-accent);
+    border-color: var(--ka-accent);
+    color: var(--ka-accent-fg);
+}
+
+.bypass-banner.is-plan {
+    color: var(--ka-accent);
+}
+
+.bypass-banner.is-plan::before {
+    content: "◇ ";
+}
+
+.todos {
+    margin-bottom: 6px;
+    font-size: 12px;
+    border: 1px solid var(--ka-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    background: var(--ka-bg);
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.todos[hidden],
+.mentions[hidden],
+.attachments[hidden] {
+    display: none;
+}
+
+.todos summary {
+    cursor: pointer;
+    color: var(--ka-muted);
+}
+
+.todos ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+}
+
+.todos li.is-done {
+    color: var(--ka-muted);
+    text-decoration: line-through;
+}
+
+.mentions {
+    margin-bottom: 4px;
+    border: 1px solid var(--ka-border);
+    border-radius: 6px;
+    background: var(--ka-bg);
+    font-family: var(--ka-mono);
+    font-size: 12px;
+    overflow: hidden;
+}
+
+.mention {
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mention.is-chosen,
+.mention:hover {
+    background: var(--ka-hover);
+}
+
+.attachments {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.attachment {
+    position: relative;
+}
+
+.attachment img,
+.bubble-images img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--ka-border);
+}
+
+.attachment button {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--ka-border);
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font-size: 12px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+}
+
+.bubble-images {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.bubble-images-note {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.before-after {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.before-after figure {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+.before-after img {
+    width: 100%;
+    max-height: 160px;
+    object-fit: contain;
+    background: var(--ka-chrome-bg);
+    border-radius: 4px;
+    border: 1px solid var(--ka-border);
+}
+
+.before-after figcaption {
+    font-size: 11px;
+    color: var(--ka-muted);
+    text-align: center;
+}

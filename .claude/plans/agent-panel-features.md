@@ -24,22 +24,14 @@ shell sandboxing, subagents and background agents are left out.
 - Permission modes (ask, edit files without asking, everything) and "always allow" per tool; edits
   shown as diffs; a turn's file changes undone in one click; requests queued while the agent works;
   "try again" after a failure; Esc stops, Up recalls the last request.
+- @-mentions (`@file` attaches it, `@selection` what is selected in full); images pasted or dropped
+  into the box; a to-do list the agent keeps, pinned above the box; plan mode (proposes, changes
+  nothing); `check_frame` (builds a frame, opening a view if none shows it); the view before and
+  after an edit, on its chip.
 
-## Then: the usual agent panel
+## Next
 
-10. **@-mentions**: `@file` to attach a file, `@selection` for what is selected in the view.
-11. **Paste or drop images** (a sketch, a photo of a joint) into the prompt.
-12. **A to-do list** the agent keeps for a long task, shown pinned above the input.
-13. **Plan mode**: read-only; the agent proposes, then you let it go ahead.
-
-## Kigumi's own
-
-15. **Build check after an edit**: when a frame file the view shows is edited, refresh the view and
-    hand the agent the log's errors without it asking (one step instead of three).
-16. **What you are looking at, attached**: the active view and selection go with each message
-    (small), so "this" needs no describe_panel step.
-17. **Run a frame headless** (build it, return errors and a summary) for files no view shows.
-18. **Before/after screenshots** on a chip after an edit that rebuilt a view.
+Everything planned here is in. Ideas from using it go here.
 
 ## Sources
 

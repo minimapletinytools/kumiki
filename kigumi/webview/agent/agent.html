@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src data:;">
     <script src="../shell/panel-bridge.js"></script>
     <title>Kigumi Agent</title>
     <link rel="stylesheet" href="../vendor/codicon.css">
@@ -48,8 +48,12 @@
             <div id="activity" class="activity" hidden>
                 <span id="activity-label">Thinking</span><span class="dots"><i></i><i></i><i></i></span>
             </div>
+            <div id="todos" class="todos" hidden></div>
+            <div id="mentions" class="mentions" hidden></div>
+            <div id="attachments" class="attachments" hidden></div>
             <div class="input-box">
-                <textarea id="prompt-input" placeholder="Ask about your frame…" rows="1"></textarea>
+                <textarea id="prompt-input" placeholder="Ask about your frame… (@ for a file, paste an image)" rows="1"></textarea>
+                <button id="plan-toggle" class="plan-toggle" title="Plan mode: the agent looks and proposes, and changes nothing" aria-pressed="false">Plan</button>
                 <button id="send-btn" class="send-btn" title="Send message"><span class="codicon codicon-send"></span></button>
             </div>
             <div class="footer-row">

@@ -73,7 +73,20 @@ describe('the panel directory', () => {
 describe('the tools', () => {
     const textOf = (content) => JSON.parse(content[0].text);
 
-    test('list_panels and describe_panel only look', async () => {
+    test('check_frame opens the file in a view and reports that build', async () => {
+        const ran = [];
+        const tools = createKigumiTools({ panels: directory(), run: async (id, args) => {
+            ran.push([id, args.filePath]);
+            return id === 'kigumi.automationOpenFileInViewer' ? { ok: true, filePath: '/p/a.py' } : { ok: true, entries: [] };
+        } });
+        const check = tools.find((tool) => tool.name === 'check_frame');
+
+        expect(check.readOnly).toBe(true);
+        expect(textOf(await check.run({ file_path: '/p/a.py' }))).toEqual({ ok: true, entries: [] });
+        expect(ran).toEqual([['kigumi.automationOpenFileInViewer', '/p/a.py'], ['kigumi.automationBuildReport', '/p/a.py']]);
+    });
+
+        test('list_panels and describe_panel only look', async () => {
         const panels = directory({ views: [{ id: 'viewer:/a.py', session: view('/a.py', { active: true }) }] });
         const tools = createKigumiTools({ panels, run: async () => { throw new Error('no commands here'); } });
         const byName = Object.fromEntries(tools.map((tool) => [tool.name, tool]));

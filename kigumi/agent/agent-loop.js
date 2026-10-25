@@ -56,7 +56,7 @@ function toModelContent(content, images) {
     return { type: 'content', value: parts };
 }
 
-const EARLIER_IMAGE = '[An earlier screenshot, dropped: only the latest is kept. Take another to look again.]';
+const EARLIER_IMAGE = '[An earlier image, dropped: only the latest is kept. Take a screenshot to look again.]';
 
 /**
  * `messages` with every image but the latest replaced by a note. A screenshot is about a megabyte,
@@ -67,6 +67,18 @@ function onlyLatestImage(messages) {
     const out = [...messages];
     for (let i = out.length - 1; i >= 0; i--) {
         const message = out[i];
+        if (message.role === 'user' && Array.isArray(message.content)) {
+            // An image the user attached counts too.
+            out[i] = { ...message, content: message.content.map((part) => {
+                if (!part || part.type !== 'image') return part;
+                if (!kept) {
+                    kept = true;
+                    return part;
+                }
+                return { type: 'text', text: EARLIER_IMAGE };
+            }) };
+            continue;
+        }
         if (message.role !== 'tool' || !Array.isArray(message.content)) continue;
         const content = message.content.map((part) => {
             const output = part && part.type === 'tool-result' && part.output;
@@ -174,11 +186,11 @@ function toToolSet(tools, { images, askPermission }) {
     return Object.fromEntries(tools.map((kigumiTool) => [kigumiTool.name, tool({
         description: kigumiTool.description,
         inputSchema: z.object(kigumiTool.shape),
-        execute: async (input) => {
+        execute: async (input, { toolCallId } = {}) => {
             if (!kigumiTool.readOnly && !(await askPermission(kigumiTool.name, input))) {
                 throw new Error('The user did not allow this.');
             }
-            return kigumiTool.run(input || {});
+            return kigumiTool.run(input || {}, { toolCallId });
         },
         toModelOutput: ({ output }) => toModelContent(output, images),
     })]));
@@ -209,7 +221,7 @@ function earlyEnd(steps) {
  * @param {object[]} options.tools       Kigumi tools
  * @param {string} options.system
  * @param {object[]} options.history     the conversation so far, as model messages
- * @param {string} options.prompt
+ * @param {string|object[]} options.prompt  text, or content parts (text and images)
  * @param {AbortSignal} [options.abortSignal]
  * @param {(toolName: string, input: object) => Promise<boolean>} options.askPermission
  * @param {(event: object) => void} options.onEvent   panel events

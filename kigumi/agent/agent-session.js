@@ -5,7 +5,8 @@
  * The panel and this talk in messages:
  *   panel -> here:  agent:ready, agent:prompt {text}, agent:stop, agent:clear,
  *                   agent:permissionAnswer {requestId, allow, always?}, agent:setModel {id},
- *                   agent:restore {turn}, agent:unqueue {id}, agent:retry,
+ *                   agent:restore {turn}, agent:unqueue {id}, agent:retry, agent:listFiles,
+ *                   (agent:prompt may carry images: [{mediaType, data (base64)}])
  *                   agent:signIn {provider}, agent:signOut, agent:setSetting {key, value},
  *                   agent:listConversations, agent:openConversation {id}, agent:deleteConversation {id}
  *   here -> panel:  agent:state {models, model, via, account, settings}, agent:busy {busy}, agent:text {text} (streamed),
@@ -23,6 +24,8 @@ const fs = require('fs');
 const path = require('path');
 
 
+const { z } = require('zod');
+
 const { createKigumiTools } = require('./tools');
 const { MODELS, findModel, routeModel } = require('./models');
 const { runTurn, languageModelFor } = require('./agent-loop');
@@ -39,7 +42,15 @@ const PANEL_SETTINGS = {
     'agent.permissionMode': { fallback: 'ask', valid: (value) => PERMISSION_MODES.includes(value) },
     'agent.alwaysAllow': { fallback: [], valid: (value) => Array.isArray(value) && value.every((name) => typeof name === 'string') },
     'agent.showOnStartup': { fallback: true, valid: (value) => typeof value === 'boolean' },
+    'agent.planMode': { fallback: false, valid: (value) => typeof value === 'boolean' },
 };
+
+/** Added to the system prompt in plan mode, when nothing that changes anything runs. */
+const PLAN_MODE_NOTE = 'Plan mode is on: look as much as you need, then propose a plan, and change nothing. Tools '
+    + 'that change things are refused until the user turns plan mode off and asks you to go ahead.';
+
+/** Most of a file an @-mention attaches, in characters. */
+const MAX_MENTIONED_CHARS = 40000;
 
 /** What the agent says to carry on after a turn that failed. */
 const RETRY_PROMPT = 'Carry on from where you stopped.';
@@ -52,12 +63,13 @@ const SYSTEM_PROMPT = [
     'file a view shows rebuilds it, and the edit\'s result says whether it built; screenshot to look at it.',
     'The kumiki docs are in .kigumi/docs/ in the project; read those and the project\'s patterns, not the',
     'kumiki package\'s source in .venv, which is large. Sizes from the tools are in metres, in world',
-    'space. Keep replies short.',
+    'space. For a task of several steps, keep a to-do list with update_todos and tick items off as you go.',
+    'Keep replies short.',
 ].join(' ');
 
 /** What the panel shows that a reopened conversation shows again. */
 const SHOWN = new Set(['agent:userMessage', 'agent:text', 'agent:reasoning', 'agent:tool', 'agent:toolResult',
-    'agent:notice', 'agent:done', 'agent:error', 'agent:checkpoint', 'agent:restored']);
+    'agent:notice', 'agent:done', 'agent:error', 'agent:checkpoint', 'agent:restored', 'agent:todos']);
 
 /** A conversation's title: the start of its first request. */
 const titleOf = (text) => (text.length > 60 ? `${text.slice(0, 57)}…` : text);
@@ -113,8 +125,10 @@ class AgentSession {
      */
     constructor({ panels, run, post, cwd, setting, setSetting = () => {}, fileTools = [], account = null,
         conversations = null, createModel = languageModelFor, log = () => {} }) {
+        this.fileTools = fileTools;
         this.tools = [...createKigumiTools({ panels, run, workspaceFolders: () => [cwd()].filter(Boolean) }),
-            ...fileTools.map((tool) => this._checkpointed(this._buildingAfterEdits(tool, { panels, run, cwd }), cwd))];
+            ...fileTools.map((tool) => this._checkpointed(this._buildingAfterEdits(tool, { panels, run, cwd }), cwd)),
+            this._todoTool()];
         this.panels = panels;
         // Everything the panel shows of a conversation is also kept, to show it again when reopened.
         this.post = (message) => {
@@ -150,14 +164,78 @@ class AgentSession {
         if (!FILE_EDIT_TOOLS.has(tool.name)) return tool;
         return {
             ...tool,
-            run: async (args) => {
+            run: async (args, context) => {
                 const target = path.resolve(cwd() || '', args.file_path || '');
                 if (this.changing && !(target in this.changing)) {
                     this.changing[target] = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
                 }
-                return tool.run(args);
+                return tool.run(args, context);
             },
         };
+    }
+
+    /** The agent's to-do list for a long task, shown pinned in the panel. */
+    _todoTool() {
+        return {
+            name: 'update_todos',
+            description: 'Set your to-do list for a task of several steps (the whole list each time), ticking off '
+                + 'what is done. The user sees it pinned in the panel.',
+            shape: {
+                items: z.array(z.object({ text: z.string(), done: z.boolean().optional() })).describe('Every item, in order.'),
+            },
+            readOnly: true,
+            run: async ({ items }) => {
+                this.todos = items.map(({ text, done }) => ({ text, done: Boolean(done) }));
+                this.post({ type: 'agent:todos', items: this.todos });
+                const left = this.todos.filter((item) => !item.done).length;
+                return [{ type: 'text', text: `To-do list updated: ${left} of ${this.todos.length} left.` }];
+            },
+        };
+    }
+
+    /** A picture of the view showing `filePath` as a data URL, or null. */
+    async _viewPicture(run, filePath) {
+        try {
+            const result = await run('kigumi.captureScreenshot', { filePath });
+            const data = fs.readFileSync(result.screenshotPath).toString('base64');
+            return `data:image/png;base64,${data}`;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    /** `text` with each @-mentioned project file attached (and @selection, what is selected in full). */
+    async _withMentions(text) {
+        const root = this.cwd();
+        const attached = [];
+        for (const [, written] of text.matchAll(/(?:^|\s)@([\w./-]+)/g)) {
+            const mention = written.replace(/[.]+$/, ''); // the end of a sentence
+            if (mention === 'selection') {
+                const described = await this.panels.describe().catch(() => null);
+                if (described) attached.push(`[What I have selected]\n${JSON.stringify(described, null, 1)}`);
+                continue;
+            }
+            if (!root) continue;
+            const file = path.resolve(root, mention);
+            const inside = path.relative(root, file);
+            if (inside.startsWith('..') || path.isAbsolute(inside) || !fs.existsSync(file) || !fs.statSync(file).isFile()) continue;
+            const content = fs.readFileSync(file, 'utf8');
+            const shown = content.length > MAX_MENTIONED_CHARS ? `${content.slice(0, MAX_MENTIONED_CHARS)}\n[…cut off]` : content;
+            attached.push(`[The file ${inside}]\n\`\`\`\n${shown}\n\`\`\``);
+        }
+        return attached.length ? `${text}\n\n${attached.join('\n\n')}` : text;
+    }
+
+    /** Every project file, for the panel's @-mention list. */
+    async _listFiles() {
+        const lister = this.fileTools.find((tool) => tool.name === 'list_files');
+        if (!lister) return [];
+        try {
+            const [listed] = await lister.run({});
+            return listed.text.split('\n').filter((line) => line && !line.startsWith('('));
+        } catch (_error) {
+            return [];
+        }
     }
 
     /** Put back the files the turns from `turn` on changed, as they were before it. */
@@ -189,14 +267,20 @@ class AgentSession {
         if (!['write_file', 'edit_file'].includes(tool.name)) return tool;
         return {
             ...tool,
-            run: async (args) => {
-                const result = await tool.run(args);
+            run: async (args, context = {}) => {
                 const target = path.resolve(cwd() || '', args.file_path || '');
                 const shown = panels.list().some((panel) => panel.kind === 'viewer' && panel.filePath
                     && path.resolve(panel.filePath) === target);
+                // The view before and after, for the panel only: the model isn't sent them.
+                const before = shown ? await this._viewPicture(run, target) : null;
+                const result = await tool.run(args, context);
                 if (!shown) return result;
                 const report = await run('kigumi.automationBuildReport', { filePath: target, reason: 'agent edit' })
                     .catch((error) => ({ ok: false, error: error.message, entries: [] }));
+                const after = await this._viewPicture(run, target);
+                if (before && after && context.toolCallId) {
+                    this.postRaw({ type: 'agent:toolImages', id: context.toolCallId, before, after });
+                }
                 const built = describeBuild(report);
                 return built ? [...result, { type: 'text', text: built }] : result;
             },
@@ -244,8 +328,10 @@ class AgentSession {
     /** Messages from the panel. */
     handle(message) {
         if (!message) return;
-        if (message.type === 'agent:prompt' && typeof message.text === 'string' && message.text.trim()) {
-            this.ask(message.text.trim());
+        if (message.type === 'agent:prompt' && typeof message.text === 'string' && (message.text.trim() || message.images)) {
+            this.ask(message.text.trim(), Array.isArray(message.images) ? message.images.slice(0, 4) : []);
+        } else if (message.type === 'agent:listFiles') {
+            void this._listFiles().then((files) => this.postRaw({ type: 'agent:files', files }));
         } else if (message.type === 'agent:retry') {
             this.ask(RETRY_PROMPT);
         } else if (message.type === 'agent:unqueue') {
@@ -305,6 +391,7 @@ class AgentSession {
     }
 
     startConversation() {
+        this.todos = [];
         this.history = [];
         this.transcript = [];
         this.conversation = null;
@@ -361,6 +448,10 @@ class AgentSession {
     }
 
     _askPermission(toolName, input) {
+        if (this.panelSetting('agent.planMode')) {
+            return Promise.reject(new Error('Plan mode is on, so nothing that changes anything runs. Propose the change; '
+                + 'the user will turn plan mode off and ask you to go ahead.'));
+        }
         const mode = this.panelSetting('agent.permissionMode');
         if (mode === 'all' || (mode === 'edits' && FILE_EDIT_TOOLS.has(toolName))
             || this.panelSetting('agent.alwaysAllow').includes(toolName)) {
@@ -373,20 +464,31 @@ class AgentSession {
         });
     }
 
+    /** What a request sends: the text with mentions attached and what is in view, then any images. */
+    async _promptContent(text, images) {
+        const full = withContext(await this._withMentions(text), await this.panels.describe().catch(() => null));
+        if (!images.length) return full;
+        if (!this.model.images) {
+            return `${full}\n\n[${images.length} image${images.length === 1 ? '' : 's'} attached, which this model can't see.]`;
+        }
+        return [{ type: 'text', text: full },
+            ...images.map((image) => ({ type: 'image', image: image.data, mediaType: image.mediaType || 'image/png' }))];
+    }
+
     /** A request from the panel: run now, or after the turn running, in the order asked. */
-    ask(text) {
+    ask(text, images = []) {
         if (!this.busy) {
-            void this.prompt(text);
+            void this.prompt(text, images);
             return;
         }
         const id = this.nextQueued++;
-        this.queue.push({ id, text });
+        this.queue.push({ id, text, images });
         this.postRaw({ type: 'agent:queued', id, text });
     }
 
-    async prompt(text) {
+    async prompt(text, images = []) {
         if (this.busy) {
-            this.ask(text);
+            this.ask(text, images);
             return;
         }
         const route = this.route();
@@ -397,7 +499,7 @@ class AgentSession {
         }
         const abort = new AbortController();
         this.abort = abort;
-        this.transcript.push({ type: 'agent:userMessage', text });
+        this.transcript.push({ type: 'agent:userMessage', text, images: images.length });
         this.turn += 1;
         const turn = this.turn;
         this.changing = {};
@@ -409,9 +511,9 @@ class AgentSession {
                 cacheMarks: Boolean(this.model.cacheMarks),
                 contextWindow: this.model.contextWindow,
                 tools: this.tools,
-                system: SYSTEM_PROMPT,
+                system: this.panelSetting('agent.planMode') ? `${SYSTEM_PROMPT}\n\n${PLAN_MODE_NOTE}` : SYSTEM_PROMPT,
                 history: this.history,
-                prompt: withContext(text, await this.panels.describe().catch(() => null)),
+                prompt: await this._promptContent(text, images),
                 abortSignal: abort.signal,
                 askPermission: (toolName, input) => this._askPermission(toolName, input),
                 onEvent: (event) => this.post(event),
@@ -444,8 +546,8 @@ class AgentSession {
             const next = this.queue.shift();
             if (next) {
                 this.postRaw({ type: 'agent:dequeued', id: next.id });
-                this.postRaw({ type: 'agent:userMessage', text: next.text });
-                void this.prompt(next.text);
+                this.postRaw({ type: 'agent:userMessage', text: next.text, images: next.images.length });
+                void this.prompt(next.text, next.images);
             }
         }
     }

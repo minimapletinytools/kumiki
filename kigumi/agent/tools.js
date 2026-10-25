@@ -121,6 +121,20 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             })),
         },
         {
+            name: 'check_frame',
+            description: 'Build a Python frame file and say whether it built, with its warnings and errors. Opens '
+                + 'it in a view first if none shows it.',
+            shape: { file_path: z.string().describe('Absolute path to a .py frame file.') },
+            readOnly: true,
+            run: async ({ file_path: filePath }) => {
+                const opened = await run('kigumi.automationOpenFileInViewer', { filePath });
+                if (opened && opened.ok === false) {
+                    return text({ ok: false, reason: opened.reason, filePath });
+                }
+                return text(await run('kigumi.automationBuildReport', { filePath: (opened && opened.filePath) || filePath }));
+            },
+        },
+        {
             name: 'screenshot',
             description: 'A picture of a view as it is drawn now, to look at the model.',
             shape: { panel_id: panelId },

@@ -148,7 +148,7 @@ describe('the agent loop', () => {
             .filter((item) => item.type === 'file').length;
         expect(imagesIn(model.doStreamCalls[2].prompt)).toBe(1);
         expect(imagesIn(history)).toBe(1);
-        expect(JSON.stringify(history)).toContain('earlier screenshot');
+        expect(JSON.stringify(history)).toContain('An earlier image, dropped');
     });
 
         test('Claude models get a cache mark on the last two messages only, however many steps pass', () => {
@@ -206,6 +206,16 @@ describe('the agent loop', () => {
         await runTurn({ model: scripted([...say('1', 'Hi.'), finish('stop')]), images: true, contextWindow: 200000, tools: [],
             system: 's', history: [], prompt: 'go', askPermission: async () => true, onEvent: (event) => events.push(event) });
         expect(events).toContainEqual({ type: 'agent:context', tokens: 10, window: 200000 });
+    });
+
+        test('an image the user attached is dropped like a screenshot once a later one comes', () => {
+        const { onlyLatestImage } = require('../agent/agent-loop');
+        const user = { role: 'user', content: [{ type: 'text', text: 'this' }, { type: 'image', image: 'AAAA', mediaType: 'image/png' }] };
+        const shot = { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c', toolName: 'screenshot',
+            output: { type: 'content', value: [{ type: 'file', data: { type: 'data', data: 'BBBB' }, mediaType: 'image/png' }] } }] };
+        const [kept, latest] = onlyLatestImage([user, shot]);
+        expect(kept.content[1]).toEqual({ type: 'text', text: expect.stringContaining('earlier image') });
+        expect(latest.content[0].output.value[0].type).toBe('file');
     });
 
         test('a model that cannot see gets a note instead of an image', () => {
@@ -317,7 +327,7 @@ describe('the agent session', () => {
         expect(posted.pop()).toEqual({
             type: 'agent:state', models: MODELS.map(({ id, label }) => ({ id, label })), model: 'claude-sonnet-5', via: 'openrouter',
             account: { configured: false },
-            settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true },
+            settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false },
         });
     });
 
@@ -346,6 +356,7 @@ describe('the agent session', () => {
         const agent = new AgentSession({
             panels: { ...panels, list: () => [{ kind: 'viewer', filePath: '/project/a.py' }] },
             run: async (id, args) => {
+                if (id === 'kigumi.captureScreenshot') throw new Error('no view to picture here');
                 reports.push([id, args.filePath]);
                 return { ok: false, entries: [{ level: 'error', message: 'NameError: brace' }] };
             },
@@ -391,7 +402,7 @@ describe('the agent session', () => {
         const again = make(scripted([...say('2', 'Longer legs.'), finish('stop')]));
         again.handle({ type: 'agent:ready' });
         const replay = posted.find((message) => message.type === 'agent:replay');
-        expect(replay.events[0]).toEqual({ type: 'agent:userMessage', text: 'make me a sawhorse' });
+        expect(replay.events[0]).toEqual({ type: 'agent:userMessage', text: 'make me a sawhorse', images: 0 });
         expect(replay.events).toContainEqual({ type: 'agent:text', text: 'A sawhorse, then.' });
 
         // It carries on the same conversation; a new one starts empty.
@@ -428,7 +439,7 @@ describe('the agent session', () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         expect(prompts).toEqual(['first', 'second']);
-        expect(posted).toContainEqual({ type: 'agent:userMessage', text: 'second' });
+        expect(posted).toContainEqual({ type: 'agent:userMessage', text: 'second', images: 0 });
         expect(posted).toContainEqual({ type: 'agent:dequeued', id: third.id });
     });
 
@@ -468,6 +479,70 @@ describe('the agent session', () => {
         agent.prompt = async (text) => { asked.push(text); };
         agent.handle({ type: 'agent:retry' });
         expect(asked).toEqual([RETRY_PROMPT]);
+    });
+
+        test('the agent keeps a to-do list, shown in the panel and kept with the conversation', async () => {
+        const { agent, posted } = session();
+        const todos = agent.tools.find((tool) => tool.name === 'update_todos');
+        expect(todos.readOnly).toBe(true);
+        const [result] = await todos.run({ items: [{ text: 'legs', done: true }, { text: 'beam' }] });
+        expect(result.text).toBe('To-do list updated: 1 of 2 left.');
+        expect(posted).toContainEqual({ type: 'agent:todos', items: [{ text: 'legs', done: true }, { text: 'beam', done: false }] });
+        expect(agent.transcript.at(-1).type).toBe('agent:todos');
+    });
+
+    test('in plan mode, nothing that changes anything runs, and the model is told why', async () => {
+        const { agent, posted } = session({ settings: { 'agent.planMode': true, 'agent.permissionMode': 'all' } });
+        await expect(agent._askPermission('edit_file', {})).rejects.toThrow('Plan mode is on');
+        expect(posted.some((message) => message.type === 'agent:permission')).toBe(false);
+    });
+
+    test('an @-mentioned file goes with the request; anything outside the project does not', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-mention-'));
+        fs.writeFileSync(path.join(root, 'frame.py'), 'legs = 4\n');
+        const agent = new AgentSession({ panels, run: async () => ({}), post: () => {}, cwd: () => root,
+            setting: (key, fallback) => fallback });
+
+        const sent = await agent._withMentions('fix @frame.py. and @../secret.txt and @missing.py');
+
+        expect(sent).toContain('[The file frame.py]\n```\nlegs = 4\n');
+        expect(sent).not.toContain('[The file ../secret.txt]');
+        expect(sent).not.toContain('[The file missing.py]');
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    test('images go with a request to a model that can see; one that can\'t is told they were there', async () => {
+        const seeing = session({ settings: { 'agent.model': 'claude-haiku-4.5' } }).agent;
+        const parts = await seeing._promptContent('this joint', [{ mediaType: 'image/jpeg', data: 'AAAA' }]);
+        expect(parts[1]).toEqual({ type: 'image', image: 'AAAA', mediaType: 'image/jpeg' });
+
+        const blind = session().agent;
+        blind.model.images = false;
+        const text = await blind._promptContent('this joint', [{ mediaType: 'image/png', data: 'AAAA' }]);
+        blind.model.images = true;
+        expect(text).toContain("1 image attached, which this model can't see");
+    });
+
+    test('an edit to a file a view shows puts the view before and after on its chip', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-shots-'));
+        const shot = path.join(root, 'shot.png');
+        fs.writeFileSync(shot, 'png');
+        const posted = [];
+        const editTool = { name: 'edit_file', shape: {}, readOnly: false, run: async () => [{ type: 'text', text: 'Edited.' }] };
+        const agent = new AgentSession({
+            panels: { ...panels, list: () => [{ kind: 'viewer', filePath: path.join(root, 'a.py') }] },
+            run: async (id) => (id === 'kigumi.captureScreenshot' ? { screenshotPath: shot } : { ok: true, entries: [] }),
+            post: (message) => posted.push(message), cwd: () => root, setting: (key, fallback) => fallback, fileTools: [editTool],
+        });
+
+        await agent.tools.find((tool) => tool.name === 'edit_file').run({ file_path: 'a.py' }, { toolCallId: 'c9' });
+
+        const pictures = posted.find((message) => message.type === 'agent:toolImages');
+        expect(pictures).toEqual({ type: 'agent:toolImages', id: 'c9',
+            before: `data:image/png;base64,${Buffer.from('png').toString('base64')}`, after: expect.stringMatching(/^data:image\/png/) });
+        // For the panel only: not kept in the conversation.
+        expect(agent.transcript.some((event) => event.type === 'agent:toolImages')).toBe(false);
+        fs.rmSync(root, { recursive: true, force: true });
     });
 
         test('out of credit says so', () => {

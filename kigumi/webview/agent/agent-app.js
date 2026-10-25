@@ -25,6 +25,10 @@
     const historyMenu = $('history-menu');
     const historyList = $('history-list');
     const contextMeter = $('context-meter');
+    const planToggle = $('plan-toggle');
+    const todosEl = $('todos');
+    const mentionsEl = $('mentions');
+    const attachmentsEl = $('attachments');
     const activityLabel = $('activity-label');
     const welcomeHtml = $('welcome').outerHTML;
 
@@ -229,16 +233,198 @@
     // While the agent works, a request waits its turn (agent:queued) rather than starting.
     function sendPrompt(text) {
         const prompt = (text !== undefined ? text : inputEl.value).trim();
-        if (!prompt) return;
-        if (!busy) add('message-bubble user', prompt);
+        const images = text !== undefined ? [] : attachments.splice(0);
+        if (!prompt && !images.length) return;
+        if (!busy) userBubble(prompt, images.map((image) => image.url));
         lastSent = prompt;
         inputEl.value = '';
         inputEl.style.height = 'auto';
-        vscode.postMessage({ type: 'agent:prompt', text: prompt });
+        showAttachments();
+        hideMentions();
+        vscode.postMessage({ type: 'agent:prompt', text: prompt,
+            images: images.map(({ mediaType, data }) => ({ mediaType, data })) });
+    }
+
+    /** A request as the user sees it: its text, and thumbnails of images sent with it (or how many). */
+    function userBubble(text, imageUrls = [], imageCount = 0) {
+        const bubble = add('message-bubble user', text);
+        if (imageUrls.length) {
+            const row = Object.assign(document.createElement('div'), { className: 'bubble-images' });
+            for (const url of imageUrls) row.appendChild(Object.assign(document.createElement('img'), { src: url, alt: '' }));
+            bubble.appendChild(row);
+        } else if (imageCount) {
+            bubble.appendChild(Object.assign(document.createElement('div'), { className: 'bubble-images-note',
+                textContent: `(${imageCount} image${imageCount === 1 ? '' : 's'})` }));
+        }
+        return bubble;
+    }
+
+    // Images pasted or dropped into the box go with the next request.
+    const attachments = [];
+
+    function showAttachments() {
+        attachmentsEl.hidden = !attachments.length;
+        attachmentsEl.replaceChildren(...attachments.map((image, index) => {
+            const chip = Object.assign(document.createElement('div'), { className: 'attachment' });
+            chip.appendChild(Object.assign(document.createElement('img'), { src: image.url, alt: '' }));
+            const remove = Object.assign(document.createElement('button'), { type: 'button', textContent: '×', title: 'Remove' });
+            remove.addEventListener('click', () => {
+                attachments.splice(index, 1);
+                showAttachments();
+            });
+            chip.appendChild(remove);
+            return chip;
+        }));
+    }
+
+    function attachFiles(files) {
+        for (const file of files) {
+            if (!file.type.startsWith('image/') || attachments.length >= 4) continue;
+            const reader = new FileReader();
+            reader.onload = () => {
+                const url = String(reader.result);
+                attachments.push({ url, mediaType: file.type, data: url.slice(url.indexOf(',') + 1) });
+                showAttachments();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    inputEl.addEventListener('paste', (event) => {
+        const files = [...(event.clipboardData ? event.clipboardData.files : [])];
+        if (files.some((file) => file.type.startsWith('image/'))) {
+            event.preventDefault();
+            attachFiles(files);
+        }
+    });
+    const inputBox = inputEl.closest('.input-box');
+    inputBox.addEventListener('dragover', (event) => event.preventDefault());
+    inputBox.addEventListener('drop', (event) => {
+        event.preventDefault();
+        attachFiles([...event.dataTransfer.files]);
+    });
+
+    // @-mentions: a project file, or "selection", picked from a list as you type.
+    let projectFiles = null;
+    let mentionChoices = [];
+    let mentionIndex = 0;
+
+    function mentionAtCaret() {
+        const before = inputEl.value.slice(0, inputEl.selectionStart);
+        const match = /(?:^|\s)@([\w./-]*)$/.exec(before);
+        return match ? { query: match[1], start: inputEl.selectionStart - match[1].length } : null;
+    }
+
+    function hideMentions() {
+        mentionsEl.hidden = true;
+        mentionChoices = [];
+    }
+
+    function showMentions() {
+        const at = mentionAtCaret();
+        if (!at) return hideMentions();
+        if (projectFiles === null) {
+            projectFiles = [];
+            vscode.postMessage({ type: 'agent:listFiles' });
+        }
+        const query = at.query.toLowerCase();
+        const scored = ['selection', ...projectFiles]
+            .map((name) => ({ name, at: name.toLowerCase().indexOf(query) }))
+            .filter((choice) => choice.at >= 0)
+            .sort((a, b) => (a.at === b.at ? a.name.length - b.name.length : a.at - b.at))
+            .slice(0, 8);
+        mentionChoices = scored.map((choice) => choice.name);
+        mentionIndex = Math.min(mentionIndex, Math.max(mentionChoices.length - 1, 0));
+        mentionsEl.hidden = !mentionChoices.length;
+        mentionsEl.replaceChildren(...mentionChoices.map((name, index) => {
+            const option = Object.assign(document.createElement('div'), {
+                className: 'mention' + (index === mentionIndex ? ' is-chosen' : ''),
+                textContent: name === 'selection' ? '@selection — what is selected in the view' : `@${name}`,
+            });
+            option.addEventListener('mousedown', (event) => {
+                event.preventDefault();
+                chooseMention(name);
+            });
+            return option;
+        }));
+    }
+
+    function chooseMention(name) {
+        const at = mentionAtCaret();
+        if (!at) return;
+        const caret = inputEl.selectionStart;
+        inputEl.value = `${inputEl.value.slice(0, at.start)}${name} ${inputEl.value.slice(caret)}`;
+        inputEl.selectionStart = inputEl.selectionEnd = at.start + name.length + 1;
+        hideMentions();
+        inputEl.focus();
+    }
+
+    inputEl.addEventListener('input', () => {
+        mentionIndex = 0;
+        showMentions();
+    });
+    inputEl.addEventListener('blur', () => setTimeout(hideMentions, 100));
+
+    // Plan mode: the agent looks and proposes, and changes nothing.
+    planToggle.addEventListener('click', () => vscode.postMessage({
+        type: 'agent:setSetting', key: 'agent.planMode', value: planToggle.getAttribute('aria-pressed') !== 'true',
+    }));
+
+    /** The agent's to-do list, pinned above the box. */
+    function showTodos(items) {
+        todosEl.hidden = !items.length;
+        if (!items.length) return todosEl.replaceChildren();
+        const left = items.filter((item) => !item.done).length;
+        const details = document.createElement('details');
+        details.open = left > 0;
+        details.appendChild(Object.assign(document.createElement('summary'), {
+            textContent: left ? `To do: ${left} of ${items.length} left` : `Done: all ${items.length}`,
+        }));
+        const list = document.createElement('ul');
+        for (const item of items) {
+            list.appendChild(Object.assign(document.createElement('li'), {
+                className: item.done ? 'is-done' : '', textContent: item.text,
+            }));
+        }
+        details.appendChild(list);
+        todosEl.replaceChildren(details);
+    }
+
+    /** The view before and after an edit, on its chip. */
+    function showToolImages(id, before, after) {
+        const chip = toolChips.get(id);
+        if (!chip) return;
+        const row = Object.assign(document.createElement('div'), { className: 'before-after' });
+        for (const [label, url] of [['Before', before], ['After', after]]) {
+            const figure = document.createElement('figure');
+            figure.appendChild(Object.assign(document.createElement('img'), { src: url, alt: label }));
+            figure.appendChild(Object.assign(document.createElement('figcaption'), { textContent: label }));
+            row.appendChild(figure);
+        }
+        chip.querySelector('.tool-body').appendChild(row);
+        chip.classList.add('has-images');
     }
 
     // Enter sends; Escape stops the agent; Up, in an empty box, brings back the last request to edit.
     inputEl.addEventListener('keydown', (event) => {
+        if (!mentionsEl.hidden && mentionChoices.length) {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                mentionIndex = (mentionIndex + (event.key === 'ArrowDown' ? 1 : mentionChoices.length - 1)) % mentionChoices.length;
+                showMentions();
+                return;
+            }
+            if (event.key === 'Enter' || event.key === 'Tab') {
+                event.preventDefault();
+                chooseMention(mentionChoices[mentionIndex]);
+                return;
+            }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                hideMentions();
+                return;
+            }
+        }
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             sendPrompt();
@@ -307,6 +493,8 @@
     sendBtn.addEventListener('click', () => (busy ? vscode.postMessage({ type: 'agent:stop' }) : sendPrompt()));
 
     function resetMessages() {
+        showTodos([]);
+        projectFiles = null;
         toolChips.clear();
         thinking = null;
         messagesEl.innerHTML = welcomeHtml;
@@ -419,8 +607,12 @@
         const mode = settings['agent.permissionMode'] || 'ask';
         for (const radio of modeRadios) radio.checked = radio.value === mode;
         startupToggle.checked = settings['agent.showOnStartup'] !== false;
-        bypassBanner.hidden = mode === 'ask';
-        bypassBanner.textContent = MODE_BANNERS[mode] || '';
+        const planning = settings['agent.planMode'] === true;
+        planToggle.setAttribute('aria-pressed', String(planning));
+        planToggle.classList.toggle('is-on', planning);
+        bypassBanner.hidden = !planning && mode === 'ask';
+        bypassBanner.textContent = planning ? 'Plan mode: looking and proposing, changing nothing' : MODE_BANNERS[mode] || '';
+        bypassBanner.classList.toggle('is-plan', planning);
         // Tools allowed for good from a permission card, each with a way to take it back.
         allowedTools = settings['agent.alwaysAllow'] || [];
         alwaysAllowed.replaceChildren(...(allowedTools.length ? [Object.assign(document.createElement('div'), {
@@ -524,7 +716,17 @@
                 break;
             case 'agent:userMessage':
                 endThinking();
-                add('message-bubble user', message.text || '');
+                userBubble(message.text || '', [], message.images || 0);
+                break;
+            case 'agent:todos':
+                showTodos(message.items || []);
+                break;
+            case 'agent:files':
+                projectFiles = message.files || [];
+                showMentions();
+                break;
+            case 'agent:toolImages':
+                showToolImages(message.id, message.before, message.after);
                 break;
             case 'agent:queued':
                 showQueued(message.id, message.text || '');
