@@ -1600,8 +1600,16 @@ class ButtJointTimberArrangement:
             self.butt_timber.get_face_direction_global(self.front_face_on_butt_timber),
             self.compute_normalized_timber_cross_product(),
         ):
-            return "front_face_on_butt_timber must be parallel to the joint alignment plane"
+            return (f"front_face_on_butt_timber is {self.front_face_on_butt_timber.name}, which is not parallel to the "
+                    f"joint alignment plane (the plane both timbers lie in); use {self._faces_named(parallel=True)}.")
         return None
+
+    def _faces_named(self, parallel: bool) -> str:
+        """The butt timber's long faces that are (or aren't) parallel to the joint alignment plane, as "FRONT or BACK"."""
+        normal = self.compute_normalized_timber_cross_product()
+        faces = [face.name for face in TimberLongFace
+                 if are_vectors_parallel(self.butt_timber.get_face_direction_global(face), normal) == parallel]
+        return " or ".join(faces)
 
     def _check_top_face_orientation(self) -> Optional[str]:
         """Return None if top_face_on_butt_timber (when set) is not parallel
@@ -1610,7 +1618,8 @@ class ButtJointTimberArrangement:
             self.butt_timber.get_face_direction_global(self.top_face_on_butt_timber),
             self.compute_normalized_timber_cross_product(),
         ):
-            return "top_face_on_butt_timber must not be parallel to the joint alignment plane"
+            return (f"top_face_on_butt_timber is {self.top_face_on_butt_timber.name}, but it must not be parallel to the "
+                    f"joint alignment plane (the plane both timbers lie in); use {self._faces_named(parallel=False)}.")
         return None
 
     def check_plane_aligned(self) -> Optional[str]:

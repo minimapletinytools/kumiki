@@ -2378,3 +2378,21 @@ class TestButtJointTimberArrangement:
         arrangement = self._make_arrangement(top=TimberLongFace.FRONT)
         assert arrangement.check_plane_aligned() is None
 
+
+
+def test_a_wrong_butt_face_names_the_faces_that_would_work():
+    """A vertical leg butting down into a runner along Y: its RIGHT and LEFT faces lie in the joint's plane."""
+    runner = create_axis_aligned_timber(bottom_position=create_v3(0, -0.7, 0), length=mm(1400), size=Matrix([mm(200), mm(200)]),
+                                        length_direction=TimberFace.FRONT, width_direction=TimberFace.RIGHT)
+    leg = create_axis_aligned_timber(bottom_position=create_v3(0, 0, mm(100)), length=mm(900), size=Matrix([mm(200), mm(200)]),
+                                     length_direction=TimberFace.TOP, width_direction=TimberFace.RIGHT)
+
+    def check(**faces):
+        return ButtJointTimberArrangement(receiving_timber=runner, butt_timber=leg, butt_timber_end=TimberEnd.BOTTOM,
+                                          **faces).check_plane_aligned()
+
+    assert check(front_face_on_butt_timber=TimberLongFace.RIGHT) is None
+    assert check(front_face_on_butt_timber=TimberLongFace.FRONT) == (
+        "front_face_on_butt_timber is FRONT, which is not parallel to the joint alignment plane "
+        "(the plane both timbers lie in); use RIGHT or LEFT.")
+    assert check(top_face_on_butt_timber=TimberLongFace.RIGHT).endswith("lie in); use FRONT or BACK.")
