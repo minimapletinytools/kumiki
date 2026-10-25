@@ -2492,8 +2492,9 @@ def warn_joints_whose_timbers_dont_meet(joints: Iterable['Joint']) -> None:
     boxes: Dict[int, Optional[Tuple[List[float], List[float]]]] = {}
     for joint in joints:
         timbers = list({id(c.timber): c.timber for c in joint.cuttings.values()}.values())
-        found = [boxes.setdefault(id(t), _timber_box(t)) for t in timbers]
-        if len(timbers) < 2 or any(box is None for box in found):
+        maybe = [boxes.setdefault(id(t), _timber_box(t)) for t in timbers]
+        found = [box for box in maybe if box is not None]
+        if len(timbers) < 2 or len(found) < len(timbers):
             continue
         # Timbers that touch, transitively, from the first.
         reached = {0}
