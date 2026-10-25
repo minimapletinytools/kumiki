@@ -130,9 +130,19 @@ class TestFreeDovetailJoint:
 
             assert "dovetail_right_flank×dovetail_wide_face" in _edges_at(beam, 0, 20 + 30 * 0.2679491924, 20), taper
 
-    def test_a_taper_needs_both_ends(self):
-        with pytest.raises(AssertionError, match="finite"):
-            _dovetail(taper=5, forward=None)
+    def test_an_open_end_runs_through_both_timbers(self):
+        # Backward (world +x) left open: the socket runs out the beam's end at x=500.
+        for taper in (0, 5):
+            beam = _beam()
+            joint = cut_free_dovetail_joint(_post(), beam, _dovetail(taper, backward=None))
+            beam_cut = CutTimber(beam, cuts=[joint.cuttings["receiving_timber"]])
+
+            assert not _has(beam_cut, 495, 0, 35), taper
+
+    def test_a_taper_that_closes_before_its_open_end_is_refused(self):
+        # Forward (world -x) left open runs 500mm, and a 5 degree taper closes the 40mm neck in ~230.
+        with pytest.raises(AssertionError, match="closes"):
+            cut_free_dovetail_joint(_post(), _beam(), _dovetail(taper=5, forward=None))
 
     def test_the_dovetail_angle_must_be_positive(self):
         origin = _dovetail().origin

@@ -3,10 +3,11 @@ Kumiki - Free joint construction functions
 Contains functions for creating joints with flexible geometry matching.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 from kumiki.timber import *
+from kumiki.timber import _get_rough_size_and_offset
 from kumiki.construction import *
 from kumiki.rule import *
 from kumiki.csg.cutcsg import (
@@ -40,6 +41,16 @@ _DOVETAIL_EDGES = [
 _DOVETAIL_FEATURES = [*_DOVETAIL_FACES, *_DOVETAIL_EDGES]
 
 
+_END_CLEARANCE = mm(5)
+
+
+def _rough_box_corners(timber: TimberLike) -> List[V3]:
+    """The eight corners of `timber`'s rough box over its length, in world space."""
+    size, offset = _get_rough_size_and_offset(timber)
+    return [timber.transform.local_to_global(create_v3(offset[0] + sx * size[0] / 2, offset[1] + sy * size[1] / 2, z))
+            for sx in (-1, 1) for sy in (-1, 1) for z in (scalar(0), timber.length)]
+
+
 #.    _______
 #.    \_____/ <- angle.  }depth
 #        ^
@@ -57,7 +68,7 @@ class FreeDovetailShape:
     width: Numeric
     depth: Numeric
     dovetail_angle: Numeric
-    # None means infinite
+    # None runs it through both timbers: cut_free_dovetail_joint sets it from their bounding boxes
     forward_length: Optional[Numeric] = None
     backward_length: Optional[Numeric] = None
     taper_angle: Numeric = scalar(0)
@@ -67,12 +78,27 @@ class FreeDovetailShape:
         assert safe_compare(self.depth, 0, Comparison.GT), "a dovetail needs a positive depth"
         assert safe_compare(self.dovetail_angle, 0, Comparison.GT), \
             "a dovetail's angle must be positive: it widens away from its neck, toward +y"
-        if not safe_zero_test(self.taper_angle):
-            assert self.forward_length is not None and self.backward_length is not None, \
-                "a tapered dovetail needs finite forward and backward lengths"
+        if not safe_zero_test(self.taper_angle) and self.forward_length is not None \
+                and self.backward_length is not None:
             assert safe_compare(self._half_width_at(self.forward_length), 0, Comparison.GT) \
                 and safe_compare(self._half_width_at(-self.backward_length), 0, Comparison.GT), \
                 "the taper closes the dovetail to nothing within its length"
+
+    def through(self, *timbers: TimberLike) -> 'FreeDovetailShape':
+        """This dovetail with each open (None) end run just past `timbers`' rough bounding boxes."""
+        if self.forward_length is not None and self.backward_length is not None:
+            return self
+        along = self.origin.orientation.matrix[:, 2]
+        reach = [safe_dot_product(corner - self.origin.position, along)
+                 for timber in timbers for corner in _rough_box_corners(timber)]
+        # A little past the farthest corner, so an end never lands on a timber's face.
+        forward = self.forward_length
+        if forward is None:
+            forward = max(max(reach), scalar(0)) + _END_CLEARANCE
+        backward = self.backward_length
+        if backward is None:
+            backward = max(-min(reach), scalar(0)) + _END_CLEARANCE
+        return replace(self, forward_length=forward, backward_length=backward)
 
     def _half_width_at(self, z: Numeric) -> Numeric:
         """Half the small width at `z` along the dovetail, narrowing toward +z by the taper."""
@@ -92,7 +118,8 @@ class FreeDovetailShape:
             return ConvexPolygonExtrusion(points=self.profile_at(scalar(0)), start_distance=start,
                                           end_distance=self.forward_length, feature_overrides=_DOVETAIL_FEATURES,
                                           label=CutCSGLabel("dovetail"))
-        assert start is not None and self.forward_length is not None
+        assert start is not None and self.forward_length is not None, \
+            "a tapered dovetail needs both ends: set them, or resolve them with through()"
         return ConvexPolygonSimpleLoft(bottom_points=self.profile_at(start),
                                        top_points=self.profile_at(self.forward_length),
                                        bottom_points_z_pos=start, top_points_z_pos=self.forward_length,
@@ -107,6 +134,7 @@ def cut_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: Timbe
     along +y -- so the dovetail timber should lie on the -y side of the dovetail shape origin, and it tapers towards +y.
     Between the dovetail's ends, everything of the dovetail timber past the narrow face in +y is cut away except the tongue. That face is the joint's shoulder.
     """
+    dovetail = dovetail.through(dovetail_timber, receiving_timber)
     # create a convex polygon extrusion from `dovetail`
     dovetail_csg = dovetail.csg()
 

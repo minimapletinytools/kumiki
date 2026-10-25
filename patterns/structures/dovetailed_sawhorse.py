@@ -1,4 +1,4 @@
-"""Dovetailed sawhorse: a beam on edge and four splayed 1x6 legs.
+"""Dovetailed sawhorse: a beam on edge and four splayed legs.
 
 Each leg is let into an arris of the beam by its whole thickness, as a sliding dovetail tapered
 point up, so the load wedges it tighter. Seen along the beam, a leg's outer face runs through the
@@ -10,12 +10,12 @@ from kumiki import *
 
 
 SAWHORSE = kiwari(
-    leg_distance=kiwari.length(inches(25), about="Centre to centre along the beam, where the legs meet its top"),
+    leg_distance=kiwari.length(inches(22), about="Centre to centre along the beam, where the legs meet its top"),
     leg_y_splay_angle=kiwari.angle(degrees(12), about="How far the legs lean out toward the beam's ends"),
     leg_side_splay_angle=kiwari.angle(
         optional=True, about="How far the legs splay out from the beam's sides; based on beam and leg dimensions if disabled"),
-    beam_size=kiwari.point2(create_v2(inches(2), inches(9, 2)), about="Across and tall"),
-    leg_size=kiwari.point2(create_v2(inches(11, 2), inches(3, 4)), about="Width and thickness"),
+    beam_size=kiwari.point2(create_v2(inches(2), inches(15, 4)), about="Across and tall"),
+    leg_size=kiwari.point2(create_v2(inches(13, 2), inches(3, 4)), about="Width and thickness"),
     sawhorse_height=kiwari.length(inches(30), about="Floor to the top of the beam"),
     sawhorse_length=kiwari.length(inches(42), about="The beam's length"),
 )
@@ -63,14 +63,16 @@ def _leg(k: Kiwari, beam: Timber, end: int, side: int):
     to_bottom = beam_height * lean_cos
     at_bottom = arris + up * (-to_bottom / safe_dot_product(slide, up))
     width_at_bottom = leg_size[0] / sqrt(1 - up[0] * up[0])
+    # Turned in the leg's face, about the centre at the bottom arris, so the inner flank stands
+    # plumb seen from the side; the neck stays in the face, its line on the beam top along the beam.
+    turn = end * side * DOVETAIL_TAPER
+    turned_across = across * cos(turn) - slide * sin(turn)
+    turned_slide = across * sin(turn) + slide * cos(turn)
     dovetail = FreeDovetailShape(
-        origin=Transform(position=create_v3(at_bottom[0], arris[1], arris[2]),
-                         orientation=Orientation.from_x_and_y(across, into_beam)),
+        origin=Transform(position=at_bottom + turned_slide * to_bottom,
+                         orientation=Orientation.from_x_and_y(turned_across, into_beam)),
         width=width_at_bottom - cos(DOVETAIL_TAPER) * leg_size[1] - 2 * to_bottom * tan(DOVETAIL_TAPER),
-        depth=leg_size[1], dovetail_angle=DOVETAIL_FLARE,
-        # Up past the beam's top for good -- above it is only the leg, trimmed level. The taper
-        # needs finite ends, so "for good" is the beam's height.
-        forward_length=beam_height, backward_length=leg_length, taper_angle=DOVETAIL_TAPER,
+        depth=leg_size[1], dovetail_angle=DOVETAIL_FLARE, taper_angle=DOVETAIL_TAPER,
     )
     joint = cut_free_dovetail_joint(leg, beam, dovetail)
 
