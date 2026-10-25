@@ -165,6 +165,30 @@ describe('the agent loop', () => {
         expect(failed.history.map((message) => message.role)).toEqual(['user', 'assistant', 'tool']);
     });
 
+    test('a look repeated with the same arguments and result is told so; a changed result or arguments is not', async () => {
+        let content = 'line 1';
+        const readTool = { name: 'read', description: 'Read.', shape: { offset: z.number().optional() }, readOnly: true,
+            run: async () => [{ type: 'text', text: content }] };
+        const model = scripted(
+            [call('c1', 'read'), finish('tool-calls')],
+            [call('c2', 'read'), finish('tool-calls')],
+            [call('c3', 'read', { offset: 5 }), finish('tool-calls')],
+            [call('c4', 'read'), finish('tool-calls')],
+            [...say('1', 'Done.'), finish('stop')],
+        );
+        const results = [];
+        await runTurn({ model, images: true, tools: [readTool], system: 'sys', history: [], prompt: 'go', askPermission: async () => true,
+            onEvent: (event) => {
+                if (event.type === 'agent:toolResult') {
+                    results.push(event.text.startsWith('[You made this same call') ? 'noted' : 'plain');
+                    // Changed after the third read: the fourth repeats the first's arguments, not its result.
+                    if (results.length === 3) content = 'line 1 changed';
+                }
+            } });
+        expect(results).toEqual(['plain', 'noted', 'plain', 'plain']);
+        expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('You made this same call');
+    });
+
     test('only the latest screenshot is sent; earlier ones become a note', async () => {
         const model = scripted(
             [call('c1', 'look'), finish('tool-calls')],

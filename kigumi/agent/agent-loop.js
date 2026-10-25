@@ -226,7 +226,21 @@ async function summariseIfLarge(model, system, history, abortSignal) {
 }
 
 /** Kigumi's tools as an AI SDK tool set. */
+/** Put before a look that repeats one from earlier in the turn, with the same result. */
+const REPEATED_LOOK = '[You made this same call earlier in this turn and got this same result. To see something else, '
+    + 'change the arguments: read_file reads on from `offset`.]';
+
 function toToolSet(tools, { images, askPermission }) {
+    // This turn's looks and what each gave: a small model repeats one, e.g. read_file without the offset it meant.
+    const looked = new Map();
+    const noteRepeat = (name, input, output) => {
+        if (!Array.isArray(output) || output.some((part) => part.type === 'image')) return output;
+        const call = `${name} ${JSON.stringify(input)}`;
+        const result = JSON.stringify(output);
+        const repeated = looked.get(call) === result;
+        looked.set(call, result);
+        return repeated ? [{ type: 'text', text: REPEATED_LOOK }, ...output] : output;
+    };
     return Object.fromEntries(tools.map((kigumiTool) => [kigumiTool.name, tool({
         description: kigumiTool.description,
         inputSchema: z.object(kigumiTool.shape),
@@ -234,7 +248,8 @@ function toToolSet(tools, { images, askPermission }) {
             if (!kigumiTool.readOnly && !(await askPermission(kigumiTool.name, input))) {
                 throw new Error('The user did not allow this.');
             }
-            return kigumiTool.run(input || {}, { toolCallId });
+            const output = await kigumiTool.run(input || {}, { toolCallId });
+            return kigumiTool.readOnly ? noteRepeat(kigumiTool.name, input || {}, output) : output;
         },
         toModelOutput: ({ output }) => toModelContent(output, images),
     })]));
