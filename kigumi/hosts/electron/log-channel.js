@@ -1,12 +1,27 @@
 /**
  * The Kigumi log for the standalone app: kept in memory for the Log tab and
  * appended to a file. Has the OutputChannel shape sessions use.
+ *
+ * Besides lines (for the file), it keeps entries for the Log tab: each with its time, level and
+ * source (the view's file, from the "[name.py]" sessions start their lines with, or "app"). An
+ * appendLine of several lines, a traceback, is one entry; a level given with it beats the guess.
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const MAX_LINES = 5000;
+const MAX_ENTRIES = 5000;
+
+/** An entry's level and source, read from its text. */
+function classify(text) {
+    const source = /^\[([^\]]+\.py)\]/.exec(text);
+    let level = 'info';
+    if (/\[error\]|Traceback \(most recent call last\)|failed:/i.test(text)) level = 'error';
+    else if (/\[warn(ing)?\]/i.test(text)) level = 'warn';
+    else if (/\[(timing|debug)\]/i.test(text)) level = 'debug';
+    return { level, source: source ? source[1] : 'app' };
+}
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 // Moves an oversized log aside as kigumi.1.log, replacing the previous one.
@@ -29,8 +44,10 @@ class LogChannel {
         this.filePath = filePath;
         this.onShow = onShow;
         this.lines = [];
+        this.entries = [];
         this.partial = '';
         this.listeners = new Set();
+        this.entryListeners = new Set();
         fs.mkdirSync(path.dirname(filePath), { recursive: true });
         rotateIfLarge(filePath);
     }
@@ -40,11 +57,34 @@ class LogChannel {
         this.partial = parts.pop();
         for (const line of parts) {
             this._push(line);
+            this._entry(line);
         }
     }
 
-    appendLine(text) {
-        this.append(`${text}\n`);
+    appendLine(text, level) {
+        const whole = this.partial + String(text);
+        this.partial = '';
+        for (const line of whole.split('\n')) {
+            this._push(line);
+        }
+        this._entry(whole, level);
+    }
+
+    _entry(text, level) {
+        const entry = { timestamp: new Date().toISOString(), text, ...classify(text), ...(level ? { level } : {}) };
+        this.entries.push(entry);
+        if (this.entries.length > MAX_ENTRIES) {
+            this.entries.splice(0, this.entries.length - MAX_ENTRIES);
+        }
+        for (const listener of [...this.entryListeners]) {
+            listener(entry);
+        }
+    }
+
+    /** Each entry as it comes: { timestamp, level, source, text }. */
+    onEntry(listener) {
+        this.entryListeners.add(listener);
+        return { dispose: () => this.entryListeners.delete(listener) };
     }
 
     _push(line) {
@@ -74,7 +114,8 @@ class LogChannel {
 
     dispose() {
         this.listeners.clear();
+        this.entryListeners.clear();
     }
 }
 
-module.exports = { LogChannel, rotateIfLarge };
+module.exports = { LogChannel, rotateIfLarge, classify };

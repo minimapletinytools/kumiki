@@ -10,11 +10,21 @@
 </head>
 <body>
     <header class="log-header">
+        <div id="levels" class="log-levels" role="group" aria-label="Levels to show">
+            <button type="button" data-level="debug">All</button>
+            <button type="button" data-level="info" class="is-on">Info</button>
+            <button type="button" data-level="warn">Warnings</button>
+            <button type="button" data-level="error">Errors</button>
+        </div>
+        <select id="source" aria-label="Whose log"></select>
         <input id="filter" type="search" placeholder="Filter log" aria-label="Filter log">
+        <span id="counts" class="log-counts"></span>
         <label><input id="follow" type="checkbox" checked> Follow</label>
+        <button id="copy">Copy</button>
+        <button id="clear">Clear</button>
         <button id="open-file">Open log file</button>
     </header>
-    <pre id="lines" class="log-lines" tabindex="0"></pre>
-    <script src="log.js"></script>
+    <div id="entries" class="log-lines" tabindex="0"></div>
+    <script type="module" src="log.js"></script>
 </body>
 </html>

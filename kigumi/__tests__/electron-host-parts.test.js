@@ -4,7 +4,7 @@ const path = require('path');
 const { createMatcher } = require('../hosts/electron/glob-match');
 const { SettingsStore, defaultsFromPackageJson } = require('../hosts/electron/settings-store');
 const { TabList } = require('../app-shell/tab-list');
-const { LogChannel, rotateIfLarge } = require('../hosts/electron/log-channel');
+const { LogChannel, classify, rotateIfLarge } = require('../hosts/electron/log-channel');
 
 describe('glob matching for file watches', () => {
   test.each([
@@ -132,6 +132,25 @@ describe('log channel', () => {
     expect(heard).toEqual(['partial line one', 'two']);
     expect(fs.readFileSync(file, 'utf8')).toBe('partial line one\ntwo\n');
     expect(onShow).toHaveBeenCalledWith(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  test('keeps entries by level and source; a traceback is one entry, at the level given', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-log-'));
+    const channel = new LogChannel(path.join(dir, 'kigumi.log'));
+    const heard = [];
+    channel.onEntry((entry) => heard.push(entry));
+
+    channel.appendLine('[frame.py] NameError: x\n  File "/p/frame.py", line 3', 'error');
+    channel.append('[mcp] started\n');
+
+    expect(heard.map(({ level, source, text }) => ({ level, source, text }))).toEqual([
+      { level: 'error', source: 'frame.py', text: '[frame.py] NameError: x\n  File "/p/frame.py", line 3' },
+      { level: 'info', source: 'app', text: '[mcp] started' },
+    ]);
+    expect(channel.entries).toHaveLength(2);
+    expect(classify('[a.py] [warn] slow')).toEqual({ level: 'warn', source: 'a.py' });
+    expect(classify('[timing] build 3ms').level).toBe('debug');
+    expect(classify('Traceback (most recent call last):').level).toBe('error');
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

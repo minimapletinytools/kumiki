@@ -215,22 +215,27 @@ async function chooseFrameFile() {
     }
 }
 
-function openLogTab() {
+/** The Log tab, showing everything, or `source` (a view's file name) only. */
+function openLogTab({ source } = {}) {
     status.logBadge = false;
     const existing = connection.findPanel((panel) => panel.type === 'log');
     if (existing) {
         existing.reveal();
+        if (typeof source === 'string') void existing.postMessage({ type: 'logShowSource', source });
         return;
     }
     const surface = connection.createPanel('log', { title: 'Log' });
-    const subscription = logChannel.onLine((line) => {
-        void surface.postMessage({ type: 'logLine', line });
+    const subscription = logChannel.onEntry((entry) => {
+        void surface.postMessage({ type: 'logEntry', entry });
     });
     surface.onMessage((message) => {
         if (message && message.type === 'logReady') {
-            void surface.postMessage({ type: 'logLines', lines: logChannel.lines, filePath: logChannel.filePath });
+            void surface.postMessage({ type: 'logEntries', entries: logChannel.entries, filePath: logChannel.filePath,
+                ...(typeof source === 'string' ? { source } : {}) });
         } else if (message && message.type === 'openLogFile') {
             void electronShell.openPath(logChannel.filePath);
+        } else if (message && message.type === 'openLogLocation' && typeof message.filePath === 'string') {
+            openEditorTab(message.filePath, Number(message.lineNumber) || 1);
         }
     });
     surface.onDispose(() => subscription.dispose());
@@ -703,6 +708,7 @@ async function start() {
         setStatus,
         setProgress,
         openEditor: openEditorTab,
+        showLog: openLogTab,
         mcp: mcpControls,
     }));
 
@@ -745,6 +751,7 @@ async function start() {
             connection: () => connection,
             window: () => mainWindow,
             logLines: () => logChannel.lines,
+            logEntries: () => logChannel.entries,
             onShellCommand,
             settings,
             panels: () => kigumiApp && kigumiApp.panels,

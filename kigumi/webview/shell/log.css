@@ -46,10 +46,74 @@ body {
     word-break: break-word;
 }
 
-.line-error {
+.log-line {
+    display: flex;
+    gap: 8px;
+}
+
+.log-line[hidden] {
+    display: none;
+}
+
+.log-time {
+    flex: none;
+    color: var(--ka-muted);
+}
+
+.log-message {
+    min-width: 0;
+}
+
+.log-debug {
+    color: var(--ka-muted);
+}
+
+.log-warn .log-message {
+    color: var(--ka-warning);
+}
+
+.log-error .log-message {
     color: var(--ka-error);
 }
 
-.line-warn {
-    color: var(--ka-warning);
+.log-location {
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.log-levels {
+    display: inline-flex;
+}
+
+.log-levels button {
+    border-radius: 0;
+    margin-left: -1px;
+}
+
+.log-levels button:first-child {
+    border-radius: 3px 0 0 3px;
+    margin-left: 0;
+}
+
+.log-levels button:last-child {
+    border-radius: 0 3px 3px 0;
+}
+
+.log-levels button.is-on {
+    background: var(--ka-hover);
+    color: var(--ka-fg);
+}
+
+.log-header select {
+    height: 24px;
+    border: 1px solid var(--ka-border);
+    border-radius: 3px;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font: inherit;
+}
+
+.log-counts {
+    color: var(--ka-muted);
+    white-space: nowrap;
 }

@@ -1,5 +1,4 @@
 import { LitElement, html } from 'lit';
-import { LogPanel } from './log-panel.js';
 import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
@@ -184,9 +183,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         // Kigumi's MCP server as the host last said it is (frame-view-session.js), or null.
         this.mcpState = null;
         this.sidebar = new ViewSidebar({ requestUpdate: () => this.requestUpdate(), store: vscode });
-        // The view's own log, where the host has none (VS Code has its Output panel).
-        this.hostHasLog = INITIAL_PAYLOAD.hostHasLog === true;
-        this.logPanel = new LogPanel(this, { t, post: (message) => vscode && vscode.postMessage(message) });
+
         this.selectionPanel = new SelectionPanel(this, {
             t,
             csgTreeView: CsgTreeView,
@@ -316,12 +313,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 content: this.kiwariPanel.render() || html`<div class="vsb-empty">${t('viewer.sidebar.noParameters')}</div>`,
             },
             { id: 'members', label: t('viewer.sidebar.tab.members'), badge: memberCount || '', content: this.memberListPanel.render() },
-            ...(this.hostHasLog ? [] : [{
-                id: 'log',
-                label: t('viewer.sidebar.tab.log'),
-                badge: this.logPanel.counts.errors || '',
-                content: this.logPanel.render(),
-            }]),
         ];
     }
 
@@ -583,13 +574,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
         const outputBtn = this.renderRoot.querySelector('#output-btn');
         if (outputBtn) {
-            // The host's log (VS Code's Output), else the view's own.
+            // The host's log, showing this view's: the app's Log tab, or VS Code's Output.
             outputBtn.addEventListener('click', () => {
-                if (this.hostHasLog) {
-                    if (vscode) vscode.postMessage({ type: 'openKigumiOutput' });
-                } else {
-                    this.showLog();
-                }
+                if (vscode) vscode.postMessage({ type: 'openKigumiOutput' });
             });
         }
 
@@ -602,7 +589,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
         this.settingsPanel.bindEvents(this.renderRoot);
 
-        if (!this.hostHasLog) this.logPanel.bindEvents(this.renderRoot);
 
         this.memberListPanel.bindEvents(this.renderRoot);
         this.memberListPanel.applyOptionVisibility();
@@ -1064,15 +1050,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         console.info('[Kigumi]', payload);
     }
 
-    appendLogLine(text, level, timestamp) {
-        if (!this.hostHasLog) this.logPanel.add({ text, level, timestamp });
-    }
 
-    /** The view's log, in front. */
-    showLog() {
-        this.sidebar.setCollapsed(false);
-        this.sidebar.show('log');
-    }
 
     // ------------------------------------------------------------------
     // Options, export choices and saved settings
@@ -1413,11 +1391,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return;
         }
 
-        if (message.type === 'logEntry') {
-            const text = typeof message.text === 'string' ? message.text : String(message.text);
-            this.appendLogLine(text, message.level, message.timestamp);
-            return;
-        }
 
         if (message.type === 'featureResult') {
             // Legacy stub — replaced by csgSelectionResult
@@ -1540,14 +1513,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             }
             return;
         }
-
-        if (message.type === 'viewerSettingsSaved') {
-            if (message.ok !== false) {
-                const pathText = typeof message.path === 'string' ? ` (${message.path})` : '';
-                this.appendLogLine(`[settings] Saved viewer settings${pathText}`);
-            }
-            return;
-        }
     }
 
     async handleCaptureScreenshotRequest(message) {
@@ -1605,7 +1570,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 .filter((label) => label.length > 0);
             const memberRowsElement = this.renderRoot.querySelector('#timber-rows');
             const memberRows = this.renderRoot.querySelectorAll('#timber-rows tr').length;
-            const logText = this.logPanel.text();
 
             vscode.postMessage({
                 type: 'capturePanelSnapshotResult',
@@ -1638,7 +1602,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                         return button ? button.disabled : null;
                     })(),
                     memberRowCount: memberRows,
-                    logTextLength: logText.length,
                 },
             });
         } catch (error) {

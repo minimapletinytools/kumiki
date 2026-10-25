@@ -289,7 +289,6 @@ class FrameViewSession {
             this.profiler.markTiming(initTiming, 'initialize.runner.error', {
                 message: startError && startError.message ? startError.message : String(startError),
             });
-            this.channel.appendLine(`[${path.basename(this.filePath)}] Runner startup failed: ${startError && startError.message ? startError.message : String(startError)}`);
             const startDetails = extractRunnerErrorDetails(startError);
             this.logBlock('error', `Runner startup failed: ${startDetails.type ? `${startDetails.type}: ` : ''}${startDetails.message}`
                 + (startDetails.traceback ? `\n${startDetails.traceback}` : ''));
@@ -299,6 +298,8 @@ class FrameViewSession {
         }
         this.profiler.markTiming(initTiming, 'initialize.runner.end');
         await pushCadqueryStatus(this);
+        // Closed while starting: nothing left to watch for.
+        if (this.isDisposed || !this.runnerSession) return;
 
         // For shared-runner pattern sessions, load the slot now
         if (this.sessionType === 'pattern' && !this.ownsRunner) {
@@ -393,7 +394,10 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'openOutputChannel' || message.type === 'openKigumiOutput') {
-                this.channel.show(true);
+                // The host's log showing this view's (the standalone app's Log tab), else the channel.
+                const host = getHost();
+                if (typeof host.showLog === 'function') host.showLog({ source: path.basename(this.filePath) });
+                else this.channel.show(true);
                 return;
             }
             if (message.type === 'openLogLocation') {
@@ -1444,13 +1448,8 @@ class FrameViewSession {
         this.pushViewerErrorState(details);
 
         if (details.traceback) {
-            this.channel.appendLine(`[${path.basename(this.filePath)}] [traceback] BEGIN`);
-            for (const tracebackLine of details.traceback.split('\n')) {
-                this.channel.appendLine(`[${path.basename(this.filePath)}] ${tracebackLine}`);
-            }
-            this.channel.appendLine(`[${path.basename(this.filePath)}] [traceback] END`);
-            // One entry in the view's log, whose frames open at their lines, and in the session
-            // log an agent's build report reads.
+            // One entry, whose frames the Log tab opens at their lines, and in the session log an
+            // agent's build report reads.
             this.logBlock('error', `${errorTypePart}${details.message}\n${details.traceback}`);
         }
         // No pop-up: the view shows the error itself, and a dialog would stop an agent at work.
@@ -1541,15 +1540,9 @@ class FrameViewSession {
         };
         this.appendSessionLog(entry);
         this.channel.appendLine(formatted);
-        if (this.panel) {
-            this.panel.postMessage({ type: 'logEntry', text: formatted, level, timestamp: entry.timestamp }).catch(() => {});
-        }
     }
 
-    /**
-     * Several lines as one entry of the view's log and session log (a traceback), at `level`.
-     * The host's log channel gets them line by line, as it always has.
-     */
+    /** Several lines (a traceback) as one entry of the log channel and the session log, at `level`. */
     logBlock(level, text) {
         const entry = {
             timestamp: new Date().toISOString(),
@@ -1560,9 +1553,7 @@ class FrameViewSession {
             sessionType: this.sessionType,
         };
         this.appendSessionLog(entry);
-        if (this.panel) {
-            this.panel.postMessage({ type: 'logEntry', text: entry.message, level: entry.level, timestamp: entry.timestamp }).catch(() => {});
-        }
+        this.channel.appendLine(entry.message, entry.level);
     }
 
     _setupRunnerMilestoneHandler() {

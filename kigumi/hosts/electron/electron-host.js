@@ -43,7 +43,7 @@ function languageOf(filePath) {
  * @param {(level: string, text: string) => void} options.setStatus
  * @param {(title: string|null) => void} options.setProgress
  */
-function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress, openEditor = null, mcp = null }) {
+function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress, openEditor = null, showLog = null, mcp = null }) {
     function openExternalEditor(filePath, line = 1) {
         const template = settings.get('app.editorCommand', '');
         if (template) {
@@ -137,6 +137,9 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
 
         // The explorer lists the workspace's files too (sidebar-model.js); VS Code has its own.
         showsFileBrowser: true,
+
+        // The Log tab, all of it or one view's: what a view's "view log" opens.
+        ...(showLog ? { showLog } : {}),
 
         // Kigumi's MCP server, which the views' options show and copy the setup of.
         mcp,

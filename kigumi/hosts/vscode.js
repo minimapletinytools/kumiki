@@ -65,9 +65,6 @@ function registerSidebarView(context, viewId, resourceRoot, onSurface) {
 
 function createVscodeHost() {
     return {
-        // Kigumi's log is VS Code's Output panel, so views show no Log tab of their own.
-        hasOutputPanel: true,
-
         get locale() {
             return vscode.env && vscode.env.language;
         },

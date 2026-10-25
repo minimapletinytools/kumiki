@@ -38,7 +38,11 @@ module.exports = async function smoke(app) {
     }
     scenario = 'log';
     await ctx.reset().catch(() => null);
-    const errors = app.logLines().filter((line) => /traceback|uncaught|\[error\]/i.test(line));
+    // Leaving out the frame the log scenario breaks on purpose.
+    const errors = app.logEntries()
+        .filter((entry) => !/_log_scenario_broken_frame|brace is not defined/.test(`${entry.source} ${entry.text}`))
+        .filter((entry) => entry.level === 'error' || /uncaught/i.test(entry.text))
+        .map((entry) => entry.text);
     check('no errors in the log', errors.length === 0, errors.slice(0, 3).join(' / '));
 
     if (ctx.ARTIFACTS) {

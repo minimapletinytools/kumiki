@@ -11,7 +11,7 @@ module.exports = {
         onShellCommand('openLog');
         const logLinesShown = await waitFor(() => inShell(`(() => {
             const frame = document.querySelector('#slot-center iframe:not([hidden])');
-            return frame && frame.contentDocument ? frame.contentDocument.querySelectorAll('#lines div').length : 0;
+            return frame && frame.contentDocument ? frame.contentDocument.querySelectorAll('#entries .log-line').length : 0;
         })()`));
         check('the Log tab opens and shows the log', connection().activePanel && connection().activePanel.type === 'log' && logLinesShown > 0, `${logLinesShown} lines`);
         await capture('06-log');
