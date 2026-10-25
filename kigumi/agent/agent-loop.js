@@ -302,11 +302,11 @@ function toToolSet(tools, { images, askPermission }) {
 }
 
 /** Why a turn ended other than by the model finishing, for the panel ({key, params, text}); or null. */
-function earlyEnd(steps) {
+function earlyEnd(steps, maxSteps = MAX_STEPS) {
     const last = steps[steps.length - 1];
     if (!last) return null;
-    if (last.finishReason === 'tool-calls' && steps.length >= MAX_STEPS) {
-        return { key: 'agent.notice.maxSteps', params: { steps: MAX_STEPS }, text: `Stopped after ${MAX_STEPS} steps. Say "continue" to carry on.` };
+    if (last.finishReason === 'tool-calls' && steps.length >= maxSteps) {
+        return { key: 'agent.notice.maxSteps', params: { steps: maxSteps }, text: `Stopped after ${maxSteps} steps. Say "continue" to carry on.` };
     }
     if (last.finishReason === 'length') {
         return { key: 'agent.notice.outputLimit', text: 'Stopped at the output limit for one step. Say "continue" to carry on, or raise the limit in settings.' };
@@ -325,6 +325,7 @@ function earlyEnd(steps) {
  * @param {boolean} [options.cacheMarks] whether to mark where its prompt cache should hold (models.js)
  * @param {number} [options.contextWindow] the model's, for the panel's context meter
  * @param {number} [options.maxOutputTokens] the most one step may write
+ * @param {number} [options.maxSteps]    the most steps in the turn
  * @param {object[]} options.tools       Kigumi tools
  * @param {object} [options.files]       the project's files (project-files.js), for a summary to carry changed ones
  * @param {string} options.system
@@ -336,7 +337,7 @@ function earlyEnd(steps) {
  * @returns {Promise<{ history: object[], costUsd?: number }>} the conversation after the turn. A turn
  *     that fails throws, with the conversation as far as it got as the error's `history`.
  */
-async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS, tools, files = null,
+async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS, maxSteps = MAX_STEPS, tools, files = null,
     system, history, prompt, abortSignal, askPermission, onEvent }) {
     const compacted = await summariseIfLarge(model, system, history, abortSignal, files);
     if (compacted.summarised) {
@@ -350,7 +351,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
         system,
         messages,
         tools: toToolSet(tools, { images, askPermission }),
-        stopWhen: stepCountIs(MAX_STEPS),
+        stopWhen: stepCountIs(maxSteps),
         maxOutputTokens,
         abortSignal,
         // A request refused or failed (busy, rate limited, an upstream error) is never charged, so
@@ -391,7 +392,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
     if (failure) {
         throw Object.assign(failure, { history: sofar() });
     }
-    const notice = earlyEnd(steps);
+    const notice = earlyEnd(steps, maxSteps);
     if (notice) onEvent({ type: 'agent:notice', ...notice });
     const costs = steps.map((step) => step.providerMetadata && step.providerMetadata.openrouter
         && step.providerMetadata.openrouter.usage && step.providerMetadata.openrouter.usage.cost)

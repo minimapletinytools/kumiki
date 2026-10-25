@@ -5,9 +5,10 @@
  * Scored on the task's checks, with steps, cost and time. Costs real money, on the OpenRouter key in
  * KIGUMI_EVAL_OPENROUTER_KEY.
  *
- *   node test/evals/run-evals.js [--models a,b] [--tasks a,b] [--repeat n] [--out results.json] [--keep]
+ *   node test/evals/run-evals.js [--models a,b] [--tasks a,b] [--repeat n] [--max-steps n] [--out results.json] [--keep]
  *
- * --keep leaves each run's project folder, to see what the agent wrote.
+ * --max-steps is the most steps in a turn (the app's 40 by default). --keep leaves each run's project
+ * folder, to see what the agent wrote.
  */
 
 const fs = require('fs');
@@ -15,7 +16,7 @@ const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
 
-const { runTurn, languageModelFor } = require('../../agent/agent-loop');
+const { runTurn, languageModelFor, MAX_STEPS } = require('../../agent/agent-loop');
 const { MODELS, findModel, routeModel } = require('../../agent/models');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { createProjectFiles } = require('../../agent/project-files');
@@ -88,7 +89,7 @@ async function runOne(task, modelId, key) {
     try {
         const result = await runTurn({
             model: await languageModelFor(routeModel(model, { openrouterKey: key })), images: model.images,
-            cacheMarks: Boolean(model.cacheMarks), tools: evalTools(files), files, system: loadSystemPrompt()(kumikiSource),
+            cacheMarks: Boolean(model.cacheMarks), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: evalTools(files), files, system: loadSystemPrompt()(kumikiSource),
             history: [], prompt: task.prompt, askPermission: async () => true,
             onEvent: (event) => {
                 if (event.type === 'agent:tool') tools.push(event.name);
