@@ -254,6 +254,13 @@ Some alignment assumptions are joint orientation specific:
 
 - Boards are *orthogonal* if the 2 faces to be joined are parallel to each other. 
 
+### Butt joint arrangements
+
+A `ButtJointTimberArrangement` names the timber that butts (`butt_timber`, and which end of it, `butt_timber_end`) into the one that receives it (`receiving_timber`). The two timbers' centerlines lie in one plane, the *joint alignment plane*.
+
+- `front_face_on_butt_timber` is a long face of the butt timber parallel to that plane: the face you see when looking straight at the joint, and the one a peg goes through. For a post standing on a sill that runs along Y, those are the post's faces that look along X (`RIGHT` or `LEFT` for a post made with `width_direction=TimberFace.RIGHT`). Pegged joints need it; the error for a wrong one names the faces that would work.
+- `top_face_on_butt_timber` must not be parallel to that plane.
+
 ## Cuttings
 
 Joints contain a dictionary of `CutTimbers` which are a `Timber` with a `Cutting` removing away part of the timber. Cuttings contain a `negative_csg: Optional[CutCSG]` representing what needs to be removed from the timber. In addition they contain `maybe_top/bottom_end_cut_distance_from_bottom` which are 90 degree cross cuts at the top/bottom end of the timber which represent. These end cuts should always remove maximal material (i.e. as "close" to `negative_csg` as possible). They may sometimes be required to complete the cut (i.e. `negative_csg` by itself may not be enough). These end cuts are used to generate minimal axis aligned bounding boxes for `CutTimbers` and also used to "rough cut" length for material bills.
