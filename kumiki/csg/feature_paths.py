@@ -6,7 +6,7 @@ TODO rename this file to "FeatureHandle"
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Sequence, Tuple, Union
 
-from .cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, DerivedPointFeature, Difference, F_co,
+from .cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, DerivedPointFeature, Difference, F_co, Intersection,
                      OwnedFeatureHit, SolidUnion, csg_children, shared_ancestor)
 from ..identity import (DerivedFeaturePath, FeaturePath, FeatureRef, ResolvedJointPath,
                        ResolvedTimberPath, SingleFeaturePath)
@@ -56,7 +56,7 @@ def label_name(labeled: Union[CutCSG, 'Cutting']) -> Optional[str]:
 def _labelled_children(node: CutCSG) -> List[CutCSG]:
     """Return the labelled nodes a path step under `node` can name, in document order.
 
-    Looks through unlabelled unions and differences.
+    Looks through unlabelled unions, differences and intersections.
     """
     found: List[CutCSG] = []
 
@@ -65,7 +65,7 @@ def _labelled_children(node: CutCSG) -> List[CutCSG]:
         for child in children:
             if label_name(child) is not None:
                 found.append(child)
-            elif isinstance(child, (SolidUnion, Difference)):
+            elif isinstance(child, (SolidUnion, Difference, Intersection)):
                 gather(child)
 
     gather(node)

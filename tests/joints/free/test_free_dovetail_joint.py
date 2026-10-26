@@ -150,6 +150,17 @@ class TestFreeDovetailJoint:
             with pytest.raises(AssertionError, match="positive"):
                 FreeDovetailShape(origin=origin, width=mm(40), depth=mm(30), dovetail_angle=degrees(angle))
 
+    def test_the_shoulder_can_be_found_again_by_its_path(self):
+        from kumiki.csg.feature_paths import FeatureHandle, resolve_feature_path, to_feature_path
+        frame = Frame.from_joints([cut_free_dovetail_joint(_post(), _beam(), _dovetail())])
+        post = next(cut for cut in frame.cut_timbers if cut.timber.ticket.path == "post")
+        shoulder = next(required.handle for required in planning_features(post)
+                        if required.handle.feature.name == "shoulder")
+
+        found = resolve_feature_path(to_feature_path(shoulder, frame), frame)
+
+        assert found == FeatureHandle(timber=shoulder.timber, hit=shoulder.hit)
+
     def test_it_builds_into_a_frame(self):
         frame = Frame.from_joints([cut_free_dovetail_joint(_post(), _beam(), _dovetail())])
 
