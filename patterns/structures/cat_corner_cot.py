@@ -97,6 +97,7 @@ from kumiki.csg.cutcsg import Datum, MidplaneFeature, OwnedFeatureHit, measured_
 from kumiki.csg.feature_paths import FeatureHandle, hit_identity
 from kumiki.csg.required_features import planning_features, required_features
 from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Policy, auto_dimension, derived_edge_anchors,
+                                               measurable_targets,
                                                coincidence_assumptions, is_reference, sheet_candidates, faces_to_edges,
                                                without_edges_on_faces)
 from kumiki.drawings.drawing import ViewAxes
@@ -2096,12 +2097,6 @@ def _rows(handles: Sequence[FeatureHandle], solve: DrawingSolve) -> List[Row]:
     return [row for handle in handles for row in solve.dof_rows(handle)]
 
 
-def _measurable(targets: Sequence[FeatureHandle], visible: Dict[str, List[FeatureHandle]]) -> List[FeatureHandle]:
-    """The targets some view can see, since only those can be dimensioned in this drawing."""
-    seen = {_feature_key(handle) for handles in visible.values() for handle in handles}
-    return [handle for handle in targets if _feature_key(handle) in seen]
-
-
 def _plan_timbers(cut_timbers: Sequence[CutTimber]) -> List[CutTimber]:
     """The frame's members, which the plan dimensions: everything but the boards.
 
@@ -2145,11 +2140,12 @@ def _solve_plan(
         cut, [handle for handle in directed if handle.timber is cut.timber], views)]
     # Edges lying on a face seen edge-on are measured through that face, and moved onto after solving.
     visible = without_edges_on_faces(visible_by_view(anchors, views, cut_timbers), views)
+    measurable, visible = measurable_targets(targets, visible, views, cut_timbers, directed, carriers)
     assumptions += coincidence_assumptions(visible, views, solve)
 
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
     candidates = sheet_candidates(visible, views, solve)
-    result = auto_dimension(candidates, _measurable(targets, visible), known_rows, solve, policy)
+    result = auto_dimension(candidates, measurable, known_rows, solve, policy)
     return faces_to_edges(result, cut_timbers, directed, views, solve.carriers)
 
 
@@ -2170,11 +2166,12 @@ def _solve_member(cut: CutTimber, policy: Policy = DEFAULT_POLICY) -> AutoDimens
     anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
     anchors += derived_edge_anchors(cut, targets, views)
     visible = without_edges_on_faces(visible_by_view(anchors, views, [cut]), views)
+    measurable, visible = measurable_targets(targets, visible, views, [cut], targets, carriers)
     assumptions += coincidence_assumptions(visible, views, solve)
 
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
     candidates = sheet_candidates(visible, views, solve)
-    result = auto_dimension(candidates, _measurable(targets, visible), known_rows, solve, policy)
+    result = auto_dimension(candidates, measurable, known_rows, solve, policy)
     return faces_to_edges(result, [cut], targets, views, solve.carriers)
 
 

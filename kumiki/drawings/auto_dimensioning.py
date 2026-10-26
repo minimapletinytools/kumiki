@@ -15,8 +15,8 @@ import numpy as np
 from ..csg.assumptions import Assumption
 from ..csg.carriers import CarrierMap, CarrierPlane, CarrierRef, Row
 from ..csg.dof_solver import rank_svd, remaining, rows_matrix
-from ..csg.cutcsg import (CutCSG, Datum, DerivedEdgeFeature, EdgeFeature, FaceFeature, HasFeatures, OwnedFeatureHit,
-                         csg_children, derive_edge_hits, shared_ancestor)
+from ..csg.cutcsg import (CutCSG, Datum, DerivedEdgeFeature, EdgeFeature, FaceFeature, HasFeatures, MidplaneFeature,
+                         OwnedFeatureHit, csg_children, derive_edge_hits, shared_ancestor)
 from ..csg.feature_extent import FeatureExtent, extents_of
 from ..csg.feature_solving import Solve
 from ..csg.feature_paths import FeatureHandle, hit_identity
@@ -27,6 +27,7 @@ from ..rule import as_ndarray, create_v3, unit_ndarray
 from .measure import Measure, MeasurementKind, MeasurementOperation, ViewAxes
 from .measure_solving import DrawingSolve
 from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, SheetShape, sheet_gap, sheet_shape
+from .visibility import visible_by_view
 
 if TYPE_CHECKING:
     from ..timber import CutTimber
@@ -283,6 +284,15 @@ class UnsolvedFeaturesWarning(UserWarning):
     """auto_dimension left features unsolved: no candidate fixes them."""
 
 
+class UnmeasurableFeaturesWarning(UserWarning):
+    """No view can see a feature, nor any edge on it, so it cannot be dimensioned."""
+
+
+class UnderivedEdgesWarning(UserWarning):
+    """Faces meet in an edge a drawing could use, but it is neither declared nor derived (their feature
+    groups don't pair), so it is left out."""
+
+
 @dataclass(frozen=True)
 class AutoDimensioning:
     picks: List[Pick]
@@ -516,6 +526,159 @@ def _on_an_edge_on_face(handle: FeatureHandle, look: np.ndarray) -> bool:
                for carrier in carriers)
 
 
+def measurable_targets(
+    targets: Sequence[FeatureHandle], visible: Mapping[str, Sequence[FeatureHandle]],
+    views: Mapping[str, ViewAxes], cut_timbers: Sequence['CutTimber'], faces: Sequence[FeatureHandle],
+    carriers: CarrierMap,
+) -> Tuple[List[FeatureHandle], Dict[str, List[FeatureHandle]]]:
+    """Return the targets that can be dimensioned, and `visible` (per view) plus the edges that let them be.
+
+    A target can be if some view sees it. A face no view draws as a line (a dovetail's flank, at a
+    compound angle) still can if a view draws one of its edges, where it meets another of `faces`, as
+    a line; those edges join `visible`, and so, to place them from, do the timber's corners that view
+    sees end-on (where two of its own faces meet). Only such faces add edges: one a view draws as a
+    line but cannot see (hidden behind another timber) stays dropped. Only declared and derived edges
+    are used. Warns of the compound-angle faces no edge reaches, and of the edges on them left out
+    because they are neither.
+    """
+    seen = {_key(handle) for handles in visible.values() for handle in handles}
+    measurable = [handle for handle in targets if _key(handle) in seen]
+    looks = [unit_ndarray(as_ndarray(axes.look)) for axes in views.values()]
+    dropped = [handle for handle in targets if _key(handle) not in seen
+               and isinstance(handle.feature, FaceFeature) and not isinstance(handle.feature, MidplaneFeature)
+               and all(_on_sheet(handle, look) is None for look in looks)]
+    out = {view: list(handles) for view, handles in visible.items()}
+    roots = {id(cut.timber): cut.render_timber_with_cuts_csg_local() for cut in cut_timbers}
+    # The timbers, by view, a rescued line was drawn on.
+    shown_in: Dict[Tuple[int, str], 'PerfectTimberWithin'] = {}
+
+    underived: Dict[Tuple, FeatureHandle] = {}
+
+    def show(edges: Sequence[FeatureHandle]) -> bool:
+        """Add the edges some view draws as a visible line to `out`; return whether any were."""
+        any_shown = False
+        for view, axes in views.items():
+            look = unit_ndarray(as_ndarray(axes.look))
+            lines = [edge for edge in edges if isinstance(_on_sheet(edge, look), SheetLine)
+                     and _present(edge, roots[id(edge.timber)])]
+            shown = visible_by_view(lines, {view: axes}, cut_timbers)[view]
+            shown += [edge for edge in lines if edge not in shown and _clear_in_front(edge, look, cut_timbers, roots)]
+            shown = without_edges_on_faces({view: shown}, {view: axes})[view]
+            shown_in.update(((id(edge.timber), view), edge.timber) for edge in shown)
+            out.setdefault(view, []).extend(edge for edge in shown if _key(edge) not in seen)
+            seen.update(_key(edge) for edge in shown)
+            any_shown = any_shown or bool(shown)
+        return any_shown
+
+    lost = []
+    for face in dropped:
+        edges, missing = _edges_on(face, faces, roots[id(face.timber)], carriers)
+        underived.update((_key(edge), edge) for edge in missing)
+        (measurable if show(edges) else lost).append(face)
+    for (_, view), timber in list(shown_in.items()):
+        look = unit_ndarray(as_ndarray(views[view].look))
+        # The timber's own faces square to the sheet: those meet in its corners seen end-on.
+        mine = [face for face in faces if face.timber is timber and isinstance(face.feature, FaceFeature)
+                and _of_the_timber(face.feature) and _normal_across(face, look) < 1e-9]
+        corners = [edge for i, one in enumerate(mine) for other in mine[i + 1:]
+                   for edge in [_pipeline_edge(one, other, roots[id(timber)], carriers)[0]]
+                   if edge is not None and isinstance(_on_sheet(edge, look), SheetPoint)
+                   and _present(edge, roots[id(timber)])]
+        shown = visible_by_view(corners, {view: views[view]}, cut_timbers)[view]
+        out[view].extend(edge for edge in shown if _key(edge) not in seen)
+        seen.update(_key(edge) for edge in shown)
+    underived_used = [edge for edge in underived.values()
+                      if any(isinstance(_on_sheet(edge, look), SheetLine) for look in looks)
+                      and _present(edge, roots[id(edge.timber)])]
+    if underived_used:
+        warnings.warn(f"{len(underived_used)} edge(s) left out, neither declared nor derived: "
+                      + ", ".join(f"{edge.timber.ticket.path}:{edge.feature.name}" for edge in underived_used),
+                      UnderivedEdgesWarning, stacklevel=2)
+    if lost:
+        warnings.warn(f"{len(lost)} feature(s) no view can dimension: "
+                      + ", ".join(f"{handle.timber.ticket.path}:{handle.feature.name}" for handle in lost),
+                      UnmeasurableFeaturesWarning, stacklevel=2)
+    return measurable, out
+
+
+def _edges_on(face: FeatureHandle, faces: Sequence[FeatureHandle], root: CutCSG,
+              carriers: CarrierMap) -> Tuple[List[FeatureHandle], List[FeatureHandle]]:
+    """Return the edges where `face` meets another of `faces`, one per other plane (_pipeline_edge), and
+    those it meets in that are neither declared nor derived. Whether each is on the cut timber is left
+    to the caller."""
+    own = _solving_carriers(face, carriers)
+    edges: Dict[FrozenSet, FeatureHandle] = {}
+    missing: List[FeatureHandle] = []
+    for other in faces:
+        if other.timber is not face.timber or not isinstance(other.feature, FaceFeature) or other is face:
+            continue
+        theirs = _solving_carriers(other, carriers)
+        if not theirs or theirs == own or theirs in edges:
+            continue
+        edge, lacking = _pipeline_edge(face, other, root, carriers)
+        if edge is not None:
+            edges[theirs] = edge
+        elif lacking is not None:
+            missing.append(lacking)
+    return list(edges.values()), missing
+
+
+def _pipeline_edge(one: FeatureHandle, other: FeatureHandle, root: CutCSG,
+                   carriers: CarrierMap) -> Tuple[Optional[FeatureHandle], Optional[FeatureHandle]]:
+    """Return the edge where two faces meet if it is declared or derived (their groups pair), else None;
+    and, when it is neither, the edge they would make whatever their groups (to warn of), else None."""
+    faces = {_canonical(part, carriers) for face in (one, other)
+             for part in (face.feature.solve_recipe(face.owner) or ()) if isinstance(part, CarrierRef)}
+    for owner in {id(face.owner): face.owner for face in (one, other)}.values():
+        for feature, meets in _declared_meets(owner):
+            if {_canonical(ref, carriers) for ref in meets} == faces:
+                return FeatureHandle(timber=one.timber, hit=OwnedFeatureHit(feature=feature, owner=owner)), None
+    owner = shared_ancestor(root, one.owner, other.owner)
+    if owner is None:
+        return None, None
+    derived = DerivedEdgeFeature.derive(one.hit, other.hit)
+    if derived is not None:
+        return FeatureHandle(timber=one.timber, hit=OwnedFeatureHit(feature=derived, owner=owner)), None
+    anyway = DerivedEdgeFeature.derive(one.hit, other.hit, any_groups=True)
+    return None, None if anyway is None else FeatureHandle(
+        timber=one.timber, hit=OwnedFeatureHit(feature=anyway, owner=owner))
+
+
+def _normal_across(face: FeatureHandle, look: np.ndarray) -> float:
+    """Return how much of `face`'s normal runs along `look` (1 for a face seen square on); 1 if not planar."""
+    plane = face.feature.locate_simple_unbounded(face.owner)
+    if not isinstance(plane, Plane):
+        return 1.0
+    normal = unit_ndarray(as_ndarray(face.timber.transform.local_to_global_direction(plane.normal)))
+    return abs(float(normal @ look))
+
+
+def _present(edge: FeatureHandle, root: CutCSG) -> bool:
+    """Return whether some of `edge` is on its cut timber."""
+    extent = extents_of(root, edge.timber).of(edge.feature, edge.owner)
+    return extent is not None and not extent.is_empty
+
+
+def _clear_in_front(edge: FeatureHandle, look: np.ndarray, cut_timbers: Sequence['CutTimber'],
+                    roots: Mapping[int, CutCSG]) -> bool:
+    """Return whether nothing of `cut_timbers` lies in front of the middle of `edge`, looking along `look`.
+
+    For a line beside a face seen nearly edge-on, which visible_by_view reads as hidden behind it.
+    """
+    extent = extents_of(roots[id(edge.timber)], edge.timber).of(edge.feature, edge.owner)
+    outline = list(extent.outline()) if extent is not None else []
+    if not outline:
+        return False
+    start, stop = (as_ndarray(edge.timber.transform.local_to_global(create_v3(*point))) for point in outline[0])
+    middle = (start + stop) / 2
+    for distance in (1e-3, 1e-2, 0.05, 0.2, 1.0, 4.0):
+        point = create_v3(*(middle - look * distance))
+        if any(roots[id(cut.timber)].contains_point(cut.timber.transform.global_to_local(point))
+               for cut in cut_timbers):
+            return False
+    return True
+
+
 def without_edges_on_faces(visible: Mapping[str, Sequence[FeatureHandle]],
                            views: Mapping[str, ViewAxes]) -> Dict[str, List[FeatureHandle]]:
     """Return `visible` (per view) less the edges lying on a face seen edge-on there."""
@@ -650,10 +813,9 @@ def _edge_between(one: FeatureHandle, other: FeatureHandle, root: CutCSG,
     faces = {_canonical(part, carriers) for face in (one, other)
              for part in (face.feature.solve_recipe(face.owner) or ()) if isinstance(part, CarrierRef)}
     for owner in {id(face.owner): face.owner for face in (one, other)}.values():
-        for feature in _declared_edges(owner):
-            edge = FeatureHandle(timber=one.timber, hit=OwnedFeatureHit(feature=feature, owner=owner))
-            if {_canonical(ref, carriers) for ref in _meets(edge)} == faces:
-                return edge
+        for feature, meets in _declared_meets(owner):
+            if {_canonical(ref, carriers) for ref in meets} == faces:
+                return FeatureHandle(timber=one.timber, hit=OwnedFeatureHit(feature=feature, owner=owner))
     derived = DerivedEdgeFeature.derive(one.hit, other.hit, any_groups=True)
     owner = None if derived is None else shared_ancestor(root, one.owner, other.owner)
     return None if derived is None or owner is None else FeatureHandle(
@@ -663,6 +825,14 @@ def _edge_between(one: FeatureHandle, other: FeatureHandle, root: CutCSG,
 @memo_by_identity
 def _declared_edges(owner: CutCSG) -> List[EdgeFeature]:
     return [feature for feature in owner.get_declared_features() if isinstance(feature, EdgeFeature)]
+
+
+@memo_by_identity
+def _declared_meets(owner: CutCSG) -> List[Tuple[EdgeFeature, List[CarrierRef]]]:
+    """Return each declared edge of `owner` with the carriers it is the meet of."""
+    return [(feature, [part for part in (feature.solve_recipe(owner) or ()) if isinstance(part, CarrierRef)]
+             if len(feature.solve_recipe(owner) or ()) == 2 else [])
+            for feature in _declared_edges(owner)]
 
 
 def _canonical(ref: 'CarrierRef', carriers: CarrierMap) -> 'CarrierRef':

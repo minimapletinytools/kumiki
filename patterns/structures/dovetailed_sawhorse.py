@@ -4,9 +4,14 @@ Each leg is let into an arris of the beam by its whole thickness, as a sliding d
 point up, so the load wedges it tighter. Seen along the beam, a leg's outer face runs through the
 beam's top arris; unless its side splay is given, it leans just so its inner face runs through the
 bottom arris. The floor is at z=0.
+
+Drawings are generated: a plan, and a shop drawing for the beam and one for the four legs. The legs'
+also looks straight down on a leg's level top, where the dovetail is marked out.
 """
 
 from kumiki import *
+from kumiki.drawings.auto_drawings import with_auto_drawings
+from kumiki.drawings.measure import ViewAxes
 
 
 SAWHORSE = kiwari(
@@ -22,7 +27,14 @@ SAWHORSE = kiwari(
 
 DOVETAIL_TAPER = degrees(10)      # narrowing toward the top: point end up
 DOVETAIL_FLARE = atan(scalar(1) / scalar(6))
-TRIM_ALLOWANCE = inches(1)        # each leg is cut this much long at both ends, for the level trims
+TRIM_ALLOWANCE = inches(1)
+BEAM_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE   # the beam's top meets its +y side
+LEG_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE    # a leg's outer face meets its +width edge        # each leg is cut this much long at both ends, for the level trims
+
+
+def _leg_end(name: str) -> FeatureOverride:
+    """Return the override naming a level trim's face, in the PERFECT group."""
+    return FeatureOverride(HALF_SPACE_PLANE, name, FeatureProperties(group=FeatureGroup.PERFECT))
 
 
 def _leg(k: Kiwari, beam: Timber, end: int, side: int):
@@ -52,7 +64,8 @@ def _leg(k: Kiwari, beam: Timber, end: int, side: int):
     leg = create_timber(bottom_position=top - up * (leg_length + TRIM_ALLOWANCE),
                         length=leg_length + 2 * TRIM_ALLOWANCE,
                         size=leg_size, length_direction=up, width_direction=width,
-                        ticket=f"leg {'+x' if end > 0 else '-x'} {'+y' if side > 0 else '-y'}")
+                        ticket=TimberTicket(path=f"leg {'+x' if end > 0 else '-x'} {'+y' if side > 0 else '-y'}",
+                                            reference_features=(LEG_REFERENCE,)))
 
     # The dovetail: its width square to the beam, its neck on the leg's outer face with its top edge
     # on the top arris, its wide face on the leg's inner face, down the whole leg.
@@ -76,10 +89,13 @@ def _leg(k: Kiwari, beam: Timber, end: int, side: int):
     )
     joint = cut_free_dovetail_joint(leg, beam, dovetail)
 
+    # The level trims are the leg's ends: PERFECT, so they meet the dovetail in edges to dimension.
     level_top = adopt_csg(None, leg.transform, HalfSpace(
-        normal=create_v3(0, 0, 1), offset=height, label=CutCSGLabel("level_top")))
+        normal=create_v3(0, 0, 1), offset=height, label=CutCSGLabel("level_top"),
+        feature_overrides=[_leg_end("level_top")]))
     level_bottom = adopt_csg(None, leg.transform, HalfSpace(
-        normal=create_v3(0, 0, -1), offset=scalar(0), label=CutCSGLabel("level_bottom")))
+        normal=create_v3(0, 0, -1), offset=scalar(0), label=CutCSGLabel("level_bottom"),
+        feature_overrides=[_leg_end("level_bottom")]))
     cut_leg = CutTimber(leg, cuts=[joint.cuttings["dovetail_timber"],
                                    Cutting(timber=leg, negative_csg=level_top, label=CutCSGLabel("level_top")),
                                    Cutting(timber=leg, negative_csg=level_bottom, label=CutCSGLabel("level_bottom"))],
@@ -93,7 +109,8 @@ def dovetailed_sawhorse(k: Optional[Kiwari] = None) -> Frame:
     beam_size, length = k.v2("beam_size"), k.length("sawhorse_length")
     beam = create_timber(bottom_position=create_v3(-length / 2, 0, k.length("sawhorse_height") - beam_size[1] / 2),
                          length=length, size=beam_size,
-                         length_direction=create_v3(1, 0, 0), width_direction=create_v3(0, 1, 0), ticket="beam")
+                         length_direction=create_v3(1, 0, 0), width_direction=create_v3(0, 1, 0),
+                         ticket=TimberTicket(path="beam", reference_features=(BEAM_REFERENCE,)))
     legs, joints = [], []
     for end in (1, -1):
         for side in (1, -1):
@@ -103,5 +120,13 @@ def dovetailed_sawhorse(k: Optional[Kiwari] = None) -> Frame:
     # Built by hand rather than from the joints, for the legs' level trims; the joints ride along
     # so Kigumi can list them.
     beam_cuts = [cutting for joint in joints for cutting in joint.cuttings.values() if cutting.timber is beam]
-    return Frame(cut_timbers=[CutTimber(beam, cuts=beam_cuts, joints=joints), *legs],
-                 source_joints=joints, name="Dovetailed sawhorse", kiwari=k)
+    sawhorse = Frame(cut_timbers=[CutTimber(beam, cuts=beam_cuts, joints=joints), *legs],
+                     source_joints=joints, name="Dovetailed sawhorse", kiwari=k)
+    return with_auto_drawings(sawhorse, fixed_path="beam", extra_views=_leg_top_view)
+
+
+def _leg_top_view(cut: CutTimber) -> Dict[str, ViewAxes]:
+    """Return a leg's view straight down on its level top, square to the beam's top, the beam across."""
+    if not cut.timber.ticket.path.startswith("leg"):
+        return {}
+    return {"Leg top": ViewAxes(look=create_v3(0, 0, -1), right=create_v3(1, 0, 0), up=create_v3(0, 1, 0))}
