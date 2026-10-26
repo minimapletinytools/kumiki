@@ -163,9 +163,14 @@ class Viewport:
     #: Which is in front where two floating viewports overlap. Higher is nearer
     #: the reader.
     z: int = 0
+    #: A leaf's camera, in world space. None lets the viewer choose one from the label
+    #: ("Front", "Top", "Preview", ...).
+    camera: Optional[ViewAxes] = None
 
     def __post_init__(self):
         object.__setattr__(self, 'measurements', tuple(self.measurements))
+        if self.camera is not None and self.subdivision is not None:
+            raise ValueError("Only a leaf viewport has a camera; this one is subdivided")
         if self.rect is not None:
             rect = tuple(float(value) for value in self.rect)
             if len(rect) != 4:

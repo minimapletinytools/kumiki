@@ -1729,6 +1729,8 @@ def _long_face_viewports(entry: TimberEntry, page: PageWire,
 
     viewports: List[ViewportWire] = []
     for view_id, axis_name, sign in _LONG_FACE_VIEWS:
+        if view_id not in placed_by_role:
+            continue
         normal = [component * sign for component in axes[axis_name]]
         frame = camera_looking_at_face(normal, along)
         placed = placed_by_role[view_id]
@@ -1755,6 +1757,8 @@ def _world_elevation_viewports(
     centre, half_size = world_bounds([entry["cutTimber"] for entry in entries])
     viewports: List[ViewportWire] = []
     for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
+        if view_id not in placed_by_role:
+            continue
         placed = placed_by_role[view_id]
         rect = list(placed.rect)
         viewports.append(_viewport_spec(
@@ -1770,6 +1774,45 @@ def _world_elevation_viewports(
             },
         ))
     return viewports
+
+
+def _placed_by_label(
+    layout: Sequence['Viewport'], page: PageWire,
+) -> Tuple[Dict[str, 'PlacedViewport'], List['PlacedViewport']]:
+    """Return `layout`'s leaves on `page`: those without a camera keyed by lowercased label, and those with one."""
+    from kumiki.drawings.drawing import Page
+    from kumiki.drawings.layout import resolve_viewports
+
+    by_label: Dict[str, 'PlacedViewport'] = {}
+    custom: List['PlacedViewport'] = []
+    for placed in resolve_viewports(layout, Page(page["width"], page["height"])):
+        if placed.viewport.camera is not None:
+            custom.append(placed)
+        elif placed.label:
+            by_label[placed.label.lower()] = placed
+    return by_label, custom
+
+
+def _custom_camera_viewport(
+    placed: 'PlacedViewport', centre: List[float], half_size: List[float], page: PageWire,
+) -> ViewportWire:
+    """Return a locked orthographic viewport looking along its own camera at what is drawn."""
+    from kumiki.drawings.kigumi_drawing_view_helpers import view_extent
+
+    camera = placed.viewport.camera
+    right, up, look = (_normalize(_vector3_to_floats(axis)) for axis in (camera.right, camera.up, camera.look))
+    return _viewport_spec(
+        placed,
+        locked=True,
+        projection="orthographic",
+        camera={
+            "right": right,
+            "up": up,
+            "look": look,
+            "target": centre,
+            "extent": view_extent(half_size, right, up, _viewport_aspect(list(placed.rect), page)),
+        },
+    )
 
 
 def _unique_drawing_id(base: str, taken: set) -> str:
@@ -1791,11 +1834,14 @@ def _selection_drawing_name(entries: List[TimberEntry], total: int) -> str:
     return f"{len(entries)} members"
 
 
-def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> DrawingWire:
+def create_drawing_from_selection(frame: 'Frame', member_keys: List[str],
+                                  layout: Optional[Sequence['Viewport']] = None) -> DrawingWire:
     """Return a drawing of the selected members.
 
     One timber gets a shop drawing (four long faces and a preview); several get world elevations.
-    Other timbers stay in the scene, ghosted.
+    Other timbers stay in the scene, ghosted. `layout` replaces the default viewports: a leaf with
+    a camera looks along it, and the others take the default view their label names
+    ("Front", "Top", "Preview", ...).
     """
     from kumiki.drawings.kigumi_drawing_view_helpers import orient_by_search, orient_from_box, timber_box, world_bounds, world_box
 
@@ -1808,10 +1854,13 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dra
     drawn = entries or timber_entries
     centre, half_size = world_bounds([entry["cutTimber"] for entry in drawn])
 
+    placed_custom: List['PlacedViewport'] = []
+    if layout is not None:
+        placed, placed_custom = _placed_by_label(layout, page)
     if len(entries) == 1:
         from kumiki.drawings.drawing import SHOP_DRAWING_IDS, shop_drawing_viewports
-        viewports = shop_drawing_viewports()
-        placed = _placed_by_role(viewports, SHOP_DRAWING_IDS, page)
+        if layout is None:
+            placed = _placed_by_role(shop_drawing_viewports(), SHOP_DRAWING_IDS, page)
         viewports = _long_face_viewports(entries[0], page, placed)
         # One piece: oriented from its own box rather than the world box it
         # happens to occupy, and turned about its own length, so it can be
@@ -1824,8 +1873,8 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dra
         # No selection is treated as the whole frame, so asking for a drawing
         # before selecting anything gives you something rather than nothing.
         from kumiki.drawings.drawing import ELEVATION_IDS, elevation_viewports
-        viewports = elevation_viewports()
-        placed = _placed_by_role(viewports, ELEVATION_IDS, page)
+        if layout is None:
+            placed = _placed_by_role(elevation_viewports(), ELEVATION_IDS, page)
         viewports = _world_elevation_viewports(entries or timber_entries, page, placed)
         # Several pieces have no length of their own to speak of, so the angle
         # is searched for -- and kept upright, since which way is up is part of
@@ -1834,12 +1883,14 @@ def create_drawing_from_selection(frame: 'Frame', member_keys: List[str]) -> Dra
         orient = orient_by_search
         orbit = OrbitWire(mode="free")
 
+    viewports += [_custom_camera_viewport(one, centre, half_size, page) for one in placed_custom]
     members = [entry["memberKey"] for entry in entries]
     for viewport in viewports:
         viewport["members"] = members or None
         viewport["ghostOthers"] = True
         viewport["measurements"] = []
-    viewports.append(_preview_viewport(placed["preview"], preview_box, page, orbit, orient))
+    if "preview" in placed:
+        viewports.append(_preview_viewport(placed["preview"], preview_box, page, orbit, orient))
 
     return {
         "id": SELECTION_DRAWING_ID,
@@ -2215,7 +2266,7 @@ def _member_keys_for_timbers(frame: 'Frame', timbers: List[Any]) -> List[str]:
 def _drawing_from_code(frame: 'Frame', declared: Any) -> DrawingWire:
     """Return a code Drawing as a viewer scene."""
     member_keys = _member_keys_for_timbers(frame, list(declared.timbers))
-    scene = create_drawing_from_selection(frame, member_keys)
+    scene = create_drawing_from_selection(frame, member_keys, declared.viewports)
     scene["id"] = str(declared.drawing_id)
     scene["name"] = declared.name
     scene["members"] = member_keys

@@ -394,3 +394,18 @@ class TestTheSheetDoesNotChangeTheLayout:
 
         with pytest.raises(ValueError, match="no page"):
             resolve_drawing(drawing)
+
+
+class TestAViewportsCamera:
+
+    def test_a_leaf_can_have_one(self):
+        from kumiki.drawings.measure import ViewAxes
+        from kumiki.rule import create_v3
+        camera = ViewAxes(look=create_v3(0, 0, -1), right=create_v3(1, 0, 0), up=create_v3(0, 1, 0))
+
+        assert Viewport(label="Leg top", camera=camera).camera is camera
+
+    def test_a_subdivided_one_cannot(self):
+        from kumiki.drawings.measure import ViewAxes
+        with pytest.raises(ValueError, match="leaf"):
+            Viewport(camera=ViewAxes(), subdivision=rows(Viewport(), Viewport()))
