@@ -744,7 +744,8 @@ def _closed_spans(
     """Return where a line lies on a solid, surface included, or None.
 
     A line in a cut's wall is ambiguous: an arris the cut made, or one it planed away. Computes both
-    readings and checks each disputed stretch's midpoint with is_point_on_boundary.
+    readings and checks each disputed stretch with is_point_on_boundary, at the middle of each piece
+    between where the line enters or leaves any solid of the tree.
     """
     direction = unit_vector(line.direction)
     origin = line.point
@@ -757,12 +758,33 @@ def _closed_spans(
         return None
 
     doubtful = _subtracted_spans(permissive, strict)
+    if not doubtful:
+        return permissive
+    stations = _crossing_stations(csg, line, seed, tolerance)
     gone = []
     for low, high in doubtful:
-        middle = origin + direction * scalar((low + high) / 2.0)
-        if not csg.is_point_on_boundary(middle, eps=scalar(_VERIFY_EPS)):
-            gone.append((low, high))
+        ends = [low, *sorted(station for station in stations if low < station < high), high]
+        for start, stop in zip(ends, ends[1:]):
+            middle = origin + direction * scalar((start + stop) / 2.0)
+            if not csg.is_point_on_boundary(middle, eps=scalar(_VERIFY_EPS)):
+                gone.append((start, stop))
     return _subtracted_spans(permissive, gone)
+
+
+def _crossing_stations(csg: 'CutCSG', line: Line, seed: Span, tolerance: float) -> List[float]:
+    """Return where `line` enters or leaves any solid in the tree under `csg`, as stations along it."""
+    from .cutcsg import csg_children
+
+    stations: List[float] = []
+
+    def walk(node: 'CutCSG') -> None:
+        spans = _spans_on_csg(node, line, seed, tolerance, flush_removes=False)
+        stations.extend(end for span in spans or () for end in span)
+        for child in csg_children(node):
+            walk(child)
+
+    walk(csg)
+    return stations
 
 
 def _interior_spans(

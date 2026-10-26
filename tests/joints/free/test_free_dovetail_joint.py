@@ -157,7 +157,9 @@ class TestFreeDovetailJoint:
         shoulder = next(required.handle for required in planning_features(post)
                         if required.handle.feature.name == "shoulder")
 
-        found = resolve_feature_path(to_feature_path(shoulder, frame), frame)
+        path = to_feature_path(shoulder, frame)
+        assert path is not None
+        found = resolve_feature_path(path, frame)
 
         assert found == FeatureHandle(timber=shoulder.timber, hit=shoulder.hit)
 

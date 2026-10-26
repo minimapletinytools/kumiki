@@ -109,3 +109,45 @@ def test_two_derived_features_named_alike_on_one_node_are_kept_apart():
     one, other = anchors
     assert one is not None and other is not None
     assert float(one[0]) == pytest.approx(-float(other[0])) and abs(float(one[0])) > 0.1
+
+
+@pytest.fixture(scope="module")
+def sawhorse_leg():
+    """Return a sawhorse leg whose level top contains only the dovetail tongue."""
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "patterns" / "structures" / "dovetailed_sawhorse.py"
+    spec = importlib.util.spec_from_file_location("sawhorse_for_extents", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with pytest.warns():
+        frame = module.dovetailed_sawhorse()
+    return next(cut for cut in frame.cut_timbers if cut.timber.ticket.path == "leg +x +y")
+
+
+def _top_edge_length(leg, side):
+    """Return the level top's edge length with `side`, in inches, or zero if cut away."""
+    from kumiki.csg.cutcsg import DerivedEdgeFeature, shared_ancestor
+    from kumiki.csg.feature_paths import find_feature
+    root = leg.render_timber_with_cuts_csg_local()
+    top = find_feature(leg, ["level_top", "level_top"], "level_top")
+    face = find_feature(leg, ["timber (rough, extended)"], side)
+    assert top is not None and face is not None
+    edge = DerivedEdgeFeature.derive(top.hit, face.hit, any_groups=True)
+    owner = shared_ancestor(root, top.owner, face.owner)
+    assert edge is not None and owner is not None
+    extent = extents_of(root, leg.timber).of(edge, owner)
+    assert extent is not None
+    return sum(high - low for low, high in extent.pieces) / 0.0254
+
+
+def test_an_edge_cut_away_but_for_where_it_crosses_a_cut_wall_is_not_there(sawhorse_leg):
+    # Neither side face reaches the level top.
+    assert _top_edge_length(sawhorse_leg, "rptw.left") == 0.0
+    assert _top_edge_length(sawhorse_leg, "rptw.right") == 0.0
+
+
+def test_an_edge_partly_on_a_flush_cut_wall_is_only_where_the_solid_is(sawhorse_leg):
+    # The outer face's edge on the top is the neck (4.66"), not the leg's whole width (6.64").
+    assert _top_edge_length(sawhorse_leg, "rptw.front") == pytest.approx(4.66, abs=0.01)

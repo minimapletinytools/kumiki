@@ -44,6 +44,12 @@ def _station(located: Line, point) -> float:
     return float(((point - located.point).T * located.direction)[0, 0])
 
 
+def _point_at(located: Line, station: float):
+    """Return the point at `station` along `located` (the inverse of _station)."""
+    direction = located.direction
+    return located.point + direction * (station / float((direction.T * direction)[0, 0]))
+
+
 def intersected_intervals(one: Sequence[Interval], other: Sequence[Interval]) -> List[Interval]:
     """Return the overlaps of two interval lists, dropping ones that only touch."""
     return [(max(a[0], b[0]), min(a[1], b[1])) for a in one for b in other if max(a[0], b[0]) < min(a[1], b[1])]
@@ -206,7 +212,8 @@ class FeatureExtents:
         """Return where a real edge is: where the surface creases along it, within its parent faces'
         solids (or its owner) and its declared ends. None if a solid can't be computed.
 
-        Exact first; if that leaves nothing, retried at the edge tolerance (derived) or float noise (declared).
+        Retry empty exact crops at edge tolerance (derived) or float noise (declared), keeping
+        only pieces whose midpoint lies on the solid.
         """
         root = self.root
         assert root is not None
@@ -230,6 +237,8 @@ class FeatureExtents:
         cropped = clipped(0.0)
         if cropped == []:
             cropped = clipped(float(FEATURE_EDGE_TOLERANCE) if feature.is_derived() else DECLARED_EDGE_FLOAT_NOISE)
+            if cropped:
+                cropped = [piece for piece in cropped if root.contains_point(_point_at(located, sum(piece) / 2))]
         return cropped
 
 

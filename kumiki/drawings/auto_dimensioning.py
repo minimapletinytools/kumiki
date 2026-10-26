@@ -30,7 +30,7 @@ from .sheet_shape import SQUARE_TO_VIEW, SheetLine, SheetPoint, SheetShape, shee
 from .visibility import visible_by_view
 
 if TYPE_CHECKING:
-    from ..timber import CutTimber
+    from ..timber import CutTimber, PerfectTimberWithin
 
 PERPENDICULAR = MeasurementKind.parse("projected_perpendicular_distance")
 HORIZONTAL = MeasurementKind.parse("projected_horizontal_distance")
