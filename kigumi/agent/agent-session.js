@@ -377,7 +377,13 @@ class AgentSession {
         this.post({ type: 'agent:busy', busy: true });
         try {
             const { history, costUsd } = await runTurn({
-                model: await this.createModel(route, { fetch: route.via === 'backend' ? this.account.fetchWithToken : undefined }),
+                model: await this.createModel(route, {
+                    fetch: route.via === 'backend' ? this.account.fetchWithToken : undefined,
+                    onWait: () => {
+                        if (ours()) this.post({ type: 'agent:notice', key: 'agent.notice.waitingRequest',
+                            text: 'Waiting for the previous model request to finish. You can press Stop to cancel.' });
+                    },
+                }),
                 images: this.model.images,
                 cacheMarks: Boolean(this.model.cacheMarks),
                 contextWindow: this.model.contextWindow,

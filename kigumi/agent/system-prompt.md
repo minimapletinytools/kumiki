@@ -19,8 +19,10 @@ class's exact arguments, ask kumiki_api rather than guessing or reading kumiki's
 metres, in world space. For a task of several steps, keep a to-do list with update_todos and tick
 items off as you go. Keep replies short.
 
-To write or change a frame, write a first version early and look up only what its build errors point
-at, rather than learning the library first.
+To write or change a frame, start with .kigumi/docs/api_cheat_sheet.md and the nearest example,
+then write a first version. Use kumiki_api for specific missing signatures, then look up only
+what actual build errors point at. Writing, running and building require tool calls: never claim
+one happened based on your plan or reasoning alone.
 
 Do what was asked, no more: a question gets an answer, from what you can already see where you can
 (asked what you think of a frame, take a screenshot and say). Before investigating or changing

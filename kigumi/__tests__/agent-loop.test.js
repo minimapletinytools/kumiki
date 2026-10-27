@@ -191,6 +191,33 @@ describe('the agent loop', () => {
         expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('changed the leg');
     });
 
+    test('an interrupted agent turn waits for a backend lease and finishes without replaying its edit', async () => {
+        const event = (delta, finish_reason = null) => `data: ${JSON.stringify({ id: 'gen-recovery', created: 0,
+            model: 'deepseek/deepseek-v4.1-flash', choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
+        const stream = (text) => new Response(text, { headers: { 'Content-Type': 'text/event-stream' } });
+        const replies = [
+            stream(event({ tool_calls: [{ index: 0, id: 'edit-once', type: 'function',
+                function: { name: 'change', arguments: '{"what":"the bookshelf"}' } }] }) + event({}, 'tool_calls') + 'data: [DONE]\n\n'),
+            stream(event({ reasoning: 'Checking the bookshelf' })),
+            Response.json({ error: { code: 'request_busy', message: 'Still finishing.' } }, { status: 429, headers: { 'Retry-After': '1' } }),
+            stream(event({ content: 'The bookshelf is ready.' }) + event({}, 'stop') + 'data: [DONE]\n\n'),
+        ];
+        const fetch = jest.fn(async () => replies.shift());
+        const onWait = jest.fn();
+        const model = await languageModelFor({ via: 'backend', modelId: 'deepseek/deepseek-v4.1-flash', baseURL: 'https://api.test/v1' },
+            { fetch, onWait });
+        const previousCalls = changeTool.run.mock.calls.length;
+
+        const { events, history } = await turn(model);
+
+        expect(fetch).toHaveBeenCalledTimes(4);
+        expect(onWait).toHaveBeenCalledTimes(1);
+        expect(changeTool.run.mock.calls.length - previousCalls).toBe(1);
+        expect(events).toContainEqual({ type: 'agent:text', text: 'The bookshelf is ready.' });
+        expect(events).not.toContainEqual(expect.objectContaining({ key: 'agent.notice.unexpected' }));
+        expect(JSON.stringify(history)).toContain('changed the bookshelf');
+    });
+
     test.each([undefined, 'other'])('repeated incomplete streams (%s) stop after two continuations', async (raw) => {
         const interrupted = () => [...say('1', 'Thinking'), { ...finish('other'), finishReason: { unified: 'other', raw } }];
         const model = scripted(interrupted(), interrupted(), interrupted());
@@ -292,7 +319,7 @@ describe('the agent loop', () => {
         expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('You made this same call');
     });
 
-    test('after 25 looks without writing, the model is told once to write a first version', async () => {
+    test('after six looks without writing, progress reminders repeat every six calls', async () => {
         const readTool = { name: 'read', description: 'Read.', shape: { n: z.number().optional() }, readOnly: true,
             run: async ({ n }) => [{ type: 'text', text: `line ${n}` }] };
         const looks = (from, count) => Array.from({ length: count }, (_, i) => [call(`c${from + i}`, 'read', { n: from + i }), finish('tool-calls')]);
@@ -300,9 +327,37 @@ describe('the agent loop', () => {
         await runTurn({ model, images: true, tools: [readTool], system: 'sys', history: [], prompt: 'go', askPermission: async () => true,
             onEvent: () => {} });
         const told = (i) => (JSON.stringify(model.doStreamCalls[i].prompt).match(/without changing anything/g) || []).length;
-        expect(told(24)).toBe(0);
-        expect(told(25)).toBe(1);
-        expect(told(30)).toBe(1);
+        expect(told(5)).toBe(0);
+        expect(told(6)).toBe(1);
+        expect(told(11)).toBe(1);
+        expect(told(12)).toBe(2);
+        expect(told(30)).toBe(5);
+    });
+
+    test('research from earlier user turns counts toward the next reminder', async () => {
+        const first = scripted(...Array.from({ length: 4 }, (_, i) => [call(`c${i}`, 'look'), finish('tool-calls')]),
+            [...say('1', 'Still researching.'), finish('stop')]);
+        const prior = await turn(first);
+        const model = scripted([call('c4', 'look'), finish('tool-calls')],
+            [call('c5', 'look'), finish('tool-calls')], [...say('2', 'Writing now.'), finish('stop')]);
+
+        await turn(model, { history: prior.history });
+
+        expect(JSON.stringify(model.doStreamCalls[1].prompt)).not.toContain('without changing anything');
+        expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('6 tool calls without changing anything');
+    });
+
+    test('a write resets the research budget for the following turn', async () => {
+        const prior = await turn(scripted([call('c0', 'look'), finish('tool-calls')],
+            [call('c1', 'change', { what: 'the frame' }), finish('tool-calls')], [...say('1', 'Done.'), finish('stop')]));
+        const write = { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'write', toolName: 'write_file', input: {} }] };
+        const model = scripted(...Array.from({ length: 5 }, (_, i) => [call(`next${i}`, 'look'), finish('tool-calls')]),
+            [...say('2', 'Ready.'), finish('stop')]);
+
+        await turn(model, { history: [...prior.history, write,
+            { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'write', toolName: 'write_file', output: { type: 'text', value: 'Written.' } }] }] });
+
+        expect(JSON.stringify(model.doStreamCalls[5].prompt)).not.toContain('without changing anything');
     });
 
     test('only the latest screenshot is sent; earlier ones become a note', async () => {

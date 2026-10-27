@@ -11,6 +11,7 @@
 const { streamText, stepCountIs, tool } = require('ai');
 // The same zod the tools' shapes are made with (agent/tools.js).
 const { z } = require('zod');
+const { backendFetch } = require('./backend-fetch');
 
 /** Steps in one turn, each a model call and the tools it asks for. */
 const MAX_STEPS = 40;
@@ -22,7 +23,7 @@ const STREAM_CONTINUATION = '[The previous response stream ended without a compl
     + 'you left off, using the tool results already in this conversation. Do not repeat completed changes.]';
 
 /** Return the AI SDK language model a route (agent/models.js routeModel) names. */
-async function languageModelFor(route, { fetch } = {}) {
+async function languageModelFor(route, { fetch, onWait } = {}) {
     if (route.via === 'anthropic') {
         const { createAnthropic } = require('@ai-sdk/anthropic');
         return createAnthropic({ apiKey: route.apiKey, fetch })(route.modelId);
@@ -30,7 +31,8 @@ async function languageModelFor(route, { fetch } = {}) {
     const { createOpenRouter } = require('@openrouter/ai-sdk-provider');
     const provider = createOpenRouter({
         // Through the backend, `fetch` puts the account's token in instead.
-        apiKey: route.apiKey || 'kigumi-account', compatibility: 'strict', fetch,
+        apiKey: route.apiKey || 'kigumi-account', compatibility: 'strict',
+        fetch: route.via === 'backend' ? backendFetch(fetch || globalThis.fetch, { onWait }) : fetch,
         ...(route.baseURL ? { baseURL: route.baseURL } : {}),
         headers: { 'X-Title': 'Kigumi' },
     });
@@ -100,26 +102,30 @@ function onlyLatestImage(messages) {
     return out;
 }
 
-/** Tool calls in a row without a write or edit before the model is nudged to write. */
-const LOOKS_BEFORE_NUDGE = 25;
+/** Tool calls without a write or edit between progress reminders. */
+const LOOKS_BEFORE_NUDGE = 6;
 const WRITE_TOOLS = new Set(['write_file', 'edit_file']);
-const WRITE_EARLY = `[From Kigumi: that's ${LOOKS_BEFORE_NUDGE} tool calls without changing anything. If the task is to `
-    + 'write or change a frame, write a first version now, from the nearest example, and let the build\'s errors '
-    + 'show what to look up next.]';
 
-/**
- * Whether the model has looked `LOOKS_BEFORE_NUDGE` times since it last wrote (or since the turn
- * began). A model given a library to learn can read for 60 steps before writing a line, where a
- * first version's build errors would have shown what it needed.
- */
-function lookedTooLong(steps) {
+/** Count tool calls since the latest write or edit, across user turns. */
+function looksSinceWrite(messages) {
     let looks = 0;
-    for (let i = steps.length - 1; i >= 0; i--) {
-        const calls = steps[i].toolCalls || [];
-        if (calls.some((call) => WRITE_TOOLS.has(call.toolName))) break;
-        looks += calls.length;
+    for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role !== 'assistant' || !Array.isArray(messages[i].content)) continue;
+        const calls = messages[i].content.filter((part) => part.type === 'tool-call');
+        for (let j = calls.length - 1; j >= 0; j--) {
+            if (WRITE_TOOLS.has(calls[j].toolName)) return looks;
+            looks += 1;
+        }
     }
-    return looks >= LOOKS_BEFORE_NUDGE;
+    return looks;
+}
+
+/** Return a reminder to turn research into a first editable version. */
+function writeEarly(looks) {
+    return `[From Kigumi: you have made ${looks} tool calls without changing anything, including earlier turns. `
+        + 'If the current request is to write or change a frame, write a first version now. Use kumiki_api for '
+        + 'specific signatures and let actual build errors guide further lookups. Do not reread files you already have. '
+        + 'Only report writing, running, or building after the corresponding tool has actually done it.]';
 }
 
 const IMAGE_BELOW = '[The image is in the next message.]';
@@ -371,7 +377,8 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
     }
     const messages = [...compacted.history, { role: 'user', content: prompt }];
     const steps = [];
-    let nudged = false;
+    let looks = looksSinceWrite(history);
+    let nudgedAt = null;
     const toolSet = toToolSet(tools, { images, askPermission });
     const sofar = () => trimOldToolResults(onlyLatestImage(messages));
     for (let continuations = 0; ; continuations++) {
@@ -389,17 +396,23 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
             maxRetries: 2,
             prepareStep: ({ messages: sending }) => {
                 const trimmed = imagesAfterToolResults(trimOldToolResults(onlyLatestImage(sending)));
-                // Add one reminder per stretch of looking without writing.
-                if (!nudged && lookedTooLong(steps)) {
-                    nudged = true;
-                    trimmed.push({ role: 'user', content: WRITE_EARLY });
+                if (looks >= LOOKS_BEFORE_NUDGE && (nudgedAt === null || looks - nudgedAt >= LOOKS_BEFORE_NUDGE)) {
+                    nudgedAt = looks;
+                    trimmed.push({ role: 'user', content: writeEarly(looks) });
                 }
                 return { messages: cacheMarks ? cacheMarked(trimmed) : trimmed };
             },
             onStepEnd: (step) => {
                 steps.push(step);
                 messages.push(...step.response.messages);
-                if ((step.toolCalls || []).some((call) => WRITE_TOOLS.has(call.toolName))) nudged = false;
+                for (const call of step.toolCalls || []) {
+                    if (WRITE_TOOLS.has(call.toolName)) {
+                        looks = 0;
+                        nudgedAt = null;
+                    } else {
+                        looks += 1;
+                    }
+                }
                 const tokens = step.usage && step.usage.inputTokens;
                 if (typeof tokens === 'number') onEvent({ type: 'agent:context', tokens, window: contextWindow || null });
             },
