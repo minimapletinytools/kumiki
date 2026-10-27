@@ -92,14 +92,16 @@ DONE-add bypass permissions toggle in agent panel, in general, can youlook up wh
 DONE-setup more stuff to usepreferedfeatures
 DONE-setup backend, auth, billing, subscription or pay per token or both? or just get rid of the agent panel entirely
 
-
--the view output button doesn't do anything in standalone viewr, and the log should not have the "open vs code output"
+DONE-the view output button doesn't do anything in standalone viewr, and the log should not have the "open vs code output"
   -make the log panel a full featured log panel, and then don't show it in vscode since it has a bulid in log
   -when you error in the standalone viewer, the "open kigumi output" button doesn't do anything, it should open the log view
     -acutalyl just get rid of this pop up, there is aleardy an error red button thingy in the viewer itself and it messe with agentic flows
   -the log view should not hav eraw python output anymore, just get rid of that, a
 
 
+-end cuts should be given their own intersection group, dovetailed_sawhores currentyl uses PERFECT, and no where else sets the group. We should make a new group, cross intersects but not shoulderplane
+
+-prioritize axis aligned measurements
 -the active view you are measuring in should be highlighted somehow
 -check that edges are being highlighted correctly in 2d drawing mesaurements
 -review and cleanup the internal/docs
