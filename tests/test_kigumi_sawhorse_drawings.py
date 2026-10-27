@@ -25,16 +25,22 @@ runner = _load_runner()
 
 
 @pytest.fixture(scope="module")
-def drawings():
-    """The sawhorse's drawings, loaded once (see test_kigumi_generated_drawings for why once per file)."""
+def sawhorse():
+    """Return the sawhorse's loaded viewer slot, including its generated drawings."""
     saved_modules = dict(sys.modules)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         slot = runner.load_slot_state(str(ROOT / "patterns" / "structures" / "dovetailed_sawhorse.py"))
         state = runner.RunnerState(slots={"main": slot}, active_slot="main")
         runner.build_real_geometry(state, slot)
-        found = runner.collect_drawings(slot.frame, None)
-    yield found
+    yield slot
     restore_modules(saved_modules)
+
+
+@pytest.fixture(scope="module")
+def drawings(sawhorse):
+    """Return the sawhorse's serialized drawings."""
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        return runner.collect_drawings(sawhorse.frame, None)
 
 
 def _leg_top(drawings):
@@ -86,3 +92,47 @@ def test_both_flanks_are_angled_on_the_leg_top(drawings):
               for name in _names(measure)}
 
     assert {"dovetail_left_flank", "dovetail_right_flank"} <= angled
+
+
+@pytest.mark.parametrize("x", [-18, 0, 18], ids=["outside-left", "between-legs", "outside-right"])
+@pytest.mark.parametrize("side,height,feature", [
+    (1, 30, "rptw.front_right"), (-1, 30, "rptw.front_left"),
+    (1, 26.25, "rptw.back_right"), (-1, 26.25, "rptw.back_left"),
+])
+def test_beam_edge_picks_highlight_the_segment_under_the_pointer(sawhorse, x, side, height, feature):
+    import numpy as np
+
+    edge_point = np.array([x, side, height]) * 0.0254
+    surface = edge_point - np.array([0, side * 0.004, 0])
+    look = np.array([0.25, -side, -1 if height == 30 else 1], dtype=float)
+    look /= np.linalg.norm(look)
+    payload = {"memberKey": "beam#0", "point": surface.tolist(), "space": "3d", "currentPath": [],
+               "ctrlClick": False, "look": look.tolist(), "tolerances": {"edge": 0.005, "point": 0.008},
+               "ray": {"origin": (surface - 2 * look).tolist(), "direction": look.tolist()}}
+
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        reply = runner._handle_find_csg_at_point(None, payload, sawhorse)
+
+    assert reply["featureType"] == "EDGE"
+    assert reply["featureLabel"] == feature
+    segments = reply.get("highlightEdgeSegments") or []
+    assert any(min(segment["start"][0], segment["end"][0]) - 1e-8 <= edge_point[0]
+               <= max(segment["start"][0], segment["end"][0]) + 1e-8 for segment in segments)
+
+
+@pytest.mark.parametrize("feature", ["rptw.front_right", "rptw.front_left"])
+def test_beam_top_edges_have_three_highlight_segments_and_skip_the_sockets(sawhorse, feature):
+    from kumiki.csg.feature_paths import find_feature
+    from kumiki.viewer.picking import edge_highlight_segments
+
+    entry = sawhorse.mesh_cache["beam#0"]
+    cut, root = entry["cut_timber"], entry["local_csg"]
+    handle = find_feature(cut, ["timber (rough, extended)"], feature)
+    assert handle is not None
+    segments, absent = edge_highlight_segments(handle.feature, handle.owner, cut.timber, root)
+
+    assert not absent and segments is not None
+    assert len(segments) == 3
+    for socket in (-11 * 0.0254, 11 * 0.0254):
+        assert not any(min(segment["start"][0], segment["end"][0]) < socket
+                       < max(segment["start"][0], segment["end"][0]) for segment in segments)

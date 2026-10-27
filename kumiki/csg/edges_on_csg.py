@@ -554,7 +554,7 @@ def is_crease_at(line: Line, csg: 'CutCSG', point: V3, tolerance: float = 0.0) -
     """Return whether the surface of `csg` creases along `line` at `point`. True when unsure."""
     direction = unit_vector(line.direction)
     station = float(((point - line.point).T * direction)[0, 0])
-    return _directions_at(csg, line, station, tolerance) is not _FLAT
+    return _directions_at(csg, line, station, tolerance) is not _NO_CREASE
 
 
 # --- which way the solid lies around a line ---------------------------------------------------
@@ -565,7 +565,7 @@ def is_crease_at(line: Line, csg: 'CutCSG', point: V3, tolerance: float = 0.0) -
 # How close, in radians, two angles may be and count as one.
 _ANGLE_EPS = 1e-6
 _TAU = 2.0 * math.pi
-_FLAT = "flat"
+_NO_CREASE = "no_crease"
 # A span of angle around the line, (low, high) in radians within [0, 2pi].
 AngleSpan = Tuple[float, float]
 AngleSpans = List[AngleSpan]
@@ -655,7 +655,7 @@ def _tree_angles(csg: 'CutCSG', at: np.ndarray, direction: np.ndarray, basis: Tu
 
 
 def _directions_at(csg: 'CutCSG', line: Line, station: float, tolerance: float) -> Union[str, AngleSpans, None]:
-    """Return _FLAT if the solid lies in one flat face at `station` along `line`, else its angles (None if unsure)."""
+    """Return _NO_CREASE where the surface does not crease along `line`, else its angles (None if unsure)."""
     direction = np.array([float(v) for v in unit_vector(line.direction)])
     at = np.array([float(line.point[i, 0]) for i in range(3)]) + direction * station
     seed = np.eye(3)[int(np.argmin(np.abs(direction)))]
@@ -665,11 +665,13 @@ def _directions_at(csg: 'CutCSG', line: Line, station: float, tolerance: float) 
     angles = _tree_angles(csg, at, direction, basis, tolerance)
     if angles is None:
         return None
+    if not angles or (len(angles) == 1 and angles[0][1] - angles[0][0] >= _TAU - _ANGLE_EPS):
+        return _NO_CREASE
     if len(angles) == 1 and abs(angles[0][1] - angles[0][0] - math.pi) < 1e-4:
-        return _FLAT
+        return _NO_CREASE
     if len(angles) == 2 and angles[0][0] < _ANGLE_EPS and angles[1][1] > _TAU - _ANGLE_EPS \
             and abs(angles[0][1] + _TAU - angles[1][0] - math.pi) < 1e-4:
-        return _FLAT  # one half turn, across angle 0 where the spans wrap
+        return _NO_CREASE  # one half turn, across angle 0 where the spans wrap
     return angles
 
 
@@ -704,13 +706,13 @@ def _stations(csg: 'CutCSG', line: Line, seed: Span) -> List[float]:
 
 
 def _crease_spans(line: Line, csg: 'CutCSG', spans: Sequence[Span], seed: Span, tolerance: float) -> List[Span]:
-    """Return `spans` less where the surface is one flat face across the line."""
+    """Return the pieces of `spans` where the solid's surface creases along the line."""
     stations = _stations(csg, line, seed)
     kept: List[Span] = []
     for low, high in spans:
         cuts = [low] + [station for station in stations if low < station < high] + [high]
         for start, end in zip(cuts, cuts[1:]):
-            if end - start > 0 and _directions_at(csg, line, (start + end) / 2, tolerance) is not _FLAT:
+            if end - start > 0 and _directions_at(csg, line, (start + end) / 2, tolerance) is not _NO_CREASE:
                 kept.append((start, end))
     return _merged_spans(kept)
 

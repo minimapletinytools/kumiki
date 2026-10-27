@@ -769,8 +769,7 @@ def _nearest_edge_of(end: FeatureHandle, look: np.ndarray, root: CutCSG, faces: 
         # elsewhere its plane only passes through a seam between `end` and a face in line with it.
         shared = _shared_stretch(start, stop, extents_of(root, other.timber).of(other.feature, other.owner))
         edge = None if shared is None else _edge_between(end, other, root, carriers)
-        if edge is not None and shared is not None:
-            _know_extent(edge, root, *shared)
+        if edge is not None:
             return edge
     return end
 
@@ -792,18 +791,6 @@ def _shared_stretch(start: np.ndarray, stop: np.ndarray,
         if high - low > _ON_PLANE and (best is None or high - low > best[1] - best[0]):
             best = (low, high)
     return None if best is None else (start + run * best[0], start + run * best[1])
-
-
-def _know_extent(edge: FeatureHandle, root: CutCSG, start: np.ndarray, stop: np.ndarray) -> None:
-    """Record the segment `start`-`stop` (local) as the edge's extent, so it isn't cropped for again."""
-    line = edge.feature.locate_simple_unbounded(edge.owner)
-    if not isinstance(line, Line):
-        return
-    direction = unit_ndarray(as_ndarray(line.direction))
-    point = as_ndarray(line.point)
-    low, high = sorted(float((end - point) @ direction) for end in (start, stop))
-    located = Line(direction=create_v3(*direction), point=line.point)
-    extents_of(root, edge.timber).know(edge.feature, edge.owner, FeatureExtent(located, pieces=((low, high),)))
 
 
 def _edge_between(one: FeatureHandle, other: FeatureHandle, root: CutCSG,
