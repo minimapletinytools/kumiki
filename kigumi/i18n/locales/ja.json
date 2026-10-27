@@ -459,6 +459,7 @@
   "agent.notice.maxSteps": "{steps} ステップで停止しました。続けるには「続けて」と言うか、設定で上限を上げてください。",
   "agent.notice.outputLimit": "1 ステップの出力の上限で停止しました。続けるには「続けて」と言うか、設定で上限を上げてください。",
   "agent.notice.unexpected": "モデルが予期せず停止しました（{reason}）。続けるには「続けて」と言ってください。",
+  "agent.notice.continuing": "応答ストリームが途中で終了しました。自動的に続けます（{attempt}/{attempts}）。",
   "agent.notice.summarised": "各ステップを小さく保つため、それまでの会話を要約しました。",
   "agent.notice.restored": "そのリクエストの前の状態に戻しました: {files}。次のメッセージでエージェントに伝えます。",
   "agent.error.noCredit": "クレジットがありません。",

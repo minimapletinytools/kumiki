@@ -16,6 +16,10 @@ const { z } = require('zod');
 const MAX_STEPS = 40;
 /** Per step, unless the user's setting says more. Unset, a provider may reserve its maximum (64k for Haiku) against the balance. */
 const MAX_OUTPUT_TOKENS = 8000;
+/** Continuations after a stream closes without a completion signal, within the turn's step limit. */
+const MAX_STREAM_CONTINUATIONS = 2;
+const STREAM_CONTINUATION = '[The previous response stream ended without a completion signal. Continue from where '
+    + 'you left off, using the tool results already in this conversation. Do not repeat completed changes.]';
 
 /** Return the AI SDK language model a route (agent/models.js routeModel) names. */
 async function languageModelFor(route, { fetch } = {}) {
@@ -368,61 +372,73 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
     const messages = [...compacted.history, { role: 'user', content: prompt }];
     const steps = [];
     let nudged = false;
-    let failure = null;
-    const result = streamText({
-        model,
-        system,
-        messages,
-        tools: toToolSet(tools, { images, askPermission }),
-        stopWhen: stepCountIs(maxSteps),
-        maxOutputTokens,
-        abortSignal,
-        // A request refused or failed (busy, rate limited, an upstream error) is never charged, so
-        // retrying one costs nothing.
-        maxRetries: 2,
-        prepareStep: ({ messages: sending }) => {
-            const trimmed = imagesAfterToolResults(trimOldToolResults(onlyLatestImage(sending)));
-            // Once in each stretch of looking: the note stays in the conversation, so it isn't added again.
-            if (!nudged && lookedTooLong(steps)) {
-                nudged = true;
-                trimmed.push({ role: 'user', content: WRITE_EARLY });
+    const toolSet = toToolSet(tools, { images, askPermission });
+    const sofar = () => trimOldToolResults(onlyLatestImage(messages));
+    for (let continuations = 0; ; continuations++) {
+        const before = steps.length;
+        let failure = null;
+        const result = streamText({
+            model,
+            system,
+            messages: [...messages],
+            tools: toolSet,
+            stopWhen: stepCountIs(maxSteps - steps.length),
+            maxOutputTokens,
+            abortSignal,
+            // Retry transient request failures before streaming begins.
+            maxRetries: 2,
+            prepareStep: ({ messages: sending }) => {
+                const trimmed = imagesAfterToolResults(trimOldToolResults(onlyLatestImage(sending)));
+                // Add one reminder per stretch of looking without writing.
+                if (!nudged && lookedTooLong(steps)) {
+                    nudged = true;
+                    trimmed.push({ role: 'user', content: WRITE_EARLY });
+                }
+                return { messages: cacheMarks ? cacheMarked(trimmed) : trimmed };
+            },
+            onStepEnd: (step) => {
+                steps.push(step);
+                messages.push(...step.response.messages);
+                if ((step.toolCalls || []).some((call) => WRITE_TOOLS.has(call.toolName))) nudged = false;
+                const tokens = step.usage && step.usage.inputTokens;
+                if (typeof tokens === 'number') onEvent({ type: 'agent:context', tokens, window: contextWindow || null });
+            },
+            onError: ({ error }) => { failure = error; },
+        });
+        try {
+            for await (const part of result.fullStream) {
+                if (part.type === 'text-delta') {
+                    onEvent({ type: 'agent:text', text: part.text });
+                } else if (part.type === 'reasoning-delta') {
+                    onEvent({ type: 'agent:reasoning', text: part.text });
+                } else if (part.type === 'tool-call') {
+                    onEvent({ type: 'agent:tool', id: part.toolCallId, name: part.toolName, input: part.input });
+                } else if (part.type === 'tool-result') {
+                    onEvent({ type: 'agent:toolResult', id: part.toolCallId, isError: false, text: summarise(part.output).slice(0, 2000) });
+                } else if (part.type === 'tool-error') {
+                    const error = part.error;
+                    onEvent({ type: 'agent:toolResult', id: part.toolCallId, isError: true, text: String((error && error.message) || error) });
+                } else if (part.type === 'error') {
+                    failure = failure || part.error;
+                }
             }
-            return { messages: cacheMarks ? cacheMarked(trimmed) : trimmed };
-        },
-        onStepEnd: (step) => {
-            steps.push(step);
-            if ((step.toolCalls || []).some((call) => WRITE_TOOLS.has(call.toolName))) nudged = false;
-            const tokens = step.usage && step.usage.inputTokens;
-            if (typeof tokens === 'number') onEvent({ type: 'agent:context', tokens, window: contextWindow || null });
-        },
-        onError: ({ error }) => { failure = error; },
-    });
-    const sofar = () => trimOldToolResults(onlyLatestImage([...messages, ...steps.flatMap((step) => step.response.messages)]));
-    try {
-        for await (const part of result.fullStream) {
-            if (part.type === 'text-delta') {
-                onEvent({ type: 'agent:text', text: part.text });
-            } else if (part.type === 'reasoning-delta') {
-                onEvent({ type: 'agent:reasoning', text: part.text });
-            } else if (part.type === 'tool-call') {
-                onEvent({ type: 'agent:tool', id: part.toolCallId, name: part.toolName, input: part.input });
-            } else if (part.type === 'tool-result') {
-                onEvent({ type: 'agent:toolResult', id: part.toolCallId, isError: false, text: summarise(part.output).slice(0, 2000) });
-            } else if (part.type === 'tool-error') {
-                const error = part.error;
-                onEvent({ type: 'agent:toolResult', id: part.toolCallId, isError: true, text: String((error && error.message) || error) });
-            } else if (part.type === 'error') {
-                failure = failure || part.error;
-            }
+        } catch (error) {
+            failure = failure || error;
         }
-    } catch (error) {
-        failure = failure || error;
-    }
-    if (failure) {
-        throw Object.assign(failure, { history: sofar() });
+        if (failure) {
+            throw Object.assign(failure, { history: sofar() });
+        }
+        const last = steps.at(-1);
+        if (abortSignal?.aborted || steps.length === before || last.finishReason !== 'other'
+            || (last.rawFinishReason && last.rawFinishReason !== 'other') || last.toolCalls.length || steps.length >= maxSteps
+            || continuations >= MAX_STREAM_CONTINUATIONS) break;
+        messages.push({ role: 'user', content: STREAM_CONTINUATION });
+        onEvent({ type: 'agent:notice', key: 'agent.notice.continuing',
+            params: { attempt: continuations + 1, attempts: MAX_STREAM_CONTINUATIONS },
+            text: `The response stream ended early. Continuing automatically (${continuations + 1}/${MAX_STREAM_CONTINUATIONS}).` });
     }
     const notice = earlyEnd(steps, maxSteps);
-    if (notice) onEvent({ type: 'agent:notice', ...notice });
+    if (notice && !abortSignal?.aborted) onEvent({ type: 'agent:notice', ...notice });
     const costs = steps.map((step) => step.providerMetadata && step.providerMetadata.openrouter
         && step.providerMetadata.openrouter.usage && step.providerMetadata.openrouter.usage.cost)
         .filter((cost) => typeof cost === 'number');

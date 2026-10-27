@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 
 const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test');
-const { runTurn, toModelContent, cacheMarked, trimOldToolResults, estimateTokens, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
+const { runTurn, languageModelFor, toModelContent, cacheMarked, trimOldToolResults, estimateTokens, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
 const { MODELS, findModel, createModelList, routeModel } = require('../agent/models');
 const { createFileTools } = require('../agent/file-tools');
 const { createProjectFiles } = require('../agent/project-files');
@@ -151,6 +151,109 @@ describe('the agent loop', () => {
     test('a turn cut short says so', async () => {
         const { events } = await turn(scripted([...say('1', 'Half a'), finish('length')]));
         expect(events.at(-1)).toMatchObject({ type: 'agent:notice', key: 'agent.notice.outputLimit', text: expect.stringContaining('output limit') });
+    });
+
+    test('an OpenRouter stream closed mid-reasoning continues from its partial response', async () => {
+        const chunk = (delta, finish_reason = null) => `data: ${JSON.stringify({
+            id: 'gen-test', model: 'deepseek/deepseek-v4.1-flash', created: 0,
+            choices: [{ index: 0, delta, finish_reason }],
+        })}\n\n`;
+        const replies = [chunk({ reasoning: 'I need to inspect the' }),
+            chunk({ content: 'The frame is ready.' }) + chunk({}, 'stop') + 'data: [DONE]\n\n'];
+        const fetch = jest.fn(async () => new Response(replies.shift(), { headers: { 'Content-Type': 'text/event-stream' } }));
+        const model = await languageModelFor({ via: 'openrouter', modelId: 'deepseek/deepseek-v4.1-flash', apiKey: 'test' }, { fetch });
+
+        const { events, history } = await turn(model);
+
+        expect(fetch).toHaveBeenCalledTimes(2);
+        const continued = JSON.parse(fetch.mock.calls[1][1].body).messages;
+        expect(history[1].content).toContainEqual(expect.objectContaining({ type: 'reasoning', text: 'I need to inspect the' }));
+        expect(continued.at(-1).content).toContain('Continue from where you left off');
+        expect(events).toContainEqual(expect.objectContaining({ key: 'agent.notice.continuing' }));
+        expect(events).not.toContainEqual(expect.objectContaining({ key: 'agent.notice.unexpected' }));
+        expect(history.at(-1).content).toContainEqual(expect.objectContaining({ type: 'text', text: 'The frame is ready.' }));
+    });
+
+    test('continuing preserves completed tool results and accounts for every step without replaying edits', async () => {
+        const interrupted = { ...finish('other', 0.002), finishReason: { unified: 'other' } };
+        const model = scripted(
+            [call('c1', 'change', { what: 'the leg' }), finish('tool-calls', 0.001)],
+            [...say('1', 'Checking the'), interrupted],
+            [...say('2', 'The leg is ready.'), finish('stop', 0.003)],
+        );
+        const previousCalls = changeTool.run.mock.calls.length;
+
+        const { history, costUsd } = await turn(model);
+
+        expect(changeTool.run.mock.calls.length - previousCalls).toBe(1);
+        expect(costUsd).toBeCloseTo(0.006);
+        expect(history.map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'assistant', 'user', 'assistant']);
+        expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('changed the leg');
+    });
+
+    test.each([undefined, 'other'])('repeated incomplete streams (%s) stop after two continuations', async (raw) => {
+        const interrupted = () => [...say('1', 'Thinking'), { ...finish('other'), finishReason: { unified: 'other', raw } }];
+        const model = scripted(interrupted(), interrupted(), interrupted());
+
+        const { events } = await turn(model);
+
+        expect(model.doStreamCalls).toHaveLength(3);
+        expect(events.filter((event) => event.key === 'agent.notice.continuing')).toHaveLength(2);
+        expect(events.at(-1)).toMatchObject({ key: 'agent.notice.unexpected' });
+    });
+
+    test('the step limit includes steps before a continuation', async () => {
+        const model = scripted(
+            [{ ...finish('other'), finishReason: { unified: 'other' } }],
+            [call('c1', 'look'), finish('tool-calls')],
+            [call('c2', 'look'), finish('tool-calls')],
+        );
+        const events = [];
+
+        await runTurn({ model, images: true, maxSteps: 3, tools: [lookTool], system: 'sys', history: [], prompt: 'go',
+            askPermission: async () => true, onEvent: (event) => events.push(event) });
+
+        expect(model.doStreamCalls).toHaveLength(3);
+        expect(events.at(-1)).toMatchObject({ key: 'agent.notice.maxSteps', params: { steps: 3 } });
+    });
+
+    test.each(['length', 'content-filter', 'error'])('an explicit %s finish is not continued automatically', async (reason) => {
+        const model = scripted([...say('1', 'Partial'), finish(reason)]);
+
+        const { events } = await turn(model);
+
+        expect(model.doStreamCalls).toHaveLength(1);
+        expect(events).not.toContainEqual(expect.objectContaining({ key: 'agent.notice.continuing' }));
+    });
+
+    test('stopping a response prevents automatic continuation', async () => {
+        const abort = new AbortController();
+        const model = scripted([...say('1', 'Partial'), { ...finish('other'), finishReason: { unified: 'other' } }]);
+        const events = [];
+
+        await runTurn({ model, images: true, tools: [], system: 'sys', history: [], prompt: 'go', abortSignal: abort.signal,
+            askPermission: async () => true, onEvent: (event) => {
+                events.push(event);
+                if (event.type === 'agent:context') abort.abort();
+            } });
+
+        expect(model.doStreamCalls).toHaveLength(1);
+        expect(events).not.toContainEqual(expect.objectContaining({ key: 'agent.notice.continuing' }));
+        expect(events).not.toContainEqual(expect.objectContaining({ key: 'agent.notice.unexpected' }));
+    });
+
+    test('a failed continuation preserves the partial response for retrying later', async () => {
+        const model = new MockLanguageModelV4({ doStream: async () => {
+            if (model.doStreamCalls.length > 1) throw Object.assign(new Error('Provider refused the continuation.'), { statusCode: 400 });
+            return { stream: convertArrayToReadableStream([...say('1', 'Partial answer'),
+                { ...finish('other'), finishReason: { unified: 'other' } }]) };
+        } });
+
+        const failure = await turn(model).catch((error) => error);
+
+        expect(failure.message).toBe('Provider refused the continuation.');
+        expect(JSON.stringify(failure.history)).toContain('Partial answer');
+        expect(failure.history.at(-1).content).toContain('Continue from where you left off');
     });
 
     test('a failing step keeps the steps before it, for asking again', async () => {
