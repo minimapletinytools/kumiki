@@ -3037,12 +3037,24 @@ class TestFeatureGroups:
         assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.PERFECT)
         assert not feature_groups_intersect(FeatureGroup.PERFECT, FeatureGroup.ROUGH)
 
-    def test_a_crossing_pairs_with_both_bodies_and_nothing_else(self):
-        """A cross lap's faces outline the lap where they meet the timber, and nowhere else."""
+    def test_a_crossing_pairs_with_both_bodies_and_end_cuts(self):
         assert feature_groups_intersect(FeatureGroup.CROSSING, FeatureGroup.PERFECT)
         assert feature_groups_intersect(FeatureGroup.CROSSING, FeatureGroup.ROUGH)
+        assert feature_groups_intersect(FeatureGroup.CROSSING, FeatureGroup.END_CUT)
         for other in (FeatureGroup.CROSSING, FeatureGroup.SHOULDER_PLANE, FeatureGroup.TENON, FeatureGroup.NONE):
             assert not feature_groups_intersect(FeatureGroup.CROSSING, other), other
+
+    @pytest.mark.parametrize("other_group", list(FeatureGroup))
+    def test_an_end_cut_derives_an_edge_only_with_a_crossing(self, other_group):
+        cut = HalfSpace(normal=create_v3(0, 0, 1), offset=scalar(5), feature_overrides=[
+            FeatureOverride(HALF_SPACE_PLANE, properties=FeatureProperties(group=FeatureGroup.END_CUT))])
+        other = HalfSpace(normal=create_v3(1, 0, 0), feature_overrides=[
+            FeatureOverride(HALF_SPACE_PLANE, properties=FeatureProperties(group=other_group))])
+        edge = DerivedEdgeFeature.derive(
+            OwnedFeatureHit(cut.get_declared_features()[0], cut),
+            OwnedFeatureHit(other.get_declared_features()[0], other))
+
+        assert (edge is not None) == (other_group is FeatureGroup.CROSSING)
 
     def test_a_tenon_pairs_only_with_the_shoulder_plane(self):
         """That pair is the tenon's base arris, which is nowhere else.

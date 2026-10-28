@@ -136,7 +136,7 @@ When several features tie on depth, each rule decides only where the ones before
 2. More specific first: point, then edge, then face.
 3. Declared before derived.
 4. Group rank (`FeatureGroup`): `SHOULDER_PLANE`, `PERFECT`, `ROUGH`, `TENON`, `CROSSING`, then
-   `NONE`. A derived feature takes the better rank of its two parents.
+   `NONE` and `END_CUT`. A derived feature takes the better rank of its two parents.
 5. Author-set priority, lower first.
 6. Name, alphabetically.
 7. The order they were found in.

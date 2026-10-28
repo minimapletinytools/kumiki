@@ -99,7 +99,7 @@ DONE-the view output button doesn't do anything in standalone viewr, and the log
   -the log view should not hav eraw python output anymore, just get rid of that, a
 
 
--end cuts should be given their own intersection group, dovetailed_sawhores currentyl uses PERFECT, and no where else sets the group. We should make a new group, cross intersects but not shoulderplane
+DONE-end cuts should be given their own intersection group, dovetailed_sawhores currentyl uses PERFECT, and no where else sets the group. We should make a new group, cross intersects but not shoulderplane
 
 -prioritize axis aligned measurements
 -the active view you are measuring in should be highlighted somehow

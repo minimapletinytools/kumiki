@@ -262,14 +262,16 @@ class FeatureGroup(Enum):
         PERFECT        with SHOULDER_PLANE and CROSSING
         ROUGH          with SHOULDER_PLANE and CROSSING
         TENON          with SHOULDER_PLANE
-        CROSSING       with PERFECT and ROUGH
+        CROSSING       with PERFECT, ROUGH and END_CUT
         NONE           with nothing
+        END_CUT        with CROSSING
 
     - PERFECT: the perfect timber within's faces, arrises, corners and centerplanes, and rough faces
       lying on it (rptw.*).
     - ROUGH: the rough body's faces.
     - SHOULDER_PLANE: a joint's shoulder plane. TENON: a joint's tenon faces.
     - CROSSING: the faces a cross lap removes.
+    - END_CUT: a timber's trimmed end face.
 
     PERFECT and ROUGH don't pair with themselves: a timber's own arrises and corners are declared.
     The order is the pick preference, best first.
@@ -281,6 +283,7 @@ class FeatureGroup(Enum):
     CROSSING = 5
     #: Forms no edges with anything, including itself.
     NONE = 6
+    END_CUT = 7
 
 
 # Which groups each group forms edges with. Symmetric by construction; see
@@ -291,8 +294,9 @@ FEATURE_GROUP_PAIRS: dict = {
     FeatureGroup.PERFECT: frozenset({FeatureGroup.SHOULDER_PLANE, FeatureGroup.CROSSING}),
     FeatureGroup.ROUGH: frozenset({FeatureGroup.SHOULDER_PLANE, FeatureGroup.CROSSING}),
     FeatureGroup.TENON: frozenset({FeatureGroup.SHOULDER_PLANE}),
-    FeatureGroup.CROSSING: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH}),
+    FeatureGroup.CROSSING: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH, FeatureGroup.END_CUT}),
     FeatureGroup.NONE: frozenset(),
+    FeatureGroup.END_CUT: frozenset({FeatureGroup.CROSSING}),
 }
 
 

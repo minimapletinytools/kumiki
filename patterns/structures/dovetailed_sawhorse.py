@@ -33,8 +33,8 @@ LEG_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE    # a leg's outer face meets its
 
 
 def _leg_end(name: str) -> FeatureOverride:
-    """Return the override naming a level trim's face, in the PERFECT group."""
-    return FeatureOverride(HALF_SPACE_PLANE, name, FeatureProperties(group=FeatureGroup.PERFECT))
+    """Return the override naming a level trim's face, in the END_CUT group."""
+    return FeatureOverride(HALF_SPACE_PLANE, name, FeatureProperties(group=FeatureGroup.END_CUT))
 
 
 def _leg(k: Kiwari, beam: Timber, end: int, side: int):
@@ -89,7 +89,7 @@ def _leg(k: Kiwari, beam: Timber, end: int, side: int):
     )
     joint = cut_free_dovetail_joint(leg, beam, dovetail)
 
-    # The level trims are the leg's ends: PERFECT, so they meet the dovetail in edges to dimension.
+    # The level trims meet the dovetail's CROSSING faces in derived edges.
     level_top = adopt_csg(None, leg.transform, HalfSpace(
         normal=create_v3(0, 0, 1), offset=height, label=CutCSGLabel("level_top"),
         feature_overrides=[_leg_end("level_top")]))

@@ -1392,12 +1392,14 @@ class Cutting:
                 normal=create_v3(scalar(0), scalar(0), scalar(1)),
                 offset=self.maybe_top_end_cut_distance_from_bottom,
                 label=CutCSGLabel("top_end_cut"),
+                feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, properties=FeatureProperties(group=FeatureGroup.END_CUT))],
             ))
         if self.maybe_bottom_end_cut_distance_from_bottom is not None:
             object.__setattr__(self, '_bottom_end_cut', HalfSpace(
                 normal=create_v3(scalar(0), scalar(0), scalar(-1)),
                 offset=-self.maybe_bottom_end_cut_distance_from_bottom,
                 label=CutCSGLabel("bottom_end_cut"),
+                feature_overrides=[FeatureOverride(HALF_SPACE_PLANE, properties=FeatureProperties(group=FeatureGroup.END_CUT))],
             ))
         object.__setattr__(self, '_negative_csg_local', self._build_negative_csg_local())
 

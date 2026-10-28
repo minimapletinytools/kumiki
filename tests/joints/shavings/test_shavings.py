@@ -1150,6 +1150,24 @@ class TestChopHelperLabels:
             ticket="test_timber",
         )
 
+    @pytest.mark.parametrize("helper", [chop_timber_end_with_prism, chop_timber_end_with_half_plane])
+    @pytest.mark.parametrize("end", [TimberEnd.TOP, TimberEnd.BOTTOM])
+    @pytest.mark.parametrize("is_shoulder", [False, True])
+    def test_end_chops_distinguish_end_cut_faces_from_shoulders(self, helper, end, is_shoulder):
+        from kumiki.csg.cutcsg import FeatureGroup, PrismFace, SimpleRectangularPrismFeature
+
+        cut = helper(self._timber(), end, inches(24), is_shoulder=is_shoulder)
+        if isinstance(cut, RectangularPrism):
+            cut_face = PrismFace.BOTTOM if end is TimberEnd.TOP else PrismFace.TOP
+            feature = next(feature for feature in cut.get_declared_features()
+                           if isinstance(feature, SimpleRectangularPrismFeature) and feature.face is cut_face)
+        else:
+            feature, = cut.get_declared_features()
+
+        assert feature.group is (FeatureGroup.SHOULDER_PLANE if is_shoulder else FeatureGroup.END_CUT)
+        if is_shoulder:
+            assert feature.name == "shoulder"
+
     def test_an_end_prism_names_itself_by_default(self):
         prism = chop_timber_end_with_prism(self._timber(), TimberEnd.TOP, inches(24))
         assert prism.label.name == "timber_end_prism_cut"

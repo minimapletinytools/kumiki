@@ -52,6 +52,19 @@ def test_a_plan_and_one_drawing_per_distinct_piece(drawings):
     assert len(drawings) == 3
 
 
+def test_leg_trims_use_the_end_cut_intersection_group(sawhorse):
+    from kumiki.csg.cutcsg import FeatureGroup
+    from kumiki.csg.feature_paths import find_feature
+
+    for cut in sawhorse.frame.cut_timbers:
+        if not cut.timber.ticket.path.startswith("leg"):
+            continue
+        for name in ("level_top", "level_bottom"):
+            trim = find_feature(cut, [name, name], name)
+            assert trim is not None
+            assert trim.feature.group is FeatureGroup.END_CUT
+
+
 def test_the_legs_drawing_looks_straight_down_on_a_leg_top(drawings):
     camera = _leg_top(drawings)["camera"]
 

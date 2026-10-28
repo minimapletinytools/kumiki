@@ -787,6 +787,15 @@ class TestCutTimber:
         assert isinstance(negative, SolidUnion)
         assert negative.children[0] is cutting.get_maybe_top_end_cut()
 
+    def test_generated_end_cut_planes_have_their_own_intersection_group(self):
+        cutting = Cutting(timber=self._timber(), maybe_top_end_cut_distance_from_bottom=scalar(80),
+                          maybe_bottom_end_cut_distance_from_bottom=scalar(5))
+        for end in (cutting.get_maybe_top_end_cut(), cutting.get_maybe_bottom_end_cut()):
+            assert end is not None
+            feature, = end.get_declared_features()
+            assert feature.name == "side.0"
+            assert feature.group is FeatureGroup.END_CUT
+
     def test_both_trees_are_built_once_from_the_same_cut_nodes(self):
         timber = self._timber()
         cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))
