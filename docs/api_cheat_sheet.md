@@ -50,24 +50,16 @@ join_timbers(timber1, timber2, location_on_timber1, location_on_timber2=None, la
 
 The new timber's `BOTTOM` end is at `timber1`, its `TOP` end at `timber2`.
 
+
 ## Joints
 
-```python
-cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber, mortise_timber, tenon_end, use_peg=False) -> Joint
-```
+### Arrangements
 
-Sizes the tenon and mortise for you; start with it. For control over them:
+TODO
 
-```python
-ButtJointTimberArrangement(butt_timber, receiving_timber, butt_timber_end, front_face_on_butt_timber=None, top_face_on_butt_timber=None)
-cut_mortise_and_tenon_joint_on_face_aligned_timbers(arrangement, tenon_length, tenon_size=None, tenon_width_relative_to_joint=None,
-    tenon_height_relative_to_joint=None, mortise_depth=None, tenon_position=None, mortise_shoulder_inset=0,
-    wedge_parameters=None, peg_parameters=None, use_round_tenon=False) -> Joint
-SimplePegParameters(shape, peg_positions, size, depth=None, tenon_hole_offset=0)   # shape: PegShape.ROUND or SQUARE
-```
+### Common Joints
 
-- `TimberEnd.TOP` or `BOTTOM` names a timber's end; `TimberLongFace.RIGHT`, `FRONT`, `LEFT` or `BACK` one of its long faces.
-- `front_face_on_butt_timber` must be parallel to the plane both timbers lie in (concepts.md, "Butt joint arrangements"). Pegged joints need it.
+TODO
 
 ## The frame
 
@@ -78,7 +70,7 @@ def my_frame(k: Optional[Kiwari] = None) -> Frame:
     return Frame.from_joints(joints, additional_unjointed_timbers=None, name="my frame", kiwari=k)
 ```
 
-## A complete small frame
+## Exampel: A complete small frame
 
 Four posts on a footprint, a beam along the top of each long side, and a rail across each end, all
 in basic mortise and tenons. It builds, and every timber meets the rest.

@@ -76,8 +76,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 :: TODO
 
-
-
 DONE-btw, when I do web based deploy of kigumi, i'm going to want browser cache based filesystem and cloud DB filesystem, and then the standalone app shoulda lso have
   access to cloud DB filesystem in addition to working with local filesystem. What changesa re needed to support the cloud DB filesystem on the backend
 DONE-do preferrred measurements, so.. .features will say they "Want" to bemeasured againt something else, e.g. tenon faces lawasy want to be measured against the opposite face, same with mortise holes, the end face of a tenon should be mesaured gains tthe sohulder plane. a few weird things
@@ -85,31 +83,32 @@ DONE-do preferrred measurements, so.. .features will say they "Want" to bemeasur
   -preferred measurements are sometimes stated symmetrical i.e. a pair of tenon faces should be mesaured with each other
   -preferrefed measurements are sometimes stated 1 way, e.g. tenon end measures against a shoulder plane, but the shoulder plane has no preference whether it's measured again anything, how is this not the same as saynig its symmetric you might ask? I guess the difference is that if a tenon end face measures prefers to be measured against a shoulder plane, once it gets that measurement, the solving system tries not to add more measurements to the tenon end face, and prefers measuring to the shoulder plane. I Think that's probbaly the only difference, perhaps there's a better awy to state that, e.g. shoulderplans have a "prefer measuring to this" or some proirity property that prompts it to have measurements more likely taken from it.
   -so it seems maybe we also wnat some priority fetaure?
-
-
 DONE-agent panel should show by default, and then add setting to hide agent panel on startup
 DONE-add bypass permissions toggle in agent panel, in general, can youlook up what a typical agent featuers and create a reasoanble feature list for our agent panel 
 DONE-setup more stuff to usepreferedfeatures
 DONE-setup backend, auth, billing, subscription or pay per token or both? or just get rid of the agent panel entirely
-
 DONE-the view output button doesn't do anything in standalone viewr, and the log should not have the "open vs code output"
   -make the log panel a full featured log panel, and then don't show it in vscode since it has a bulid in log
   -when you error in the standalone viewer, the "open kigumi output" button doesn't do anything, it should open the log view
     -acutalyl just get rid of this pop up, there is aleardy an error red button thingy in the viewer itself and it messe with agentic flows
   -the log view should not hav eraw python output anymore, just get rid of that, a
-
-
-DONE-end cuts should be given their own intersection group, dovetailed_sawhores currentyl uses PERFECT, and no where else sets the group. We should make a new group, cross intersects but not shoulderplane
-
--prioritize axis aligned measurements
--the active view you are measuring in should be highlighted somehow
--check that edges are being highlighted correctly in 2d drawing mesaurements
--review and cleanup the internal/docs
-
-
--I think you need to rework hidden selection... we only want to be able to select PTW planes behind rough stock, right now you can select other non real features
+DONE/IGNORE-I think you need to rework hidden selection... we only want to be able to select PTW planes behind rough stock, right now you can select other non real features
   -PTW and non real features are different groups so you can just force it to happen
   -another idea is to expand PTW planes to rough stock dimensions? that way they aren't hidden, this might just be better?
+
+-NEXT RELEASE TODO
+  DONE-end cuts should be given their own intersection group, dovetailed_sawhores currentyl uses PERFECT, and no where else sets the group. We should make a new group, cross intersects but not shoulderplane
+    -prioritize axis aligned measurements
+  DONE-the active view you are measuring in should be highlighted somehow
+  -check that edges are being highlighted correctly in 2d drawing mesaurements
+  -review and cleanup the internal/docs
+  -do antoher agent review pass
+  -mega update wesite
+  -make a new video 
+
+
+
+
 
 
 

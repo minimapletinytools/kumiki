@@ -2,7 +2,9 @@
 
 ## Background
 
-When starting work in a workspace, if in dout, run the **`init-kumiki-project`** skill (`.kigumi/docs/skills/init-kumiki-project/SKILL.md`).
+When starting work in a workspace, if in doubt, run the **`init-kumiki-project`** skill (`.kigumi/docs/skills/init-kumiki-project/SKILL.md`).
+
+
 
 ## General Usage Pattern *START HERE*
 
@@ -15,7 +17,6 @@ Unless the user is specific about what they want, always follow the following im
 - at this point, you can show the user the design and confirm it's what they are looking for
 - once all timbers are in place, create joints binding everything together
 - iterate with the user until they are satisfied
-
 
 For the signatures of what a frame most often uses, and a complete small frame, see `api_cheat_sheet.md`.
 
@@ -32,7 +33,16 @@ Once again, review docs/concepts.md to understand the core concepts of Kumiki, t
 
 The user will NOT be familiar with all the concepts, you may need to educate the user.
 
-### ORIENTATION IMPORTANT
+### slow prompting
+
+It's best to slow the user down and break the above into several steps. So if the user asks for "build me a house", pause them and ask a series of questions such as
+
+- what is the footprint of the house
+- what size do you want for the mudsills and what is their maximum length
+
+Then, create the footprint and mudsills for the house and proceed asking more questions to finish the structure. Don't ask too many questions at once. Ask -> build -> validate -> ask again.
+
+### ORIENTATION 
 
 When the user instructs you, they may reference features, for example, they may request: "make the front face of the timber wider".
 
@@ -48,6 +58,10 @@ In these cases "front" may have many interpretations, for example:
 In all cases, make your best interpretation based on the context of the request as well as previous requests.
 If in doubt, ask the user to clarify.
 You can always instruct the user to click on the feature they are referring to in the kigumi viewer and read off what its label is so that they can give you an unambiguous local feature of the timber.
+
+### copied selection prompts from the viewer
+
+If the user prompts you to do something with their current selection, you may use the MCP tool to view it. If you don't have access to it, instead instruct the user to press the "copy for ai" button or right click on the element and choose "copy for ai" to get information about it.
 
 
 ## Imports
@@ -339,7 +353,13 @@ Lumber sizes are often specified in nominal dimensions and not their actual dime
 
 # Validation Workflow
 
-When authoring a frame for the user, always test locally first just by running the python script directly to confirm there are no errors and the logging looks accurate. There are several additional ways you can test and validate the output
+When authoring a frame for the user, always test your changes. There are several ways to do this:
+
+## Using the MCP
+
+The MCP will have tools exposed allowing you to browse the user's sessions, read the log and take screenshots.
+
+The MCP is NOT available in the VSCode extension. Only the web browser and standalone app.
 
 ## Headlessly using Kumiki
 
@@ -363,44 +383,6 @@ By default this renders the whole frame from a 3/4 isometric angle, auto-framed 
 By default this uses `render_backend=RenderBackend.MATPLOTLIB` (requires `pip install kumiki[render-matplotlib]`), which never opens a window and can be called as many times as you like in the same process. There's also `render_backend=RenderBackend.TRIMESH_PYGLET` (requires `pip install kumiki[render]`), which is correctly z-buffered but opens a real window and is only reliable for the *first* render call in a process on macOS (see the module docstring for why) -- if you use that backend and need several renders in one session, invoke this function from a fresh `python3` subprocess each time rather than calling it repeatedly in a long-lived process.
 
 After taking a screenshot, alwasy make sure to show it to the user in the agent chat window so the user can see your progress.
-
-## Using VS Code Commands for Full Agentic Development Loop (only if you have access to VSCode commands, which you most likely don't)
-
-Use this sequence after headless local validation passes.
-
-1. Open the frame in viewer
-    - Command Palette: `Kigumi: Open Current File In Viewer`
-    - Command id: `kigumi.openCurrentFileInViewer`
-2. Open Kigumi explorer (optional but useful for pattern workflows)
-    - Command Palette: `Kigumi: Open Explorer`
-    - Command id: `kigumi.explorer`
-3. Toggle auto refresh on file change as needed for the current task
-    - Command Palette: `Kigumi: Toggle Auto Refresh On File Change`
-    - Command id: `kigumi.toggleAutoRefreshOnFileChange`
-
-For automation-driven checks (agent/testing flows), call these command ids directly:
-
-1. Open a specific file in viewer: `kigumi.automationOpenFileInViewer` (with `filePath`)
-2. List active sessions: `kigumi.automationListSessions`
-3. Refresh a specific session: `kigumi.automationRefreshSession`
-4. Read disk-backed JSONL logs: `kigumi.automationReadSessionLogs`
-5. Read camera state: `kigumi.automationGetCameraState`
-6. Set camera state: `kigumi.automationSetCameraState`
-7. Capture 3D viewport screenshot: `kigumi.captureScreenshot`
-
-Expected artifacts from the automated loop:
-
-- Session logs in `.kigumi/logs/*.jsonl`
-- Screenshots in `.kigumi/automation/`
-
-Common automation loop example:
-
-1. `kigumi.automationOpenFileInViewer` with `filePath: "/absolute/path/to/frame.py"`
-2. `kigumi.automationListSessions`
-3. `kigumi.automationRefreshSession` with `dirtyOnce: true`
-4. `kigumi.automationReadSessionLogs` filtering for warnings/errors
-5. `kigumi.automationGetCameraState`
-6. `kigumi.captureScreenshot`
 
 # Updating Kumiki
 
