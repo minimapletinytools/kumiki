@@ -889,6 +889,7 @@ export const MeasuringMixin = (Base) => class extends Base {
             ? this.pageScreenRect(element.offsetWidth, element.offsetHeight)
             : { x: 0, y: 0, width: element.offsetWidth, height: element.offsetHeight };
 
+        this._drawWorkingViewportOutline(overlay, pageRect, element.offsetHeight);
         for (const viewport of this.viewports) {
             for (const measure of (viewport.spec.measurements || [])) {
                 if (!KigumiMeasurements.isDeleted(measure)) {
@@ -912,6 +913,27 @@ export const MeasuringMixin = (Base) => class extends Base {
                     { className: 'dim-pending', pending: true });
             }
         }
+    }
+
+    /** Outline the drawing view holding a selection or a measurement in progress. */
+    _drawWorkingViewportOutline(overlay, pageRect, canvasHeight) {
+        const selection = this.selectionManager;
+        if (!this.isInDrawing || !(selection.focus || selection.markedMeasures.size || this.measureDraft.isActive)) {
+            return;
+        }
+        const viewport = this.viewports.find((one) => one.id === selection.scope && one.isOrthographic);
+        if (!viewport) {
+            return;
+        }
+        const rect = viewport.pixelRect(pageRect, canvasHeight);
+        const outline = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        outline.setAttribute('class', 'drawing-view-outline');
+        outline.setAttribute('data-viewport-id', viewport.id);
+        outline.setAttribute('x', rect.x + 1);
+        outline.setAttribute('y', canvasHeight - rect.y - rect.height + 1);
+        outline.setAttribute('width', Math.max(0, rect.width - 2));
+        outline.setAttribute('height', Math.max(0, rect.height - 2));
+        overlay.appendChild(outline);
     }
 
     /**

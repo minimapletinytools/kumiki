@@ -152,6 +152,13 @@
     pointer-events: none;
 }
 
+.drawing-view-outline {
+    fill: none;
+    stroke: var(--hv-accent, #4a7dbd);
+    stroke-width: 2;
+    pointer-events: none;
+}
+
 .dim-line,
 .dim-witness {
     stroke: var(--hv-title);

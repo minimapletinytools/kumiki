@@ -47,5 +47,60 @@ module.exports = {
             drawn ? `${drawn.shown} of ${drawn.lines} lines shown, ${drawn.broken} broken programs, GL error ${drawn.glError}`
                 : `drawing ${drawingId}; ${state}`);
         await capture('03c-drawing-dotted-lines');
+        if (!drawn) return;
+
+        const outline = await inShell(`(() => {
+            const app = ${viewerApp};
+            const views = app.viewports.filter((view) => view.isOrthographic);
+            const selected = () => {
+                app.renderMeasurements();
+                return Array.from(app.querySelectorAll('.drawing-view-outline')).map((rect) => rect.dataset.viewportId);
+            };
+            app.selectionManager.clearAll();
+            const empty = selected();
+            app.selectionManager.enterScope(views[0].id);
+            app.selectionManager.setCsgFocus({ timberKey: Array.from(app.sceneManager.keys())[0],
+                path: [], featureLabel: 'rptw.front' });
+            const feature = selected();
+            const rect = app.querySelector('.drawing-view-outline');
+            const bounds = rect.getBoundingClientRect();
+            const pointerEvents = getComputedStyle(rect).pointerEvents;
+            app.selectionManager.setMeasurementFocus({ viewportId: views[1].id, measureKey: 'outline-test' });
+            const moved = selected();
+            app.selectionManager.clearAll();
+            const cleared = selected();
+            app.selectionManager.enterScope(views[0].id);
+            app.measureDraft.hold({ reference: { timber: 'test', feature: 'front' }, geometry: { type: 'plane' } });
+            const held = selected();
+            app.measureDraft.leave();
+            const released = selected();
+            app.selectionManager.clearAll();
+            selected();
+            app.querySelector('.dim-group').dispatchEvent(new app.ownerDocument.defaultView.PointerEvent('pointerdown',
+                { bubbles: true, shiftKey: true }));
+            const clicked = selected();
+            return { empty, feature, moved, cleared, held, released, clicked, focus: app.selectionManager.focus,
+                first: views[0].id, second: views[1].id,
+                width: bounds.width, height: bounds.height, pointerEvents };
+        })()`);
+        check('selection outlines only its own drawing view, and moving the selection moves the outline',
+            outline.empty.length === 0 && outline.feature.join() === outline.first && outline.moved.join() === outline.second,
+            JSON.stringify(outline));
+        check('deselecting removes the drawing view outline', outline.cleared.length === 0);
+        check('a held measurement end outlines its view until released',
+            outline.held.join() === outline.first && outline.released.length === 0);
+        check('the view outline has visible bounds and lets pointer input pass through',
+            outline.width > 0 && outline.height > 0 && outline.pointerEvents === 'none');
+        check('clicking a drawn measurement outlines its view',
+            outline.focus?.kind === 'measurement' && outline.clicked.join() === outline.focus.viewportId);
+        await waitFor(() => inShell(`${viewerApp}.querySelectorAll('.drawing-view-outline').length === 1`), { timeoutMs: 5000 });
+        await capture('03d-drawing-selected-view');
+        const modelOutlined = await inShell(`(() => {
+            const app = ${viewerApp};
+            app.leaveDrawing();
+            app.renderMeasurements();
+            return !!app.querySelector('.drawing-view-outline');
+        })()`);
+        check('leaving the drawing removes its view outline', !modelOutlined);
     },
 };
