@@ -254,9 +254,8 @@ came from single sessions.
    Left from §6: a TurnRunner apart from the panel protocol, and typed protocol messages.
 4. **Done: backend reservations (§7).** `reserve_request` holds back each request's most possible
    cost; `settle_request` drops the hold. The client's `backend-fetch.js` and its wait notice are
-   gone. The rate limit's 429 says `Retry-After: 20`. Left: once the previous Worker is gone, a
-   migration dropping `claim_request`, `start_request`, `finish_request`, `busy_until` and
-   `active_request`.
+   gone. The rate limit's 429 says `Retry-After: 20`. The old lease (`claim_request` and its
+   columns) was dropped once the previous Worker was gone (kigumi-backend 20261030000000).
 5. **Done: profiles (§5).** `HARNESS` in `agent/models.js` holds the defaults (nudgeAfter,
    keepToolResults, summariseAt, imagesInToolResults); a model's `harness` from `/models` overrides
    them, so tuning needs no app release. No model sets one yet: set them from eval runs. Not done:
