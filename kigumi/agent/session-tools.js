@@ -37,35 +37,24 @@ function todoTool(onChange) {
     };
 }
 
-/** A picture of the view showing `filePath` as a data URL, or null. */
-async function viewPicture(run, filePath) {
-    try {
-        const result = await run('kigumi.captureScreenshot', { filePath, includeData: true });
-        return result && result.data ? `data:image/png;base64,${result.data}` : null;
-    } catch (_error) {
-        return null;
-    }
-}
-
 /**
  * `tool`, and when it writes or edits a file a view shows, that view rebuilt with the build's result
  * (one step for the agent where it took three), and the view before and after given to
- * `onPictures(toolCallId, before, after)`, for the panel only.
+ * `onPictures(toolCallId, before, after)`, for the panel only. `frames` is the host's (agent/frames.js).
  */
-function withBuildCheck(tool, { panels, run, files, onPictures }) {
+function withBuildCheck(tool, { files, frames, onPictures }) {
     if (!EDIT_TOOLS.has(tool.name)) return tool;
+    const picture = (file) => (frames.picture ? frames.picture(file) : null);
     return {
         ...tool,
         run: async (args, context = {}) => {
             const target = files.resolve(args.file_path || '');
-            const shown = panels.list().some((panel) => panel.kind === 'viewer' && panel.filePath
-                && files.resolve(panel.filePath) === target);
-            const before = shown ? await viewPicture(run, target) : null;
+            const shown = frames.shows(target);
+            const before = shown ? await picture(target) : null;
             const result = await tool.run(args, context);
             if (!shown) return result;
-            const report = await run('kigumi.automationBuildReport', { filePath: target, reason: 'agent edit' })
-                .catch((error) => ({ ok: false, error: error.message, entries: [] }));
-            const after = await viewPicture(run, target);
+            const report = await frames.rebuild(target);
+            const after = await picture(target);
             if (before && after && context.toolCallId) onPictures(context.toolCallId, before, after);
             const built = describeBuild(report);
             return built ? [...result, { type: 'text', text: built }] : result;

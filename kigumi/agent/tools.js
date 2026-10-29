@@ -1,12 +1,10 @@
 /**
- * Kigumi's tools for agents: one list, served over MCP (agent/mcp-http.js) to any agent, and
- * in process to the built-in agent panel (agent/agent-session.js).
+ * Kigumi's view tools: the panels open, what they show, and each view's camera, log and picture.
+ * agent/agent.js adds them to the agent's tools and the MCP server's.
  *
  * Each tool is { name, description, shape, effect, run }, where `shape` is a zod raw shape
  * (both SDKs take one), `effect` is what running it does (agent/permissions.js), and `run(args)`
  * resolves to MCP content: [{ type: 'text', text }] or an image.
- *
- * Kigumi-specific only: reading and editing files is the agent's own job.
  */
 
 const { z } = require('zod');
@@ -127,20 +125,6 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             run: async ({ panel_id: id, camera }) => text(await run('kigumi.automationSetCameraState', {
                 ...viewOptions(id), cameraState: camera,
             })),
-        },
-        {
-            name: 'check_frame',
-            description: 'Build a Python frame file and say whether it built, with its warnings and errors. Opens '
-                + 'it in a view first if none shows it.',
-            shape: { file_path: z.string().describe('Absolute path to a .py frame file.') },
-            effect: 'run',
-            run: async ({ file_path: filePath }) => {
-                const opened = await run('kigumi.automationOpenFileInViewer', { filePath });
-                if (opened && opened.ok === false) {
-                    return text({ ok: false, reason: opened.reason, filePath });
-                }
-                return text(await run('kigumi.automationBuildReport', { filePath: (opened && opened.filePath) || filePath }));
-            },
         },
         {
             name: 'screenshot',

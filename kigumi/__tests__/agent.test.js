@@ -4,6 +4,8 @@ const path = require('path');
 
 const { createPanelDirectory } = require('../agent/panel-directory');
 const { createKigumiTools } = require('../agent/tools');
+const { viewFrames, checkFrameTool } = require('../agent/frames');
+const { sharedTools, agentTools, viewHost } = require('../agent/agent');
 const { startMcpHttpServer } = require('../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../agent/mcp-setup');
 
@@ -73,13 +75,24 @@ describe('the panel directory', () => {
 describe('the tools', () => {
     const textOf = (content) => JSON.parse(content[0].text);
 
+    test('every agent gets the view tools, check_frame and kumiki_api; the built-in one also files and a to-do list', () => {
+        const host = viewHost({ panels: directory(), run: async () => ({}), files: { root: () => '/p' }, kumikiApi: async () => '{}' });
+        const shared = sharedTools(host).map((tool) => tool.name);
+        const own = agentTools(host, { checkpoints: () => null }).map((tool) => tool.name);
+
+        expect(shared).toEqual(expect.arrayContaining(['list_panels', 'screenshot', 'check_frame', 'kumiki_api']));
+        expect(shared).not.toContain('edit_file');
+        expect(own).toEqual([...shared, 'list_files', 'search_files', 'read_file', 'write_file', 'edit_file', 'update_todos']);
+        // Headless: no views, so no view tools.
+        expect(sharedTools({ ...host, view: null, kumikiApi: null }).map((tool) => tool.name)).toEqual(['check_frame']);
+    });
+
     test('check_frame opens the file in a view and reports that build', async () => {
         const ran = [];
-        const tools = createKigumiTools({ panels: directory(), run: async (id, args) => {
+        const check = checkFrameTool(viewFrames({ panels: directory(), files: { resolve: (file) => file }, run: async (id, args) => {
             ran.push([id, args.filePath]);
             return id === 'kigumi.automationOpenFileInViewer' ? { ok: true, filePath: '/p/a.py' } : { ok: true, entries: [] };
-        } });
-        const check = tools.find((tool) => tool.name === 'check_frame');
+        } }));
 
         expect(check.effect).toBe('run');
         expect(textOf(await check.run({ file_path: '/p/a.py' }))).toEqual({ ok: true, entries: [] });

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Agent evals: each task (tasks.js) run by each model, in a project of its own, through the agent's
- * own loop, prompt and file tools, with frames built by Python (build_frame.py) rather than a view.
+ * own loop, tools and prompt (agent/agent.js), on a host whose frames are built by Python
+ * (build_frame.py) rather than in a view.
  * Scored on the task's checks, with steps, cost and time. Costs real money, on the OpenRouter key in
  * KIGUMI_EVAL_OPENROUTER_KEY.
  *
@@ -20,9 +21,9 @@ const { runTurn, languageModelFor, MAX_STEPS } = require('../../agent/agent-loop
 const { MODELS, findModel, routeModel } = require('../../agent/models');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { createProjectFiles } = require('../../agent/project-files');
-const { createFileTools } = require('../../agent/file-tools');
-const { todoTool } = require('../../agent/session-tools');
-const { createKumikiApiTool } = require('../../agent/kumiki-api');
+const { pythonKumikiApi } = require('../../agent/kumiki-api');
+const { agentTools, instructions } = require('../../agent/agent');
+const { Checkpoints } = require('../../agent/checkpoints');
 const { TASKS } = require('./tasks');
 
 const REPO = path.resolve(__dirname, '..', '..', '..');
@@ -49,29 +50,25 @@ function buildFrame(file) {
     });
 }
 
-/** A report as the agent sees an edit's or check_frame's, as in the app (session-tools.js describeBuild). */
-function describeReport(report) {
-    if (!report.ok) return `The file failed to build:\nerror: ${report.error}\n${(report.traceback || '').slice(-2000)}`;
-    return `The file built without errors.${report.warnings.length ? `\n${report.warnings.map((w) => `warning: ${w}`).join('\n')}` : ''}`;
+/** build_frame.py's report as a host's frames give one (agent/frames.js). */
+function asBuildReport(report) {
+    const entries = (report.warnings || []).map((message) => ({ level: 'warning', message }));
+    if (report.traceback) entries.push({ level: 'error', message: report.traceback.slice(-2000) });
+    return { ok: report.ok, error: report.ok ? null : report.error, entries };
 }
 
-/** The tools as in the app, a view's build standing in for Python's. */
-function evalTools(files) {
-    const fileTools = createFileTools({ files }).map((tool) => (['write_file', 'edit_file'].includes(tool.name) ? {
-        ...tool,
-        run: async (args, context) => {
-            const result = await tool.run(args, context);
-            if (!String(args.file_path).endsWith('.py')) return result;
-            return [...result, { type: 'text', text: describeReport(await buildFrame(files.resolve(args.file_path))) }];
-        },
-    } : tool));
-    return [...fileTools, todoTool(() => {}), createKumikiApiTool({ python: () => PYTHON, env: { PYTHONPATH: REPO } }), {
-        name: 'check_frame',
-        description: 'Build a Python frame file and say whether it built, with its warnings and errors.',
-        shape: { file_path: require('zod').z.string().describe('A path in the project.') },
-        effect: 'run',
-        run: async ({ file_path: file }) => [{ type: 'text', text: describeReport(await buildFrame(files.resolve(file))) }],
-    }];
+/** The app's host without its views: every .py file counts as shown, and is built by Python. */
+function headlessHost(files, { kumikiSource, examples }) {
+    const build = async (file) => asBuildReport(await buildFrame(files.resolve(file)));
+    return {
+        files,
+        frames: { shows: (file) => String(file).endsWith('.py'), check: build, rebuild: build },
+        view: null,
+        kumikiApi: pythonKumikiApi({ python: () => PYTHON, env: { PYTHONPATH: REPO } }),
+        kumikiSource: () => kumikiSource,
+        kumikiExamples: () => examples,
+        systemPrompt: loadSystemPrompt(),
+    };
 }
 
 async function runOne(task, modelId, key) {
@@ -82,6 +79,9 @@ async function runOne(task, modelId, key) {
     const kumikiSource = path.join(REPO, 'kumiki');
     const examples = path.join(REPO, 'patterns');
     const files = createProjectFiles({ root: () => root, readOnly: () => [kumikiSource, examples] });
+    const host = headlessHost(files, { kumikiSource, examples });
+    const checkpoints = new Checkpoints(files);
+    checkpoints.begin(1);
     const model = findModel(modelId);
     const tools = [];
     const notices = [];
@@ -93,7 +93,7 @@ async function runOne(task, modelId, key) {
     try {
         const result = await runTurn({
             model: await languageModelFor(routeModel(model, { openrouterKey: key })), images: model.images,
-            cacheMarks: Boolean(model.cacheMarks), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: evalTools(files), files, system: loadSystemPrompt()(kumikiSource, examples),
+            cacheMarks: Boolean(model.cacheMarks), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: agentTools(host, { checkpoints: () => checkpoints }), files, system: instructions(host),
             history: [], prompt: task.prompt, askPermission: async () => true,
             onEvent: (event) => {
                 if (event.type === 'agent:tool') {
@@ -150,7 +150,11 @@ async function main() {
     if (out) fs.writeFileSync(out, JSON.stringify(results, null, 1));
 }
 
-main().catch((error) => {
-    console.error(error.message || error);
-    process.exit(1);
-});
+if (require.main === module) {
+    main().catch((error) => {
+        console.error(error.message || error);
+        process.exit(1);
+    });
+}
+
+module.exports = { headlessHost };

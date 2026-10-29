@@ -1,9 +1,6 @@
 /**
  * The agent panel's conversation, run in the app's own process (never the page) on the built-in
- * agent loop (agent/agent-loop.js), with Kigumi's tools and the project's files.
- *
- * Host-neutral: the project's files come in as an interface (agent/project-files.js for Node), so
- * a web host can run the same session over its own storage.
+ * agent loop (agent/agent-loop.js), with the tools and instructions agent/agent.js builds from a host.
  *
  * The panel and this talk in messages (webview/agent/protocol.js lists them):
  *   panel -> here:  agent:ready, agent:prompt {text, images?: [{mediaType, data}]}, agent:stop,
@@ -25,13 +22,13 @@
  * Kigumi's backend when signed in.
  */
 
-const { createKigumiTools } = require('./tools');
+const { agentTools, instructions } = require('./agent');
 const { MODELS, findModel, routeModel } = require('./models');
 const { runTurn, languageModelFor } = require('./agent-loop');
 const { Checkpoints } = require('./checkpoints');
-const { PERMISSION_MODES, PLAN_MODE_NOTE, PLAN_MODE_REFUSAL, permissionMode, decide } = require('./permissions');
+const { PERMISSION_MODES, PLAN_MODE_REFUSAL, permissionMode, decide } = require('./permissions');
 const { promptContent } = require('./prompt-content');
-const { todoTool, withBuildCheck, withCheckpoints, describeBuild } = require('./session-tools');
+const { describeBuild } = require('./session-tools');
 
 /** The settings the panel's own menu sets: their defaults, and what a value must be. */
 const PANEL_SETTINGS = {
@@ -68,39 +65,27 @@ function describeFailure(error) {
 class AgentSession {
     /**
      * @param {object} options
-     * @param {object} options.panels         a panel directory (panel-directory.js)
-     * @param {(id: string, args?: object) => Promise<any>} options.run  an app command
+     * @param {object} options.host           what the agent works with (agent/agent.js)
      * @param {(message: object) => void} options.post  to the agent panel
-     * @param {object} [options.files]        the project's files (agent/project-files.js)
-     * @param {object[]} [options.fileTools]   tools for them (agent/file-tools.js)
      * @param {(key: string, fallback: any) => any} options.setting
      * @param {(key: string, value: any) => void} [options.setSetting]
      * @param {object|null} [options.account]  the Kigumi account (agent/account.js)
      * @param {{list: () => object[]}} [options.models]  the models offered (models.js createModelList)
-     * @param {() => string|null} [options.kumikiSource]  where the kumiki library's source is, for the agent to read
-     * @param {() => string|null} [options.kumikiExamples]  where kumiki's example frames are, for the agent to read
-     * @param {(kumikiSource: string|null, kumikiExamples: string|null) => string} [options.systemPrompt]  the agent's instructions
-     *     (agent/system-prompt.js loadSystemPrompt)
      * @param {object|null} [options.conversations]  where past conversations are kept (conversation-store.js)
      * @param {(route: object, options: {fetch?: typeof fetch}) => Promise<object>} [options.createModel]
      * @param {(line: string) => void} [options.log]
      * @param {object} [options.strings]   the panel's strings in the app's language (the agent.* keys of i18n/locales)
      */
-    constructor({ panels, run, post, files = null, fileTools = [], setting, setSetting = () => {}, account = null,
-        conversations = null, createModel = languageModelFor, log = () => {}, strings = {}, models = { list: () => MODELS },
-        kumikiSource = () => null, kumikiExamples = () => null, systemPrompt = () => '' }) {
+    constructor({ host, post, setting, setSetting = () => {}, account = null,
+        conversations = null, createModel = languageModelFor, log = () => {}, strings = {}, models = { list: () => MODELS } }) {
         this.strings = Object.fromEntries(Object.entries(strings).filter(([key]) => key.startsWith('agent.')));
-        this.files = files || { root: () => null };
-        this.fileTools = fileTools;
-        this.panels = panels;
-        this.tools = [
-            ...createKigumiTools({ panels, run, workspaceFolders: () => [this.files.root()].filter(Boolean) }),
-            ...fileTools.map((tool) => withCheckpoints(
-                withBuildCheck(tool, { panels, run, files: this.files,
-                    onPictures: (id, before, after) => this.postRaw({ type: 'agent:toolImages', id, before, after }) }),
-                { files: this.files, checkpoints: () => this.checkpoints })),
-            todoTool((items) => this.post({ type: 'agent:todos', items })),
-        ];
+        this.host = host;
+        this.files = host.files;
+        this.tools = agentTools(host, {
+            checkpoints: () => this.checkpoints,
+            onTodos: (items) => this.post({ type: 'agent:todos', items }),
+            onPictures: (id, before, after) => this.postRaw({ type: 'agent:toolImages', id, before, after }),
+        });
         // Everything the panel shows of a conversation is also kept, to show it again when reopened.
         this.post = (message) => {
             if (SHOWN.has(message.type)) this.transcript.push(message);
@@ -112,9 +97,6 @@ class AgentSession {
         this.setSetting = setSetting;
         this.account = account;
         this.models = models;
-        this.kumikiSource = kumikiSource;
-        this.kumikiExamples = kumikiExamples;
-        this.systemPrompt = systemPrompt;
         this.createModel = createModel;
         this.log = log;
         this.abort = null;
@@ -322,17 +304,18 @@ class AgentSession {
     /** Whether a 'run' tool's file is one a view shows or the agent wrote; a tool with no file runs a view's. */
     _knownFile(input) {
         if (!input || !input.file_path) return true;
-        const resolved = (file) => {
-            try {
-                return this.files.resolve(file);
-            } catch (_error) {
-                return null;
-            }
-        };
-        const target = resolved(input.file_path);
-        if (!target) return false;
-        return this.checkpoints.wrote(target) || this.panels.list().some((panel) => panel.kind === 'viewer'
-            && panel.filePath && resolved(panel.filePath) === target);
+        let target;
+        try {
+            target = this.files.resolve(input.file_path);
+        } catch (_error) {
+            return false;
+        }
+        return this.checkpoints.wrote(target) || this.host.frames.shows(target);
+    }
+
+    /** What the user is looking at, or null. */
+    _describe() {
+        return this.host.view ? this.host.view.panels.describe() : Promise.resolve(null);
     }
 
     _askPermission(toolName, input) {
@@ -407,11 +390,9 @@ class AgentSession {
                 maxOutputTokens: this.panelSetting('agent.maxOutputTokens'),
                 tools: this.tools,
                 files: this.files.root() ? this.files : null,
-                system: this.panelSetting('agent.planMode')
-                    ? `${this.systemPrompt(this.kumikiSource(), this.kumikiExamples())}\n\n${PLAN_MODE_NOTE}`
-                    : this.systemPrompt(this.kumikiSource(), this.kumikiExamples()),
+                system: instructions(this.host, { planMode: this.panelSetting('agent.planMode') }),
                 history: this.history,
-                prompt: await promptContent({ text, images, files: this.files, describe: () => this.panels.describe(),
+                prompt: await promptContent({ text, images, files: this.files, describe: () => this._describe(),
                     modelSeesImages: this.model.images }),
                 abortSignal: abort.signal,
                 askPermission: (toolName, input) => this._askPermission(toolName, input),

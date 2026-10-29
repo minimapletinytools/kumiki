@@ -9,6 +9,7 @@ const { createFileTools } = require('../agent/file-tools');
 const { createProjectFiles } = require('../agent/project-files');
 const { withContext, withMentions, promptContent } = require('../agent/prompt-content');
 const { AgentSession, RETRY_PROMPT, describeFailure, describeBuild } = require('../agent/agent-session');
+const { viewHost } = require('../agent/agent');
 const { z } = require('zod');
 
 const USAGE = { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } };
@@ -607,6 +608,8 @@ function fakeFiles(root) {
 
 describe('the agent session', () => {
     const panels = { list: () => [], active: () => null, describe: async () => null, viewSession: () => null };
+    const hostOf = ({ panels: shown = panels, run = async () => ({}), files = { root: () => null } } = {}) =>
+        viewHost({ panels: shown, run, files });
 
     /** An account that is signed in, as far as the session can tell. */
     const signedIn = () => ({
@@ -621,7 +624,7 @@ describe('the agent session', () => {
         const values = { ...settings };
         const created = [];
         const agent = new AgentSession({
-            panels, run: async () => ({}), post: (message) => posted.push(message),
+            host: hostOf(), post: (message) => posted.push(message),
             setting: (key, fallback) => (key in values ? values[key] : fallback),
             setSetting: (key, value) => { values[key] = value; },
             account, createModel: async (route, options) => { created.push([route, options]); return model; },
@@ -670,29 +673,35 @@ describe('the agent session', () => {
     });
 
     test('editing a file a view shows rebuilds it, and the edit says whether it built', async () => {
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-rebuild-')));
+        fs.writeFileSync(path.join(root, 'a.py'), 'x = 1\n');
+        fs.writeFileSync(path.join(root, 'b.py'), 'x = 1\n');
         const reports = [];
-        const editTool = { name: 'edit_file', shape: {}, effect: 'edit', run: async () => [{ type: 'text', text: 'Edited a.py.' }] };
         const agent = new AgentSession({
-            panels: { ...panels, list: () => [{ kind: 'viewer', filePath: '/project/a.py' }] },
-            run: async (id, args) => {
-                if (id === 'kigumi.captureScreenshot') throw new Error('no view to picture here');
-                reports.push([id, args.filePath]);
-                return { ok: false, entries: [{ level: 'error', message: 'NameError: brace' }] };
-            },
-            post: () => {}, files: fakeFiles('/project'), setting: (key, fallback) => fallback, fileTools: [editTool],
+            host: hostOf({
+                panels: { ...panels, list: () => [{ kind: 'viewer', filePath: path.join(root, 'a.py') }] },
+                run: async (id, args) => {
+                    if (id === 'kigumi.captureScreenshot') throw new Error('no view to picture here');
+                    reports.push([id, args.filePath]);
+                    return { ok: false, entries: [{ level: 'error', message: 'NameError: brace' }] };
+                },
+                files: createProjectFiles({ root: () => root }),
+            }),
+            post: () => {}, setting: (key, fallback) => fallback,
         });
         const edit = agent.tools.find((tool) => tool.name === 'edit_file');
 
-        expect(await edit.run({ file_path: 'a.py' })).toEqual([
-            { type: 'text', text: 'Edited a.py.' },
+        expect(await edit.run({ file_path: 'a.py', old_string: 'x = 1', new_string: 'x = 2' })).toEqual([
+            { type: 'text', text: 'Edited a.py (1 replacement).' },
             { type: 'text', text: 'The view of this file rebuilt with errors:\nerror: NameError: brace' },
         ]);
-        expect(reports).toEqual([['kigumi.automationBuildReport', '/project/a.py']]);
+        expect(reports).toEqual([['kigumi.automationBuildReport', path.join(root, 'a.py')]]);
         // A file no view shows is just edited.
         reports.length = 0;
-        await edit.run({ file_path: 'b.py' });
+        await edit.run({ file_path: 'b.py', old_string: 'x = 1', new_string: 'x = 2' });
         expect(reports).toEqual([]);
         expect(describeBuild({ ok: true, entries: [] })).toBe('The view of this file rebuilt without errors.');
+        fs.rmSync(root, { recursive: true, force: true });
     });
 
         test('a conversation is saved after each turn, and comes back when the panel opens again', async () => {
@@ -705,7 +714,7 @@ describe('the agent session', () => {
         };
         const posted = [];
         const make = (model) => new AgentSession({
-            panels, run: async () => ({}), post: (message) => posted.push(message), files: fakeFiles('/project'),
+            host: hostOf({ files: fakeFiles('/project') }), post: (message) => posted.push(message),
             setting: (key, fallback) => (key === 'agent.openrouterApiKey' ? 'sk-or' : fallback), conversations,
             createModel: async () => model,
         });
@@ -773,9 +782,9 @@ describe('the agent session', () => {
         );
         const posted = [];
         const agent = new AgentSession({
-            panels, run: async () => ({}), post: (message) => posted.push(message), files: projectFiles,
+            host: hostOf({ files: projectFiles }), post: (message) => posted.push(message),
             setting: (key, fallback) => ({ 'agent.openrouterApiKey': 'sk-or', 'agent.permissionMode': 'auto' }[key] ?? fallback),
-            fileTools: createFileTools({ files: projectFiles }), createModel: async () => model,
+            createModel: async () => model,
         });
 
         await agent.prompt('three legs and a brace');
@@ -858,15 +867,19 @@ describe('the agent session', () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-shots-'));
         const shot = path.join(root, 'shot.png');
         fs.writeFileSync(shot, 'png');
+        fs.writeFileSync(path.join(root, 'a.py'), 'x = 1\n');
         const posted = [];
-        const editTool = { name: 'edit_file', shape: {}, effect: 'edit', run: async () => [{ type: 'text', text: 'Edited.' }] };
         const agent = new AgentSession({
-            panels: { ...panels, list: () => [{ kind: 'viewer', filePath: path.join(root, 'a.py') }] },
-            run: async (id) => (id === 'kigumi.captureScreenshot' ? { data: Buffer.from('png').toString('base64') } : { ok: true, entries: [] }),
-            post: (message) => posted.push(message), files: createProjectFiles({ root: () => root }), setting: (key, fallback) => fallback, fileTools: [editTool],
+            host: hostOf({
+                panels: { ...panels, list: () => [{ kind: 'viewer', filePath: path.join(root, 'a.py') }] },
+                run: async (id) => (id === 'kigumi.captureScreenshot' ? { data: Buffer.from('png').toString('base64') } : { ok: true, entries: [] }),
+                files: createProjectFiles({ root: () => root }),
+            }),
+            post: (message) => posted.push(message), setting: (key, fallback) => fallback,
         });
 
-        await agent.tools.find((tool) => tool.name === 'edit_file').run({ file_path: 'a.py' }, { toolCallId: 'c9' });
+        await agent.tools.find((tool) => tool.name === 'edit_file').run({ file_path: 'a.py', old_string: 'x = 1', new_string: 'x = 2' },
+            { toolCallId: 'c9' });
 
         const pictures = posted.find((message) => message.type === 'agent:toolImages');
         expect(pictures).toEqual({ type: 'agent:toolImages', id: 'c9',
@@ -940,7 +953,7 @@ describe('the agent session', () => {
 
     test('asking, building a file runs freely when a view shows it or the agent wrote it, else asks', async () => {
         const viewed = { ...panels, list: () => [{ kind: 'viewer', filePath: '/project/shown.py' }] };
-        const agent = new AgentSession({ panels: viewed, run: async () => ({}), post: () => {}, files: fakeFiles('/project'),
+        const agent = new AgentSession({ host: hostOf({ panels: viewed, files: fakeFiles('/project') }), post: () => {},
             setting: (key, fallback) => fallback });
         agent.checkpoints.begin(1);
         await agent.checkpoints.beforeWrite('/project/written.py');

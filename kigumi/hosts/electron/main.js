@@ -19,7 +19,6 @@ const { createElectronHost } = require('./electron-host');
 const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
 const { AgentSession } = require('../../agent/agent-session');
-const { createFileTools } = require('../../agent/file-tools');
 const { createProjectFiles } = require('../../agent/project-files');
 const { createAccount } = require('../../agent/account');
 const { createConversationStore } = require('../../agent/conversation-store');
@@ -27,10 +26,10 @@ const { loadCatalog, resolveLocale } = require('../../i18n');
 const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
 const { findKumikiSource, kumikiExamples, projectPython } = require('../../agent/kumiki-source');
-const { createKumikiApiTool } = require('../../agent/kumiki-api');
+const { pythonKumikiApi } = require('../../agent/kumiki-api');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { SecureStorage } = require('./secure-storage');
-const { createKigumiTools } = require('../../agent/tools');
+const { viewHost, sharedTools } = require('../../agent/agent');
 const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../../agent/mcp-setup');
 
@@ -450,6 +449,38 @@ function createAppAccount() {
     if (link) handleAuthLink(link);
 }
 
+// The kumiki library's source, which the agent may read: found once per project.
+let kumikiSource = null;
+let kumikiSourceFor = null;
+function knownKumikiSource() {
+    if (kumikiSourceFor !== workspaceFolder) {
+        kumikiSourceFor = workspaceFolder;
+        kumikiSource = null;
+        const asked = workspaceFolder;
+        void findKumikiSource(asked).then((folder) => {
+            if (kumikiSourceFor === asked) kumikiSource = folder;
+        });
+    }
+    return kumikiSource;
+}
+
+// What the agent panel and the MCP server work with (agent/agent.js).
+function agentHost() {
+    knownKumikiSource();
+    const files = createProjectFiles({ root: () => workspaceFolder,
+        readOnly: () => [kumikiSource, kumikiExamples(kumikiSource)].filter(Boolean) });
+    return viewHost({
+        panels: kigumiApp.panels,
+        run: runToolCommand,
+        files,
+        workspaceFolders: () => (workspaceFolder ? [workspaceFolder] : []),
+        kumikiApi: pythonKumikiApi({ python: () => projectPython(workspaceFolder), cwd: () => workspaceFolder }),
+        kumikiSource: knownKumikiSource,
+        kumikiExamples: () => kumikiExamples(knownKumikiSource()),
+        systemPrompt: loadSystemPrompt(),
+    });
+}
+
 // Shows or hides the agent. Hidden, it keeps its conversation.
 function toggleAgentPanel() {
     if (connection.findPanel((panel) => panel.type === 'agent')) {
@@ -457,37 +488,13 @@ function toggleAgentPanel() {
         return;
     }
     const surface = connection.createPanel('agent', { title: 'Agent' });
-    // The kumiki library's source, which the agent may read: found once per project.
-    let kumikiSource = null;
-    let kumikiSourceFor = null;
-    const knowKumikiSource = () => {
-        if (kumikiSourceFor === workspaceFolder) return;
-        kumikiSourceFor = workspaceFolder;
-        kumikiSource = null;
-        void findKumikiSource(workspaceFolder).then((folder) => {
-            if (kumikiSourceFor === workspaceFolder) kumikiSource = folder;
-        });
-    };
-    knowKumikiSource();
-    const projectFiles = createProjectFiles({ root: () => workspaceFolder,
-        readOnly: () => [kumikiSource, kumikiExamples(kumikiSource)].filter(Boolean) });
     agentSession = new AgentSession({
-        panels: kigumiApp.panels,
-        run: runToolCommand,
+        host: agentHost(),
         post: (message) => void surface.postMessage(message),
         setting: (key, fallback) => settings.get(key, fallback),
         setSetting: (key, value) => settings.set(key, value),
-        files: projectFiles,
-        fileTools: [...createFileTools({ files: projectFiles }),
-            createKumikiApiTool({ python: () => projectPython(workspaceFolder), cwd: () => workspaceFolder })],
         account,
         models: modelList,
-        systemPrompt: loadSystemPrompt(),
-        kumikiSource: () => {
-            knowKumikiSource();
-            return kumikiSource;
-        },
-        kumikiExamples: () => kumikiExamples(kumikiSource),
         conversations: createConversationStore(path.join(app.getPath('userData'), 'conversations')),
         strings: loadCatalog(resolveLocale(app.getLocale())),
         log: (line) => logChannel.appendLine(line),
@@ -558,11 +565,7 @@ async function syncMcpServer() {
     }
     try {
         mcpServer = await startMcpHttpServer({
-            tools: createKigumiTools({
-                panels: kigumiApp.panels,
-                run: runToolCommand,
-                workspaceFolders: () => (workspaceFolder ? [workspaceFolder] : []),
-            }),
+            tools: sharedTools(agentHost()),
             token,
             port,
             version: packageJson.version,

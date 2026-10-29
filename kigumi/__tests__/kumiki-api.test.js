@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
-const { createKumikiApiTool } = require('../agent/kumiki-api');
+const { kumikiApiTool, pythonKumikiApi } = require('../agent/kumiki-api');
 
 const REPO = path.resolve(__dirname, '..', '..');
 const PYTHON = path.join(REPO, '.venv', 'bin', 'python');
-const tool = createKumikiApiTool({ python: () => PYTHON, env: { PYTHONPATH: REPO } });
+const tool = kumikiApiTool(pythonKumikiApi({ python: () => PYTHON, env: { PYTHONPATH: REPO } }));
 const ask = async (args) => JSON.parse((await tool.run(args))[0].text);
 
 (fs.existsSync(PYTHON) ? describe : describe.skip)('kumiki_api', () => {
@@ -31,5 +31,5 @@ const ask = async (args) => JSON.parse((await tool.run(args))[0].text);
 });
 
 test('without a Python environment, it says so', async () => {
-    await expect(createKumikiApiTool({ python: () => null }).run({ name: 'x' })).rejects.toThrow('no Python environment');
+    await expect(kumikiApiTool(pythonKumikiApi({ python: () => null })).run({ name: 'x' })).rejects.toThrow('no Python environment');
 });

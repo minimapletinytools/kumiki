@@ -239,15 +239,17 @@ came from single sessions.
 
 ## Order
 
-1. **Now, small:** §0; §2's effect field and permission table (fixes the edits-mode hole); the
-   epoch boundary from §3 inside today's `trimOldToolResults` (fixes caching without the rest of §3);
-   nudge counter per turn.
-2. **Composition root (§1)** and evals on it (§8). Everything after is measured with it.
+1. **Done.** §0; §2's effects and two modes; batched trimming in `trimOldToolResults`; nudge counter
+   per turn; the direct-Anthropic route dropped (from §5).
+2. **Done: composition root (§1).** `agent/agent.js` builds the tools and prompt from a host;
+   `agent/frames.js` is how a host builds frames. The app, MCP (now also given `kumiki_api`) and the
+   evals (a headless host over `build_frame.py`) all use it. Left from §8: the new eval tasks and
+   recording cache hit rate.
 3. **Log + buildRequest + notes (§3, §4)**, with the split of AgentSession (§6). The log keeps the
    whole conversation; trimming only shapes what is sent. Conversations saved before this have only
    their trimmed history: convert them best-effort (what was cut stays cut).
 4. **Backend reservations (§7)**, then delete `backend-fetch.js` and the lease code.
-5. **Profiles (§5)**, and dropping the direct-Anthropic route.
+5. **Profiles (§5).**
 
 ## Decisions (2026-10-29)
 
