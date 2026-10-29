@@ -274,7 +274,6 @@
     "monaco-editor": "^0.57.0"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.87",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "@supabase/supabase-js": "^2.118.0",

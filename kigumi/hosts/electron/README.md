@@ -66,8 +66,7 @@ take their accelerators from it. Not configurable yet.
   Vercel AI SDK (`../../agent/agent-loop.js`), run in the app's main process
   (`../../agent/agent-session.js`). Its tools are Kigumi's plus reading, listing, writing and editing
   files inside the project; no shell. The model is picked in the panel (`agent.model`, an id from
-  `../../agent/models.js`). Requests go with `agent.apiKey` (an Anthropic key) or
-  `agent.openrouterApiKey` if set, else through the Kigumi account: signing in with GitHub or Google
+  `../../agent/models.js`). Requests go with `agent.openrouterApiKey` if set, else through the Kigumi account: signing in with GitHub or Google
   (`../../agent/account.js`) opens the browser and comes back on `kigumi://auth`; the session is kept
   encrypted with the OS keychain's key (`secure-storage.js`). Signing in shows only once
   `../../agent/backend-config.js` names a deployed backend (or `KIGUMI_SUPABASE_URL`,

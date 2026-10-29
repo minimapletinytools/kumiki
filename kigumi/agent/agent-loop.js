@@ -24,10 +24,6 @@ const STREAM_CONTINUATION = '[The previous response stream ended without a compl
 
 /** Return the AI SDK language model a route (agent/models.js routeModel) names. */
 async function languageModelFor(route, { fetch, onWait } = {}) {
-    if (route.via === 'anthropic') {
-        const { createAnthropic } = require('@ai-sdk/anthropic');
-        return createAnthropic({ apiKey: route.apiKey, fetch })(route.modelId);
-    }
     const { createOpenRouter } = require('@openrouter/ai-sdk-provider');
     const provider = createOpenRouter({
         // Through the backend, `fetch` puts the account's token in instead.
@@ -167,12 +163,12 @@ const CACHE_HERE = { type: 'ephemeral' };
  */
 function cacheMarked(messages) {
     return messages.map((message, i) => {
-        const { openrouter, anthropic, ...others } = message.providerOptions || {};
+        const { openrouter, ...others } = message.providerOptions || {};
         const rest = Object.keys(others).length ? others : undefined;
         if (i < messages.length - 2) {
             return { ...message, providerOptions: rest };
         }
-        return { ...message, providerOptions: { ...others, openrouter: { cacheControl: CACHE_HERE }, anthropic: { cacheControl: CACHE_HERE } } };
+        return { ...message, providerOptions: { ...others, openrouter: { cacheControl: CACHE_HERE } } };
     });
 }
 

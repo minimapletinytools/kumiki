@@ -52,14 +52,11 @@ describe('the model table', () => {
         expect(findModel('nonsense')).toBe(MODELS[0]);
     });
 
-    test('a key the user set wins over the account; an Anthropic key only for Anthropic models', () => {
-        const haiku = findModel('claude-haiku-4.5');
+    test("the user's OpenRouter key wins over the account", () => {
         const deepseek = findModel('deepseek-v4.1-flash');
         const backend = { url: 'https://api.example/' };
 
-        expect(routeModel(haiku, { anthropicKey: 'sk-ant', backend })).toEqual(
-            { via: 'anthropic', modelId: 'claude-haiku-4-5', apiKey: 'sk-ant' });
-        expect(routeModel(deepseek, { anthropicKey: 'sk-ant', backend })).toEqual(
+        expect(routeModel(deepseek, { backend })).toEqual(
             { via: 'backend', modelId: 'deepseek/deepseek-v4.1-flash', baseURL: 'https://api.example/v1' });
         expect(routeModel(deepseek, { openrouterKey: 'sk-or', backend }).via).toBe('openrouter');
         expect(routeModel(deepseek, {})).toBeNull();
@@ -391,7 +388,7 @@ describe('the agent loop', () => {
             messages = cacheMarked([...messages, { role: 'assistant', content: `a${step}` }]);
         }
         expect(marked(messages)).toBe(2);
-        expect(messages.at(-1).providerOptions.anthropic.cacheControl).toEqual({ type: 'ephemeral' });
+        expect(messages.at(-1).providerOptions.openrouter.cacheControl).toEqual({ type: 'ephemeral' });
         expect(messages[0].providerOptions).toBeUndefined();
     });
 

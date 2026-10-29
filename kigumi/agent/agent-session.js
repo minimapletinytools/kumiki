@@ -21,8 +21,8 @@
  *                   agent:queued {id, text}, agent:dequeued {id}, agent:userMessage {text, images},
  *                   agent:todos {items}, agent:files {files}
  *
- * Requests go where agent/models.js routeModel says: an Anthropic or OpenRouter key from settings,
- * else Kigumi's backend when signed in.
+ * Requests go where agent/models.js routeModel says: the OpenRouter key from settings, else
+ * Kigumi's backend when signed in.
  */
 
 const { createKigumiTools } = require('./tools');
@@ -140,7 +140,6 @@ class AgentSession {
     /** Where requests for the chosen model go, or null. */
     route() {
         return routeModel(this.model, {
-            anthropicKey: this.setting('agent.apiKey', ''),
             openrouterKey: this.setting('agent.openrouterApiKey', ''),
             backend: this.account && this.account.backend(),
         });
@@ -360,8 +359,8 @@ class AgentSession {
         }
         const route = this.route();
         if (!route) {
-            this.post({ type: 'agent:error', key: 'agent.route.setKey', message: 'Sign in to use the agent, or set '
-                + 'agent.openrouterApiKey (or agent.apiKey, an Anthropic key) in settings.' });
+            this.post({ type: 'agent:error', key: 'agent.route.setKey',
+                message: 'Sign in to use the agent, or set agent.openrouterApiKey in settings.' });
             return;
         }
         const abort = new AbortController();

@@ -46,9 +46,8 @@ const APP_DEFAULTS = {
     'app.editorCommand': '',
     // Names the explorer's "All files" leaves out; `*` matches anything.
     'app.filesExclude': [...DEFAULT_FILES_EXCLUDE],
-    // The agent panel: an Anthropic key, an OpenRouter key, or neither (then the Kigumi account).
+    // The agent panel: an OpenRouter key, or none (then the Kigumi account).
     // The model is an id from agent/models.js.
-    'agent.apiKey': '',
     'agent.openrouterApiKey': '',
     'agent.model': '',
     // Run tools that change something without asking (the agent panel's settings).

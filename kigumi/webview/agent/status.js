@@ -32,7 +32,6 @@ export class Status {
     // Where requests go: the user's own key, or the Kigumi account (signed in, or a way to sign in).
     showRoute(via, account) {
         const parts = [];
-        if (via === 'anthropic') parts.push(t('agent.route.anthropic'));
         else if (via === 'openrouter') parts.push(t('agent.route.openrouter'));
         else if (account.signedIn) {
             const left = typeof account.balanceUsd === 'number' ? ` · ${t('agent.route.left', { usd: account.balanceUsd.toFixed(2) })}` : '';
