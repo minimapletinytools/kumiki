@@ -705,6 +705,9 @@ async function start() {
     });
     logChannel.appendLine(`[app] Kigumi ${packageJson.version} (Electron ${process.versions.electron})`);
     logChannel.appendLine(`[app] Workspace: ${workspaceFolder || '(none)'}`);
+    if (settings.setAside) {
+        logChannel.appendLine(`[app] [warn] settings.json could not be read; it was moved to ${settings.setAside} and Kigumi started with its defaults`);
+    }
 
     const log = (line) => logChannel.appendLine(line);
     const appWindow = createAppWindow({ origin: ORIGIN, log });

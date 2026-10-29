@@ -18,20 +18,49 @@ function defaultsFromPackageJson(packageJson) {
 }
 
 class SettingsStore {
+    /**
+     * A file that is there but can't be read as settings is moved aside to
+     * `settings.unreadable-<time>.json` (its path in `setAside`) rather than written over.
+     */
     constructor(filePath, defaults = {}) {
         this.filePath = filePath;
         this.defaults = defaults;
         this.listeners = new Set();
-        this.values = this._read();
+        this.setAside = null;
+        const read = this._read();
+        if (read === null) {
+            this.setAside = this._setAside();
+            this.values = {};
+        } else {
+            this.values = read;
+        }
         this.watcher = null;
     }
 
+    /** The file's settings: {} if there is no file, null if it can't be read as settings. */
     _read() {
+        let text;
         try {
-            const parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
-            return parsed && typeof parsed === 'object' ? parsed : {};
+            text = fs.readFileSync(this.filePath, 'utf8');
         } catch (_error) {
             return {};
+        }
+        try {
+            const parsed = JSON.parse(text);
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    _setAside() {
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const aside = path.join(path.dirname(this.filePath), `settings.unreadable-${stamp}.json`);
+        try {
+            fs.renameSync(this.filePath, aside);
+            return aside;
+        } catch (_error) {
+            return null;
         }
     }
 
@@ -41,15 +70,21 @@ class SettingsStore {
         }
     }
 
+    /** Write the settings whole or not at all, so the file is never read half-written. */
     _write() {
         fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
-        fs.writeFileSync(this.filePath, `${JSON.stringify(this.values, null, 2)}\n`, 'utf8');
+        const temporary = `${this.filePath}.${process.pid}.tmp`;
+        fs.writeFileSync(temporary, `${JSON.stringify(this.values, null, 2)}\n`, 'utf8');
+        fs.renameSync(temporary, this.filePath);
     }
 
-    // Re-reads the file, telling listeners about every key whose value changed.
+    // Re-reads the file, telling listeners about every key whose value changed. A file that can't be
+    // read (saved mid-edit) changes nothing: the settings stay as they were until it can.
     reload() {
+        const read = this._read();
+        if (read === null) return;
         const before = this.values;
-        this.values = this._read();
+        this.values = read;
         const keys = new Set([...Object.keys(before), ...Object.keys(this.values)]);
         for (const key of keys) {
             if (JSON.stringify(before[key]) !== JSON.stringify(this.values[key])) {

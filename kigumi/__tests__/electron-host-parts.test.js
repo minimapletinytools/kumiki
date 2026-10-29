@@ -68,10 +68,32 @@ describe('settings', () => {
     expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ a: 9, b: 2, c: 3 });
   });
 
-  test('a corrupt settings file starts empty', () => {
+  test('a corrupt settings file starts empty, and is set aside rather than written over', () => {
     const file = path.join(dir, 'settings.json');
-    fs.writeFileSync(file, '{ nope');
-    expect(new SettingsStore(file, { a: 1 }).get('a')).toBe(1);
+    fs.writeFileSync(file, '{ "agent.openrouterApiKey": "sk-or", nope');
+
+    const store = new SettingsStore(file, { a: 1 });
+    store.watch();
+    store.dispose();
+
+    expect(store.get('a')).toBe(1);
+    expect(store.setAside).toMatch(/settings\.unreadable-.*\.json$/);
+    expect(fs.readFileSync(store.setAside, 'utf8')).toContain('sk-or');
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({});
+  });
+
+  test('a file saved mid-edit changes nothing, and the next setting written keeps the rest', () => {
+    const file = path.join(dir, 'settings.json');
+    const store = new SettingsStore(file, {});
+    store.set('agent.openrouterApiKey', 'sk-or');
+    store.set('app.workspaceFolder', '/p');
+    fs.writeFileSync(file, '{ "agent.openrouterApiKey": "sk-or", ');
+
+    store.reload();
+    store.set('agent.model', 'm');
+
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ 'agent.openrouterApiKey': 'sk-or', 'app.workspaceFolder': '/p', 'agent.model': 'm' });
+    expect(fs.readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });
 });
 
