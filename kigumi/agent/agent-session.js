@@ -23,7 +23,7 @@
  */
 
 const { agentTools, instructions } = require('./agent');
-const { MODELS, findModel, routeModel } = require('./models');
+const { MODELS, findModel, harnessOf, routeModel } = require('./models');
 const { runTurn, languageModelFor } = require('./agent-loop');
 const { Conversation } = require('./conversation');
 const { PERMISSION_MODES, PLAN_MODE_REFUSAL, permissionMode, decide } = require('./permissions');
@@ -361,6 +361,7 @@ class AgentSession {
                 }),
                 images: this.model.images,
                 cacheMarks: Boolean(this.model.cacheMarks),
+                harness: harnessOf(this.model),
                 contextWindow: this.model.contextWindow,
                 maxOutputTokens: this.panelSetting('agent.maxOutputTokens'),
                 tools: this.tools,

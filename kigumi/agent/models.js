@@ -7,7 +7,17 @@
  * backend or the user's OpenRouter key.
  * `images`: it can look at screenshots. `cacheMarks`: its prompt cache needs telling where to
  * cache (Anthropic's); others cache by themselves. `contextWindow`: the most tokens one request may carry.
+ * `harness`: how the agent loop treats it, where it differs from HARNESS.
  */
+
+/**
+ * How the agent loop treats a model, unless its `harness` says otherwise:
+ *   nudgeAfter           tool calls in a turn without an edit before a write-early reminder; 0 for none
+ *   keepToolResults      tool results kept whole (request.js trimOldToolResults)
+ *   summariseAt          tokens (estimated) past which a turn starts by summarising the conversation
+ *   imagesInToolResults  whether images may stay in tool results, rather than go in a user message after
+ */
+const HARNESS = Object.freeze({ nudgeAfter: 6, keepToolResults: 8, summariseAt: 100000, imagesInToolResults: false });
 
 const MODELS = [
     { id: 'deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', openrouter: 'deepseek/deepseek-v4.1-flash', images: true, contextWindow: 1048576 },
@@ -21,13 +31,29 @@ function findModel(id, models = MODELS) {
     return models.find((model) => model.id === id) || models[0];
 }
 
+/** `model`'s harness: HARNESS with what its `harness` sets. */
+function harnessOf(model) {
+    return { ...HARNESS, ...((model && model.harness) || {}) };
+}
+
+/** The fields of `harness` that are HARNESS's and of its type, or null if none are. */
+function validHarness(harness) {
+    if (!harness || typeof harness !== 'object') return null;
+    const valid = Object.fromEntries(Object.entries(harness).filter(([key, value]) => key in HARNESS
+        && typeof value === typeof HARNESS[key] && (typeof value !== 'number' || (Number.isFinite(value) && value >= 0))));
+    return Object.keys(valid).length ? valid : null;
+}
+
 /** `rows` as a model list, keeping only well-formed models; null if none are. */
 function validModels(rows) {
     if (!Array.isArray(rows)) return null;
     const models = rows.filter((row) => row && typeof row.id === 'string' && typeof row.label === 'string'
         && typeof row.openrouter === 'string' && Number.isFinite(row.contextWindow))
-        .map((row) => ({ id: row.id, label: row.label, openrouter: row.openrouter,
-            images: row.images === true, ...(row.cacheMarks === true ? { cacheMarks: true } : {}), contextWindow: row.contextWindow }));
+        .map((row) => {
+            const harness = validHarness(row.harness);
+            return { id: row.id, label: row.label, openrouter: row.openrouter, images: row.images === true,
+                ...(row.cacheMarks === true ? { cacheMarks: true } : {}), contextWindow: row.contextWindow, ...(harness ? { harness } : {}) };
+        });
     return models.length ? models : null;
 }
 
@@ -80,4 +106,4 @@ function routeModel(model, { openrouterKey, backend } = {}) {
     return null;
 }
 
-module.exports = { MODELS, findModel, validModels, createModelList, routeModel };
+module.exports = { MODELS, HARNESS, findModel, harnessOf, validModels, createModelList, routeModel };

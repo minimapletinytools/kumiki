@@ -13,6 +13,7 @@ const { streamText, stepCountIs, tool } = require('ai');
 // The same zod the tools' shapes are made with (agent/tools.js).
 const { z } = require('zod');
 const { buildRequest, estimateTokens } = require('./request');
+const { HARNESS } = require('./models');
 
 /** Steps in one turn, each a model call and the tools it asks for. */
 const MAX_STEPS = 40;
@@ -20,8 +21,6 @@ const MAX_STEPS = 40;
 const MAX_OUTPUT_TOKENS = 8000;
 /** Continuations after a stream closes without a completion signal, within the turn's step limit. */
 const MAX_STREAM_CONTINUATIONS = 2;
-/** Past this many tokens (estimated) at the start of a turn, the conversation before it is summarised. */
-const SUMMARISE_AT_TOKENS = 100000;
 
 /** What Kigumi tells the model, by note kind. */
 const NOTES = {
@@ -71,8 +70,6 @@ function toModelContent(content, images) {
     return { type: 'content', value: parts };
 }
 
-/** Tool calls in a turn without a write or edit between progress reminders. */
-const LOOKS_BEFORE_NUDGE = 6;
 const WRITE_TOOLS = new Set(['write_file', 'edit_file']);
 
 const SUMMARY_REQUEST = 'Summarise our conversation so far for carrying on the work: what the user wants, what '
@@ -116,16 +113,17 @@ async function changedFilesNow(log, files) {
 }
 
 /**
- * When the request `log` would send is large, have the model summarise it and append the summary,
- * with the files the conversation changed as they are now (`files`, project-files.js). Returns the
- * summary's cost, or undefined.
+ * When the request `log` would send is past `harness.summariseAt`, have the model summarise it and
+ * append the summary, with the files the conversation changed as they are now (`files`,
+ * project-files.js). Returns the summary's cost, or undefined.
  */
-async function summariseIfLarge({ model, system, log, abortSignal, files = null, cacheMarks = false }) {
-    if (estimateTokens(buildRequest(log, { cacheMarks })) < SUMMARISE_AT_TOKENS) return undefined;
+async function summariseIfLarge({ model, system, log, abortSignal, files = null, harness = HARNESS }) {
+    if (estimateTokens(buildRequest(log, { keep: harness.keepToolResults })) < harness.summariseAt) return undefined;
     // Streamed like every other request, which is all the backend carries cost reports for.
     const result = streamText({
         model, system, abortSignal, maxRetries: 2, maxOutputTokens: MAX_OUTPUT_TOKENS,
-        messages: [...buildRequest(log, { keep: 0 }), { role: 'user', content: SUMMARY_REQUEST }],
+        messages: [...buildRequest(log, { keep: 0, imagesInToolResults: harness.imagesInToolResults }),
+            { role: 'user', content: SUMMARY_REQUEST }],
     });
     const summary = await result.text;
     const metadata = await result.providerMetadata;
@@ -184,6 +182,7 @@ function earlyEnd(steps, maxSteps = MAX_STEPS) {
  * @param {object} options.model         an AI SDK language model (languageModelFor)
  * @param {boolean} options.images       whether the model can look at images
  * @param {boolean} [options.cacheMarks] whether to mark where its prompt cache should hold (models.js)
+ * @param {object} [options.harness]     how the loop treats the model (models.js harnessOf)
  * @param {number} [options.contextWindow] the model's, for the panel's context meter
  * @param {number} [options.maxOutputTokens] the most one step may write
  * @param {number} [options.maxSteps]    the most steps in the turn
@@ -197,10 +196,10 @@ function earlyEnd(steps, maxSteps = MAX_STEPS) {
  * @param {(event: object) => void} options.onEvent   panel events
  * @returns {Promise<{ costUsd?: number }>}
  */
-async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS, maxSteps = MAX_STEPS, tools, files = null,
-    system, log, prompt, abortSignal, askPermission, onEvent }) {
+async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS,
+    maxSteps = MAX_STEPS, tools, files = null, system, log, prompt, abortSignal, askPermission, onEvent }) {
     const costs = [];
-    const summaryCost = await summariseIfLarge({ model, system, log, abortSignal, files, cacheMarks });
+    const summaryCost = await summariseIfLarge({ model, system, log, abortSignal, files, harness });
     if (log.at(-1) && log.at(-1).summary !== undefined) {
         if (typeof summaryCost === 'number') costs.push(summaryCost);
         onEvent({ type: 'agent:notice', key: 'agent.notice.summarised', text: 'The earlier conversation was summarised, to keep each step small.' });
@@ -212,7 +211,8 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
     // Repeated looks this step, noted after its tool results.
     let repeats = [];
     const toolSet = toToolSet(tools, { images, askPermission, onRepeat: (call) => repeats.push(call) });
-    const request = () => buildRequest(log, { cacheMarks });
+    const request = () => buildRequest(log, { keep: harness.keepToolResults, imagesInToolResults: harness.imagesInToolResults, cacheMarks });
+    const nudgeAfter = harness.nudgeAfter;
     for (let continuations = 0; ; continuations++) {
         const before = steps.length;
         let failure = null;
@@ -227,7 +227,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
             // Retry transient request failures before streaming begins.
             maxRetries: 2,
             prepareStep: () => {
-                if (looks >= LOOKS_BEFORE_NUDGE && (nudgedAt === null || looks - nudgedAt >= LOOKS_BEFORE_NUDGE)) {
+                if (nudgeAfter > 0 && looks >= nudgeAfter && (nudgedAt === null || looks - nudgedAt >= nudgeAfter)) {
                     nudgedAt = looks;
                     log.push({ note: 'nudge', text: NOTES.nudge(looks) });
                 }
@@ -292,4 +292,4 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
 }
 
 module.exports = { runTurn, languageModelFor, toModelContent, summarise, summariseIfLarge, changedFiles,
-    NOTES, SUMMARISE_AT_TOKENS, MAX_STEPS, MAX_OUTPUT_TOKENS };
+    NOTES, MAX_STEPS, MAX_OUTPUT_TOKENS };

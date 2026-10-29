@@ -40,10 +40,12 @@ function logMessages(log) {
 
 /**
  * The messages a step sends for `log`. `keep`: tool results kept whole (trimOldToolResults);
+ * `imagesInToolResults`: leave images where they are (imagesAfterToolResults otherwise);
  * `cacheMarks`: mark where the prompt cache should hold (cacheMarked).
  */
-function buildRequest(log, { keep = KEEP_TOOL_RESULTS, cacheMarks = false } = {}) {
-    const messages = imagesAfterToolResults(trimOldToolResults(onlyLatestImage(logMessages(log)), keep));
+function buildRequest(log, { keep = KEEP_TOOL_RESULTS, imagesInToolResults = false, cacheMarks = false } = {}) {
+    const trimmed = trimOldToolResults(onlyLatestImage(logMessages(log)), keep);
+    const messages = imagesInToolResults ? trimmed : imagesAfterToolResults(trimmed);
     return cacheMarks ? cacheMarked(messages) : messages;
 }
 

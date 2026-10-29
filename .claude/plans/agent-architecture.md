@@ -256,7 +256,10 @@ came from single sessions.
    gone. The rate limit's 429 says `Retry-After: 20`. Left: once the previous Worker is gone, a
    migration dropping `claim_request`, `start_request`, `finish_request`, `busy_until` and
    `active_request`.
-5. **Profiles (§5).**
+5. **Done: profiles (§5).** `HARNESS` in `agent/models.js` holds the defaults (nudgeAfter,
+   keepToolResults, summariseAt, imagesInToolResults); a model's `harness` from `/models` overrides
+   them, so tuning needs no app release. No model sets one yet: set them from eval runs. Not done:
+   generating the bundled fallback list from the backend (it is only used until `/models` answers).
 
 ## Decisions (2026-10-29)
 

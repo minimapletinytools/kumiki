@@ -3,9 +3,11 @@ const os = require('os');
 const path = require('path');
 
 const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test');
-const { runTurn, languageModelFor, toModelContent, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
+const { runTurn, languageModelFor, toModelContent } = require('../agent/agent-loop');
 const { cacheMarked, trimOldToolResults, estimateTokens, logMessages, isMessage } = require('../agent/request');
-const { MODELS, findModel, createModelList, routeModel } = require('../agent/models');
+const { MODELS, HARNESS, findModel, harnessOf, createModelList, routeModel } = require('../agent/models');
+
+const SUMMARISE_AT_TOKENS = HARNESS.summariseAt;
 const { createFileTools } = require('../agent/file-tools');
 const { createProjectFiles } = require('../agent/project-files');
 const { contextNote, withMentions, promptEntries } = require('../agent/prompt-content');
@@ -92,6 +94,17 @@ describe('the model table', () => {
         expect(offline.list()).toEqual(saved);
         await expect(offline.refresh()).rejects.toThrow('offline');
         expect(offline.list()).toEqual(saved);
+    });
+
+    test("a model's harness is the defaults with what the backend sets, of the right types", async () => {
+        const listed = [{ id: 'm', label: 'M', openrouter: 'x/m', images: true, contextWindow: 1000,
+            harness: { nudgeAfter: 0, keepToolResults: 'many', summariseAt: -1, imagesInToolResults: true, unknown: 1 } }];
+        const models = createModelList({ backendUrl: 'https://api.example', fetch: async () => ({ ok: true, json: async () => ({ models: listed }) }) });
+        await models.refresh();
+
+        expect(models.list()[0].harness).toEqual({ nudgeAfter: 0, imagesInToolResults: true });
+        expect(harnessOf(models.list()[0])).toEqual({ ...HARNESS, nudgeAfter: 0, imagesInToolResults: true });
+        expect(harnessOf(MODELS[0])).toEqual(HARNESS);
     });
 });
 
@@ -338,6 +351,12 @@ describe('the agent loop', () => {
         expect(told(11)).toBe(1);
         expect(told(12)).toBe(2);
         expect(told(30)).toBe(5);
+
+        // A model whose harness says none gets none.
+        const quiet = scripted(...looks(0, 8), [...say('1', 'Done.'), finish('stop')]);
+        await runTurn({ model: quiet, images: true, harness: { ...HARNESS, nudgeAfter: 0 }, tools: [readTool], system: 'sys', log: [],
+            prompt: go(), askPermission: async () => true, onEvent: () => {} });
+        expect(JSON.stringify(quiet.doStreamCalls)).not.toContain('without changing anything');
     });
 
     test('research in earlier turns does not count toward a reminder', async () => {

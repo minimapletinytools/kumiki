@@ -18,7 +18,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 
 const { runTurn, languageModelFor, MAX_STEPS } = require('../../agent/agent-loop');
-const { MODELS, findModel, routeModel } = require('../../agent/models');
+const { MODELS, findModel, harnessOf, routeModel } = require('../../agent/models');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { createProjectFiles } = require('../../agent/project-files');
 const { pythonKumikiApi } = require('../../agent/kumiki-api');
@@ -94,7 +94,7 @@ async function runOne(task, modelId, key) {
     try {
         const result = await runTurn({
             model: await languageModelFor(routeModel(model, { openrouterKey: key })), images: model.images,
-            cacheMarks: Boolean(model.cacheMarks), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: agentTools(host, { checkpoints: () => checkpoints }), files, system: instructions(host),
+            cacheMarks: Boolean(model.cacheMarks), harness: harnessOf(model), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: agentTools(host, { checkpoints: () => checkpoints }), files, system: instructions(host),
             log, prompt: [{ role: 'user', content: task.prompt, shown: { text: task.prompt, images: 0 } }], askPermission: async () => true,
             onEvent: (event) => {
                 if (event.type === 'agent:tool') {

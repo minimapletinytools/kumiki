@@ -34,6 +34,13 @@ describe('a request built from the log', () => {
         ]);
     });
 
+    test('images stay in tool results only for a model whose harness says so', () => {
+        const shot = toolResult('c1', 'screenshot', { type: 'content', value: [{ type: 'file', mediaType: 'image/png', data: { type: 'data', data: 'AAAA' } }] });
+        const log = [user('look'), toolCall('c1', 'screenshot'), shot];
+        expect(buildRequest(log).map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'user']);
+        expect(buildRequest(log, { imagesInToolResults: true })).toEqual([{ role: 'user', content: 'look' }, toolCall('c1', 'screenshot'), shot]);
+    });
+
     test('cache marks go on the last two messages, and a message\'s other options stay', () => {
         const reasoning = { openrouter: { reasoning_details: [{ type: 'reasoning.text', text: 'Hmm.' }] } };
         const sent = buildRequest([user('a'), { role: 'assistant', content: 'b', providerOptions: reasoning }, user('c'), { role: 'assistant', content: 'd' }],
