@@ -99,6 +99,27 @@ describe('the tools', () => {
         expect(ran).toEqual([['kigumi.automationOpenFileInViewer', '/p/a.py'], ['kigumi.automationBuildReport', '/p/a.py']]);
     });
 
+    test('check_frame and open_in_viewer take a file in the project, relative or absolute, and refuse one outside', async () => {
+        const { createProjectFiles } = require('../agent/project-files');
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-sandbox-')));
+        fs.writeFileSync(path.join(root, 'frame.py'), 'x = 1\n');
+        const opened = [];
+        const host = viewHost({ panels: directory(), files: createProjectFiles({ root: () => root }), run: async (id, args) => {
+            if (id === 'kigumi.automationOpenFileInViewer') opened.push(args.filePath);
+            return { ok: true, entries: [] };
+        } });
+        const tools = Object.fromEntries(sharedTools(host).map((tool) => [tool.name, tool]));
+
+        await tools.check_frame.run({ file_path: 'frame.py' });
+        await tools.open_in_viewer.run({ file_path: path.join(root, 'frame.py') });
+        expect(opened).toEqual([path.join(root, 'frame.py'), path.join(root, 'frame.py')]);
+
+        expect(textOf(await tools.check_frame.run({ file_path: '/etc/evil.py' }))).toMatchObject({ ok: false, reason: 'outside-project' });
+        await expect(tools.open_in_viewer.run({ file_path: '../evil.py' })).rejects.toThrow('outside the project');
+        expect(opened).toHaveLength(2);
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
         test('list_panels and describe_panel only look', async () => {
         const panels = directory({ views: [{ id: 'viewer:/a.py', session: view('/a.py', { active: true }) }] });
         const tools = createKigumiTools({ panels, run: async () => { throw new Error('no commands here'); } });

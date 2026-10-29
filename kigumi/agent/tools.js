@@ -16,8 +16,10 @@ const text = (value) => [{ type: 'text', text: typeof value === 'string' ? value
  * @param {ReturnType<typeof import('./panel-directory').createPanelDirectory>} options.panels
  * @param {(commandId: string, args?: object) => Promise<any>} options.run  an app command
  * @param {() => string[]} [options.workspaceFolders]  the folders open, the project first
+ * @param {(file: string) => string} [options.resolve]  a file the agent names as an absolute path,
+ *     throwing for one it may not use (agent/project-files.js resolve)
  */
-function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
+function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve = (file) => file }) {
     const panelId = z.string().optional()
         .describe('A panel id from list_panels. Defaults to the active panel, or the active view.');
 
@@ -71,9 +73,9 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
         {
             name: 'open_in_viewer',
             description: 'Open a Python frame file in a Kigumi 3D view (or bring its view forward).',
-            shape: { file_path: z.string().describe('Absolute path to a .py frame file.') },
+            shape: { file_path: z.string().describe('A .py frame file: relative to the project folder, or absolute inside it.') },
             effect: 'run',
-            run: async ({ file_path: filePath }) => text(await run('kigumi.automationOpenFileInViewer', { filePath })),
+            run: async ({ file_path: filePath }) => text(await run('kigumi.automationOpenFileInViewer', { filePath: resolve(filePath) })),
         },
         {
             name: 'refresh_view',

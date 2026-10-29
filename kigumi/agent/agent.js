@@ -22,7 +22,7 @@ const { PLAN_MODE_NOTE } = require('./permissions');
 /** A host over the app's views. */
 function viewHost({ panels, run, files, workspaceFolders = () => [files.root()].filter(Boolean), kumikiApi = null,
     kumikiSource = () => null, kumikiExamples = () => null, systemPrompt = () => '' }) {
-    return { files, frames: viewFrames({ panels, run, files }), view: { panels, run, workspaceFolders },
+    return { files, frames: viewFrames({ panels, run, files }), view: { panels, run, workspaceFolders, resolve: (file) => files.resolve(file) },
         kumikiApi, kumikiSource, kumikiExamples, systemPrompt };
 }
 

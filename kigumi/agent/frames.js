@@ -7,7 +7,9 @@
  *   check(file)    build the file, opening a view first if none shows it
  *   rebuild(file)  build a file a view shows, after an edit
  *   picture(file)  a picture of its view as a data URL, or null; optional
- * check and rebuild resolve to a build report: { ok, error, entries: [{ level, message }] }.
+ * check and rebuild resolve to a build report: { ok, error, entries: [{ level, message }] }. A file is
+ * relative to the project folder or absolute; check refuses one outside the project and the folders
+ * the agent may read.
  */
 
 const { z } = require('zod');
@@ -28,9 +30,11 @@ function viewFrames({ panels, run, files }) {
                 && resolved(panel.filePath) === target);
         },
         async check(file) {
-            const opened = await run('kigumi.automationOpenFileInViewer', { filePath: file });
+            const target = resolved(file);
+            if (!target) return { ok: false, reason: 'outside-project', filePath: file };
+            const opened = await run('kigumi.automationOpenFileInViewer', { filePath: target });
             if (opened && opened.ok === false) return { ok: false, reason: opened.reason, filePath: file };
-            return run('kigumi.automationBuildReport', { filePath: (opened && opened.filePath) || file });
+            return run('kigumi.automationBuildReport', { filePath: (opened && opened.filePath) || target });
         },
         rebuild(file) {
             return Promise.resolve(run('kigumi.automationBuildReport', { filePath: file, reason: 'agent edit' }))
@@ -53,7 +57,7 @@ function checkFrameTool(frames) {
         name: 'check_frame',
         description: 'Build a Python frame file and say whether it built, with its warnings and errors. Opens '
             + 'it in a view first if none shows it.',
-        shape: { file_path: z.string().describe('Absolute path to a .py frame file.') },
+        shape: { file_path: z.string().describe('A .py frame file: relative to the project folder, or absolute inside it.') },
         effect: 'run',
         run: async ({ file_path: filePath }) => [{ type: 'text', text: JSON.stringify(await frames.check(filePath), null, 2) }],
     };
