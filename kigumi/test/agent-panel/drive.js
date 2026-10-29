@@ -12,7 +12,6 @@ const WEBVIEW = path.join(__dirname, '..', '..', 'webview');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.ttf': 'font/ttf', '.svg': 'image/svg+xml' };
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'kigumi', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
-if (process.platform === 'linux') app.commandLine.appendSwitch('no-sandbox');
 
 const STATE = {
     type: 'agent:state', model: 'm1', via: 'openrouter', account: { configured: false }, strings: {},

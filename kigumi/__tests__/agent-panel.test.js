@@ -20,7 +20,9 @@ const canRun = typeof electron === 'string' && fs.existsSync(electron) && (proce
     beforeAll(() => {
         const env = { ...process.env };
         delete env.ELECTRON_RUN_AS_NODE;
-        const ran = spawnSync(electron, [path.join(__dirname, '..', 'test', 'agent-panel', 'drive.js')], { encoding: 'utf8', timeout: 60000, env });
+        // Linux CI's Electron has no set-up sandbox helper; the switch must come before it starts.
+        const args = [...(process.platform === 'linux' ? ['--no-sandbox'] : []), path.join(__dirname, '..', 'test', 'agent-panel', 'drive.js')];
+        const ran = spawnSync(electron, args, { encoding: 'utf8', timeout: 60000, env });
         const line = (ran.stdout || '').trim().split('\n').pop();
         result = line && line.startsWith('{') ? JSON.parse(line) : { failure: `${ran.stderr || ''}${ran.error || ''}`.slice(-2000) };
     }, 70000);
