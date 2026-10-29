@@ -70,9 +70,9 @@ take their accelerators from it. Not configurable yet.
   (`../../agent/account.js`) opens the browser and comes back on `kigumi://auth`; the session is kept
   encrypted with the OS keychain's key (`secure-storage.js`). Signing in shows only once
   `../../agent/backend-config.js` names a deployed backend (or `KIGUMI_SUPABASE_URL`,
-  `KIGUMI_SUPABASE_KEY` and `KIGUMI_BACKEND_URL` do); the backend is the kigumi-backend repo. Tools
-  that only look run without
-  asking; anything else (editing files, moving the camera) asks in the panel. Hiding the panel keeps
+  `KIGUMI_SUPABASE_KEY` and `KIGUMI_BACKEND_URL` do); the backend is the kigumi-backend repo. In the
+  panel's default mode the agent asks before editing files, and before running a file it didn't
+  write that no view shows; in Auto it never asks. Hiding the panel keeps
   the conversation; the clear button starts a new one.
 - **MCP server** (`../../agent/mcp-http.js`): with `mcp.enabled` on, Kigumi's tools are served at
   `http://127.0.0.1:<mcp.port>/mcp` (default port 7345) to any agent holding `mcp.token`, which is

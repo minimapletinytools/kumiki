@@ -50,8 +50,6 @@ const APP_DEFAULTS = {
     // The model is an id from agent/models.js.
     'agent.openrouterApiKey': '',
     'agent.model': '',
-    // Run tools that change something without asking (the agent panel's settings).
-    'agent.bypassPermissions': false,
     'agent.showOnStartup': true,
     // Kigumi's tools for any agent, over MCP on this machine only. See agent/mcp-http.js.
     'mcp.enabled': false,

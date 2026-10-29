@@ -29,11 +29,11 @@ const say = (id, text) => [{ type: 'text-start', id }, { type: 'text-delta', id,
 const call = (id, name, input = {}) => ({ type: 'tool-call', toolCallId: id, toolName: name, input: JSON.stringify(input) });
 
 const lookTool = {
-    name: 'look', description: 'Look.', shape: {}, readOnly: true,
+    name: 'look', description: 'Look.', shape: {}, effect: 'read',
     run: async () => [{ type: 'text', text: 'a frame' }, { type: 'image', data: 'AAAA', mimeType: 'image/png' }],
 };
 const changeTool = {
-    name: 'change', description: 'Change.', shape: { what: z.string() }, readOnly: false,
+    name: 'change', description: 'Change.', shape: { what: z.string() }, effect: 'edit',
     run: jest.fn(async ({ what }) => [{ type: 'text', text: `changed ${what}` }]),
 };
 
@@ -294,7 +294,7 @@ describe('the agent loop', () => {
 
     test('a look repeated with the same arguments and result is told so; a changed result or arguments is not', async () => {
         let content = 'line 1';
-        const readTool = { name: 'read', description: 'Read.', shape: { offset: z.number().optional() }, readOnly: true,
+        const readTool = { name: 'read', description: 'Read.', shape: { offset: z.number().optional() }, effect: 'read',
             run: async () => [{ type: 'text', text: content }] };
         const model = scripted(
             [call('c1', 'read'), finish('tool-calls')],
@@ -317,7 +317,7 @@ describe('the agent loop', () => {
     });
 
     test('after six looks without writing, progress reminders repeat every six calls', async () => {
-        const readTool = { name: 'read', description: 'Read.', shape: { n: z.number().optional() }, readOnly: true,
+        const readTool = { name: 'read', description: 'Read.', shape: { n: z.number().optional() }, effect: 'read',
             run: async ({ n }) => [{ type: 'text', text: `line ${n}` }] };
         const looks = (from, count) => Array.from({ length: count }, (_, i) => [call(`c${from + i}`, 'read', { n: from + i }), finish('tool-calls')]);
         const model = scripted(...looks(0, 30), [...say('1', 'Done.'), finish('stop')]);
@@ -331,30 +331,15 @@ describe('the agent loop', () => {
         expect(told(30)).toBe(5);
     });
 
-    test('research from earlier user turns counts toward the next reminder', async () => {
-        const first = scripted(...Array.from({ length: 4 }, (_, i) => [call(`c${i}`, 'look'), finish('tool-calls')]),
-            [...say('1', 'Still researching.'), finish('stop')]);
-        const prior = await turn(first);
-        const model = scripted([call('c4', 'look'), finish('tool-calls')],
-            [call('c5', 'look'), finish('tool-calls')], [...say('2', 'Writing now.'), finish('stop')]);
+    test('research in earlier turns does not count toward a reminder', async () => {
+        const prior = await turn(scripted(...Array.from({ length: 8 }, (_, i) => [call(`c${i}`, 'look'), finish('tool-calls')]),
+            [...say('1', 'Still researching.'), finish('stop')]));
+        const model = scripted([call('c8', 'look'), finish('tool-calls')], [...say('2', 'It looks fine.'), finish('stop')]);
 
         await turn(model, { history: prior.history });
 
-        expect(JSON.stringify(model.doStreamCalls[1].prompt)).not.toContain('without changing anything');
-        expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('6 tool calls without changing anything');
-    });
-
-    test('a write resets the research budget for the following turn', async () => {
-        const prior = await turn(scripted([call('c0', 'look'), finish('tool-calls')],
-            [call('c1', 'change', { what: 'the frame' }), finish('tool-calls')], [...say('1', 'Done.'), finish('stop')]));
-        const write = { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'write', toolName: 'write_file', input: {} }] };
-        const model = scripted(...Array.from({ length: 5 }, (_, i) => [call(`next${i}`, 'look'), finish('tool-calls')]),
-            [...say('2', 'Ready.'), finish('stop')]);
-
-        await turn(model, { history: [...prior.history, write,
-            { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'write', toolName: 'write_file', output: { type: 'text', value: 'Written.' } }] }] });
-
-        expect(JSON.stringify(model.doStreamCalls[5].prompt)).not.toContain('without changing anything');
+        expect(JSON.stringify(model.doStreamCalls.map((step) => step.prompt.slice(prior.history.length + 1))))
+            .not.toContain('without changing anything');
     });
 
     test('only the latest screenshot is sent; earlier ones become a note', async () => {
@@ -400,19 +385,25 @@ describe('the agent loop', () => {
         expect(model.doStreamCalls[0].prompt.at(-1).providerOptions.openrouter.cacheControl).toEqual({ type: 'ephemeral' });
     });
 
-        test('older tool results are cut down; the last few stay whole', () => {
+    test('older tool results are cut down eight at a time, so the cut moves only every eight results', () => {
         const result = (id, text) => ({ role: 'tool', content: [{ type: 'tool-result', toolCallId: id, toolName: 'read_file',
             output: { type: 'content', value: [{ type: 'text', text }] } }] });
         const long = 'x'.repeat(5000);
-        const messages = Array.from({ length: 10 }, (_, i) => result(`c${i}`, long));
+        const lengths = (count) => trimOldToolResults(Array.from({ length: count }, (_, i) => result(`c${i}`, long)))
+            .map((message) => message.content[0].output.value[0].text.length);
 
+        expect(lengths(15)).toEqual(Array(15).fill(5000));
+        expect(lengths(16).slice(8)).toEqual(Array(8).fill(5000));
+        expect(lengths(16)[7]).toBeLessThan(500);
+        // The results cut at 16 are cut the same way at 23: what was sent before is unchanged.
+        expect(lengths(23).slice(0, 8)).toEqual(lengths(16).slice(0, 8));
+        expect(lengths(23).slice(8)).toEqual(Array(15).fill(5000));
+
+        const messages = Array.from({ length: 16 }, (_, i) => result(`c${i}`, long));
         const trimmed = trimOldToolResults(messages);
-
-        const lengths = trimmed.map((message) => message.content[0].output.value[0].text.length);
-        expect(lengths.slice(2)).toEqual(Array(8).fill(5000));
-        expect(lengths[0]).toBeLessThan(500);
         expect(trimmed[0].content[0].output.value[0].text).toContain('run the tool again');
         expect(estimateTokens(trimmed)).toBeLessThan(estimateTokens(messages));
+        expect(trimOldToolResults(trimmed)).toEqual(trimmed);
     });
 
     test('a large conversation is summarised at the start of a turn; the new request is kept as it is', async () => {
@@ -504,9 +495,9 @@ describe('the file tools', () => {
 
     afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-    test('read and list only look; write and edit ask', () => {
-        expect(tools.map((tool) => [tool.name, tool.readOnly])).toEqual([
-            ['list_files', true], ['search_files', true], ['read_file', true], ['write_file', false], ['edit_file', false],
+    test('read and list only read; write and edit edit', () => {
+        expect(tools.map((tool) => [tool.name, tool.effect])).toEqual([
+            ['list_files', 'read'], ['search_files', 'read'], ['read_file', 'read'], ['write_file', 'edit'], ['edit_file', 'edit'],
         ]);
     });
 
@@ -680,7 +671,7 @@ describe('the agent session', () => {
 
     test('editing a file a view shows rebuilds it, and the edit says whether it built', async () => {
         const reports = [];
-        const editTool = { name: 'edit_file', shape: {}, readOnly: false, run: async () => [{ type: 'text', text: 'Edited a.py.' }] };
+        const editTool = { name: 'edit_file', shape: {}, effect: 'edit', run: async () => [{ type: 'text', text: 'Edited a.py.' }] };
         const agent = new AgentSession({
             panels: { ...panels, list: () => [{ kind: 'viewer', filePath: '/project/a.py' }] },
             run: async (id, args) => {
@@ -783,7 +774,7 @@ describe('the agent session', () => {
         const posted = [];
         const agent = new AgentSession({
             panels, run: async () => ({}), post: (message) => posted.push(message), files: projectFiles,
-            setting: (key, fallback) => ({ 'agent.openrouterApiKey': 'sk-or', 'agent.permissionMode': 'all' }[key] ?? fallback),
+            setting: (key, fallback) => ({ 'agent.openrouterApiKey': 'sk-or', 'agent.permissionMode': 'auto' }[key] ?? fallback),
             fileTools: createFileTools({ files: projectFiles }), createModel: async () => model,
         });
 
@@ -819,7 +810,7 @@ describe('the agent session', () => {
         test('the agent keeps a to-do list, shown in the panel and kept with the conversation', async () => {
         const { agent, posted } = session();
         const todos = agent.tools.find((tool) => tool.name === 'update_todos');
-        expect(todos.readOnly).toBe(true);
+        expect(todos.effect).toBe('read');
         const [result] = await todos.run({ items: [{ text: 'legs', done: true }, { text: 'beam' }] });
         expect(result.text).toBe('To-do list updated: 1 of 2 left.');
         expect(posted).toContainEqual({ type: 'agent:todos', items: [{ text: 'legs', done: true }, { text: 'beam', done: false }] });
@@ -835,9 +826,10 @@ describe('the agent session', () => {
         }
     });
 
-    test('in plan mode, nothing that changes anything runs, and the model is told why', async () => {
-        const { agent, posted } = session({ settings: { 'agent.planMode': true, 'agent.permissionMode': 'all' } });
+    test('in plan mode, no file is edited, and the model is told why; the camera still moves', async () => {
+        const { agent, posted } = session({ settings: { 'agent.planMode': true, 'agent.permissionMode': 'auto' } });
         await expect(agent._askPermission('edit_file', {})).rejects.toThrow('Plan mode is on');
+        await expect(agent._askPermission('set_camera', {})).resolves.toBe(true);
         expect(posted.some((message) => message.type === 'agent:permission')).toBe(false);
     });
 
@@ -867,7 +859,7 @@ describe('the agent session', () => {
         const shot = path.join(root, 'shot.png');
         fs.writeFileSync(shot, 'png');
         const posted = [];
-        const editTool = { name: 'edit_file', shape: {}, readOnly: false, run: async () => [{ type: 'text', text: 'Edited.' }] };
+        const editTool = { name: 'edit_file', shape: {}, effect: 'edit', run: async () => [{ type: 'text', text: 'Edited.' }] };
         const agent = new AgentSession({
             panels: { ...panels, list: () => [{ kind: 'viewer', filePath: path.join(root, 'a.py') }] },
             run: async (id) => (id === 'kigumi.captureScreenshot' ? { data: Buffer.from('png').toString('base64') } : { ok: true, entries: [] }),
@@ -919,43 +911,56 @@ describe('the agent session', () => {
         expect(describeFailure({ statusCode: 402, message: 'Payment Required' })).toEqual({ key: 'agent.error.noCredit', text: 'Out of credit.' });
     });
 
-    test('permission modes: ask every time, edit files without asking, or do everything', async () => {
+    test('permission modes: ask before edits, or never ask', async () => {
         const { agent, posted, values } = session();
         const asked = () => posted.filter((message) => message.type === 'agent:permission').length;
 
         void agent._askPermission('edit_file', {});
         expect(asked()).toBe(1);
-
-        agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'edits' });
-        await expect(agent._askPermission('edit_file', {})).resolves.toBe(true);
-        void agent._askPermission('set_camera', {});
-        expect(asked()).toBe(2);
-
-        agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'all' });
+        // Moving the camera only changes what the user sees.
         await expect(agent._askPermission('set_camera', {})).resolves.toBe(true);
-        expect(asked()).toBe(2);
+
+        agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'auto' });
+        await expect(agent._askPermission('edit_file', {})).resolves.toBe(true);
+        await expect(agent._askPermission('check_frame', { file_path: 'other.py' })).resolves.toBe(true);
+        expect(asked()).toBe(1);
 
         // Only the panel's own settings, and only sensible values.
         agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'whatever' });
         agent.handle({ type: 'agent:setSetting', key: 'agent.apiKey', value: 'not one the panel sets' });
-        expect(values['agent.permissionMode']).toBe('all');
+        expect(values['agent.permissionMode']).toBe('auto');
         expect(values['agent.apiKey']).toBeUndefined();
     });
 
-    test('the old bypass switch reads as doing everything without asking', () => {
-        const { agent } = session({ settings: { 'agent.bypassPermissions': true } });
-        expect(agent.panelSetting('agent.permissionMode')).toBe('all');
+    test('the old modes and the old bypass switch read as auto', () => {
+        for (const settings of [{ 'agent.bypassPermissions': true }, { 'agent.permissionMode': 'edits' }, { 'agent.permissionMode': 'all' }]) {
+            expect(session({ settings }).agent.panelSetting('agent.permissionMode')).toBe('auto');
+        }
+    });
+
+    test('asking, building a file runs freely when a view shows it or the agent wrote it, else asks', async () => {
+        const viewed = { ...panels, list: () => [{ kind: 'viewer', filePath: '/project/shown.py' }] };
+        const agent = new AgentSession({ panels: viewed, run: async () => ({}), post: () => {}, files: fakeFiles('/project'),
+            setting: (key, fallback) => fallback });
+        agent.checkpoints.begin(1);
+        await agent.checkpoints.beforeWrite('/project/written.py');
+
+        await expect(agent._askPermission('check_frame', { file_path: 'shown.py' })).resolves.toBe(true);
+        await expect(agent._askPermission('check_frame', { file_path: 'written.py' })).resolves.toBe(true);
+        await expect(agent._askPermission('refresh_view', {})).resolves.toBe(true);
+        void agent._askPermission('check_frame', { file_path: 'cleanup.py' });
+        expect(agent.pendingPermissions.size).toBe(1);
     });
 
     test('"always allow" from a permission card holds for that tool from then on', async () => {
         const { agent, posted, values } = session();
-        const first = agent._askPermission('set_camera', {});
+        const first = agent._askPermission('check_frame', { file_path: 'a.py' });
         const { requestId } = posted.find((message) => message.type === 'agent:permission');
         agent.handle({ type: 'agent:permissionAnswer', requestId, allow: true, always: true });
 
         await expect(first).resolves.toBe(true);
-        expect(values['agent.alwaysAllow']).toEqual(['set_camera']);
-        await expect(agent._askPermission('set_camera', {})).resolves.toBe(true);
+        expect(values['agent.alwaysAllow']).toEqual(['check_frame']);
+        await expect(agent._askPermission('check_frame', { file_path: 'b.py' })).resolves.toBe(true);
         expect(posted.filter((message) => message.type === 'agent:permission')).toHaveLength(1);
     });
 

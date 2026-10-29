@@ -26,7 +26,7 @@ function createKumikiApiTool({ python, cwd = () => null, env = {} }) {
             members: z.boolean().optional().describe('Also list its members, with a line on each.'),
             source: z.boolean().optional().describe('Also give its source code.'),
         },
-        readOnly: true,
+        effect: 'read',
         run: ({ name, members, source }) => new Promise((resolve, reject) => {
             const command = python();
             if (!command) {

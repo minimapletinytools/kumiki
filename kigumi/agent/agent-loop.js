@@ -2,8 +2,8 @@
  * The built-in agent's loop: one user turn, as many model steps and tool calls as it takes, on the
  * Vercel AI SDK. Host-neutral (no Node APIs), so the desktop app and the web page run the same loop.
  *
- * Tools are Kigumi's ({ name, description, shape, readOnly, run }, agent/tools.js); one that changes
- * something waits on `askPermission` first. What happens is reported as panel events (see
+ * Tools are Kigumi's ({ name, description, shape, effect, run }, agent/tools.js); one that does more
+ * than read waits on `askPermission` first. What happens is reported as panel events (see
  * agent/agent-session.js).
  */
 
@@ -98,27 +98,13 @@ function onlyLatestImage(messages) {
     return out;
 }
 
-/** Tool calls without a write or edit between progress reminders. */
+/** Tool calls in a turn without a write or edit between progress reminders. */
 const LOOKS_BEFORE_NUDGE = 6;
 const WRITE_TOOLS = new Set(['write_file', 'edit_file']);
 
-/** Count tool calls since the latest write or edit, across user turns. */
-function looksSinceWrite(messages) {
-    let looks = 0;
-    for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role !== 'assistant' || !Array.isArray(messages[i].content)) continue;
-        const calls = messages[i].content.filter((part) => part.type === 'tool-call');
-        for (let j = calls.length - 1; j >= 0; j--) {
-            if (WRITE_TOOLS.has(calls[j].toolName)) return looks;
-            looks += 1;
-        }
-    }
-    return looks;
-}
-
 /** Return a reminder to turn research into a first editable version. */
 function writeEarly(looks) {
-    return `[From Kigumi: you have made ${looks} tool calls without changing anything, including earlier turns. `
+    return `[From Kigumi: you have made ${looks} tool calls this turn without changing anything. `
         + 'If the current request is to write or change a frame, write a first version now. Use kumiki_api for '
         + 'specific signatures and let actual build errors guide further lookups. Do not reread files you already have. '
         + 'Only report writing, running, or building after the corresponding tool has actually done it.]';
@@ -172,7 +158,7 @@ function cacheMarked(messages) {
     });
 }
 
-/** Tool results kept whole; older ones are cut down (trimOldToolResults). */
+/** Tool results kept whole at the least; older ones are cut down, this many at a time (trimOldToolResults). */
 const KEEP_TOOL_RESULTS = 8;
 /** What an older tool result is cut to, in characters. */
 const TRIMMED_TO = 300;
@@ -207,22 +193,23 @@ function trimmedOutput(output) {
 }
 
 /**
- * `messages` with all but the last few tool results cut down. Every step resends the whole
- * conversation, and tool results (files read, logs) are most of it.
+ * `messages` with older tool results cut down, `keep` at a time: between `keep` and `2 * keep - 1`
+ * of the latest stay whole, so the cut moves only every `keep` results. `keep` 0 cuts them all.
  */
 function trimOldToolResults(messages, keep = KEEP_TOOL_RESULTS) {
+    const isResult = (part) => part && part.type === 'tool-result' && part.output;
+    const total = messages.reduce((count, message) => count
+        + (message.role === 'tool' && Array.isArray(message.content) ? message.content.filter(isResult).length : 0), 0);
+    const cut = keep === 0 ? total : Math.floor(Math.max(0, total - keep) / keep) * keep;
     let seen = 0;
-    const out = [...messages];
-    for (let i = out.length - 1; i >= 0; i--) {
-        const message = out[i];
-        if (message.role !== 'tool' || !Array.isArray(message.content)) continue;
-        out[i] = { ...message, content: message.content.map((part) => {
-            if (!part || part.type !== 'tool-result' || !part.output) return part;
+    return messages.map((message) => {
+        if (seen >= cut || message.role !== 'tool' || !Array.isArray(message.content)) return message;
+        return { ...message, content: message.content.map((part) => {
+            if (!isResult(part)) return part;
             seen += 1;
-            return seen > keep ? { ...part, output: trimmedOutput(part.output) } : part;
+            return seen <= cut ? { ...part, output: trimmedOutput(part.output) } : part;
         }) };
-    }
-    return out;
+    });
 }
 
 const SUMMARY_REQUEST = 'Summarise our conversation so far for carrying on the work: what the user wants, what '
@@ -319,11 +306,11 @@ function toToolSet(tools, { images, askPermission }) {
         description: kigumiTool.description,
         inputSchema: z.object(kigumiTool.shape),
         execute: async (input, { toolCallId } = {}) => {
-            if (!kigumiTool.readOnly && !(await askPermission(kigumiTool.name, input))) {
+            if (kigumiTool.effect !== 'read' && !(await askPermission(kigumiTool.name, input))) {
                 throw new Error('The user did not allow this.');
             }
             const output = await kigumiTool.run(input || {}, { toolCallId });
-            return kigumiTool.readOnly ? noteRepeat(kigumiTool.name, input || {}, output) : output;
+            return kigumiTool.effect === 'edit' ? output : noteRepeat(kigumiTool.name, input || {}, output);
         },
         toModelOutput: ({ output }) => toModelContent(output, images),
     })]));
@@ -373,7 +360,7 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
     }
     const messages = [...compacted.history, { role: 'user', content: prompt }];
     const steps = [];
-    let looks = looksSinceWrite(history);
+    let looks = 0;
     let nudgedAt = null;
     const toolSet = toToolSet(tools, { images, askPermission });
     const sofar = () => trimOldToolResults(onlyLatestImage(messages));

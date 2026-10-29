@@ -27,7 +27,7 @@ function todoTool(onChange) {
         shape: {
             items: z.array(z.object({ text: z.string(), done: z.boolean().optional() })).describe('Every item, in order.'),
         },
-        readOnly: true,
+        effect: 'read',
         run: async ({ items }) => {
             const todos = items.map(({ text, done }) => ({ text, done: Boolean(done) }));
             onChange(todos);

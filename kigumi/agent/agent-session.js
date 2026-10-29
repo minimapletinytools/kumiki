@@ -29,7 +29,7 @@ const { createKigumiTools } = require('./tools');
 const { MODELS, findModel, routeModel } = require('./models');
 const { runTurn, languageModelFor } = require('./agent-loop');
 const { Checkpoints } = require('./checkpoints');
-const { PERMISSION_MODES, PLAN_MODE_NOTE, PLAN_MODE_REFUSAL, decide } = require('./permissions');
+const { PERMISSION_MODES, PLAN_MODE_NOTE, PLAN_MODE_REFUSAL, permissionMode, decide } = require('./permissions');
 const { promptContent } = require('./prompt-content');
 const { todoTool, withBuildCheck, withCheckpoints, describeBuild } = require('./session-tools');
 
@@ -158,13 +158,13 @@ class AgentSession {
         });
     }
 
-    /** A setting the panel's menu sets, as it is or its default. Bypassing permissions was a switch once. */
+    /** A setting the panel's menu sets, as it is or its default. */
     panelSetting(key) {
         const { fallback, valid } = PANEL_SETTINGS[key];
-        const value = this.setting(key, undefined);
-        if (valid(value)) return value;
-        if (key === 'agent.permissionMode' && this.setting('agent.bypassPermissions', false) === true) return 'all';
-        return fallback;
+        const value = key === 'agent.permissionMode'
+            ? permissionMode(this.setting(key, undefined), this.setting('agent.bypassPermissions', false))
+            : this.setting(key, undefined);
+        return valid(value) ? value : fallback;
     }
 
     /** Messages from the panel. */
@@ -319,12 +319,30 @@ class AgentSession {
         this.queue = [];
     }
 
+    /** Whether a 'run' tool's file is one a view shows or the agent wrote; a tool with no file runs a view's. */
+    _knownFile(input) {
+        if (!input || !input.file_path) return true;
+        const resolved = (file) => {
+            try {
+                return this.files.resolve(file);
+            } catch (_error) {
+                return null;
+            }
+        };
+        const target = resolved(input.file_path);
+        if (!target) return false;
+        return this.checkpoints.wrote(target) || this.panels.list().some((panel) => panel.kind === 'viewer'
+            && panel.filePath && resolved(panel.filePath) === target);
+    }
+
     _askPermission(toolName, input) {
+        // An unknown tool is treated as one that edits.
+        const tool = this.tools.find((candidate) => candidate.name === toolName) || { name: toolName, effect: 'edit' };
         const decision = decide({
             mode: this.panelSetting('agent.permissionMode'),
             alwaysAllow: this.panelSetting('agent.alwaysAllow'),
             planMode: this.panelSetting('agent.planMode'),
-        }, toolName);
+        }, tool, { knownFile: tool.effect === 'run' && this._knownFile(input) });
         if (decision === 'refuse') return Promise.reject(new Error(PLAN_MODE_REFUSAL));
         if (decision === 'allow') return Promise.resolve(true);
         const requestId = this.nextPermission++;

@@ -28,7 +28,7 @@ function buildServer(tools, version) {
     for (const tool of tools) {
         server.registerTool(
             tool.name,
-            { description: tool.description, inputSchema: tool.shape, annotations: { readOnlyHint: tool.readOnly } },
+            { description: tool.description, inputSchema: tool.shape, annotations: { readOnlyHint: tool.effect === 'read', destructiveHint: tool.effect === 'edit' } },
             async (args) => {
                 try {
                     return { content: await tool.run(args || {}) };

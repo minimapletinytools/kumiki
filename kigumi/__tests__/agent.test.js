@@ -81,7 +81,7 @@ describe('the tools', () => {
         } });
         const check = tools.find((tool) => tool.name === 'check_frame');
 
-        expect(check.readOnly).toBe(true);
+        expect(check.effect).toBe('run');
         expect(textOf(await check.run({ file_path: '/p/a.py' }))).toEqual({ ok: true, entries: [] });
         expect(ran).toEqual([['kigumi.automationOpenFileInViewer', '/p/a.py'], ['kigumi.automationBuildReport', '/p/a.py']]);
     });
@@ -91,7 +91,7 @@ describe('the tools', () => {
         const tools = createKigumiTools({ panels, run: async () => { throw new Error('no commands here'); } });
         const byName = Object.fromEntries(tools.map((tool) => [tool.name, tool]));
 
-        expect(byName.list_panels.readOnly && byName.describe_panel.readOnly).toBe(true);
+        expect([byName.list_panels.effect, byName.describe_panel.effect]).toEqual(['read', 'read']);
         expect(textOf(await byName.list_panels.run({})).active).toBe('viewer:/a.py');
         expect(textOf(await byName.describe_panel.run({})).kind).toBe('viewer');
     });

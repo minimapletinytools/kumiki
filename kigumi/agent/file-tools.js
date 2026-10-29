@@ -31,7 +31,7 @@ function createFileTools({ files }) {
             name: 'list_files',
             description: 'List the files under a folder of the project (the whole project by default).',
             shape: { folder: z.string().optional().describe('A folder relative to the project folder.') },
-            readOnly: true,
+            effect: 'read',
             run: async ({ folder }) => {
                 const found = await files.list(folder, MAX_LISTED);
                 return text(found.join('\n') + (found.length >= MAX_LISTED ? `\n(first ${MAX_LISTED} only)` : ''));
@@ -47,7 +47,7 @@ function createFileTools({ files }) {
                 file_glob: z.string().optional().describe('Only files whose name matches, e.g. "*.py".'),
                 ignore_case: z.boolean().optional(),
             },
-            readOnly: true,
+            effect: 'read',
             run: async ({ pattern, folder, file_glob: nameGlob, ignore_case: ignoreCase }) => {
                 const matches = await files.search(pattern, { folder, nameGlob, ignoreCase, maxMatches: MAX_MATCHES });
                 return text(matches.length
@@ -63,7 +63,7 @@ function createFileTools({ files }) {
                 offset: z.number().int().min(1).optional().describe('The first line to read (1-based).'),
                 limit: z.number().int().min(1).optional(),
             },
-            readOnly: true,
+            effect: 'read',
             run: async ({ file_path: file, offset = 1, limit = MAX_READ_LINES }) => {
                 const content = await files.read(file);
                 if (content === null) throw new Error(`${file} doesn't exist.`);
@@ -84,7 +84,7 @@ function createFileTools({ files }) {
             name: 'write_file',
             description: 'Create a file in the project, or replace one whole. Prefer edit_file to change part of a file.',
             shape: { file_path: filePath, content: z.string() },
-            readOnly: false,
+            effect: 'edit',
             run: ({ file_path: file, content }) => oneAtATime(async () => {
                 const target = await files.write(file, content);
                 return text(`Wrote ${files.relative(target)}.`);
@@ -99,7 +99,7 @@ function createFileTools({ files }) {
                 new_string: z.string(),
                 replace_all: z.boolean().optional(),
             },
-            readOnly: false,
+            effect: 'edit',
             run: ({ file_path: file, old_string: before, new_string: after, replace_all: all }) => oneAtATime(async () => {
                 files.resolve(file, { write: true });
                 const content = await files.read(file);

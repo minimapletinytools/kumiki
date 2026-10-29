@@ -2,9 +2,9 @@
  * Kigumi's tools for agents: one list, served over MCP (agent/mcp-http.js) to any agent, and
  * in process to the built-in agent panel (agent/agent-session.js).
  *
- * Each tool is { name, description, shape, readOnly, run }, where `shape` is a zod raw shape
- * (both SDKs take one) and `run(args)` resolves to MCP content: [{ type: 'text', text }] or an
- * image. `readOnly` tools change nothing, so the agent panel runs them without asking.
+ * Each tool is { name, description, shape, effect, run }, where `shape` is a zod raw shape
+ * (both SDKs take one), `effect` is what running it does (agent/permissions.js), and `run(args)`
+ * resolves to MCP content: [{ type: 'text', text }] or an image.
  *
  * Kigumi-specific only: reading and editing files is the agent's own job.
  */
@@ -40,7 +40,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             description: 'The project folder open in Kigumi: where its frame files and patterns are, and '
                 + 'what the file paths the other tools give are relative to.',
             shape: {},
-            readOnly: true,
+            effect: 'read',
             run: async () => {
                 const folders = workspaceFolders();
                 return text({ workspaceFolder: folders[0] || null, workspaceFolders: folders });
@@ -51,7 +51,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             description: 'Every open Kigumi panel (3D views, code editors, the log), which one is active, '
                 + 'and the file each shows.',
             shape: {},
-            readOnly: true,
+            effect: 'read',
             run: async () => {
                 const active = panels.active();
                 return text({ active: active ? active.id : null, panels: panels.list() });
@@ -64,7 +64,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
                 + 'the focused feature with the reference that finds it in code. For an editor: the file '
                 + 'and the selected text.',
             shape: { panel_id: panelId },
-            readOnly: true,
+            effect: 'read',
             run: async ({ panel_id: id }) => {
                 const described = await panels.describe(id);
                 return text(described || { error: 'No such panel, and no panel is active.' });
@@ -74,14 +74,14 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             name: 'open_in_viewer',
             description: 'Open a Python frame file in a Kigumi 3D view (or bring its view forward).',
             shape: { file_path: z.string().describe('Absolute path to a .py frame file.') },
-            readOnly: false,
+            effect: 'run',
             run: async ({ file_path: filePath }) => text(await run('kigumi.automationOpenFileInViewer', { filePath })),
         },
         {
             name: 'refresh_view',
             description: 'Rebuild a view from its source file, after the file has been edited.',
             shape: { panel_id: panelId },
-            readOnly: false,
+            effect: 'run',
             run: async ({ panel_id: id }) => text(await run('kigumi.automationRefreshSession', {
                 ...viewOptions(id), reason: 'agent refresh',
             })),
@@ -92,7 +92,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
                 + 'touches, and says whether every timber is connected to the rest. Use it to check that timbers '
                 + 'you joined actually meet.',
             shape: { panel_id: panelId },
-            readOnly: true,
+            effect: 'read',
             run: async ({ panel_id: id }) => text(await run('kigumi.automationDescribeFrame', viewOptions(id))),
         },
         {
@@ -104,7 +104,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
                 min_level: z.enum(['debug', 'info', 'warning', 'error']).optional(),
                 contains: z.string().optional().describe('Only entries containing this text.'),
             },
-            readOnly: true,
+            effect: 'read',
             run: async ({ panel_id: id, min_level: minLevel, contains }) => text(await run(
                 'kigumi.automationReadSessionLogs', { ...viewOptions(id), minLevel, contains },
             )),
@@ -113,7 +113,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             name: 'get_camera',
             description: "A view's camera: where it looks from and at.",
             shape: { panel_id: panelId },
-            readOnly: true,
+            effect: 'read',
             run: async ({ panel_id: id }) => text(await run('kigumi.automationGetCameraState', viewOptions(id))),
         },
         {
@@ -123,7 +123,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
                 panel_id: panelId,
                 camera: z.record(z.string(), z.unknown()).describe('A camera state, as get_camera returns it.'),
             },
-            readOnly: false,
+            effect: 'ui',
             run: async ({ panel_id: id, camera }) => text(await run('kigumi.automationSetCameraState', {
                 ...viewOptions(id), cameraState: camera,
             })),
@@ -133,7 +133,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             description: 'Build a Python frame file and say whether it built, with its warnings and errors. Opens '
                 + 'it in a view first if none shows it.',
             shape: { file_path: z.string().describe('Absolute path to a .py frame file.') },
-            readOnly: true,
+            effect: 'run',
             run: async ({ file_path: filePath }) => {
                 const opened = await run('kigumi.automationOpenFileInViewer', { filePath });
                 if (opened && opened.ok === false) {
@@ -146,7 +146,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [] }) {
             name: 'screenshot',
             description: 'A picture of a view as it is drawn now, to look at the model.',
             shape: { panel_id: panelId },
-            readOnly: true,
+            effect: 'read',
             run: async ({ panel_id: id }) => {
                 const result = await run('kigumi.captureScreenshot', { ...viewOptions(id), includeData: true });
                 return [

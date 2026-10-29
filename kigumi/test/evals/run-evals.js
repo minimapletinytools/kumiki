@@ -69,7 +69,7 @@ function evalTools(files) {
         name: 'check_frame',
         description: 'Build a Python frame file and say whether it built, with its warnings and errors.',
         shape: { file_path: require('zod').z.string().describe('A path in the project.') },
-        readOnly: true,
+        effect: 'run',
         run: async ({ file_path: file }) => [{ type: 'text', text: describeReport(await buildFrame(files.resolve(file))) }],
     }];
 }

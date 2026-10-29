@@ -2,7 +2,7 @@
 // the longest step, opening at startup) and past conversations; and the banner saying when it isn't asking.
 import { t } from './i18n.js';
 
-const MODE_BANNERS = { edits: 'agent.banner.edits', all: 'agent.banner.all' };
+const MODE_BANNERS = { auto: 'agent.banner.auto' };
 
 function ago(time) {
     const minutes = Math.round((Date.now() - new Date(time).getTime()) / 60000);

@@ -25,6 +25,11 @@ class Checkpoints {
         this.open.files[absolute] = { before: await this.files.read(absolute), after: null };
     }
 
+    /** Whether a turn of this conversation, the open one included, wrote `absolute`. */
+    wrote(absolute) {
+        return Boolean((this.open && absolute in this.open.files) || this.kept.some((turn) => absolute in turn.files));
+    }
+
     /** The turn is over: what it changed, as relative paths, or null if nothing. */
     async end() {
         const turn = this.open;
