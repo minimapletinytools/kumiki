@@ -47,6 +47,7 @@ export class Conversation {
     reset() {
         this.toolChips.clear();
         this.undoNotes.clear();
+        this.queued.clear();
         this.thinking = null;
         this.element.innerHTML = this.welcomeHtml;
         translatePage(this.element);
@@ -184,6 +185,11 @@ export class Conversation {
     }
 
     done({ stopped, isError, error, costUsd }) {
+        // A question the turn ended without an answer to can no longer be answered.
+        for (const buttons of this.element.querySelectorAll('.permission-card .permission-buttons')) {
+            buttons.closest('.permission-card').classList.add('is-denied');
+            buttons.remove();
+        }
         if (stopped) {
             this.note(t('agent.stopped'));
         } else if (isError) {

@@ -49,6 +49,11 @@ const canRun = typeof electron === 'string' && fs.existsSync(electron) && (proce
         expect(result.stop).toEqual({ type: 'agent:stop' });
     });
 
+    test('a permission card answers its question; one left when the turn ends can no longer be answered', () => {
+        expect(result.answer).toEqual({ type: 'agent:permissionAnswer', requestId: 7, allow: true, always: false });
+        expect(result.unansweredLeft).toBe(0);
+    });
+
     test('a replayed conversation is drawn', () => {
         expect(result.drawn).toContain('a sawhorse please');
         expect(result.drawn).toContain('Here is a sawhorse.');

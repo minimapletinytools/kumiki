@@ -95,6 +95,14 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
         result.drawn = await run('document.getElementById("messages").textContent');
 
+        await send({ type: 'agent:permission', requestId: 7, toolName: 'edit_file', input: { file_path: 'a.py' } });
+        from = await count();
+        await run('document.querySelector(".permission-card button.allow").click()');
+        result.answer = await posted('agent:permissionAnswer', from);
+        await send({ type: 'agent:permission', requestId: 8, toolName: 'edit_file', input: { file_path: 'b.py' } });
+        await send({ type: 'agent:done', isError: false, stopped: true });
+        result.unansweredLeft = await run('document.querySelectorAll(".permission-card .permission-buttons").length');
+
         await send({ type: 'agent:busy', busy: true });
         from = await count();
         await run('document.getElementById("send-btn").click()');
