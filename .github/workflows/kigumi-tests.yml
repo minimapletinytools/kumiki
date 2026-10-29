@@ -56,8 +56,12 @@ jobs:
       - name: Install Node.js dependencies
         run: npm install
 
+      # The agent panel test loads its page in Electron, which needs a display.
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Run unit tests
-        run: npm run test:unit
+        run: xvfb-run -a npm run test:unit
 
   # The extension in a real VS Code: the viewer and the explorer open, render and answer the
   # automation commands. VS Code needs a display, so it runs under xvfb.
