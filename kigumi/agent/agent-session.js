@@ -198,9 +198,10 @@ class AgentSession {
                 if (latest) this.openConversation(latest.id);
             }
             this.restored = true;
+            if (this.busy) this.postRaw({ type: 'agent:busy', busy: true });
         } else if (message.type === 'agent:signIn' && this.account) {
             this.account.signIn(message.provider === 'google' ? 'google' : 'github')
-                .catch((error) => this.post({ type: 'agent:error', key: 'agent.error.signIn', params: { error: error.message },
+                .catch((error) => this.postRaw({ type: 'agent:error', key: 'agent.error.signIn', params: { error: error.message },
                     message: `Could not sign in: ${error.message}` }));
         } else if (message.type === 'agent:signOut' && this.account) {
             void this.account.signOut().then(() => this.postState());
@@ -341,7 +342,7 @@ class AgentSession {
         }
         const route = this.route();
         if (!route) {
-            this.post({ type: 'agent:error', key: 'agent.route.setKey',
+            this.postRaw({ type: 'agent:error', key: 'agent.route.setKey',
                 message: 'Sign in to use the agent, or set agent.openrouterApiKey in settings.' });
             return;
         }
@@ -354,6 +355,7 @@ class AgentSession {
         const { checkpoints } = conversation;
         checkpoints.begin(conversation.turn);
         this.post({ type: 'agent:busy', busy: true });
+        let finished = false;
         try {
             const { costUsd } = await runTurn({
                 model: await this.createModel(route, {
@@ -374,7 +376,12 @@ class AgentSession {
                 askPermission: (toolName, input) => this._askPermission(toolName, input),
                 onEvent: (event) => { if (ours()) this.post(event); },
             });
-            if (ours()) this.post({ type: 'agent:done', isError: false, costUsd: this._charged(route, costUsd) });
+            // Stopped, a turn can end without an error.
+            finished = !abort.signal.aborted;
+            if (ours()) {
+                this.post(finished ? { type: 'agent:done', isError: false, costUsd: this._charged(route, costUsd) }
+                    : { type: 'agent:done', isError: false, stopped: true });
+            }
         } catch (error) {
             // The log keeps what the turn did before it failed, so asking again carries on from there.
             if (ours()) {
@@ -389,6 +396,11 @@ class AgentSession {
         } finally {
             const changed = await checkpoints.end();
             if (changed && ours()) this.post({ type: 'agent:checkpoint', ...changed });
+            // A step cut off after an edit never reached the log: say what changed.
+            if (changed && !finished) {
+                conversation.log.push({ note: 'interrupted', text: `Before it stopped, your last turn changed ${changed.files.join(', ')}. `
+                    + 'Read them before relying on what you think is in them.' });
+            }
             this.abort = null;
             this.post({ type: 'agent:busy', busy: false });
             if (route.via === 'backend') {

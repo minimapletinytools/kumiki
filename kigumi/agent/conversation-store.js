@@ -58,11 +58,16 @@ function createConversationStore(baseDir) {
         });
     }
 
-    /** JSON with its blobs read back in. */
+    /** JSON with its blobs read back in; a blob gone is a note saying so. */
     function readBlobs(project, json) {
-        return JSON.parse(json, (_key, value) => (value && typeof value === 'object' && typeof value.$blob === 'string'
-            ? fs.readFileSync(path.join(blobFolder(project), value.$blob.replace(/[^0-9a-f]/g, '')), 'utf8')
-            : value));
+        return JSON.parse(json, (_key, value) => {
+            if (!value || typeof value !== 'object' || typeof value.$blob !== 'string') return value;
+            try {
+                return fs.readFileSync(path.join(blobFolder(project), value.$blob.replace(/[^0-9a-f]/g, '')), 'utf8');
+            } catch (_error) {
+                return '[Kept in a file that is gone.]';
+            }
+        });
     }
 
     /** Delete the blobs no kept conversation refers to. */

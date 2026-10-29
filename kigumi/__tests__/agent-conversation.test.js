@@ -103,6 +103,11 @@ describe('a conversation', () => {
         expect(conversation.turn).toBe(2);
         conversation.log.push(user('more'));
         expect(conversation.render()).toEqual([...transcript, { type: 'agent:userMessage', text: 'more', images: 0 }]);
+        // Streamed pieces are joined, as the panel shows them.
+        const streamed = Conversation.load(files, { history: [], transcript: [{ type: 'agent:text', text: 'Hel' }, { type: 'agent:text', text: 'lo' },
+            { type: 'agent:tool', id: 'c', name: 'look' }, { type: 'agent:reasoning', text: 'a' }, { type: 'agent:reasoning', text: 'b' }] });
+        expect(streamed.render()).toEqual([{ type: 'agent:text', text: 'Hello' }, { type: 'agent:tool', id: 'c', name: 'look' },
+            { type: 'agent:reasoning', text: 'ab' }]);
         // Saved again, it is in this format and opens the same.
         const reopened = Conversation.load(files, JSON.parse(JSON.stringify(conversation)));
         expect(reopened.render()).toEqual(conversation.render());
@@ -130,5 +135,9 @@ describe('the conversation store', () => {
         store.remove('/project', 'b');
         expect(blobs()).toBe(1);
         expect(store.load('/project', 'a').log[0].content).toBe(shot);
+
+        // A blob gone leaves a note in its place; the conversation still opens.
+        for (const name of fs.readdirSync(path.join(base, folder, 'blobs'))) fs.rmSync(path.join(base, folder, 'blobs', name));
+        expect(store.load('/project', 'a').log[0].content).toBe('[Kept in a file that is gone.]');
     });
 });

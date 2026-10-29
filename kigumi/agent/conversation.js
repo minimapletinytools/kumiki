@@ -13,7 +13,7 @@
 const { Checkpoints } = require('./checkpoints');
 
 /** Panel events kept in the log. */
-const KEPT_EVENTS = new Set(['agent:notice', 'agent:done', 'agent:error', 'agent:checkpoint', 'agent:restored', 'agent:todos']);
+const KEPT_EVENTS = new Set(['agent:notice', 'agent:done', 'agent:checkpoint', 'agent:restored', 'agent:todos']);
 
 /** Most of a tool result the panel shows. */
 const MAX_RESULT_CHARS = 2000;
@@ -53,6 +53,20 @@ function renderLog(entries) {
     return events;
 }
 
+/** `events` with each run of streamed text, and of reasoning, joined into one event, as the panel shows them. */
+function joinStreamed(events) {
+    const joined = [];
+    for (const event of events) {
+        const last = joined.at(-1);
+        if (last && last.type === event.type && (event.type === 'agent:text' || event.type === 'agent:reasoning')) {
+            joined[joined.length - 1] = { ...last, text: `${last.text || ''}${event.text || ''}` };
+        } else {
+            joined.push(event);
+        }
+    }
+    return joined;
+}
+
 const SUMMARY_PREFIX = '[A summary of our conversation so far]\n';
 const UNDO_PREFIX = '[I undid your changes to ';
 
@@ -76,7 +90,7 @@ function fromFirstFormat({ history = [], transcript = [], ...rest }) {
             log.push(message);
         }
     }
-    return { ...rest, log, earlier: { transcript, entries: log.length } };
+    return { ...rest, log, earlier: { transcript: joinStreamed(transcript), entries: log.length } };
 }
 
 class Conversation {
@@ -111,4 +125,4 @@ class Conversation {
     }
 }
 
-module.exports = { Conversation, renderLog, KEPT_EVENTS };
+module.exports = { Conversation, renderLog, joinStreamed, KEPT_EVENTS };

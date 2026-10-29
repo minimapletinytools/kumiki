@@ -113,21 +113,29 @@ async function changedFilesNow(log, files) {
 }
 
 /**
- * When the request `log` would send is past `harness.summariseAt`, have the model summarise it and
- * append the summary, with the files the conversation changed as they are now (`files`,
- * project-files.js). Returns the summary's cost, or undefined.
+ * When the request the log's first `upTo` entries would send is past `harness.summariseAt`, have the
+ * model summarise them and put the summary after them, with the files the conversation changed as
+ * they are now (`files`, project-files.js). Returns the summary's cost, or undefined.
  */
-async function summariseIfLarge({ model, system, log, abortSignal, files = null, harness = HARNESS }) {
-    if (estimateTokens(buildRequest(log, { keep: harness.keepToolResults })) < harness.summariseAt) return undefined;
+async function summariseIfLarge({ model, system, log, upTo = log.length, abortSignal, files = null, harness = HARNESS }) {
+    const earlier = log.slice(0, upTo);
+    if (estimateTokens(buildRequest(earlier, { keep: harness.keepToolResults })) < harness.summariseAt) return undefined;
     // Streamed like every other request, which is all the backend carries cost reports for.
+    let failure = null;
     const result = streamText({
         model, system, abortSignal, maxRetries: 2, maxOutputTokens: MAX_OUTPUT_TOKENS,
-        messages: [...buildRequest(log, { keep: 0, imagesInToolResults: harness.imagesInToolResults }),
+        messages: [...buildRequest(earlier, { keep: 0, imagesInToolResults: harness.imagesInToolResults }),
             { role: 'user', content: SUMMARY_REQUEST }],
+        onError: ({ error }) => { failure = error; },
     });
-    const summary = await result.text;
+    let summary;
+    try {
+        summary = await result.text;
+    } catch (error) {
+        throw failure || error;
+    }
     const metadata = await result.providerMetadata;
-    log.push({ summary: `${summary}${await changedFilesNow(log, files)}` });
+    log.splice(upTo, 0, { summary: `${summary}${await changedFilesNow(earlier, files)}` });
     const openrouter = metadata && metadata.openrouter;
     return openrouter && openrouter.usage && openrouter.usage.cost;
 }
@@ -174,9 +182,9 @@ function earlyEnd(steps, maxSteps = MAX_STEPS) {
 }
 
 /**
- * Run one user turn, appending to `log` as it goes: a summary first if the conversation is large,
- * then `prompt`, then each step's messages and Kigumi's notes. A turn that fails throws, and the log
- * keeps the steps it finished.
+ * Run one user turn, appending to `log` as it goes: `prompt`, a summary before it if the conversation
+ * is large, then each step's messages and Kigumi's notes. A turn that fails throws, and the log keeps
+ * the request and the steps it finished.
  *
  * @param {object} options
  * @param {object} options.model         an AI SDK language model (languageModelFor)
@@ -199,12 +207,13 @@ function earlyEnd(steps, maxSteps = MAX_STEPS) {
 async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS,
     maxSteps = MAX_STEPS, tools, files = null, system, log, prompt, abortSignal, askPermission, onEvent }) {
     const costs = [];
-    const summaryCost = await summariseIfLarge({ model, system, log, abortSignal, files, harness });
-    if (log.at(-1) && log.at(-1).summary !== undefined) {
+    const start = log.length;
+    log.push(...prompt);
+    const summaryCost = await summariseIfLarge({ model, system, log, upTo: start, abortSignal, files, harness });
+    if (log[start] && log[start].summary !== undefined) {
         if (typeof summaryCost === 'number') costs.push(summaryCost);
         onEvent({ type: 'agent:notice', key: 'agent.notice.summarised', text: 'The earlier conversation was summarised, to keep each step small.' });
     }
-    log.push(...prompt);
     const steps = [];
     let looks = 0;
     let nudgedAt = null;

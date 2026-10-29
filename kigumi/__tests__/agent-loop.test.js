@@ -455,6 +455,15 @@ describe('the agent loop', () => {
         expect(costUsd).toBeCloseTo(0.003);
     });
 
+    test('a request whose summary fails stays in the log, for asking again', async () => {
+        const model = new MockLanguageModelV4({ doStream: async () => { throw Object.assign(new Error('Summary refused.'), { statusCode: 400 }); } });
+        const log = [{ role: 'user', content: 'x'.repeat(SUMMARISE_AT_TOKENS * 4 + 100) }, { role: 'assistant', content: 'ok' }];
+
+        await expect(turn(model, { log })).rejects.toThrow('Summary refused.');
+
+        expect(log.at(-1)).toEqual(go()[0]);
+    });
+
     test('a summary carries the files the conversation changed, as they are now, and again at the next summary', async () => {
         const model = scripted(
             [...say('s', 'Line 98 still reads bottom_position.'), finish('stop')],
@@ -670,10 +679,11 @@ describe('the agent session', () => {
         return { agent, posted, values, created };
     }
 
-    test('says what to do when nothing can carry a request', async () => {
+    test('says what to do when nothing can carry a request, and keeps none of it in the conversation', async () => {
         const { agent, posted } = session();
         await agent.prompt('hi');
         expect(posted).toEqual([{ type: 'agent:error', key: 'agent.route.setKey', message: expect.stringContaining('Sign in') }]);
+        expect(agent.conversation.log).toEqual([]);
     });
 
     test('tells the panel the models, the one chosen, and where its requests go', () => {
@@ -1031,5 +1041,48 @@ describe('the agent session', () => {
         const second = agent._askPermission('write_file', {});
         agent.stop();
         await expect(second).resolves.toBe(false);
+    });
+
+    test('a panel reloaded while the agent works is told it is busy', async () => {
+        let release;
+        const gate = new Promise((resolve) => { release = resolve; });
+        const model = new MockLanguageModelV4({ doStream: async () => {
+            await gate;
+            return { stream: convertArrayToReadableStream([...say('1', 'Done.'), finish('stop')]) };
+        } });
+        const { agent, posted } = session({ settings: { 'agent.openrouterApiKey': 'sk-or' }, model });
+        const turn = agent.prompt('go');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        posted.length = 0;
+
+        agent.handle({ type: 'agent:ready' });
+
+        expect(posted.map((message) => message.type)).toEqual(['agent:state', 'agent:replay', 'agent:busy']);
+        expect(posted.at(-1).busy).toBe(true);
+        release();
+        await turn;
+    });
+
+    test('a turn stopped after an edit leaves a note of the files it changed', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-stopped-'));
+        fs.writeFileSync(path.join(root, 'frame.py'), 'legs = 4\n');
+        const abort = { agent: null };
+        const model = new MockLanguageModelV4({ doStream: async ({ abortSignal }) => {
+            if (model.doStreamCalls.length > 1) {
+                abort.agent.stop();
+                throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+            }
+            return { stream: convertArrayToReadableStream([
+                call('c1', 'edit_file', { file_path: 'frame.py', old_string: 'legs = 4', new_string: 'legs = 3' }), finish('tool-calls')]) };
+        } });
+        const agent = new AgentSession({ host: hostOf({ files: createProjectFiles({ root: () => root }) }), post: () => {},
+            setting: (key, fallback) => ({ 'agent.openrouterApiKey': 'sk-or', 'agent.permissionMode': 'auto' }[key] ?? fallback),
+            createModel: async () => model });
+        abort.agent = agent;
+
+        await agent.prompt('three legs');
+
+        expect(agent.conversation.log.at(-1)).toEqual({ note: 'interrupted', text: expect.stringContaining('changed frame.py') });
+        fs.rmSync(root, { recursive: true, force: true });
     });
 });
