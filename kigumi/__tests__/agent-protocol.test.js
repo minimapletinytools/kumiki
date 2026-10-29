@@ -4,6 +4,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const { PANEL_TO_SESSION, SESSION_TO_PANEL } = require('../webview/agent/protocol.js');
 
@@ -35,4 +36,13 @@ describe('the agent panel protocol', () => {
         expect(SESSION_TO_PANEL.filter((type) => !sentBySession.has(type))).toEqual([]);
         expect(PANEL_TO_SESSION.filter((type) => !sentByPanel.has(type))).toEqual([]);
     });
+});
+
+test('every agent panel module parses: one that doesn\'t leaves the whole panel dead', () => {
+    const folder = path.join(__dirname, '..', 'webview', 'agent');
+    for (const name of fs.readdirSync(folder).filter((file) => file.endsWith('.js'))) {
+        const checked = spawnSync(process.execPath, ['--input-type=module', '--check'],
+            { input: fs.readFileSync(path.join(folder, name), 'utf8'), encoding: 'utf8' });
+        expect({ name, error: checked.status === 0 ? null : checked.stderr.split('\n').slice(0, 3).join('\n') }).toEqual({ name, error: null });
+    }
 });
