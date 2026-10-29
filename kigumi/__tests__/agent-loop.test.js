@@ -197,7 +197,7 @@ describe('the agent loop', () => {
         expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('changed the leg');
     });
 
-    test('an interrupted agent turn waits for a backend lease and finishes without replaying its edit', async () => {
+    test('an interrupted turn through the backend finishes without replaying its edit', async () => {
         const event = (delta, finish_reason = null) => `data: ${JSON.stringify({ id: 'gen-recovery', created: 0,
             model: 'deepseek/deepseek-v4.1-flash', choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
         const stream = (text) => new Response(text, { headers: { 'Content-Type': 'text/event-stream' } });
@@ -205,19 +205,16 @@ describe('the agent loop', () => {
             stream(event({ tool_calls: [{ index: 0, id: 'edit-once', type: 'function',
                 function: { name: 'change', arguments: '{"what":"the bookshelf"}' } }] }) + event({}, 'tool_calls') + 'data: [DONE]\n\n'),
             stream(event({ reasoning: 'Checking the bookshelf' })),
-            Response.json({ error: { code: 'request_busy', message: 'Still finishing.' } }, { status: 429, headers: { 'Retry-After': '1' } }),
             stream(event({ content: 'The bookshelf is ready.' }) + event({}, 'stop') + 'data: [DONE]\n\n'),
         ];
         const fetch = jest.fn(async () => replies.shift());
-        const onWait = jest.fn();
         const model = await languageModelFor({ via: 'backend', modelId: 'deepseek/deepseek-v4.1-flash', baseURL: 'https://api.test/v1' },
-            { fetch, onWait });
+            { fetch });
         const previousCalls = changeTool.run.mock.calls.length;
 
         const { events, log } = await turn(model);
 
-        expect(fetch).toHaveBeenCalledTimes(4);
-        expect(onWait).toHaveBeenCalledTimes(1);
+        expect(fetch).toHaveBeenCalledTimes(3);
         expect(changeTool.run.mock.calls.length - previousCalls).toBe(1);
         expect(events).toContainEqual({ type: 'agent:text', text: 'The bookshelf is ready.' });
         expect(events).not.toContainEqual(expect.objectContaining({ key: 'agent.notice.unexpected' }));

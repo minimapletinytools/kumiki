@@ -457,7 +457,6 @@
   "agent.notice.outputLimit": "Stopped at the output limit for one step. Say \"continue\" to carry on, or raise the limit in settings.",
   "agent.notice.unexpected": "The model stopped unexpectedly ({reason}). Say \"continue\" to carry on.",
   "agent.notice.continuing": "The response stream ended early. Continuing automatically ({attempt}/{attempts}).",
-  "agent.notice.waitingRequest": "Waiting for the previous model request to finish. You can press Stop to cancel.",
   "agent.notice.summarised": "The earlier conversation was summarised, to keep each step small.",
   "agent.notice.restored": "Put back as they were before that request: {files}. The agent is told so with your next message.",
   "agent.error.noCredit": "Out of credit.",

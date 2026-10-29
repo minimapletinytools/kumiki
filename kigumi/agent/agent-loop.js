@@ -12,7 +12,6 @@
 const { streamText, stepCountIs, tool } = require('ai');
 // The same zod the tools' shapes are made with (agent/tools.js).
 const { z } = require('zod');
-const { backendFetch } = require('./backend-fetch');
 const { buildRequest, estimateTokens } = require('./request');
 
 /** Steps in one turn, each a model call and the tools it asks for. */
@@ -37,12 +36,12 @@ const NOTES = {
 };
 
 /** Return the AI SDK language model a route (agent/models.js routeModel) names. */
-async function languageModelFor(route, { fetch, onWait } = {}) {
+async function languageModelFor(route, { fetch } = {}) {
     const { createOpenRouter } = require('@openrouter/ai-sdk-provider');
     const provider = createOpenRouter({
         // Through the backend, `fetch` puts the account's token in instead.
         apiKey: route.apiKey || 'kigumi-account', compatibility: 'strict',
-        fetch: route.via === 'backend' ? backendFetch(fetch || globalThis.fetch, { onWait }) : fetch,
+        fetch,
         ...(route.baseURL ? { baseURL: route.baseURL } : {}),
         headers: { 'X-Title': 'Kigumi' },
     });

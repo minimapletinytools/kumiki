@@ -251,7 +251,11 @@ came from single sessions.
    `[Kigumi note: …]`; the conversation store keeps long strings as shared blobs and writes
    atomically. Old conversations open: their history becomes the log, their transcript is shown.
    Left from §6: a TurnRunner apart from the panel protocol, and typed protocol messages.
-4. **Backend reservations (§7)**, then delete `backend-fetch.js` and the lease code.
+4. **Done: backend reservations (§7).** `reserve_request` holds back each request's most possible
+   cost; `settle_request` drops the hold. The client's `backend-fetch.js` and its wait notice are
+   gone. The rate limit's 429 says `Retry-After: 20`. Left: once the previous Worker is gone, a
+   migration dropping `claim_request`, `start_request`, `finish_request`, `busy_until` and
+   `active_request`.
 5. **Profiles (§5).**
 
 ## Decisions (2026-10-29)
