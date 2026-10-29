@@ -890,8 +890,8 @@ describe('the agent session', () => {
 
     test('in plan mode, no file is edited, and the model is told why; the camera still moves', async () => {
         const { agent, posted } = session({ settings: { 'agent.planMode': true, 'agent.permissionMode': 'auto' } });
-        await expect(agent._askPermission('edit_file', {})).rejects.toThrow('Plan mode is on');
-        await expect(agent._askPermission('set_camera', {})).resolves.toBe(true);
+        await expect(agent.permissions.ask('edit_file', {})).rejects.toThrow('Plan mode is on');
+        await expect(agent.permissions.ask('set_camera', {})).resolves.toBe(true);
         expect(posted.some((message) => message.type === 'agent:permission')).toBe(false);
     });
 
@@ -981,14 +981,14 @@ describe('the agent session', () => {
         const { agent, posted, values } = session();
         const asked = () => posted.filter((message) => message.type === 'agent:permission').length;
 
-        void agent._askPermission('edit_file', {});
+        void agent.permissions.ask('edit_file', {});
         expect(asked()).toBe(1);
         // Moving the camera only changes what the user sees.
-        await expect(agent._askPermission('set_camera', {})).resolves.toBe(true);
+        await expect(agent.permissions.ask('set_camera', {})).resolves.toBe(true);
 
         agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'auto' });
-        await expect(agent._askPermission('edit_file', {})).resolves.toBe(true);
-        await expect(agent._askPermission('check_frame', { file_path: 'other.py' })).resolves.toBe(true);
+        await expect(agent.permissions.ask('edit_file', {})).resolves.toBe(true);
+        await expect(agent.permissions.ask('check_frame', { file_path: 'other.py' })).resolves.toBe(true);
         expect(asked()).toBe(1);
 
         // Only the panel's own settings, and only sensible values.
@@ -1011,34 +1011,34 @@ describe('the agent session', () => {
         agent.conversation.checkpoints.begin(1);
         await agent.conversation.checkpoints.beforeWrite('/project/written.py');
 
-        await expect(agent._askPermission('check_frame', { file_path: 'shown.py' })).resolves.toBe(true);
-        await expect(agent._askPermission('check_frame', { file_path: 'written.py' })).resolves.toBe(true);
-        await expect(agent._askPermission('refresh_view', {})).resolves.toBe(true);
-        void agent._askPermission('check_frame', { file_path: 'cleanup.py' });
-        expect(agent.pendingPermissions.size).toBe(1);
+        await expect(agent.permissions.ask('check_frame', { file_path: 'shown.py' })).resolves.toBe(true);
+        await expect(agent.permissions.ask('check_frame', { file_path: 'written.py' })).resolves.toBe(true);
+        await expect(agent.permissions.ask('refresh_view', {})).resolves.toBe(true);
+        void agent.permissions.ask('check_frame', { file_path: 'cleanup.py' });
+        expect(agent.permissions.pending.size).toBe(1);
     });
 
     test('"always allow" from a permission card holds for that tool from then on', async () => {
         const { agent, posted, values } = session();
-        const first = agent._askPermission('check_frame', { file_path: 'a.py' });
+        const first = agent.permissions.ask('check_frame', { file_path: 'a.py' });
         const { requestId } = posted.find((message) => message.type === 'agent:permission');
         agent.handle({ type: 'agent:permissionAnswer', requestId, allow: true, always: true });
 
         await expect(first).resolves.toBe(true);
         expect(values['agent.alwaysAllow']).toEqual(['check_frame']);
-        await expect(agent._askPermission('check_frame', { file_path: 'b.py' })).resolves.toBe(true);
+        await expect(agent.permissions.ask('check_frame', { file_path: 'b.py' })).resolves.toBe(true);
         expect(posted.filter((message) => message.type === 'agent:permission')).toHaveLength(1);
     });
 
     test('a tool waiting for the user is answered from the panel, and stopping says no', async () => {
         const { agent, posted } = session();
 
-        const first = agent._askPermission('edit_file', { file_path: 'a.py' });
+        const first = agent.permissions.ask('edit_file', { file_path: 'a.py' });
         const { requestId } = posted.find((message) => message.type === 'agent:permission');
         agent.handle({ type: 'agent:permissionAnswer', requestId, allow: true });
         await expect(first).resolves.toBe(true);
 
-        const second = agent._askPermission('write_file', {});
+        const second = agent.permissions.ask('write_file', {});
         agent.stop();
         await expect(second).resolves.toBe(false);
     });

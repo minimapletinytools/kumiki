@@ -7,6 +7,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const { PANEL_TO_SESSION, SESSION_TO_PANEL } = require('../webview/agent/protocol.js');
+const { PANEL_MESSAGES, parsePanelMessage } = require('../agent/panel-messages');
 
 const read = (folder) => fs.readdirSync(folder).filter((name) => name.endsWith('.js'))
     .map((name) => fs.readFileSync(path.join(folder, name), 'utf8')).join('\n');
@@ -16,7 +17,8 @@ const types = (source, pattern) => new Set([...source.matchAll(pattern)].map((ma
 
 describe('the agent panel protocol', () => {
     const sentBySession = types(sessionSource, /type: '(agent:\w+)'/g);
-    const handledBySession = types(sessionSource, /message\.type === '(agent:\w+)'/g);
+    // The session's handler table, one method per type; each has a shape (agent/panel-messages.js).
+    const handledBySession = types(sessionSource.slice(sessionSource.indexOf('const HANDLERS')), /'(agent:\w+)'\(/g);
     const sentByPanel = types(panelSource, /type: '(agent:\w+)'/g);
     const handledByPanel = types(panelSource.slice(panelSource.indexOf('const HANDLERS')), /'(agent:\w+)': \(/g);
 
@@ -27,9 +29,19 @@ describe('the agent panel protocol', () => {
         expect([...handledByPanel].filter((type) => !SESSION_TO_PANEL.includes(type))).toEqual([]);
     });
 
-    test('the panel sends only what the protocol lists, and the session handles all of it', () => {
+    test('the panel sends only what the protocol lists, and the session has a shape and a handler for each', () => {
         expect([...sentByPanel].filter((type) => !PANEL_TO_SESSION.includes(type))).toEqual([]);
-        expect(PANEL_TO_SESSION.filter((type) => !handledBySession.has(type))).toEqual([]);
+        expect(Object.keys(PANEL_MESSAGES).sort()).toEqual([...PANEL_TO_SESSION].sort());
+        expect([...handledBySession].sort()).toEqual([...PANEL_TO_SESSION].sort());
+    });
+
+    test('a message not in its shape, or of a type the panel may not send, is not handled', () => {
+        expect(parsePanelMessage({ type: 'agent:prompt', text: 'hi' })).toEqual({ type: 'agent:prompt', text: 'hi', images: [] });
+        expect(parsePanelMessage({ type: 'agent:prompt', text: 42 })).toBeNull();
+        expect(parsePanelMessage({ type: 'agent:restore', turn: 1.5 })).toBeNull();
+        expect(parsePanelMessage({ type: 'agent:state' })).toBeNull();
+        expect(parsePanelMessage({ type: 'toString' })).toBeNull();
+        expect(parsePanelMessage(null)).toBeNull();
     });
 
     test('nothing is listed that nobody sends', () => {

@@ -251,7 +251,8 @@ came from single sessions.
    panel's replay from it; `agent/request.js` builds each step's request from it; notes go as
    `[Kigumi note: …]`; the conversation store keeps long strings as shared blobs and writes
    atomically. Old conversations open: their history becomes the log, their transcript is shown.
-   Left from §6: a TurnRunner apart from the panel protocol, and typed protocol messages.
+   §6 since: a turn is `agent/turn.js`, permissions `agent/permission-gate.js`, and each message the
+   panel sends has a shape (`agent/panel-messages.js`) and a handler in AgentSession's table.
 4. **Done: backend reservations (§7).** `reserve_request` holds back each request's most possible
    cost; `settle_request` drops the hold. The client's `backend-fetch.js` and its wait notice are
    gone. The rate limit's 429 says `Retry-After: 20`. The old lease (`claim_request` and its

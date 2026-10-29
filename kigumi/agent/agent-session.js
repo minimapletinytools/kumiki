@@ -1,13 +1,10 @@
 /**
- * The agent panel's conversation, run in the app's own process (never the page) on the built-in
- * agent loop (agent/agent-loop.js), with the tools and instructions agent/agent.js builds from a host.
+ * The agent panel's session, in the app's own process (never the page): its settings, conversations
+ * and queued requests, and what it does with each message the panel sends. A turn is agent/turn.js;
+ * tool permissions are agent/permission-gate.js.
  *
  * The panel and this talk in messages (webview/agent/protocol.js lists them):
- *   panel -> here:  agent:ready, agent:prompt {text, images?: [{mediaType, data}]}, agent:stop,
- *                   agent:clear, agent:permissionAnswer {requestId, allow, always?}, agent:setModel {id},
- *                   agent:restore {turn, force?}, agent:unqueue {id}, agent:retry, agent:listFiles,
- *                   agent:signIn {provider}, agent:signOut, agent:setSetting {key, value},
- *                   agent:listConversations, agent:openConversation {id}, agent:deleteConversation {id}
+ *   panel -> here:  agent/panel-messages.js, with each one's shape
  *   here -> panel:  agent:state {models, model, via, account, settings, strings}, agent:busy {busy},
  *                   agent:text {text}, agent:reasoning {text} (both streamed), agent:tool {id, name, input},
  *                   agent:toolResult {id, isError, text}, agent:toolImages {id, before, after},
@@ -22,12 +19,14 @@
  * Kigumi's backend when signed in.
  */
 
-const { agentTools, instructions } = require('./agent');
-const { MODELS, findModel, harnessOf, routeModel } = require('./models');
-const { runTurn, languageModelFor } = require('./agent-loop');
+const { agentTools } = require('./agent');
+const { MODELS, findModel, routeModel } = require('./models');
+const { languageModelFor } = require('./agent-loop');
 const { Conversation } = require('./conversation');
-const { PERMISSION_MODES, PLAN_MODE_REFUSAL, permissionMode, decide } = require('./permissions');
-const { promptEntries } = require('./prompt-content');
+const { PERMISSION_MODES, permissionMode } = require('./permissions');
+const { PermissionGate } = require('./permission-gate');
+const { parsePanelMessage } = require('./panel-messages');
+const { runPanelTurn, describeFailure } = require('./turn');
 const { describeBuild } = require('./session-tools');
 
 /** The settings the panel's own menu sets: their defaults, and what a value must be. */
@@ -46,17 +45,79 @@ const RETRY_PROMPT = 'Carry on from where you stopped.';
 /** A conversation's title: the start of its first request. */
 const titleOf = (text) => (text.length > 60 ? `${text.slice(0, 57)}…` : text);
 
-/** What to tell the user for a failed request: {key, text}, the key for the panel to show it in its language. */
-function describeFailure(error) {
-    const status = error && (error.statusCode || (error.lastError && error.lastError.statusCode));
-    if (status === 402) {
-        return { key: 'agent.error.noCredit', text: 'Out of credit.' };
-    }
-    if (status === 401) {
-        return { key: 'agent.error.refused', text: 'Not signed in, or the API key was refused.' };
-    }
-    return { text: String((error && error.message) || error) };
-}
+
+/** What the session does with each message the panel sends (agent/panel-messages.js), as `this`. */
+const HANDLERS = {
+    'agent:ready'() {
+        this.postState();
+        // The panel (re)loaded: show what it had, or, the first time, the latest conversation.
+        if (this.conversation.log.length) {
+            this.postRaw({ type: 'agent:replay', events: this.conversation.render() });
+        } else if (!this.restored) {
+            const latest = this._project() && this.conversations.list(this._project())[0];
+            if (latest) this.openConversation(latest.id);
+        }
+        this.restored = true;
+        if (this.busy) this.postRaw({ type: 'agent:busy', busy: true });
+    },
+    'agent:prompt'({ text, images }) {
+        if (text.trim() || images.length) this.ask(text.trim(), images.slice(0, 4));
+    },
+    'agent:retry'() {
+        this.ask(RETRY_PROMPT);
+    },
+    'agent:stop'() {
+        this.stop();
+    },
+    'agent:clear'() {
+        this.stop();
+        this.startConversation();
+    },
+    'agent:unqueue'({ id }) {
+        this.queue = this.queue.filter((queued) => queued.id !== id);
+        this.postRaw({ type: 'agent:dequeued', id });
+    },
+    'agent:permissionAnswer'(answer) {
+        this.permissions.answer(answer);
+    },
+    'agent:restore'({ turn, force }) {
+        if (!this.busy) void this.restore(turn, { force: force === true });
+    },
+    'agent:setModel'({ id }) {
+        this.setSetting('agent.model', findModel(id, this.models.list()).id);
+        this.postState();
+    },
+    'agent:setSetting'({ key, value }) {
+        if (!Object.hasOwn(PANEL_SETTINGS, key)) return;
+        if (PANEL_SETTINGS[key].valid(value)) this.setSetting(key, value);
+        this.postState();
+    },
+    'agent:listFiles'() {
+        void this._listFiles().then((files) => this.postRaw({ type: 'agent:files', files }));
+    },
+    'agent:listConversations'() {
+        this.postConversations();
+    },
+    'agent:openConversation'({ id }) {
+        if (!this.busy) this.openConversation(id);
+    },
+    'agent:deleteConversation'({ id }) {
+        if (this._project()) this.conversations.remove(this._project(), id);
+        if (this.conversation.id === id) {
+            this.stop();
+            this.startConversation();
+        }
+        this.postConversations();
+    },
+    'agent:signIn'({ provider }) {
+        if (!this.account) return;
+        this.account.signIn(provider).catch((error) => this.postRaw({ type: 'agent:error', key: 'agent.error.signIn',
+            params: { error: error.message }, message: `Could not sign in: ${error.message}` }));
+    },
+    'agent:signOut'() {
+        if (this.account) void this.account.signOut().then(() => this.postState());
+    },
+};
 
 class AgentSession {
     /**
@@ -88,6 +149,18 @@ class AgentSession {
             post(message);
         };
         this.postRaw = post;
+        this.permissions = new PermissionGate({
+            tools: () => this.tools,
+            settings: () => ({ mode: this.panelSetting('agent.permissionMode'), alwaysAllow: this.panelSetting('agent.alwaysAllow'),
+                planMode: this.panelSetting('agent.planMode') }),
+            allowAlways: (toolName) => {
+                const allowed = this.panelSetting('agent.alwaysAllow');
+                if (!allowed.includes(toolName)) this.setSetting('agent.alwaysAllow', [...allowed, toolName]);
+                this.postState();
+            },
+            knownFile: (input) => this._knownFile(input),
+            post: (message) => this.post(message),
+        });
         this.conversations = conversations;
         this.setting = setting;
         this.setSetting = setSetting;
@@ -96,8 +169,6 @@ class AgentSession {
         this.createModel = createModel;
         this.log = log;
         this.abort = null;
-        this.pendingPermissions = new Map();
-        this.nextPermission = 1;
         // Requests typed while the agent works, run in order once it is done.
         this.queue = [];
         this.nextQueued = 1;
@@ -143,69 +214,10 @@ class AgentSession {
         return valid(value) ? value : fallback;
     }
 
-    /** Messages from the panel. */
+    /** A message from the panel; one it may not send, or not in its shape, is ignored. */
     handle(message) {
-        if (!message) return;
-        if (message.type === 'agent:prompt' && typeof message.text === 'string' && (message.text.trim() || message.images)) {
-            this.ask(message.text.trim(), Array.isArray(message.images) ? message.images.slice(0, 4) : []);
-        } else if (message.type === 'agent:listFiles') {
-            void this._listFiles().then((files) => this.postRaw({ type: 'agent:files', files }));
-        } else if (message.type === 'agent:retry') {
-            this.ask(RETRY_PROMPT);
-        } else if (message.type === 'agent:unqueue') {
-            this.queue = this.queue.filter((queued) => queued.id !== message.id);
-            this.postRaw({ type: 'agent:dequeued', id: message.id });
-        } else if (message.type === 'agent:restore' && Number.isInteger(message.turn)) {
-            if (!this.busy) void this.restore(message.turn, { force: message.force === true });
-        } else if (message.type === 'agent:stop') {
-            this.stop();
-        } else if (message.type === 'agent:clear') {
-            this.stop();
-            this.startConversation();
-        } else if (message.type === 'agent:permissionAnswer') {
-            const pending = this.pendingPermissions.get(message.requestId);
-            this.pendingPermissions.delete(message.requestId);
-            if (pending && message.allow && message.always) {
-                const allowed = this.panelSetting('agent.alwaysAllow');
-                if (!allowed.includes(pending.toolName)) this.setSetting('agent.alwaysAllow', [...allowed, pending.toolName]);
-                this.postState();
-            }
-            if (pending) pending.answer(Boolean(message.allow));
-        } else if (message.type === 'agent:setModel' && typeof message.id === 'string') {
-            this.setSetting('agent.model', findModel(message.id, this.models.list()).id);
-            this.postState();
-        } else if (message.type === 'agent:setSetting' && message.key in PANEL_SETTINGS) {
-            if (PANEL_SETTINGS[message.key].valid(message.value)) this.setSetting(message.key, message.value);
-            this.postState();
-        } else if (message.type === 'agent:listConversations') {
-            this.postConversations();
-        } else if (message.type === 'agent:openConversation' && typeof message.id === 'string') {
-            if (!this.busy) this.openConversation(message.id);
-        } else if (message.type === 'agent:deleteConversation' && typeof message.id === 'string') {
-            if (this._project()) this.conversations.remove(this._project(), message.id);
-            if (this.conversation.id === message.id) {
-                this.stop();
-                this.startConversation();
-            }
-            this.postConversations();
-        } else if (message.type === 'agent:ready') {
-            this.postState();
-            // The panel (re)loaded: show what it had, or, the first time, the latest conversation.
-            if (this.conversation.log.length) {
-                this.postRaw({ type: 'agent:replay', events: this.conversation.render() });
-            } else if (!this.restored) {
-                const latest = this._project() && this.conversations.list(this._project())[0];
-                if (latest) this.openConversation(latest.id);
-            }
-            this.restored = true;
-            if (this.busy) this.postRaw({ type: 'agent:busy', busy: true });
-        } else if (message.type === 'agent:signIn' && this.account) {
-            this.account.signIn(message.provider === 'google' ? 'google' : 'github')
-                .catch((error) => this.postRaw({ type: 'agent:error', key: 'agent.error.signIn', params: { error: error.message },
-                    message: `Could not sign in: ${error.message}` }));
-        } else if (message.type === 'agent:signOut' && this.account) {
-            void this.account.signOut().then(() => this.postState());
-        }
+        const parsed = parsePanelMessage(message);
+        if (parsed) HANDLERS[parsed.type].call(this, parsed);
     }
 
     /** Every project file, for the panel's @-mention list. */
@@ -274,10 +286,7 @@ class AgentSession {
         if (this.abort) {
             this.abort.abort();
         }
-        for (const { answer } of this.pendingPermissions.values()) {
-            answer(false);
-        }
-        this.pendingPermissions.clear();
+        this.permissions.refuseAll();
         // Stopping drops what was waiting too.
         for (const queued of this.queue) this.postRaw({ type: 'agent:dequeued', id: queued.id });
         this.queue = [];
@@ -300,23 +309,6 @@ class AgentSession {
         return this.host.view ? this.host.view.panels.describe() : Promise.resolve(null);
     }
 
-    _askPermission(toolName, input) {
-        // An unknown tool is treated as one that edits.
-        const tool = this.tools.find((candidate) => candidate.name === toolName) || { name: toolName, effect: 'edit' };
-        const decision = decide({
-            mode: this.panelSetting('agent.permissionMode'),
-            alwaysAllow: this.panelSetting('agent.alwaysAllow'),
-            planMode: this.panelSetting('agent.planMode'),
-        }, tool, { knownFile: tool.effect === 'run' && this._knownFile(input) });
-        if (decision === 'refuse') return Promise.reject(new Error(PLAN_MODE_REFUSAL));
-        if (decision === 'allow') return Promise.resolve(true);
-        const requestId = this.nextPermission++;
-        return new Promise((resolve) => {
-            this.pendingPermissions.set(requestId, { toolName, answer: resolve });
-            this.post({ type: 'agent:permission', requestId, toolName, input });
-        });
-    }
-
     /** A request from the panel: run now, or after the turn running, in the order asked. */
     ask(text, images = []) {
         if (!this.busy) {
@@ -335,6 +327,7 @@ class AgentSession {
         return typeof markup === 'number' ? costUsd * markup : costUsd;
     }
 
+    /** Run `text` as a turn of the current conversation (agent/turn.js), then the next request queued. */
     async prompt(text, images = []) {
         if (this.busy) {
             this.ask(text, images);
@@ -351,56 +344,20 @@ class AgentSession {
         // The conversation this turn belongs to; if another starts meanwhile, the turn keeps out of it.
         const { conversation } = this;
         const ours = () => this.conversation === conversation;
-        conversation.turn += 1;
-        const { checkpoints } = conversation;
-        checkpoints.begin(conversation.turn);
         this.post({ type: 'agent:busy', busy: true });
-        let finished = false;
         try {
-            const { costUsd } = await runTurn({
-                model: await this.createModel(route, {
-                    fetch: route.via === 'backend' ? this.account.fetchWithToken : undefined,
-                }),
-                images: this.model.images,
-                cacheMarks: Boolean(this.model.cacheMarks),
-                harness: harnessOf(this.model),
-                contextWindow: this.model.contextWindow,
-                maxOutputTokens: this.panelSetting('agent.maxOutputTokens'),
-                tools: this.tools,
-                files: this.files.root() ? this.files : null,
-                system: instructions(this.host, { planMode: this.panelSetting('agent.planMode') }),
-                log: conversation.log,
-                prompt: await promptEntries({ text, images, files: this.files, describe: () => this._describe(),
-                    modelSeesImages: this.model.images }),
+            await runPanelTurn({
+                conversation, text, images, host: this.host, tools: this.tools, profile: this.model,
+                createModel: () => this.createModel(route, { fetch: route.via === 'backend' ? this.account.fetchWithToken : undefined }),
+                settings: { maxOutputTokens: this.panelSetting('agent.maxOutputTokens'), planMode: this.panelSetting('agent.planMode') },
+                askPermission: (toolName, input) => this.permissions.ask(toolName, input),
+                describe: () => this._describe(),
                 abortSignal: abort.signal,
-                askPermission: (toolName, input) => this._askPermission(toolName, input),
-                onEvent: (event) => { if (ours()) this.post(event); },
+                post: (event) => { if (ours()) this.post(event); },
+                charged: (costUsd) => this._charged(route, costUsd),
+                log: this.log,
             });
-            // Stopped, a turn can end without an error.
-            finished = !abort.signal.aborted;
-            if (ours()) {
-                this.post(finished ? { type: 'agent:done', isError: false, costUsd: this._charged(route, costUsd) }
-                    : { type: 'agent:done', isError: false, stopped: true });
-            }
-        } catch (error) {
-            // The log keeps what the turn did before it failed, so asking again carries on from there.
-            if (ours()) {
-                if (abort.signal.aborted) {
-                    this.post({ type: 'agent:done', isError: false, stopped: true });
-                } else {
-                    this.log(`[agent] ${(error && error.stack) || error}`);
-                    const failure = describeFailure(error);
-                    this.post({ type: 'agent:done', isError: true, error: failure.text, errorKey: failure.key });
-                }
-            }
         } finally {
-            const changed = await checkpoints.end();
-            if (changed && ours()) this.post({ type: 'agent:checkpoint', ...changed });
-            // A step cut off after an edit never reached the log: say what changed.
-            if (changed && !finished) {
-                conversation.log.push({ note: 'interrupted', text: `Before it stopped, your last turn changed ${changed.files.join(', ')}. `
-                    + 'Read them before relying on what you think is in them.' });
-            }
             this.abort = null;
             this.post({ type: 'agent:busy', busy: false });
             if (route.via === 'backend') {
