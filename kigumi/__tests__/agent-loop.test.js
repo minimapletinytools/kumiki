@@ -493,7 +493,7 @@ describe('the agent loop', () => {
         const events = [];
         await runTurn({ model: scripted([...say('1', 'Hi.'), finish('stop')]), images: true, contextWindow: 200000, tools: [],
             system: 's', log: [], prompt: go(), askPermission: async () => true, onEvent: (event) => events.push(event) });
-        expect(events).toContainEqual({ type: 'agent:context', tokens: 10, window: 200000 });
+        expect(events).toContainEqual({ type: 'agent:context', tokens: 10, window: 200000, cached: 0 });
     });
 
         test('an image the user attached is dropped like a screenshot once a later one comes', () => {

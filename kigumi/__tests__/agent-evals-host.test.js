@@ -2,7 +2,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { headlessHost } = require('../test/evals/run-evals');
+const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test');
+const { headlessHost, runOne } = require('../test/evals/run-evals');
+const { TASKS } = require('../test/evals/tasks');
 const { agentTools } = require('../agent/agent');
 const { Checkpoints } = require('../agent/checkpoints');
 const { createProjectFiles } = require('../agent/project-files');
@@ -26,5 +28,19 @@ const STARTER = fs.readFileSync(path.join(REPO, 'patterns', 'structures', 'my_cu
         expect(fixed.at(-1).text).toMatch(/^The view of this file rebuilt without errors/);
         expect(JSON.parse((await tools.check_frame.run({ file_path: 'frame.py' }))[0].text).ok).toBe(true);
         fs.rmSync(root, { recursive: true, force: true });
+    }, 120000);
+
+    test('a task runs its prompts as turns of one conversation and is scored, with its cache use', async () => {
+        const answer = (text, cached) => ({ stream: convertArrayToReadableStream([
+            { type: 'text-start', id: '1' }, { type: 'text-delta', id: '1', delta: text }, { type: 'text-end', id: '1' },
+            { type: 'finish', finishReason: { unified: 'stop' },
+                usage: { inputTokens: { total: 100, cacheRead: cached }, outputTokens: { total: 5 } } }]) });
+        const model = new MockLanguageModelV4({ doStream: [answer('Four timbers, joined with mortise and tenon.', 60)] });
+
+        const result = await runOne(TASKS.find((task) => task.name === 'question'), 'deepseek-v4.1-flash', null, { languageModel: model });
+
+        expect(result.checks.map((check) => check.said)).toEqual(['it builds', 'frame.py unchanged', 'the reply gives the count']);
+        expect(result.passed).toBe(true);
+        expect(result.cacheRate).toBeCloseTo(0.6);
     }, 120000);
 });

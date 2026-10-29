@@ -8,6 +8,9 @@
  *
  *   node test/evals/run-evals.js [--models a,b] [--tasks a,b] [--repeat n] [--max-steps n] [--out results.json] [--keep]
  *
+ * A task's prompts run as turns of one conversation. Each result has its prompt tokens and how many
+ * were read from the cache.
+ *
  * --max-steps is the most steps in a turn (the app's 40 by default). --keep leaves each run's project
  * folder, to see what the agent wrote.
  */
@@ -71,7 +74,8 @@ function headlessHost(files, { kumikiSource, examples }) {
     };
 }
 
-async function runOne(task, modelId, key) {
+/** Run `task` on `modelId`; `languageModel` stands in for the real one in tests. */
+async function runOne(task, modelId, key, { languageModel: given = null } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), `kigumi-eval-${task.name}-`));
     fs.mkdirSync(path.join(root, '.kigumi', 'docs'), { recursive: true });
     for (const doc of DOCS) fs.copyFileSync(path.join(REPO, 'docs', doc), path.join(root, '.kigumi', 'docs', doc));
@@ -83,7 +87,7 @@ async function runOne(task, modelId, key) {
     const checkpoints = new Checkpoints(files);
     checkpoints.begin(1);
     const model = findModel(modelId);
-    const tools = [];
+    const toolCalls = [];
     const notices = [];
     // Each call with its arguments, for seeing what a model spends its steps on.
     const calls = [];
@@ -91,32 +95,47 @@ async function runOne(task, modelId, key) {
     let costUsd = 0;
     let failure = null;
     const log = [];
+    const tokens = { prompt: 0, cached: 0 };
+    // The last turn's reply, for checks on what the agent said.
+    let reply = '';
+    const languageModel = given || await languageModelFor(routeModel(model, { openrouterKey: key }));
+    const tools = agentTools(host, { checkpoints: () => checkpoints });
     try {
-        const result = await runTurn({
-            model: await languageModelFor(routeModel(model, { openrouterKey: key })), images: model.images,
-            cacheMarks: Boolean(model.cacheMarks), harness: harnessOf(model), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: agentTools(host, { checkpoints: () => checkpoints }), files, system: instructions(host),
-            log, prompt: [{ role: 'user', content: task.prompt, shown: { text: task.prompt, images: 0 } }], askPermission: async () => true,
-            onEvent: (event) => {
-                if (event.type === 'agent:tool') {
-                    tools.push(event.name);
-                    calls.push({ name: event.name, input: event.input });
-                }
-                if (event.type === 'agent:notice') notices.push(event.text);
-            },
-        });
-        costUsd = result.costUsd || 0;
+        for (const prompt of task.prompts) {
+            reply = '';
+            const result = await runTurn({
+                model: languageModel, images: model.images, cacheMarks: Boolean(model.cacheMarks), harness: harnessOf(model),
+                maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools, files, system: instructions(host),
+                log, prompt: [{ role: 'user', content: prompt, shown: { text: prompt, images: 0 } }], askPermission: async () => true,
+                onEvent: (event) => {
+                    if (event.type === 'agent:tool') {
+                        toolCalls.push(event.name);
+                        calls.push({ name: event.name, input: event.input });
+                    }
+                    if (event.type === 'agent:notice') notices.push(event.text);
+                    if (event.type === 'agent:text') reply += event.text;
+                    if (event.type === 'agent:context') {
+                        tokens.prompt += event.tokens;
+                        tokens.cached += event.cached || 0;
+                    }
+                },
+            });
+            costUsd += result.costUsd || 0;
+        }
     } catch (error) {
         failure = String(error.message || error);
     }
     const report = await buildFrame(path.join(root, task.target));
+    const project = { read: (name) => fs.readFileSync(path.join(root, name), 'utf8'), reply };
     const checks = task.checks.map((check) => {
-        const [passed, said] = check(report);
+        const [passed, said] = check(report, project);
         return { passed: Boolean(passed), said };
     });
     if (!process.argv.includes('--keep')) fs.rmSync(root, { recursive: true, force: true });
     return {
         task: task.name, model: modelId, ...(process.argv.includes('--keep') ? { project: root } : {}), passed: !failure && checks.every((check) => check.passed), checks,
-        tools: tools.length, toolsUsed: Object.fromEntries([...new Set(tools)].map((name) => [name, tools.filter((t) => t === name).length])),
+        tools: toolCalls.length, toolsUsed: Object.fromEntries([...new Set(toolCalls)].map((name) => [name, toolCalls.filter((t) => t === name).length])),
+        promptTokens: tokens.prompt, cachedTokens: tokens.cached, cacheRate: tokens.prompt ? tokens.cached / tokens.prompt : 0,
         notices, notes: log.filter((entry) => entry.note).map(({ note, text }) => ({ note, text })), calls, costUsd, seconds: Math.round((Date.now() - started) / 1000), failure,
     };
 }
@@ -135,7 +154,7 @@ async function main() {
                 const result = await runOne(task, modelId, key);
                 results.push(result);
                 console.log(`${result.passed ? 'PASS' : 'FAIL'} ${modelId} ${task.name}: ${result.checks.map((c) => `${c.passed ? '✓' : '✗'} ${c.said}`).join('; ')}`
-                    + ` | ${result.tools} tool calls, $${result.costUsd.toFixed(4)}, ${result.seconds}s`
+                    + ` | ${result.tools} tool calls, $${result.costUsd.toFixed(4)}, ${Math.round(result.cacheRate * 100)}% cached, ${result.seconds}s`
                     + `${result.notices.length ? ` | ${result.notices.join(' ')}` : ''}${result.failure ? ` | ${result.failure}` : ''}`);
             }
         }
@@ -158,4 +177,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { headlessHost };
+module.exports = { headlessHost, runOne };

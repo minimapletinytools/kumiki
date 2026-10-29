@@ -247,7 +247,10 @@ async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, c
                     }
                 }
                 const tokens = step.usage && step.usage.inputTokens;
-                if (typeof tokens === 'number') onEvent({ type: 'agent:context', tokens, window: contextWindow || null });
+                const cached = step.usage && step.usage.inputTokenDetails && step.usage.inputTokenDetails.cacheReadTokens;
+                if (typeof tokens === 'number') {
+                    onEvent({ type: 'agent:context', tokens, window: contextWindow || null, ...(typeof cached === 'number' ? { cached } : {}) });
+                }
             },
             onError: ({ error }) => { failure = error; },
         });

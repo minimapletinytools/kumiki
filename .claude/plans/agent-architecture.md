@@ -243,8 +243,9 @@ came from single sessions.
    per turn; the direct-Anthropic route dropped (from §5).
 2. **Done: composition root (§1).** `agent/agent.js` builds the tools and prompt from a host;
    `agent/frames.js` is how a host builds frames. The app, MCP (now also given `kumiki_api`) and the
-   evals (a headless host over `build_frame.py`) all use it. Left from §8: the new eval tasks and
-   recording cache hit rate.
+   evals (a headless host over `build_frame.py`) all use it. §8 since: a task's prompts run as turns of
+   one conversation; tasks `question` (must not edit) and `two-turns`; each result records its
+   cache rate. Left: a screenshot task, which needs a host that draws views.
 3. **Done: log, buildRequest and notes (§3, §4); Conversation out of AgentSession (§6).**
    `agent/conversation.js` holds the log (messages, notes, summaries, panel events) and draws the
    panel's replay from it; `agent/request.js` builds each step's request from it; notes go as
