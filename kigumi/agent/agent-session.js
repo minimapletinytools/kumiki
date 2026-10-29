@@ -25,9 +25,9 @@
 const { agentTools, instructions } = require('./agent');
 const { MODELS, findModel, routeModel } = require('./models');
 const { runTurn, languageModelFor } = require('./agent-loop');
-const { Checkpoints } = require('./checkpoints');
+const { Conversation } = require('./conversation');
 const { PERMISSION_MODES, PLAN_MODE_REFUSAL, permissionMode, decide } = require('./permissions');
-const { promptContent } = require('./prompt-content');
+const { promptEntries } = require('./prompt-content');
 const { describeBuild } = require('./session-tools');
 
 /** The settings the panel's own menu sets: their defaults, and what a value must be. */
@@ -42,10 +42,6 @@ const PANEL_SETTINGS = {
 
 /** What the agent says to carry on after a turn that failed. */
 const RETRY_PROMPT = 'Carry on from where you stopped.';
-
-/** What the panel shows that a reopened conversation shows again. */
-const SHOWN = new Set(['agent:userMessage', 'agent:text', 'agent:reasoning', 'agent:tool', 'agent:toolResult',
-    'agent:notice', 'agent:done', 'agent:error', 'agent:checkpoint', 'agent:restored', 'agent:todos']);
 
 /** A conversation's title: the start of its first request. */
 const titleOf = (text) => (text.length > 60 ? `${text.slice(0, 57)}…` : text);
@@ -82,13 +78,13 @@ class AgentSession {
         this.host = host;
         this.files = host.files;
         this.tools = agentTools(host, {
-            checkpoints: () => this.checkpoints,
+            checkpoints: () => this.conversation.checkpoints,
             onTodos: (items) => this.post({ type: 'agent:todos', items }),
             onPictures: (id, before, after) => this.postRaw({ type: 'agent:toolImages', id, before, after }),
         });
-        // Everything the panel shows of a conversation is also kept, to show it again when reopened.
+        // Panel events the messages don't hold are kept in the log, to show them again when reopened.
         this.post = (message) => {
-            if (SHOWN.has(message.type)) this.transcript.push(message);
+            if (this.conversation) this.conversation.keep(message);
             post(message);
         };
         this.postRaw = post;
@@ -106,8 +102,6 @@ class AgentSession {
         this.queue = [];
         this.nextQueued = 1;
         this.restored = false;
-        // Changes when another conversation starts, so a turn still running can't write into it.
-        this.generation = 0;
         this.startConversation();
     }
 
@@ -189,7 +183,7 @@ class AgentSession {
             if (!this.busy) this.openConversation(message.id);
         } else if (message.type === 'agent:deleteConversation' && typeof message.id === 'string') {
             if (this._project()) this.conversations.remove(this._project(), message.id);
-            if (this.conversation && this.conversation.id === message.id) {
+            if (this.conversation.id === message.id) {
                 this.stop();
                 this.startConversation();
             }
@@ -197,8 +191,8 @@ class AgentSession {
         } else if (message.type === 'agent:ready') {
             this.postState();
             // The panel (re)loaded: show what it had, or, the first time, the latest conversation.
-            if (this.transcript.length) {
-                this.postRaw({ type: 'agent:replay', events: this.transcript });
+            if (this.conversation.log.length) {
+                this.postRaw({ type: 'agent:replay', events: this.conversation.render() });
             } else if (!this.restored) {
                 const latest = this._project() && this.conversations.list(this._project())[0];
                 if (latest) this.openConversation(latest.id);
@@ -224,7 +218,7 @@ class AgentSession {
 
     /** Put back the files the turns from `turn` on changed, unless some have changed since (then ask). */
     async restore(turn, { force = false } = {}) {
-        const { restored, conflicts } = await this.checkpoints.restore(turn, { force });
+        const { restored, conflicts } = await this.conversation.checkpoints.restore(turn, { force });
         if (conflicts.length) {
             this.postRaw({ type: 'agent:restoreConflict', turn, files: conflicts });
             return;
@@ -233,9 +227,8 @@ class AgentSession {
         this.post({ type: 'agent:notice', key: 'agent.notice.restored', params: { files: restored.join(', ') },
             text: `Put back as they were before that request: ${restored.join(', ')}. The agent is told so with your next message.` });
         // The model still thinks its edits are there; say otherwise when the conversation carries on.
-        this.history.push({ role: 'user', content: `[I undid your changes to ${restored.join(', ')}: those files are back as they were before.]` },
-            { role: 'assistant', content: 'Understood.' });
-        this._saveConversation('');
+        this.conversation.log.push({ note: 'undo', text: `The user undid your changes to ${restored.join(', ')}: those files are back as they were before.` });
+        this._saveConversation(this.conversation, '');
     }
 
     /** The project conversations are kept for, when there is somewhere to keep them. */
@@ -243,46 +236,34 @@ class AgentSession {
         return this.conversations ? this.files.root() : null;
     }
 
-    startConversation() {
-        this.generation += 1;
-        this.history = [];
-        this.transcript = [];
-        this.conversation = null;
-        this.checkpoints = new Checkpoints(this.files);
-        this.turn = 0;
+    startConversation(conversation = new Conversation(this.files)) {
+        this.conversation = conversation;
     }
 
     openConversation(id) {
         const found = this._project() && this.conversations.load(this._project(), id);
         if (!found) return;
-        this.startConversation();
-        this.conversation = found;
-        this.history = found.history || [];
-        this.transcript = found.transcript || [];
-        this.checkpoints = new Checkpoints(this.files, found.checkpoints || []);
-        this.turn = found.turn || 0;
-        this.postRaw({ type: 'agent:replay', events: this.transcript });
+        this.startConversation(Conversation.load(this.files, found));
+        this.postRaw({ type: 'agent:replay', events: this.conversation.render() });
     }
 
     postConversations() {
         this.postRaw({
             type: 'agent:conversations',
             items: this._project() ? this.conversations.list(this._project()) : [],
-            current: this.conversation ? this.conversation.id : null,
+            current: this.conversation.id,
         });
     }
 
-    _saveConversation(firstText) {
+    _saveConversation(conversation, firstText) {
         const project = this._project();
         if (!project) return;
         const now = new Date().toISOString();
-        if (!this.conversation) {
-            this.conversation = { id: globalThis.crypto.randomUUID(), title: titleOf(firstText), createdAt: now };
+        if (!conversation.id) {
+            Object.assign(conversation, { id: globalThis.crypto.randomUUID(), title: titleOf(firstText), createdAt: now });
         }
-        Object.assign(this.conversation, { model: this.model.id, updatedAt: now, history: this.history,
-            transcript: this.transcript, checkpoints: this.checkpoints.toJSON(), turn: this.turn });
         try {
-            this.conversations.save(project, this.conversation);
+            this.conversations.save(project, { ...conversation.toJSON(), model: this.model.id, updatedAt: now });
         } catch (error) {
             this.log(`[agent] could not save the conversation: ${error.message}`);
         }
@@ -310,7 +291,7 @@ class AgentSession {
         } catch (_error) {
             return false;
         }
-        return this.checkpoints.wrote(target) || this.host.frames.shows(target);
+        return this.conversation.checkpoints.wrote(target) || this.host.frames.shows(target);
     }
 
     /** What the user is looking at, or null. */
@@ -367,16 +348,14 @@ class AgentSession {
         const abort = new AbortController();
         this.abort = abort;
         // The conversation this turn belongs to; if another starts meanwhile, the turn keeps out of it.
-        const generation = this.generation;
-        const ours = () => this.generation === generation;
-        this.transcript.push({ type: 'agent:userMessage', text, images: images.length });
-        this.turn += 1;
-        const turn = this.turn;
-        const checkpoints = this.checkpoints;
-        checkpoints.begin(turn);
+        const { conversation } = this;
+        const ours = () => this.conversation === conversation;
+        conversation.turn += 1;
+        const { checkpoints } = conversation;
+        checkpoints.begin(conversation.turn);
         this.post({ type: 'agent:busy', busy: true });
         try {
-            const { history, costUsd } = await runTurn({
+            const { costUsd } = await runTurn({
                 model: await this.createModel(route, {
                     fetch: route.via === 'backend' ? this.account.fetchWithToken : undefined,
                     onWait: () => {
@@ -391,21 +370,17 @@ class AgentSession {
                 tools: this.tools,
                 files: this.files.root() ? this.files : null,
                 system: instructions(this.host, { planMode: this.panelSetting('agent.planMode') }),
-                history: this.history,
-                prompt: await promptContent({ text, images, files: this.files, describe: () => this._describe(),
+                log: conversation.log,
+                prompt: await promptEntries({ text, images, files: this.files, describe: () => this._describe(),
                     modelSeesImages: this.model.images }),
                 abortSignal: abort.signal,
                 askPermission: (toolName, input) => this._askPermission(toolName, input),
                 onEvent: (event) => { if (ours()) this.post(event); },
             });
-            if (ours()) {
-                this.history = history;
-                this.post({ type: 'agent:done', isError: false, costUsd: this._charged(route, costUsd) });
-            }
+            if (ours()) this.post({ type: 'agent:done', isError: false, costUsd: this._charged(route, costUsd) });
         } catch (error) {
+            // The log keeps what the turn did before it failed, so asking again carries on from there.
             if (ours()) {
-                // Keep what the turn did before it failed, so asking again carries on from there.
-                if (error && Array.isArray(error.history)) this.history = error.history;
                 if (abort.signal.aborted) {
                     this.post({ type: 'agent:done', isError: false, stopped: true });
                 } else {
@@ -422,7 +397,7 @@ class AgentSession {
             if (route.via === 'backend') {
                 void this.account.refreshBalance().catch(() => {});
             }
-            if (ours()) this._saveConversation(text);
+            if (ours()) this._saveConversation(conversation, text);
             const next = this.queue.shift();
             if (next) {
                 this.postRaw({ type: 'agent:dequeued', id: next.id });

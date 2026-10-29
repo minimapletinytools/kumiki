@@ -245,9 +245,12 @@ came from single sessions.
    `agent/frames.js` is how a host builds frames. The app, MCP (now also given `kumiki_api`) and the
    evals (a headless host over `build_frame.py`) all use it. Left from §8: the new eval tasks and
    recording cache hit rate.
-3. **Log + buildRequest + notes (§3, §4)**, with the split of AgentSession (§6). The log keeps the
-   whole conversation; trimming only shapes what is sent. Conversations saved before this have only
-   their trimmed history: convert them best-effort (what was cut stays cut).
+3. **Done: log, buildRequest and notes (§3, §4); Conversation out of AgentSession (§6).**
+   `agent/conversation.js` holds the log (messages, notes, summaries, panel events) and draws the
+   panel's replay from it; `agent/request.js` builds each step's request from it; notes go as
+   `[Kigumi note: …]`; the conversation store keeps long strings as shared blobs and writes
+   atomically. Old conversations open: their history becomes the log, their transcript is shown.
+   Left from §6: a TurnRunner apart from the panel protocol, and typed protocol messages.
 4. **Backend reservations (§7)**, then delete `backend-fetch.js` and the lease code.
 5. **Profiles (§5).**
 

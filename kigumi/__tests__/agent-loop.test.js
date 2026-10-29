@@ -3,11 +3,12 @@ const os = require('os');
 const path = require('path');
 
 const { MockLanguageModelV4, convertArrayToReadableStream } = require('ai/test');
-const { runTurn, languageModelFor, toModelContent, cacheMarked, trimOldToolResults, estimateTokens, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
+const { runTurn, languageModelFor, toModelContent, SUMMARISE_AT_TOKENS } = require('../agent/agent-loop');
+const { cacheMarked, trimOldToolResults, estimateTokens, logMessages, isMessage } = require('../agent/request');
 const { MODELS, findModel, createModelList, routeModel } = require('../agent/models');
 const { createFileTools } = require('../agent/file-tools');
 const { createProjectFiles } = require('../agent/project-files');
-const { withContext, withMentions, promptContent } = require('../agent/prompt-content');
+const { contextNote, withMentions, promptEntries } = require('../agent/prompt-content');
 const { AgentSession, RETRY_PROMPT, describeFailure, describeBuild } = require('../agent/agent-session');
 const { viewHost } = require('../agent/agent');
 const { z } = require('zod');
@@ -38,13 +39,18 @@ const changeTool = {
     run: jest.fn(async ({ what }) => [{ type: 'text', text: `changed ${what}` }]),
 };
 
-async function turn(model, { askPermission = async () => true, history = [], images = true } = {}) {
+/** A user's request "go", as log entries. */
+const go = () => [{ role: 'user', content: 'go', shown: { text: 'go', images: 0 } }];
+/** The roles of the log's model messages. */
+const roles = (log) => log.filter(isMessage).map((message) => message.role);
+
+async function turn(model, { askPermission = async () => true, log = [], images = true } = {}) {
     const events = [];
     const result = await runTurn({
-        model, images, tools: [lookTool, changeTool], system: 'sys', history, prompt: 'go',
+        model, images, tools: [lookTool, changeTool], system: 'sys', log, prompt: go(),
         askPermission, onEvent: (event) => events.push(event),
     });
-    return { ...result, events };
+    return { ...result, events, log };
 }
 
 describe('the model table', () => {
@@ -96,7 +102,7 @@ describe('the agent loop', () => {
             [...say('2', 'A frame.'), finish('stop', 0.002)],
         );
 
-        const { events, history, costUsd } = await turn(model);
+        const { events, log, costUsd } = await turn(model);
 
         expect(events.filter((event) => event.type !== 'agent:context')).toEqual([
             { type: 'agent:text', text: 'Looking. ' },
@@ -104,7 +110,7 @@ describe('the agent loop', () => {
             { type: 'agent:toolResult', id: 'c1', isError: false, text: 'a frame\n[image]' },
             { type: 'agent:text', text: 'A frame.' },
         ]);
-        expect(history.map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'assistant']);
+        expect(roles(log)).toEqual(['user', 'assistant', 'tool', 'assistant']);
         expect(costUsd).toBeCloseTo(0.003);
         // The second step saw the screenshot as an image, in a user message after the tool result.
         const prompt = model.doStreamCalls[1].prompt;
@@ -128,11 +134,11 @@ describe('the agent loop', () => {
         expect(events).toContainEqual({ type: 'agent:toolResult', id: 'c1', isError: true, text: 'The user did not allow this.' });
     });
 
-    test('a later turn carries on from the history', async () => {
+    test('a later turn carries on from the log', async () => {
         const first = await turn(scripted([...say('1', 'Hello.'), finish('stop')]));
         const model = scripted([...say('2', 'Again.'), finish('stop')]);
 
-        await turn(model, { history: first.history });
+        await turn(model, { log: first.log });
 
         expect(model.doStreamCalls[0].prompt.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'user']);
     });
@@ -161,15 +167,16 @@ describe('the agent loop', () => {
         const fetch = jest.fn(async () => new Response(replies.shift(), { headers: { 'Content-Type': 'text/event-stream' } }));
         const model = await languageModelFor({ via: 'openrouter', modelId: 'deepseek/deepseek-v4.1-flash', apiKey: 'test' }, { fetch });
 
-        const { events, history } = await turn(model);
+        const { events, log } = await turn(model);
 
         expect(fetch).toHaveBeenCalledTimes(2);
         const continued = JSON.parse(fetch.mock.calls[1][1].body).messages;
-        expect(history[1].content).toContainEqual(expect.objectContaining({ type: 'reasoning', text: 'I need to inspect the' }));
+        expect(log.filter(isMessage)[1].content).toContainEqual(expect.objectContaining({ type: 'reasoning', text: 'I need to inspect the' }));
         expect(continued.at(-1).content).toContain('Continue from where you left off');
         expect(events).toContainEqual(expect.objectContaining({ key: 'agent.notice.continuing' }));
         expect(events).not.toContainEqual(expect.objectContaining({ key: 'agent.notice.unexpected' }));
-        expect(history.at(-1).content).toContainEqual(expect.objectContaining({ type: 'text', text: 'The frame is ready.' }));
+        expect(log.at(-1).content).toContainEqual(expect.objectContaining({ type: 'text', text: 'The frame is ready.' }));
+        expect(log.filter((entry) => entry.note).map((entry) => entry.note)).toEqual(['continuation']);
     });
 
     test('continuing preserves completed tool results and accounts for every step without replaying edits', async () => {
@@ -181,11 +188,12 @@ describe('the agent loop', () => {
         );
         const previousCalls = changeTool.run.mock.calls.length;
 
-        const { history, costUsd } = await turn(model);
+        const { log, costUsd } = await turn(model);
 
         expect(changeTool.run.mock.calls.length - previousCalls).toBe(1);
         expect(costUsd).toBeCloseTo(0.006);
-        expect(history.map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'assistant', 'user', 'assistant']);
+        // The continuation note goes as a user message.
+        expect(logMessages(log).map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'assistant', 'user', 'assistant']);
         expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('changed the leg');
     });
 
@@ -206,14 +214,14 @@ describe('the agent loop', () => {
             { fetch, onWait });
         const previousCalls = changeTool.run.mock.calls.length;
 
-        const { events, history } = await turn(model);
+        const { events, log } = await turn(model);
 
         expect(fetch).toHaveBeenCalledTimes(4);
         expect(onWait).toHaveBeenCalledTimes(1);
         expect(changeTool.run.mock.calls.length - previousCalls).toBe(1);
         expect(events).toContainEqual({ type: 'agent:text', text: 'The bookshelf is ready.' });
         expect(events).not.toContainEqual(expect.objectContaining({ key: 'agent.notice.unexpected' }));
-        expect(JSON.stringify(history)).toContain('changed the bookshelf');
+        expect(JSON.stringify(log)).toContain('changed the bookshelf');
     });
 
     test.each([undefined, 'other'])('repeated incomplete streams (%s) stop after two continuations', async (raw) => {
@@ -235,7 +243,7 @@ describe('the agent loop', () => {
         );
         const events = [];
 
-        await runTurn({ model, images: true, maxSteps: 3, tools: [lookTool], system: 'sys', history: [], prompt: 'go',
+        await runTurn({ model, images: true, maxSteps: 3, tools: [lookTool], system: 'sys', log: [], prompt: go(),
             askPermission: async () => true, onEvent: (event) => events.push(event) });
 
         expect(model.doStreamCalls).toHaveLength(3);
@@ -256,7 +264,7 @@ describe('the agent loop', () => {
         const model = scripted([...say('1', 'Partial'), { ...finish('other'), finishReason: { unified: 'other' } }]);
         const events = [];
 
-        await runTurn({ model, images: true, tools: [], system: 'sys', history: [], prompt: 'go', abortSignal: abort.signal,
+        await runTurn({ model, images: true, tools: [], system: 'sys', log: [], prompt: go(), abortSignal: abort.signal,
             askPermission: async () => true, onEvent: (event) => {
                 events.push(event);
                 if (event.type === 'agent:context') abort.abort();
@@ -274,11 +282,12 @@ describe('the agent loop', () => {
                 { ...finish('other'), finishReason: { unified: 'other' } }]) };
         } });
 
-        const failure = await turn(model).catch((error) => error);
+        const log = [];
+        const failure = await turn(model, { log }).catch((error) => error);
 
         expect(failure.message).toBe('Provider refused the continuation.');
-        expect(JSON.stringify(failure.history)).toContain('Partial answer');
-        expect(failure.history.at(-1).content).toContain('Continue from where you left off');
+        expect(JSON.stringify(log)).toContain('Partial answer');
+        expect(log.at(-1)).toMatchObject({ note: 'continuation', text: expect.stringContaining('Continue from where you left off') });
     });
 
     test('a failing step keeps the steps before it, for asking again', async () => {
@@ -288,9 +297,10 @@ describe('the agent loop', () => {
             if (calls > 1) throw Object.assign(new Error('One request at a time.'), { statusCode: 400 });
             return { stream: convertArrayToReadableStream([call('c1', 'look'), finish('tool-calls')]) };
         } });
-        const failed = await turn(model).catch((error) => error);
+        const log = [];
+        const failed = await turn(model, { log }).catch((error) => error);
         expect(failed.message).toContain('One request at a time');
-        expect(failed.history.map((message) => message.role)).toEqual(['user', 'assistant', 'tool']);
+        expect(roles(log)).toEqual(['user', 'assistant', 'tool']);
     });
 
     test('a look repeated with the same arguments and result is told so; a changed result or arguments is not', async () => {
@@ -304,17 +314,18 @@ describe('the agent loop', () => {
             [call('c4', 'read'), finish('tool-calls')],
             [...say('1', 'Done.'), finish('stop')],
         );
-        const results = [];
-        await runTurn({ model, images: true, tools: [readTool], system: 'sys', history: [], prompt: 'go', askPermission: async () => true,
+        const log = [];
+        let results = 0;
+        await runTurn({ model, images: true, tools: [readTool], system: 'sys', log, prompt: go(), askPermission: async () => true,
             onEvent: (event) => {
-                if (event.type === 'agent:toolResult') {
-                    results.push(event.text.startsWith('[You made this same call') ? 'noted' : 'plain');
-                    // Changed after the third read: the fourth repeats the first's arguments, not its result.
-                    if (results.length === 3) content = 'line 1 changed';
-                }
+                // Changed after the third read: the fourth repeats the first's arguments, not its result.
+                if (event.type === 'agent:toolResult' && ++results === 3) content = 'line 1 changed';
             } });
-        expect(results).toEqual(['plain', 'noted', 'plain', 'plain']);
-        expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('You made this same call');
+        // Noted once, after the second read's result.
+        expect(log.filter((entry) => entry.note === 'repeat')).toEqual([{ note: 'repeat', text: expect.stringContaining('read {}') }]);
+        expect(log.findIndex((entry) => entry.note === 'repeat')).toBe(log.findIndex((entry) => entry.role === 'tool'
+            && entry.content[0].toolCallId === 'c2') + 1);
+        expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('[Kigumi note: Your call read {}');
     });
 
     test('after six looks without writing, progress reminders repeat every six calls', async () => {
@@ -322,7 +333,7 @@ describe('the agent loop', () => {
             run: async ({ n }) => [{ type: 'text', text: `line ${n}` }] };
         const looks = (from, count) => Array.from({ length: count }, (_, i) => [call(`c${from + i}`, 'read', { n: from + i }), finish('tool-calls')]);
         const model = scripted(...looks(0, 30), [...say('1', 'Done.'), finish('stop')]);
-        await runTurn({ model, images: true, tools: [readTool], system: 'sys', history: [], prompt: 'go', askPermission: async () => true,
+        await runTurn({ model, images: true, tools: [readTool], system: 'sys', log: [], prompt: go(), askPermission: async () => true,
             onEvent: () => {} });
         const told = (i) => (JSON.stringify(model.doStreamCalls[i].prompt).match(/without changing anything/g) || []).length;
         expect(told(5)).toBe(0);
@@ -337,10 +348,10 @@ describe('the agent loop', () => {
             [...say('1', 'Still researching.'), finish('stop')]));
         const model = scripted([call('c8', 'look'), finish('tool-calls')], [...say('2', 'It looks fine.'), finish('stop')]);
 
-        await turn(model, { history: prior.history });
+        const { log } = await turn(model, { log: prior.log });
 
-        expect(JSON.stringify(model.doStreamCalls.map((step) => step.prompt.slice(prior.history.length + 1))))
-            .not.toContain('without changing anything');
+        // The first turn's reminder stays in the log; the second turn adds none.
+        expect(log.filter((entry) => entry.note === 'nudge')).toHaveLength(1);
     });
 
     test('only the latest screenshot is sent; earlier ones become a note', async () => {
@@ -349,7 +360,7 @@ describe('the agent loop', () => {
             [call('c2', 'look'), finish('tool-calls')],
             [...say('1', 'Done.'), finish('stop')],
         );
-        const { history } = await turn(model);
+        const { log } = await turn(model);
 
         const imagesIn = (messages) => messages.filter((message) => message.role === 'tool')
             .flatMap((message) => message.content).flatMap((part) => part.output.value)
@@ -361,9 +372,10 @@ describe('the agent loop', () => {
             .flatMap((message) => message.content).filter((part) => part.type === 'file');
         expect(shown).toHaveLength(1);
         expect(shown[0].mediaType).toBe('image/png');
-        expect(sent.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'tool', 'user', 'assistant', 'tool', 'user']);
-        expect(imagesIn(history)).toBe(1);
-        expect(JSON.stringify(history)).toContain('An earlier image, dropped');
+        expect(sent.map((message) => message.role)).toEqual(['system', 'user', 'assistant', 'tool', 'assistant', 'tool', 'user']);
+        // The log keeps every image; only what is sent drops them.
+        expect(imagesIn(log.filter(isMessage))).toBe(2);
+        expect(JSON.stringify(sent)).toContain('An earlier image, dropped');
     });
 
         test('Claude models get a cache mark on the last two messages only, however many steps pass', () => {
@@ -381,7 +393,7 @@ describe('the agent loop', () => {
     test('Claude models are marked for caching; the others cache by themselves', async () => {
         const model = scripted([...say('1', 'Hi.'), finish('stop')]);
         const events = [];
-        await runTurn({ model, images: true, cacheMarks: true, tools: [], system: 's', history: [], prompt: 'go',
+        await runTurn({ model, images: true, cacheMarks: true, tools: [], system: 's', log: [], prompt: go(),
             askPermission: async () => true, onEvent: (event) => events.push(event) });
         expect(model.doStreamCalls[0].prompt.at(-1).providerOptions.openrouter.cacheControl).toEqual({ type: 'ephemeral' });
     });
@@ -414,11 +426,16 @@ describe('the agent loop', () => {
         );
         const big = [{ role: 'user', content: 'x'.repeat(SUMMARISE_AT_TOKENS * 4 + 100) }, { role: 'assistant', content: 'ok' }];
 
-        const { events, history, costUsd } = await turn(model, { history: big });
+        const { events, log, costUsd } = await turn(model, { log: [...big] });
 
         expect(events).toContainEqual(expect.objectContaining({ type: 'agent:notice', key: 'agent.notice.summarised' }));
-        expect(history[0].content).toContain('They want a sawhorse');
-        expect(history[2]).toEqual({ role: 'user', content: 'go' });
+        // The log keeps what came before; what is sent starts from the summary.
+        expect(log.slice(0, 2)).toEqual(big);
+        expect(log[2].summary).toContain('They want a sawhorse');
+        const sent = model.doStreamCalls[1].prompt;
+        expect(sent.map((message) => message.role)).toEqual(['system', 'user', 'user']);
+        expect(sent[1].content[0].text).toContain('[A summary of our conversation so far]');
+        expect(sent[2].content).toEqual([{ type: 'text', text: 'go' }]);
         expect(costUsd).toBeCloseTo(0.003);
     });
 
@@ -437,29 +454,34 @@ describe('the agent loop', () => {
         ];
         const big = [{ role: 'user', content: 'x'.repeat(SUMMARISE_AT_TOKENS * 4 + 100) }, ...edit('e1', 'frame.py'), ...edit('e2', 'gone.py'),
             { role: 'assistant', content: 'ok' }];
-        const run = (history) => runTurn({ model, images: true, tools: [], files, system: 's', history, prompt: 'go',
+        const log = [...big];
+        const run = () => runTurn({ model, images: true, tools: [], files, system: 's', log, prompt: go(),
             askPermission: async () => true, onEvent: () => {} });
+        const summaries = () => log.filter((entry) => entry.summary !== undefined).map((entry) => entry.summary);
 
-        const { history } = await run(big);
-        expect(history[0].content).toContain('Line 98 still reads bottom_position.');
-        expect(history[0].content).toContain('Where the summary disagrees with them, they are right.');
-        expect(history[0].content).toContain('[The file frame.py as it is now]\n```\nx_pos = x\n');
-        expect(history[0].content).not.toContain('gone.py');
+        await run();
+        expect(summaries()[0]).toContain('Line 98 still reads bottom_position.');
+        expect(summaries()[0]).toContain('Where the summary disagrees with them, they are right.');
+        expect(summaries()[0]).toContain('[The file frame.py as it is now]\n```\nx_pos = x\n');
+        expect(summaries()[0]).not.toContain('gone.py');
 
+        // Large again: the next summary carries the file as it is then, from the edit before the first summary.
         disk['frame.py'] = 'x_pos = x  # newer\n';
-        const again = await run([{ role: 'user', content: `${history[0].content}${'y'.repeat(SUMMARISE_AT_TOKENS * 4)}` }, ...history.slice(1)]);
-        expect(again.history[0].content).toContain('x_pos = x  # newer');
+        log.push({ role: 'user', content: 'y'.repeat(SUMMARISE_AT_TOKENS * 4) });
+        await run();
+        expect(summaries()).toHaveLength(2);
+        expect(summaries()[1]).toContain('x_pos = x  # newer');
     });
 
     test('each step reports how full the conversation is', async () => {
         const events = [];
         await runTurn({ model: scripted([...say('1', 'Hi.'), finish('stop')]), images: true, contextWindow: 200000, tools: [],
-            system: 's', history: [], prompt: 'go', askPermission: async () => true, onEvent: (event) => events.push(event) });
+            system: 's', log: [], prompt: go(), askPermission: async () => true, onEvent: (event) => events.push(event) });
         expect(events).toContainEqual({ type: 'agent:context', tokens: 10, window: 200000 });
     });
 
         test('an image the user attached is dropped like a screenshot once a later one comes', () => {
-        const { onlyLatestImage } = require('../agent/agent-loop');
+        const { onlyLatestImage } = require('../agent/request');
         const user = { role: 'user', content: [{ type: 'text', text: 'this' }, { type: 'image', image: 'AAAA', mediaType: 'image/png' }] };
         const shot = { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c', toolName: 'screenshot',
             output: { type: 'content', value: [{ type: 'file', data: { type: 'data', data: 'BBBB' }, mediaType: 'image/png' }] } }] };
@@ -665,11 +687,14 @@ describe('the agent session', () => {
         expect(account.refreshBalance).toHaveBeenCalled();
     });
 
-    test('a message goes with what the user is looking at', () => {
-        expect(withContext('fix this', { kind: 'viewer', fileName: 'a.py' }))
-            .toBe('[What I\'m looking at in Kigumi: {"kind":"viewer","fileName":"a.py"}]\n\nfix this');
-        expect(withContext('hi', null)).toBe('hi');
-        expect(withContext('hi', { text: 'x'.repeat(5000) }).length).toBeLessThan(2100);
+    test('a request goes with a note of what the user is looking at', async () => {
+        expect(contextNote({ kind: 'viewer', fileName: 'a.py' }))
+            .toEqual({ note: 'context', text: 'What the user is looking at in Kigumi: {"kind":"viewer","fileName":"a.py"}' });
+        expect(contextNote(null)).toBeNull();
+        expect(contextNote({ text: 'x'.repeat(5000) }).text.length).toBeLessThan(2100);
+        const entries = await promptEntries({ text: 'fix this', files: { root: () => null }, describe: async () => ({ kind: 'viewer' }) });
+        expect(entries).toEqual([{ note: 'context', text: expect.stringContaining('viewer') },
+            { role: 'user', content: 'fix this', shown: { text: 'fix this', images: 0 } }]);
     });
 
     test('editing a file a view shows rebuilds it, and the edit says whether it built', async () => {
@@ -723,7 +748,8 @@ describe('the agent session', () => {
 
         const [only] = saved.values();
         expect(only.title).toBe('make me a sawhorse');
-        expect(only.history.map((message) => message.role)).toEqual(['user', 'assistant']);
+        expect(only.version).toBe(2);
+        expect(only.log.filter((entry) => entry.role).map((entry) => entry.role)).toEqual(['user', 'assistant']);
 
         // A new session, as after a restart: the panel gets the conversation drawn again.
         posted.length = 0;
@@ -736,9 +762,9 @@ describe('the agent session', () => {
         // It carries on the same conversation; a new one starts empty.
         await again.prompt('longer legs');
         expect(saved.size).toBe(1);
-        expect(saved.get(only.id).history).toHaveLength(4);
+        expect(saved.get(only.id).log.filter((entry) => entry.role)).toHaveLength(4);
         again.handle({ type: 'agent:clear' });
-        expect(again.history).toEqual([]);
+        expect(again.conversation.log).toEqual([]);
         await again.prompt('something else').catch(() => {});
         expect(saved.size).toBe(2);
     });
@@ -804,7 +830,8 @@ describe('the agent session', () => {
         expect(fs.readFileSync(path.join(root, 'frame.py'), 'utf8')).toBe('legs = 4\n');
         expect(fs.existsSync(path.join(root, 'brace.py'))).toBe(false);
         expect(posted).toContainEqual({ type: 'agent:restored', turn: 1 });
-        expect(agent.history.at(-2).content).toMatch(/I undid your changes to (frame\.py, brace\.py|brace\.py, frame\.py)/);
+        expect(agent.conversation.log.at(-1)).toEqual({ note: 'undo',
+            text: expect.stringMatching(/undid your changes to (frame\.py, brace\.py|brace\.py, frame\.py)/) });
         fs.rmSync(root, { recursive: true, force: true });
     });
 
@@ -823,7 +850,7 @@ describe('the agent session', () => {
         const [result] = await todos.run({ items: [{ text: 'legs', done: true }, { text: 'beam' }] });
         expect(result.text).toBe('To-do list updated: 1 of 2 left.');
         expect(posted).toContainEqual({ type: 'agent:todos', items: [{ text: 'legs', done: true }, { text: 'beam', done: false }] });
-        expect(agent.transcript.at(-1).type).toBe('agent:todos');
+        expect(agent.conversation.log.at(-1).event.type).toBe('agent:todos');
     });
 
     test('the longest step is the setting, if it is one offered; else 8k', async () => {
@@ -856,11 +883,12 @@ describe('the agent session', () => {
 
     test('images go with a request to a model that can see; one that can\'t is told they were there', async () => {
         const common = { text: 'this joint', files: { root: () => null }, describe: async () => null };
-        const parts = await promptContent({ ...common, images: [{ mediaType: 'image/jpeg', data: 'AAAA' }], modelSeesImages: true });
-        expect(parts[1]).toEqual({ type: 'image', image: 'AAAA', mediaType: 'image/jpeg' });
+        const [seen] = await promptEntries({ ...common, images: [{ mediaType: 'image/jpeg', data: 'AAAA' }], modelSeesImages: true });
+        expect(seen.content[1]).toEqual({ type: 'image', image: 'AAAA', mediaType: 'image/jpeg' });
+        expect(seen.shown).toEqual({ text: 'this joint', images: 1 });
 
-        const text = await promptContent({ ...common, images: [{ mediaType: 'image/png', data: 'AAAA' }], modelSeesImages: false });
-        expect(text).toContain("1 image attached, which this model can't see");
+        const [unseen] = await promptEntries({ ...common, images: [{ mediaType: 'image/png', data: 'AAAA' }], modelSeesImages: false });
+        expect(unseen.content).toContain("1 image attached, which this model can't see");
     });
 
     test('an edit to a file a view shows puts the view before and after on its chip', async () => {
@@ -885,7 +913,7 @@ describe('the agent session', () => {
         expect(pictures).toEqual({ type: 'agent:toolImages', id: 'c9',
             before: `data:image/png;base64,${Buffer.from('png').toString('base64')}`, after: expect.stringMatching(/^data:image\/png/) });
         // For the panel only: not kept in the conversation.
-        expect(agent.transcript.some((event) => event.type === 'agent:toolImages')).toBe(false);
+        expect(agent.conversation.log.some((entry) => entry.event && entry.event.type === 'agent:toolImages')).toBe(false);
         fs.rmSync(root, { recursive: true, force: true });
     });
 
@@ -908,8 +936,7 @@ describe('the agent session', () => {
         release();
         await turn;
 
-        expect(agent.history).toEqual([]);
-        expect(agent.transcript).toEqual([]);
+        expect(agent.conversation.log).toEqual([]);
         expect(saved).toEqual([]);
     });
 
@@ -955,8 +982,8 @@ describe('the agent session', () => {
         const viewed = { ...panels, list: () => [{ kind: 'viewer', filePath: '/project/shown.py' }] };
         const agent = new AgentSession({ host: hostOf({ panels: viewed, files: fakeFiles('/project') }), post: () => {},
             setting: (key, fallback) => fallback });
-        agent.checkpoints.begin(1);
-        await agent.checkpoints.beforeWrite('/project/written.py');
+        agent.conversation.checkpoints.begin(1);
+        await agent.conversation.checkpoints.beforeWrite('/project/written.py');
 
         await expect(agent._askPermission('check_frame', { file_path: 'shown.py' })).resolves.toBe(true);
         await expect(agent._askPermission('check_frame', { file_path: 'written.py' })).resolves.toBe(true);

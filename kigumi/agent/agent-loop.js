@@ -2,9 +2,10 @@
  * The built-in agent's loop: one user turn, as many model steps and tool calls as it takes, on the
  * Vercel AI SDK. Host-neutral (no Node APIs), so the desktop app and the web page run the same loop.
  *
- * Tools are Kigumi's ({ name, description, shape, effect, run }, agent/tools.js); one that does more
- * than read waits on `askPermission` first. What happens is reported as panel events (see
- * agent/agent-session.js).
+ * The turn appends to the conversation's log (agent/conversation.js) as it goes, and each step's
+ * request is built from the log (agent/request.js). Tools are Kigumi's ({ name, description, shape,
+ * effect, run }, agent/agent.js); one that does more than read waits on `askPermission` first. What
+ * happens is reported as panel events (see agent/agent-session.js).
  */
 
 // require() of these ES modules needs Node 22.12+ (Electron 44 has it).
@@ -12,6 +13,7 @@ const { streamText, stepCountIs, tool } = require('ai');
 // The same zod the tools' shapes are made with (agent/tools.js).
 const { z } = require('zod');
 const { backendFetch } = require('./backend-fetch');
+const { buildRequest, estimateTokens } = require('./request');
 
 /** Steps in one turn, each a model call and the tools it asks for. */
 const MAX_STEPS = 40;
@@ -19,8 +21,20 @@ const MAX_STEPS = 40;
 const MAX_OUTPUT_TOKENS = 8000;
 /** Continuations after a stream closes without a completion signal, within the turn's step limit. */
 const MAX_STREAM_CONTINUATIONS = 2;
-const STREAM_CONTINUATION = '[The previous response stream ended without a completion signal. Continue from where '
-    + 'you left off, using the tool results already in this conversation. Do not repeat completed changes.]';
+/** Past this many tokens (estimated) at the start of a turn, the conversation before it is summarised. */
+const SUMMARISE_AT_TOKENS = 100000;
+
+/** What Kigumi tells the model, by note kind. */
+const NOTES = {
+    continuation: () => 'The previous response stream ended without a completion signal. Continue from where you left '
+        + 'off, using the tool results already in this conversation. Do not repeat completed changes.',
+    nudge: (looks) => `You have made ${looks} tool calls this turn without changing anything. If the current request is `
+        + 'to write or change a frame, write a first version now. Use kumiki_api for specific signatures and let actual '
+        + 'build errors guide further lookups. Do not reread files you already have. Only report writing, running, or '
+        + 'building after the corresponding tool has actually done it.',
+    repeat: (call) => `Your call ${call} gave the same result as the same call earlier this turn. To see something else, `
+        + 'change the arguments: read_file reads on from `offset`.',
+};
 
 /** Return the AI SDK language model a route (agent/models.js routeModel) names. */
 async function languageModelFor(route, { fetch, onWait } = {}) {
@@ -58,159 +72,9 @@ function toModelContent(content, images) {
     return { type: 'content', value: parts };
 }
 
-const EARLIER_IMAGE = '[An earlier image, dropped: only the latest is kept. Take a screenshot to look again.]';
-
-/**
- * `messages` with every image but the latest replaced by a note. A screenshot is about a megabyte,
- * and each step resends the whole conversation: kept, they made steps 2.5 MB and cost 40 times more.
- */
-function onlyLatestImage(messages) {
-    let kept = false;
-    const out = [...messages];
-    for (let i = out.length - 1; i >= 0; i--) {
-        const message = out[i];
-        if (message.role === 'user' && Array.isArray(message.content)) {
-            // An image the user attached counts too, and one moved out of a tool result (imagesAfterToolResults).
-            out[i] = { ...message, content: message.content.map((part) => {
-                const image = part && (part.type === 'image' || (part.type === 'file' && /^image\//.test(part.mediaType || '')));
-                if (!image) return part;
-                if (!kept) {
-                    kept = true;
-                    return part;
-                }
-                return { type: 'text', text: EARLIER_IMAGE };
-            }) };
-            continue;
-        }
-        if (message.role !== 'tool' || !Array.isArray(message.content)) continue;
-        const content = message.content.map((part) => {
-            const output = part && part.type === 'tool-result' && part.output;
-            if (!output || output.type !== 'content' || !output.value.some((item) => item.type === 'file')) return part;
-            if (!kept) {
-                kept = true;
-                return part;
-            }
-            const value = output.value.map((item) => (item.type === 'file' ? { type: 'text', text: EARLIER_IMAGE } : item));
-            return { ...part, output: { ...output, value } };
-        });
-        out[i] = { ...message, content };
-    }
-    return out;
-}
-
 /** Tool calls in a turn without a write or edit between progress reminders. */
 const LOOKS_BEFORE_NUDGE = 6;
 const WRITE_TOOLS = new Set(['write_file', 'edit_file']);
-
-/** Return a reminder to turn research into a first editable version. */
-function writeEarly(looks) {
-    return `[From Kigumi: you have made ${looks} tool calls this turn without changing anything. `
-        + 'If the current request is to write or change a frame, write a first version now. Use kumiki_api for '
-        + 'specific signatures and let actual build errors guide further lookups. Do not reread files you already have. '
-        + 'Only report writing, running, or building after the corresponding tool has actually done it.]';
-}
-
-const IMAGE_BELOW = '[The image is in the next message.]';
-
-/**
- * `messages` with each tool result's images moved into a user message after it. Chat-completions
- * hosts take images only from the user: one in a tool result reaches DeepSeek's cheapest host as
- * nothing at all.
- */
-function imagesAfterToolResults(messages) {
-    const out = [];
-    for (const message of messages) {
-        if (message.role !== 'tool' || !Array.isArray(message.content)) {
-            out.push(message);
-            continue;
-        }
-        const images = [];
-        const content = message.content.map((part) => {
-            const output = part && part.type === 'tool-result' && part.output;
-            if (!output || output.type !== 'content' || !output.value.some((item) => item.type === 'file')) return part;
-            const value = output.value.map((item) => {
-                if (item.type !== 'file') return item;
-                images.push({ type: 'file', data: item.data, mediaType: item.mediaType });
-                return { type: 'text', text: IMAGE_BELOW };
-            });
-            return { ...part, output: { ...output, value } };
-        });
-        out.push({ ...message, content });
-        if (images.length) out.push({ role: 'user', content: [{ type: 'text', text: '[The image from the tool result above.]' }, ...images] });
-    }
-    return out;
-}
-
-const CACHE_HERE = { type: 'ephemeral' };
-
-/**
- * `messages` with a prompt-cache mark on the last two and none elsewhere: each step then reads the
- * conversation so far from the cache. Marks carry forward between steps, and Anthropic takes four.
- */
-function cacheMarked(messages) {
-    return messages.map((message, i) => {
-        const { openrouter, ...others } = message.providerOptions || {};
-        const rest = Object.keys(others).length ? others : undefined;
-        if (i < messages.length - 2) {
-            return { ...message, providerOptions: rest };
-        }
-        return { ...message, providerOptions: { ...others, openrouter: { cacheControl: CACHE_HERE } } };
-    });
-}
-
-/** Tool results kept whole at the least; older ones are cut down, this many at a time (trimOldToolResults). */
-const KEEP_TOOL_RESULTS = 8;
-/** What an older tool result is cut to, in characters. */
-const TRIMMED_TO = 300;
-/** Past this many tokens (estimated) at the start of a turn, the conversation before it is summarised. */
-const SUMMARISE_AT_TOKENS = 100000;
-
-/** What an image counts for in estimateTokens: about what a model reads one as, not its encoded size. */
-const IMAGE_TOKENS = 1500;
-
-/** A rough token count: about four characters a token, and images at what a model reads them as. */
-function estimateTokens(messages) {
-    let images = 0;
-    const text = JSON.stringify(messages, (key, value) => {
-        // An image's data (a user's image, or a screenshot sent as a file) is hundreds of KB encoded.
-        if ((key === 'image' || key === 'data') && typeof value === 'string' && value.length > 1000) {
-            images += 1;
-            return '';
-        }
-        return value;
-    });
-    return Math.round(text.length / 4) + images * IMAGE_TOKENS;
-}
-
-const TRIMMED_NOTE = '\n[… cut down to keep the conversation small; run the tool again if you need the rest.]';
-
-/** A tool result's output cut to its first characters. */
-function trimmedOutput(output) {
-    const parts = output.type === 'content' ? output.value : [{ type: 'text', text: typeof output.value === 'string' ? output.value : JSON.stringify(output.value) }];
-    const text = parts.filter((part) => part.type === 'text').map((part) => part.text).join('\n');
-    if (text.length <= TRIMMED_TO + TRIMMED_NOTE.length) return output;
-    return { type: 'content', value: [{ type: 'text', text: text.slice(0, TRIMMED_TO) + TRIMMED_NOTE }] };
-}
-
-/**
- * `messages` with older tool results cut down, `keep` at a time: between `keep` and `2 * keep - 1`
- * of the latest stay whole, so the cut moves only every `keep` results. `keep` 0 cuts them all.
- */
-function trimOldToolResults(messages, keep = KEEP_TOOL_RESULTS) {
-    const isResult = (part) => part && part.type === 'tool-result' && part.output;
-    const total = messages.reduce((count, message) => count
-        + (message.role === 'tool' && Array.isArray(message.content) ? message.content.filter(isResult).length : 0), 0);
-    const cut = keep === 0 ? total : Math.floor(Math.max(0, total - keep) / keep) * keep;
-    let seen = 0;
-    return messages.map((message) => {
-        if (seen >= cut || message.role !== 'tool' || !Array.isArray(message.content)) return message;
-        return { ...message, content: message.content.map((part) => {
-            if (!isResult(part)) return part;
-            seen += 1;
-            return seen <= cut ? { ...part, output: trimmedOutput(part.output) } : part;
-        }) };
-    });
-}
 
 const SUMMARY_REQUEST = 'Summarise our conversation so far for carrying on the work: what the user wants, what '
     + 'has been done (files changed and how), what was found, and what is left. Keep file paths, names and '
@@ -220,37 +84,27 @@ const SUMMARY_REQUEST = 'Summarise our conversation so far for carrying on the w
 /** The most of each changed file, and of all of them, a summary carries. */
 const MAX_CHANGED_FILE_CHARS = 20000;
 const MAX_CHANGED_CHARS = 60000;
-const CHANGED_FILE_HEADING = /^\[The file (.+) as it is now\]$/gm;
 
-/**
- * The files `history` wrote or edited: by write_file and edit_file calls, and in an earlier
- * summary, by the files it carried.
- */
-function changedFiles(history) {
+/** The files the log's write_file and edit_file calls changed. */
+function changedFiles(log) {
     const files = new Set();
-    for (const message of history) {
-        if (message.role === 'assistant' && Array.isArray(message.content)) {
-            for (const part of message.content) {
-                if (part.type === 'tool-call' && ['write_file', 'edit_file'].includes(part.toolName) && part.input && part.input.file_path) {
-                    files.add(part.input.file_path);
-                }
+    for (const entry of log) {
+        if (entry.role !== 'assistant' || !Array.isArray(entry.content)) continue;
+        for (const part of entry.content) {
+            if (part.type === 'tool-call' && WRITE_TOOLS.has(part.toolName) && part.input && part.input.file_path) {
+                files.add(part.input.file_path);
             }
-        } else if (message.role === 'user' && typeof message.content === 'string') {
-            for (const [, file] of message.content.matchAll(CHANGED_FILE_HEADING)) files.add(file);
         }
     }
     return [...files];
 }
 
-/**
- * The changed files as they are now, for a summary: it can be wrong about what is in them (one
- * said a bug was still there after it was fixed), and this is what the model goes by.
- */
-async function changedFilesNow(history, files) {
+/** The changed files as they are now, for a summary: it can be wrong about what is in them, and the model goes by it. */
+async function changedFilesNow(log, files) {
     if (!files) return '';
     const shown = [];
     let total = 0;
-    for (const file of changedFiles(history)) {
+    for (const file of changedFiles(log)) {
         const content = await files.read(file).catch(() => null);
         if (content === null || total >= MAX_CHANGED_CHARS) continue;
         const cut = content.length > MAX_CHANGED_FILE_CHARS ? `${content.slice(0, MAX_CHANGED_FILE_CHARS)}\n[…cut off]` : content;
@@ -263,44 +117,34 @@ async function changedFilesNow(history, files) {
 }
 
 /**
- * `history` summarised by the model into one exchange, when it is large; else as it is, with the
- * files it changed as they are now (`files`, project-files.js). Returns { history, summarised, costUsd }.
+ * When the request `log` would send is large, have the model summarise it and append the summary,
+ * with the files the conversation changed as they are now (`files`, project-files.js). Returns the
+ * summary's cost, or undefined.
  */
-async function summariseIfLarge(model, system, history, abortSignal, files = null) {
-    if (estimateTokens(history) < SUMMARISE_AT_TOKENS) return { history, summarised: false };
+async function summariseIfLarge({ model, system, log, abortSignal, files = null, cacheMarks = false }) {
+    if (estimateTokens(buildRequest(log, { cacheMarks })) < SUMMARISE_AT_TOKENS) return undefined;
     // Streamed like every other request, which is all the backend carries cost reports for.
     const result = streamText({
         model, system, abortSignal, maxRetries: 2, maxOutputTokens: MAX_OUTPUT_TOKENS,
-        messages: [...imagesAfterToolResults(trimOldToolResults(onlyLatestImage(history), 0)), { role: 'user', content: SUMMARY_REQUEST }],
+        messages: [...buildRequest(log, { keep: 0 }), { role: 'user', content: SUMMARY_REQUEST }],
     });
     const summary = await result.text;
     const metadata = await result.providerMetadata;
+    log.push({ summary: `${summary}${await changedFilesNow(log, files)}` });
     const openrouter = metadata && metadata.openrouter;
-    return {
-        history: [
-            { role: 'user', content: `[A summary of our conversation so far]\n${summary}${await changedFilesNow(history, files)}` },
-            { role: 'assistant', content: 'Understood; I will carry on from there.' },
-        ],
-        summarised: true,
-        costUsd: openrouter && openrouter.usage && openrouter.usage.cost,
-    };
+    return openrouter && openrouter.usage && openrouter.usage.cost;
 }
 
-/** Kigumi's tools as an AI SDK tool set. */
-/** Put before a look that repeats one from earlier in the turn, with the same result. */
-const REPEATED_LOOK = '[You made this same call earlier in this turn and got this same result. To see something else, '
-    + 'change the arguments: read_file reads on from `offset`.]';
-
-function toToolSet(tools, { images, askPermission }) {
+/** Kigumi's tools as an AI SDK tool set; a look repeated with the same result calls `onRepeat(call)`. */
+function toToolSet(tools, { images, askPermission, onRepeat }) {
     // This turn's looks and what each gave: a small model repeats one, e.g. read_file without the offset it meant.
     const looked = new Map();
     const noteRepeat = (name, input, output) => {
-        if (!Array.isArray(output) || output.some((part) => part.type === 'image')) return output;
+        if (!Array.isArray(output) || output.some((part) => part.type === 'image')) return;
         const call = `${name} ${JSON.stringify(input)}`;
         const result = JSON.stringify(output);
-        const repeated = looked.get(call) === result;
+        if (looked.get(call) === result) onRepeat(call);
         looked.set(call, result);
-        return repeated ? [{ type: 'text', text: REPEATED_LOOK }, ...output] : output;
     };
     return Object.fromEntries(tools.map((kigumiTool) => [kigumiTool.name, tool({
         description: kigumiTool.description,
@@ -310,7 +154,8 @@ function toToolSet(tools, { images, askPermission }) {
                 throw new Error('The user did not allow this.');
             }
             const output = await kigumiTool.run(input || {}, { toolCallId });
-            return kigumiTool.effect === 'edit' ? output : noteRepeat(kigumiTool.name, input || {}, output);
+            if (kigumiTool.effect !== 'edit') noteRepeat(kigumiTool.name, input || {}, output);
+            return output;
         },
         toModelOutput: ({ output }) => toModelContent(output, images),
     })]));
@@ -332,7 +177,9 @@ function earlyEnd(steps, maxSteps = MAX_STEPS) {
 }
 
 /**
- * Run one user turn.
+ * Run one user turn, appending to `log` as it goes: a summary first if the conversation is large,
+ * then `prompt`, then each step's messages and Kigumi's notes. A turn that fails throws, and the log
+ * keeps the steps it finished.
  *
  * @param {object} options
  * @param {object} options.model         an AI SDK language model (languageModelFor)
@@ -344,50 +191,54 @@ function earlyEnd(steps, maxSteps = MAX_STEPS) {
  * @param {object[]} options.tools       Kigumi tools
  * @param {object} [options.files]       the project's files (project-files.js), for a summary to carry changed ones
  * @param {string} options.system
- * @param {object[]} options.history     the conversation so far, as model messages
- * @param {string|object[]} options.prompt  text, or content parts (text and images)
+ * @param {object[]} options.log         the conversation's log
+ * @param {object[]} options.prompt      the entries the user's request adds (agent/prompt-content.js)
  * @param {AbortSignal} [options.abortSignal]
  * @param {(toolName: string, input: object) => Promise<boolean>} options.askPermission
  * @param {(event: object) => void} options.onEvent   panel events
- * @returns {Promise<{ history: object[], costUsd?: number }>} the conversation after the turn. A turn
- *     that fails throws, with the conversation as far as it got as the error's `history`.
+ * @returns {Promise<{ costUsd?: number }>}
  */
 async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOutputTokens = MAX_OUTPUT_TOKENS, maxSteps = MAX_STEPS, tools, files = null,
-    system, history, prompt, abortSignal, askPermission, onEvent }) {
-    const compacted = await summariseIfLarge(model, system, history, abortSignal, files);
-    if (compacted.summarised) {
+    system, log, prompt, abortSignal, askPermission, onEvent }) {
+    const costs = [];
+    const summaryCost = await summariseIfLarge({ model, system, log, abortSignal, files, cacheMarks });
+    if (log.at(-1) && log.at(-1).summary !== undefined) {
+        if (typeof summaryCost === 'number') costs.push(summaryCost);
         onEvent({ type: 'agent:notice', key: 'agent.notice.summarised', text: 'The earlier conversation was summarised, to keep each step small.' });
     }
-    const messages = [...compacted.history, { role: 'user', content: prompt }];
+    log.push(...prompt);
     const steps = [];
     let looks = 0;
     let nudgedAt = null;
-    const toolSet = toToolSet(tools, { images, askPermission });
-    const sofar = () => trimOldToolResults(onlyLatestImage(messages));
+    // Repeated looks this step, noted after its tool results.
+    let repeats = [];
+    const toolSet = toToolSet(tools, { images, askPermission, onRepeat: (call) => repeats.push(call) });
+    const request = () => buildRequest(log, { cacheMarks });
     for (let continuations = 0; ; continuations++) {
         const before = steps.length;
         let failure = null;
         const result = streamText({
             model,
             system,
-            messages: [...messages],
+            messages: request(),
             tools: toolSet,
             stopWhen: stepCountIs(maxSteps - steps.length),
             maxOutputTokens,
             abortSignal,
             // Retry transient request failures before streaming begins.
             maxRetries: 2,
-            prepareStep: ({ messages: sending }) => {
-                const trimmed = imagesAfterToolResults(trimOldToolResults(onlyLatestImage(sending)));
+            prepareStep: () => {
                 if (looks >= LOOKS_BEFORE_NUDGE && (nudgedAt === null || looks - nudgedAt >= LOOKS_BEFORE_NUDGE)) {
                     nudgedAt = looks;
-                    trimmed.push({ role: 'user', content: writeEarly(looks) });
+                    log.push({ note: 'nudge', text: NOTES.nudge(looks) });
                 }
-                return { messages: cacheMarks ? cacheMarked(trimmed) : trimmed };
+                return { messages: request() };
             },
             onStepEnd: (step) => {
                 steps.push(step);
-                messages.push(...step.response.messages);
+                log.push(...step.response.messages);
+                log.push(...repeats.map((call) => ({ note: 'repeat', text: NOTES.repeat(call) })));
+                repeats = [];
                 for (const call of step.toolCalls || []) {
                     if (WRITE_TOOLS.has(call.toolName)) {
                         looks = 0;
@@ -421,29 +272,25 @@ async function runTurn({ model, images, cacheMarks = false, contextWindow, maxOu
         } catch (error) {
             failure = failure || error;
         }
-        if (failure) {
-            throw Object.assign(failure, { history: sofar() });
-        }
+        if (failure) throw failure;
         const last = steps.at(-1);
         if (abortSignal?.aborted || steps.length === before || last.finishReason !== 'other'
             || (last.rawFinishReason && last.rawFinishReason !== 'other') || last.toolCalls.length || steps.length >= maxSteps
             || continuations >= MAX_STREAM_CONTINUATIONS) break;
-        messages.push({ role: 'user', content: STREAM_CONTINUATION });
+        log.push({ note: 'continuation', text: NOTES.continuation() });
         onEvent({ type: 'agent:notice', key: 'agent.notice.continuing',
             params: { attempt: continuations + 1, attempts: MAX_STREAM_CONTINUATIONS },
             text: `The response stream ended early. Continuing automatically (${continuations + 1}/${MAX_STREAM_CONTINUATIONS}).` });
     }
     const notice = earlyEnd(steps, maxSteps);
     if (notice && !abortSignal?.aborted) onEvent({ type: 'agent:notice', ...notice });
-    const costs = steps.map((step) => step.providerMetadata && step.providerMetadata.openrouter
-        && step.providerMetadata.openrouter.usage && step.providerMetadata.openrouter.usage.cost)
-        .filter((cost) => typeof cost === 'number');
-    if (typeof compacted.costUsd === 'number') costs.push(compacted.costUsd);
-    return {
-        history: sofar(),
-        costUsd: costs.length ? costs.reduce((sum, cost) => sum + cost, 0) : undefined,
-    };
+    for (const step of steps) {
+        const cost = step.providerMetadata && step.providerMetadata.openrouter
+            && step.providerMetadata.openrouter.usage && step.providerMetadata.openrouter.usage.cost;
+        if (typeof cost === 'number') costs.push(cost);
+    }
+    return { costUsd: costs.length ? costs.reduce((sum, cost) => sum + cost, 0) : undefined };
 }
 
-module.exports = { runTurn, languageModelFor, toModelContent, summarise, onlyLatestImage, cacheMarked, trimOldToolResults,
-    estimateTokens, summariseIfLarge, SUMMARISE_AT_TOKENS, MAX_STEPS, MAX_OUTPUT_TOKENS };
+module.exports = { runTurn, languageModelFor, toModelContent, summarise, summariseIfLarge, changedFiles,
+    NOTES, SUMMARISE_AT_TOKENS, MAX_STEPS, MAX_OUTPUT_TOKENS };

@@ -90,11 +90,12 @@ async function runOne(task, modelId, key) {
     const started = Date.now();
     let costUsd = 0;
     let failure = null;
+    const log = [];
     try {
         const result = await runTurn({
             model: await languageModelFor(routeModel(model, { openrouterKey: key })), images: model.images,
             cacheMarks: Boolean(model.cacheMarks), maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools: agentTools(host, { checkpoints: () => checkpoints }), files, system: instructions(host),
-            history: [], prompt: task.prompt, askPermission: async () => true,
+            log, prompt: [{ role: 'user', content: task.prompt, shown: { text: task.prompt, images: 0 } }], askPermission: async () => true,
             onEvent: (event) => {
                 if (event.type === 'agent:tool') {
                     tools.push(event.name);
@@ -116,7 +117,7 @@ async function runOne(task, modelId, key) {
     return {
         task: task.name, model: modelId, ...(process.argv.includes('--keep') ? { project: root } : {}), passed: !failure && checks.every((check) => check.passed), checks,
         tools: tools.length, toolsUsed: Object.fromEntries([...new Set(tools)].map((name) => [name, tools.filter((t) => t === name).length])),
-        notices, calls, costUsd, seconds: Math.round((Date.now() - started) / 1000), failure,
+        notices, notes: log.filter((entry) => entry.note).map(({ note, text }) => ({ note, text })), calls, costUsd, seconds: Math.round((Date.now() - started) / 1000), failure,
     };
 }
 
