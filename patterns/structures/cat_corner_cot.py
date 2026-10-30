@@ -30,11 +30,10 @@ Defines:
    - Uses `cut_free_house_joint` with a cutout block located 18" out of the corner.
 5. Cat cot structure:
     - 3 3/8" square posts on corners:
-      - BL post stops under front rail at Z = 50 5/8".
+      - BL post runs from the ground to the underside of the front roof beam, past the front rail.
       - BR post connects into lower rafter and front roof beam (top plate).
       - TR post stops under right rail at Z = 50 5/8".
       - TL post runs from the ground to the underside of the back roof beam.
-      - Upper front-left post sits on front rail, offset 1.5" from wall, and connects into front roof beam.
       - Upper back-right post sits on right rail, offset 1.5" from wall, and connects into lower rafter and back roof beam.
       - Door post on right side connects into top of right rim joist at bottom, right rail, and extends up to the lower rafter.
     - 3.5" x 3.5" tilted lower rafter along the right wall matching the roof slope:
@@ -56,10 +55,8 @@ Defines:
       - Offset vertically (+13/16" for X-running rim joists, -13/16" for Y-running rim joists) to prevent intersection.
       - Held in place by 5/8" square through-pegs.
     - 3 3/8" square front rail at 54" rail height (top of rail at 54") between the two front posts:
-      - BL post connects into underside of front rail with 1.5" x 1" tenon (offset from rail end to prevent blowout).
-      - Upper left post connects into top of front rail with 1.5" x 1" tenon offset to the right so it doesn't intersect with the bottom post tenon.
-      - Front rail connects into BR post with 3" x 1" tenon.
-    - 2x 2" x 1" studs uniformly spaced between the upper front-left post and BR post, connecting the front rail to the front top plate:
+      - Front rail connects into BL post and BR post with 3" x 1" tenons.
+    - 2x 2" x 1" studs uniformly spaced between the BL post and BR post, connecting the front rail to the front top plate:
       - 1" deep mortise and tenon joints (no pegs).
     - 3 3/8" square vertical center stud connecting the front rail to the front rim joist right in the middle:
       - Connects into the top of front rim joist with 3" long x 1" thick mortise and tenon joint (offset +15/16" right along X) with 5/8" square peg.
@@ -160,8 +157,7 @@ cot_stacked_through_tenon_width = inches(2)       # 2" along the lower rafter (l
 cot_stacked_plate_tenon_width = inches(1)         # 1" across the top plate (upper tenon)
 cot_stacked_plate_tenon_length = inches(5, 2)     # 2.5" into the top plate
 
-# Upper left & back-right post parameters
-cot_upper_left_post_offset_x = inches(3, 2)   # 1.5" offset away from house wall at X = 0
+# Upper back-right post parameters
 cot_upper_back_post_offset_y = inches(3, 2)   # 1.5" offset away from house wall at Y = 0
 
 # Lower rafter parameters
@@ -518,12 +514,11 @@ def compute_front_beam_height() -> Numeric:
 
 def create_cot_posts() -> list[Timber]:
     """
-    Creates six 3 3/8" square posts on the cat cot:
-    - Corner 0: Bottom-Left post connects into underside of front rail (top at 50 5/8")
+    Creates five 3 3/8" square posts on the cat cot:
+    - Corner 0: Bottom-Left post runs from the ground to the underside of the front beam
     - Corner 1: Bottom-Right post connects into underside of front beam
     - Corner 2: Bottom-Right (TR) post connects into underside of right rail (top at 50 5/8")
     - Corner 3: Top-Left post runs from the ground to the underside of the back beam
-    - Upper Left Post: sits on front rail (offset 1.5" from house wall at X=0) and reaches front beam
     - Upper Back-Right Post: sits on right rail (offset 1.5" from house wall at Y=0) and reaches back beam
     """
     timber_cs = cot_timber_cross_section
@@ -531,14 +526,13 @@ def create_cot_posts() -> list[Timber]:
     front_beam_bottom_z = front_beam_top_z - timber_cs
     back_beam_bottom_z = back_beam_height - timber_cs
 
-    bl_post_height = cot_rail_height - timber_cs  # 50 5/8"
     tr_post_height = cot_rail_height - timber_cs  # 50 5/8"
 
     # 1. Bottom-Left Post
     post_bl = create_vertical_timber_on_footprint_corner(
         footprint=cot_footprint,
         corner_index=0,
-        length=bl_post_height,
+        length=front_beam_bottom_z,
         location_type=FootprintLocation.INSIDE,
         size=cot_timber_size,
         ticket=TimberTicket(path="cot_post_BL", tags=("post", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE,)),
@@ -574,21 +568,7 @@ def create_cot_posts() -> list[Timber]:
         ticket=TimberTicket(path="cot_post_TL", tags=("post", "cot", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE,)),
     )
 
-    # 5. Upper Left Post (between front rail and front beam, offset 1.5" from wall at X=0)
-    upper_left_x_center = cot_upper_left_post_offset_x + timber_cs / scalar(2)
-    y_front_center = cot_corner_offset_y - cot_length_y + timber_cs / scalar(2)
-    upper_left_length = front_beam_bottom_z - cot_rail_height
-
-    upper_left_post = create_axis_aligned_timber(
-        bottom_position=create_v3(upper_left_x_center, y_front_center, cot_rail_height),
-        length=upper_left_length,
-        size=cot_timber_size,
-        length_direction=TimberFace.TOP,
-        width_direction=TimberFace.RIGHT,
-        ticket=TimberTicket(path="cot_post_front_upper_left", tags=("post", "cot", "upper_post", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE,)),
-    )
-
-    # 6. Upper Back-Right Post (between right rail and back beam, offset 1.5" from wall at Y=0)
+    # 5. Upper Back-Right Post (between right rail and back beam, offset 1.5" from wall at Y=0)
     x_end = cot_corner_offset_x + cot_width_x
     x_right_center = x_end - timber_cs / scalar(2)
     y_upper_back_center = -cot_upper_back_post_offset_y - timber_cs / scalar(2)
@@ -603,7 +583,7 @@ def create_cot_posts() -> list[Timber]:
         ticket=TimberTicket(path="cot_post_back_upper_right", tags=("post", "cot", "upper_post", "3_3_8x3_3_8"), reference_features=(REFERENCE_POST_OUTER_EDGE_BACK_RIGHT,)),
     )
 
-    return [post_bl, post_br, post_tr, post_tl, upper_left_post, upper_back_right_post]
+    return [post_bl, post_br, post_tr, post_tl, upper_back_right_post]
 
 
 def create_cot_rim_joists() -> list[Timber]:
@@ -941,7 +921,7 @@ def create_cot_stepped_girts() -> list[Timber]:
 
 def create_cot_upper_front_studs() -> list[Timber]:
     """
-    Creates two 2" x 1" studs uniformly spaced between the upper front-left post and BR post,
+    Creates two 2" x 1" studs uniformly spaced between the BL post and BR post,
     running vertically from the front rail (Z = 54") up to the front top plate / roof beam.
     """
     timber_cs = cot_timber_cross_section
@@ -954,7 +934,7 @@ def create_cot_upper_front_studs() -> list[Timber]:
     front_beam_bottom_z = front_beam_top_z - timber_cs
     stud_length = front_beam_bottom_z - cot_rail_height
 
-    left_post_right_face = x_start + cot_upper_left_post_offset_x + timber_cs
+    left_post_right_face = x_start + timber_cs
     right_post_left_face = x_end - timber_cs
     bay_width = right_post_left_face - left_post_right_face
     spacing = bay_width / scalar(3)
@@ -1001,11 +981,9 @@ def cut_rail_and_post_joints(
     - The peg face named on the tenon is the cheek the peg hole passes through, so the peg
       enters the mortise from the opposite side. The beam joints below all name the post's
       south (-Y) face, so their peg heads sit on the front side of the cot.
-    - Front rail to BR post: 3" x 1" tenon, centered (with peg).
+    - Front rail to BL and BR posts: 3" x 1" tenons (with pegs).
     - Right rail to door post: 3" x 1" tenon, centered (with peg).
-    - BL post top into front rail underside: 1.5" x 1" tenon, offset +9/16" along X to preserve end grain relish (with peg).
-    - Upper left post bottom into front rail top: 1.5" x 1" tenon, offset +15/16" along X (with peg).
-    - Upper left post top into front beam: 1.5" x 1" tenon, centered (with peg).
+    - BL post top into front beam: 1.5" x 1" tenon, centered (with peg).
     - Post TR (bottom back-right post) top into right rail underside: 1.5" x 1" tenon, offset +9/16" along Y (with peg).
     - Upper back-right post bottom into right rail top: 1.5" x 1" tenon, offset -15/16" along Y (with peg).
     - TL post top into back beam: 1.5" x 1" tenon, centered (with peg from the front / south).
@@ -1027,7 +1005,7 @@ def cut_rail_and_post_joints(
     - Middle floor joist into front and back rim joists: 3" long x 1" thick tenon offset down -13/16" in Z (with pegs).
     - Left and right floor joists into front and back rim joists: 1.5" deep drop-in housed butt joints.
     """
-    post_bl, post_br, post_tr, post_tl, upper_left_post, upper_back_right_post = posts
+    post_bl, post_br, post_tr, post_tl, upper_back_right_post = posts
     front_rail, front_mid_stud, door_post_right, right_rail = rails_and_studs
     back_beam, front_beam = roof_beams
     front_rim, right_rim, back_rim, left_rim = rim_joists
@@ -1075,10 +1053,26 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 3. BL Post top into bottom of Front Rail (1.5" x 1" tenon, offset +9/16" along X, with peg from outside)
-    j_post_bl_rail = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+    # 3. Front Rail @ BL Post (3" wide x 1" thick tenon, with peg), mirroring the BR end
+    j_front_rail_bl = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
-            receiving_timber=front_rail,
+            receiving_timber=post_bl,
+            butt_timber=front_rail,
+            butt_timber_end=TimberEnd.BOTTOM,
+            front_face_on_butt_timber=TimberLongFace.FRONT,
+        ),
+        tenon_width_relative_to_joint=cot_rail_tenon_width,
+        tenon_height_relative_to_joint=cot_rim_tenon_thickness,
+        tenon_length=cot_rim_tenon_length,
+        mortise_depth=cot_rim_tenon_length,
+        tenon_position=tenon_position_from_reference(post_bl, front_rail, TimberEnd.BOTTOM, create_v2(cot_rail_tenon_width, cot_rim_tenon_thickness)),
+        peg_parameters=peg_params,
+    )
+
+    # 4. BL Post top into Front Beam (1.5" x 1" tenon, centered, with peg from outside)
+    j_post_bl_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        arrangement=ButtJointTimberArrangement(
+            receiving_timber=front_beam,
             butt_timber=post_bl,
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.BACK,
@@ -1087,43 +1081,11 @@ def cut_rail_and_post_joints(
         tenon_height_relative_to_joint=cot_rim_tenon_thickness,
         tenon_length=inches(5, 2),
         mortise_depth=inches(5, 2),
-        tenon_position=tenon_position_from_reference(front_rail, post_bl, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=inches(9, 16)),
+        tenon_position=tenon_position_from_reference(front_beam, post_bl, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness)),
         peg_parameters=peg_params,
     )
 
-    # 4. Upper Left Post bottom into Front Rail top (1.5" x 1" tenon, offset +15/16" along X, with peg from outside)
-    j_upper_left_rail = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=front_rail,
-            butt_timber=upper_left_post,
-            butt_timber_end=TimberEnd.BOTTOM,
-            front_face_on_butt_timber=TimberLongFace.BACK,
-        ),
-        tenon_width_relative_to_joint=cot_rim_tenon_height,
-        tenon_height_relative_to_joint=cot_rim_tenon_thickness,
-        tenon_length=inches(5, 2),
-        mortise_depth=inches(5, 2),
-        tenon_position=tenon_position_from_reference(front_rail, upper_left_post, TimberEnd.BOTTOM, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness), other_axis_offset=inches(15, 16)),
-        peg_parameters=peg_params,
-    )
-
-    # 5. Upper Left Post top into Front Beam (1.5" x 1" tenon, centered, with peg from outside)
-    j_upper_left_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=front_beam,
-            butt_timber=upper_left_post,
-            butt_timber_end=TimberEnd.TOP,
-            front_face_on_butt_timber=TimberLongFace.BACK,
-        ),
-        tenon_width_relative_to_joint=cot_rim_tenon_height,
-        tenon_height_relative_to_joint=cot_rim_tenon_thickness,
-        tenon_length=inches(5, 2),
-        mortise_depth=inches(5, 2),
-        tenon_position=tenon_position_from_reference(front_beam, upper_left_post, TimberEnd.TOP, create_v2(cot_rim_tenon_height, cot_rim_tenon_thickness)),
-        peg_parameters=peg_params,
-    )
-
-    # 6. Post TR (bottom back-right) top into bottom of Right Rail (1.5" x 1" tenon, offset +9/16" along Y, with peg from outside)
+    # 5. Post TR (bottom back-right) top into bottom of Right Rail (1.5" x 1" tenon, offset +9/16" along Y, with peg from outside)
     j_post_tr_rail = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=right_rail,
@@ -1139,7 +1101,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 7. Upper Back-Right Post bottom into top of Right Rail (1.5" x 1" tenon, offset -15/16" along Y, with peg)
+    # 6. Upper Back-Right Post bottom into top of Right Rail (1.5" x 1" tenon, offset -15/16" along Y, with peg)
     j_upper_right_rail = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=right_rail,
@@ -1155,7 +1117,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 8. TL Post top into Back Beam (1.5" x 1" tenon, centered, with peg from the front / south)
+    # 7. TL Post top into Back Beam (1.5" x 1" tenon, centered, with peg from the front / south)
     # Post TL is built rotated, so its local X (front to back) carries the 1" thickness and its
     # local Y (left to right) carries the 1 1/2" width, hence the order of the tenon size.
     j_post_tl_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -1173,7 +1135,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 9. Door Post bottom into Right Rim Joist top (1.5" x 1" tenon, centered, with peg from outside)
+    # 8. Door Post bottom into Right Rim Joist top (1.5" x 1" tenon, centered, with peg from outside)
     j_door_post_rim = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=right_rim,
@@ -1205,7 +1167,7 @@ def cut_rail_and_post_joints(
     )
     upper_back_rafter_tenon_length = stacked_through_tenon_length(upper_back_right_post, lower_rafter, cot_stacked_plate_tenon_length)
 
-    # 10. Post BR top through Lower Rafter (1.5" x 2" through tenon, NO PEGS)
+    # 9. Post BR top through Lower Rafter (1.5" x 2" through tenon, NO PEGS)
     j_post_br_rafter = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=lower_rafter,
@@ -1225,7 +1187,7 @@ def cut_rail_and_post_joints(
         mortise_depth=post_br_rafter_tenon_length,
     )
 
-    # 11. Door Post top into Lower Rafter (1.5" x 1" tenon, NO PEGS)
+    # 10. Door Post top into Lower Rafter (1.5" x 1" tenon, NO PEGS)
     j_door_post_rafter = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=lower_rafter,
@@ -1240,7 +1202,7 @@ def cut_rail_and_post_joints(
         mortise_depth=inches(5, 2),
     )
 
-    # 12. Upper Back-Right Post top through Lower Rafter (1.5" x 2" through tenon, NO PEGS)
+    # 11. Upper Back-Right Post top through Lower Rafter (1.5" x 2" through tenon, NO PEGS)
     j_upper_back_rafter = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=lower_rafter,
@@ -1260,7 +1222,7 @@ def cut_rail_and_post_joints(
         mortise_depth=upper_back_rafter_tenon_length,
     )
 
-    # 13. Post BR top into Front Beam (1.5" x 1" tenon cut out of the through tenon's tip, with peg from the front / south)
+    # 12. Post BR top into Front Beam (1.5" x 1" tenon cut out of the through tenon's tip, with peg from the front / south)
     j_post_br_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_beam,
@@ -1276,7 +1238,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 14. Upper Back-Right Post top into Back Beam (1.5" x 1" tenon cut out of the through tenon's tip, with peg from the front / south)
+    # 13. Upper Back-Right Post top into Back Beam (1.5" x 1" tenon cut out of the through tenon's tip, with peg from the front / south)
     j_upper_back_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=back_beam,
@@ -1292,7 +1254,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 15. Housing joints between Top Plates (housed) and Lower Rafter (housing)
+    # 14. Housing joints between Top Plates (housed) and Lower Rafter (housing)
     j_house_front = cut_plain_cross_lap_house_joint(
         CrossJointTimberArrangement(timber1=lower_rafter, timber2=front_beam)
     )
@@ -1300,7 +1262,7 @@ def cut_rail_and_post_joints(
         CrossJointTimberArrangement(timber1=lower_rafter, timber2=back_beam)
     )
 
-    # 16. Stepped Girt Front @ Post BR (with peg)
+    # 15. Stepped Girt Front @ Post BR (with peg)
     j_girt_front_br = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=post_br,
@@ -1316,7 +1278,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 17. Stepped Girt Front @ Door Post (with peg)
+    # 16. Stepped Girt Front @ Door Post (with peg)
     j_girt_front_door = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=door_post_right,
@@ -1332,7 +1294,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 18. Stepped Girt Back @ Door Post (with peg)
+    # 17. Stepped Girt Back @ Door Post (with peg)
     j_girt_back_door = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=door_post_right,
@@ -1348,7 +1310,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 19. Stepped Girt Back @ Upper Back-Right Post (with peg)
+    # 18. Stepped Girt Back @ Upper Back-Right Post (with peg)
     j_girt_back_tr = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=upper_back_right_post,
@@ -1364,7 +1326,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 20. Upper Front Stud 1 @ Front Rail (1" deep M&T, no pegs)
+    # 19. Upper Front Stud 1 @ Front Rail (1" deep M&T, no pegs)
     j_stud1_rail = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_rail,
@@ -1379,7 +1341,7 @@ def cut_rail_and_post_joints(
         tenon_position=tenon_position_from_reference(front_rail, stud1, TimberEnd.BOTTOM, create_v2(cot_upper_stud_width_x, cot_upper_stud_thickness_y)),
     )
 
-    # 21. Upper Front Stud 1 @ Front Beam (1" deep M&T, no pegs)
+    # 20. Upper Front Stud 1 @ Front Beam (1" deep M&T, no pegs)
     j_stud1_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_beam,
@@ -1394,7 +1356,7 @@ def cut_rail_and_post_joints(
         tenon_position=tenon_position_from_reference(front_beam, stud1, TimberEnd.TOP, create_v2(cot_upper_stud_width_x, cot_upper_stud_thickness_y)),
     )
 
-    # 22. Upper Front Stud 2 @ Front Rail (1" deep M&T, no pegs)
+    # 21. Upper Front Stud 2 @ Front Rail (1" deep M&T, no pegs)
     j_stud2_rail = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_rail,
@@ -1409,7 +1371,7 @@ def cut_rail_and_post_joints(
         tenon_position=tenon_position_from_reference(front_rail, stud2, TimberEnd.BOTTOM, create_v2(cot_upper_stud_width_x, cot_upper_stud_thickness_y)),
     )
 
-    # 23. Upper Front Stud 2 @ Front Beam (1" deep M&T, no pegs)
+    # 22. Upper Front Stud 2 @ Front Beam (1" deep M&T, no pegs)
     j_stud2_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_beam,
@@ -1424,7 +1386,7 @@ def cut_rail_and_post_joints(
         tenon_position=tenon_position_from_reference(front_beam, stud2, TimberEnd.TOP, create_v2(cot_upper_stud_width_x, cot_upper_stud_thickness_y)),
     )
 
-    # 24. Front Mid Stud bottom @ Front Rim (M&T with peg from outside, 3" tenon length, 1" thick, offset +15/16" in X to the right)
+    # 23. Front Mid Stud bottom @ Front Rim (M&T with peg from outside, 3" tenon length, 1" thick, offset +15/16" in X to the right)
     j_stud_rim = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_rim,
@@ -1440,7 +1402,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 25. Front Mid Stud top @ Front Rail (M&T with peg from outside, 3" tenon length, 1" thick, centered)
+    # 24. Front Mid Stud top @ Front Rail (M&T with peg from outside, 3" tenon length, 1" thick, centered)
     j_stud_rail = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_rail,
@@ -1456,7 +1418,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 26. Middle Floor Joist @ Front Rim (M&T with peg, 3" tenon length, 1" thick, offset -13/16" in Z)
+    # 25. Middle Floor Joist @ Front Rim (M&T with peg, 3" tenon length, 1" thick, offset -13/16" in Z)
     j_joist_mid_front = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_rim,
@@ -1472,7 +1434,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 27. Middle Floor Joist @ Back Rim (M&T with peg, 3" tenon length, 1" thick, offset -13/16" in Z)
+    # 26. Middle Floor Joist @ Back Rim (M&T with peg, 3" tenon length, 1" thick, offset -13/16" in Z)
     j_joist_mid_back = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=back_rim,
@@ -1488,7 +1450,7 @@ def cut_rail_and_post_joints(
         peg_parameters=peg_params,
     )
 
-    # 28. Left Floor Joist @ Front Rim (Drop-in housed butt joint)
+    # 27. Left Floor Joist @ Front Rim (Drop-in housed butt joint)
     j_joist_1_front = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_rim,
@@ -1502,7 +1464,7 @@ def cut_rail_and_post_joints(
         housing_depth=inches(3, 2),
     )
 
-    # 29. Left Floor Joist @ Back Rim (Drop-in housed butt joint)
+    # 28. Left Floor Joist @ Back Rim (Drop-in housed butt joint)
     j_joist_1_back = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=back_rim,
@@ -1516,7 +1478,7 @@ def cut_rail_and_post_joints(
         housing_depth=inches(3, 2),
     )
 
-    # 30. Right Floor Joist @ Front Rim (Drop-in housed butt joint)
+    # 29. Right Floor Joist @ Front Rim (Drop-in housed butt joint)
     j_joist_3_front = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=front_rim,
@@ -1530,7 +1492,7 @@ def cut_rail_and_post_joints(
         housing_depth=inches(3, 2),
     )
 
-    # 31. Right Floor Joist @ Back Rim (Drop-in housed butt joint)
+    # 30. Right Floor Joist @ Back Rim (Drop-in housed butt joint)
     j_joist_3_back = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=back_rim,
@@ -1547,9 +1509,8 @@ def cut_rail_and_post_joints(
     joints = [
         j_front_rail_br,
         j_right_rail_door,
-        j_post_bl_rail,
-        j_upper_left_rail,
-        j_upper_left_beam,
+        j_front_rail_bl,
+        j_post_bl_beam,
         j_post_tr_rail,
         j_upper_right_rail,
         j_post_tl_beam,
