@@ -3,6 +3,7 @@ Kumiki - Drop-in housed butt joint construction functions
 """
 
 from __future__ import annotations
+from kumiki.timber import arrangement_error
 
 from typing import Optional, Union
 
@@ -70,11 +71,10 @@ def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
     Returns:
         Joint object containing the two CutTimbers with the housing cuts applied
     """
-    require_check(arrangement.check_face_aligned_and_orthogonal())
+    require_check(arrangement.check_face_aligned_and_orthogonal(), about=arrangement)
     warn_if_arrangement_timbers_imperfect(arrangement)
-    assert arrangement.front_face_on_butt_timber is not None, (
-        "arrangement.front_face_on_butt_timber must be set to determine the housing face"
-    )
+    if arrangement.front_face_on_butt_timber is None:
+        raise arrangement_error("arrangement.front_face_on_butt_timber must be set to determine the housing face", arrangement)
     housed_timber = arrangement.butt_timber
     receiving_timber = arrangement.receiving_timber
     housed_timber_end = arrangement.butt_timber_end

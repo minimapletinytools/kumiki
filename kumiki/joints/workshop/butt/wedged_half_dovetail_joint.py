@@ -3,6 +3,7 @@ Kumiki - Wedged half-dovetail mortise and tenon joint construction functions
 """
 
 from __future__ import annotations
+from kumiki.timber import arrangement_error
 
 from dataclasses import replace
 from typing import Optional, Union
@@ -96,9 +97,8 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     Returns:
         Joint object with cuts on both timbers and (optionally) a "wedge" accessory.
     """
-    assert arrangement.top_face_on_butt_timber is not None, (
-        "arrangement.top_face_on_butt_timber must be set to determine the dovetail's flat side"
-    )
+    if arrangement.top_face_on_butt_timber is None:
+        raise arrangement_error("arrangement.top_face_on_butt_timber must be set to determine the dovetail's flat side", arrangement)
     dovetail_top_side_on_butt_timber = arrangement.top_face_on_butt_timber
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber

@@ -16,6 +16,7 @@ outside of the purview of build-a-butt-joint, finish the joint:
 """
 
 from __future__ import annotations
+from kumiki.timber import arrangement_error
 from typing import NamedTuple, Union
 
 from kumiki.timber import *
@@ -1078,9 +1079,9 @@ def compute_peg_positions(
     mortise_timber = arrangement.receiving_timber
     tenon_end = arrangement.butt_timber_end
 
-    assert arrangement.front_face_on_butt_timber is not None, (
-        "arrangement.front_face_on_butt_timber must be set to determine the peg face"
-    )
+    if arrangement.front_face_on_butt_timber is None:
+
+        raise arrangement_error("arrangement.front_face_on_butt_timber must be set to determine the peg face", arrangement)
     tenon_face: TimberLongFace = arrangement.front_face_on_butt_timber
     peg_face: TimberFace = tenon_face.to.face()
 
