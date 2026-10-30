@@ -375,9 +375,9 @@ class PythonRunnerSession {
             return;
         }
 
-        if (message.type === 'assembly_result') {
-            if (typeof this.onAssemblyResult === 'function') {
-                this.onAssemblyResult(message);
+        if (typeof message.type === 'string' && message.type.startsWith('job_')) {
+            if (typeof this.onJobEvent === 'function') {
+                this.onJobEvent(message);
             }
             return;
         }

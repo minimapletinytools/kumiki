@@ -640,6 +640,31 @@ class ErrorWire(TypedDict):
     traceback: str
 
 
+class JobTimingWire(TypedDict, total=False):
+    """Seconds from the job's start: `elapsedS` once it has ended."""
+    elapsedS: float
+
+
+class JobWire(TypedDict, total=False):
+    """A background job, as job events and list_jobs give it."""
+    jobId: str
+    kind: str
+    slot: str
+    state: str  # "running" | "done" | "failed" | "cancelled"
+    timing: JobTimingWire
+
+
+class JobEventWire(JobWire, total=False):
+    """An unsolicited message about a job: job_started, job_progress, job_result, job_failed or
+    job_cancelled (`type`), with the result, the error, or progress (`done` of `total`, `label`)."""
+    type: str
+    result: Any
+    error: ErrorWire
+    done: int
+    total: Optional[int]
+    label: Optional[str]
+
+
 class ResponseWire(TypedDict, total=False):
     """Every answer to a request: `result` when ok, `error` when not."""
     id: Any
@@ -5048,12 +5073,112 @@ def _require_str(payload: Dict[str, Any], key: str, message: str) -> str:
     return value
 
 
-_active_assembly_cancels: Dict[str, threading.Event] = {}
+# --- background jobs ----------------------------------------------------------
 
-def _cancel_active_assembly(slot_name: str) -> None:
-    event = _active_assembly_cancels.pop(slot_name, None)
-    if event is not None:
-        event.set()
+
+class JobContext:
+    """What a job's work is given: whether it has been cancelled, and a way to report progress."""
+
+    def __init__(self, job: "Job") -> None:
+        self._job = job
+
+    def should_cancel(self) -> bool:
+        return self._job.cancel_event.is_set()
+
+    def progress(self, done: int, total: Optional[int] = None, label: Optional[str] = None) -> None:
+        """Report `done` of `total` steps, with what is being done now."""
+        if not self.should_cancel():
+            emit_message(self._job.event("job_progress", done=done, total=total, label=label))
+
+
+@dataclass
+class Job:
+    """A piece of work running on its own thread for a slot. `kind` names what it is ("assembly")."""
+    job_id: str
+    kind: str
+    slot: str
+    cancel_event: threading.Event
+    started_at: float
+    state: str = "running"
+    elapsed_s: Optional[float] = None
+
+    def wire(self) -> JobWire:
+        timing: JobTimingWire = {} if self.elapsed_s is None else {"elapsedS": self.elapsed_s}
+        return {"jobId": self.job_id, "kind": self.kind, "slot": self.slot, "state": self.state, "timing": timing}
+
+    def event(self, event_type: str, **fields: Any) -> JobEventWire:
+        return cast(JobEventWire, {"type": event_type, **self.wire(), **fields})
+
+
+class Jobs:
+    """The runner's background jobs. Each runs `work(context)` on a thread, at most one of a kind per
+    slot, and says how it went in job events: job_started, then job_result, job_failed or
+    job_cancelled. A cancelled job's result is never sent."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._running: Dict[str, Job] = {}
+        self._next = 0
+
+    def start(self, kind: str, slot: str, work: Callable[[JobContext], Any]) -> Job:
+        """Start `work` as a `kind` job for `slot`, cancelling one of the same kind running for it."""
+        with self._lock:
+            for running in list(self._running.values()):
+                if running.kind == kind and running.slot == slot:
+                    self._cancel(running)
+            self._next += 1
+            job = Job(f"{kind}-{self._next}", kind, slot, threading.Event(), time.monotonic())
+            self._running[job.job_id] = job
+        emit_message(job.event("job_started"))
+        threading.Thread(target=self._run, args=(job, work), name=job.job_id, daemon=True).start()
+        return job
+
+    def _run(self, job: Job, work: Callable[[JobContext], Any]) -> None:
+        try:
+            result = work(JobContext(job))
+            outcome: Tuple[str, Dict[str, Any]] = ("job_result", {"result": result})
+        except Exception as exc:  # noqa: BLE001 -- a job's failure is reported, never raised into the runner
+            outcome = ("job_failed", {"error": {"message": str(exc), "type": type(exc).__name__,
+                                                "traceback": traceback.format_exc()}})
+        with self._lock:
+            self._running.pop(job.job_id, None)
+            job.elapsed_s = time.monotonic() - job.started_at
+            if job.cancel_event.is_set():
+                job.state = "cancelled"
+            else:
+                job.state = "done" if outcome[0] == "job_result" else "failed"
+        if job.state == "cancelled":
+            log_stderr(f"[job] {job.job_id} [{job.slot}] cancelled after {job.elapsed_s:.3f}s")
+            emit_message(job.event("job_cancelled"))
+        else:
+            log_stderr(f"[job] {job.job_id} [{job.slot}] {job.state} in {job.elapsed_s:.3f}s")
+            emit_message(job.event(outcome[0], **outcome[1]))
+
+    @staticmethod
+    def _cancel(job: Job) -> None:
+        job.cancel_event.set()
+
+    def cancel(self, job_id: str) -> bool:
+        """Tell job `job_id` to stop; return whether it was running."""
+        with self._lock:
+            job = self._running.get(job_id)
+            if job is not None:
+                self._cancel(job)
+            return job is not None
+
+    def cancel_slot(self, slot: str) -> None:
+        """Tell every job running for `slot` to stop: its frame is being replaced."""
+        with self._lock:
+            for job in self._running.values():
+                if job.slot == slot:
+                    self._cancel(job)
+
+    def running(self) -> List[JobWire]:
+        with self._lock:
+            return [job.wire() for job in self._running.values()]
+
+
+_jobs = Jobs()
 
 
 def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerState, ResponseWire, bool]:
@@ -5069,7 +5194,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
 
     if command == "reload_example":
         slot_name = _resolve_slot_name(state, payload)
-        _cancel_active_assembly(slot_name)
+        _jobs.cancel_slot(slot_name)
         old_slot = state.slots.get(slot_name)
         next_path = payload.get("filePath", str(state.get_slot(slot_name).file_path))
         kiwari_values = _opt_mapping(payload, "kiwari")
@@ -5221,45 +5346,27 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         return state, make_success_response(request_id, command, serialize_layers(ss.frame, ss.frame_parts)), False
 
     if command == "get_assembly":
-        # Deferred from get_layers_tree so the frame renders before the
-        # (potentially slow) disassembly solve runs.
+        # Deferred from get_layers_tree so the frame renders before the (potentially slow)
+        # disassembly solve runs: answered at once, the result comes as a job_result event.
         slot_name = _resolve_slot_name(state, payload)
         ss = _resolve_slot(state, payload)
 
-        _cancel_active_assembly(slot_name)
-        cancel_event = threading.Event()
-        _active_assembly_cancels[slot_name] = cancel_event
+        def _solve_assembly(context: JobContext) -> Dict[str, Any]:
+            timber_entries, accessory_entries = _assign_member_keys(ss.frame)
+            return {"assembly": _build_assembly_payload(
+                ss.frame, timber_entries, accessory_entries, should_cancel=context.should_cancel)}
 
-        log_stderr(f"[assembly] [{slot_name}] Starting async background assembly solve for frame '{getattr(ss.frame, 'name', '?')}' ({len(ss.frame.cut_timbers)} timbers)...")
-        t0 = time.monotonic()
+        log_stderr(f"[assembly] [{slot_name}] Solving the assembly of '{getattr(ss.frame, 'name', '?')}' "
+                   f"({len(ss.frame.cut_timbers)} timbers) in the background")
+        job = _jobs.start("assembly", slot_name, _solve_assembly)
+        return state, make_success_response(request_id, command, {"assembly": {"pending": True}, "jobId": job.job_id}), False
 
-        def _worker() -> None:
-            try:
-                timber_entries, accessory_entries = _assign_member_keys(ss.frame)
-                payload_data = _build_assembly_payload(
-                    ss.frame, timber_entries, accessory_entries, should_cancel=cancel_event.is_set
-                )
-                assembly_s = time.monotonic() - t0
-                _active_assembly_cancels.pop(slot_name, None)
-                if not cancel_event.is_set():
-                    log_stderr(f"[assembly] [{slot_name}] Background assembly solve completed in {assembly_s:.3f}s")
-                    emit_message({
-                        "type": "assembly_result",
-                        "slot": slot_name,
-                        "result": {"assembly": payload_data},
-                        "profiling": {"assembly_s": assembly_s},
-                    })
-                else:
-                    log_stderr(f"[assembly] [{slot_name}] Background assembly solve canceled after {assembly_s:.3f}s")
-            except Exception as exc:
-                _active_assembly_cancels.pop(slot_name, None)
-                if not cancel_event.is_set():
-                    log_stderr(f"[assembly] [{slot_name}] Background assembly solve failed: {exc}")
+    if command == "cancel_job":
+        job_id = _require_str(payload, "jobId", "cancel_job requires payload.jobId")
+        return state, make_success_response(request_id, command, {"cancelled": _jobs.cancel(job_id)}), False
 
-        thread = threading.Thread(target=_worker, daemon=True)
-        thread.start()
-
-        return state, make_success_response(request_id, command, {"assembly": {"pending": True}}), False
+    if command == "list_jobs":
+        return state, make_success_response(request_id, command, {"jobs": _jobs.running()}), False
 
     if command == "get_csg_tree":
         ss = _resolve_slot(state, payload)
@@ -5304,7 +5411,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
 
     if command == "load_slot":
         slot_name = _require_str(payload, "slot", "load_slot requires payload.slot")
-        _cancel_active_assembly(slot_name)
+        _jobs.cancel_slot(slot_name)
         file_path = _require_str(payload, "filePath", "load_slot requires payload.filePath")
         t0 = time.monotonic()
         new_slot = load_slot_state(file_path, kiwari_values=_opt_mapping(payload, "kiwari"))
@@ -5326,7 +5433,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
 
     if command == "unload_slot":
         slot_name = _require_str(payload, "slot", "unload_slot requires payload.slot")
-        _cancel_active_assembly(slot_name)
+        _jobs.cancel_slot(slot_name)
         if slot_name == state.active_slot:
             raise ValueError(f"Cannot unload the active slot '{slot_name}'")
         removed = slot_name in state.slots

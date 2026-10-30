@@ -1315,8 +1315,8 @@ class FrameViewSession {
                 // This only resolves the *request* -- runner.py always
                 // acks get_assembly immediately with {pending: true} and
                 // solves in a background thread. The real result arrives
-                // later as a separate 'assembly_result' event, handled by
-                // onAssemblyResult (see _setupRunnerMilestoneHandler).
+                // later as a job_result event, handled by onJobEvent
+                // (see _setupRunnerMilestoneHandler).
                 // Posting this ack's payload as if it were the solved data
                 // would wipe out the "still solving" UI state almost
                 // instantly, well before the actual solve finishes.
@@ -1604,13 +1604,19 @@ class FrameViewSession {
             this.profiler.addMilestone(name);
             this.postLoadingStatus(name);
         };
-        this.runnerSession.onAssemblyResult = (message) => {
-            if (!message || message.slot !== this.slotName || this.isDisposed) {
+        // The runner's background jobs (runner.py Jobs): an assembly's result, or that it failed.
+        this.runnerSession.onJobEvent = (message) => {
+            if (!message || message.slot !== this.slotName || this.isDisposed || message.kind !== 'assembly') {
                 return;
             }
-            const assemblyData = message.result ? message.result.assembly : null;
-            this.log(`[assembly] Received background assembly result (${message.profiling ? message.profiling.assembly_s + 's' : ''})`);
-            this._postToWebview({ type: 'assemblyData', payload: assemblyData });
+            const seconds = message.timing && message.timing.elapsedS;
+            if (message.type === 'job_result') {
+                this.log(`[assembly] Received background assembly result (${seconds}s)`);
+                this._postToWebview({ type: 'assemblyData', payload: message.result ? message.result.assembly : null });
+            } else if (message.type === 'job_failed') {
+                this.log(`[assembly] Background assembly solve failed: ${message.error && message.error.message}`);
+                this._postToWebview({ type: 'assemblyData', payload: null });
+            }
         };
     }
 }
