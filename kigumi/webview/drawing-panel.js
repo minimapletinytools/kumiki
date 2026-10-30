@@ -188,6 +188,17 @@ class DrawingPanel {
         });
         header.appendChild(save);
 
+        const exportPng = document.createElement('button');
+        exportPng.type = 'button';
+        exportPng.className = 'dp-action';
+        exportPng.textContent = t('viewer.layers.drawing.exportPng');
+        exportPng.title = t('viewer.layers.drawing.exportPng.title');
+        exportPng.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this._emit('kigumi-export-drawing-png', {});
+        });
+        header.appendChild(exportPng);
+
         return header;
     }
 

@@ -34,6 +34,7 @@ const TO_EXTENSION = Object.freeze([
     'requestInstallCadqueryOcp',
     'requestRefresh',
     'requestSaveDrawings',
+    'exportDrawingPng',
     'requestSaveViewerSettings',
     'copyMcpSetup',
     'requestMcpState',

@@ -2,9 +2,13 @@
 // reload to read); then a drawing's dotted lines, clipped per timber by the member id pass, drawn
 // with every shader they need compiled. Nothing else enters a drawing, so nothing else draws them.
 
+const fs = require('fs');
+const path = require('path');
+const { nativeImage } = require('electron');
+
 module.exports = {
     name: 'drawings',
-    async run({ check, inShell, waitFor, capture, settings, runAppCommand, openFrame, viewDoc, showTab, FRAME, DRAWING_FRAME }) {
+    async run({ check, inShell, waitFor, capture, settings, runAppCommand, openFrame, viewDoc, showTab, FRAME, DRAWING_FRAME, REPO, ARTIFACTS }) {
         await openFrame(FRAME);
         await showTab('options');
         await inShell(`${viewDoc}.getElementById('beta-drawing-toggle').click()`);
@@ -48,6 +52,46 @@ module.exports = {
                 : `drawing ${drawingId}; ${state}`);
         await capture('03c-drawing-dotted-lines');
         if (!drawn) return;
+
+        // Export as PNG: the page fitted whole at about 3000 px, with its dimensions, written to the
+        // frame's exports; the view the user had (zoomed and panned here) comes back as it was.
+        const exportsDir = path.join(REPO, 'kigumi_exports', path.basename(DRAWING_FRAME, '.py'), 'drawings');
+        fs.rmSync(exportsDir, { recursive: true, force: true });
+        const before = await inShell(`(() => {
+            const app = ${viewerApp};
+            app.pageView = { zoom: 2, offsetX: 40, offsetY: -30 };
+            app.renderViewports();
+            const button = Array.from(app.querySelectorAll('#drawing-panel button.dp-action')).find((one) => one.textContent === 'export png');
+            const view = JSON.stringify(app.pageView);
+            const ratio = app.renderer.getPixelRatio();
+            const page = app.sceneStore.activeScene().page;
+            if (button) button.click();
+            return { found: Boolean(button), view, ratio, page };
+        })()`);
+        const written = await waitFor(() => (fs.existsSync(exportsDir) && fs.readdirSync(exportsDir).find((name) => name.endsWith('.png'))) || null,
+            { timeoutMs: 20000 }).catch(() => null);
+        const after = await inShell(`(() => { const app = ${viewerApp}; return { view: JSON.stringify(app.pageView), ratio: app.renderer.getPixelRatio() }; })()`);
+        check('the drawing panel has an "export png" button, and it writes the drawing to the frame\'s exports',
+            before.found && Boolean(written), JSON.stringify({ found: before.found, written }));
+        if (written) {
+            const file = path.join(exportsDir, written);
+            if (ARTIFACTS) fs.copyFileSync(file, path.join(ARTIFACTS, `03c-export-${written}`));
+            const image = nativeImage.createFromPath(file);
+            const { width, height } = image.getSize();
+            const pixels = image.toBitmap();
+            let marked = 0;
+            for (let i = 0; i < pixels.length; i += 4 * 7) {
+                if (pixels[i] < 200 || pixels[i + 1] < 200 || pixels[i + 2] < 200) marked += 1;
+            }
+            const pageAspect = before.page ? before.page.width / before.page.height : width / height;
+            check('the exported PNG is the whole page at about 3000 px, and has something drawn on it',
+                Math.max(width, height) > 2900 && Math.max(width, height) <= 3001
+                    && Math.abs(width / height - pageAspect) < 0.01 && marked > 1000,
+                `${width}x${height}, page aspect ${pageAspect.toFixed(3)}, ${marked} marked samples`);
+            fs.rmSync(path.join(REPO, 'kigumi_exports', path.basename(DRAWING_FRAME, '.py')), { recursive: true, force: true });
+        }
+        check('exporting leaves the view zoomed and panned as it was, at its own pixel ratio',
+            after.view === before.view && after.ratio === before.ratio, JSON.stringify({ before, after }));
 
         const outline = await inShell(`(() => {
             const app = ${viewerApp};

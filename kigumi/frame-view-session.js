@@ -10,7 +10,7 @@ const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 const { createTranslator } = require('./i18n');
 const { describeSelection } = require('./webview/selection-copy');
 const { extractRunnerErrorDetails, parseTracebackLocation, describeTracebackLocation, deriveViewerErrorMessage } = require('./runner-errors');
-const { exportFormats, exportMember, installCadqueryOcp, pushCadqueryStatus } = require('./export-requests');
+const { exportDirectory, exportFormats, exportMember, installCadqueryOcp, pushCadqueryStatus } = require('./export-requests');
 
 // Resolved once from VS Code's own display language (no user override yet).
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
@@ -443,6 +443,10 @@ class FrameViewSession {
                 this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
                     this.log(`[drawing] requestDrawings error: ${err.message || err}`);
                 });
+                return;
+            }
+            if (message.type === 'exportDrawingPng') {
+                void this._writeDrawingPng(message);
                 return;
             }
             if (message.type === 'requestSaveDrawings') {
@@ -1249,6 +1253,23 @@ class FrameViewSession {
      * is what the four-long-sides sheet is arranged around -- so the viewer
      * sends the selection and renders whatever comes back.
      */
+    /** Write a drawing the view rendered as a PNG into the frame's exports, and say where. */
+    async _writeDrawingPng(message) {
+        const fileName = message && typeof message.fileName === 'string' ? path.basename(message.fileName) : '';
+        const match = message && typeof message.dataUrl === 'string' && /^data:image\/png;base64,(.+)$/u.exec(message.dataUrl);
+        if (!fileName.endsWith('.png') || !match) {
+            const error = (message && typeof message.error === 'string' && message.error) || 'the view sent no PNG';
+            this.log(`[drawing] PNG export failed: ${error}`);
+            void getHost().showMessage('error', t('message.drawingExportFailed', { error }));
+            return;
+        }
+        const outputPath = path.join(exportDirectory(this), 'drawings', fileName);
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+        fs.writeFileSync(outputPath, Buffer.from(match[1], 'base64'));
+        this.log(`[drawing] Wrote ${outputPath}`);
+        void getHost().showMessage('info', t('message.drawingExported', { path: outputPath }));
+    }
+
     async _handleRequestDrawingFromSelection(message) {
         const memberKeys = Array.isArray(message.memberKeys) ? message.memberKeys : [];
         await this._handleDrawingsCommand(

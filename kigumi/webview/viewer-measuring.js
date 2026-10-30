@@ -903,7 +903,7 @@ export const MeasuringMixin = (Base) => class extends Base {
 
         // Last, and over the rest: what is being made now is what you are
         // looking at.
-        const pending = this._previewMeasurementForDisplay();
+        const pending = this._exportingDrawing ? null : this._previewMeasurementForDisplay();
         if (pending) {
             // In the view the measurement is being made in, which is the selection's.
             const viewport = this.viewports.find((one) => one.id === this.selectionManager.scope);
@@ -918,7 +918,8 @@ export const MeasuringMixin = (Base) => class extends Base {
     /** Outline the drawing view holding a selection or a measurement in progress. */
     _drawWorkingViewportOutline(overlay, pageRect, canvasHeight) {
         const selection = this.selectionManager;
-        if (!this.isInDrawing || !(selection.focus || selection.markedMeasures.size || this.measureDraft.isActive)) {
+        if (this._exportingDrawing || !this.isInDrawing
+            || !(selection.focus || selection.markedMeasures.size || this.measureDraft.isActive)) {
             return;
         }
         const viewport = this.viewports.find((one) => one.id === selection.scope && one.isOrthographic);
@@ -1059,7 +1060,7 @@ export const MeasuringMixin = (Base) => class extends Base {
         }
         const key = measurementKey(measure);
         group.setAttribute('class', 'dim-group'
-            + (this.selectionManager.isMeasurementFocused(viewport.id, key)
+            + (!this._exportingDrawing && this.selectionManager.isMeasurementFocused(viewport.id, key)
                 ? ' dim-focused' : ''));
         group.addEventListener('pointerdown', (event) => {
             event.stopPropagation();

@@ -850,7 +850,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 || viewportId === (role === 'hover' ? this._hoverViewportId : this.selectionManager.scope);
             // The selection echoes softly in the other views, so it can be found there too.
             const echo = !own && role === 'selection';
-            object.visible = own || echo;
+            object.visible = !this._exportingDrawing && (own || echo);
             object.material.opacity = object.userData.opacity * (echo ? SELECTION_ECHO_OPACITY : 1);
         }
     }

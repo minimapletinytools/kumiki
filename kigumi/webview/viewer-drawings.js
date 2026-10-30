@@ -6,6 +6,10 @@
 
 import { DEBUG_DRAWING_SCENE_ID, DEFAULT_SCENE_ID, DrawingPanel, KigumiMeasurements, anchorName, describeAnchor, measurementKey, pageScreenRect, panPage, rectAspect, sceneMembers, vscode, zoomPageAt } from './viewer-shared.js';
 import { SELECTION_MODES } from './selection-store.js';
+import { composeDrawingPng, drawingFileName } from './drawing-export.js';
+
+// The exported page's longer side, in pixels; less where the GPU can't draw that large.
+const EXPORT_LONG_SIDE_PX = 3000;
 
 export const DrawingsMixin = (Base) => class extends Base {
     /** The members this scene is about, or null when it is about all of them. */
@@ -228,6 +232,52 @@ export const DrawingsMixin = (Base) => class extends Base {
         }
     }
 
+    /**
+     * Return the open drawing's page as a PNG data URL, as printed: fitted whole, drawn at
+     * EXPORT_LONG_SIDE_PX, with its dimensions and without the selection, hovers or a measurement
+     * being made. Raises the renderer's pixel ratio for it, so lines and dimensions scale together.
+     */
+    async renderDrawingPng() {
+        const savedView = this.pageView;
+        const savedRatio = this.renderer.getPixelRatio();
+        this.pageView = { zoom: 1, offsetX: 0, offsetY: 0 };
+        this._exportingDrawing = true;
+        try {
+            const size = this.renderer.getSize(new THREE.Vector2());
+            const pageRect = this.pageScreenRect(size.x, size.y);
+            const gl = this.renderer.getContext();
+            const largest = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), gl.getParameter(gl.MAX_TEXTURE_SIZE));
+            const scale = Math.min(EXPORT_LONG_SIDE_PX / Math.max(pageRect.width, pageRect.height), largest / Math.max(size.x, size.y));
+            this.renderer.setPixelRatio(scale);
+            this.renderViewports();
+            return await composeDrawingPng({
+                canvas: this.renderer.domElement,
+                overlay: this.renderRoot.querySelector('#measurement-overlay'),
+                pageRect, cssWidth: size.x, cssHeight: size.y, scale,
+            });
+        } finally {
+            this._exportingDrawing = false;
+            this.pageView = savedView;
+            this.renderer.setPixelRatio(savedRatio);
+            this.renderViewports();
+        }
+    }
+
+    /** Render the open drawing to a PNG and send it to be saved with the frame's exports. */
+    async exportDrawingPng() {
+        const scene = this.sceneStore.activeScene();
+        if (!vscode || !this.isInDrawing || !this.renderer) {
+            return;
+        }
+        try {
+            const dataUrl = await this.renderDrawingPng();
+            vscode.postMessage({ type: 'exportDrawingPng', fileName: drawingFileName(scene.name || scene.id), dataUrl });
+        } catch (error) {
+            vscode.postMessage({ type: 'exportDrawingPng', fileName: drawingFileName(scene.name || scene.id),
+                error: (error && error.message) || String(error) });
+        }
+    }
+
     /** Enter a drawing by id, from the layers panel. */
     enterDrawing(sceneId) {
         this.setActiveScene(sceneId);
@@ -258,6 +308,7 @@ export const DrawingsMixin = (Base) => class extends Base {
             this._drawingPanel = new DrawingPanel(this.selectionManager);
             this._drawingPanel.mount(host);
             host.addEventListener('kigumi-save-drawings', () => this.saveDrawings());
+            host.addEventListener('kigumi-export-drawing-png', () => void this.exportDrawingPng());
             host.addEventListener('kigumi-focus-measurement', (event) => {
                 this._focusMeasurementFrom(event.detail);
             });

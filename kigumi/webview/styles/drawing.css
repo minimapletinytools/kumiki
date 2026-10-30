@@ -29,6 +29,7 @@
 .dp-action {
     font: inherit;
     font-size: 0.9em;
+    white-space: nowrap;
     text-transform: lowercase;
     color: var(--hv-title);
     background: transparent;
