@@ -122,7 +122,8 @@ def coffee_table(k: Optional[Kiwari] = None) -> Frame:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size = create_v2(stretcher_tenon_size, stretcher_tenon_size),
+        tenon_width_relative_to_joint = stretcher_tenon_size,
+        tenon_height_relative_to_joint = stretcher_tenon_size,
         tenon_length_past_opposite_shoulder = tenon_length_past_opposite_shoulder,
         tusk_parameters = TuskParameters(
             tusk_thickness = tusk_size,
@@ -139,7 +140,8 @@ def coffee_table(k: Optional[Kiwari] = None) -> Frame:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size = create_v2(stretcher_tenon_size, stretcher_tenon_size),
+        tenon_width_relative_to_joint = stretcher_tenon_size,
+        tenon_height_relative_to_joint = stretcher_tenon_size,
         tenon_length_past_opposite_shoulder = tenon_length_past_opposite_shoulder,
         tusk_parameters = TuskParameters(
             tusk_thickness = tusk_size,
@@ -156,7 +158,8 @@ def coffee_table(k: Optional[Kiwari] = None) -> Frame:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size = create_v2(stretcher_tenon_size, stretcher_tenon_size),
+        tenon_width_relative_to_joint = stretcher_tenon_size,
+        tenon_height_relative_to_joint = stretcher_tenon_size,
         tenon_length_past_opposite_shoulder = tenon_length_past_opposite_shoulder,
         tusk_parameters = TuskParameters(
             tusk_thickness = tusk_size,
@@ -173,7 +176,8 @@ def coffee_table(k: Optional[Kiwari] = None) -> Frame:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size = create_v2(stretcher_tenon_size, stretcher_tenon_size),
+        tenon_width_relative_to_joint = stretcher_tenon_size,
+        tenon_height_relative_to_joint = stretcher_tenon_size,
         tenon_length_past_opposite_shoulder = tenon_length_past_opposite_shoulder,
         tusk_parameters = TuskParameters(
             tusk_thickness = tusk_size,
@@ -190,7 +194,8 @@ def coffee_table(k: Optional[Kiwari] = None) -> Frame:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size = create_v2(stretcher_tenon_size, stretcher_tenon_size),
+        tenon_width_relative_to_joint = stretcher_tenon_size,
+        tenon_height_relative_to_joint = stretcher_tenon_size,
         tenon_length_past_opposite_shoulder = tenon_length_past_opposite_shoulder,
         tusk_parameters = TuskParameters(
             tusk_thickness = tusk_size,
@@ -206,7 +211,8 @@ def coffee_table(k: Optional[Kiwari] = None) -> Frame:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size = create_v2(stretcher_tenon_size, stretcher_tenon_size),
+        tenon_width_relative_to_joint = stretcher_tenon_size,
+        tenon_height_relative_to_joint = stretcher_tenon_size,
         tenon_length_past_opposite_shoulder = tenon_length_past_opposite_shoulder,
         tusk_parameters = TuskParameters(
             tusk_thickness = tusk_size,
@@ -223,7 +229,8 @@ def coffee_table(k: Optional[Kiwari] = None) -> Frame:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size = create_v2(stretcher_tenon_size, stretcher_tenon_size),
+        tenon_width_relative_to_joint = stretcher_tenon_size,
+        tenon_height_relative_to_joint = stretcher_tenon_size,
         tenon_length_past_opposite_shoulder = tenon_length_past_opposite_shoulder,
         tusk_parameters = TuskParameters(
             tusk_thickness = tusk_size,
@@ -239,7 +246,8 @@ def coffee_table(k: Optional[Kiwari] = None) -> Frame:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size = create_v2(stretcher_tenon_size, stretcher_tenon_size),
+        tenon_width_relative_to_joint = stretcher_tenon_size,
+        tenon_height_relative_to_joint = stretcher_tenon_size,
         tenon_length_past_opposite_shoulder = tenon_length_past_opposite_shoulder,
         tusk_parameters = TuskParameters(
             tusk_thickness = tusk_size,

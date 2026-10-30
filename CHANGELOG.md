@@ -25,6 +25,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - A joint arrangement that fails a check says which timbers it is about: `ButtJointTimberArrangement (butt_timber 'peg', receiving_timber 'top rail'): front_face_on_butt_timber (RIGHT) is not parallel to the joint alignment plane; use FRONT or BACK`. **Breaking:** `require_check` is `arrangement_check`, in `kumiki.construction`, and takes the arrangement as its second argument; `arrangement_error(message, arrangement)` builds such an error.
 - A joint missing a face it needs (`front_face_on_butt_timber`, `front_face_on_timber1`, `top_face_on_butt_timber`) raises `KumikiArrangementError` naming its timbers, not `AssertionError`.
 - `attach_plane_aligned_timber` and `attach_timber` say which timber would have no length and why, as `KumikiArrangementError`, rather than asserting on their internal variable names.
+- `cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers` sizes its tenon by `tenon_width_relative_to_joint` and `tenon_height_relative_to_joint`, like the plain mortise and tenon; `tenon_size` is optional and deprecated. **Breaking** for a positional call: `tenon_size` now comes after `tusk_parameters`. The basic tusked joint, the coffee table and the tusked joint patterns use the new pair, so none of them warns.
 - The example frames `my_cute_frame`, `coffee_table` and `assembly_preview_demo` (and the starter frame kigumi writes into a new project) are marked `@frame` rather than named `build_frame`, which is deprecated.
 
 ### kigumi

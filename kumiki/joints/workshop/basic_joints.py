@@ -783,16 +783,9 @@ def cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
         top_face = front_face.rotate_right()
         arrangement = replace(arrangement, top_face_on_butt_timber=top_face)
 
-    # tenon_size[0]/[1] are always the butt timber's RIGHT/LEFT-axis / FRONT/BACK-axis sizes
-    # respectively (the tenon-cutting code below indexes tenon_size that way regardless of
-    # which face is labeled "front"), so swap front/top into the right slot depending on
-    # which axis front_face actually landed on.
+    # The front face is parallel to the joint plane, so its axis is the tenon's height relative to the joint.
     front_face_size = arrangement.butt_timber.get_size_in_face_normal_axis(front_face) / scalar(3)
     top_face_size = arrangement.butt_timber.get_size_in_face_normal_axis(top_face) * scalar(4/5)
-    if front_face in (TimberLongFace.RIGHT, TimberLongFace.LEFT):
-        tenon_size = create_v2(front_face_size, top_face_size)
-    else:
-        tenon_size = create_v2(top_face_size, front_face_size)
 
     mortise_insertion_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(-arrangement.butt_timber.get_face_direction_global(arrangement.butt_timber_end))
     # center to center
@@ -809,7 +802,8 @@ def cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
     return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=top_face_size,
+        tenon_height_relative_to_joint=front_face_size,
         tenon_length_past_opposite_shoulder=tenon_length_past_opposite_shoulder,
         tusk_parameters=tusk,
     )

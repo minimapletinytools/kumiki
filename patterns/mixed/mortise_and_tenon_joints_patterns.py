@@ -696,7 +696,8 @@ def example_tusked_mortise_and_tenon(position=None, use_round_timbers=False) -> 
     )
     return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(2),
+        tenon_height_relative_to_joint=inches(2),
         tenon_length_past_opposite_shoulder=inches(3),
         tusk_parameters=TuskParameters(
             tusk_thickness=inches(scalar(3, 2)),
@@ -728,7 +729,8 @@ def example_tusked_mortise_and_tenon_entry_from_top(position=None, use_round_tim
     )
     return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(2),
+        tenon_height_relative_to_joint=inches(2),
         tenon_length_past_opposite_shoulder=inches(3),
         tusk_parameters=TuskParameters(
             tusk_thickness=inches(scalar(3, 2)),
@@ -761,7 +763,8 @@ def example_tusked_mortise_and_tenon_opposite_shoulder_inset_from_top(position=N
     )
     return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(2),
+        tenon_height_relative_to_joint=inches(2),
         tenon_length_past_opposite_shoulder=inches(3),
         opposite_mortise_shoulder_inset=inches(1),
         tusk_parameters=TuskParameters(
@@ -808,7 +811,8 @@ def example_tusked_mortise_and_tenon_opposite_shoulder_from_perfect(position=Non
     arrangement = _make_rough_receiving_timber_arrangement(position)
     return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(2),
+        tenon_height_relative_to_joint=inches(2),
         tenon_length_past_opposite_shoulder=inches(3),
         measure_opposite_shoulder_from=MeasureOppositeShoulderFrom.Perfect,
         tusk_parameters=TuskParameters(
@@ -833,7 +837,8 @@ def example_tusked_mortise_and_tenon_opposite_shoulder_from_rough(position=None)
     arrangement = _make_rough_receiving_timber_arrangement(position)
     return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(2),
+        tenon_height_relative_to_joint=inches(2),
         tenon_length_past_opposite_shoulder=inches(3),
         measure_opposite_shoulder_from=MeasureOppositeShoulderFrom.Rough,
         tusk_parameters=TuskParameters(

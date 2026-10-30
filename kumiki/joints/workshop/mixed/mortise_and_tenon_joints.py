@@ -658,6 +658,14 @@ def cut_mortise_and_tenon_joint(
     )
 
 
+def _tenon_height_index(arrangement: ButtJointTimberArrangement) -> int:
+    """Return which of the butt timber's size axes (0: its X, 1: its Y) is the tenon's height relative
+    to the joint: the axis normal to the joint plane."""
+    joint_plane_normal = arrangement.compute_normalized_timber_cross_product()
+    height_face = arrangement.butt_timber.get_closest_oriented_long_face_from_global_direction(joint_plane_normal)
+    return arrangement.butt_timber.get_size_index_in_long_face_normal_axis(height_face)
+
+
 def _resolve_tenon_size_relative_to_joint(
     arrangement: ButtJointTimberArrangement,
     tenon_size: Optional[V2],
@@ -687,9 +695,7 @@ def _resolve_tenon_size_relative_to_joint(
         )
         return tenon_size
 
-    joint_plane_normal = arrangement.compute_normalized_timber_cross_product()
-    height_face = arrangement.butt_timber.get_closest_oriented_long_face_from_global_direction(joint_plane_normal)
-    height_index = arrangement.butt_timber.get_size_index_in_long_face_normal_axis(height_face)
+    height_index = _tenon_height_index(arrangement)
     width_index = 1 - height_index
 
     resolved_size: List[Optional[Numeric]] = [None, None]
@@ -1018,9 +1024,11 @@ class TuskParameters:
 
 def cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
-    tenon_size: V2,
     tenon_length_past_opposite_shoulder: Numeric,
     tusk_parameters: TuskParameters,
+    tenon_size: Optional[V2] = None,
+    tenon_width_relative_to_joint: Optional[Numeric] = None,
+    tenon_height_relative_to_joint: Optional[Numeric] = None,
     tenon_position: Optional[V2] = None,
     mortise_shoulder_inset: Numeric = scalar(0),
     measure_opposite_shoulder_from: MeasureOppositeShoulderFrom = MeasureOppositeShoulderFrom.Perfect,
@@ -1029,8 +1037,18 @@ def cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
 ) -> Joint:
     """
     Creates a through mortise-and-tenon joint locked by a tapered crosswise key (a "tusk").
+
+    The tenon is sized as in cut_mortise_and_tenon_joint_on_plane_aligned_timbers: by
+    tenon_width_relative_to_joint and tenon_height_relative_to_joint, or by the deprecated tenon_size.
     """
-    arrangement.check_plane_aligned()
+    arrangement_check(arrangement.check_plane_aligned(), arrangement)
+    tenon_size = _resolve_tenon_size_relative_to_joint(
+        arrangement=arrangement,
+        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
+    )
+    height_index = _tenon_height_index(arrangement)
 
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
@@ -1064,7 +1082,8 @@ def cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
     base_joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_size[1 - height_index],
+        tenon_height_relative_to_joint=tenon_size[height_index],
         tenon_length=tenon_length,
         mortise_depth=None,
         tenon_position=tenon_position,
@@ -1077,10 +1096,10 @@ def cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
         if tusk_parameters.entry_face == TuskEntryFace.Front
         else arrangement.top_face_on_butt_timber
     )
-    assert entry_face_designation is not None, (
-        "arrangement.front_face_on_butt_timber/top_face_on_butt_timber (per tusk_parameters.entry_face) "
-        "must be set to determine which face the tusk enters from"
-    )
+    if entry_face_designation is None:
+        raise arrangement_error(
+            "arrangement.front_face_on_butt_timber/top_face_on_butt_timber (per tusk_parameters.entry_face) "
+            "must be set to determine which face the tusk enters from", arrangement)
     entry_axis_extent = (
         tenon_size[0] if entry_face_designation in (TimberLongFace.RIGHT, TimberLongFace.LEFT) else tenon_size[1]
     )
