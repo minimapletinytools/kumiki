@@ -2,7 +2,7 @@
 Kumiki - Rebated oblique and dadoed scarf joint (Kanawa Tsugi) construction functions
 """
 
-from kumiki.timber import arrangement_error
+from kumiki.construction import arrangement_error
 from dataclasses import replace
 from typing import Optional, Tuple
 
@@ -63,7 +63,7 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
         the oblique scarf face angle (Sogi-michi (斜面)) is determined by the rebated_shoulder_depth and the scarf_half_length
         all measurements are done relative to timber1, timber2 is expected to share the same axis and be the same size as timber1.
     """
-    require_check(arrangement.check_face_aligned_and_parallel_axis(), about=arrangement)
+    arrangement_check(arrangement.check_face_aligned_and_parallel_axis(), arrangement)
     warn_if_arrangement_timbers_imperfect(arrangement)
     if arrangement.front_face_on_timber1 is None:
         raise arrangement_error("arrangement.front_face_on_timber1 must be set to determine the joint orientation", arrangement)
@@ -85,18 +85,18 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
     SSL = rebated_shoulder_length
     STW = stub_tenon_width
 
-    require_check(
+    arrangement_check(
         None if SSL == SSD
         else "rebated_shoulder_length must equal rebated_shoulder_depth: the Kusabi peg accessory "
              "(kumiki.timber.Peg) only supports a square or round cross-section, so a non-square "
              "peg hole can't yet be represented by an accessory"
     )
-    require_check(None if SL >= SSD else "rebated_shoulder_depth must be less than scarf_length")
-    require_check(None if DD > 0 else "dado_depth must be positive")
-    require_check(None if DH > 0 else "dado_height must be positive")
-    require_check(None if SSD > 0 else "rebated_shoulder_depth must be positive")
-    require_check(None if SL > 0 else "scarf_length must be positive")
-    require_check(None if STW > 0 else "stub_tenon_width must be positive")
+    arrangement_check(None if SL >= SSD else "rebated_shoulder_depth must be less than scarf_length")
+    arrangement_check(None if DD > 0 else "dado_depth must be positive")
+    arrangement_check(None if DH > 0 else "dado_height must be positive")
+    arrangement_check(None if SSD > 0 else "rebated_shoulder_depth must be positive")
+    arrangement_check(None if SL > 0 else "scarf_length must be positive")
+    arrangement_check(None if STW > 0 else "stub_tenon_width must be positive")
 
     some_var_x = sqrt((SL / scalar(2)) ** 2 - (SSD / scalar(2)) ** 2)
     scarf_hypotneuse = some_var_x + SSL / scalar(2)
@@ -107,10 +107,10 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
     H = timber1.get_size_in_face_normal_axis(v_face)
     depth_size = timber1.get_size_in_face_normal_axis(front_face)
 
-    require_check(None if STW < depth_size else "stub_tenon_width must be less than the timber's dimension in the front_face_on_timber1 normal axis")
-    require_check(None if DH < H / scalar(2) else "dado_height must be less than half the timber's dimension in the front_face_on_timber1-adjacent axis")
-    require_check(None if DD < (SL - SSD) / scalar(2) else "dado_depth must be less than (scarf_length - rebated_shoulder_depth) / 2")
-    require_check(None if DH >= SSD else "dado_height must be at least rebated_shoulder_depth")
+    arrangement_check(None if STW < depth_size else "stub_tenon_width must be less than the timber's dimension in the front_face_on_timber1 normal axis")
+    arrangement_check(None if DH < H / scalar(2) else "dado_height must be less than half the timber's dimension in the front_face_on_timber1-adjacent axis")
+    arrangement_check(None if DD < (SL - SSD) / scalar(2) else "dado_depth must be less than (scarf_length - rebated_shoulder_depth) / 2")
+    arrangement_check(None if DH >= SSD else "dado_height must be at least rebated_shoulder_depth")
 
     u_dir = -timber1.get_face_direction_global(timber1_end)
     v_dir = timber1.get_face_direction_global(v_face)

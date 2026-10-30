@@ -2,7 +2,7 @@
 Kumiki - Splined opposing double butt joint construction function
 """
 
-from kumiki.timber import arrangement_error
+from kumiki.construction import arrangement_error
 from dataclasses import replace
 from typing import Dict, List, Optional
 

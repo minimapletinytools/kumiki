@@ -3,12 +3,12 @@ Kumiki - Board joint construction functions
 Contains functions for creating joints between boards.
 """
 
-from kumiki.timber import arrangement_error
+from kumiki.construction import arrangement_check, arrangement_error
 import warnings
 from dataclasses import replace
 from typing import Dict, List, Tuple, Union, Optional
 
-from kumiki.timber import AssemblyFreedom, Board, TimberFace, Cutting, Joint, JointTicket, require_check
+from kumiki.timber import AssemblyFreedom, Board, TimberFace, Cutting, Joint, JointTicket
 from kumiki.rule import (
     Numeric,
     V3,
@@ -292,13 +292,13 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
         boards: Panel of boards to be fitted into the grooves.
         frame_timbers: The surrounding frame timbers (top/bottom/left/right) that will have grooves cut to receive the board panel's edges.
     """
-    require_check(boards.check_parallal_coplanar_and_same_thickness(), about=boards)
+    arrangement_check(boards.check_parallal_coplanar_and_same_thickness(), boards)
 
     board_list = boards.boards
     ref = board_list[0]
     board_thickness = ref.size[1]
 
-    require_check(
+    arrangement_check(
         ExtendedTimberArrangement(timbers=[ref, *frame_timbers.timbers]).check_face_aligned()
     )
 

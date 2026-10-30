@@ -7,7 +7,7 @@ full control over dimensions and parameters, call the underlying cut_plain_*,
 cut_mortise_and_tenon_*, or cut_lapped_* functions directly.
 """
 
-from kumiki.timber import arrangement_error
+from kumiki.construction import arrangement_error
 import warnings
 from dataclasses import replace
 from typing import Optional, List, Tuple, cast

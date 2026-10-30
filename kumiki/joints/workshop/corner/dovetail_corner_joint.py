@@ -35,13 +35,13 @@ from kumiki.rule import (
     scalar,
     tan,
 )
+from kumiki.construction import arrangement_check
 from kumiki.timber import (
     AssemblyFreedom,
     Cutting,
     Joint,
     JointTicket,
     TimberEnd,
-    require_check,
 )
 from ..shavings.shavings import (
     chop_profile_on_timber_face,
@@ -126,8 +126,8 @@ def cut_dovetail_corner_joint(arrangement: CornerJointTimberArrangement, distanc
         AssertionError: If the dovetail parameters do not fit the timbers, overlap each
             other, or run past either face of the layout axis.
     """
-    require_check(arrangement.check_face_aligned_and_orthogonal(), about=arrangement)
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    arrangement_check(arrangement.check_face_aligned_and_orthogonal(), arrangement)
+    arrangement_check(arrangement.check_plane_aligned(), arrangement)
 
     warn_if_arrangement_timbers_imperfect(arrangement)
 

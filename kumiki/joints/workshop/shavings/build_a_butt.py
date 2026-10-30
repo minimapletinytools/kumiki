@@ -16,7 +16,7 @@ outside of the purview of build-a-butt-joint, finish the joint:
 """
 
 from __future__ import annotations
-from kumiki.timber import arrangement_error
+from kumiki.construction import arrangement_error
 from typing import NamedTuple, Union
 
 from kumiki.timber import *

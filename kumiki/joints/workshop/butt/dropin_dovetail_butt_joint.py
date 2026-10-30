@@ -3,7 +3,7 @@ Kumiki - Drop-in dovetail butt joint construction functions (蟻仕口 / Ari Shi
 """
 
 from __future__ import annotations
-from kumiki.timber import arrangement_error
+from kumiki.construction import arrangement_check, arrangement_error
 
 from dataclasses import replace
 from typing import Optional, Union
@@ -14,7 +14,6 @@ from kumiki.timber import (
     Joint,
     JointTicket,
     TimberEnd,
-    require_check,
 )
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.rule import (
@@ -93,7 +92,7 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     Raises:
         ValueError: If the parameters are invalid or the timbers are not orthogonal
     """
-    require_check(arrangement.check_face_aligned_and_orthogonal(), about=arrangement)
+    arrangement_check(arrangement.check_face_aligned_and_orthogonal(), arrangement)
 
     warn_if_arrangement_timbers_imperfect(arrangement)
 

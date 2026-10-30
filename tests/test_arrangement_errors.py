@@ -20,7 +20,7 @@ def test_a_failed_arrangement_check_names_its_timbers():
     arrangement = ButtJointTimberArrangement(butt_timber=post, receiving_timber=rail, butt_timber_end=TimberEnd.TOP,
                                              front_face_on_butt_timber=TimberLongFace.RIGHT)
     with pytest.raises(KumikiArrangementError) as raised:
-        require_check(arrangement.check_plane_aligned(), about=arrangement)
+        arrangement_check(arrangement.check_plane_aligned(), arrangement)
     assert str(raised.value).startswith(
         "ButtJointTimberArrangement (butt_timber 'post', receiving_timber 'top rail'): front_face_on_butt_timber (RIGHT)")
     assert str(raised.value).endswith("use FRONT or BACK")
@@ -28,7 +28,7 @@ def test_a_failed_arrangement_check_names_its_timbers():
 
 def test_an_error_about_no_arrangement_is_as_given():
     with pytest.raises(KumikiArrangementError, match="^tenon too long$"):
-        require_check("tenon too long")
+        arrangement_check("tenon too long")
 
 
 def test_an_attached_timber_with_no_length_says_which_and_why():

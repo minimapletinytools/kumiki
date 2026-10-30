@@ -3,6 +3,7 @@ Kumiki - Timber construction functions
 Contains functions for creating and manipulating timbers
 """
 
+import dataclasses
 import warnings
 from kumiki.timber import *
 from kumiki.rule import *
@@ -1202,13 +1203,13 @@ def join_plane_aligned_on_plane_aligned_timbers(timber1: PerfectTimberWithin, ti
     Returns:
         New timber that joins timber1 and timber2, lying in their shared plane
     """
-    require_check(None if are_timbers_plane_aligned(timber1, timber2) else "Timbers must be plane-aligned")
+    arrangement_check(None if are_timbers_plane_aligned(timber1, timber2) else "Timbers must be plane-aligned")
     plane_normal = safe_normalize_vector(cross_product(timber1.get_length_direction_global(), timber2.get_length_direction_global()))
 
     if orientation_long_face_on_timber1 is None:
         orientation_long_face_on_timber1 = timber1.get_closest_oriented_long_face_from_global_direction(plane_normal)
     else:
-        require_check(
+        arrangement_check(
             None
             if are_vectors_parallel(timber1.get_face_direction_global(orientation_long_face_on_timber1), plane_normal)
             else "orientation_long_face_on_timber1 must point in the aligned plane normal"
@@ -2235,6 +2236,28 @@ class ExtendedTimberArrangement:
 # internal helpers
 # =========================================
 
+
+
+Arrangement = Union[ButtJointTimberArrangement, DoubleButtJointTimberArrangement, TripleButtJointTimberArrangement,
+                    QuadrupleButtJointTimberArrangement, CrossCapJointTimberArrangement, SpliceJointTimberArrangement,
+                    CornerJointTimberArrangement, CrossJointTimberArrangement, BraceJointTimberArrangement,
+                    ButtJointBoardArrangement, PanelBoardArrangement, ExtendedTimberArrangement]
+
+
+def arrangement_error(err: str, arrangement: Optional[Arrangement] = None) -> KumikiArrangementError:
+    """Return the error for `err`, beginning with `arrangement`'s kind and its timbers by field:
+    "ButtJointTimberArrangement (butt_timber 'peg', receiving_timber 'top rail'): ..."."""
+    if arrangement is None:
+        return KumikiArrangementError(err)
+    timbers = [f"{entry.name} '{value.ticket.path}'" for entry in dataclasses.fields(arrangement)
+               if isinstance(value := getattr(arrangement, entry.name), PerfectTimberWithin)]
+    return KumikiArrangementError(f"{type(arrangement).__name__} ({', '.join(timbers)}): {err}")
+
+
+def arrangement_check(err: Optional[str], arrangement: Optional[Arrangement] = None) -> None:
+    """Raise arrangement_error(err, arrangement) if `err` is set."""
+    if err is not None:
+        raise arrangement_error(err, arrangement)
 
 
 def _are_directions_perpendicular(direction1: Direction3D, direction2: Direction3D, tolerance: Optional[Numeric] = None) -> bool:

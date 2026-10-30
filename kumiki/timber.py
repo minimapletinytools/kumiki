@@ -3,7 +3,6 @@ Kumiki - Timber types, enums, constants, and core classes
 Contains all core data structures and type definitions for the timber framing system
 """
 
-import dataclasses
 import functools
 import re
 from typing import Sequence
@@ -26,7 +25,7 @@ from .assembly import (
 # Aliased: cutcsg (wildcard-imported above) also exports a AxisAlignedBoundingBox.
 from .assembly import AxisAlignedBoundingBox as AssemblyBoundingBox
 from enum import Enum
-from typing import Any, Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
+from typing import Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from typing_extensions import deprecated
@@ -3055,31 +3054,6 @@ class KumikiArrangementError(ValueError):
     Unlike AssertionError, this survives `python -O` and is safe for callers to
     catch specifically when handling invalid joint/arrangement configurations.
     """
-
-
-def _arrangement_label(about: Any) -> str:
-    """`about` (an arrangement) as its kind and the timbers it holds by field, e.g.
-    "ButtJointTimberArrangement (butt_timber 'peg', receiving_timber 'top rail')"; '' if it holds none."""
-    if about is None or not dataclasses.is_dataclass(about):
-        return ''
-    named = []
-    for entry in dataclasses.fields(about):
-        ticket = getattr(getattr(about, entry.name, None), 'ticket', None)
-        if ticket is not None and hasattr(ticket, 'path'):
-            named.append(f"{entry.name} '{ticket.path}'")
-    return f"{type(about).__name__} ({', '.join(named)})" if named else ''
-
-
-def arrangement_error(err: str, about: Any = None) -> KumikiArrangementError:
-    """Return the error for `err`, beginning with the timbers of `about` (an arrangement) when given."""
-    label = _arrangement_label(about)
-    return KumikiArrangementError(f"{label}: {err}" if label else err)
-
-
-def require_check(err: Optional[str], about: Any = None):
-    """Raise KumikiArrangementError(err) if `err` is set, naming the timbers of `about` (an arrangement)."""
-    if err is not None:
-        raise arrangement_error(err, about)
 
 
 def add_milestone(name: str):

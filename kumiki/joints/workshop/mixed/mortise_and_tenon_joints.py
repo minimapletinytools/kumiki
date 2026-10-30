@@ -176,23 +176,23 @@ def cut_mortise_and_tenon_joint(
     )
 
     if use_round_tenon:
-        require_check(
+        arrangement_check(
             None if tenon_size[0] == tenon_size[1] else "Round tenon requires tenon_size[0] == tenon_size[1]"
         )
-        require_check(
+        arrangement_check(
             None if peg_parameters is None else "Round tenon does not support pegs (peg_parameters must be None)"
         )
 
     if bore_mortise_perpendicular_to_face:
-        require_check(
+        arrangement_check(
             None if not use_round_tenon
             else "bore_mortise_perpendicular_to_face cannot be True for round tenons"
         )
-        require_check(
+        arrangement_check(
             None if mortise_depth is not None
             else "mortise_depth must be provided (not None) when bore_mortise_perpendicular_to_face is True"
         )
-        require_check(arrangement.check_plane_aligned(), about=arrangement)
+        arrangement_check(arrangement.check_plane_aligned(), arrangement)
 
     if set_mortise_shoulder_parallel_to_face:
         resolved_face = resolve_parallel_shoulder_face(arrangement, set_mortise_shoulder_parallel_to_face)
@@ -665,15 +665,15 @@ def _resolve_tenon_size_relative_to_joint(
     tenon_height_relative_to_joint: Optional[Numeric],
 ) -> V2:
     has_relative_pair = tenon_width_relative_to_joint is not None or tenon_height_relative_to_joint is not None
-    require_check(
+    arrangement_check(
         None if (tenon_width_relative_to_joint is None) == (tenon_height_relative_to_joint is None)
         else "tenon_width_relative_to_joint and tenon_height_relative_to_joint must be provided together"
     )
-    require_check(
+    arrangement_check(
         None if tenon_size is None or not has_relative_pair
         else "Provide either tenon_size or (tenon_width_relative_to_joint and tenon_height_relative_to_joint), not both"
     )
-    require_check(
+    arrangement_check(
         None if tenon_size is not None or has_relative_pair
         else "Must provide either tenon_size or (tenon_width_relative_to_joint and tenon_height_relative_to_joint)"
     )
@@ -716,7 +716,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     """
     Creates a mortise and tenon joint for plane-aligned timbers.
     """
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    arrangement_check(arrangement.check_plane_aligned(), arrangement)
 
     tenon_size = _resolve_tenon_size_relative_to_joint(
         arrangement=arrangement,
@@ -819,7 +819,7 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     """
     Creates a mortise and tenon joint for face-aligned orthogonal timbers.
     """
-    require_check(arrangement.check_face_aligned_and_orthogonal(), about=arrangement)
+    arrangement_check(arrangement.check_face_aligned_and_orthogonal(), arrangement)
 
     return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
@@ -869,7 +869,7 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
     """
     Creates a simplified round mortise and tenon joint for plane-aligned timbers.
     """
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    arrangement_check(arrangement.check_plane_aligned(), arrangement)
 
     tenon_end_direction = arrangement.butt_timber.get_face_direction_global(
         TimberFace.TOP if arrangement.butt_timber_end == TimberEnd.TOP else TimberFace.BOTTOM
@@ -909,7 +909,7 @@ def cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
     """
     Creates a mortise and tenon corner joint on plane-aligned timbers.
     """
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    arrangement_check(arrangement.check_plane_aligned(), arrangement)
 
     tenon_timber = arrangement.timber1
     mortise_timber = arrangement.timber2

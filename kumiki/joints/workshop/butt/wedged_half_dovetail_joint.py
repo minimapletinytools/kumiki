@@ -3,7 +3,7 @@ Kumiki - Wedged half-dovetail mortise and tenon joint construction functions
 """
 
 from __future__ import annotations
-from kumiki.timber import arrangement_error
+from kumiki.construction import arrangement_error
 
 from dataclasses import replace
 from typing import Optional, Union
