@@ -3,7 +3,8 @@ from kumiki import *
 from dataclasses import replace
 
 
-def build_frame() -> Frame:
+@frame
+def coffee_table(k: Optional[Kiwari] = None) -> Frame:
 
     base_width = inches(32.5)
     base_length = inches(17.5)
@@ -497,6 +498,3 @@ def build_frame() -> Frame:
     replace(frame, footprints=[footprint])
 
     return frame
-
-
-example = build_frame
