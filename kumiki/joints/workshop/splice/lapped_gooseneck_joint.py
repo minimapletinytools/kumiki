@@ -2,6 +2,7 @@
 Kumiki - Lapped gooseneck joint (Koshikake Kama Tsugi) construction functions
 """
 
+from kumiki.timber import arrangement_error
 import warnings
 from typing import Optional
 
@@ -67,11 +68,10 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
     Raises:
         ValueError: If the parameters are invalid or the timbers are not properly positioned
     """
-    require_check(arrangement.check_face_aligned_and_parallel_axis())
+    require_check(arrangement.check_face_aligned_and_parallel_axis(), about=arrangement)
     warn_if_arrangement_timbers_imperfect(arrangement)
-    assert arrangement.front_face_on_timber1 is not None, (
-        "arrangement.front_face_on_timber1 must be set to determine the gooseneck face"
-    )
+    if arrangement.front_face_on_timber1 is None:
+        raise arrangement_error("arrangement.front_face_on_timber1 must be set to determine the gooseneck face", arrangement)
     gooseneck_timber = arrangement.timber1
     receiving_timber = arrangement.timber2
     gooseneck_timber_end = arrangement.timber1_end
