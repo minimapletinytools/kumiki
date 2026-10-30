@@ -602,10 +602,8 @@ def attach_timber(
 
     # ---- extend along the pointing direction and build the timber ----
     attached_total_length = attached_timber_length + attached_timber_opposite_length
-    if not safe_compare(attached_total_length, scalar(0), Comparison.GT):
-        raise KumikiArrangementError(
-            f"attach_timber: attached_timber_length ({attached_timber_length}) plus attached_timber_opposite_length "
-            f"({attached_timber_opposite_length}) must be more than 0")
+    assert safe_compare(attached_total_length, scalar(0), Comparison.GT), \
+        "attached timber total length (attached_timber_length + attached_timber_opposite_length) must be positive"
 
     center = reference + point_dir * (attached_timber_length - attached_timber_opposite_length) / scalar(2)
     bottom_position = center - length_dir * (attached_total_length / scalar(2))
@@ -944,17 +942,10 @@ def attach_plane_aligned_timber(
                 f"timber); used {opposite_face.name} instead.",
                 stacklevel=2,
             )
-    if result is None:
-        face = original_timber_long_face_that_attached_timber_points_to
-        named = f" '{ticket.path if isinstance(ticket, TimberTicket) else ticket}'" if ticket is not None else ''
-        target_ticket = getattr(attached_timber_length_or_target, 'ticket', None)
-        reason = ("attached_timber_length_or_target plus attached_timber_stickout.stickout1 must be more than 0"
-                  if target_ticket is None else
-                  f"the target '{target_ticket.path}' isn't out from either face along the attached timber's "
-                  f"direction at attached_timber_angle, or the stickouts cancel its length")
-        raise KumikiArrangementError(
-            f"attach_plane_aligned_timber: the attached timber{named} would have no length, pointing out of "
-            f"'{original_timber.ticket.path}'s {face.name} face or its opposite: {reason}")
+    assert result is not None, (
+        "attached timber total length (attached_timber_length + opposite length from stickout1) must be "
+        "positive for original_timber_long_face_that_attached_timber_points_to or its opposite face"
+    )
     return result
 
 def attach_face_aligned_timber(

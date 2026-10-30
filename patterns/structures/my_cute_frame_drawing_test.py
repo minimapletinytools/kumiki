@@ -49,7 +49,7 @@ def _rough(timber: Timber) -> Timber:
 
 
 def _load_cute_frame():
-    """my_cute_frame's frame, every timber of it rough on its two non-reference faces.
+    """my_cute_frame's build_frame, every timber of it rough on its two non-reference faces.
 
     my_cute_frame.py is the starter project's frame and stays as it is, so the rough stock goes in
     here, where its timbers are made.
@@ -60,7 +60,7 @@ def _load_cute_frame():
     module = importlib_util.module_from_spec(spec)
     spec.loader.exec_module(module)
     module.create_axis_aligned_timber = lambda *args, **kwargs: _rough(create_axis_aligned_timber(*args, **kwargs))
-    return module.my_cute_frame
+    return module.build_frame
 
 
 FIXED_TIMBER = "Left Side"

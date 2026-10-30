@@ -9,7 +9,7 @@ const { requestWebviewRoundTrip } = require('./webview-request');
 const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 const { createTranslator } = require('./i18n');
 const { describeSelection } = require('./webview/selection-copy');
-const { extractRunnerErrorDetails, parseTracebackLocation, describeTracebackLocation, deriveViewerErrorMessage } = require('./runner-errors');
+const { extractRunnerErrorDetails, parseTracebackLocation, deriveViewerErrorMessage } = require('./runner-errors');
 const { exportFormats, exportMember, installCadqueryOcp, pushCadqueryStatus } = require('./export-requests');
 
 // Resolved once from VS Code's own display language (no user override yet).
@@ -290,9 +290,8 @@ class FrameViewSession {
                 message: startError && startError.message ? startError.message : String(startError),
             });
             const startDetails = extractRunnerErrorDetails(startError);
-            const startWhere = describeTracebackLocation(startDetails.traceback, { prefer: this.filePath });
             this.logBlock('error', `Runner startup failed: ${startDetails.type ? `${startDetails.type}: ` : ''}${startDetails.message}`
-                + (startWhere ? `\n${startWhere}` : '') + (startDetails.traceback ? `\n${startDetails.traceback}` : ''));
+                + (startDetails.traceback ? `\n${startDetails.traceback}` : ''));
             // A frame that raised while loading says so, as a failed refresh does.
             const errorMessage = startDetails.traceback
                 ? deriveViewerErrorMessage(startDetails)
@@ -1456,9 +1455,7 @@ class FrameViewSession {
         if (details.traceback) {
             // One entry, whose frames the Log tab opens at their lines, and in the session log an
             // agent's build report reads.
-            // The user's line first: an agent reads this, and the traceback starts in the runner.
-            const where = describeTracebackLocation(details.traceback, { prefer: this.filePath });
-            this.logBlock('error', `${errorTypePart}${details.message}\n${where ? `${where}\n` : ''}${details.traceback}`);
+            this.logBlock('error', `${errorTypePart}${details.message}\n${details.traceback}`);
         }
         // No pop-up: the view shows the error itself, and a dialog would stop an agent at work.
 

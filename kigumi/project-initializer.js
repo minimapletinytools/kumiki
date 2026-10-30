@@ -191,8 +191,7 @@ function getInlineExampleFrameContent() {
         'peg_draw_bore_offset = mm(2)',
         '',
         '',
-        '@frame',
-        'def my_cute_frame(k: Optional[Kiwari] = None) -> Frame:',
+        'def build_frame() -> Frame:',
         '    # Side timbers run in +Y, at x = +/- side_spacing/2.',
         '    # Each timber is measured from its bottom outside edge, its reference feature.',
         '    left_side = create_axis_aligned_timber(',
@@ -269,6 +268,9 @@ function getInlineExampleFrameContent() {
         '    ]',
         '',
         '    return Frame.from_joints(joints, name="My Cute Frame")',
+        '',
+        '',
+        'example = build_frame',
         '',
     ].join('\n');
 }

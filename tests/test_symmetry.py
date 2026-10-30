@@ -29,7 +29,7 @@ def _module(name):
 def coffee_table():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return {cut.timber.ticket.path: cut for cut in _module("coffee_table").coffee_table().cut_timbers}
+        return {cut.timber.ticket.path: cut for cut in _module("coffee_table").build_frame().cut_timbers}
 
 
 @pytest.fixture(scope="module")

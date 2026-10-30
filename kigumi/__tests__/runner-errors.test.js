@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { extractRunnerErrorDetails, parseTracebackLocation, describeTracebackLocation, deriveViewerErrorMessage } = require('../runner-errors');
+const { extractRunnerErrorDetails, parseTracebackLocation, deriveViewerErrorMessage } = require('../runner-errors');
 
 test('a runner error gives its message, traceback and type; a plain error its message', () => {
   const error = new Error('outer');
@@ -33,21 +33,4 @@ test('a view says what went wrong plainly', () => {
   expect(deriveViewerErrorMessage({ message: '' })).toBe('Unable to render this file in Kigumi viewer.');
   expect(deriveViewerErrorMessage({ message: 'No patternbook found in x' })).toMatch(/does not define a patternbook/);
   expect(deriveViewerErrorMessage({ message: 'boom' })).toBe('Kigumi failed to render this file: boom');
-});
-
-test('where it happened, as one line: the user\'s file, line and code, past the runner\'s own frames', () => {
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-tb-')), 'coat_rack.py');
-  fs.writeFileSync(file, '');
-  const traceback = [
-    'Traceback (most recent call last):',
-    '  File "/app/kigumi/runner.py", line 3773, in _build_frame_entry',
-    '    result = function(kiwari)',
-    `  File "${file}", line 126, in coat_rack`,
-    '    joints.append(mortise_and_tenon(peg, TimberEnd.BOTTOM, top_rail, TimberLongFace.RIGHT,',
-    '                  ~~~~~~~~~~~~~~~~~^^^^^^',
-    'KumikiArrangementError: front_face_on_butt_timber (RIGHT) is not parallel',
-  ].join('\n');
-  expect(describeTracebackLocation(traceback, { prefer: file }))
-    .toBe('In coat_rack.py, line 126: joints.append(mortise_and_tenon(peg, TimberEnd.BOTTOM, top_rail, TimberLongFace.RIGHT,');
-  expect(describeTracebackLocation(null)).toBeNull();
 });

@@ -13,7 +13,7 @@ STARTER_FRAME = Path(__file__).resolve().parent.parent / "patterns" / "structure
 
 
 def test_starter_frame_builds_and_meshes():
-    frame = runpy.run_path(str(STARTER_FRAME))["my_cute_frame"]()
+    frame = runpy.run_path(str(STARTER_FRAME))["build_frame"]()
 
     assert frame.name == "My Cute Frame"
     assert len(frame.cut_timbers) == 4

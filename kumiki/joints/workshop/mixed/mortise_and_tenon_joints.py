@@ -192,7 +192,7 @@ def cut_mortise_and_tenon_joint(
             None if mortise_depth is not None
             else "mortise_depth must be provided (not None) when bore_mortise_perpendicular_to_face is True"
         )
-        require_check(arrangement.check_plane_aligned(), about=arrangement)
+        require_check(arrangement.check_plane_aligned())
 
     if set_mortise_shoulder_parallel_to_face:
         resolved_face = resolve_parallel_shoulder_face(arrangement, set_mortise_shoulder_parallel_to_face)
@@ -716,7 +716,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     """
     Creates a mortise and tenon joint for plane-aligned timbers.
     """
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    require_check(arrangement.check_plane_aligned())
 
     tenon_size = _resolve_tenon_size_relative_to_joint(
         arrangement=arrangement,
@@ -819,7 +819,7 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     """
     Creates a mortise and tenon joint for face-aligned orthogonal timbers.
     """
-    require_check(arrangement.check_face_aligned_and_orthogonal(), about=arrangement)
+    require_check(arrangement.check_face_aligned_and_orthogonal())
 
     return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
@@ -869,7 +869,7 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
     """
     Creates a simplified round mortise and tenon joint for plane-aligned timbers.
     """
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    require_check(arrangement.check_plane_aligned())
 
     tenon_end_direction = arrangement.butt_timber.get_face_direction_global(
         TimberFace.TOP if arrangement.butt_timber_end == TimberEnd.TOP else TimberFace.BOTTOM
@@ -909,7 +909,7 @@ def cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
     """
     Creates a mortise and tenon corner joint on plane-aligned timbers.
     """
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    require_check(arrangement.check_plane_aligned())
 
     tenon_timber = arrangement.timber1
     mortise_timber = arrangement.timber2

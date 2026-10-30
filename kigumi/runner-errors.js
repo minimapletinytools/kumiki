@@ -4,7 +4,6 @@
  */
 
 const fs = require('fs');
-const path = require('path');
 
 /** Returns `{ message, traceback, type }` from an error a runner request threw. */
 function extractRunnerErrorDetails(error) {
@@ -42,20 +41,6 @@ function parseTracebackLocation(traceback, { prefer } = {}) {
         || null;
 }
 
-/**
- * Where in the user's code a traceback went wrong, as one line: "In frame.py, line 126:
- * joints.append(...)", from parseTracebackLocation and the code the traceback shows; or null.
- */
-function describeTracebackLocation(traceback, { prefer } = {}) {
-    const location = parseTracebackLocation(traceback, { prefer });
-    if (!location) return null;
-    const frame = [...traceback.matchAll(/File "([^"]+)", line (\d+)[^\n]*\n([^\n]*)/g)]
-        .reverse().find((match) => match[1] === location.filePath && Number(match[2]) === location.lineNumber);
-    const code = frame && frame[3].trim();
-    const where = `In ${path.basename(location.filePath)}, line ${location.lineNumber}`;
-    return code ? `${where}: ${code}` : where;
-}
-
 /** Returns the line a view shows for a runner error (extractRunnerErrorDetails's result). */
 function deriveViewerErrorMessage(details) {
     const message = details && typeof details.message === 'string' ? details.message : '';
@@ -74,4 +59,4 @@ function deriveViewerErrorMessage(details) {
     return `Kigumi failed to render this file: ${message}`;
 }
 
-module.exports = { extractRunnerErrorDetails, parseTracebackLocation, describeTracebackLocation, deriveViewerErrorMessage };
+module.exports = { extractRunnerErrorDetails, parseTracebackLocation, deriveViewerErrorMessage };

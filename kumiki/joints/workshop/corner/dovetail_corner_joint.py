@@ -126,8 +126,8 @@ def cut_dovetail_corner_joint(arrangement: CornerJointTimberArrangement, distanc
         AssertionError: If the dovetail parameters do not fit the timbers, overlap each
             other, or run past either face of the layout axis.
     """
-    require_check(arrangement.check_face_aligned_and_orthogonal(), about=arrangement)
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    require_check(arrangement.check_face_aligned_and_orthogonal())
+    require_check(arrangement.check_plane_aligned())
 
     warn_if_arrangement_timbers_imperfect(arrangement)
 

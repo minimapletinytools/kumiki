@@ -2,7 +2,6 @@
 Kumiki - Splined opposing double butt joint construction function
 """
 
-from kumiki.timber import arrangement_error
 from dataclasses import replace
 from typing import Dict, List, Optional
 
@@ -279,9 +278,9 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
         butt_1_negative_parts = [butt_1_slot_negative_csg_local]
         butt_2_negative_parts = [butt_2_slot_negative_csg_local]
 
-        if arrangement.front_face_on_butt_timber_1 is None:
-
-            raise arrangement_error("front_face_on_butt_timber_1 must be provided when peg_parameters are set", arrangement)
+        assert arrangement.front_face_on_butt_timber_1 is not None, (
+            "front_face_on_butt_timber_1 must be provided when peg_parameters are set"
+        )
 
         peg_entry_direction_global = butt_timber_1.get_face_direction_global(
             arrangement.front_face_on_butt_timber_1

@@ -7,7 +7,6 @@ full control over dimensions and parameters, call the underlying cut_plain_*,
 cut_mortise_and_tenon_*, or cut_lapped_* functions directly.
 """
 
-from kumiki.timber import arrangement_error
 import warnings
 from dataclasses import replace
 from typing import Optional, List, Tuple, cast
@@ -743,8 +742,9 @@ def cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
     """
     error = arrangement.check_plane_aligned()
     assert error is None, error
-    if arrangement.front_face_on_timber1 is None:
-        raise arrangement_error("arrangement.front_face_on_timber1 must be set to determine the reference miter face", arrangement)
+    assert arrangement.front_face_on_timber1 is not None, (
+        "arrangement.front_face_on_timber1 must be set to determine the reference miter face"
+    )
     return cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
         arrangement=arrangement
     )

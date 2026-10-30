@@ -2,7 +2,6 @@
 Kumiki - Rebated oblique and dadoed scarf joint (Kanawa Tsugi) construction functions
 """
 
-from kumiki.timber import arrangement_error
 from dataclasses import replace
 from typing import Optional, Tuple
 
@@ -63,10 +62,11 @@ def cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
         the oblique scarf face angle (Sogi-michi (斜面)) is determined by the rebated_shoulder_depth and the scarf_half_length
         all measurements are done relative to timber1, timber2 is expected to share the same axis and be the same size as timber1.
     """
-    require_check(arrangement.check_face_aligned_and_parallel_axis(), about=arrangement)
+    require_check(arrangement.check_face_aligned_and_parallel_axis())
     warn_if_arrangement_timbers_imperfect(arrangement)
-    if arrangement.front_face_on_timber1 is None:
-        raise arrangement_error("arrangement.front_face_on_timber1 must be set to determine the joint orientation", arrangement)
+    assert arrangement.front_face_on_timber1 is not None, (
+        "arrangement.front_face_on_timber1 must be set to determine the joint orientation"
+    )
 
     timber1 = arrangement.timber1
     timber2 = arrangement.timber2

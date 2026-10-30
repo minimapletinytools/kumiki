@@ -40,8 +40,7 @@ peg_draw_bore_offset = mm(2)
 brace_length = mm(250)
 
 
-@frame
-def assembly_preview_demo(k: Optional[Kiwari] = None) -> Frame:
+def build_frame() -> Frame:
     left_side = create_axis_aligned_timber(
         bottom_position=create_v3(-side_spacing / 2, -side_length / 2, scalar(0)),
         length=side_length,
@@ -129,3 +128,6 @@ def assembly_preview_demo(k: Optional[Kiwari] = None) -> Frame:
         mortise_into_side(back_cross, TimberEnd.BOTTOM, left_side).with_order(4),
     ]
     return Frame.from_joints(joints, name="Assembly Preview Demo")
+
+
+example = build_frame

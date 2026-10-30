@@ -2,7 +2,6 @@
 Kumiki - Mitered and keyed lap joint (Hako Aikaki Shachi Sen Shikuchi) construction functions
 """
 
-from kumiki.timber import arrangement_error
 from dataclasses import replace
 from typing import Optional, List
 
@@ -52,10 +51,11 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
     Raises:
         ValueError: If parameters are invalid or timbers are not properly positioned
     """
-    require_check(arrangement.check_plane_aligned(), about=arrangement)
+    require_check(arrangement.check_plane_aligned())
     warn_if_arrangement_timbers_imperfect(arrangement)
-    if arrangement.front_face_on_timber1 is None:
-        raise arrangement_error("arrangement.front_face_on_timber1 must be set to determine the reference miter face", arrangement)
+    assert arrangement.front_face_on_timber1 is not None, (
+        "arrangement.front_face_on_timber1 must be set to determine the reference miter face"
+    )
     timberA = arrangement.timber1
     timberA_end = arrangement.timber1_end
     timberA_reference_miter_face = arrangement.front_face_on_timber1

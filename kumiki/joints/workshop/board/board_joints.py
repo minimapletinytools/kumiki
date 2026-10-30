@@ -3,7 +3,6 @@ Kumiki - Board joint construction functions
 Contains functions for creating joints between boards.
 """
 
-from kumiki.timber import arrangement_error
 import warnings
 from dataclasses import replace
 from typing import Dict, List, Tuple, Union, Optional
@@ -292,7 +291,7 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
         boards: Panel of boards to be fitted into the grooves.
         frame_timbers: The surrounding frame timbers (top/bottom/left/right) that will have grooves cut to receive the board panel's edges.
     """
-    require_check(boards.check_parallal_coplanar_and_same_thickness(), about=boards)
+    require_check(boards.check_parallal_coplanar_and_same_thickness())
 
     board_list = boards.boards
     ref = board_list[0]
@@ -434,8 +433,9 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
     butt_timber = arrangement.butt_timber
     receiving_timber = arrangement.receiving_timber
     butt_timber_face = arrangement.butt_timber_face
-    if arrangement.front_face_on_butt_timber is None:
-        raise arrangement_error("front_face_on_butt_timber is required for cut_practice_sliding_dovetail_joint_on_orthogonal_boards", arrangement)
+    assert arrangement.front_face_on_butt_timber is not None, (
+        "front_face_on_butt_timber is required for cut_practice_sliding_dovetail_joint_on_orthogonal_boards"
+    )
     front_face_on_butt_timber = arrangement.front_face_on_butt_timber
 
     orthogonal_error = arrangement.check_orthogonal()

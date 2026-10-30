@@ -10,8 +10,7 @@ from typing import Optional
 from kumiki import *
 from kumiki.ticket import TimberTicket
 
-@frame
-def n_legged_stool(k: Optional[Kiwari] = None) -> Frame:
+def build_frame(k: Optional[Kiwari] = None) -> Frame:
     k = kiwari(
         legs=kiwari.count(4, minimum=3, maximum=12, about="How many legs the stool stands on"),
         stool_height=kiwari.length(mm(450), about="Floor to the top of the seat"),
@@ -197,3 +196,5 @@ def n_legged_stool(k: Optional[Kiwari] = None) -> Frame:
         joints.append(joint_end)
 
     return Frame.from_joints(joints, name=f"{n_int}-Legged Stool", kiwari=k)
+
+example = build_frame
