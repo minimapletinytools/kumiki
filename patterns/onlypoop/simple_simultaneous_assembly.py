@@ -10,7 +10,8 @@ from typing import Optional
 from kumiki import *
 from kumiki.ticket import TimberTicket
 
-def build_frame(k: Optional[Kiwari] = None) -> Frame:
+@frame
+def simple_simultaneous_assembly(k: Optional[Kiwari] = None) -> Frame:
     k = kiwari(
         timbers=kiwari.count(4, minimum=3, maximum=16,
                       about="How many timbers go round the cycle"),
@@ -100,5 +101,3 @@ def build_frame(k: Optional[Kiwari] = None) -> Frame:
         joints.append(joint)
 
     return Frame.from_joints(joints, name=f"Simple Assembly Test ({n_int}-gon)", kiwari=k)
-
-example = build_frame
