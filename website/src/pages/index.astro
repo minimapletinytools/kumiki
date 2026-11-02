@@ -124,7 +124,7 @@ const faqs = [
   {
     question: 'Can I use AI coding agents (Claude, Cursor, Copilot, ChatGPT) to design timber frames with Kumiki?',
     answer:
-      'Yes. Kumiki is designed from the ground up for agentic workflows. Because frames are declarative Python using an exact rational rule system, AI agents can reliably generate, refactor, and validate structural models without floating-point errors. Agents can consume our standardized llms.txt and llms-full.txt endpoints for complete context.',
+      'Yes. Kumiki is designed from the ground up for agentic workflows. Because frames are declarative Python using an exact rational rule system, AI agents can reliably generate, refactor, and validate structural models without floating-point errors. Agents can use the authoring instructions and concepts documentation to learn Kumiki’s rule types, coordinate systems, and joint methods.',
   },
   {
     question: 'What types of woodworking joinery does Kumiki support?',
@@ -274,13 +274,14 @@ const faqs = [
         <div class="ai-card">
           <h3>2. Zero-hallucination context</h3>
           <p>
-            Agents ingest <a href={`${base}/llms.txt`}><code>llms.txt</code></a> or
-            <a href={`${base}/llms-full.txt`}><code>llms-full.txt</code></a> to get precise rule types,
-            coordinate systems, and joint methods in a single context fetch.
+            Give your agent the
+            <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md">authoring instructions</a>
+            and <a href="https://kumiki.build/docs/concepts/">concepts documentation</a>
+            for guidance on rule types, coordinate systems, and joint methods.
           </p>
           <div class="ai-links">
-            <a class="btn btn-secondary btn-sm" href={`${base}/llms.txt`}>View llms.txt</a>
-            <a class="btn btn-secondary btn-sm" href={`${base}/llms-full.txt`}>View llms-full.txt</a>
+            <a class="btn btn-secondary btn-sm" href="https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md">Authoring instructions</a>
+            <a class="btn btn-secondary btn-sm" href="https://kumiki.build/docs/concepts/">Concepts</a>
           </div>
         </div>
         <div class="ai-card">

@@ -1,3 +1,21 @@
+:: 11/1/2026 kumiki 0.10.0 release
+
+Kumiki is a programmatic CAD application for timber framing and woodwork. 
+
+Here's what's new for kumiki 0.10.0
+
+You can now ask the agent to generate blueprints and plans for you and if you don't like them you can go in and modify things yourself.
+
+There's a much easier to install standalone app that will set up all your project dependencies for you.
+
+With the ne wapp, the UI has also been overhauled to be more compact and intuitive
+
+the agent interaciton experience has been improved, it can self validate your work and you can also press this handy "copy for ai" to tell the AI what you're looking at
+
+And of course many more joints, patterns and examples have been added
+
+There's plenty more to come. kumiki is free and open source Please like and subscribe and stay tuned!
+
 :: 10/17/2026 PTW rough measuring notes
 
 Every timber has a "Perfect Timber Within" which may differ from its actual "rough" shape.
@@ -95,20 +113,35 @@ DONE-the view output button doesn't do anything in standalone viewr, and the log
 DONE/IGNORE-I think you need to rework hidden selection... we only want to be able to select PTW planes behind rough stock, right now you can select other non real features
   -PTW and non real features are different groups so you can just force it to happen
   -another idea is to expand PTW planes to rough stock dimensions? that way they aren't hidden, this might just be better?
+DONE/IGNORE-add types to runner.py
 
 -NEXT RELEASE TODO
   DONE-end cuts should be given their own intersection group, dovetailed_sawhores currentyl uses PERFECT, and no where else sets the group. We should make a new group, cross intersects but not shoulderplane
     -prioritize axis aligned measurements
   DONE-the active view you are measuring in should be highlighted somehow
+  DONE-review and cleanup the internal/docs
+  IGNORE-do apple dev signing
+  DONE-hide agent for now or make secret web build?
+  DONE-do antoher agent review pass
+
+  -add export drawing button (how to do this?)
+  
+  -DRAWINGS
+    -make decision on how to do solver in separate thread
+      -must still be possible fo rteh agent to run the solver directly outside of the viewer to inspect its results
+      -disable the draw button when drawings are being generated
+    -maybe do drawing prettifier pass
+    -test agent created drawings
+
+
   -check that edges are being highlighted correctly in 2d drawing mesaurements
-  -review and cleanup the internal/docs
-  -do antoher agent review pass
+  -add joints/arrangement stuff to cheat sheet
+  
   -mega update wesite
   -make a new video 
-
-
-
-
+  
+  -setup GHA release for binary app
+  	-test end to end
 
 
 
@@ -120,7 +153,7 @@ DONE/IGNORE-I think you need to rework hidden selection... we only want to be ab
 -add support to run @tools from the parameter section
   -do this for generating saw horse router jig lol
   -router jig template function? takes a timber and a flat profile (extrusion or prism), adds a "template blcok over both, cuts out the timber, and then cuts out the profile extruding upwards to make the template based on bit + collar paraemetrs. shouldn't be too hard? would be cool if it makes mid supports too for extra wide profiles...
--add export drawing button (how to do this?)
+
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
 -decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
@@ -128,7 +161,7 @@ DONE/IGNORE-I think you need to rework hidden selection... we only want to be ab
 
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
 
--add types to runner.py
+
 -improve board  functions, think bout the simplest way to do this...
 -update shed example to include board
   -make a video about this maybe after you do some more edge joints
@@ -138,7 +171,7 @@ DONE/IGNORE-I think you need to rework hidden selection... we only want to be ab
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
   
--rename/reorg all mortise and tenon joints
+-rename/reo rg all mortise and tenon joints
   DONE-mortise_and_tenon_join/...
   DONE-delete 45 degree relative tenon size, basic, 
   -face_aligned
