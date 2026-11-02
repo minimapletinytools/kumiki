@@ -51,12 +51,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build app
-        shell: bash
+      - name: Stage docs and uv
         run: |
           npm run prepare:instructions
           node scripts/bundle-docs.js
           node scripts/fetch-uv.js
+
+      - name: Build app
+        shell: bash
+        run: |
+          # An empty signing variable reads as a path to electron-builder.
+          for name in CSC_LINK CSC_KEY_PASSWORD WIN_CSC_LINK WIN_CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!name}" ] || unset "$name"
+          done
           EXTRA_ARGS=()
           if [ "${{ matrix.target }}" = "--mac" ] && [ -z "$CSC_LINK" ]; then
             # No Developer ID: sign the whole bundle ad hoc, which Gatekeeper lets
