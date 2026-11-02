@@ -20,12 +20,17 @@ const { getHost } = require('./host');
 
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
 
+// What the system's file manager is called, for "reveal in …".
+const REVEAL_LABEL_KEY = { darwin: 'sidebar.action.revealInFinder', win32: 'sidebar.action.revealInExplorer' }[process.platform]
+    || 'sidebar.action.revealInFolder';
+
 // Extra row actions: `inline` ones also show as buttons on the row.
 const ROW_ACTIONS = Object.freeze({
     viewSource: { command: 'kigumi.viewPatternSource', icon: 'go-to-file', labelKey: 'sidebar.action.viewSource', inline: true },
     duplicate: { command: 'kigumi.duplicatePatternToWorkspace', icon: 'copy', labelKey: 'sidebar.action.duplicate', inline: true },
     openInNewWindow: { command: 'kigumi.openPatternInNewWindow', icon: 'link-external', labelKey: 'sidebar.action.openInNewWindow', inline: false },
     openInViewer: { command: 'kigumi.openInViewer', icon: 'eye', labelKey: 'sidebar.action.openInViewer', inline: false },
+    revealInFileManager: { command: 'kigumi.revealInFileManager', icon: 'folder-opened', labelKey: REVEAL_LABEL_KEY, inline: false },
 });
 
 const LIBRARY_SECTIONS = new Set(['shipped-patterns', 'dependency-patterns']);
@@ -496,6 +501,7 @@ class SidebarModel {
         const entries = this._files.entries(dirPath);
         return node({
             expanded: false,
+            rowActions: ['revealInFileManager'],
             ...fields,
             lazyDir: entries === null ? dirPath : undefined,
             children: entries === null ? [] : entries.map((entry) => (entry.isDirectory
@@ -519,7 +525,7 @@ class SidebarModel {
             label: entry.name,
             icon,
             action: open('kigumi.openFileSource', entry.filePath),
-            rowActions: entry.name.endsWith('.py') ? ['openInViewer'] : [],
+            rowActions: entry.name.endsWith('.py') ? ['openInViewer', 'revealInFileManager'] : ['revealInFileManager'],
             data: { filePath: entry.filePath },
         });
     }

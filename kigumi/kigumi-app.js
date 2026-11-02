@@ -431,6 +431,18 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             }
             await openFileOrPatternbookInViewer(filePath);
         },
+        // A file path, or a sidebar row: shown selected in Finder / Explorer.
+        'kigumi.revealInFileManager': async (target) => {
+            const data = target && typeof target === 'object' && target.data ? target.data : null;
+            const filePath = typeof target === 'string' ? target
+                : target && typeof target.fsPath === 'string' ? target.fsPath
+                    : data && (data.filePath || data.dirPath || data.sourceFile);
+            if (!filePath) {
+                host.showMessage('error', t('message.noFilePathProvided'));
+                return;
+            }
+            await host.revealInFileManager(filePath);
+        },
         'kigumi.openExampleFromSidebar': (sourceFile) => openFileInViewer(sourceFile),
 
         'kigumi.openPatternFromSidebar': (patternRecord) => openPatternRecord(patternRecord),

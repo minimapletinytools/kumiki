@@ -1,5 +1,5 @@
 // The explorer: the workspace scanned, and All Files opened folder by folder down to a frame,
-// opened in a viewer from its right-click menu.
+// opened in a viewer from its right-click menu, and revealed in the file manager from it.
 
 const path = require('path');
 
@@ -55,6 +55,28 @@ module.exports = {
                 return snapshot && snapshot.exists ? snapshot : null;
             }, { timeoutMs: 60000 }).catch(() => null);
             check('right-click > Open in Viewer on a frame in All files opens it', choseOpen && openedFromMenu && connection().tabs.tabs.length === 1);
+
+            // Revealing is caught here rather than opening Finder.
+            const host = require('../../../host').getHost();
+            const reveal = host.revealInFileManager;
+            const revealed = [];
+            host.revealInFileManager = async (filePath) => { revealed.push(filePath); };
+            try {
+                await inExplorer(`const target = row(${JSON.stringify(`file:${FRAME}`)});
+                    const box = target.getBoundingClientRect();
+                    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: box.left + 10, clientY: box.top + 5 }));
+                    return true;`);
+                const label = process.platform === 'darwin' ? 'Reveal in Finder' : process.platform === 'win32' ? 'Show in Explorer' : 'Open Containing Folder';
+                const choseReveal = await waitFor(() => inExplorer(`const item = [...doc.querySelectorAll('.ks-menu-item')]
+                    .find((one) => one.textContent.includes(${JSON.stringify(label)}));
+                    if (!item) return false;
+                    item.click();
+                    return true;`), { timeoutMs: 10000 }).catch(() => false);
+                await waitFor(() => revealed.length > 0, { timeoutMs: 5000 }).catch(() => null);
+                check(`right-click > ${label} on a file in All files reveals it`, choseReveal && revealed[0] === FRAME, JSON.stringify(revealed));
+            } finally {
+                host.revealInFileManager = reveal;
+            }
         } finally {
             await inExplorer(`row('files-root')?.querySelector('.ks-twistie')?.click(); return true;`);
         }

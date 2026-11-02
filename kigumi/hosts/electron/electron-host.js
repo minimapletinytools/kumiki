@@ -198,6 +198,8 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
 
         copyText: async (text) => clipboard.writeText(text),
 
+        revealInFileManager: async (filePath) => electronShell.showItemInFolder(filePath),
+
         async openFileAt(filePath, line = 1) {
             openInEditor(filePath, line);
         },

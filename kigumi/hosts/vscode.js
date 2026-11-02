@@ -167,6 +167,10 @@ function createVscodeHost() {
             return Promise.resolve(vscode.env.clipboard.writeText(text));
         },
 
+        revealInFileManager(filePath) {
+            return Promise.resolve(vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(filePath)));
+        },
+
         updateConfig(key, value) {
             return Promise.resolve(vscode.workspace.getConfiguration('kigumi').update(key, value, vscode.ConfigurationTarget.Workspace));
         },

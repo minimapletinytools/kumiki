@@ -311,7 +311,7 @@ describe('all files', () => {
     expect(labels).not.toContain('a_notes.txt');
   });
 
-  test('frames and patternbooks keep their icons; a click opens the source; Python files open in the viewer', async () => {
+  test('frames and patternbooks keep their icons; a click opens the source; Python files open in the viewer; any file or folder reveals', async () => {
     filesHost();
     const frame = path.join(root, 'b_frame.py');
     const book = path.join(root, 'patterns', 'book.py');
@@ -327,11 +327,13 @@ describe('all files', () => {
     const byLabel = (label) => findNode(rootOf(model, 'filesRoot').children, (one) => one.label === label);
 
     expect(byLabel('b_frame.py')).toMatchObject({
-      icon: 'fish2-very-sad', rowActions: ['openInViewer'],
+      icon: 'fish2-very-sad', rowActions: ['openInViewer', 'revealInFileManager'],
       action: { command: 'kigumi.openFileSource', arguments: [frame] },
     });
     expect(byLabel('book.py').icon).toBe('library');
-    expect(byLabel('a_notes.txt')).toMatchObject({ icon: 'file', rowActions: [] });
+    expect(byLabel('a_notes.txt')).toMatchObject({ icon: 'file', rowActions: ['revealInFileManager'] });
+    expect(byLabel('patterns').rowActions).toEqual(['revealInFileManager']);
+    expect(rootOf(model, 'filesRoot').rowActions).toEqual(['revealInFileManager']);
   });
 
   test('a folder outside the workspace is not listed', async () => {

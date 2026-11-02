@@ -132,6 +132,16 @@ test('open in viewer with nothing to open says so', async () => {
   await app.dispose();
 });
 
+test('reveal shows a sidebar row\'s file or folder in the file manager', async () => {
+  const host = fakeHost({ revealInFileManager: jest.fn(async () => {}) });
+  const app = newApp(host);
+  await app.commands['kigumi.revealInFileManager']({ data: { filePath: '/w/notes.txt' } });
+  await app.commands['kigumi.revealInFileManager']({ data: { dirPath: '/w/patterns' } });
+
+  expect(host.revealInFileManager.mock.calls).toEqual([['/w/notes.txt'], ['/w/patterns']]);
+  await app.dispose();
+});
+
 test('open in viewer on a patternbook (a VS Code Uri) asks which of its patterns', async () => {
   const host = fakeHost();
   const app = newApp(host);
