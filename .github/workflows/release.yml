@@ -59,6 +59,11 @@ on:
         required: true
         default: true
         type: boolean
+      kigumi_app:
+        description: "Build the standalone app for macOS and Windows and attach it to the kigumi release."
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -131,6 +136,15 @@ jobs:
       publish: false
       prerelease: ${{ inputs.kigumi_prerelease == true || github.event.inputs.kigumi_prerelease == 'true' }}
       tag: ${{ inputs.tag || github.event.inputs.tag || github.ref_name }}
+
+  build_kigumi_app:
+    name: Build Kigumi App
+    needs: [resolve_tag]
+    if: ${{ needs.resolve_tag.outputs.prefix == 'kigumi' && (github.event_name == 'push' || ((inputs.kigumi_app == true || github.event.inputs.kigumi_app == 'true') && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true'))) }}
+    uses: ./.github/workflows/build-kigumi-app.yml
+    secrets: inherit
+    with:
+      tag: ${{ needs.resolve_tag.outputs.tag }}
 
   publish_kumiki:
     name: Publish kumiki to PyPI
@@ -228,7 +242,8 @@ jobs:
       - resolve_tag
       - build_kumiki
       - build_kigumi
-    if: ${{ !cancelled() && needs.resolve_tag.result == 'success' && ((needs.resolve_tag.outputs.prefix == 'kumiki' && (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push')) || (needs.resolve_tag.outputs.prefix == 'kigumi' && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push'))) }}
+      - build_kigumi_app
+    if: ${{ !cancelled() && needs.resolve_tag.result == 'success' && needs.build_kigumi_app.result != 'failure' && ((needs.resolve_tag.outputs.prefix == 'kumiki' && (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push')) || (needs.resolve_tag.outputs.prefix == 'kigumi' && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push'))) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -246,10 +261,34 @@ jobs:
           name: kigumi-vsix
           path: release-assets
 
+      - name: Download the app's installers
+        if: ${{ needs.build_kigumi_app.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: kigumi-app-*
+          path: app-builds
+          merge-multiple: true
+
+      - name: Add the Mac and Windows installers
+        shell: bash
+        run: |
+          : > release-notes.md
+          if [ -d app-builds ]; then
+            cp app-builds/*.dmg app-builds/*.exe release-assets/
+            cat > release-notes.md <<'EOF'
+          ## Kigumi app
+
+          - **macOS**: `-mac-arm64.dmg` for Apple Silicon, `-mac-x64.dmg` for Intel. The first time, macOS can't verify the developer: open System Settings > Privacy & Security and click **Open Anyway**.
+          - **Windows**: `-windows-setup.exe`. If Windows protects your PC, click **More info** > **Run anyway**.
+
+          EOF
+          fi
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.resolve_tag.outputs.tag }}
           name: ${{ needs.resolve_tag.outputs.tag }}
+          body_path: release-notes.md
           generate_release_notes: true
           files: release-assets/*

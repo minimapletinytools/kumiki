@@ -1,11 +1,18 @@
 name: Build Kigumi App
 
 # Builds the standalone Kigumi app for macOS, Windows and Linux and uploads the
-# installers as workflow artifacts. Builds are signed only when the signing
-# secrets below are configured; otherwise they are unsigned.
+# installers as workflow artifacts; release.yml attaches them to a kigumi release.
+# Builds are signed only when the signing secrets below are configured. Without
+# them the Mac app is ad-hoc signed (opens via Open Anyway) and Windows unsigned.
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: Git ref or tag to build.
+        required: false
+        type: string
   pull_request:
     paths:
       - 'kigumi/hosts/electron/**'
@@ -32,6 +39,8 @@ jobs:
         working-directory: kigumi
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -43,18 +52,27 @@ jobs:
         run: npm ci
 
       - name: Build app
+        shell: bash
         run: |
           npm run prepare:instructions
           node scripts/bundle-docs.js
           node scripts/fetch-uv.js
-          npx electron-builder --config electron-builder.yml ${{ matrix.target }} --publish never
+          EXTRA_ARGS=()
+          if [ "${{ matrix.target }}" = "--mac" ] && [ -z "$CSC_LINK" ]; then
+            # No Developer ID: sign the whole bundle ad hoc, which Gatekeeper lets
+            # people open; electron-builder's unsigned build reads as "damaged".
+            EXTRA_ARGS+=(-c.mac.identity=- -c.mac.hardenedRuntime=false)
+          fi
+          npx electron-builder --config electron-builder.yml ${{ matrix.target }} --publish never "${EXTRA_ARGS[@]}"
         env:
-          CSC_LINK: ${{ secrets.KIGUMI_APP_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.KIGUMI_APP_CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ matrix.target == '--mac' && secrets.KIGUMI_APP_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.target == '--mac' && secrets.KIGUMI_APP_CSC_KEY_PASSWORD || '' }}
+          WIN_CSC_LINK: ${{ matrix.target == '--win' && secrets.KIGUMI_APP_WIN_CSC_LINK || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ matrix.target == '--win' && secrets.KIGUMI_APP_WIN_CSC_KEY_PASSWORD || '' }}
           APPLE_ID: ${{ secrets.KIGUMI_APP_APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.KIGUMI_APP_APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.KIGUMI_APP_APPLE_TEAM_ID }}
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.KIGUMI_APP_CSC_LINK != '' }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.target == '--mac' && secrets.KIGUMI_APP_CSC_LINK != '' }}
 
       - uses: actions/upload-artifact@v4
         with:

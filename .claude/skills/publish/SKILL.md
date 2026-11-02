@@ -31,6 +31,7 @@ Use this skill to trigger GitHub Actions release and publishing workflows.
 - `kigumi_publish_ovsx`: `true` / `false`
 - `kigumi_prerelease`: `true` / `false`
 - `kigumi_release`: `true` / `false`
+- `kigumi_app`: `true` / `false` (builds the Mac and Windows app and attaches it to the kigumi release)
 
 ## Commands (GitHub CLI)
 
