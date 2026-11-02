@@ -62,7 +62,7 @@ take their accelerators from it. Not configurable yet.
 
 ## Agent and MCP
 
-- **Agent panel** (the sparkle button, or Kigumi > Toggle Agent): Kigumi's own agent loop on the
+- **Agent panel** (the sparkle button, or Kigumi > Toggle Agent; `"agent.enabled": false` in settings hides it): Kigumi's own agent loop on the
   Vercel AI SDK (`../../agent/agent-loop.js`), run in the app's main process
   (`../../agent/agent-session.js`). Its tools are Kigumi's plus reading, listing, writing and editing
   files inside the project; no shell. The model is picked in the panel (`agent.model`, an id from

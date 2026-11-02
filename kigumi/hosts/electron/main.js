@@ -45,8 +45,9 @@ const APP_DEFAULTS = {
     'app.editorCommand': '',
     // Names the explorer's "All files" leaves out; `*` matches anything.
     'app.filesExclude': [...DEFAULT_FILES_EXCLUDE],
-    // The agent panel: an OpenRouter key, or none (then the Kigumi account).
-    // The model is an id from agent/models.js.
+    // The agent panel: off hides it everywhere. An OpenRouter key, or none (then the Kigumi
+    // account). The model is an id from agent/models.js.
+    'agent.enabled': true,
     'agent.openrouterApiKey': '',
     'agent.model': '',
     'agent.showOnStartup': true,
@@ -147,7 +148,13 @@ function shellStatus() {
         logBadge: status.logBadge,
         version: packageJson.version,
         autoRefresh: settings ? settings.get('viewer.autoRefreshOnFileChange', false) : false,
+        agent: agentEnabled(),
     };
+}
+
+/** Whether the built-in agent is offered at all (`agent.enabled`). */
+function agentEnabled() {
+    return Boolean(settings) && settings.get('agent.enabled', true) !== false;
 }
 
 function pushShellState() {
@@ -483,6 +490,9 @@ function agentHost() {
 
 // Shows or hides the agent. Hidden, it keeps its conversation.
 function toggleAgentPanel() {
+    if (!agentEnabled()) return;
+    if (!account) createAppAccount();
+    if (!modelList) createAppModelList();
     if (connection.findPanel((panel) => panel.type === 'agent')) {
         connection.setSideShown('right', !connection.layout.right);
         return;
@@ -507,6 +517,13 @@ function toggleAgentPanel() {
     surface.loadUrl(`${ORIGIN}/webview/agent/agent.html`);
     connection.setSideShown('right', true);
     refreshModels();
+}
+
+/** Closes the agent panel once `agent.enabled` is turned off. */
+function closeAgentIfDisabled() {
+    if (agentEnabled() || !connection) return;
+    const panel = connection.findPanel((one) => one.type === 'agent');
+    if (panel) panel.dispose();
 }
 
 let mcpServer = null;
@@ -651,7 +668,7 @@ function buildMenu() {
                     click: () => runAppCommand('kigumi.toggleAutoRefreshOnFileChange'),
                 },
                 { type: 'separator' },
-                { label: 'Toggle Agent', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() },
+                ...(agentEnabled() ? [{ label: 'Toggle Agent', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() }] : []),
                 { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcpServer), click: () => copyMcpSetup() },
                 { type: 'separator' },
                 { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
@@ -711,8 +728,10 @@ async function start() {
 
     const log = (line) => logChannel.appendLine(line);
     const appWindow = createAppWindow({ origin: ORIGIN, log });
-    createAppAccount();
-    createAppModelList();
+    if (agentEnabled()) {
+        createAppAccount();
+        createAppModelList();
+    }
     mainWindow = appWindow.window;
     pages = new PageStore({ origin: ORIGIN, webviewDir });
     connection = new ShellConnection({
@@ -769,11 +788,12 @@ async function start() {
         bundledUv: bundledUvPath(),
     });
     kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
-    if (settings.get('agent.showOnStartup', true)) {
+    if (agentEnabled() && settings.get('agent.showOnStartup', true)) {
         toggleAgentPanel();
     }
 
     settings.onChange(() => {
+        closeAgentIfDisabled();
         buildMenu();
         pushShellState();
         void syncMcpServer();

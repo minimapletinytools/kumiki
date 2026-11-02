@@ -1,10 +1,10 @@
 // The agent panel: it lists the models, offers signing in when there is no key, and a model picked
 // there is kept; with a key set, it says it is using it. Its settings set the longest step. And the
-// build an agent's edit runs.
+// build an agent's edit runs. Turned off, the agent is gone: its panel, button and menu item.
 
 module.exports = {
     name: 'agent',
-    async run({ check, inShell, waitFor, capture, settings, openFrame, runAppCommand, FRAME }) {
+    async run({ check, inShell, waitFor, capture, settings, openFrame, runAppCommand, connection, onShellCommand, FRAME }) {
         const agentDoc = 'document.querySelector("#slot-right iframe").contentDocument';
         const read = (script) => inShell(`(() => { const doc = ${agentDoc}; return ${script}; })()`);
 
@@ -43,5 +43,20 @@ module.exports = {
             JSON.stringify(described && { groups: described.groups, first: described.timbers && described.timbers[0] }).slice(0, 300));
         check('a view\'s file builds on request, reporting that build\'s problems',
             report && report.ok === true && Array.isArray(report.entries) && report.entries.length === 0, JSON.stringify(report).slice(0, 200));
+
+        const { Menu } = require('electron');
+        const menuHasAgent = () => Menu.getApplicationMenu().items.flatMap((item) => (item.submenu ? item.submenu.items : []))
+            .some((item) => item.label === 'Toggle Agent');
+        const agentPanel = () => Boolean(connection().findPanel((panel) => panel.type === 'agent'));
+        settings.set('agent.enabled', false);
+        const gone = await waitFor(async () => !agentPanel() && !menuHasAgent()
+            && await inShell(`document.querySelector('#toggle-right').hidden`), { timeoutMs: 5000 }).catch(() => false);
+        await onShellCommand('toggleAgent');
+        check('turned off, the agent panel closes and its button and menu item go, and it can\'t be opened',
+            gone && !agentPanel(), `panel ${agentPanel()}, menu ${menuHasAgent()}`);
+        settings.set('agent.enabled', true);
+        const back = await waitFor(async () => menuHasAgent()
+            && !(await inShell(`document.querySelector('#toggle-right').hidden`)), { timeoutMs: 5000 }).catch(() => false);
+        check('turned back on, the button and menu item return', back);
     },
 };

@@ -20,6 +20,7 @@ const SETTINGS_AT_START = {
     'viewer.autoRefreshOnFileChange': true,
     'agent.model': '',
     'agent.openrouterApiKey': '',
+    'agent.enabled': true,
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

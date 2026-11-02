@@ -169,6 +169,10 @@ body:not(.is-mac) .titlebar-drag-region {
     -webkit-app-region: no-drag;
 }
 
+.layout-toggle[hidden] {
+    display: none;
+}
+
 .layout-toggle:hover {
     color: var(--ka-fg);
     background: var(--ka-hover);

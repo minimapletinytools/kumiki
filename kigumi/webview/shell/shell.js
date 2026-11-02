@@ -105,6 +105,7 @@
         $('slot-right').hidden = !showRight;
         $('splitter-right').hidden = !showRight;
         $('toggle-right').classList.toggle('is-active', showRight);
+        $('toggle-right').hidden = state.agent === false;
 
         const hasBottom = state.panels.some((panel) => panel.slot === 'bottom');
         const showBottom = hasBottom && layout.bottom;
