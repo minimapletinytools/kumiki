@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """Cat Corner Cot - A timber frame cat cot designed against a corner supporting structure.
 
 The file builds two frames, shown together where they stand:

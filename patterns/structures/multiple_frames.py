@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """Multiple frames in one file: a little yard of four structures.
 
 Each `@frame` below builds one structure, and Kigumi shows them all together,

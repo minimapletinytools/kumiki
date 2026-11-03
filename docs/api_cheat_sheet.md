@@ -76,7 +76,7 @@ Four posts on a footprint, a beam along the top of each long side, and a rail ac
 in basic mortise and tenons. It builds, and every timber meets the rest.
 
 ```python
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 from typing import Optional
 from kumiki import *
 

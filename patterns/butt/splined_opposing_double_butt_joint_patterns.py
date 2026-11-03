@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """
 Splined Opposing Double Butt Joint Patterns
 """

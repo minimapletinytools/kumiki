@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """
 Drop-in Housed Butt Joint Patterns (大入れ仕口 / Oire Shiguchi)
 """

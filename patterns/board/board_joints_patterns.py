@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """Tongue-and-groove board joint example using PatternBook."""
 
 from dataclasses import replace

@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """Dovetailed sawhorse: a beam on edge and four splayed legs.
 
 Each leg is let into an arris of the beam by its whole thickness, as a sliding dovetail tapered

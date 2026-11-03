@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """
 Tiny House 120 sqft - A 15' x 8' timber frame tiny house
 Posts are on the INSIDE of the footprint. Front is the 15' side.

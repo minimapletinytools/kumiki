@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """
 Mitered and Keyed Lap Joint Patterns (箱相欠き車知栓仕口 / Hako Aikaki Shachi Sen Shikuchi)
 """

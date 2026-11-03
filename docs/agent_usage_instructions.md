@@ -76,7 +76,7 @@ from kumiki import *
 The first line of every frame or pattern file names the last kumiki version it ran correctly on:
 
 ```python
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 ```
 
 - Put it in every new frame or pattern file.

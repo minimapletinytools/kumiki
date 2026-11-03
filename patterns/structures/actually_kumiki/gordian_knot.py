@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """Gordian's Knot puzzle structure with cutouts.
 
 Six interlocking 5×7×1 pieces arranged around the origin:

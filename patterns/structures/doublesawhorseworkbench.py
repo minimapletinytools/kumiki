@@ -1,4 +1,4 @@
-# Last checked on kumiki 0.8.0
+# Last checked on kumiki 0.9.0
 """Double sawhorse workbench.
 
 Footprint is 2' (Y) x 4' (X). Two 4x6 feet (tall dimension in Z) run along the
