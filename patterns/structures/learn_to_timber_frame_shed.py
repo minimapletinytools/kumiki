@@ -94,9 +94,9 @@ def make_timber_imperfect_opposite_edge(
 # - South side (Y = 0) has length 12'
 # - East side (X = 12') has length 16'
 # - West side (X = 0) has length 16'
-base_width = feet(12)   # East-West width (12 feet)
-length_feet = 16
-base_length = feet(length_feet)  # North-South length (16 feet)
+#
+# The counts below are optional: left off, each comes from its "Default:" formula,
+# from the shed's length in whole feet (length_feet).
 
 # Number of floor joists spanning between the East and West mudsills.
 # Evenly spaced along the mudsill length (base_length / (num_joists + 1) per gap),
@@ -104,7 +104,7 @@ base_length = feet(length_feet)  # North-South length (16 feet)
 # joists clear the corner-post mortises there.
 # The middle 1 joist (if num_joists is odd) or 2 joists (if even) use a pegged
 # mortise-and-tenon joint; the rest use a drop-in housed butt joint.
-num_joists = length_feet // 3
+# Default: length_feet // 3
 
 # Number of rafter pairs (each pair = one West + one East rafter meeting at the ridge).
 # The outer 2 rafter pairs on each side keep their existing alignment:
@@ -113,13 +113,23 @@ num_joists = length_feet // 3
 #     collar tie sits, the "gable bent")
 # The remaining pairs are evenly spaced between the two gable-bent pairs.
 # Must be >= 4 (2 aligned pairs on each side).
-num_rafter_pairs = length_feet // 2 + 1
+# Default: length_feet // 2 + 1
 
 # Number of mid-wall posts on the East and West walls (in addition to the 4 corner
 # posts), evenly spaced between the corner posts. Each mid post gets its own tie beam
 # to its opposite-wall counterpart, and knee braces leaning into both of its
 # neighboring bays. 0 removes mid posts entirely (a single long bay per wall).
-num_ew_mid_posts = length_feet // 9
+# Default: length_feet // 9
+SHED = kiwari(
+    base_width=kiwari.length(feet(12), minimum=0, about="East-West width"),
+    base_length=kiwari.length(feet(16), minimum=0, about="North-South length"),
+    num_joists=kiwari.count(
+        optional=True, minimum=1, about="Floor joists between the East and West mudsills; length in feet // 3 if off"),
+    num_rafter_pairs=kiwari.count(
+        optional=True, minimum=4, about="Rafter pairs, at least 4; length in feet // 2 + 1 if off"),
+    num_ew_mid_posts=kiwari.count(
+        optional=True, minimum=0, about="Mid-wall posts on the East and West walls; length in feet // 9 if off"),
+)
 
 # Mudsill size: 8" vertical height, 7" horizontal width
 # Note: size[0] is the vertical Z-dimension, size[1] is the horizontal depth perpendicular to the footprint boundary
@@ -148,10 +158,25 @@ peg_diameter = inches(3, 4)              # 3/4" diameter peg
 peg_distance_from_shoulder = inches(3, 2) # 1.5" away from the shoulder
 
 
-def build_shed_frame() -> Frame:
+@frame
+def build_shed_frame(k: Optional[Kiwari] = None) -> Frame:
     """
     Build the shed floor frame including mudsills, floor joists, and mudsill joints.
     """
+    k = SHED.resolve(k)
+    base_width = k.length("base_width")
+    base_length = k.length("base_length")
+    length_feet = int(base_length / feet(1) + 1e-9)
+
+    def count_or(key: str, formula: int) -> int:
+        """The count set for `key`, or `formula` when it is off."""
+        value = k.count(key)
+        return formula if value is None else value
+
+    num_joists = count_or("num_joists", length_feet // 3)
+    num_rafter_pairs = count_or("num_rafter_pairs", length_feet // 2 + 1)
+    num_ew_mid_posts = count_or("num_ew_mid_posts", length_feet // 9)
+
     # 1. Define the footprint (rectangular, counter-clockwise starting from South-West)
     # Corner 0: South-West (0, 0)
     # Corner 1: South-East (12', 0)
@@ -1528,15 +1553,13 @@ def build_shed_frame() -> Frame:
             + collar_joints
         ),
         additional_unjointed_timbers=[],
-        name="Timber Frame Shed Base"
+        name="Timber Frame Shed Base",
+        kiwari=k,
     )
     
     from dataclasses import replace
     return replace(frame, footprints=[footprint])
 
-
-# Expose build_shed_frame as the example for Kigumi viewer
-example = build_shed_frame
 
 if __name__ == "__main__":
     frame = build_shed_frame()
