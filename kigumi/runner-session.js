@@ -292,6 +292,7 @@ class PythonRunnerSession {
                 this.process = spawn(pythonCmd, runnerArgs, {
                     cwd: this.projectRoot,
                     stdio: ['pipe', 'pipe', 'pipe'],
+                    env: { ...process.env, KIGUMI_VERSION: getKigumiVersion() },
                 });
 
                 this.process.stdout.on('data', (chunk) => {

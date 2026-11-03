@@ -314,6 +314,14 @@ class TestSaveDrawings:
         assert [d["id"] for d in drawings] == ["kept"]
         assert drawings[0]["origin"] == runner.ORIGIN_FILE
 
+    def test_it_records_the_versions_that_wrote_it(self, example, monkeypatch):
+        import kumiki
+        monkeypatch.setenv("KIGUMI_VERSION", "1.2.3")
+        runner.write_drawings_file(example, [dict(_sheet("a"), origin=runner.ORIGIN_FILE)])
+
+        saved = json.loads(runner._drawings_file_path(example).read_text())
+        assert saved["writtenBy"] == {"kumiki": kumiki.__version__, "kigumi": "1.2.3"}
+
     def test_it_makes_the_directory_it_needs(self, example):
         runner.write_drawings_file(example, [dict(_sheet("a"), origin=runner.ORIGIN_FILE)])
 

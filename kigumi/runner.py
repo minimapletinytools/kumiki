@@ -2788,8 +2788,15 @@ def write_drawings_file(example_path: Path, drawings: List[DrawingWire]) -> str:
             else _savable_drawing(drawing)
             for drawing in drawings
             if drawing.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)]
-    path.write_text(json.dumps({"drawings": keep}, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps({"writtenBy": _written_by(), "drawings": keep}, indent=2) + "\n",
+                    encoding="utf-8")
     return str(path)
+
+
+def _written_by() -> Dict[str, Optional[str]]:
+    """Return the kumiki and kigumi versions that wrote a file (kigumi's is None when not given)."""
+    import kumiki
+    return {"kumiki": kumiki.__version__, "kigumi": os.environ.get("KIGUMI_VERSION") or None}
 
 
 # --- resolving a measurement's anchors --------------------------------------
