@@ -17,8 +17,10 @@ from kumiki.drawings.measure import ViewAxes
 SAWHORSE = kiwari(
     leg_distance=kiwari.length(inches(22), about="Centre to centre along the beam, where the legs meet its top"),
     leg_y_splay_angle=kiwari.angle(degrees(12), about="How far the legs lean out toward the beam's ends"),
-    leg_side_splay_angle=kiwari.angle(
-        optional=True, about="How far the legs splay out from the beam's sides; based on beam and leg dimensions if disabled"),
+    leg_side_splay=kiwari.ratio(
+        optional=True, parts=("rise", "run"),
+        about="How far the legs splay out to the side; the slope is determined by the rise and run. "
+              "By default, the board thickness and beam height are used to determine this"),
     beam_size=kiwari.point2(create_v2(inches(2), inches(15, 4)), about="Across and tall"),
     leg_size=kiwari.point2(create_v2(inches(13, 2), inches(3, 4)), about="Width and thickness"),
     sawhorse_height=kiwari.length(inches(30), about="Floor to the top of the beam"),
@@ -43,13 +45,15 @@ def _leg(k: Kiwari, beam: Timber, end: int, side: int):
     beam_width, beam_height = beam_size[0], beam_size[1]
     height = k.length("sawhorse_height")
 
-    side_splay = k.angle("leg_side_splay_angle")
-    if side_splay is None:
+    slope = k.ratio("leg_side_splay")
+    if slope is None:
         # The faces through both arrises are a thickness apart: sin = thickness / beam height.
         lean_sin = leg_size[1] / beam_height
         lean_cos = sqrt(1 - lean_sin * lean_sin)
     else:
-        lean_sin, lean_cos = sin(side_splay), cos(side_splay)
+        # Seen along the beam, the leg rises `slope` for each unit it runs out: atan(slope) from the floor.
+        lean_sin = 1 / sqrt(1 + slope * slope)
+        lean_cos = slope * lean_sin
     up = safe_normalize_vector(create_v3(-end * tan(k.angle("leg_y_splay_angle")), -side * lean_sin / lean_cos, 1))
     outward = create_v3(0, side * lean_cos, lean_sin)  # the leg's face normal, square to the beam
     along_beam = create_v3(1, 0, 0)

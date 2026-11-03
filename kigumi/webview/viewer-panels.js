@@ -574,7 +574,8 @@ export class ViewerKiwariPanel {
     }
 
     renderPoint(parameter, inputId, draft, problem, disabled) {
-        const axes = KigumiKiwariValues.VECTOR_AXES[parameter.kind];
+        const axes = KigumiKiwariValues.axesOf(parameter);
+        const boxKind = parameter.kind === 'ratio' ? 'number' : 'length';
         return html`
             <div class="kiwari-point">
                 ${axes.map((axis) => html`
@@ -585,7 +586,7 @@ export class ViewerKiwariPanel {
                             class=${problem && problem.startsWith(`${axis}:`) ? 'kiwari-box kiwari-box-bad' : 'kiwari-box'}
                             type="text"
                             .value=${String((draft || {})[axis] ?? '')}
-                            placeholder=${this.placeholderFor({ kind: 'length' })}
+                            placeholder=${this.placeholderFor({ kind: boxKind })}
                             ?disabled=${disabled}
                             @input=${(event) => this.app.setKiwariAxisDraft(parameter.section, parameter.key, axis, event.target.value)}>
                     </label>`)}
@@ -613,7 +614,7 @@ export class ViewerKiwariPanel {
         if (parameter.kind === 'count') {
             return this.renderCount(parameter, inputId, draft, problem, disabled);
         }
-        if (KigumiKiwariValues.VECTOR_AXES[parameter.kind]) {
+        if (KigumiKiwariValues.axesOf(parameter)) {
             return this.renderPoint(parameter, inputId, draft, problem, disabled);
         }
         return this.renderTextControl(parameter, inputId, draft, problem, {

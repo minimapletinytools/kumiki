@@ -288,9 +288,10 @@ file can give every frame one set, each its own, or anything between. To build
 a frame from a script or a test, call it bare for the defaults: `stool()`.
 
 Declare with `kiwari.length`, `.angle`, `.count`, `.number`, `.flag`, `.text`,
-`.choice` (pass the Enum class), `.point2` and `.point3`. Read back with the
-matching accessor: `k.length("seat_height")`, `k.count("legs")`,
-`k.choice("butt_end")`. Asking for the wrong one raises where you asked, which
+`.choice` (pass the Enum class), `.point2`, `.point3` and `.ratio` (two numbers
+in boxes named by `parts`, e.g. `kiwari.ratio((1, 6), parts=("rise", "run"))`).
+Read back with the matching accessor: `k.length("seat_height")`,
+`k.count("legs")`, `k.choice("butt_end")`, `k.ratio("slope")` (rise over run). Asking for the wrong one raises where you asked, which
 is the point of reading them by kind rather than by a single `get`.
 
 The helpers live on `kiwari` rather than as bare names because `length`,

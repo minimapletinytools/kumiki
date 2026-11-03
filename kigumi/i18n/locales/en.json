@@ -116,6 +116,7 @@
   "viewer.kiwari.kind.choice": "choice",
   "viewer.kiwari.kind.point2": "x, y",
   "viewer.kiwari.kind.point3": "x, y, z",
+  "viewer.kiwari.kind.ratio": "ratio",
   "viewer.chrome.toV3d": "to v3d view",
   "viewer.chrome.toV3d.title": "Scroll back to top",
   "viewer.chrome.loading.startingViewer": "starting viewer",

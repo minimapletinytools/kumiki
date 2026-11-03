@@ -21,6 +21,15 @@ module.exports = {
             pageAfterEdit === 'parameters' && parameterRows > 0 && parameterEdits > 0,
             `${parameterRows} parameters; page ${pageAfterClick} -> ${pageAfterEdit}`);
         await capture('03d-parameters');
+
+        // A ratio: switched on, it has a box per part, labelled by the frame.
+        await inShell(`${viewDoc}.getElementById('kiwari-leg_side_splay-on').click()`);
+        const parts = await waitFor(() => inShell(`[...${viewDoc}.querySelectorAll('#kiwari-leg_side_splay-rise, #kiwari-leg_side_splay-run')]
+            .map((box) => box.closest('.kiwari-axis').querySelector('.kiwari-axis-name').textContent).join('/')`)
+            .then((text) => text || null), { timeoutMs: 5000 }).catch(() => '');
+        await capture('03e-parameters-ratio');
+        await inShell(`${viewDoc}.getElementById('kiwari-leg_side_splay-on').click()`);
+        check('a ratio parameter shows a box for each of its parts', parts === 'rise/run', parts);
         await showTab('tree');
     },
 };

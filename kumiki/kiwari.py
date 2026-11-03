@@ -89,8 +89,9 @@ TEXT = "text"
 CHOICE = "choice"
 POINT2 = "point2"
 POINT3 = "point3"
+RATIO = "ratio"
 
-_KINDS = (LENGTH, ANGLE, COUNT, NUMBER, FLAG, TEXT, CHOICE, POINT2, POINT3)
+_KINDS = (LENGTH, ANGLE, COUNT, NUMBER, FLAG, TEXT, CHOICE, POINT2, POINT3, RATIO)
 
 # The kinds whose value is a measurement, and so can be written as text.
 _MEASURED = {LENGTH: (parse_length, format_length), ANGLE: (parse_angle, format_angle)}
@@ -110,6 +111,8 @@ class Declaration:
     minimum: Optional[float] = None
     maximum: Optional[float] = None
     choices: Optional[Type[Enum]] = None
+    # A ratio's two parts, top then bottom, as their boxes are labelled.
+    parts: Optional[Tuple[str, str]] = None
 
     def __post_init__(self) -> None:
         if self.kind not in _KINDS:
@@ -117,6 +120,8 @@ class Declaration:
         if self.kind == CHOICE:
             if self.choices is None or not (isinstance(self.choices, type) and issubclass(self.choices, Enum)):
                 raise ValueError("a choice must name the Enum class its options come from")
+        if self.kind == RATIO and (self.parts is None or len(self.parts) != 2 or self.parts[0] == self.parts[1]):
+            raise ValueError("a ratio names its two parts, e.g. parts=('rise', 'run')")
         if self.default is None and not self.optional:
             raise ValueError(
                 "a parameter with no default has nothing to build with. "
@@ -189,6 +194,9 @@ def _coerce(key: str, declaration: Declaration, value: Any) -> Any:
         numbers = [_coerce_measurement(f"{key}.{axis}", LENGTH, part) for axis, part in zip(axes, parts)]
         return create_v2(*numbers) if kind == POINT2 else create_v3(*numbers)
 
+    if kind == RATIO:
+        return _coerce_ratio(key, declaration, value)
+
     coerced = _coerce_measurement(key, kind, value)
     if kind == COUNT:
         whole = round(coerced)
@@ -197,6 +205,20 @@ def _coerce(key: str, declaration: Declaration, value: Any) -> Any:
         coerced = int(whole)
     _check_bounds(key, declaration, coerced)
     return coerced
+
+
+def _coerce_ratio(key: str, declaration: Declaration, value: Any) -> Tuple[float, float]:
+    """Two numbers, top and bottom: a pair, a mapping by part name, or one number over 1."""
+    parts = declaration.parts
+    assert parts is not None, "a ratio always names its parts -- Declaration checks that"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        value = (value, 1)
+    top, bottom = (_coerce_measurement(f"{key}.{part}", NUMBER, part_value)
+                   for part, part_value in zip(parts, _vector_parts(key, value, parts)))
+    if bottom == 0:
+        raise ValueError(f"{key!r}'s {parts[1]} can't be zero")
+    _check_bounds(key, declaration, top / bottom)
+    return (top, bottom)
 
 
 def _coerce_measurement(key: str, kind: str, value: Any) -> float:
@@ -327,6 +349,11 @@ class Kiwari:
     def v3(self, key: str) -> V3:
         """Three lengths."""
         return self._look_up(key, POINT3)
+
+    def ratio(self, key: str) -> Optional[float]:
+        """A ratio's top part over its bottom part."""
+        parts = self._look_up(key, RATIO)
+        return None if parts is None else parts[0] / parts[1]
 
     @property
     def origin(self) -> "Kiwari":
@@ -467,7 +494,7 @@ def _kiwari(**declarations: Declaration) -> Kiwari:
         if not isinstance(declaration, Declaration):
             raise TypeError(
                 f"{key!r} must be declared with one of length(), angle(), count(), number(), "
-                f"flag(), text(), choice(), point2() or point3() -- got {type(declaration).__name__}"
+                f"flag(), text(), choice(), point2(), point3() or ratio() -- got {type(declaration).__name__}"
             )
     # Coerced now so a default that is not what it claims to be is an error
     # where it was written, not on whichever later run first reads it.
@@ -565,6 +592,17 @@ class _KiwariFactory:
         """Three lengths -- a position, an offset."""
         return Declaration(POINT3, _default_or_nothing(default, optional), about, optional)
 
+    @staticmethod
+    def ratio(default=NOTHING, *, parts: Tuple[str, str] = ("rise", "run"), about: str = "",
+              minimum=None, maximum=None, optional: bool = False) -> Declaration:
+        """Two numbers read as one, the first over the second: a slope's rise over its run.
+
+        The default is a pair, e.g. ``(1, 6)``. The viewer shows one box per part, labelled
+        by `parts`; ``k.ratio(key)`` reads the quotient. `minimum` and `maximum` bound it.
+        """
+        return Declaration(RATIO, _default_or_nothing(default, optional), about, optional, minimum, maximum,
+                           parts=tuple(parts))
+
     def __repr__(self) -> str:
         return "<kiwari: declare with kiwari(key=kiwari.length(...), ...)>"
 
@@ -595,6 +633,8 @@ def _same_value(one: Any, other: Any) -> bool:
             abs(float(one[i]) - float(other[i])) <= 1e-12
             for i in range(one_shape[0] * one_shape[1])
         )
+    if isinstance(one, tuple) and isinstance(other, tuple) and len(one) == len(other):
+        return all(abs(float(a) - float(b)) <= 1e-12 for a, b in zip(one, other))
     if isinstance(one, bool) or isinstance(other, bool):
         return bool(one) == bool(other)
     if isinstance(one, (int, float)) and isinstance(other, (int, float)):
@@ -611,6 +651,8 @@ def _write(declaration: Declaration, value: Any) -> str:
     if declaration.kind in _VECTOR_AXES:
         axes = _VECTOR_AXES[declaration.kind]
         return ", ".join(format_length(value[index]) for index in range(len(axes)))
+    if declaration.kind == RATIO:
+        return f"{value[0]:g} / {value[1]:g}"
     if declaration.kind == CHOICE:
         return value.name
     return str(value)
@@ -625,6 +667,8 @@ def _plain(declaration: Declaration, value: Any) -> Any:
     if declaration.kind in _VECTOR_AXES:
         axes = _VECTOR_AXES[declaration.kind]
         return {axis: float(value[index]) for index, axis in enumerate(axes)}
+    if declaration.kind == RATIO:
+        return {part: float(value[index]) for index, part in enumerate(declaration.parts or ())}
     if declaration.kind == FLAG:
         return bool(value)
     if declaration.kind == TEXT:
@@ -649,6 +693,8 @@ def _declaration_payload(key: str, declaration: Declaration) -> Dict[str, Any]:
         payload["minimum"] = float(declaration.minimum)
     if declaration.maximum is not None:
         payload["maximum"] = float(declaration.maximum)
+    if declaration.parts is not None:
+        payload["parts"] = list(declaration.parts)
     if declaration.choices is not None:
         payload["choices"] = [
             {"value": option.name, "label": _label_for(option)}

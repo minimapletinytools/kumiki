@@ -286,7 +286,7 @@ def test_an_optional_parameter_may_still_have_a_default_to_be_turned_off() -> No
 
 def test_an_omitted_default_is_refused_unless_the_parameter_is_optional() -> None:
     for declare in (kiwari.length, kiwari.angle, kiwari.count, kiwari.number,
-                    kiwari.flag, kiwari.text, kiwari.point2, kiwari.point3):
+                    kiwari.flag, kiwari.text, kiwari.point2, kiwari.point3, kiwari.ratio):
         with pytest.raises(ValueError, match="needs a default"):
             declare()
         assert declare(optional=True).default is None
@@ -334,3 +334,30 @@ def test_the_payload_says_a_parameter_is_optional_and_what_it_defaults_to() -> N
     assert by_key["chamfer"]["default"] == {"value": 0.006, "text": "6mm"}
     assert "optional" not in by_key["posts"]
     assert payload["applied"]["trim"] == {"value": None}
+
+
+def test_a_ratio_reads_as_its_first_part_over_its_second() -> None:
+    k = kiwari(slope=kiwari.ratio((1, 6), parts=("rise", "run")))
+    assert k.ratio("slope") == pytest.approx(1 / 6)
+    assert k.resolve({"slope": {"rise": 3, "run": 4}}).ratio("slope") == pytest.approx(0.75)
+    assert k.resolve({"slope": 2}).ratio("slope") == pytest.approx(2)
+    with pytest.raises(TypeError, match="is a ratio"):
+        k.number("slope")
+
+
+def test_a_ratio_refuses_a_zero_bottom_and_bounds_its_quotient() -> None:
+    k = kiwari(slope=kiwari.ratio((1, 6), minimum=0.1))
+    with pytest.raises(ValueError, match="run can't be zero"):
+        k.resolve({"slope": (1, 0)})
+    with pytest.raises(ValueError, match="at least"):
+        k.resolve({"slope": (1, 20)})
+
+
+def test_a_ratios_payload_names_its_parts_and_round_trips() -> None:
+    k = kiwari(slope=kiwari.ratio((1, 6), parts=("rise", "run")))
+    payload = k.to_payload()
+    assert payload["schema"][0]["parts"] == ["rise", "run"]
+    assert payload["applied"]["slope"] == {"value": {"rise": 1.0, "run": 6.0}}
+    edited = k.resolve({"slope": {"value": {"rise": 2.0, "run": 6.0}}})
+    assert edited.changed_from_defaults() == ("slope",)
+    assert k.resolve(edited.to_payload()["applied"]).ratio("slope") == pytest.approx(1 / 3)

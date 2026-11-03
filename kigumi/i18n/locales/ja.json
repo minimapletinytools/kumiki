@@ -116,6 +116,7 @@
   "viewer.kiwari.kind.choice": "選択",
   "viewer.kiwari.kind.point2": "x, y",
   "viewer.kiwari.kind.point3": "x, y, z",
+  "viewer.kiwari.kind.ratio": "比",
   "viewer.chrome.toV3d": "3Dビューへ戻る",
   "viewer.chrome.toV3d.title": "先頭へスクロールして戻る",
   "viewer.chrome.loading.startingViewer": "ビューアーを起動中",

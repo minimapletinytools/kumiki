@@ -12,6 +12,19 @@ const dimensionText = KigumiDimensionText;
 const MEASURED = { length: 'parseLength', angle: 'parseAngle' };
 const VECTOR_AXES = { point2: ['x', 'y'], point3: ['x', 'y', 'z'] };
 
+/** The boxes a parameter is typed into, by name: a point's axes, a ratio's parts; null for one box. */
+function axesOf(parameter) {
+    if (parameter.kind === 'ratio') {
+        return Array.isArray(parameter.parts) && parameter.parts.length === 2 ? parameter.parts : ['top', 'bottom'];
+    }
+    return VECTOR_AXES[parameter.kind] || null;
+}
+
+/** What each of those boxes holds: a ratio's parts are plain numbers, a point's are lengths. */
+function axisKindOf(parameter) {
+    return parameter.kind === 'ratio' ? 'number' : 'length';
+}
+
 /** The unit a bare number in a box means, given what the viewer is set to. */
 function defaultUnitFor(kind, unitSystem) {
     if (kind === 'angle') {
@@ -54,14 +67,13 @@ function toDraft(parameter, entry, unitSystem) {
     if (parameter.kind === 'flag') {
         return Boolean(entry.value);
     }
-    if (VECTOR_AXES[parameter.kind]) {
-        const axes = VECTOR_AXES[parameter.kind];
+    if (axesOf(parameter)) {
         const vector = entry.value || {};
         const drafts = {};
-        for (const axis of axes) {
-            drafts[axis] = vector[axis] === undefined || vector[axis] === null
-                ? ''
-                : written('length', vector[axis], unitSystem);
+        for (const axis of axesOf(parameter)) {
+            drafts[axis] = vector[axis] === undefined || vector[axis] === null ? ''
+                : axisKindOf(parameter) === 'number' ? String(vector[axis])
+                    : written('length', vector[axis], unitSystem);
         }
         return drafts;
     }
@@ -86,7 +98,7 @@ function untouchedFor(parameter, entry, draft) {
     if (typed || !entry || entry.value === null || entry.value === undefined) {
         return null;
     }
-    if (!MEASURED[parameter.kind] && !VECTOR_AXES[parameter.kind]) {
+    if (!MEASURED[parameter.kind] && !axesOf(parameter)) {
         return null;
     }
     return { draft, wire: { value: entry.value } };
@@ -108,8 +120,21 @@ function whyNotValid(parameter, draft, unitSystem) {
     if (parameter.kind === 'flag' || parameter.kind === 'text' || parameter.kind === 'choice') {
         return null;
     }
-    if (VECTOR_AXES[parameter.kind]) {
-        for (const axis of VECTOR_AXES[parameter.kind]) {
+    if (parameter.kind === 'ratio') {
+        for (const axis of axesOf(parameter)) {
+            const why = whyNotOneNumber({}, 'number', (draft || {})[axis], unitSystem);
+            if (why) {
+                return `${axis}: ${why}`;
+            }
+        }
+        const [top, bottom] = axesOf(parameter).map((axis) => Number(String(draft[axis]).trim()));
+        if (bottom === 0) {
+            return `${axesOf(parameter)[1]}: can't be zero`;
+        }
+        return whyNotOneNumber(parameter, 'number', String(top / bottom), unitSystem);
+    }
+    if (axesOf(parameter)) {
+        for (const axis of axesOf(parameter)) {
             const why = whyNotOneNumber(parameter, 'length', (draft || {})[axis], unitSystem);
             if (why) {
                 return `${axis}: ${why}`;
@@ -172,12 +197,12 @@ function toWireValue(parameter, draft, unitSystem) {
     if (parameter.kind === 'text' || parameter.kind === 'choice') {
         return { value: draft === '' ? null : String(draft) };
     }
-    if (VECTOR_AXES[parameter.kind]) {
+    if (axesOf(parameter)) {
         const value = {};
-        for (const axis of VECTOR_AXES[parameter.kind]) {
-            value[axis] = dimensionText.parseLength(
-                String((draft || {})[axis]).trim(), defaultUnitFor('length', unitSystem),
-            );
+        for (const axis of axesOf(parameter)) {
+            const text = String((draft || {})[axis]).trim();
+            value[axis] = axisKindOf(parameter) === 'number' ? Number(text)
+                : dimensionText.parseLength(text, defaultUnitFor('length', unitSystem));
         }
         return { value };
     }
@@ -213,8 +238,8 @@ function sameValue(parameter, one, other) {
     if (a === null || a === undefined || b === null || b === undefined) {
         return (a === null || a === undefined) && (b === null || b === undefined);
     }
-    if (VECTOR_AXES[parameter.kind]) {
-        return VECTOR_AXES[parameter.kind].every((axis) => close(Number(a[axis]), Number(b[axis])));
+    if (axesOf(parameter)) {
+        return axesOf(parameter).every((axis) => close(Number(a[axis]), Number(b[axis])));
     }
     if (typeof a === 'number' && typeof b === 'number') {
         return close(a, b);
@@ -438,6 +463,7 @@ const KigumiKiwariValues = {
     withUnits,
     defaultUnitFor,
     VECTOR_AXES,
+    axesOf,
 };
 
-export { fromPayload, sectionsFromPayload, withSection, sectionsToWire, withDraft, withAxisDraft, withEnabled, isEnabled, valueFor, problems, isEdited, isChangedFromDefault, toWire, toWireValue, toDraft, whyNotValid, sameValue, resetToDefaults, withUnits, defaultUnitFor, VECTOR_AXES };
+export { fromPayload, sectionsFromPayload, withSection, sectionsToWire, withDraft, withAxisDraft, withEnabled, isEnabled, valueFor, problems, isEdited, isChangedFromDefault, toWire, toWireValue, toDraft, whyNotValid, sameValue, resetToDefaults, withUnits, defaultUnitFor, VECTOR_AXES, axesOf };

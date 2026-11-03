@@ -121,6 +121,34 @@ describe('what goes on the wire', () => {
     });
 });
 
+describe('a ratio', () => {
+    const ratioState = () => values.fromPayload({
+        schema: [{ key: 'slope', kind: 'ratio', parts: ['rise', 'run'], minimum: 0.1, default: { value: { rise: 1, run: 6 } } }],
+        applied: { slope: { value: { rise: 1, run: 6 } } },
+        changed: [],
+    });
+
+    test('has a box per part, holding a plain number', () => {
+        expect(values.axesOf(ratioState().schema[0])).toEqual(['rise', 'run']);
+        expect(ratioState().drafts.slope).toEqual({ rise: '1', run: '6' });
+    });
+
+    test('is sent as its parts, unit-free', () => {
+        const edited = values.withAxisDraft(ratioState(), 'slope', 'rise', '3');
+        expect(values.toWire(edited, 'imperial').slope).toEqual({ value: { rise: 3, run: 6 } });
+        expect(values.isEdited(edited, edited.schema[0], 'imperial')).toBe(true);
+    });
+
+    test('says which part is wrong, and bounds the quotient', () => {
+        const check = (rise, run) => values.problems(
+            values.withAxisDraft(values.withAxisDraft(ratioState(), 'slope', 'rise', rise), 'slope', 'run', run), 'metric').slope;
+        expect(check('1', '6')).toBeUndefined();
+        expect(check('1', '0')).toBe("run: can't be zero");
+        expect(check('x', '6')).toMatch(/^rise:/);
+        expect(check('1', '20')).toMatch(/at least/);
+    });
+});
+
 describe('marking what has been touched', () => {
     test('a box matching what was built is not edited', () => {
         for (const parameter of state().schema) {
