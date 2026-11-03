@@ -259,12 +259,12 @@ class FeatureGroup(Enum):
     """Which features a feature may derive an edge with:
 
         SHOULDER_PLANE with PERFECT, ROUGH and TENON
-        PERFECT        with SHOULDER_PLANE and CROSSING
-        ROUGH          with SHOULDER_PLANE and CROSSING
+        PERFECT        with SHOULDER_PLANE, CROSSING and END_CUT
+        ROUGH          with SHOULDER_PLANE, CROSSING and END_CUT
         TENON          with SHOULDER_PLANE
         CROSSING       with PERFECT, ROUGH and END_CUT
         NONE           with nothing
-        END_CUT        with CROSSING
+        END_CUT        with PERFECT, ROUGH and CROSSING
 
     - PERFECT: the perfect timber within's faces, arrises, corners and centerplanes, and rough faces
       lying on it (rptw.*).
@@ -291,12 +291,12 @@ class FeatureGroup(Enum):
 FEATURE_GROUP_PAIRS: dict = {
     FeatureGroup.SHOULDER_PLANE: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH,
                                             FeatureGroup.TENON}),
-    FeatureGroup.PERFECT: frozenset({FeatureGroup.SHOULDER_PLANE, FeatureGroup.CROSSING}),
-    FeatureGroup.ROUGH: frozenset({FeatureGroup.SHOULDER_PLANE, FeatureGroup.CROSSING}),
+    FeatureGroup.PERFECT: frozenset({FeatureGroup.SHOULDER_PLANE, FeatureGroup.CROSSING, FeatureGroup.END_CUT}),
+    FeatureGroup.ROUGH: frozenset({FeatureGroup.SHOULDER_PLANE, FeatureGroup.CROSSING, FeatureGroup.END_CUT}),
     FeatureGroup.TENON: frozenset({FeatureGroup.SHOULDER_PLANE}),
     FeatureGroup.CROSSING: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH, FeatureGroup.END_CUT}),
     FeatureGroup.NONE: frozenset(),
-    FeatureGroup.END_CUT: frozenset({FeatureGroup.CROSSING}),
+    FeatureGroup.END_CUT: frozenset({FeatureGroup.PERFECT, FeatureGroup.ROUGH, FeatureGroup.CROSSING}),
 }
 
 

@@ -98,8 +98,9 @@ Declared features on a CSG can be queried at a point using `collect_feature_hits
 Flat face and straight edge features can be assigned a "FeatureGroup" which determines which features in a CutTimber can combine to produce derived features. That is, 2 faces producing an edge, or a face and an edge producing a point.
 
 `END_CUT` marks trimmed timber ends, including `Cutting`'s generated end-cut planes and the
-end-chop helpers' cut faces. It pairs only with `CROSSING`, so cuts crossing an end can form
-derived edges there without forming edges with joint shoulder planes. An end chop explicitly
+end-chop helpers' cut faces. It pairs with the timber's own faces (`PERFECT`, `ROUGH`), so the
+arrises where an end is trimmed are edges, and with `CROSSING`, so cuts crossing an end can form
+derived edges there, but not with joint shoulder planes. An end chop explicitly
 marked as a shoulder retains `SHOULDER_PLANE`.
 
 Note that the feature derivation system currently does NOT support the following:

@@ -3045,7 +3045,7 @@ class TestFeatureGroups:
             assert not feature_groups_intersect(FeatureGroup.CROSSING, other), other
 
     @pytest.mark.parametrize("other_group", list(FeatureGroup))
-    def test_an_end_cut_derives_an_edge_only_with_a_crossing(self, other_group):
+    def test_an_end_cut_derives_an_edge_with_the_timbers_faces_and_a_crossing(self, other_group):
         cut = HalfSpace(normal=create_v3(0, 0, 1), offset=scalar(5), feature_overrides=[
             FeatureOverride(HALF_SPACE_PLANE, properties=FeatureProperties(group=FeatureGroup.END_CUT))])
         other = HalfSpace(normal=create_v3(1, 0, 0), feature_overrides=[
@@ -3054,7 +3054,8 @@ class TestFeatureGroups:
             OwnedFeatureHit(cut.get_declared_features()[0], cut),
             OwnedFeatureHit(other.get_declared_features()[0], other))
 
-        assert (edge is not None) == (other_group is FeatureGroup.CROSSING)
+        meets = {FeatureGroup.PERFECT, FeatureGroup.ROUGH, FeatureGroup.CROSSING}
+        assert (edge is not None) == (other_group in meets)
 
     def test_a_tenon_pairs_only_with_the_shoulder_plane(self):
         """That pair is the tenon's base arris, which is nowhere else.

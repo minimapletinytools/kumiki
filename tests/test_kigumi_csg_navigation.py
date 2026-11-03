@@ -1414,14 +1414,14 @@ class TestEdgeHighlightSpan:
                     f"{a_name} x {b_name} could not be cropped at all")
                 checked += 1
 
-        # Eight: the shoulder against each of the timber's four long faces, and
-        # the four its tenon's cheeks make where they leave it at the shoulder --
-        # the tenon's base. Not the shoulder against the timber's top: the rough
+        # Twelve: the shoulder against each of the timber's four long faces, the
+        # four its tenon's cheeks make where they leave it at the shoulder --
+        # the tenon's base -- and the end cut (side.0) against the four long faces. Not the shoulder against the timber's top: the rough
         # prism runs to infinity that way, so there is no face there for an edge
         # to be against, and derive says so rather than handing back an edge that
         # locates to nothing. Nor the shoulder against the tenon's tip: the two
         # planes are parallel, so they meet in no line.
-        assert checked == 8, f"expected the four shoulder and four tenon base edges, got {checked}"
+        assert checked == 12, f"expected the shoulder, tenon base and end cut edges, got {checked}"
 
 
 class TestAnArrisStopsWhereTheSurfaceDoes:
