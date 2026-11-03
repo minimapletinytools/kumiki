@@ -1,6 +1,6 @@
-"""Marking the frames and tools in a file for kigumi to find.
+"""Marking the frames in a file for kigumi to find.
 
-A file may declare any number of frames and tools. Each frame declares its own parameters,
+A file may declare any number of frames. Each frame declares its own parameters,
 resolves the values it is handed onto them, and returns them on the Frame::
 
     STOOL = kiwari(legs=kiwari.count(4, minimum=3))
@@ -16,20 +16,14 @@ resolves the values it is handed onto them, and returns them on the Frame::
         k = STOOL.resolve(k)    # the same kiwari object: one set of parameters for both
         ...
 
-    @tool
-    def leg_report(frame: Frame) -> str:
-        return f"{frame.kiwari.count('legs')} legs"
-
 Kigumi builds every `@frame` and shows them together. Frames whose kiwari were resolved from
 the same kiwari object share one set of parameters (see `Kiwari.origin`); each different one
 gets its own section in the parameters panel. A frame is handed back the values for its own
-kiwari, or None on the first build. A `@tool` runs on demand against the shown frame and its
-text is displayed. The decorators only mark a function; it is still an ordinary function to
+kiwari, or None on the first build. The decorators only mark a function; it is still an ordinary function to
 call from a script or a test.
 
-A marked function is admitted only if its annotations say exactly that: `(k: Kiwari) -> Frame`
-for a frame, `(frame: Frame) -> str` for a tool. `Optional[Kiwari]` is accepted for the
-parameters.
+A frame is admitted only if its annotations say exactly `(k: Kiwari) -> Frame`;
+`Optional[Kiwari]` is accepted for the parameter.
 
 A pattern book marks each of its patterns instead, with a path and, if it takes parameters,
 its own kiwari::
@@ -49,11 +43,10 @@ from typing import Any, Callable, List, Optional, Sequence, Tuple, TypeVar
 
 from .kiwari import Kiwari
 
-__all__ = ["frame", "tool", "pattern"]
+__all__ = ["frame", "pattern"]
 
 _MARK = "__kumiki_entry__"
 FRAME = "frame"
-TOOL = "tool"
 PATTERN = "pattern"
 _PATTERN_DECLARATION = "__kumiki_pattern__"
 
@@ -66,12 +59,6 @@ def frame(function: F) -> F:
     It returns its parameters on the Frame: `Frame(..., kiwari=k)`.
     """
     setattr(function, _MARK, FRAME)
-    return function
-
-
-def tool(function: F) -> F:
-    """Marks a function `(frame: Frame) -> str` as a tool to run on the file's frame."""
-    setattr(function, _MARK, TOOL)
     return function
 
 
@@ -114,9 +101,8 @@ class Rejected:
 
 @dataclass(frozen=True)
 class ModuleEntries:
-    """What a module marked: its admitted frames and tools, and those rejected."""
+    """What a module marked: its admitted frames, and those rejected."""
     frames: Tuple[Entry, ...]
-    tools: Tuple[Entry, ...]
     rejected: Tuple[Rejected, ...]
 
 
@@ -148,8 +134,6 @@ def _signature_problem(function: Callable[..., Any], kind: str) -> Optional[str]
     is_frame = lambda annotation: _is_class(annotation, Frame)  # noqa: E731
     if kind == FRAME:
         wanted, checks, returns_ok = "(k: Kiwari) -> Frame", [_is_kiwari], is_frame
-    elif kind == TOOL:
-        wanted, checks, returns_ok = "(frame: Frame) -> str", [is_frame], lambda a: a is str
     else:
         takes_kiwari = getattr(function, _PATTERN_DECLARATION).kiwari is not None
         wanted = f"({'k: Kiwari' if takes_kiwari else ''}) -> Frame | Joint | CutCSG"
@@ -191,19 +175,16 @@ def _marked(module: Any, kinds: Tuple[str, ...]) -> List[Tuple[str, Callable[...
 
 
 def module_entries(module: Any) -> ModuleEntries:
-    """The frames and tools `module` marked, in source order, each admitted or rejected."""
-    marked = _marked(module, (FRAME, TOOL))
+    """The frames `module` marked, in source order, each admitted or rejected."""
     frames: List[Entry] = []
-    tools: List[Entry] = []
     rejected: List[Rejected] = []
-    for name, function in marked:
-        kind = getattr(function, _MARK)
-        problem = _signature_problem(function, kind)
+    for name, function in _marked(module, (FRAME,)):
+        problem = _signature_problem(function, FRAME)
         if problem is not None:
-            rejected.append(Rejected(name, kind, problem))
+            rejected.append(Rejected(name, FRAME, problem))
         else:
-            (frames if kind == FRAME else tools).append(Entry(name, function))
-    return ModuleEntries(tuple(frames), tuple(tools), tuple(rejected))
+            frames.append(Entry(name, function))
+    return ModuleEntries(tuple(frames), tuple(rejected))
 
 
 # TODO merging into one Frame keeps kigumi working as is. Instead, kigumi should take several

@@ -259,17 +259,7 @@ legs = k.count("legs")
 
 Please see `kiwari.py` and `dovetailed_sawhorse.py` for examples
 
-### Tools
-
-A `@tool` is a function Kigumi runs on demand against the shown frame; the text it returns is displayed. It must be annotated exactly `(frame: Frame) -> str`. The frame's parameters are `frame.kiwari` -- when every frame in the file shares one kiwari; otherwise it is None.
-
-```python
-@tool
-def leg_report(frame: Frame) -> str:
-    return f"{frame.kiwari.count('legs')} legs, {len(frame.cut_timbers)} timbers"
-```
-
-The annotations on `@frame` and `@tool` are checked (`Optional[Kiwari]` is also accepted). One that doesn't match is not used, and Kigumi says why.
+The annotations on `@frame` are checked (`Optional[Kiwari]` is also accepted). One that doesn't match is not used, and Kigumi says why.
 
 ## Parameters (kiwari)
 

@@ -1,4 +1,4 @@
-"""A file with several @frame functions and @tool functions, as the kigumi runner loads it."""
+"""A file with several @frame functions, as the kigumi runner loads it."""
 
 import json
 
@@ -41,19 +41,9 @@ def east(k: Optional[Kiwari] = None) -> Frame:
     return Frame(cut_timbers=_posts(k, 10, "east"), name="east", kiwari=k)
 
 
-@tool
-def count_posts(frame: Frame) -> str:
-    return f"{len(frame.cut_timbers)} posts"
-
-
-@tool
-def mistyped(frame: Frame, k: Kiwari) -> str:
-    return "never admitted"
-
-
-@tool
-def not_text(frame: Frame) -> str:
-    return 42
+@frame
+def mistyped(k: Kiwari, extra: int) -> Frame:
+    return Frame(cut_timbers=[], name="never admitted")
 '''
 
 
@@ -104,37 +94,13 @@ def test_values_for_one_kiwari_leave_the_others_alone(frames_file):
     assert (_posts_of(again, "west"), _posts_of(again, "east"), _posts_of(again, "north")) == (2, 2, 4)
 
 
-def test_tools_and_rejections_reach_the_viewer(frames_file):
+def test_rejections_reach_the_viewer(frames_file):
     slot = runner.load_slot_state(str(frames_file))
 
-    listed = runner._serialize_tools(slot)
+    (rejected,) = runner._serialize_rejected_entries(slot)
 
-    assert [tool["name"] for tool in listed["tools"]] == ["count_posts", "not_text"]
-    (rejected,) = listed["rejectedEntries"]
-    assert rejected["name"] == "mistyped" and rejected["kind"] == "tool" and "1 parameter" in rejected["reason"]
-    json.dumps(listed)
-
-
-def test_a_tool_runs_on_the_shown_frame(frames_file):
-    first = runner.load_slot_state(str(frames_file))
-    slot = runner.load_slot_state(str(frames_file), kiwari_values={"west,east": {"posts": 3}},
-                                  previous_groups=first.kiwari_groups)
-
-    assert runner.run_tool(slot, "count_posts") == {"name": "count_posts", "output": "7 posts"}
-
-
-def test_a_tool_must_return_text(frames_file):
-    slot = runner.load_slot_state(str(frames_file))
-
-    with pytest.raises(TypeError, match="expected str"):
-        runner.run_tool(slot, "not_text")
-
-
-def test_an_unknown_tool_says_what_there_is(frames_file):
-    slot = runner.load_slot_state(str(frames_file))
-
-    with pytest.raises(ValueError, match="count_posts"):
-        runner.run_tool(slot, "nope")
+    assert rejected["name"] == "mistyped" and rejected["kind"] == "frame" and "1 parameter" in rejected["reason"]
+    json.dumps(rejected)
 
 
 def test_saved_values_go_back_to_the_frames_they_were_saved_for(frames_file):
@@ -186,7 +152,7 @@ def test_a_kumiki_without_frame_decorators_still_loads_legacy_files(workspace, m
     slot = runner.load_slot_state(str(path))
 
     assert slot.frame.name == "old"
-    assert runner._serialize_tools(slot) == {"tools": [], "rejectedEntries": []}
+    assert runner._serialize_rejected_entries(slot) == []
 
 
 def test_a_pattern_book_ignores_its_frames(workspace, capsys):  # noqa: F811

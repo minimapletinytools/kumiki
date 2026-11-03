@@ -1,4 +1,4 @@
-"""@frame and @tool: marking a file's frames and tools, and admitting them by their signature."""
+"""@frame: marking a file's frames, and admitting them by their signature."""
 
 import types
 from typing import Optional
@@ -37,7 +37,7 @@ class TestDecorators:
 
 class TestAdmission:
 
-    def test_well_typed_frames_and_tools_are_admitted_in_order(self):
+    def test_well_typed_frames_are_admitted_in_order(self):
         @frame
         def first(k: Kiwari) -> Frame:
             return Frame(cut_timbers=[])
@@ -46,14 +46,9 @@ class TestAdmission:
         def second(k: Optional[Kiwari]) -> Frame:
             return Frame(cut_timbers=[])
 
-        @tool
-        def report(frame: Frame) -> str:
-            return ""
-
-        entries = module_entries(_module(first=first, second=second, report=report))
+        entries = module_entries(_module(first=first, second=second))
 
         assert [entry.name for entry in entries.frames] == ["first", "second"]
-        assert [entry.name for entry in entries.tools] == ["report"]
         assert entries.rejected == ()
 
     @pytest.mark.parametrize("source, reason", [
@@ -61,9 +56,6 @@ class TestAdmission:
         ("@frame\ndef f(k: Kiwari): ...", "return"),
         ("@frame\ndef f(k: Kiwari, extra: int) -> Frame: ...", "1 parameter"),
         ("@frame\ndef f(*k: Kiwari) -> Frame: ...", "no *args"),
-        ("@tool\ndef f(frame: Frame) -> int: ...", "return"),
-        ("@tool\ndef f(k: Kiwari) -> str: ...", "parameter 'k'"),
-        ("@tool\ndef f(frame: Frame, k: Kiwari) -> str: ...", "1 parameter"),
         ("@frame\ndef f(k: 'NoSuchType') -> Frame: ...", "could not be read"),
     ])
     def test_a_wrong_signature_is_rejected_with_why(self, source, reason):
@@ -75,7 +67,7 @@ class TestAdmission:
 
         entries = module_entries(module)
 
-        assert entries.frames == () and entries.tools == ()
+        assert entries.frames == ()
         (rejected,) = entries.rejected
         assert reason in rejected.reason
 

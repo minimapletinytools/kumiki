@@ -578,7 +578,7 @@ class CSGTreeWire(TypedDict, total=False):
     memberKey: str
 
 
-# --- slots, patterns, tools and responses ----------------------------------------------
+# --- slots, patterns and responses ----------------------------------------------
 
 
 
@@ -616,22 +616,13 @@ class PatternListWire(TypedDict):
     scan_s: float
 
 
-class ToolsWire(TypedDict):
-    tools: List[Dict[str, str]]
-    rejectedEntries: List[Dict[str, str]]
-
-
-class ToolRunWire(TypedDict):
-    name: str
-    output: str
-
-
-class ReadyEventWire(ToolsWire):
+class ReadyEventWire(TypedDict):
     type: str
     examplePath: str
     commands: List[str]
     frame: FrameCountsWire
     kiwari: Optional[List[KiwariSectionWire]]
+    rejectedEntries: List[Dict[str, str]]
 
 
 class ErrorWire(TypedDict):
@@ -809,8 +800,7 @@ class SlotState:
     kiwari_groups: Tuple[KiwariGroup, ...] = ()
     # Each @frame's name and its own frame, when a file shows several as one.
     frame_parts: Tuple[Tuple[str, Any], ...] = ()
-    # The file's @tool functions, and any @frame / @tool rejected for its signature.
-    tools: Tuple[Any, ...] = ()
+    # Any @frame rejected for its signature.
     rejected_entries: Tuple[Any, ...] = ()
     # Drawings made in this session and not yet saved. They live here rather
     # than in the viewer so python stays the one place a drawing comes from,
@@ -3958,7 +3948,6 @@ def load_slot_state(
         patternbook=patternbook,
         kiwari_groups=groups,
         frame_parts=parts,
-        tools=entries.tools if entries is not None else (),
         rejected_entries=entries.rejected if entries is not None else (),
         generation=_project_generation,
     )
@@ -3967,7 +3956,6 @@ def load_slot_state(
 def make_ready_event(state: RunnerState) -> ReadyEventWire:
     ss = state._active
     frame_summary = serialize_frame(ss.frame)
-    tools = _serialize_tools(ss)
     return {
         "type": "ready",
         "examplePath": str(ss.file_path),
@@ -3982,7 +3970,6 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
-            "list_tools", "run_tool",
             "shutdown",
         ],
         "frame": {
@@ -3991,30 +3978,13 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
             "accessories_count": frame_summary["accessories_count"],
         },
         "kiwari": _serialize_kiwari_for_slot(ss),
-        "tools": tools["tools"],
-        "rejectedEntries": tools["rejectedEntries"],
+        "rejectedEntries": _serialize_rejected_entries(ss),
     }
 
 
-def _serialize_tools(slot_state: SlotState) -> ToolsWire:
-    """Return the slot's @tool functions, and the @frame / @tool functions rejected for their signature."""
-    return {
-        "tools": [{"name": entry.name} for entry in slot_state.tools],
-        "rejectedEntries": [{"name": r.name, "kind": r.kind, "reason": r.reason} for r in slot_state.rejected_entries],
-    }
-
-
-def run_tool(slot_state: SlotState, name: str) -> ToolRunWire:
-    """Run a @tool function on the slot's frame and return its text."""
-    entry = next((entry for entry in slot_state.tools if entry.name == name), None)
-    if entry is None:
-        available = [entry.name for entry in slot_state.tools]
-        raise ValueError(f"No tool named {name!r}. Available: {available}")
-    with contextlib.redirect_stdout(sys.stderr):
-        output = entry.function(slot_state.frame)
-    if not isinstance(output, str):
-        raise TypeError(f"tool {name!r} returned {type(output).__name__}, expected str")
-    return {"name": name, "output": output}
+def _serialize_rejected_entries(slot_state: SlotState) -> List[Dict[str, str]]:
+    """Return the @frame functions rejected for their signature."""
+    return [{"name": r.name, "kind": r.kind, "reason": r.reason} for r in slot_state.rejected_entries]
 
 
 def make_success_response(request_id: Any, command: str, result: Any) -> ResponseWire:
@@ -5464,12 +5434,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
 
     # --- Tools ---
 
-    if command == "list_tools":
-        return state, make_success_response(request_id, command, _serialize_tools(_resolve_slot(state, payload))), False
-
-    if command == "run_tool":
-        name = _require_str(payload, "name", "run_tool requires payload.name")
-        return state, make_success_response(request_id, command, run_tool(_resolve_slot(state, payload), name)), False
 
     # --- Pattern discovery ---
 

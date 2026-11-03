@@ -16,29 +16,13 @@ def bench(k: Kiwari) -> Frame: ...
     info = analyze_source(src, "f.py")
     assert [(e.name, e.kind) for e in info.frames] == [("stool", "function"), ("bench", "function")]
     assert info.multiple_frames is True
-    assert info.tools == []
-
-
-def test_decorated_tools_are_tools_not_frames():
-    src = """
-from kumiki import *
-
-@frame
-def stool(k: Kiwari) -> Frame: ...
-
-@tool
-def report(frame: Frame, k: Kiwari) -> str: ...
-"""
-    info = analyze_source(src, "f.py")
-    assert [e.name for e in info.frames] == ["stool"]
-    assert [e.name for e in info.tools] == ["report"]
 
 
 def test_decorators_by_name_alias_or_attribute():
     src = """
 import kumiki
 from kumiki import frame as view
-from kumiki.frame_decorators import tool
+from kumiki.frame_decorators import frame as plain
 
 @view
 def a(k): ...
@@ -46,12 +30,11 @@ def a(k): ...
 @kumiki.frame
 def b(k): ...
 
-@tool
-def c(frame, k): ...
+@plain
+def c(k): ...
 """
     info = analyze_source(src, "f.py")
-    assert [e.name for e in info.frames] == ["a", "b"]
-    assert [e.name for e in info.tools] == ["c"]
+    assert [e.name for e in info.frames] == ["a", "b", "c"]
 
 
 def test_a_decorator_from_elsewhere_is_ignored():

@@ -18,9 +18,8 @@ statement is recognized as a **frame** entry if it is:
 * a deprecated single entry: a function named ``build_frame``, or a function or
   variable named ``example``.
 
-A function decorated with ``@tool`` is recorded as a **tool**. Whether a
-decorated function's signature is right is only checked after import, by
-``kumiki.frame_decorators``.
+Whether a decorated function's signature is right is only checked after
+import, by ``kumiki.frame_decorators``.
 
 A function decorated with ``@pattern`` makes the file a **pattern book**. Its
 signature is checked after import, in ``_resolve_pattern_list``.
@@ -112,10 +111,10 @@ _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
 # AST-driven static analysis (no imports)
 # ---------------------------------------------------------------------------
 #
-# Frame entries are recognized by kumiki's ``@frame`` / ``@tool`` decorators, or by the
+# Frame entries are recognized by kumiki's ``@frame`` decorator, or by the
 # deprecated names ``build_frame`` and ``example``. The decorators may come in by ``from kumiki import *`` (the usual
 # form), by name, under an alias, or as ``kumiki.frame``.
-_DECORATORS = ("frame", "tool", "pattern")
+_DECORATORS = ("frame", "pattern")
 # Deprecated: frames picked up by name rather than by @frame.
 _LEGACY_NAMES = ("build_frame", "example")
 
@@ -133,7 +132,6 @@ class ModuleStaticInfo:
     """Result of statically analyzing a single source file."""
     file_path: str
     frames: List[StaticEntry] = field(default_factory=list)
-    tools: List[StaticEntry] = field(default_factory=list)
     pattern_functions: List[StaticEntry] = field(default_factory=list)
     parse_error: Optional[str] = None
 
@@ -157,10 +155,10 @@ def _is_kumiki_module(module_name: Optional[str]) -> bool:
 
 
 def _collect_decorator_aliases(tree: ast.Module) -> dict[str, str]:
-    """Map local identifier -> ``frame`` / ``tool`` for kumiki's decorators in scope.
+    """Map local identifier -> ``frame`` / ``pattern`` for kumiki's decorators in scope.
 
     Only module-level ``from kumiki[...] import ...`` statements are inspected;
-    ``import *`` from kumiki brings both in under their own names.
+    ``import *`` from kumiki brings them all in under their own names.
     """
     aliases: dict[str, str] = {}
     for node in tree.body:
@@ -174,7 +172,7 @@ def _collect_decorator_aliases(tree: ast.Module) -> dict[str, str]:
 
 
 def _decorator_kind(decorator: ast.expr, aliases: dict[str, str]) -> Optional[str]:
-    """``frame``, ``tool`` or ``pattern`` if *decorator* is one of kumiki's, else None."""
+    """``frame`` or ``pattern`` if *decorator* is one of kumiki's, else None."""
     if isinstance(decorator, ast.Call):  # @pattern("group/name", ...)
         decorator = decorator.func
     if isinstance(decorator, ast.Name):
@@ -211,15 +209,13 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
     aliases = _collect_decorator_aliases(tree)
 
     for node in tree.body:
-        # @frame / @tool def name(...): ...
+        # @frame / @pattern def name(...): ...
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             kinds = {_decorator_kind(decorator, aliases) for decorator in node.decorator_list}
             if "pattern" in kinds:
                 info.pattern_functions.append(StaticEntry(node.name, "function", node.lineno))
             elif "frame" in kinds:
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
-            elif "tool" in kinds:
-                info.tools.append(StaticEntry(node.name, "function", node.lineno))
             elif node.name in _LEGACY_NAMES:
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
             continue
@@ -556,7 +552,6 @@ def _frame_record_for_index(
         "chosen_frame_kind": chosen_kind,
         "all_frame_names": all_frame_names,
         "multiple_frames": bool(static and static.multiple_frames),
-        "tools": [entry.name for entry in (static.tools if static else [])],
         "content_sha256": rec.content_sha256,
         "load_error": rec.load_error,
         "warnings": list(rec.warnings or []),
@@ -668,7 +663,6 @@ def _entry_from_record(rec: LibrarianModuleRecord) -> Dict[str, Any]:
         "chosen_frame_name": chosen.name if chosen is not None else None,
         "chosen_frame_kind": chosen.kind if chosen is not None else None,
         "multiple_frames": bool(static and static.multiple_frames),
-        "tools": [entry.name for entry in (static.tools if static else [])],
         "warnings": list(rec.warnings or []),
         "load_error": rec.load_error,
         "patternbook": _patternbook_payload(rec.pattern_list),
