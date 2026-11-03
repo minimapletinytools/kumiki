@@ -9,6 +9,7 @@ Drawings are generated: a plan, and a shop drawing for the beam and one for the 
 also looks straight down on a leg's level top, where the dovetail is marked out.
 """
 
+
 from kumiki import *
 from kumiki.drawings.auto_drawings import with_auto_drawings
 from kumiki.drawings.measure import ViewAxes
@@ -27,7 +28,7 @@ SAWHORSE = kiwari(
     sawhorse_length=kiwari.length(inches(42), about="The beam's length"),
 )
 
-DOVETAIL_TAPER = degrees(10)      # narrowing toward the top: point end up
+DOVETAIL_TAPER = degrees(13)      # narrowing toward the top: point end up
 DOVETAIL_FLARE = atan(scalar(1) / scalar(6))
 TRIM_ALLOWANCE = inches(1)
 BEAM_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE   # the beam's top meets its +y side

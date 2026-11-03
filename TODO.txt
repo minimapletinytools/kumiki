@@ -123,9 +123,9 @@ DONE/IGNORE-add types to runner.py
   IGNORE-do apple dev signing
   DONE-hide agent for now or make secret web build?
   DONE-do antoher agent review pass
+  DONE-add export drawing button (how to do this?)
+  DONE-add reveal in finder option
 
-  -add export drawing button (how to do this?)
-  
   -DRAWINGS
     -make decision on how to do solver in separate thread
       -must still be possible fo rteh agent to run the solver directly outside of the viewer to inspect its results
@@ -133,6 +133,8 @@ DONE/IGNORE-add types to runner.py
     -maybe do drawing prettifier pass
     -test agent created drawings
 
+  -finish the sawhorse and add tools
+  -refreshing viewer does not refresh measurements, they still show the old values, need to figure this out
 
   -check that edges are being highlighted correctly in 2d drawing mesaurements
   -add joints/arrangement stuff to cheat sheet
@@ -153,15 +155,10 @@ DONE/IGNORE-add types to runner.py
 -add support to run @tools from the parameter section
   -do this for generating saw horse router jig lol
   -router jig template function? takes a timber and a flat profile (extrusion or prism), adds a "template blcok over both, cuts out the timber, and then cuts out the profile extruding upwards to make the template based on bit + collar paraemetrs. shouldn't be too hard? would be cool if it makes mid supports too for extra wide profiles...
-
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
 -decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
-
-
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
-
-
 -improve board  functions, think bout the simplest way to do this...
 -update shed example to include board
   -make a video about this maybe after you do some more edge joints
@@ -277,9 +274,7 @@ DONE/IGNORE-add types to runner.py
     -may as well do a union joint then? (these would really be decorative joints...)
     -or would it be better just to have folsk make custom joints
   DONE-tapered dovetail joint for that cool sawhores
-
-
-  -finish dovetail jonit
+  DONE-finish dovetail jonit
   -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
