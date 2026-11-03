@@ -8,7 +8,7 @@ const { nativeImage } = require('electron');
 
 module.exports = {
     name: 'drawings',
-    async run({ check, inShell, waitFor, capture, settings, runAppCommand, openFrame, viewDoc, showTab, FRAME, DRAWING_FRAME, REPO, ARTIFACTS }) {
+    async run({ check, inShell, waitFor, capture, settings, runAppCommand, openFrame, viewDoc, showTab, FRAME, DRAWING_FRAME, PARAMETER_FRAME, REPO, ARTIFACTS }) {
         await openFrame(FRAME);
         await showTab('options');
         await inShell(`${viewDoc}.getElementById('beta-drawing-toggle').click()`);
@@ -146,5 +146,23 @@ module.exports = {
             return !!app.querySelector('.drawing-view-outline');
         })()`);
         check('leaving the drawing removes its view outline', !modelOutlined);
+
+        // A refresh measures the drawings again: the sawhorse's generated dimensions move with leg_distance.
+        await openFrame(PARAMETER_FRAME);
+        const ends = () => inShell(`(() => {
+            const app = ${viewerApp};
+            const drawings = app && app.sceneStore ? app.sceneStore.drawings() : [];
+            const at = drawings.flatMap((drawing) => (drawing.viewports || []).flatMap((viewport) => viewport.measurements || []))
+                .map((measure) => [measure.a && measure.a.at, measure.b && measure.b.at]);
+            return at.length ? JSON.stringify(at) : null;
+        })()`);
+        const measuredBefore = await waitFor(ends, { timeoutMs: 90000 }).catch(() => null);
+        const section = await inShell(`(${viewerApp}.kiwariSections || [])[0]?.id ?? null`).catch(() => null);
+        await inShell(`(() => { const app = ${viewerApp}; app.setKiwariDraft(${JSON.stringify(section)}, 'leg_distance', '20in'); app.requestRefresh(); })()`);
+        const measuredAfter = await waitFor(() => ends().then((now) => (now && now !== measuredBefore ? now : null)),
+            { timeoutMs: 90000 }).catch(() => null);
+        check('after a refresh, a drawing\'s measurements are of the frame just built',
+            Boolean(measuredBefore) && Boolean(measuredAfter), measuredBefore ? `${JSON.parse(measuredBefore).length} measurements` : 'none found');
+        await inShell(`(() => { const app = ${viewerApp}; app.setKiwariDraft(${JSON.stringify(section)}, 'leg_distance', '22in'); app.requestRefresh(); })()`);
     },
 };

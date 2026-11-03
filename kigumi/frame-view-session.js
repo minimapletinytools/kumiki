@@ -946,6 +946,12 @@ class FrameViewSession {
                 });
                 this._fetchAssemblyInBackground(layersData);
             }
+            // The drawings again, measured on the frame just built.
+            if (getHost().getConfig(BETA_FEATURE_SETTINGS.drawingBeta, false) === true) {
+                this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
+                    this.log(`[drawing] get_drawings after refresh failed: ${err.message || err}`);
+                });
+            }
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
             this.profiler.markTiming(timing, 'refresh.end', { refresh_total_ms: Math.round(refresh_total_s * 1000) });
             await pushCadqueryStatus(this);
