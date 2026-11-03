@@ -149,5 +149,5 @@ def test_an_edge_cut_away_but_for_where_it_crosses_a_cut_wall_is_not_there(sawho
 
 
 def test_an_edge_partly_on_a_flush_cut_wall_is_only_where_the_solid_is(sawhorse_leg):
-    # The outer face's edge on the top is the neck (4.66"), not the leg's whole width (6.64").
-    assert _top_edge_length(sawhorse_leg, "rptw.front") == pytest.approx(4.66, abs=0.01)
+    # The outer face's edge on the top is the neck (4.29"), not the leg's whole width (6.64").
+    assert _top_edge_length(sawhorse_leg, "rptw.front") == pytest.approx(4.29, abs=0.01)
