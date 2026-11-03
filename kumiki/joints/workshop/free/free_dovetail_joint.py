@@ -3,7 +3,6 @@ Kumiki - Free joint construction functions
 Contains functions for creating joints with flexible geometry matching.
 """
 
-import warnings
 from dataclasses import dataclass, replace
 from typing import Optional
 
@@ -81,9 +80,9 @@ class FreeDovetailShape:
             "a dovetail's angle must be positive: it widens away from its neck, toward +y"
         if not safe_zero_test(self.taper_angle) and self.forward_length is not None \
                 and self.backward_length is not None:
-            if not (safe_compare(self._half_width_at(self.forward_length), 0, Comparison.GT)
-                    and safe_compare(self._half_width_at(-self.backward_length), 0, Comparison.GT)):
-                warnings.warn("the taper closes the dovetail to nothing within its length")
+            assert safe_compare(self._half_width_at(self.forward_length), 0, Comparison.GT) \
+                and safe_compare(self._half_width_at(-self.backward_length), 0, Comparison.GT), \
+                "the taper closes the dovetail to nothing within its length"
 
     def through(self, *timbers: TimberLike) -> 'FreeDovetailShape':
         """This dovetail with each open (None) end run just past `timbers`' rough bounding boxes."""

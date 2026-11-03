@@ -139,9 +139,9 @@ class TestFreeDovetailJoint:
 
             assert not _has(beam_cut, 495, 0, 35), taper
 
-    def test_a_taper_that_closes_before_its_open_end_warns(self):
+    def test_a_taper_that_closes_before_its_open_end_is_refused(self):
         # Forward (world -x) left open runs 500mm, and a 5 degree taper closes the 40mm neck in ~230.
-        with pytest.warns(UserWarning, match="closes"):
+        with pytest.raises(AssertionError, match="closes"):
             cut_free_dovetail_joint(_post(), _beam(), _dovetail(taper=5, forward=None))
 
     def test_the_dovetail_angle_must_be_positive(self):
