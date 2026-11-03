@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """
 Construction Examples - Testing join_face_aligned_on_face_aligned_timbers
 with different reference features

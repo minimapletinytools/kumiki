@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """Assembly preview demo: an H-frame with a disassembly sequence.
 
 Joint cut functions author their own assembly freedoms (escape directions and

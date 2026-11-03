@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """N-Legged Stool Structure
 
 An n-legged stool consisting of a round flat seat, n legs arranged with circular

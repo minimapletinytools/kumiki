@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """Half-blind tenoned, dadoed, rabbeted scarf joint (Kanawa Tsugi style).
 
 Two 4"x6" timbers meeting end-to-end, joined with

@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """Simple Assembly Test Structure
 
 A regular n-gon of timbers where each timber is joined to the next timber in sequence

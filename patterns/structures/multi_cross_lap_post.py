@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """Six-way cross lap arrangement: a round post capped by three crossing 2x8 boards.
 
 A single round post (10" diameter, 4' tall) stands at the origin. Three 2x8

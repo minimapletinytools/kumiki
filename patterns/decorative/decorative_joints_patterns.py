@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """
 Decorative Joints Patterns
 """

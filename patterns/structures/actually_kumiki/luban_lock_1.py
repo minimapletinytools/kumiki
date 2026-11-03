@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """Six-piece Luban lock (鲁班锁) / burr puzzle.
 
 Six 1×1 wooden blocks (length = 2√2 × side), each rotated 45° around its

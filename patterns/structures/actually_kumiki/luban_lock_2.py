@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """Three-piece Luban lock (鲁班锁三通) / burr puzzle cross.
 
 Three 1×1×3 timbers form a cross around the origin:

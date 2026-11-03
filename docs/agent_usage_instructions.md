@@ -71,6 +71,20 @@ Import via the top-level `kumiki` module:
 from kumiki import *
 ```
 
+## Recording the kumiki version
+
+The first line of every frame or pattern file names the last kumiki version it ran correctly on:
+
+```python
+# Last checked on kumiki 0.8.0
+```
+
+- Put it in every new frame or pattern file.
+- After running a file and finding that it works, set it to the installed version
+  (`python -c "import kumiki; print(kumiki.__version__)"`). Don't change it in a file you have not run.
+- When a file breaks on a newer kumiki, it tells you which changes to look through: the ones made
+  since that version.
+
 ## Numeric Values
 
 - **Always use rule types (rule.py) -- never Python floats.**

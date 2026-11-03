@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """
 Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py

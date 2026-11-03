@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """Experiment: generate a planning drawing for my_cute_frame with the feature solver.
 
 The Left Side timber is fixed (its six faces are known). Everything else that a planning drawing

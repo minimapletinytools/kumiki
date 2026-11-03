@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """
 Rebated Oblique and Dadoed Scarf Joint Patterns (Kanawa Tsugi / 金輪継ぎ)
 """

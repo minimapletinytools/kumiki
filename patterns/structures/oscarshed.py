@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """
 Oscar's Shed - A simple timber frame shed structure
 Built using the Kumiki API

@@ -161,6 +161,7 @@ function getBundledExampleFrameContent() {
 // without patterns/. A unit test keeps the two identical.
 function getInlineExampleFrameContent() {
     return [
+        '# Last checked on kumiki 0.8.0',
         '"""Starter Kigumi frame: a simple H-shaped frame made of four 90x90mm timbers.',
         '',
         'Two side timbers run in the +Y direction. Two cross timbers join them with',

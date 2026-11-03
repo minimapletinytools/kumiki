@@ -1,3 +1,4 @@
+# Last checked on kumiki 0.8.0
 """
 Lapped Gooseneck Joint Patterns (腰掛鎌継ぎ / Koshikake Kama Tsugi)
 """
