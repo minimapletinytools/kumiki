@@ -1,3 +1,111 @@
+
+:: 11/3/2026 dovetail sawhores video script (actually the non-kumiki one)
+
+In this video I'll show you how to make this dovetail sawhorse designed by _____
+
+I've made many sawhorses in the past and I think this one might just be the best.
+
+The dovetail design is simple, strong, and the angle legs resist racking better than the vertical legs in a more typical design. 
+
+Did I also mention they stack?
+
+But I think my favorite part of this design is that it's such a simple application of advanced joinery and can only be easily done with hand tools. 
+
+(the dimensions I chose are somewhat arbitary so I won't justify them, you can and should adjust them to fit your own needs)
+
+We'll start with 1x6 stock for the legs and a 2x4 stock for the beam. You can rip a 4x6 in half to make the leg stock. Note the exact dimensions here aren't so important so long as a few relations stay correct.
+
+With multiple double or triple angle bevels, the hardest part of this design will be in the marking, so follow along carefully:
+
+Begin by finding the center of the beam and marking outwards by ___ inches on both sides, drafting a vertical line which will mark where the inside dovetail cut lies on the beam.
+
+next measure out from this line by ___ inches and from this point, mark a ___ degree line angled downward which will mark where the outside dovetail cut line on the beam.
+
+mark a line from the top of the beam downards by 3.75 which will locate where the legs leave the beam. This measurement determines the lateral splay angle of the legs. Since I cut my beam to exactly 3.75 the bottom arris is my mark.
+
+From the top of the beam, mark inwards by .75"
+
+(not great that I'm using both sides of a raw board as reference edges but it's easier and mostly ok in this case! Make sure the beam is flat-ish and the one for the matching pair is identical)
+
+(if you want the sides of your legs to be exactly flush with the sides of the beam at the top where the dovetail is deepest, you need to mark inwards by the board thickness * 1/cos(splay angle). I don't care about this so I'm just using the exact board thickness)
+
+(I'll actually be making several marks that break the usual rules for marking. Sometimes it matters, sometimes it doesn't!)
+
+from the dovetail cut marks on the top of the beam, draw a 10 degree angled line to this line.
+
+Lets go ahead and cut the dovetail notch now. This will serve as a visual guide for understand how we mark the legs to match
+
+Using a fine saw, make the 2 cross cuts on the side being careful not to go past the line. I like use the tip of the saw to scrape the inside to deepen the cut without risking gonig past the edges.
+
+I make a few coares cross cuts across the middle to make clearing the wood easier
+
+next I coarsley chop away until you are about 1mm away from the line.
+
+then I switch to my pairing chisel to clear to the final dimensions
+
+(I absolutley love my ouchi tsuki-nomis, a regular chisel works just as well!)
+
+I use a straight edge to mark the crests showing where I need to move more material. You want to see no light where the straight edge leaves the wood. Some valleys are ok!
+
+and yes, this is very fun and satisfying
+
+marking the legs is tricky as it must match the multi-angle bevels we marked on the beam. Your leg must have 2 flat faces meeting at a square edge. The flat face will face inwards.
+
+Our legs are splayed 15 degrees in both directions so our marking will be based on this.
+
+First draw a ___ degree line on the flat face making sure to measure from the square edge (duh)
+
+from this line, draw a 20 degree line outwards
+
+(it's not exactly 15 and 20 degrees, but it's close enough, moreover we will do contact fitting to get it the rest of the way there so it doesn't matter so much))
+
+cut through both these lines to form a flat face that matches the top of the beam
+
+From this edge, mark a parallel line downwards on the flat back face 3 7/8". then mark a perpendicular line to the oblique corner of this line to mark the inside edge of the inner dovetail
+
+from this corner point, measure to the other side by ____ inches. This mesaurement is determined by measuring the bottom edge of the dovetail cut you made on the beam
+from the top point, measure to the other side by ___ inches.
+
+Now make the asme 10 degree marks on the top end of the board to complete the markings
+
+Cut along this lines using a hand saw
+
+now were ready to do the final transfer fit
+
+I use a carpenter pencil to mark up the insides of the dovetails on the beam
+
+insert the leg and give a few firm taps at the bottom
+
+remove the leg and pair away where theere are makrs keeping in mind that only the bottom triangle actually inserts but you'll still want to pair away the top half of the triangle to keep the faces flat (or not)
+
+keep going until you're happy with your fit :)
+
+repeat this process for the other 4 legs. Remember to mark the legs with their matching dovetails on the beam.
+
+With all 4 legs done' we're ready to make the bottom cuts on the legs. tap the leg in FIRMLY and use a pencil to mark where the leg leaves the beam
+
+remove the leg, and measure a parallel line downward from this line by about 27" for a 30" tall sawhorse.
+
+(27 3/16 if you want to be closer to exactly 30")
+
+Once again, make the 20 degree mark to complete the bevel. make sure you angle it in the right direction!
+
+Cut the bottom of the leg and repeat for the other 3 legs.
+
+We're now ready for the final assembly As you've probably noticed by now, tapping in one leg causes the other legs to pop up. Assembling is challenging for this reason. 
+
+I found the best way is to sit on top of the beam and tap the bema downwards pushing it into the legs that are resting on the ground. 
+
+check that the marks you drew on the legs line up with the beam, and then cut off the excess from the top
+
+Optionally, come through with a plane to finish the top of the sawhorse.
+
+
+
+
+
+
+
 :: 11/1/2026 kumiki 0.10.0 release
 
 Kumiki is a programmatic CAD application for timber framing and woodwork. 
@@ -133,7 +241,7 @@ DONE/IGNORE-add types to runner.py
     DONE-if you do the callback thing, let tools be dedfined in the callback
     IGNORE-disable the draw button when drawings are being generated
   DONE-how to do self update?
-  
+
   -maybe do drawing prettifier pass
   -test agent created drawings
   -finish the sawhorse and add tools
