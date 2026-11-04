@@ -125,29 +125,29 @@ DONE/IGNORE-add types to runner.py
   DONE-do antoher agent review pass
   DONE-add export drawing button (how to do this?)
   DONE-add reveal in finder option
-
-  -DRAWINGS
-    -make decision on how to do solver in separate thread
-      -must still be possible fo rteh agent to run the solver directly outside of the viewer to inspect its results
-      -disable the draw button when drawings are being generated
-    -maybe do drawing prettifier pass
-    -test agent created drawings
-
+  DONE-refreshing viewer does not refresh measurements, they still show the old values, need to figure this out
+  DONE-add version comments to everything
+  DONE-maybe add parameters to learn to timebr frame
+  DONE-make decision on how to do solver in separate thread
+    DONE-must still be possible fo rteh agent to run the solver directly outside of the viewer to inspect its results
+    DONE-if you do the callback thing, let tools be dedfined in the callback
+    IGNORE-disable the draw button when drawings are being generated
+  DONE-how to do self update?
+  
+  -maybe do drawing prettifier pass
+  -test agent created drawings
   -finish the sawhorse and add tools
-  -refreshing viewer does not refresh measurements, they still show the old values, need to figure this out
-
+  -do strcuture/example cleanup
   -check that edges are being highlighted correctly in 2d drawing mesaurements
   -add joints/arrangement stuff to cheat sheet
-  
   -mega update wesite
   -make a new video 
-  
   -setup GHA release for binary app
   	-test end to end
 
 
 
-
+-do auto update (need mac code signing)
 
 
 
