@@ -232,6 +232,36 @@ shop = Drawing(
 - Draw each distinct piece once: `match_timbers(frame.cut_timbers)` groups timbers that are the same piece, turned (ROTATION) or mirrored (REFLECTION, a "handed" piece). Draw the group's `representative` and put the count in the drawing's name.
 - The `my_cute_frame_drawing_test.py` pattern (in the installed kumiki package, under `kumiki/patterns/structures/`) dimensions drawings automatically with `kumiki.drawings.auto_dimensioning`; start from it rather than placing every measurement by hand.
 
+### Slow work after the frame is shown
+
+Generating drawings can take seconds. Put that work in a deferred routine: a function inside the frame function, handed a `Deferred`. Kigumi shows the frame first, then runs the routine in the background and lists each drawing as it is added. `with_auto_drawings` already works this way.
+
+```python
+@frame
+def shed(k: Optional[Kiwari] = None) -> Frame:
+    frame = Frame.from_joints(joints, kiwari=k)
+    groups = match_timbers(frame.cut_timbers)
+
+    def later(deferred: Deferred) -> None:
+        for done, group in enumerate(groups):
+            deferred.progress(done, len(groups), group.representative.timber.ticket.path)
+            deferred.add_drawing(my_piece_drawing(group))
+
+    return frame.with_deferred(later)
+```
+
+- `frame.drawings` doesn't include them until they run. In a script or test, `frame.run_deferred()` runs them and returns the frame with its drawings.
+- When the frame is rebuilt, the routine stops at its next `add_drawing` or `progress` call.
+
+### Tools
+
+A frame can offer tools: functions Kigumi runs on demand, each returning text to show. Give each a name and a description. A tool is written inside the frame function, so it can use what the build computed:
+
+```python
+frame = replace(frame, tools=[ToolAd("leg report", "How many legs, and how long",
+                                     lambda: f"{len(legs)} legs, {leg_length} long")])
+```
+
 ## Parameterizing with Kiwari
 
 kumiki is a *programmatic CAD* tool hence all designs can be parameterized by code. To make this even easier, `kiwari` allows you to expose some parameters in one of the kigumi panels.

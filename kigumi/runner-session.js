@@ -309,7 +309,8 @@ class PythonRunnerSession {
                     reject(error);
                 });
 
-                this.process.on('exit', (code, signal) => {
+                // 'close', not 'exit': it comes after the last of stdout, such as the answer to shutdown.
+                this.process.on('close', (code, signal) => {
                     this.ready = false;
                     const error = new Error(`Runner exited (code=${code}, signal=${signal})`);
                     this.rejectAllPending(error);

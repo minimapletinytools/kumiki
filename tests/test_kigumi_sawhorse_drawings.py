@@ -24,12 +24,26 @@ def _load_runner():
 runner = _load_runner()
 
 
+class _Context:
+    """A job context that is never cancelled and drops progress."""
+
+    def should_cancel(self):
+        return False
+
+    def progress(self, done, total=None, label=None):
+        pass
+
+    def report(self, **fields):
+        pass
+
+
 @pytest.fixture(scope="module")
 def sawhorse():
     """Return the sawhorse's loaded viewer slot, including its generated drawings."""
     saved_modules = dict(sys.modules)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         slot = runner.load_slot_state(str(ROOT / "patterns" / "structures" / "dovetailed_sawhorse.py"))
+        runner._run_deferred(slot, _Context())
         state = runner.RunnerState(slots={"main": slot}, active_slot="main")
         runner.build_real_geometry(state, slot)
     yield slot
