@@ -946,10 +946,11 @@ class FrameViewSession {
                 });
                 this._fetchAssemblyInBackground(layersData);
             }
+            this._runDeferredInBackground();
             // The drawings again, measured on the frame just built.
             if (getHost().getConfig(BETA_FEATURE_SETTINGS.drawingBeta, false) === true) {
                 this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
-                    this.log(`[drawing] get_drawings after refresh failed: ${err.message || err}`);
+                    if (!this.isDisposed) this.log(`[drawing] get_drawings after refresh failed: ${err.message || err}`);
                 });
             }
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
@@ -1305,6 +1306,55 @@ class FrameViewSession {
         });
     }
 
+    /** Ask the runner to run the frame's deferred routines, now that the frame is shown. */
+    _runDeferredInBackground() {
+        if (!this.runnerSession) {
+            return;
+        }
+        this.runnerSession.slotRequest('run_deferred', this.slotName)
+            .then((result) => {
+                if (result && result.jobId) {
+                    this.log(`[deferred] Running the frame's deferred work in the background (${result.jobId})`);
+                }
+            })
+            .catch((err) => {
+                if (!this.isDisposed) this.log(`[deferred] run_deferred failed: ${err.message || err}`);
+            });
+    }
+
+    /** Fetch the drawings again shortly, once a burst of added drawings settles. */
+    _refreshDrawingsSoon() {
+        if (getHost().getConfig(BETA_FEATURE_SETTINGS.drawingBeta, false) !== true) {
+            return;
+        }
+        clearTimeout(this._drawingsRefreshTimer);
+        this._drawingsRefreshTimer = setTimeout(() => {
+            if (this.isDisposed) {
+                return;
+            }
+            this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
+                if (!this.isDisposed) this.log(`[drawing] get_drawings after a deferred drawing failed: ${err.message || err}`);
+            });
+        }, 200);
+    }
+
+    /** A job event about the frame's deferred work: log it, and refresh the drawings when one is added. */
+    _handleDeferredJobEvent(message) {
+        if (message.type === 'job_progress' && typeof message.drawing === 'string') {
+            this.log(`[deferred] Added drawing "${message.drawing}"`);
+            this._refreshDrawingsSoon();
+        } else if (message.type === 'job_result') {
+            const seconds = message.timing && message.timing.elapsedS;
+            const count = message.result && Array.isArray(message.result.drawings) ? message.result.drawings.length : 0;
+            this.log(`[deferred] Finished: ${count} drawing(s) in ${seconds}s`);
+            this._refreshDrawingsSoon();
+        } else if (message.type === 'job_failed') {
+            const error = message.error || {};
+            this.log(`[error] [deferred] ${error.type || 'Error'}: ${error.message}\n${error.traceback || ''}`);
+            this._refreshDrawingsSoon();
+        }
+    }
+
     _fetchAssemblyInBackground(layersPayload) {
         if (!layersPayload || !layersPayload.assembly || layersPayload.assembly.pending !== true) {
             return;
@@ -1610,9 +1660,16 @@ class FrameViewSession {
             this.profiler.addMilestone(name);
             this.postLoadingStatus(name);
         };
-        // The runner's background jobs (runner.py Jobs): an assembly's result, or that it failed.
+        // The runner's background jobs (runner.py Jobs): an assembly's result, or the frame's deferred work.
         this.runnerSession.onJobEvent = (message) => {
-            if (!message || message.slot !== this.slotName || this.isDisposed || message.kind !== 'assembly') {
+            if (!message || message.slot !== this.slotName || this.isDisposed) {
+                return;
+            }
+            if (message.kind === 'deferred') {
+                this._handleDeferredJobEvent(message);
+                return;
+            }
+            if (message.kind !== 'assembly') {
                 return;
             }
             const seconds = message.timing && message.timing.elapsedS;

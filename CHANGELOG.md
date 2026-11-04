@@ -12,6 +12,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
+- A frame can leave slow work for after it is shown: `frame.with_deferred(routine)`, where `routine(deferred)` adds drawings with `deferred.add_drawing(...)` and reports `deferred.progress(...)`. `frame.run_deferred()` runs it straight away. **Breaking:** `with_auto_drawings` generates its drawings this way, so `frame.drawings` doesn't include them until `run_deferred()`.
+- A frame can offer tools: `Frame(..., tools=[ToolAd(name, description, run)])`, where `run()` returns text.
 - **Breaking:** the feature solver moved from `kumiki.drawings` to `kumiki.csg`: `feature_solving`, `solve_recipe`, `dof_solver`, `required_features` and `assumptions`. `kumiki.drawings` keeps what is drawn, and `kumiki.drawings.measure_solving` turns a drawing's `Measure` into what the solver takes.
   - Migration: `from kumiki.drawings.feature_solving import ...` becomes `from kumiki.csg.feature_solving import ...`, and likewise for the other four.
   - `measure_row`, `remaining_dofs` and `solve_report` take `SolveDistance` / `SolveAngle` instead of `Measure`, and no `view`: `measure_row(measure, carriers, view)` becomes `measure_row(solve_measurement(measure, cut_timbers, view), carriers)`.
@@ -32,6 +34,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
+- A frame's deferred work, such as its generated drawings, runs after the frame is shown, and the drawings list fills in as each drawing is made. `cat_corner_cot` builds in about 0.4 s, then takes about 6 s more for its 27 drawings.
+- Whatever frame code prints goes to the log, from any thread. Before, output redirected for a background job could take the runner's replies with it.
 - A frame's error in the log, and in the build report an agent reads, says first where in the frame file it happened: `In coat_rack.py, line 126: joints.append(mortise_and_tenon(peg, ...))`, ahead of the traceback.
 
 ## [0.8.0] - 2026-10-05
