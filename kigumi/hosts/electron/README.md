@@ -32,13 +32,17 @@ can later run in a browser.
 - `app-window.js`: the BrowserWindow and the IPC transport (one channel,
   `kigumi:shell`, exposed to the page by `shell-preload.js`).
 - `main.js`: startup, the `kigumi://app` protocol, menus, the Log panel.
+- `update-check.js`: looking for a newer kigumi release (`kigumi-v*` tags on GitHub).
 - `electron-host.js`: the Host (see `../../host.js`).
 
 Settings live in `<userData>/settings.json`: the extension's `kigumi.*` keys
 without the prefix, plus `app.workspaceFolder`, `app.editorCommand` (e.g.
 `"code -g {file}:{line}"`) and `app.filesExclude` (names the explorer's All Files leaves out). Kigumi > Open Settings File (or the gear in the
 status bar) opens it listing every key; edits apply without a restart. Auto
-refresh on save defaults to on in the app. Logs are in
+refresh on save defaults to on in the app. `app.checkForUpdates` (on by default)
+looks for a newer kigumi release on GitHub at start and once a day, and shows an
+Update button in the title bar when there is one; `app.updatePrereleases` includes
+prereleases. Kigumi > Check for Updates… looks now. Logs are in
 `<userData>/logs/kigumi.log`, rotated to `kigumi.1.log` past 5 MB.
 
 ## Layout

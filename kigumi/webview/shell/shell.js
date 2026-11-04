@@ -106,6 +106,8 @@
         $('splitter-right').hidden = !showRight;
         $('toggle-right').classList.toggle('is-active', showRight);
         $('toggle-right').hidden = state.agent === false;
+        $('update-available').hidden = !state.update;
+        $('update-available').title = state.update ? `Kigumi ${state.update.version} is available` : '';
 
         const hasBottom = state.panels.some((panel) => panel.slot === 'bottom');
         const showBottom = hasBottom && layout.bottom;
@@ -391,6 +393,7 @@
         $('toggle-left').addEventListener('click', () => core.send({ type: 'layout:toggle', side: 'left' }));
         $('toggle-right').addEventListener('click', () => command('toggleAgent'));
         $('toggle-bottom').addEventListener('click', () => core.send({ type: 'layout:toggle', side: 'bottom' }));
+        $('update-available').addEventListener('click', () => command('showUpdate'));
         setupSplitter('left');
         setupSplitter('right');
         setupSplitter('bottom');

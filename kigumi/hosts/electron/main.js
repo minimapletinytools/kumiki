@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, protocol, Menu, dialog, safeStorage, shell: electronShell } = require('electron');
+const { app, net, protocol, Menu, dialog, safeStorage, shell: electronShell } = require('electron');
 const { setHost } = require('../../host');
 const { createKigumiApp } = require('../../kigumi-app');
 const { DEFAULT_FILES_EXCLUDE } = require('../../sidebar-files');
@@ -32,6 +32,7 @@ const { SecureStorage } = require('./secure-storage');
 const { viewHost, sharedTools } = require('../../agent/agent');
 const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../../agent/mcp-setup');
+const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
 const ORIGIN = 'kigumi://app';
@@ -55,6 +56,9 @@ const APP_DEFAULTS = {
     'mcp.enabled': false,
     'mcp.port': 7345,
     'mcp.token': '',
+    // Look for a newer Kigumi release on start and once a day; prereleases only when asked.
+    'app.checkForUpdates': true,
+    'app.updatePrereleases': false,
 };
 
 const CONTENT_TYPES = {
@@ -83,6 +87,7 @@ let logChannel = null;
 let workspaceFolder = null;
 const status = { message: null, level: 'info', progress: null, logBadge: false };
 let statusTimer = null;
+let updates = null;
 
 function notFound() {
     return new Response('Not found', { status: 404 });
@@ -149,6 +154,7 @@ function shellStatus() {
         version: packageJson.version,
         autoRefresh: settings ? settings.get('viewer.autoRefreshOnFileChange', false) : false,
         agent: agentEnabled(),
+        update: updates && updates.available ? { version: updates.available.version } : null,
     };
 }
 
@@ -621,8 +627,55 @@ function onShellCommand(id, ...args) {
     if (id === 'openSettings') return openSettingsFile();
     if (id === 'toggleAgent') return toggleAgentPanel();
     if (id === 'copyMcpSetup') return copyMcpSetup();
+    if (id === 'showUpdate') return showUpdate();
     if (id === 'run' && typeof args[0] === 'string') return runAppCommand(args[0], ...args.slice(1));
     return undefined;
+}
+
+/** Fetch GitHub's list of releases. */
+async function fetchReleases() {
+    const response = await net.fetch(RELEASES_URL, {
+        headers: { Accept: 'application/vnd.github+json', 'User-Agent': `Kigumi/${packageJson.version}` },
+    });
+    if (!response.ok) throw new Error(`GitHub answered ${response.status} ${response.statusText}`);
+    return response.json();
+}
+
+/** Offer the available update: download it, read its notes, skip it, or leave it for later. */
+async function showUpdate(release = updates && updates.available) {
+    if (!release || !mainWindow || mainWindow.isDestroyed()) return;
+    const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        message: `Kigumi ${release.version} is available`,
+        detail: `You have ${packageJson.version}. Download the new version and install it over this one; `
+            + 'your settings and projects are kept.',
+        buttons: ['Download', 'Release Notes', 'Skip This Version', 'Later'],
+        defaultId: 0,
+        cancelId: 3,
+    });
+    if (response === 0) void electronShell.openExternal(downloadUrl(release, process.platform, process.arch));
+    if (response === 1) void electronShell.openExternal(release.page);
+    if (response === 2) updates.skip(release.version);
+}
+
+/** Kigumi > Check for Updates…: look now, and say what was found. */
+async function checkForUpdatesNow() {
+    let newer;
+    try {
+        newer = await updates.check({ manual: true });
+    } catch (error) {
+        await dialog.showMessageBox(mainWindow, {
+            type: 'warning', message: 'Could not check for updates', detail: String(error.message || error),
+        });
+        return;
+    }
+    if (newer) {
+        await showUpdate(newer);
+    } else {
+        await dialog.showMessageBox(mainWindow, {
+            type: 'info', message: 'Kigumi is up to date', detail: `${packageJson.version} is the newest release.`,
+        });
+    }
 }
 
 function buildMenu() {
@@ -660,6 +713,7 @@ function buildMenu() {
                 { type: 'separator' },
                 command('Initialize Project', 'kigumi.initializeProjectInWorkspace'),
                 command('Update Kumiki', 'kigumi.updateKumiki'),
+                { label: 'Check for Updates…', click: () => void checkForUpdatesNow() },
                 command('Refresh Explorer', 'kigumi.refreshSidebar'),
                 {
                     label: 'Auto Refresh on File Change',
@@ -792,7 +846,21 @@ async function start() {
         toggleAgentPanel();
     }
 
+    updates = createUpdateChecker({
+        currentVersion: packageJson.version,
+        settings,
+        fetchReleases,
+        onChange: () => pushShellState(),
+        log,
+    });
+    updates.start();
+    let checkingForUpdates = settings.get('app.checkForUpdates', true);
+
     settings.onChange(() => {
+        if (settings.get('app.checkForUpdates', true) !== checkingForUpdates) {
+            checkingForUpdates = settings.get('app.checkForUpdates', true);
+            updates.start();
+        }
         closeAgentIfDisabled();
         buildMenu();
         pushShellState();
@@ -803,6 +871,7 @@ async function start() {
 
     mainWindow.on('closed', async () => {
         if (agentSession) agentSession.stop();
+        updates.stop();
         if (mcpServer) await mcpServer.close();
         const current = kigumiApp;
         kigumiApp = null;
@@ -824,6 +893,7 @@ async function start() {
             onShellCommand,
             settings,
             panels: () => kigumiApp && kigumiApp.panels,
+            updates: () => updates,
         };
         // A test driver run against the live app; its result sets the exit code.
         if (process.env.KIGUMI_TEST_SCRIPT) {

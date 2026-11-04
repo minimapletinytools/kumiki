@@ -34,6 +34,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
+- The standalone app looks for a newer release at start and once a day, and shows an Update button in the title bar when there is one: download it, read the release notes, or skip that version. Kigumi > Check for Updates… looks now; `"app.checkForUpdates": false` turns it off.
 - A frame's finishing work, such as its generated drawings, runs after the frame is shown, and the drawings list fills in as each drawing is made. `cat_corner_cot` builds in about 0.4 s, then takes about 6 s more for its 27 drawings.
 - Whatever frame code prints goes to the log, from any thread. Before, output redirected for a background job could take the runner's replies with it.
 - A frame's error in the log, and in the build report an agent reads, says first where in the frame file it happened: `In coat_rack.py, line 126: joints.append(mortise_and_tenon(peg, ...))`, ahead of the traceback.

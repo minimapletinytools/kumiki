@@ -182,6 +182,31 @@ body:not(.is-mac) .titlebar-drag-region {
     color: var(--ka-accent);
 }
 
+/* Shown when a newer Kigumi release is out, like VS Code's update button. */
+.update-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    margin-right: 4px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 11px;
+    background: var(--ka-accent);
+    color: var(--ka-accent-fg);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.update-button[hidden] {
+    display: none;
+}
+
+.update-button:hover {
+    filter: brightness(1.1);
+}
+
 .tabs {
     display: flex;
     flex: 1;

@@ -21,6 +21,7 @@ const SETTINGS_AT_START = {
     'agent.model': '',
     'agent.openrouterApiKey': '',
     'agent.enabled': true,
+    'app.checkForUpdates': false,
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
