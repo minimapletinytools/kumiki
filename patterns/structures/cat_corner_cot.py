@@ -2180,18 +2180,18 @@ def _count(group: SymmetricTimberGroup) -> str:
 
 
 def _with_auto_drawings(frame: Frame, fixed_path: str) -> Frame:
-    """*frame* with a deferred routine adding a generated plan drawing and a shop drawing per distinct piece."""
+    """*frame* with a finishing routine adding a generated plan drawing and a shop drawing per distinct piece."""
     cut_timbers = list(frame.cut_timbers)
 
-    def generate(deferred: Deferred) -> None:
+    def generate(finishing: Finishing) -> None:
         groups = match_timbers(cut_timbers)
-        deferred.progress(0, 1 + len(groups), "plan")
-        deferred.add_drawing(_plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)"))
+        finishing.progress(0, 1 + len(groups), "plan")
+        finishing.add_drawing(_plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)"))
         for done, group in enumerate(groups, start=1):
-            deferred.progress(done, 1 + len(groups), group.representative.timber.ticket.path)
-            deferred.add_drawing(_piece_drawing(group))
+            finishing.progress(done, 1 + len(groups), group.representative.timber.ticket.path)
+            finishing.add_drawing(_piece_drawing(group))
 
-    return frame.with_deferred(generate)
+    return frame.with_finishing(generate)
 
 
 # ============================================================================
