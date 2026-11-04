@@ -85,6 +85,7 @@ Defines:
 """
 
 import math
+from dataclasses import replace
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from kumiki import *
@@ -2180,18 +2181,13 @@ def _count(group: SymmetricTimberGroup) -> str:
 
 
 def _with_auto_drawings(frame: Frame, fixed_path: str) -> Frame:
-    """*frame* with a deferred routine adding a generated plan drawing and a shop drawing per distinct piece."""
+    """*frame* plus a generated plan drawing and a shop drawing per distinct piece (match_timbers)."""
     cut_timbers = list(frame.cut_timbers)
-
-    def generate(deferred: Deferred) -> None:
-        groups = match_timbers(cut_timbers)
-        deferred.progress(0, 1 + len(groups), "plan")
-        deferred.add_drawing(_plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)"))
-        for done, group in enumerate(groups, start=1):
-            deferred.progress(done, 1 + len(groups), group.representative.timber.ticket.path)
-            deferred.add_drawing(_piece_drawing(group))
-
-    return frame.with_deferred(generate)
+    return replace(frame, drawings=[
+        *frame.drawings,
+        _plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)"),
+        *(_piece_drawing(group) for group in match_timbers(cut_timbers)),
+    ])
 
 
 # ============================================================================

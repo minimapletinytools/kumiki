@@ -22,7 +22,7 @@ import sys
 import threading
 import time
 import traceback
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
 from typing import (TYPE_CHECKING, Any, Callable, Dict, Final, List, Mapping, NamedTuple, Optional, Sequence,
@@ -806,8 +806,6 @@ class SlotState:
     # than in the viewer so python stays the one place a drawing comes from,
     # and they are lost on reload, which is what "unsaved" should mean.
     pending_drawings: List[DrawingWire] = field(default_factory=list)
-    # The id of the job running the frame's deferred routines, once started.
-    deferred_job: Optional[str] = None
     # Which import of the project's modules (kumiki, in a dev checkout) this was built
     # with. See _project_generation.
     generation: int = 0
@@ -850,16 +848,13 @@ def log_stderr(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
-# Serializes protocol writes from the main loop and job threads, so lines don't interleave.
+# Serializes stdout writes from the main loop and the assembly-solve thread, so lines don't interleave.
 _stdout_lock = threading.Lock()
-# Where protocol messages go. main() keeps the real stdout here and sends sys.stdout to stderr,
-# so a print from frame code on any thread lands in the log, not in the protocol.
-_protocol_out: Optional[Any] = None
 
 
 def emit_message(payload: Mapping[str, Any]) -> None:
     with _stdout_lock:
-        print(json.dumps(payload), file=_protocol_out or sys.stdout, flush=True)
+        print(json.dumps(payload), flush=True)
 
 
 def serialize_sympy(obj: Any) -> Scalar:
@@ -3975,7 +3970,6 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
-            "run_deferred", "list_tools", "run_tool",
             "shutdown",
         ],
         "frame": {
@@ -5059,36 +5053,6 @@ def _require_str(payload: Dict[str, Any], key: str, message: str) -> str:
 # --- background jobs ----------------------------------------------------------
 
 
-def _run_deferred(ss: SlotState, context: "JobContext") -> Dict[str, Any]:
-    """Run the slot's deferred routines, putting each drawing they add on the slot's frame."""
-    from kumiki.deferred import Deferred
-
-    added: List[str] = []
-
-    def add_drawing(drawing: Any) -> None:
-        ss.frame = replace(ss.frame, drawings=[*ss.frame.drawings, drawing])
-        added.append(drawing.name)
-        context.report(drawing=drawing.name, drawingsAdded=len(added))
-
-    deferred = Deferred(on_drawing=add_drawing, on_progress=context.progress, should_cancel=context.should_cancel)
-    for routine in ss.frame.deferred:
-        routine(deferred)
-    return {"drawings": added}
-
-
-def run_tool(ss: SlotState, name: str) -> Dict[str, str]:
-    """Run the frame's tool `name` and return the text it gives."""
-    tools = list(getattr(ss.frame, "tools", []))
-    tool = next((tool for tool in tools if tool.name == name), None)
-    if tool is None:
-        raise ValueError(f"No tool named {name!r}. Available: {[tool.name for tool in tools]}")
-    with contextlib.redirect_stdout(sys.stderr):
-        output = tool.run()
-    if not isinstance(output, str):
-        raise TypeError(f"tool {name!r} returned {type(output).__name__}, expected str")
-    return {"name": name, "output": output}
-
-
 class JobContext:
     """What a job's work is given: whether it has been cancelled, and a way to report progress."""
 
@@ -5100,12 +5064,8 @@ class JobContext:
 
     def progress(self, done: int, total: Optional[int] = None, label: Optional[str] = None) -> None:
         """Report `done` of `total` steps, with what is being done now."""
-        self.report(done=done, total=total, label=label)
-
-    def report(self, **fields: Any) -> None:
-        """Send a job_progress event with `fields`, unless the job has been cancelled."""
         if not self.should_cancel():
-            emit_message(self._job.event("job_progress", **fields))
+            emit_message(self._job.event("job_progress", done=done, total=total, label=label))
 
 
 @dataclass
@@ -5378,28 +5338,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         job = _jobs.start("assembly", slot_name, _solve_assembly)
         return state, make_success_response(request_id, command, {"assembly": {"pending": True}, "jobId": job.job_id}), False
 
-    if command == "run_deferred":
-        # Asked for once the frame is shown, like get_assembly. Each drawing a routine adds is
-        # announced in a job_progress event; get_drawings then includes it.
-        slot_name = _resolve_slot_name(state, payload)
-        ss = _resolve_slot(state, payload)
-        if not getattr(ss.frame, "deferred", ()):
-            return state, make_success_response(request_id, command, {"jobId": None}), False
-        if ss.deferred_job is None:
-            ss.deferred_job = _jobs.start("deferred", slot_name, lambda context: _run_deferred(ss, context)).job_id
-        return state, make_success_response(request_id, command, {"jobId": ss.deferred_job}), False
-
-    if command == "list_tools":
-        ss = _resolve_slot(state, payload)
-        return state, make_success_response(request_id, command, {"tools": [
-            {"name": tool.name, "description": tool.description} for tool in getattr(ss.frame, "tools", [])
-        ]}), False
-
-    if command == "run_tool":
-        ss = _resolve_slot(state, payload)
-        name = _require_str(payload, "name", "run_tool requires payload.name")
-        return state, make_success_response(request_id, command, run_tool(ss, name)), False
-
     if command == "cancel_job":
         job_id = _require_str(payload, "jobId", "cancel_job requires payload.jobId")
         return state, make_success_response(request_id, command, {"cancelled": _jobs.cancel(job_id)}), False
@@ -5643,9 +5581,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
 
 
 def main() -> None:
-    global _protocol_out
-    _protocol_out = sys.stdout
-    sys.stdout = sys.stderr
     if len(sys.argv) < 2:
         emit_message({
             "type": "fatal_error",

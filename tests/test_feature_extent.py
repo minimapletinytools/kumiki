@@ -121,7 +121,8 @@ def sawhorse_leg():
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    frame = module.dovetailed_sawhorse()
+    with pytest.warns():
+        frame = module.dovetailed_sawhorse()
     return next(cut for cut in frame.cut_timbers if cut.timber.ticket.path == "leg +x +y")
 
 

@@ -164,7 +164,5 @@ module.exports = {
         check('after a refresh, a drawing\'s measurements are of the frame just built',
             Boolean(measuredBefore) && Boolean(measuredAfter), measuredBefore ? `${JSON.parse(measuredBefore).length} measurements` : 'none found');
         await inShell(`(() => { const app = ${viewerApp}; app.setKiwariDraft(${JSON.stringify(section)}, 'leg_distance', '22in'); app.requestRefresh(); })()`);
-        await waitFor(() => ends().then((now) => (now && now === measuredBefore ? now : null)), { timeoutMs: 90000 })
-            .catch(() => null);
     },
 };

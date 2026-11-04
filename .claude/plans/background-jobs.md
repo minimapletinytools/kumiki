@@ -32,33 +32,75 @@ Picklability (for worker processes): a cut timber and a `Drawing` pickle in unde
    be declared as work to do rather than done during the build.
 2. **Run them in parallel.** Independent drawings in a process pool: roughly ×(cores) on top.
 
-## Status (2026-11-03)
+## Proposal
 
-Built:
+### A. kumiki: drawings declared, not done, during the build
 
-- **Jobs** in the runner (`Jobs` / `JobContext`, thread backend): job events, `cancel_job`, `list_jobs`,
-  cancelled on slot reload. Assembly runs on it.
-- **Deferred work in kumiki** (`kumiki/deferred.py`): `frame.with_deferred(routine)`, where
-  `routine(deferred: Deferred)` calls `deferred.add_drawing(...)` and `deferred.progress(...)`. Every
-  call raises `DeferredCancelled` once cancelled. `frame.run_deferred()` runs them now, for scripts
-  and tests. `overlay_frames` keeps each frame's routines. `with_auto_drawings` and `cat_corner_cot`
-  generate their drawings this way.
-- **Runner:** `run_deferred` starts one `deferred` job per slot, asked for by the extension once the
-  frame is shown. Each drawing replaces the slot's frame with one that has it, and is announced in a
-  `job_progress` event (`drawing`, `drawingsAdded`). Protocol output keeps the real stdout and
-  `sys.stdout` goes to stderr, so a job thread's prints can't swallow replies.
-- **Extension:** `frame-view-session.js` asks for `run_deferred` after each refresh and fetches the
-  drawings again (debounced) as each one arrives.
-- **Tools:** `Frame.tools`, a list of `ToolAd(name, description, run)`; runner `list_tools` and
-  `run_tool`.
+A frame says which drawings it has and how to make each, without making them:
 
-Left:
+```python
+@frame
+def cat_corner_cot(k) -> Frame:
+    frame = Frame.from_joints(...)
+    return frame.with_drawings([
+        DrawingRecipe(_plan_drawing, cut_timbers, fixed_path, f"{name} plan (generated)"),
+        *(DrawingRecipe(_piece_drawing, group) for group in match_timbers(cut_timbers)),
+    ])
+```
 
-1. **Viewer:** "drawings 12/27" with a cancel, and a mark on the drawings list while more are coming.
-   Progress events already carry `done`, `total` and `label`.
-2. **Tools UI:** nothing lists or runs the tools yet.
-3. **Parallel drawings:** a process backend. A routine is one opaque function, so this needs a way to
-   hand the runner separate picklable calls (e.g. `deferred.add_drawing_later(fn, *args)`).
-4. **Agent build report:** say when deferred drawings are still being made.
-5. **Undecided:** whether a routine that fails shows in the drawings list or only in the log (now:
-   the log, with its traceback).
+- `DrawingRecipe(fn, *args)`: a module-level function and picklable arguments (cut timbers and
+  groups pickle). `frame.drawings` stays a list of `Drawing`; recipes are a separate field, so
+  existing frames that build drawings eagerly keep working unchanged.
+- `Frame.realize_drawings()` (sequential) for anything outside kigumi: scripts, tests, export.
+- The examples that generate drawings (`cat_corner_cot`, `dovetailed_sawhorse`,
+  `my_cute_frame_drawing_test`, the auto-drawing helpers in `kumiki.drawings.auto_drawings`) move to
+  recipes.
+
+### B. Runner: one job mechanism
+
+```
+jobs.start(kind, slot, fn, args, backend="thread"|"process") -> job id
+```
+
+- **Context for the work:** `should_cancel()`, `progress(done, total, label)`; assembly's solver
+  already takes `should_cancel`.
+- **Backends:** `thread` (runs against the live frame; assembly, which needs the unpicklable frame)
+  and `process` (a persistent `ProcessPoolExecutor`, spawn start method, warm after the first use;
+  arguments and results are pickled). Drawings use `process`, one task per recipe.
+- **Tied to a slot generation:** reloading a slot cancels its jobs — queued tasks are cancelled
+  outright, running ones are told to stop (threads) or their results dropped (processes) — and a
+  result for an older generation is never delivered.
+- **Events** (protocol, replacing `assembly_result`): `job_started {jobId, kind, slot, total}`,
+  `job_progress {jobId, done, total, label}`, `job_result {jobId, result}`,
+  `job_failed {jobId, error}`, `job_cancelled {jobId}`. Each carries timing: queued, started,
+  finished, worker.
+- **Commands:** `cancel_job {jobId}`, `list_jobs`.
+- **Drawings:** after `reload_example` answers (frame shown), the runner starts one `drawings` job
+  of N tasks; each finished `Drawing` is added to the slot and `collect_drawings` re-sent, so the
+  drawings list fills in. Measurements in the drawings file attach as each arrives.
+
+### C. Extension and viewer
+
+- `runner-session.js`: one `onJobEvent`, replacing `onAssemblyResult`; `frame-view-session.js` routes
+  by kind (assembly → the timeline, drawings → the scenes).
+- The viewer shows jobs in flight ("drawings 12/27") with a cancel; the drawings list marks the ones
+  still coming.
+- Timing goes to the session log and the refresh profiler, so a slow drawing is named.
+- The agent's build report says when drawings are still generating, rather than reporting a frame
+  with none.
+
+## Order
+
+1. Job mechanism in the runner with the `thread` backend; move assembly onto it (no behaviour
+   change), with `onJobEvent` on the extension side.
+2. `DrawingRecipe` in kumiki, and drawings as a `thread` job: the frame shows first.
+3. The `process` backend; drawings move to it: parallel.
+4. Progress and cancel in the viewer; timing in the log and the build report.
+
+## Decisions
+
+- Drawings declared as recipes (A) — a kumiki API addition; eager drawings keep working.
+- Processes for parallel drawings (spawn pool, pickled cut timbers) vs. staying on threads (no
+  speedup, only frame-first). Free-threaded Python (3.13t/3.14) would let threads run in parallel
+  later, but numpy/sympy wheels for it are not something to depend on yet.
+- Whether a drawing that fails shows as a failed entry in the drawings list, or only in the log.
