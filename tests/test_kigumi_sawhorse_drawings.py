@@ -43,7 +43,7 @@ def sawhorse():
     saved_modules = dict(sys.modules)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         slot = runner.load_slot_state(str(ROOT / "patterns" / "structures" / "dovetailed_sawhorse.py"))
-        runner._run_deferred(slot, _Context())
+        runner._run_finishing(slot, _Context())
         state = runner.RunnerState(slots={"main": slot}, active_slot="main")
         runner.build_real_geometry(state, slot)
     yield slot

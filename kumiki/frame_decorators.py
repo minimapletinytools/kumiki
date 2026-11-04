@@ -235,7 +235,7 @@ def overlay_frames(frames: List[Any], name: Optional[str]) -> Any:
         accessories=[accessory for built in frames for accessory in built.accessories],
         footprints=[footprint for built in frames for footprint in built.footprints],
         drawings=[drawing for built in frames for drawing in built.drawings],
-        deferred=tuple(routine for built in frames for routine in built.deferred),
+        finishing=tuple(routine for built in frames for routine in built.finishing),
         tools=[tool for built in frames for tool in built.tools],
         source_joints=joints or None,
         name=name,

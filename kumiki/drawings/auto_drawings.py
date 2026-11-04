@@ -17,7 +17,7 @@ from ..csg.symmetry import SymmetricTimberGroup, SymmetryKind, match_timbers
 from ..geometry import Plane
 from ..identity import DrawingId, ViewportId
 from ..rule import Orientation, Transform, create_v3
-from ..deferred import Deferred
+from ..finishing import Finishing
 from ..timber import CutTimber, Frame, PerfectTimberWithin
 from .auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Criterion, DimensionCandidate, PickContext, Policy,
                                 auto_dimension, coincidence_assumptions, derived_edge_anchors, faces_to_edges, fixed,
@@ -199,7 +199,7 @@ def _count(group: SymmetricTimberGroup) -> str:
 
 def with_auto_drawings(frame: Frame, fixed_path: str, extra_views: Optional[ExtraViews] = None,
                        dimensioned: Optional[Callable[[CutTimber], bool]] = None) -> Frame:
-    """Return `frame` with a deferred routine adding a generated plan and a shop drawing per distinct piece.
+    """Return `frame` with a finishing routine adding a generated plan and a shop drawing per distinct piece.
 
     `fixed_path` names the timber the plan is measured from. `extra_views` adds views to a piece's
     shop drawing; `dimensioned` picks which members the plan dimensions (all by default).
@@ -207,12 +207,12 @@ def with_auto_drawings(frame: Frame, fixed_path: str, extra_views: Optional[Extr
     cut_timbers = list(frame.cut_timbers)
     members = [cut for cut in cut_timbers if dimensioned(cut)] if dimensioned else None
 
-    def generate(deferred: Deferred) -> None:
+    def generate(finishing: Finishing) -> None:
         groups = match_timbers(cut_timbers)
-        deferred.progress(0, 1 + len(groups), "plan")
-        deferred.add_drawing(plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)", members))
+        finishing.progress(0, 1 + len(groups), "plan")
+        finishing.add_drawing(plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)", members))
         for done, group in enumerate(groups, start=1):
-            deferred.progress(done, 1 + len(groups), group.representative.timber.ticket.path)
-            deferred.add_drawing(piece_drawing(group, extra_views(group.representative) if extra_views else {}))
+            finishing.progress(done, 1 + len(groups), group.representative.timber.ticket.path)
+            finishing.add_drawing(piece_drawing(group, extra_views(group.representative) if extra_views else {}))
 
-    return frame.with_deferred(generate)
+    return frame.with_finishing(generate)

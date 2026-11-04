@@ -8,18 +8,18 @@ screen. The routine is written inside the frame function, so it uses what the bu
         frame = Frame.from_joints(joints, kiwari=k)
         groups = match_timbers(frame.cut_timbers)
 
-        def later(deferred: Deferred) -> None:
+        def later(finishing: Finishing) -> None:
             for group in groups:
-                deferred.add_drawing(piece_drawing(group))
+                finishing.add_drawing(piece_drawing(group))
 
-        return frame.with_deferred(later)
+        return frame.with_finishing(later)
 
 Kigumi runs the routine in the background after showing the frame, and shows each drawing as it
-is added. `frame.run_deferred()` runs it straight away, for scripts and tests.
+is added. `frame.finish()` runs it straight away, for scripts and tests.
 
 A frame also offers tools: functions the viewer can run on demand, each returning text to show::
 
-    frame = replace(frame, tools=[ToolAd("leg report", "How many legs there are",
+    frame = replace(frame, tools=[Tool("leg report", "How many legs there are",
                                          lambda: f"{k.count('legs')} legs")])
 """
 
@@ -29,17 +29,17 @@ from typing import TYPE_CHECKING, Callable, Optional
 if TYPE_CHECKING:
     from .drawings.drawing import Drawing
 
-__all__ = ["Deferred", "DeferredCancelled", "ToolAd"]
+__all__ = ["Finishing", "FinishingCancelled", "Tool"]
 
 
-class DeferredCancelled(Exception):
-    """Raised inside a deferred routine when its frame has been replaced and its work is no longer wanted."""
+class FinishingCancelled(Exception):
+    """Raised inside a finishing routine when its frame has been replaced and its work is no longer wanted."""
 
 
-class Deferred:
-    """What a deferred routine is handed: where to put what it makes.
+class Finishing:
+    """What a finishing routine is handed: where to put what it makes.
 
-    Every call raises DeferredCancelled once the work is no longer wanted, so a routine stops at
+    Every call raises FinishingCancelled once the work is no longer wanted, so a routine stops at
     its next call without checking for itself.
     """
 
@@ -53,7 +53,7 @@ class Deferred:
 
     def _stop_if_cancelled(self) -> None:
         if self._should_cancel is not None and self._should_cancel():
-            raise DeferredCancelled()
+            raise FinishingCancelled()
 
     def add_drawing(self, drawing: "Drawing") -> None:
         """Add a drawing to the frame. It must be of this frame's own timbers."""
@@ -68,7 +68,7 @@ class Deferred:
 
 
 @dataclass(frozen=True)
-class ToolAd:
+class Tool:
     """A tool a frame offers: `run()` returns the text the viewer shows."""
     name: str
     description: str

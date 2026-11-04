@@ -1,4 +1,4 @@
-"""The runner running a frame's deferred routines and its tools."""
+"""The runner running a frame's finishing routines and its tools."""
 
 import pytest
 
@@ -13,14 +13,14 @@ def posts(k: Optional[Kiwari] = None) -> Frame:
     post = create_timber(bottom_position=create_v3(0, 0, 0), length=mm(1000), size=create_v2(mm(100), mm(100)),
                          length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="post")
     frame = Frame(cut_timbers=[CutTimber(post, cuts=[])], name="posts",
-                  tools=[ToolAd("count", "How many timbers", lambda: f"{len(frame.cut_timbers)} timbers"),
-                         ToolAd("not text", "Returns a number", lambda: 42)])
+                  tools=[Tool("count", "How many timbers", lambda: f"{len(frame.cut_timbers)} timbers"),
+                         Tool("not text", "Returns a number", lambda: 42)])
 
-    def later(deferred: Deferred) -> None:
+    def later(finishing: Finishing) -> None:
         for name in ("first", "second"):
-            deferred.add_drawing(Drawing(name=name, timbers=[post]))
+            finishing.add_drawing(Drawing(name=name, timbers=[post]))
 
-    return frame.with_deferred(later)
+    return frame.with_finishing(later)
 '''
 
 
@@ -46,21 +46,21 @@ def slot(workspace):  # noqa: F811
     return runner.load_slot_state(str(path))
 
 
-def test_drawings_come_once_the_deferred_work_runs(slot):
+def test_drawings_come_once_the_finishing_work_runs(slot):
     assert runner.collect_drawings(slot.frame, slot.file_path) == []
     context = _Context()
 
-    assert runner._run_deferred(slot, context) == {"drawings": ["first", "second"]}
+    assert runner._run_finishing(slot, context) == {"drawings": ["first", "second"]}
 
     assert [d["name"] for d in runner.collect_drawings(slot.frame, slot.file_path)] == ["first", "second"]
     assert [report["drawing"] for report in context.reports] == ["first", "second"]
 
 
 def test_cancelled_work_stops_at_its_next_drawing(slot):
-    from kumiki.deferred import DeferredCancelled  # the kumiki the runner loaded
+    from kumiki.finishing import FinishingCancelled  # the kumiki the runner loaded
 
-    with pytest.raises(DeferredCancelled):
-        runner._run_deferred(slot, _Context(cancel_after=1))
+    with pytest.raises(FinishingCancelled):
+        runner._run_finishing(slot, _Context(cancel_after=1))
 
     assert [drawing.name for drawing in slot.frame.drawings] == ["first"]
 

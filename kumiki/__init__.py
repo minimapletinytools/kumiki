@@ -62,7 +62,7 @@ from .measuring import *
 from .patternbook import *
 from .kiwari import *
 from .frame_decorators import *
-from .deferred import *
+from .finishing import *
 
 # Optional heavy mesh/export modules.
 # FreeCAD's bundled Python may not have trimesh installed; keep base imports usable.

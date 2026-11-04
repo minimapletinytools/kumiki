@@ -806,8 +806,8 @@ class SlotState:
     # than in the viewer so python stays the one place a drawing comes from,
     # and they are lost on reload, which is what "unsaved" should mean.
     pending_drawings: List[DrawingWire] = field(default_factory=list)
-    # The id of the job running the frame's deferred routines, once started.
-    deferred_job: Optional[str] = None
+    # The id of the job running the frame's finishing routines, once started.
+    finishing_job: Optional[str] = None
     # Which import of the project's modules (kumiki, in a dev checkout) this was built
     # with. See _project_generation.
     generation: int = 0
@@ -3975,7 +3975,7 @@ def make_ready_event(state: RunnerState) -> ReadyEventWire:
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
-            "run_deferred", "list_tools", "run_tool",
+            "run_finishing", "list_tools", "run_tool",
             "shutdown",
         ],
         "frame": {
@@ -5059,9 +5059,9 @@ def _require_str(payload: Dict[str, Any], key: str, message: str) -> str:
 # --- background jobs ----------------------------------------------------------
 
 
-def _run_deferred(ss: SlotState, context: "JobContext") -> Dict[str, Any]:
-    """Run the slot's deferred routines, putting each drawing they add on the slot's frame."""
-    from kumiki.deferred import Deferred
+def _run_finishing(ss: SlotState, context: "JobContext") -> Dict[str, Any]:
+    """Run the slot's finishing routines, putting each drawing they add on the slot's frame."""
+    from kumiki.finishing import Finishing
 
     added: List[str] = []
 
@@ -5070,9 +5070,9 @@ def _run_deferred(ss: SlotState, context: "JobContext") -> Dict[str, Any]:
         added.append(drawing.name)
         context.report(drawing=drawing.name, drawingsAdded=len(added))
 
-    deferred = Deferred(on_drawing=add_drawing, on_progress=context.progress, should_cancel=context.should_cancel)
-    for routine in ss.frame.deferred:
-        routine(deferred)
+    finishing = Finishing(on_drawing=add_drawing, on_progress=context.progress, should_cancel=context.should_cancel)
+    for routine in ss.frame.finishing:
+        routine(finishing)
     return {"drawings": added}
 
 
@@ -5378,16 +5378,16 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         job = _jobs.start("assembly", slot_name, _solve_assembly)
         return state, make_success_response(request_id, command, {"assembly": {"pending": True}, "jobId": job.job_id}), False
 
-    if command == "run_deferred":
+    if command == "run_finishing":
         # Asked for once the frame is shown, like get_assembly. Each drawing a routine adds is
         # announced in a job_progress event; get_drawings then includes it.
         slot_name = _resolve_slot_name(state, payload)
         ss = _resolve_slot(state, payload)
-        if not getattr(ss.frame, "deferred", ()):
+        if not getattr(ss.frame, "finishing", ()):
             return state, make_success_response(request_id, command, {"jobId": None}), False
-        if ss.deferred_job is None:
-            ss.deferred_job = _jobs.start("deferred", slot_name, lambda context: _run_deferred(ss, context)).job_id
-        return state, make_success_response(request_id, command, {"jobId": ss.deferred_job}), False
+        if ss.finishing_job is None:
+            ss.finishing_job = _jobs.start("finishing", slot_name, lambda context: _run_finishing(ss, context)).job_id
+        return state, make_success_response(request_id, command, {"jobId": ss.finishing_job}), False
 
     if command == "list_tools":
         ss = _resolve_slot(state, payload)

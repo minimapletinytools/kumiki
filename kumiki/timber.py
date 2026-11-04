@@ -13,7 +13,7 @@ from .footprint import *
 from .csg.cutcsg import *
 from .ticket import Ticket, TimberTicket, AccessoryTicket, JointTicket
 from .drawings.drawing import Drawing
-from .deferred import Deferred, DeferredCancelled, ToolAd
+from .finishing import Finishing, FinishingCancelled, Tool
 from .assembly import (
     AssemblyFreedom,
     AssemblyJoint,
@@ -2759,10 +2759,10 @@ class Frame:
     # inside the builder and handed back here, which is how kigumi learns what
     # it may adjust without a module-level declaration to go looking for.
     kiwari: Optional['Kiwari'] = field(default=None, compare=False)
-    # Routines to run after the frame is shown, each handed a Deferred; see kumiki.deferred.
-    deferred: Tuple[Callable[[Deferred], None], ...] = field(default=(), compare=False, repr=False)
+    # Routines to run after the frame is shown, each handed a Finishing; see kumiki.finishing.
+    finishing: Tuple[Callable[[Finishing], None], ...] = field(default=(), compare=False, repr=False)
     # Tools the viewer can run on demand.
-    tools: List[ToolAd] = field(default_factory=list, compare=False, repr=False)
+    tools: List[Tool] = field(default_factory=list, compare=False, repr=False)
 
     def __post_init__(self):
         self._check_drawings_are_of_this_frame()
@@ -2794,17 +2794,17 @@ class Frame:
                     "Use the timber from this frame's cut_timbers.")
         return f"timber {name!r} is not in this frame."
 
-    def with_deferred(self, routine: Callable[[Deferred], None]) -> 'Frame':
-        """Return this frame with `routine` to run after it is shown, adding drawings through its Deferred."""
-        return replace(self, deferred=(*self.deferred, routine))
+    def with_finishing(self, routine: Callable[[Finishing], None]) -> 'Frame':
+        """Return this frame with `routine` to run after it is shown, adding drawings through its Finishing."""
+        return replace(self, finishing=(*self.finishing, routine))
 
-    def run_deferred(self) -> 'Frame':
-        """Run the deferred routines now and return the frame with what they added, and none left to run."""
+    def finish(self) -> 'Frame':
+        """Run the finishing routines now and return the frame with what they added, and none left to run."""
         drawings: List[Drawing] = []
-        deferred = Deferred(on_drawing=drawings.append)
-        for routine in self.deferred:
-            routine(deferred)
-        return replace(self, drawings=[*self.drawings, *drawings], deferred=())
+        finishing = Finishing(on_drawing=drawings.append)
+        for routine in self.finishing:
+            routine(finishing)
+        return replace(self, drawings=[*self.drawings, *drawings], finishing=())
 
     def resolve_timber_path(self, path: 'TimberPath') -> List['ResolvedTimberPath']:
         """Which timbers a name refers to, in this frame.

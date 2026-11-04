@@ -38,18 +38,18 @@ Built:
 
 - **Jobs** in the runner (`Jobs` / `JobContext`, thread backend): job events, `cancel_job`, `list_jobs`,
   cancelled on slot reload. Assembly runs on it.
-- **Deferred work in kumiki** (`kumiki/deferred.py`): `frame.with_deferred(routine)`, where
-  `routine(deferred: Deferred)` calls `deferred.add_drawing(...)` and `deferred.progress(...)`. Every
-  call raises `DeferredCancelled` once cancelled. `frame.run_deferred()` runs them now, for scripts
+- **Finishing work in kumiki** (`kumiki/finishing.py`): `frame.with_finishing(routine)`, where
+  `routine(finishing: Finishing)` calls `finishing.add_drawing(...)` and `finishing.progress(...)`. Every
+  call raises `FinishingCancelled` once cancelled. `frame.finish()` runs them now, for scripts
   and tests. `overlay_frames` keeps each frame's routines. `with_auto_drawings` and `cat_corner_cot`
   generate their drawings this way.
-- **Runner:** `run_deferred` starts one `deferred` job per slot, asked for by the extension once the
+- **Runner:** `run_finishing` starts one `finishing` job per slot, asked for by the extension once the
   frame is shown. Each drawing replaces the slot's frame with one that has it, and is announced in a
   `job_progress` event (`drawing`, `drawingsAdded`). Protocol output keeps the real stdout and
   `sys.stdout` goes to stderr, so a job thread's prints can't swallow replies.
-- **Extension:** `frame-view-session.js` asks for `run_deferred` after each refresh and fetches the
+- **Extension:** `frame-view-session.js` asks for `run_finishing` after each refresh and fetches the
   drawings again (debounced) as each one arrives.
-- **Tools:** `Frame.tools`, a list of `ToolAd(name, description, run)`; runner `list_tools` and
+- **Tools:** `Frame.tools`, a list of `Tool(name, description, run)`; runner `list_tools` and
   `run_tool`.
 
 Left:
@@ -58,7 +58,7 @@ Left:
    Progress events already carry `done`, `total` and `label`.
 2. **Tools UI:** nothing lists or runs the tools yet.
 3. **Parallel drawings:** a process backend. A routine is one opaque function, so this needs a way to
-   hand the runner separate picklable calls (e.g. `deferred.add_drawing_later(fn, *args)`).
-4. **Agent build report:** say when deferred drawings are still being made.
+   hand the runner separate picklable calls (e.g. `finishing.add_drawing_later(fn, *args)`).
+4. **Agent build report:** say when drawings are still being finished.
 5. **Undecided:** whether a routine that fails shows in the drawings list or only in the log (now:
    the log, with its traceback).

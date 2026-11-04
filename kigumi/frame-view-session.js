@@ -946,7 +946,7 @@ class FrameViewSession {
                 });
                 this._fetchAssemblyInBackground(layersData);
             }
-            this._runDeferredInBackground();
+            this._runFinishingInBackground();
             // The drawings again, measured on the frame just built.
             if (getHost().getConfig(BETA_FEATURE_SETTINGS.drawingBeta, false) === true) {
                 this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
@@ -1306,19 +1306,19 @@ class FrameViewSession {
         });
     }
 
-    /** Ask the runner to run the frame's deferred routines, now that the frame is shown. */
-    _runDeferredInBackground() {
+    /** Ask the runner to run the frame's finishing routines, now that the frame is shown. */
+    _runFinishingInBackground() {
         if (!this.runnerSession) {
             return;
         }
-        this.runnerSession.slotRequest('run_deferred', this.slotName)
+        this.runnerSession.slotRequest('run_finishing', this.slotName)
             .then((result) => {
                 if (result && result.jobId) {
-                    this.log(`[deferred] Running the frame's deferred work in the background (${result.jobId})`);
+                    this.log(`[finishing] Running the frame's finishing work in the background (${result.jobId})`);
                 }
             })
             .catch((err) => {
-                if (!this.isDisposed) this.log(`[deferred] run_deferred failed: ${err.message || err}`);
+                if (!this.isDisposed) this.log(`[finishing] run_finishing failed: ${err.message || err}`);
             });
     }
 
@@ -1333,24 +1333,24 @@ class FrameViewSession {
                 return;
             }
             this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
-                if (!this.isDisposed) this.log(`[drawing] get_drawings after a deferred drawing failed: ${err.message || err}`);
+                if (!this.isDisposed) this.log(`[drawing] get_drawings after a finishing drawing failed: ${err.message || err}`);
             });
         }, 200);
     }
 
-    /** A job event about the frame's deferred work: log it, and refresh the drawings when one is added. */
-    _handleDeferredJobEvent(message) {
+    /** A job event about the frame's finishing work: log it, and refresh the drawings when one is added. */
+    _handleFinishingJobEvent(message) {
         if (message.type === 'job_progress' && typeof message.drawing === 'string') {
-            this.log(`[deferred] Added drawing "${message.drawing}"`);
+            this.log(`[finishing] Added drawing "${message.drawing}"`);
             this._refreshDrawingsSoon();
         } else if (message.type === 'job_result') {
             const seconds = message.timing && message.timing.elapsedS;
             const count = message.result && Array.isArray(message.result.drawings) ? message.result.drawings.length : 0;
-            this.log(`[deferred] Finished: ${count} drawing(s) in ${seconds}s`);
+            this.log(`[finishing] Finished: ${count} drawing(s) in ${seconds}s`);
             this._refreshDrawingsSoon();
         } else if (message.type === 'job_failed') {
             const error = message.error || {};
-            this.log(`[error] [deferred] ${error.type || 'Error'}: ${error.message}\n${error.traceback || ''}`);
+            this.log(`[error] [finishing] ${error.type || 'Error'}: ${error.message}\n${error.traceback || ''}`);
             this._refreshDrawingsSoon();
         }
     }
@@ -1660,13 +1660,13 @@ class FrameViewSession {
             this.profiler.addMilestone(name);
             this.postLoadingStatus(name);
         };
-        // The runner's background jobs (runner.py Jobs): an assembly's result, or the frame's deferred work.
+        // The runner's background jobs (runner.py Jobs): an assembly's result, or the frame's finishing work.
         this.runnerSession.onJobEvent = (message) => {
             if (!message || message.slot !== this.slotName || this.isDisposed) {
                 return;
             }
-            if (message.kind === 'deferred') {
-                this._handleDeferredJobEvent(message);
+            if (message.kind === 'finishing') {
+                this._handleFinishingJobEvent(message);
                 return;
             }
             if (message.kind !== 'assembly') {
