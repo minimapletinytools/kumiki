@@ -255,6 +255,8 @@ def shed(k: Optional[Kiwari] = None) -> Frame:
 
 ### Tools
 
+Experimental: Kigumi doesn't show tools yet, and how they are declared may change in a patch release.
+
 A frame can offer tools: functions Kigumi runs on demand, each returning text to show. Give each a name and a description. A tool is written inside the frame function, so it can use what the build computed:
 
 ```python

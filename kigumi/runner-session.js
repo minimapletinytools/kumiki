@@ -12,6 +12,8 @@ const {
     runCommand: spawnProcess,
     getVenvPythonCandidates,
     getKigumiVersion,
+    getKumikiMinimumVersion,
+    isOlderVersion,
     isLocalDevKigumiVersion,
     kumikiCompatiblePipSpec,
     getMissingDependencies,
@@ -204,7 +206,8 @@ class PythonRunnerSession {
             if (this.isLocalDev && fs.existsSync(path.join(this.projectRoot, 'pyproject.toml'))) {
                 await pipInstall(this.projectRoot, pythonCmd, ['-e', this.projectRoot]);
             } else {
-                const spec = kumikiCompatiblePipSpec(getKigumiVersion(this.context.extensionPath));
+                const extensionPath = this.context.extensionPath;
+                const spec = kumikiCompatiblePipSpec(getKigumiVersion(extensionPath), getKumikiMinimumVersion(extensionPath));
                 this.channel.appendLine(`[env] Installing ${spec}`);
                 await pipInstall(this.projectRoot, pythonCmd, [spec]);
             }
@@ -261,6 +264,11 @@ class PythonRunnerSession {
 
         const [kumikiMajor, kumikiMinor] = kumikiVersion.split('.').map(Number);
         if (kumikiMajor === kigummiMajor && kumikiMinor === kigummiMinor) {
+            const minimum = getKumikiMinimumVersion(this.context.extensionPath);
+            if (isOlderVersion(kumikiVersion, minimum)) {
+                await this.upgradeKumikiTo(pythonCmd, kigummiVersion, minimum, kumikiVersion);
+                return;
+            }
             this.channel.appendLine(`[env] kumiki ${kumikiVersion} is compatible with kigumi ${kigummiVersion}`);
             return;
         }
@@ -273,6 +281,20 @@ class PythonRunnerSession {
             `kumiki version mismatch: kigumi ${kigummiVersion} requires kumiki ${kigummiMajor}.${kigummiMinor}.x, ` +
             `but found kumiki ${kumikiVersion}. ${advice}`
         );
+    }
+
+    /** Upgrade kumiki within kigumi's major.minor when it is older than this kigumi needs. */
+    async upgradeKumikiTo(pythonCmd, kigumiVersion, minimum, installed) {
+        const spec = kumikiCompatiblePipSpec(kigumiVersion, minimum);
+        this.channel.appendLine(`[env] kumiki ${installed} is older than kigumi ${kigumiVersion} needs (${minimum}); installing ${spec}`);
+        try {
+            await pipInstall(this.projectRoot, pythonCmd, ['--upgrade', spec]);
+        } catch (error) {
+            throw new Error(
+                `kigumi ${kigumiVersion} needs kumiki ${minimum} or newer, but found ${installed} and could not upgrade it: ${error.message}. ` +
+                `Run \`pip install -U "${spec}"\` in your project's virtual environment.`
+            );
+        }
     }
 
     start() {

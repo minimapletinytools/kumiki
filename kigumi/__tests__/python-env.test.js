@@ -1,9 +1,13 @@
-const { isLocalDevKigumiVersion, kumikiCompatiblePipSpec } = require('../python-env');
+const { isLocalDevKigumiVersion, isOlderVersion, kumikiCompatiblePipSpec } = require('../python-env');
 
 describe('kumikiCompatiblePipSpec', () => {
     test('a release pins kumiki to its own major.minor', () => {
         expect(kumikiCompatiblePipSpec('0.8.0')).toBe('kumiki~=0.8.0');
         expect(kumikiCompatiblePipSpec('0.8.3')).toBe('kumiki~=0.8.0');
+    });
+
+    test('a minimum raises the floor within the same major.minor', () => {
+        expect(kumikiCompatiblePipSpec('0.9.4', '0.9.2')).toBe('kumiki~=0.9.2');
     });
 
     test('a local dev build takes the latest kumiki', () => {
@@ -23,5 +27,14 @@ describe('isLocalDevKigumiVersion', () => {
     test('releases are not', () => {
         expect(isLocalDevKigumiVersion('0.8.0')).toBe(false);
         expect(isLocalDevKigumiVersion('1.2.3')).toBe(false);
+    });
+});
+
+describe('isOlderVersion', () => {
+    test('compares patch, minor and major numerically', () => {
+        expect(isOlderVersion('0.9.0', '0.9.2')).toBe(true);
+        expect(isOlderVersion('0.9.10', '0.9.2')).toBe(false);
+        expect(isOlderVersion('0.9.2', '0.9.2')).toBe(false);
+        expect(isOlderVersion('0.8.9', '0.9.0')).toBe(true);
     });
 });

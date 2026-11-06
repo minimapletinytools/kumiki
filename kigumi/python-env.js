@@ -18,8 +18,35 @@ const fs = require('fs');
 // omits it (it installs kumiki separately and checks the rest).
 const VIEWER_RUNTIME_DEPENDENCIES = ['kumiki', 'sympy', 'numpy', 'trimesh', 'manifold3d'];
 
+function readKigumiPackage(extensionPath) {
+    return JSON.parse(fs.readFileSync(path.join(extensionPath, 'package.json'), 'utf8'));
+}
+
 function getKigumiVersion(extensionPath = __dirname) {
-    return JSON.parse(fs.readFileSync(path.join(extensionPath, 'package.json'), 'utf8')).version;
+    return readKigumiPackage(extensionPath).version;
+}
+
+// The oldest kumiki this kigumi runs with: package.json's `kumikiMinimum`, else its own major.minor.0.
+// Raise it in a patch release when kigumi starts needing something a kumiki patch added.
+function getKumikiMinimumVersion(extensionPath = __dirname) {
+    const pkg = readKigumiPackage(extensionPath);
+    if (pkg.kumikiMinimum) {
+        return pkg.kumikiMinimum;
+    }
+    const [major, minor] = pkg.version.split('.').map(Number);
+    return `${major}.${minor}.0`;
+}
+
+// Whether version a is older than b, comparing major.minor.patch numerically.
+function isOlderVersion(a, b) {
+    const pa = a.split('.').map((part) => parseInt(part, 10) || 0);
+    const pb = b.split('.').map((part) => parseInt(part, 10) || 0);
+    for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) !== (pb[i] || 0)) {
+            return (pa[i] || 0) < (pb[i] || 0);
+        }
+    }
+    return false;
 }
 
 // A local dev build of kigumi, which install.sh stamps 999.0.0. It matches no released kumiki.
@@ -28,15 +55,15 @@ function isLocalDevKigumiVersion(kigumiVersion) {
     return major >= 999 || minor >= 999;
 }
 
-// pip ~= spec constraining kumiki to the same major.minor as kigumi.
-// e.g. kigumi 0.3.2 → "kumiki~=0.3.0" (pip ~= means >=0.3.0, <0.4.0)
+// pip ~= spec for kumiki from the minimum up, within kigumi's major.minor.
+// e.g. minimum 0.3.2 → "kumiki~=0.3.2" (pip ~= means >=0.3.2, <0.4.0)
 // A local dev build takes the latest kumiki.
-function kumikiCompatiblePipSpec(kigumiVersion = getKigumiVersion()) {
+function kumikiCompatiblePipSpec(kigumiVersion = getKigumiVersion(), minimum = null) {
     if (isLocalDevKigumiVersion(kigumiVersion)) {
         return 'kumiki';
     }
     const [major, minor] = kigumiVersion.split('.').map(Number);
-    return `kumiki~=${major}.${minor}.0`;
+    return `kumiki~=${minimum || `${major}.${minor}.0`}`;
 }
 
 // Candidate paths to a project virtual-environment interpreter, most-preferred
@@ -109,6 +136,8 @@ async function getMissingDependencies(python, options = {}) {
 module.exports = {
     VIEWER_RUNTIME_DEPENDENCIES,
     getKigumiVersion,
+    getKumikiMinimumVersion,
+    isOlderVersion,
     isLocalDevKigumiVersion,
     kumikiCompatiblePipSpec,
     getVenvPythonCandidates,

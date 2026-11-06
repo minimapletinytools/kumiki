@@ -25,6 +25,7 @@ kigumi enforces this at runtime and will refuse to start if they diverge.
 - **Minor (or major) bumps must always bump both projects together to the same major.minor.**
   This is required whenever kumiki introduces a breaking API change that kigumi depends on.
 - When the user says "breaking change" or asks for a `minor`/`major` bump, always target `both`.
+- When a kigumi patch needs something added in a kumiki patch, set `kumikiMinimum` in `kigumi/package.json` to that kumiki version (release kumiki first). kigumi upgrades an older kumiki in the same major.minor on open. Drop the field on a minor bump.
 
 ## Inputs
 

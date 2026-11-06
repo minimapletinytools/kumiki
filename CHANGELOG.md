@@ -13,7 +13,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Changed
 
 - A frame can leave slow work for after it is shown: `frame.with_finishing(routine)`, where `routine(finishing)` adds drawings with `finishing.add_drawing(...)` and reports `finishing.progress(...)`. `frame.finish()` runs it straight away. **Breaking:** `with_auto_drawings` generates its drawings this way, so `frame.drawings` doesn't include them until `finish()`.
-- A frame can offer tools: `Frame(..., tools=[Tool(name, description, run)])`, where `run()` returns text.
+- A frame can offer tools: `Frame(..., tools=[Tool(name, description, run)])`, where `run()` returns text. **Experimental:** the viewer doesn't list tools yet, and `Tool` may change in a 0.9 patch release.
 - **Breaking:** the feature solver moved from `kumiki.drawings` to `kumiki.csg`: `feature_solving`, `solve_recipe`, `dof_solver`, `required_features` and `assumptions`. `kumiki.drawings` keeps what is drawn, and `kumiki.drawings.measure_solving` turns a drawing's `Measure` into what the solver takes.
   - Migration: `from kumiki.drawings.feature_solving import ...` becomes `from kumiki.csg.feature_solving import ...`, and likewise for the other four.
   - `measure_row`, `remaining_dofs` and `solve_report` take `SolveDistance` / `SolveAngle` instead of `Measure`, and no `view`: `measure_row(measure, carriers, view)` becomes `measure_row(solve_measurement(measure, cut_timbers, view), carriers)`.
@@ -34,6 +34,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
+- kigumi can need a newer kumiki patch without a minor release: `kumikiMinimum` in its package.json (default `major.minor.0`) is the oldest kumiki it runs with, and it upgrades an older kumiki in the same major.minor when the project opens.
 - The standalone app looks for a newer release at start and once a day, and shows an Update button in the title bar when there is one: download it, read the release notes, or skip that version. Kigumi > Check for Updates… looks now; `"app.checkForUpdates": false` turns it off.
 - A frame's finishing work, such as its generated drawings, runs after the frame is shown, and the drawings list fills in as each drawing is made. `cat_corner_cot` builds in about 0.4 s, then takes about 6 s more for its 27 drawings.
 - Whatever frame code prints goes to the log, from any thread. Before, output redirected for a background job could take the runner's replies with it.

@@ -11,6 +11,7 @@ const {
     runCommand: spawnProcess,
     getVenvPython,
     getKigumiVersion,
+    getKumikiMinimumVersion,
     isLocalDevKigumiVersion,
     kumikiCompatiblePipSpec,
     getMissingDependencies,
@@ -369,7 +370,7 @@ async function installOrUpdateKumiki(workspaceRoot, pythonPath, isLocalDev) {
     const missingBefore = await getMissingViewerDependencies(workspaceRoot, pythonPath);
     const summary = [];
 
-    const pipSpec = kumikiCompatiblePipSpec();
+    const pipSpec = kumikiCompatiblePipSpec(getKigumiVersion(), getKumikiMinimumVersion());
     if (isLocalDev && fs.existsSync(path.join(workspaceRoot, 'pyproject.toml'))) {
         await pipInstall(workspaceRoot, pythonPath, ['--upgrade', '-e', workspaceRoot]);
         summary.push('Installed local editable Kumiki package from workspace source.');

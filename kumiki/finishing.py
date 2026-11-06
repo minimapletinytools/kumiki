@@ -17,7 +17,8 @@ screen. The routine is written inside the frame function, so it uses what the bu
 Kigumi runs the routine in the background after showing the frame, and shows each drawing as it
 is added. `frame.finish()` runs it straight away, for scripts and tests.
 
-A frame also offers tools: functions the viewer can run on demand, each returning text to show::
+A frame also offers tools: functions the viewer can run on demand, each returning text to show.
+Tools are experimental: the viewer doesn't list them yet, and their shape may change in a patch release::
 
     frame = replace(frame, tools=[Tool("leg report", "How many legs there are",
                                          lambda: f"{k.count('legs')} legs")])
@@ -69,7 +70,7 @@ class Finishing:
 
 @dataclass(frozen=True)
 class Tool:
-    """A tool a frame offers: `run()` returns the text the viewer shows."""
+    """A tool a frame offers: `run()` returns the text the viewer shows. Experimental; may change."""
     name: str
     description: str
     run: Callable[[], str]
