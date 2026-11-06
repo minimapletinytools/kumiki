@@ -77,6 +77,19 @@ def test_each_is_worked_out_once_per_tree(notched):
     assert extents.of(_named(body, "rptw.left"), body) is extents.of(_named(body, "rptw.left"), body)
 
 
+def test_a_tree_s_extents_go_when_the_tree_does():
+    import gc
+    import weakref
+    timber = Timber(length=scalar(10), size=create_v2(scalar(1), scalar(1)), transform=Transform.identity())
+    root = CutTimber(timber, cuts=[]).render_timber_with_cuts_csg_local()
+    gone = weakref.ref(extents_of(root, timber))
+
+    del root
+    gc.collect()
+
+    assert gone() is None
+
+
 def test_two_derived_features_named_alike_on_one_node_are_kept_apart():
     # A cross piece tenoned at both ends has a shoulder corner at each end, both called
     # shoulder×rough.front_right and both derived on the cut timber's root. Kept by owner and name,

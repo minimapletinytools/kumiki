@@ -261,7 +261,7 @@ A frame can offer tools: functions Kigumi runs on demand, each returning text to
 
 ```python
 frame = replace(frame, tools=[Tool("leg report", "How many legs, and how long",
-                                     lambda: f"{len(legs)} legs, {leg_length} long")])
+                                   lambda: f"{len(legs)} legs, {leg_length} long")])
 ```
 
 ## Parameterizing with Kiwari

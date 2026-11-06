@@ -37,6 +37,7 @@ A pattern takes `(k: Kiwari)` if it declares a kiwari and nothing otherwise, and
 """
 
 import inspect
+import types
 import typing
 from dataclasses import dataclass, replace
 from typing import Any, Callable, List, Optional, Sequence, Tuple, TypeVar
@@ -116,7 +117,7 @@ def _is_kiwari(annotation: Any) -> bool:
     if _is_class(annotation, Kiwari):
         return True
     arguments = [argument for argument in typing.get_args(annotation) if argument is not type(None)]
-    return (typing.get_origin(annotation) is typing.Union and len(arguments) == 1
+    return (typing.get_origin(annotation) in (typing.Union, types.UnionType) and len(arguments) == 1
             and len(typing.get_args(annotation)) == 2 and _is_class(arguments[0], Kiwari))
 
 

@@ -46,9 +46,13 @@ class TestAdmission:
         def second(k: Optional[Kiwari]) -> Frame:
             return Frame(cut_timbers=[])
 
-        entries = module_entries(_module(first=first, second=second))
+        @frame
+        def third(k: Kiwari | None = None) -> Frame:
+            return Frame(cut_timbers=[])
 
-        assert [entry.name for entry in entries.frames] == ["first", "second"]
+        entries = module_entries(_module(first=first, second=second, third=third))
+
+        assert [entry.name for entry in entries.frames] == ["first", "second", "third"]
         assert entries.rejected == ()
 
     @pytest.mark.parametrize("source, reason", [

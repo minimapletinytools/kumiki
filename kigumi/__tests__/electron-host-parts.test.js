@@ -95,6 +95,18 @@ describe('settings', () => {
     expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ 'agent.openrouterApiKey': 'sk-or', 'app.workspaceFolder': '/p', 'agent.model': 'm' });
     expect(fs.readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });
+
+  test('a file gone between delete and recreate changes nothing', () => {
+    const file = path.join(dir, 'settings.json');
+    const store = new SettingsStore(file, {});
+    store.set('agent.openrouterApiKey', 'sk-or');
+    fs.unlinkSync(file);
+
+    store.reload();
+    store.set('agent.model', 'm');
+
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ 'agent.openrouterApiKey': 'sk-or', 'agent.model': 'm' });
+  });
 });
 
 describe('tab list', () => {

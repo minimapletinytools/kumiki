@@ -65,6 +65,37 @@ def test_cancelled_work_stops_at_its_next_drawing(slot):
     assert [drawing.name for drawing in slot.frame.drawings] == ["first"]
 
 
+def _wait_for(job):
+    import time
+    deadline = time.monotonic() + 10
+    while job.state == "running" and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert job.state != "running"
+
+
+def test_finishing_runs_once_and_a_cancelled_run_starts_over(slot):
+    first = runner._start_finishing(slot, "posts")
+    runner._jobs.cancel(first.job_id)
+    _wait_for(first)
+
+    again = runner._start_finishing(slot, "posts")
+    _wait_for(again)
+
+    assert again is not first
+    assert runner._start_finishing(slot, "posts") is again
+    assert [drawing.name for drawing in slot.frame.drawings] == ["first", "second"]
+
+
+def test_an_override_of_a_drawing_still_to_come_does_not_dangle(slot, workspace):  # noqa: F811
+    override = {"id": "o", "name": "first", runner.OVERRIDES_KEY: "first", "viewports": []}
+
+    (waiting,) = runner.collect_drawings(slot.frame, slot.file_path, [override], finishing=True)
+    (gone,) = runner.collect_drawings(slot.frame, slot.file_path, [override])
+
+    assert not waiting.get("dangling")
+    assert gone["dangling"]
+
+
 def test_a_tool_runs_and_gives_its_text(slot):
     assert runner.run_tool(slot, "count") == {"name": "count", "output": "1 timbers"}
 

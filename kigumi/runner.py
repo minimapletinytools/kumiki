@@ -806,8 +806,9 @@ class SlotState:
     # than in the viewer so python stays the one place a drawing comes from,
     # and they are lost on reload, which is what "unsaved" should mean.
     pending_drawings: List[DrawingWire] = field(default_factory=list)
-    # The id of the job running the frame's finishing routines, once started.
-    finishing_job: Optional[str] = None
+    # The job running the frame's finishing routines, once started, and the frame from before it.
+    finishing_job: Optional["Job"] = None
+    finishing_base: Any = None
     # Which import of the project's modules (kumiki, in a dev checkout) this was built
     # with. See _project_generation.
     generation: int = 0
@@ -2508,11 +2509,13 @@ def collect_drawings(
     frame: 'Frame',
     example_path: Optional[Path],
     pending: Optional[List[DrawingWire]] = None,
+    finishing: bool = False,
 ) -> List[DrawingWire]:
     """Return every drawing for a frame: from code, from the file, and unsaved.
 
     A file drawing either overrides a code drawing (adding measurements), stands alone, or dangles if
-    its code drawing is gone. `dirty` marks a drawing not yet in the file.
+    its code drawing is gone. `dirty` marks a drawing not yet in the file. While `finishing`, an
+    override's drawing may be yet to come, so it doesn't dangle.
     """
     saved = _read_drawings_file(_drawings_file_path(example_path)) if example_path else []
     # Unsaved entries replace saved ones of the same id, through the same merge.
@@ -2547,7 +2550,7 @@ def collect_drawings(
         scene = DrawingWire(**entry)
         scene.setdefault("name", scene["id"])
         target = entry.get(OVERRIDES_KEY)
-        if isinstance(target, str):
+        if isinstance(target, str) and not finishing:
             # It says it overrides something the code no longer declares. Shown
             # rather than dropped, and shown as what it is, so it can be pointed
             # somewhere else or deleted on purpose.
@@ -5059,6 +5062,18 @@ def _require_str(payload: Dict[str, Any], key: str, message: str) -> str:
 # --- background jobs ----------------------------------------------------------
 
 
+def _finishing_in_progress(ss: SlotState) -> bool:
+    """Whether the slot's finishing routines may still add drawings."""
+    if not getattr(ss.frame, "finishing", ()):
+        return False
+    return ss.finishing_job is None or ss.finishing_job.state == "running"
+
+
+def _slot_drawings(ss: SlotState) -> List[DrawingWire]:
+    """Return every drawing for the slot's frame."""
+    return collect_drawings(ss.frame, ss.file_path, ss.pending_drawings, _finishing_in_progress(ss))
+
+
 def _run_finishing(ss: SlotState, context: "JobContext") -> Dict[str, Any]:
     """Run the slot's finishing routines, putting each drawing they add on the slot's frame."""
     from kumiki.finishing import Finishing
@@ -5066,6 +5081,8 @@ def _run_finishing(ss: SlotState, context: "JobContext") -> Dict[str, Any]:
     added: List[str] = []
 
     def add_drawing(drawing: Any) -> None:
+        if context.should_cancel():
+            return
         ss.frame = replace(ss.frame, drawings=[*ss.frame.drawings, drawing])
         added.append(drawing.name)
         context.report(drawing=drawing.name, drawingsAdded=len(added))
@@ -5074,6 +5091,19 @@ def _run_finishing(ss: SlotState, context: "JobContext") -> Dict[str, Any]:
     for routine in ss.frame.finishing:
         routine(finishing)
     return {"drawings": added}
+
+
+def _start_finishing(ss: SlotState, slot_name: str) -> Optional["Job"]:
+    """Start the slot's finishing job, once; a cancelled one (a failed reload, a cancel_job) starts
+    over from the frame before it. Return the job, or None if the frame has no finishing."""
+    if ss.finishing_base is None:
+        ss.finishing_base = ss.frame
+    if not getattr(ss.finishing_base, "finishing", ()):
+        return None
+    if ss.finishing_job is None or ss.finishing_job.cancel_event.is_set():
+        ss.frame = ss.finishing_base
+        ss.finishing_job = _jobs.start("finishing", slot_name, lambda context: _run_finishing(ss, context))
+    return ss.finishing_job
 
 
 def run_tool(ss: SlotState, name: str) -> Dict[str, str]:
@@ -5259,26 +5289,26 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
     if command == "get_drawings":
         ss = _resolve_slot(state, payload)
         return state, make_success_response(request_id, command, {
-            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "scenes": _slot_drawings(ss),
         }), False
 
     if command == "save_drawings":
         # Everything at once, and only what the file is responsible for.
         ss = _resolve_slot(state, payload)
-        drawings = collect_drawings(ss.frame, ss.file_path, ss.pending_drawings)
+        drawings = _slot_drawings(ss)
         written = write_drawings_file(ss.file_path, drawings)
         # They are the file's now, so nothing is pending and the next read finds
         # them there. Keeping them would give the same drawing two answers.
         ss.pending_drawings = []
         return state, make_success_response(request_id, command, {
             "path": written,
-            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "scenes": _slot_drawings(ss),
         }), False
 
     if command == "add_measurement":
         ss = _resolve_slot(state, payload)
         _check_plane_matches_view(
-            collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            _slot_drawings(ss),
             str(payload.get("drawingId") or ""), str(payload.get("viewportId") or ""), payload.get("plane"))
         add_measurement(
             ss.frame, ss.file_path, ss.pending_drawings,
@@ -5287,7 +5317,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
             _requested_measure(payload, whole=True),
         )
         return state, make_success_response(request_id, command, {
-            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "scenes": _slot_drawings(ss),
         }), False
 
     if command == "update_measurement":
@@ -5300,7 +5330,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
             cast(MeasurementRequest, payload).get("changes") or MeasureWire(),
         )
         return state, make_success_response(request_id, command, {
-            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "scenes": _slot_drawings(ss),
         }), False
 
     if command == "feature_highlights":
@@ -5321,7 +5351,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
             _requested_measure(payload),
         )
         return state, make_success_response(request_id, command, {
-            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "scenes": _slot_drawings(ss),
         }), False
 
     if command == "delete_measurement":
@@ -5333,13 +5363,13 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
             _requested_measure(payload),
         )
         return state, make_success_response(request_id, command, {
-            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "scenes": _slot_drawings(ss),
         }), False
 
     if command == "create_drawing_from_selection":
         ss = _resolve_slot(state, payload)
         drawing = create_drawing_from_selection(ss.frame, payload.get("member_keys") or [])
-        existing = collect_drawings(ss.frame, ss.file_path, ss.pending_drawings)
+        existing = _slot_drawings(ss)
         drawing["id"] = _unique_drawing_id(drawing["name"], {d["id"] for d in existing})
         # The name follows the id, so drawing the same piece twice gives two
         # rows you can tell apart rather than two called the same thing.
@@ -5347,7 +5377,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         drawing["origin"] = ORIGIN_FILE
         ss.pending_drawings.append(drawing)
         return state, make_success_response(request_id, command, {
-            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "scenes": _slot_drawings(ss),
             "enterId": drawing["id"],
         }), False
 
@@ -5383,11 +5413,8 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         # announced in a job_progress event; get_drawings then includes it.
         slot_name = _resolve_slot_name(state, payload)
         ss = _resolve_slot(state, payload)
-        if not getattr(ss.frame, "finishing", ()):
-            return state, make_success_response(request_id, command, {"jobId": None}), False
-        if ss.finishing_job is None:
-            ss.finishing_job = _jobs.start("finishing", slot_name, lambda context: _run_finishing(ss, context)).job_id
-        return state, make_success_response(request_id, command, {"jobId": ss.finishing_job}), False
+        job = _start_finishing(ss, slot_name)
+        return state, make_success_response(request_id, command, {"jobId": job and job.job_id}), False
 
     if command == "list_tools":
         ss = _resolve_slot(state, payload)

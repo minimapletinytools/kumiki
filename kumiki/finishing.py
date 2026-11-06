@@ -21,7 +21,7 @@ A frame also offers tools: functions the viewer can run on demand, each returnin
 Tools are experimental: the viewer doesn't list them yet, and their shape may change in a patch release::
 
     frame = replace(frame, tools=[Tool("leg report", "How many legs there are",
-                                         lambda: f"{k.count('legs')} legs")])
+                                       lambda: f"{k.count('legs')} legs")])
 """
 
 from dataclasses import dataclass

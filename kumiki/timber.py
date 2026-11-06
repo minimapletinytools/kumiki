@@ -2457,6 +2457,31 @@ class Sticker(Accessory):
     transform: Transform
     size: Numeric = inches(1)
 
+    def get_csg_local(self) -> CutCSG:
+        # Ball diameter = size, shaft diameter = size/2, shaft length = 2*size
+        ball_radius = self.size / scalar(2)
+        shaft_radius = self.size / scalar(4)
+        shaft_length = self.size * scalar(2)
+        axis_z = create_v3(scalar(0), scalar(0), scalar(1))
+        origin = create_v3(scalar(0), scalar(0), scalar(0))
+        ball = Cylinder(
+            position=origin,
+            axis_direction=axis_z,
+            radius=ball_radius,
+            start_distance=-ball_radius,
+            end_distance=ball_radius,
+        )
+        shaft_position = axis_z * ball_radius
+        shaft = Cylinder(
+            position=shaft_position,
+            axis_direction=axis_z,
+            radius=shaft_radius,
+            start_distance=scalar(0),
+            end_distance=shaft_length,
+        )
+        return SolidUnion(children=[ball, shaft])
+
+
 class FrameWarning(UserWarning):
     """A problem with a frame's design that still builds, e.g. a joint whose timbers don't touch."""
 
@@ -2548,30 +2573,6 @@ def warn_joints_whose_timber_extended_rough_prisms_dont_touch(joints: Iterable['
                           f"even extended past their ends (a {gap * 1000:.0f} mm gap), so the joint cuts into air.",
                           FrameWarning, stacklevel=3)
 
-
-    def get_csg_local(self) -> CutCSG:
-        # Ball diameter = size, shaft diameter = size/2, shaft length = 2*size
-        ball_radius = self.size / scalar(2)
-        shaft_radius = self.size / scalar(4)
-        shaft_length = self.size * scalar(2)
-        axis_z = create_v3(scalar(0), scalar(0), scalar(1))
-        origin = create_v3(scalar(0), scalar(0), scalar(0))
-        ball = Cylinder(
-            position=origin,
-            axis_direction=axis_z,
-            radius=ball_radius,
-            start_distance=-ball_radius,
-            end_distance=ball_radius,
-        )
-        shaft_position = axis_z * ball_radius
-        shaft = Cylinder(
-            position=shaft_position,
-            axis_direction=axis_z,
-            radius=shaft_radius,
-            start_distance=scalar(0),
-            end_distance=shaft_length,
-        )
-        return SolidUnion(children=[ball, shaft])
         
 @dataclass(frozen=True)
 class Joint:

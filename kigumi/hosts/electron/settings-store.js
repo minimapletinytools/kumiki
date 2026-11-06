@@ -42,8 +42,8 @@ class SettingsStore {
         let text;
         try {
             text = fs.readFileSync(this.filePath, 'utf8');
-        } catch (_error) {
-            return {};
+        } catch (error) {
+            return error.code === 'ENOENT' ? {} : null;
         }
         try {
             const parsed = JSON.parse(text);
@@ -78,9 +78,10 @@ class SettingsStore {
         fs.renameSync(temporary, this.filePath);
     }
 
-    // Re-reads the file, telling listeners about every key whose value changed. A file that can't be
-    // read (saved mid-edit) changes nothing: the settings stay as they were until it can.
+    // Re-reads the file, telling listeners about every key whose value changed. A file that is gone
+    // or can't be read (saved mid-edit, replaced) changes nothing until it can be read again.
     reload() {
+        if (!fs.existsSync(this.filePath)) return;
         const read = this._read();
         if (read === null) return;
         const before = this.values;
