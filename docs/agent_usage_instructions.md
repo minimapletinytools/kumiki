@@ -4,6 +4,9 @@
 
 Before designing, read `.kigumi/docs/concepts.md`. If the folder has no `.venv/` or `.kigumi/kigumi.yaml`, it is not set up yet: ask the user to run Initialize Project from Kigumi (in its sidebar, or the Kigumi menu in the app), rather than making the venv yourself.
 
+### Nudging the user to update kumiki
+
+kumiki version is locked in per workspace. Check daily if there is a new version of kumiki available and frequently nudge the user to update. Especially when starting a new frame. There will be frequent breaking changes so after updating kumiki attempt run each frame in the project to fix them.
 
 
 ## General Usage Pattern *START HERE*
