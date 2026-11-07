@@ -36,7 +36,7 @@ def loaded():
     extensions, which cannot be loaded twice."""
     saved_modules = dict(sys.modules)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-        slot = runner.load_slot_state(str(ROOT / "patterns" / "structures" / "my_cute_frame_drawing_test.py"))
+        slot = runner.load_slot_state(str(ROOT / "hidden_structures" / "my_cute_frame_drawing_test.py"))
         state = runner.RunnerState(slots={"main": slot}, active_slot="main")
         runner.build_real_geometry(state, slot)
     yield slot, state

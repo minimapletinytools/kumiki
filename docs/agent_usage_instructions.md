@@ -126,15 +126,10 @@ Kumiki ships example frames in `patterns/structures/` (in the installed package,
 - `doublesawhorseworkbench.py`: a double sawhorse workbench.
 - `dovetailed_sawhorse.py`: a beam on edge with four splayed legs in sliding dovetails, sized by kiwari parameters.
 - `coffee_table.py`: a small table.
-- `cat_corner_cot.py`: a cot built against a corner.
 - `oscarshed.py`: a shed with posts on mudsills.
 - `tinyhouse120.py`: a tiny house with posts on the ground and floor beams into them.
 - `learn_to_timber_frame_shed.py`: a shed's base, floor joists and mudsill joints.
-- `multiple_frames.py`: several frames in one file.
-- `assembly_preview_demo.py`: an H-frame with a disassembly sequence.
 - `multi_cross_lap_post.py`: a round post capped by three crossing boards, in cross laps.
-- `half_blind_tenoned_dadoed_rabbeted_scarf_joint.py`: a scarf joint (Kanawa Tsugi style).
-- `my_cute_frame_drawing_test.py`: drawings dimensioned automatically.
 
 ## Cutting Joints
 
@@ -230,7 +225,7 @@ shop = Drawing(
 
 - A drawing with no measurements is fine: it shows the views, and the user dimensions it in Kigumi.
 - Draw each distinct piece once: `match_timbers(frame.cut_timbers)` groups timbers that are the same piece, turned (ROTATION) or mirrored (REFLECTION, a "handed" piece). Draw the group's `representative` and put the count in the drawing's name.
-- The `my_cute_frame_drawing_test.py` pattern (in the installed kumiki package, under `kumiki/patterns/structures/`) dimensions drawings automatically with `kumiki.drawings.auto_dimensioning`; start from it rather than placing every measurement by hand.
+- To dimension drawings automatically, return `with_auto_drawings(frame, fixed_path="beam")` (`kumiki.drawings.auto_drawings`; `fixed_path` names the timber the plan is measured from): a plan and a dimensioned drawing for each distinct piece, as `dovetailed_sawhorse.py` does. Start from it rather than placing every measurement by hand.
 
 ### Slow work after the frame is shown
 

@@ -55,7 +55,7 @@ def _load_cute_frame():
     my_cute_frame.py is the starter project's frame and stays as it is, so the rough stock goes in
     here, where its timbers are made.
     """
-    path = FilePath(__file__).resolve().parent / "my_cute_frame.py"
+    path = FilePath(__file__).resolve().parent.parent / "patterns" / "structures" / "my_cute_frame.py"
     spec = importlib_util.spec_from_file_location("my_cute_frame_for_drawing_test", path)
     assert spec is not None and spec.loader is not None
     module = importlib_util.module_from_spec(spec)

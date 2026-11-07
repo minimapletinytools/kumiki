@@ -35,7 +35,7 @@ def load(name, path):
 
 
 runner = load("kigumi_runner", REPO / "kigumi/runner.py")
-test = load("probe_test", REPO / "patterns/structures/my_cute_frame_drawing_test.py")
+test = load("probe_test", REPO / "hidden_structures/my_cute_frame_drawing_test.py")
 
 PAGE_W_MM, PAGE_H_MM = 420.0, 297.0          # A3 landscape, the runner's _DEBUG_DRAWING_PAGE
 CANVAS_PX = 1400.0                           # a typical page width on screen

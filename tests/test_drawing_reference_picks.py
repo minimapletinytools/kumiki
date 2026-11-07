@@ -29,7 +29,7 @@ def frame():
     saved_modules = dict(sys.modules)
     with warnings.catch_warnings(), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         warnings.simplefilter("ignore")
-        slot = runner.load_slot_state(str(REPO / "patterns" / "structures" / "my_cute_frame_drawing_test.py"))
+        slot = runner.load_slot_state(str(REPO / "hidden_structures" / "my_cute_frame_drawing_test.py"))
         runner.build_real_geometry(None, slot)
     yield runner, slot
     restore_modules(saved_modules)

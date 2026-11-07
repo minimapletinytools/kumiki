@@ -10,6 +10,10 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kumiki
 
+#### Removed
+
+- The example frames `cat_corner_cot`, `assembly_preview_demo`, `multiple_frames`, `my_cute_frame_drawing_test` and the `actually_kumiki` puzzles no longer ship with kumiki (they stay in the repo, in `hidden_structures/`), and the `half_blind_tenoned_dadoed_rabbeted_scarf_joint` example frame is gone; the joint and its pattern book stay.
+
 #### Added
 
 - A tool can take parameters: `Tool(name, description, run, kiwari=kiwari(...))`, and `run` is given the resolved values. A tool without a kiwari is run with nothing, as before.

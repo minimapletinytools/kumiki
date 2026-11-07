@@ -87,7 +87,7 @@ A pick's preview (`pick_verdict`, then `place_pair`) and a written measurement g
 
 ## 8. The drawing
 
-The generator (`patterns/structures/my_cute_frame_drawing_test.py` is the worked example) finds
+The generator (`hidden_structures/my_cute_frame_drawing_test.py` is the worked example) finds
 what must be solved (`required_features`), what each view can see (`visible_by_view`), every
 dimension a view could draw between those (`sheet_candidates`), and picks until everything is
 solved (`auto_dimension`). The runner resolves each written measurement through step 6 and sends

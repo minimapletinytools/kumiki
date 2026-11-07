@@ -14,7 +14,7 @@ from kumiki.csg.cutcsg import OwnedFeatureHit
 from kumiki.csg.feature_paths import FeatureHandle
 from kumiki.drawings.auto_dimensioning import (Policy, from_reference, from_solved, is_reference, shortest)
 
-PATTERN = FilePath(__file__).resolve().parent.parent / "patterns" / "structures" / "my_cute_frame_drawing_test.py"
+PATTERN = FilePath(__file__).resolve().parent.parent / "hidden_structures" / "my_cute_frame_drawing_test.py"
 
 
 @pytest.fixture(scope="module")

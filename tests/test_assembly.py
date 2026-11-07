@@ -1080,7 +1080,7 @@ class TestRotation:
 
     def test_luban_lock_2(self):
         from kumiki.timber import solve_frame_assembly
-        from patterns.structures.actually_kumiki.luban_lock_2 import example
+        from hidden_structures.actually_kumiki.luban_lock_2 import example
 
         frame = example()
         solution = solve_frame_assembly(frame)

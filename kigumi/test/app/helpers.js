@@ -10,7 +10,7 @@ const REPO = path.resolve(__dirname, '..', '..', '..');
 const FRAME = path.join(REPO, 'patterns', 'structures', 'my_cute_frame.py');
 const PARAMETER_FRAME = path.join(REPO, 'patterns', 'structures', 'dovetailed_sawhorse.py');
 // A frame with drawings, in rough stock: its views draw dotted perfect faces and centerlines.
-const DRAWING_FRAME = path.join(REPO, 'patterns', 'structures', 'my_cute_frame_drawing_test.py');
+const DRAWING_FRAME = path.join(REPO, 'hidden_structures', 'my_cute_frame_drawing_test.py');
 const ARTIFACTS = process.env.KIGUMI_TEST_ARTIFACTS || null;
 
 // The settings a scenario may change, as every scenario starts with them.

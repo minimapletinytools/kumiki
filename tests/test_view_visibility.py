@@ -12,7 +12,7 @@ from kumiki.csg.required_features import required_features
 from kumiki.drawings.visibility import nearest_visible_depth, sight_is_blocked
 from kumiki.rule import Transform, create_v2, create_v3, scalar
 
-PATTERN = Path(__file__).resolve().parent.parent / "patterns" / "structures" / "my_cute_frame_drawing_test.py"
+PATTERN = Path(__file__).resolve().parent.parent / "hidden_structures" / "my_cute_frame_drawing_test.py"
 
 
 def _box(x, y, z):

@@ -197,7 +197,7 @@ edges as drawn lines and a face only edge-on. Solving works with faces; only wha
   assumptions fix, so the solve is unchanged. A move the solver can't write a row for isn't made.
 - Not checked: whether another timber hides the chosen edge while some of the face shows.
 
-## The whole pipeline (as in `patterns/structures/my_cute_frame_drawing_test.py`)
+## The whole pipeline (as in `hidden_structures/my_cute_frame_drawing_test.py`)
 
 - Set up a `DrawingSolve` over the frame's cut timbers.
 - **Datum**: fix one timber's reference faces and its bottom end, as known rows.

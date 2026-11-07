@@ -103,7 +103,7 @@ def test_two_derived_features_named_alike_on_one_node_are_kept_apart():
     from kumiki.drawings.kigumi_measuring_helpers import feature_anchor
 
     # The rough cute frame the drawing pattern builds.
-    source = Path(__file__).resolve().parent.parent / "patterns" / "structures" / "my_cute_frame_drawing_test.py"
+    source = Path(__file__).resolve().parent.parent / "hidden_structures" / "my_cute_frame_drawing_test.py"
     with contextlib.redirect_stdout(io.StringIO()):
         frame = runpy.run_path(str(source))["_load_cute_frame"]()()
 

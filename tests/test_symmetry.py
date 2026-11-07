@@ -13,10 +13,11 @@ from kumiki.csg.symmetry import SymmetryKind, csg_symmetries, match_timbers, tim
 from kumiki.rule import Orientation, Transform, create_v2, create_v3
 
 STRUCTURES = Path(__file__).resolve().parent.parent / "patterns" / "structures"
+HIDDEN = Path(__file__).resolve().parent.parent / "hidden_structures"
 
 
-def _module(name):
-    spec = importlib.util.spec_from_file_location(f"symmetry_test_{name}", STRUCTURES / f"{name}.py")
+def _module(name, folder=STRUCTURES):
+    spec = importlib.util.spec_from_file_location(f"symmetry_test_{name}", folder / f"{name}.py")
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     with warnings.catch_warnings():
@@ -36,7 +37,7 @@ def coffee_table():
 def cute_frame():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        frame = _module("my_cute_frame_drawing_test")._load_cute_frame()()
+        frame = _module("my_cute_frame_drawing_test", HIDDEN)._load_cute_frame()()
     return {cut.timber.ticket.path: cut for cut in frame.cut_timbers}
 
 
