@@ -4,8 +4,9 @@
  * On macOS the menu bar and the Dock take the app's name (and the Dock its icon) from the bundle
  * that runs, which the app can't change once running. So this runs a copy of Electron's bundle
  * named Kigumi, with Kigumi's icon, made once per Electron version under build-app/dev/. It also
- * claims kigumi:// links, as a build does, so signing in comes back to it. Elsewhere, or if that copy
- * can't be made, it runs Electron as it is.
+ * claims kigumi:// links, as a build does, so signing in comes back to it, and carries a stub app that
+ * loads this checkout's main.js, so opening the copy from Spotlight, the Dock or a link runs Kigumi.
+ * Elsewhere, or if that copy can't be made, it runs Electron as it is.
  */
 
 const { spawn, execFileSync } = require('child_process');
@@ -17,8 +18,9 @@ const electron = require('electron');
 const ROOT = path.join(__dirname, '..');
 const DEV_DIR = path.join(ROOT, 'build-app', 'dev');
 const ICON = path.join(ROOT, 'templogo.png');
+const MAIN = path.join(ROOT, 'hosts', 'electron', 'main.js');
 // Changes when the bundle is made differently, so an older copy is made again.
-const BUNDLE_FORMAT = 2;
+const BUNDLE_FORMAT = 3;
 const LSREGISTER = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
 
 function run(command, args) {
@@ -89,6 +91,11 @@ function macBundle() {
         run('/usr/libexec/PlistBuddy', ['-c', command, plist]);
     }
     replaceIcon(path.join(bundle, 'Contents', 'Resources'));
+    // Electron runs Resources/app ahead of its default app, which only says how to run one.
+    const stub = path.join(bundle, 'Contents', 'Resources', 'app');
+    fs.mkdirSync(stub);
+    fs.writeFileSync(path.join(stub, 'package.json'), `${JSON.stringify({ name: 'kigumi-dev', private: true, main: 'index.js' }, null, 2)}\n`);
+    fs.writeFileSync(path.join(stub, 'index.js'), `require(${JSON.stringify(MAIN)});\n`);
     // The edits break the bundle's signature, which Apple silicon won't run without.
     run('codesign', ['--force', '--deep', '--sign', '-', bundle]);
     run(LSREGISTER, ['-f', bundle]);
@@ -97,15 +104,17 @@ function macBundle() {
 }
 
 let executable = electron;
+let args = [MAIN, ...process.argv.slice(2)];
 if (process.platform === 'darwin') {
     try {
         executable = macBundle();
+        args = process.argv.slice(2); // its stub app loads main.js
     } catch (error) {
         console.warn(`[app:start] Running Electron as it is; could not make the Kigumi bundle: ${error.message}`);
     }
 }
 
-const child = spawn(executable, [path.join(ROOT, 'hosts', 'electron', 'main.js'), ...process.argv.slice(2)], {
+const child = spawn(executable, args, {
     stdio: 'inherit',
     cwd: ROOT,
 });
