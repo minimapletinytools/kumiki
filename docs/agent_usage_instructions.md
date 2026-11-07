@@ -207,7 +207,7 @@ Older files name their one frame `example` or `build_frame` instead of marking i
 
 ## Generating drawings
 
-A frame can carry drawings: `Frame(..., drawings=[...])`, or `dataclasses.replace(frame, drawings=[...])` on one built by `Frame.from_joints`. Kigumi lists them and the user can add or move dimensions there; those edits are saved in `.kigumi/drawings/` and kept across rebuilds.
+A frame can carry drawings: `Frame(..., drawings=[...])`, or `dataclasses.replace(frame, drawings=[...])`. 
 
 ```python
 from kumiki.csg.feature_paths import find_feature
@@ -223,11 +223,9 @@ shop = Drawing(
 )
 ```
 
-- A drawing with no measurements is fine: it shows the views, and the user dimensions it in Kigumi.
-- Draw each distinct piece once: `match_timbers(frame.cut_timbers)` groups timbers that are the same piece, turned (ROTATION) or mirrored (REFLECTION, a "handed" piece). Draw the group's `representative` and put the count in the drawing's name.
-- To dimension drawings automatically, return `with_auto_drawings(frame, fixed_path="beam")` (`kumiki.drawings.auto_drawings`; `fixed_path` names the timber the plan is measured from): a plan and a dimensioned drawing for each distinct piece, as `dovetailed_sawhorse.py` does. Start from it rather than placing every measurement by hand.
+Drawings can also be automtaically generated using `with_auto_drawings` e.g. `with_auto_drawings(frame, fixed_path="beam")` however the automatic mesauring placement is not very ergonomic yet, so you prefer building your own drawings or modifying the auto generated one.
 
-### Slow work after the frame is shown
+### Deferring drawing generation and other slow work.
 
 Generating drawings can take seconds. Put that work in a finishing routine: a function inside the frame function, handed a `Finishing`. Kigumi shows the frame first, then runs the routine in the background and lists each drawing as it is added. `with_auto_drawings` already works this way.
 
@@ -240,13 +238,10 @@ def shed(k: Optional[Kiwari] = None) -> Frame:
     def later(finishing: Finishing) -> None:
         for done, group in enumerate(groups):
             finishing.progress(done, len(groups), group.representative.timber.ticket.path)
-            finishing.add_drawing(my_piece_drawing(group))
+            finishing.add_drawing(generate_drawings(group))
 
     return frame.with_finishing(later)
 ```
-
-- `frame.drawings` doesn't include them until they run. In a script or test, `frame.finish()` runs them and returns the frame with its drawings.
-- When the frame is rebuilt, the routine stops at its next `add_drawing` or `progress` call.
 
 ### Tools
 
@@ -268,35 +263,6 @@ Tool("export", "Write the frame to an STL", lambda t: export(frame, t.number("sc
 ```
 
 ## Parameterizing with Kiwari
-
-kumiki is a *programmatic CAD* tool hence all designs can be parameterized by code. To make this even easier, `kiwari` allows you to expose some parameters in one of the kigumi panels.
-
-Create a new kiwari object with a list of user defined parameters, and return it as part of the frame:
-
-```python
-PARAMS = kiwari(legs=kiwari.count(4, minimum=3))
-
-
-@frame
-def my_frame(k: Optional[Kiwari] = None) -> Frame:
-    k = PARAMS.resolve(k)
-    ...
-    return Frame(..., kiwari=k)
-```
-
-Your frame function resolves the values it is passed onto it (`k = PARAMS.resolve(k)`) and returns the result on its Frame (`kiwari=k`). Kigumi passes the values set in its panel, or None the first time, which leaves the defaults.
-
-Typed values are extracted by string key.
-
-```python
-legs = k.count("legs")
-```
-
-Please see `kiwari.py` and `dovetailed_sawhorse.py` for examples
-
-The annotations on `@frame` are checked (`Optional[Kiwari]` is also accepted). One that doesn't match is not used, and Kigumi says why.
-
-## Parameters (kiwari)
 
 A file can expose numbers for the user to adjust in Kigumi's parameters panel.
 Declare them with a **kiwari** (木割 -- the traditional system that sets every
@@ -321,52 +287,14 @@ def stool(k: Optional[Kiwari] = None) -> Frame:
     return Frame.from_joints(joints, name="stool", kiwari=k)
 ```
 
-Frames resolved from the same kiwari object share one set of parameters; any
-other kiwari gets a section of its own in the panel, named by its frames. So a
-file can give every frame one set, each its own, or anything between. To build
-a frame from a script or a test, call it bare for the defaults: `stool()`.
-
 Declare with `kiwari.length`, `.angle`, `.count`, `.number`, `.flag`, `.text`,
 `.choice` (pass the Enum class), `.point2`, `.point3` and `.ratio` (two numbers
 in boxes named by `parts`, e.g. `kiwari.ratio((1, 6), parts=("rise", "run"))`).
 Read back with the matching accessor: `k.length("seat_height")`,
-`k.count("legs")`, `k.choice("butt_end")`, `k.ratio("slope")` (rise over run). Asking for the wrong one raises where you asked, which
-is the point of reading them by kind rather than by a single `get`.
+`k.count("legs")`, `k.choice("butt_end")`, `k.ratio("slope")` (rise over run). 
 
-The helpers live on `kiwari` rather than as bare names because `length`,
-`count` and `angle` are ordinary local variable names -- a local one shadows a
-module-level function for the whole function body, including the line above
-that tried to call it.
-
-Lengths are metres and angles are radians, as everywhere else in kumiki. The
-user types `450mm`, `18in`, `1 1/4"` or `2'6"` and the panel reads it; a bare
+The user types `450mm`, `18in`, `1 1/4"` or `2'6"` and the panel reads it; a bare
 number takes whichever unit the viewer is set to. Formulas are not supported.
-
-### Optional parameters
-
-A parameter that may be nothing at all takes `optional=True` and gets a switch
-in the panel. With no default it starts switched off; give it one and it starts
-on and can be turned off.
-
-```python
-PARAMS = kiwari(
-    cap=kiwari.length(optional=True, about="Thickness of a cap board; off for none"),
-    chamfer=kiwari.length(mm(6), optional=True),
-)
-
-# inside a @frame, with k = PARAMS.resolve(k):
-cap = k.length("cap")
-if cap is not None:
-    ...  # build the cap
-```
-
-The accessor returns `None` when it is switched off, so the builder decides
-what nothing means — usually leaving a member out. Bounds are not applied to
-nothing, and switching one on or off counts as a change from the code.
-
-Since the update flow is agentic, a constant in the file is often still better
-than a parameter -- reach for a kiwari when the user genuinely wants to try
-values themselves, not for everything that happens to be a number.
 
 Changing parameters in Kigumi does not edit your file. Saving them writes
 `<yourfile>.parameters.json` beside it, holding only the values that differ
