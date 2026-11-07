@@ -75,7 +75,8 @@ def _wait_for(job):
 
 def test_finishing_runs_once_and_a_cancelled_run_starts_over(slot):
     first = runner._start_finishing(slot, "posts")
-    runner._jobs.cancel(first.job_id)
+    # Cancelled directly: the job can finish before cancel_job would reach it.
+    first.cancel_event.set()
     _wait_for(first)
 
     again = runner._start_finishing(slot, "posts")
