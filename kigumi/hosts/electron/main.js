@@ -220,12 +220,93 @@ async function runAppCommand(id, ...args) {
 
 async function chooseWorkspaceFolder() {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-        title: 'Open Kigumi Project Folder',
+        title: 'Open Kigumi Project',
         properties: ['openDirectory', 'createDirectory'],
     });
     if (!canceled && filePaths.length > 0) {
         openWorkspaceFolder(filePaths[0]);
     }
+}
+
+/** Ask for a folder for a new project, starting in Documents, then open it and set it up. */
+async function chooseNewProjectFolder() {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+        title: 'New Kigumi Project',
+        message: 'Choose or make the folder for the new project.',
+        buttonLabel: 'Create Project',
+        defaultPath: app.getPath('documents'),
+        properties: ['openDirectory', 'createDirectory'],
+    });
+    if (!canceled && filePaths.length > 0) {
+        createProject(filePaths[0]);
+    }
+}
+
+/** Make `folder` (absolute) if need be, open it, and set it up as a project once it is open. */
+function createProject(folder) {
+    checkNewProjectFolder(folder);
+    fs.mkdirSync(folder, { recursive: true });
+    if (folder === workspaceFolder) {
+        void runAppCommand('kigumi.initializeProjectInWorkspace');
+        return;
+    }
+    settings.set('app.setUpProject', folder);
+    openWorkspaceFolder(folder);
+}
+
+function checkNewProjectFolder(folder) {
+    if (!path.isAbsolute(folder)) {
+        throw new Error(`${folder} is not an absolute path.`);
+    }
+    if (fs.existsSync(folder) && !fs.statSync(folder).isDirectory()) {
+        throw new Error(`${folder} is a file, not a folder.`);
+    }
+}
+
+function checkProjectFolder(folder) {
+    if (!path.isAbsolute(folder) || !fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) {
+        throw new Error(`${folder} is not a folder. Give the absolute path of an existing one.`);
+    }
+}
+
+/** Close the project: Kigumi starts again with none open. */
+function closeWorkspaceFolder() {
+    if (workspaceFolder) {
+        restartOn(null);
+    }
+}
+
+// How long the agent's project tools wait before restarting, so their answer gets back first.
+const PROJECT_SWITCH_DELAY_MS = 1500;
+
+/** What the agent's project tools (agent/project-tools.js) do here. */
+function agentProjects() {
+    const later = (switchProject) => setTimeout(() => {
+        try {
+            switchProject();
+        } catch (error) {
+            setStatus('error', error.message);
+        }
+    }, PROJECT_SWITCH_DELAY_MS);
+    const expand = (folder) => (folder.startsWith('~') ? path.join(os.homedir(), folder.slice(1)) : folder);
+    return {
+        current: () => workspaceFolder,
+        recent: () => recentFolders().map((one) => one.path),
+        open: (folder) => {
+            const target = expand(folder);
+            checkProjectFolder(target);
+            later(() => openWorkspaceFolder(target));
+        },
+        create: (folder) => {
+            const target = expand(folder);
+            checkNewProjectFolder(target);
+            later(() => createProject(target));
+        },
+        close: () => {
+            if (!workspaceFolder) throw new Error('No project is open.');
+            later(closeWorkspaceFolder);
+        },
+    };
 }
 
 /** Open one of the recent folders, by path; one that isn't listed is ignored. */
@@ -236,25 +317,41 @@ function openRecentFolder(folder) {
 }
 
 function openWorkspaceFolder(folder) {
-    if (folder === workspaceFolder) {
-        return;
+    if (folder !== workspaceFolder) {
+        restartOn(folder);
     }
+}
+
+/** Start Kigumi again on `folder`, or on none: sessions, watchers and the explorer are rooted in it. */
+function restartOn(folder) {
     settings.set('app.workspaceFolder', folder);
-    // Sessions, watchers and the explorer are all rooted in the folder, so start over.
     const cli = cliFolder();
     app.relaunch({ args: process.argv.slice(1).filter((arg) => !cli || path.resolve(arg) !== cli) });
     app.exit(0);
 }
 
-async function chooseFrameFile() {
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-        title: 'Open Frame File',
-        defaultPath: workspaceFolder || undefined,
-        properties: ['openFile'],
-        filters: [{ name: 'Python', extensions: ['py'] }],
-    });
-    if (!canceled && filePaths.length > 0) {
-        await runAppCommand('kigumi.openFrameFromSidebar', filePaths[0]);
+/** Show the explorer with the rows `keys` expanded, the first at the top; false if it has none of them. */
+function revealInExplorer(keys) {
+    connection.setSideShown('left', true);
+    return kigumiApp.sidebarController.reveal(keys).length > 0;
+}
+
+// Patterns and examples come from the project's kumiki, so there are none without a project.
+function browsePatterns() {
+    if (!workspaceFolder) {
+        setStatus('info', 'Open a project to browse patterns.');
+        return;
+    }
+    revealInExplorer(['patterns-root', 'pattern-section:workspace-patternbooks', 'pattern-section:shipped-patterns']);
+}
+
+function browseExamples() {
+    if (!workspaceFolder) {
+        setStatus('info', 'Open a project to browse examples.');
+        return;
+    }
+    if (!revealInExplorer(['example-frames-root', 'library-frames:kumiki'])) {
+        setStatus('info', 'No examples yet: kumiki is not installed in this project. Kigumi > Initialize Project sets it up.');
     }
 }
 
@@ -521,6 +618,7 @@ function agentHost() {
         kumikiSource: knownKumikiSource,
         kumikiExamples: () => kumikiExamples(knownKumikiSource()),
         systemPrompt: loadSystemPrompt(),
+        projects: agentProjects(),
     });
 }
 
@@ -652,9 +750,11 @@ function copyMcpSetup(clientId = 'claude-code') {
 
 function onShellCommand(id, ...args) {
     if (id === 'openFolder') return chooseWorkspaceFolder();
+    if (id === 'newProject') return chooseNewProjectFolder();
+    if (id === 'browsePatterns') return browsePatterns();
+    if (id === 'browseExamples') return browseExamples();
     if (id === 'openRecentFolder') return openRecentFolder(args[0]);
     if (id === 'clearRecentFolders') return clearRecentFolders();
-    if (id === 'openFrameFile') return chooseFrameFile();
     if (id === 'openLog') return openLogTab();
     if (id === 'openSettings') return openSettingsFile();
     if (id === 'toggleAgent') return toggleAgentPanel();
@@ -742,9 +842,10 @@ function buildMenu() {
                 command('Go to File…', 'kigumi.quickOpenFile', acceleratorFor('kigumi.quickOpenFile')),
                 command('Open in Viewer…', 'kigumi.quickOpenInViewer', acceleratorFor('kigumi.quickOpenInViewer')),
                 { type: 'separator' },
-                { label: 'Open Folder…', click: () => chooseWorkspaceFolder() },
+                { label: 'New Project…', click: () => chooseNewProjectFolder() },
+                { label: 'Open Project…', click: () => chooseWorkspaceFolder() },
                 { label: 'Open Recent', submenu: recentFoldersMenu() },
-                { label: 'Open Frame File…', accelerator: 'CmdOrCtrl+Shift+O', click: () => chooseFrameFile() },
+                { label: 'Close Project', enabled: Boolean(workspaceFolder), click: () => closeWorkspaceFolder() },
                 { type: 'separator' },
                 {
                     label: 'Close Tab',
@@ -762,7 +863,8 @@ function buildMenu() {
             label: 'Kigumi',
             submenu: [
                 command('Refresh Active Viewer', 'kigumi.render', 'CmdOrCtrl+R'),
-                command('Browse Patterns…', 'kigumi.browsePatterns'),
+                { label: 'Browse Patterns', enabled: Boolean(workspaceFolder), click: () => browsePatterns() },
+                { label: 'Browse Examples', enabled: Boolean(workspaceFolder), click: () => browseExamples() },
                 command('Close Pattern Viewer…', 'kigumi.unloadPattern'),
                 { type: 'separator' },
                 command('Initialize Project', 'kigumi.initializeProjectInWorkspace'),
@@ -897,6 +999,11 @@ async function start() {
         bundledUv: bundledUvPath(),
     });
     kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
+    // A new project, opened just now: set it up (its venv, kumiki and a starter frame).
+    if (workspaceFolder && settings.get('app.setUpProject', null) === workspaceFolder) {
+        settings.set('app.setUpProject', null);
+        void runAppCommand('kigumi.initializeProjectInWorkspace');
+    }
     if (agentEnabled() && settings.get('agent.showOnStartup', true)) {
         toggleAgentPanel();
     }
@@ -990,7 +1097,7 @@ if (!app.requestSingleInstanceLock()) {
         mainWindow.focus();
         const requested = argv.slice(1).find((arg) => !arg.startsWith('-') && fs.existsSync(arg) && fs.statSync(arg).isDirectory());
         if (requested && path.resolve(requested) !== workspaceFolder) {
-            setStatus('info', `Kigumi is already open on ${path.basename(workspaceFolder || '')}. Use File > Open Folder… to switch to ${path.basename(requested)}.`);
+            setStatus('info', `Kigumi is already open on ${path.basename(workspaceFolder || '')}. Use File > Open Project… to switch to ${path.basename(requested)}.`);
         }
     });
     app.whenReady().then(start);

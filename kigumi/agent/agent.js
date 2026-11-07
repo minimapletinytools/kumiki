@@ -6,6 +6,7 @@
  *   files           the project's files (agent/project-files.js)
  *   frames          building frames (agent/frames.js)
  *   view            { panels, run, workspaceFolders } for the view tools (agent/tools.js); null headless
+ *   projects        switching projects (agent/project-tools.js); null where Kigumi can't
  *   kumikiApi       (name, {members, source}) => Promise<string> (agent/kumiki-api.js); null without one
  *   kumikiSource()  the kumiki library's folder, which the agent may read; or null
  *   kumikiExamples() kumiki's example frames' folder; or null
@@ -13,6 +14,7 @@
  */
 
 const { createKigumiTools } = require('./tools');
+const { createProjectTools } = require('./project-tools');
 const { createFileTools } = require('./file-tools');
 const { viewFrames, checkFrameTool } = require('./frames');
 const { kumikiApiTool } = require('./kumiki-api');
@@ -21,15 +23,16 @@ const { PLAN_MODE_NOTE } = require('./permissions');
 
 /** A host over the app's views. */
 function viewHost({ panels, run, files, workspaceFolders = () => [files.root()].filter(Boolean), kumikiApi = null,
-    kumikiSource = () => null, kumikiExamples = () => null, systemPrompt = () => '' }) {
+    kumikiSource = () => null, kumikiExamples = () => null, systemPrompt = () => '', projects = null }) {
     return { files, frames: viewFrames({ panels, run, files }), view: { panels, run, workspaceFolders, resolve: (file) => files.resolve(file) },
-        kumikiApi, kumikiSource, kumikiExamples, systemPrompt };
+        kumikiApi, kumikiSource, kumikiExamples, systemPrompt, projects };
 }
 
 /** The tools any agent gets: the built-in one, and others over MCP. */
 function sharedTools(host) {
     return [
         ...(host.view ? createKigumiTools(host.view) : []),
+        ...(host.projects ? createProjectTools(host.projects) : []),
         checkFrameTool(host.frames),
         ...(host.kumikiApi ? [kumikiApiTool(host.kumikiApi)] : []),
     ];

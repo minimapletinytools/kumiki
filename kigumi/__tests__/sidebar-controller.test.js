@@ -167,3 +167,15 @@ test('opening an unlisted folder asks the model to list it', async () => {
   expect(model.openFolder).toHaveBeenCalledTimes(1);
   expect(model.openFolder).toHaveBeenCalledWith('/w');
 });
+
+test('reveal asks the page to expand the rows it has, and says which', async () => {
+  const { controller, surface } = await attached();
+  surface.posted.length = 0;
+
+  expect(controller.reveal(['patterns', 'not-a-row'])).toEqual(['patterns']);
+  expect(surface.posted).toEqual([{ type: 'sidebarReveal', keys: ['patterns'] }]);
+
+  surface.posted.length = 0;
+  expect(controller.reveal(['not-a-row'])).toEqual([]);
+  expect(surface.posted).toEqual([]);
+});

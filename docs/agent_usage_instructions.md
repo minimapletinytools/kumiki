@@ -4,6 +4,10 @@
 
 Before designing, read `.kigumi/docs/concepts.md`. If the folder has no `.venv/` or `.kigumi/kigumi.yaml`, it is not set up yet: ask the user to run Initialize Project from Kigumi (in its sidebar, or the Kigumi menu in the app), rather than making the venv yourself.
 
+### Projects
+
+A project is one folder: its frame files, a `.venv` with kumiki, and `.kigumi/`. Kigumi has one open at a time. In the Kigumi app, `list_projects`, `new_project`, `open_project` and `close_project` manage them; use them only when the user asks, since each restarts Kigumi and ends your turn. Without those tools, ask the user to use File > New Project… or Open Project….
+
 ### Nudging the user to update kumiki
 
 kumiki version is locked in per workspace. Check daily if there is a new version of kumiki available and frequently nudge the user to update. Especially when starting a new frame. There will be frequent breaking changes so after updating kumiki attempt run each frame in the project to fix them.

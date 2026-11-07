@@ -94,7 +94,22 @@ class KigumiSidebar extends LitElement {
             });
             walk(this.tree);
             this.requestedFolders = new Set([...this.requestedFolders].filter((key) => unlisted.has(key)));
+        } else if (message && message.type === 'sidebarReveal' && Array.isArray(message.keys)) {
+            this.reveal(message.keys);
         }
+    }
+
+    /** Expand the rows `keys`, with no filter hiding them, and scroll the first to the top. */
+    async reveal(keys) {
+        const overrides = new Map(this.overrides);
+        keys.forEach((key) => overrides.set(key, true));
+        this.overrides = overrides;
+        this.filter = '';
+        this.focusedKey = keys[0];
+        this.saveState();
+        await this.updateComplete;
+        const first = this.querySelector(`[data-key="${CSS.escape(keys[0])}"]`);
+        if (first) first.scrollIntoView({ block: 'start' });
     }
 
     onWindowPointerDown(event) {

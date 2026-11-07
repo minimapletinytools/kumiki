@@ -180,14 +180,17 @@
         if (state.workspace) {
             $('welcome-lead').textContent = `Open a frame or pattern from the explorer to view it. Project: ${state.workspace.name}`;
             $('welcome-actions').replaceChildren(
-                button('Open Frame File…', () => command('openFrameFile')),
-                button('Browse Patterns…', () => command('run', 'kigumi.browsePatterns'), true),
+                button('Browse Patterns', () => command('browsePatterns')),
+                button('Browse Examples', () => command('browseExamples'), true),
             );
         } else {
-            $('welcome-lead').textContent = 'Open a project folder to find its frames and patterns.';
-            $('welcome-actions').replaceChildren(button('Open Folder…', () => command('openFolder')));
+            $('welcome-lead').textContent = 'Make a new project, or open one, to find its frames and patterns.';
+            $('welcome-actions').replaceChildren(
+                button('New Project…', () => command('newProject')),
+                button('Open Project…', () => command('openFolder'), true),
+            );
         }
-        const recent = state.workspace ? [] : (state.recentFolders || []);
+        const recent = state.recentFolders || [];
         $('welcome-recent').hidden = recent.length === 0;
         $('welcome-recent-list').replaceChildren(...recent.map((folder) => {
             const item = el('li');
@@ -201,8 +204,8 @@
 
     function renderStatus() {
         const workspace = $('status-workspace');
-        workspace.replaceChildren(icon('folder'), document.createTextNode(state.workspace ? state.workspace.name : 'Open Folder…'));
-        workspace.title = state.workspace ? state.workspace.path : 'Open folder';
+        workspace.replaceChildren(icon('folder'), document.createTextNode(state.workspace ? state.workspace.name : 'Open Project…'));
+        workspace.title = state.workspace ? state.workspace.path : 'Open project';
 
         const progress = $('status-progress');
         progress.hidden = !state.progress;
@@ -390,9 +393,8 @@
 
     function init() {
         if (!isMac) {
-            $('key-open-folder').textContent = 'Ctrl+O';
-            $('key-open-frame').textContent = 'Ctrl+Shift+O';
-            $('key-browse').textContent = 'Ctrl+P';
+            $('key-go-to-file').textContent = 'Ctrl+P';
+            $('key-open-in-viewer').textContent = 'Ctrl+O';
         }
         $('status-workspace').addEventListener('click', () => command('openFolder'));
         $('status-log').addEventListener('click', () => command('openLog'));

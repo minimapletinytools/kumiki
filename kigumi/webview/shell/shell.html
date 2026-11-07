@@ -33,13 +33,12 @@
                     <p class="welcome-lead" id="welcome-lead"></p>
                     <div class="welcome-actions" id="welcome-actions"></div>
                     <section class="welcome-recent" id="welcome-recent" hidden>
-                        <h2>Recent</h2>
+                        <h2>Recent projects</h2>
                         <ul id="welcome-recent-list"></ul>
                     </section>
                     <dl class="welcome-keys">
-                        <dt><kbd id="key-open-folder">⌘O</kbd></dt><dd>Open folder</dd>
-                        <dt><kbd id="key-open-frame">⇧⌘O</kbd></dt><dd>Open frame file</dd>
-                        <dt><kbd id="key-browse">⌘P</kbd></dt><dd>Browse patterns</dd>
+                        <dt><kbd id="key-go-to-file">⌘P</kbd></dt><dd>Go to file</dd>
+                        <dt><kbd id="key-open-in-viewer">⌘O</kbd></dt><dd>Open in viewer</dd>
                     </dl>
                 </div>
             </section>
@@ -49,7 +48,7 @@
         <div class="splitter" id="splitter-right" role="separator" aria-orientation="vertical" aria-label="Resize side panel" hidden></div>
         <aside class="slot slot-right" id="slot-right" hidden></aside>
         <footer class="status" id="status">
-            <button class="status-item" id="status-workspace" title="Open folder"></button>
+            <button class="status-item" id="status-workspace" title="Open project"></button>
             <span class="status-item status-progress" id="status-progress" hidden></span>
             <span class="status-item status-message" id="status-message" hidden></span>
             <span class="status-spacer"></span>

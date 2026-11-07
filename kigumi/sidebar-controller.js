@@ -95,6 +95,19 @@ class SidebarController {
         }).catch((error) => this.log(`[sidebar] post failed: ${error.message || error}`));
     }
 
+    /**
+     * Expand the rows `keys` in the sidebar and bring the first into view, clearing any filter.
+     * Return the keys it has a row for; none means there is nothing to show.
+     */
+    reveal(keys) {
+        const known = keys.filter((key) => this._nodes.has(key));
+        if (known.length > 0 && this.surface) {
+            this.surface.postMessage({ type: 'sidebarReveal', keys: known })
+                .catch((error) => this.log(`[sidebar] reveal failed: ${error.message || error}`));
+        }
+        return known;
+    }
+
     async handleMessage(message) {
         if (!message || !SIDEBAR_TO_HOST.includes(message.type)) {
             return;
