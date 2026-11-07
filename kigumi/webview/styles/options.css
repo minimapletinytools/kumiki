@@ -317,3 +317,30 @@
     text-transform: uppercase;
     margin-top: 2px;
 }
+
+/* The tools under a frame's parameters, each with its last result. */
+#tool-controls {
+    margin-top: 14px;
+}
+.tool-row .kiwari-row-header {
+    justify-content: space-between;
+}
+.tool-status {
+    color: var(--hv-dim);
+    font: 10px/1.4 'Segoe UI', sans-serif;
+}
+.tool-output {
+    margin: 2px 0 0;
+    padding: 5px 7px;
+    max-height: 160px;
+    overflow: auto;
+    border-radius: 6px;
+    background: var(--hv-control-bg-solid);
+    color: var(--hv-text);
+    font: 10px/1.4 ui-monospace, Menlo, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.tool-output-error {
+    color: var(--hv-error);
+}

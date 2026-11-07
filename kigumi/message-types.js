@@ -36,6 +36,7 @@ const TO_EXTENSION = Object.freeze([
     'requestSaveDrawings',
     'exportDrawingPng',
     'requestSaveViewerSettings',
+    'runTool',
     'copyMcpSetup',
     'requestMcpState',
     'saveParameters',

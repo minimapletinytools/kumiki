@@ -345,6 +345,11 @@ class TimberSummaryWire(TypedDict):
     cuts_count: int
 
 
+class ToolWire(TypedDict):
+    name: str
+    description: str
+
+
 class FrameSummaryWire(TypedDict, total=False):
     name: Optional[str]
     timber_count: int
@@ -352,6 +357,7 @@ class FrameSummaryWire(TypedDict, total=False):
     timbers: List[TimberSummaryWire]
     accessories: List[Dict[str, str]]
     kiwari: Optional[List[KiwariSectionWire]]
+    tools: List[ToolWire]
 
 
 class CylinderAxisWire(TypedDict):
@@ -5106,6 +5112,11 @@ def _start_finishing(ss: SlotState, slot_name: str) -> Optional["Job"]:
     return ss.finishing_job
 
 
+def _serialize_tools(frame: Any) -> List[ToolWire]:
+    """Return the frame's tools, by name and description, for the viewer to list."""
+    return [{"name": tool.name, "description": tool.description} for tool in getattr(frame, "tools", [])]
+
+
 def run_tool(ss: SlotState, name: str) -> Dict[str, str]:
     """Run the frame's tool `name` and return the text it gives."""
     tools = list(getattr(ss.frame, "tools", []))
@@ -5284,6 +5295,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         ss = _resolve_slot(state, payload)
         frame_payload = serialize_frame(ss.frame)
         frame_payload["kiwari"] = _serialize_kiwari_for_slot(ss)
+        frame_payload["tools"] = _serialize_tools(ss.frame)
         return state, make_success_response(request_id, command, frame_payload), False
 
     if command == "get_drawings":
@@ -5418,9 +5430,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
 
     if command == "list_tools":
         ss = _resolve_slot(state, payload)
-        return state, make_success_response(request_id, command, {"tools": [
-            {"name": tool.name, "description": tool.description} for tool in getattr(ss.frame, "tools", [])
-        ]}), False
+        return state, make_success_response(request_id, command, {"tools": _serialize_tools(ss.frame)}), False
 
     if command == "run_tool":
         ss = _resolve_slot(state, payload)

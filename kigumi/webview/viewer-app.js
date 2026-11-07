@@ -2,7 +2,7 @@ import { LitElement, html } from 'lit';
 import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
-import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPanel, usePanelRuntime } from './viewer-panels.js';
+import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPanel, ViewerToolsPanel, usePanelRuntime } from './viewer-panels.js';
 import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DRAWING_BETA_ENABLED, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, VIEWER_APP_VERSION, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
 import { PickingMixin } from './viewer-picking.js';
 import { MeasuringMixin } from './viewer-measuring.js';
@@ -179,6 +179,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this._measurementEndHighlights = new Map();
         this._measurementEndAsked = new Set();
         this.kiwariPanel = new ViewerKiwariPanel(this);
+        // The frame's tools ({name, description}) and, by name, how each last run went.
+        this.frameTools = [];
+        this.toolRuns = {};
+        this.toolsPanel = new ViewerToolsPanel(this);
         this.memberListPanel = new MemberListPanel(this, { t });
         // Kigumi's MCP server as the host last said it is (frame-view-session.js), or null.
         this.mcpState = null;
@@ -308,9 +312,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             },
             { id: 'options', label: t('viewer.sidebar.tab.options'), content: this.settingsPanel.render() },
             {
+                // Its id is still 'parameters', so a remembered tab stays put.
                 id: 'parameters',
                 label: t('viewer.sidebar.tab.parameters'),
-                content: this.kiwariPanel.render() || html`<div class="vsb-empty">${t('viewer.sidebar.noParameters')}</div>`,
+                content: html`
+                    ${this.kiwariPanel.render() || html`<div class="vsb-empty">${t('viewer.sidebar.noParameters')}</div>`}
+                    ${this.toolsPanel.render()}`,
             },
             { id: 'members', label: t('viewer.sidebar.tab.members'), badge: memberCount || '', content: this.memberListPanel.render() },
         ];
@@ -1260,10 +1267,23 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     // Frame parameters (kiwari)
     // ------------------------------------------------------------------
 
-    /** One section per kiwari the frames were built from. */
+    /** One section per kiwari the frames were built from; and the frame's tools. */
     setKiwariFromFrame(frameData) {
         this.kiwariSections = KigumiKiwariValues.sectionsFromPayload(frameData && frameData.kiwari, this.unitSystem());
+        this.frameTools = Array.isArray(frameData && frameData.tools) ? frameData.tools : [];
+        // A tool's last result stays while the frame still offers it.
+        const names = new Set(this.frameTools.map((tool) => tool.name));
+        this.toolRuns = Object.fromEntries(Object.entries(this.toolRuns).filter(([name]) => names.has(name)));
         this.requestUpdate();
+    }
+
+    runTool(name) {
+        if (!vscode) {
+            return;
+        }
+        this.toolRuns = { ...this.toolRuns, [name]: { running: true } };
+        this.requestUpdate();
+        vscode.postMessage({ type: 'runTool', name });
     }
 
     _changeKiwariSection(sectionId, change) {
@@ -1403,6 +1423,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
         if (message.type === 'csgSelectionResult') {
             this.handleCSGSelectionResult(message);
+            return;
+        }
+
+        if (message.type === 'toolResult') {
+            this.toolRuns = { ...this.toolRuns, [message.name]: { output: message.output || '', error: message.error || null } };
+            this.requestUpdate();
             return;
         }
 

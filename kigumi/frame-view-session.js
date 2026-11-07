@@ -354,6 +354,10 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'runTool') {
+                this.runTool(String(message.name || ''));
+                return;
+            }
             if (message.type === 'setRefreshOptions') {
                 // Merge viewer-supplied refresh options (e.g. geometryMode) into the
                 // session's stored options so subsequent get_geometry calls include
@@ -1304,6 +1308,26 @@ class FrameViewSession {
             type: 'scenes',
             payload: { scenes: (result && result.scenes) || [] },
         });
+    }
+
+    /** Run the frame's tool `name` in the runner and send the viewer what it gave, or why it failed. */
+    async runTool(name) {
+        let reply;
+        try {
+            if (!this.runnerSession) {
+                throw new Error('the runner is not running');
+            }
+            this.log(`[tools] Running "${name}"`);
+            const result = await this.runnerSession.slotRequest('run_tool', this.slotName, { name });
+            reply = { type: 'toolResult', name, output: (result && result.output) || '' };
+        } catch (error) {
+            const message = error.message || String(error);
+            this.log(`[tools] "${name}" failed: ${message}`);
+            reply = { type: 'toolResult', name, error: message };
+        }
+        if (this.panel && !this.isDisposed) {
+            await this.panel.postMessage(reply).catch(() => {});
+        }
     }
 
     /** Ask the runner to run the frame's finishing routines, now that the frame is shown. */

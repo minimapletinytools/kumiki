@@ -30,6 +30,17 @@ module.exports = {
         await capture('03e-parameters-ratio');
         await inShell(`${viewDoc}.getElementById('kiwari-leg_side_splay-on').click()`);
         check('a ratio parameter shows a box for each of its parts', parts === 'rise/run', parts);
+
+        // Under the parameters, the frame's tools: run from there, with what one gave shown under it.
+        const tab = await inShell(`${viewDoc}.querySelector('.vsb-tab[data-tab="parameters"]').textContent.trim()`);
+        const tools = await inShell(`[...${viewDoc}.querySelectorAll('#tool-controls .tool-row .kiwari-key')].map((key) => key.textContent).join('|')`);
+        await inShell(`${viewDoc}.querySelector('#tool-controls .tool-run').click()`);
+        const output = await waitFor(() => inShell(`${viewDoc}.querySelector('#tool-controls .tool-output')?.textContent || null`), { timeoutMs: 60000 })
+            .catch(() => '');
+        await capture('03f-kiwari-tools');
+        check('the Kiwari tab lists the frame\'s tools under its parameters, and runs one',
+            tab.includes('Kiwari') && tools === 'export router templates' && output.startsWith('Wrote 4 router templates'),
+            `tab "${tab}", tools "${tools}", output "${output.split('\n')[0]}"`);
         await showTab('tree');
     },
 };

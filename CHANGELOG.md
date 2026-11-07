@@ -10,6 +10,12 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kigumi
 
+#### Added
+
+- The view's Parameters tab is now Kiwari: the frame's parameters, then its tools, each with what it does and a Run button, and what it gave shown under it.
+
+### kigumi
+
 #### Changed
 
 - The standalone app's built-in agent is off by default; `"agent.enabled": true` in settings turns it on.

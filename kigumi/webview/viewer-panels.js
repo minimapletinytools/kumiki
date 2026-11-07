@@ -720,3 +720,54 @@ export class ViewerKiwariPanel {
         `;
     }
 }
+
+/** The frame's tools: each with what it does and a Run button, and what it last gave. */
+export class ViewerToolsPanel {
+    constructor(app) {
+        this.app = app;
+    }
+
+    renderResult(run) {
+        if (!run) {
+            return '';
+        }
+        if (run.running) {
+            return html`<div class="tool-status">${t('viewer.tools.running')}</div>`;
+        }
+        if (run.error) {
+            return html`<pre class="tool-output tool-output-error" role="alert">${run.error}</pre>`;
+        }
+        return run.output ? html`<pre class="tool-output">${run.output}</pre>` : '';
+    }
+
+    render() {
+        const tools = this.app.frameTools;
+        return html`
+            <section id="tool-controls" aria-label=${t('viewer.tools.title')}>
+                <div class="kiwari-header">
+                    <div class="kiwari-title">${t('viewer.tools.title')}</div>
+                </div>
+                ${tools.length
+                    ? html`<div class="kiwari-list">
+                        ${tools.map((tool) => {
+                            const run = this.app.toolRuns[tool.name];
+                            return html`
+                                <div class="kiwari-row tool-row">
+                                    <div class="kiwari-row-header">
+                                        <span class="kiwari-key">${tool.name}</span>
+                                        <button
+                                            type="button"
+                                            class="kiwari-action tool-run"
+                                            ?disabled=${Boolean(run && run.running)}
+                                            @click=${() => this.app.runTool(tool.name)}>${t('viewer.tools.run')}</button>
+                                    </div>
+                                    ${tool.description ? html`<div class="kiwari-about">${tool.description}</div>` : ''}
+                                    ${this.renderResult(run)}
+                                </div>`;
+                        })}
+                    </div>`
+                    : html`<div class="vsb-empty">${t('viewer.tools.none')}</div>`}
+            </section>
+        `;
+    }
+}
