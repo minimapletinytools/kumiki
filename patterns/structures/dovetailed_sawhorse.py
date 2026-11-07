@@ -8,13 +8,19 @@ bottom arris. The floor is at z=0.
 
 Drawings are generated: a plan, and a shop drawing for the beam and one for the four legs. The legs'
 also looks straight down on a leg's level top, where the dovetail is marked out.
+
+Its tool "export router templates" writes a router template for each leg's socket in the beam to
+kigumi_exports/dovetailed_sawhorse/, as an STL in millimetres.
 """
 
+
+import pathlib
 
 import numpy as np
 
 from kumiki import *
-from kumiki.csg.cross_sections import CrossSection
+from kumiki.csg.cross_sections import CrossSection, face_cross_section
+from kumiki.csg.triangles import mesh_cutcsg
 from kumiki.drawings.auto_drawings import with_auto_drawings
 from kumiki.drawings.measure import ViewAxes
 
@@ -33,8 +39,14 @@ SAWHORSE = kiwari(
 )
 
 DOVETAIL_TAPER = degrees(13)      # narrowing toward the top: point end up
-DOVETAIL_FLARE = atan(scalar(1) / scalar(6))
+DOVETAIL_FLARE = degrees(14)
 TRIM_ALLOWANCE = inches(1)
+
+# The router template for a leg's socket in the beam, routed with a dovetail bit through the neck's plane.
+JIG_OFFSET = inches(1, 16)    # the guide bushing's radius less the bit's: a 5/8" bushing round a 1/2" bit
+JIG_TOP = inches(1, 2)        # the template's thickness above the neck's plane
+JIG_BOTTOM = inches(1)        # how far it runs below that plane, down onto the beam it sits on
+JIG_WIDTH = inches(2)         # how wide the template is round its opening
 BEAM_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE   # the beam's top meets its +y side
 LEG_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE    # a leg's outer face meets its +width edge        # each leg is cut this much long at both ends, for the level trims
 
@@ -100,6 +112,60 @@ def router_template(face: CrossSection, body: CutCSG, offset: Numeric, jig_top: 
             start_distance=-jig_bottom, end_distance=jig_top)
 
     return Difference(extrusion(outside), [extrusion(opening), body], label=CutCSGLabel("router_template"))
+
+
+def _clip_between(polygon: List[Tuple[float, float]], along: np.ndarray, low: float, high: float) -> List[Tuple[float, float]]:
+    """Return the part of a convex polygon where `along` . point lies between `low` and `high`."""
+    points = [np.array(point, dtype=float) for point in polygon]
+    for sign, bound in ((1, high), (-1, -low)):
+        kept = []
+        for here, there in zip(points, points[1:] + points[:1]):
+            here_in, there_in = sign * (along @ here) <= bound, sign * (along @ there) <= bound
+            if here_in:
+                kept.append(here)
+            if here_in != there_in:
+                t = (bound - sign * (along @ here)) / (sign * (along @ (there - here)))
+                kept.append(here + (there - here) * t)
+        points = kept
+    return [(float(x), float(y)) for x, y in points]
+
+
+def _socket_template(beam: Timber, socket: Cutting) -> CutCSG:
+    """Return the router template for one dovetail socket in the beam, in world space.
+
+    Its opening is the dovetail's neck, over the stretch of it where the socket is in the beam; the
+    uncut beam is taken out of its underside, so it sits on the beam.
+    """
+    body = adopt_csg(beam.transform, None, CutTimber(beam, cuts=[]).render_timber_with_cuts_csg_local())
+    assert socket.negative_csg is not None, "a socket is a cut"
+    dovetail = adopt_csg(beam.transform, None, socket.negative_csg)
+    assert isinstance(dovetail, (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)), "the socket is the dovetail's solid"
+    neck = next(feature for feature in dovetail.get_declared_features() if feature.name == "dovetail_neck")
+    plane = neck.locate_simple_unbounded(dovetail)
+    assert plane is not None, "the dovetail's neck is a flat face"
+    neck_face = face_cross_section(neck, dovetail, None, plane.point, float(beam.length))
+    assert neck_face is not None, "the dovetail's neck can be cut by its own plane"
+    frame, (outline,) = neck_face
+    # Where the socket starts and stops along the dovetail, from the corners of the part in the beam.
+    axis = np.array([float(value) for value in dovetail.transform.orientation.matrix[:, 2]])
+    reach = mesh_cutcsg(Intersection(dovetail, body)).mesh.vertices @ axis - frame.origin @ axis
+    along = np.array([axis @ frame.u, axis @ frame.v])
+    opening = _clip_between(outline, along, float(reach.min()), float(reach.max()))
+    return router_template((frame, [opening]), body, JIG_OFFSET, JIG_TOP, JIG_WIDTH, JIG_BOTTOM)
+
+
+def _export_socket_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint]) -> str:
+    """Write each leg's socket template to an STL in millimetres, in kigumi_exports/, and say where."""
+    folder = pathlib.Path.cwd() / "kigumi_exports" / "dovetailed_sawhorse"
+    folder.mkdir(parents=True, exist_ok=True)
+    written = []
+    for leg, joint in zip(legs, joints):
+        mesh = mesh_cutcsg(_socket_template(beam, joint.cuttings["receiving_timber"])).mesh.copy()
+        mesh.apply_scale(1000)
+        path = folder / f"router template {leg.timber.ticket.path}.stl"
+        mesh.export(path)
+        written.append(path.name)
+    return f"Wrote {len(written)} router templates to {folder}:\n" + "\n".join(written)
 
 
 def _leg_end(name: str) -> FeatureOverride:
@@ -193,7 +259,10 @@ def dovetailed_sawhorse(k: Optional[Kiwari] = None) -> Frame:
     # so Kigumi can list them.
     beam_cuts = [cutting for joint in joints for cutting in joint.cuttings.values() if cutting.timber is beam]
     sawhorse = Frame(cut_timbers=[CutTimber(beam, cuts=beam_cuts, joints=joints), *legs],
-                     source_joints=joints, name="Dovetailed sawhorse", kiwari=k)
+                     source_joints=joints, name="Dovetailed sawhorse", kiwari=k,
+                     tools=[Tool("export router templates",
+                                 "Write the router template for each leg's socket in the beam to an STL, in mm",
+                                 lambda: _export_socket_templates(beam, legs, joints))])
     return with_auto_drawings(sawhorse, fixed_path="beam", extra_views=_leg_top_view)
 
 
