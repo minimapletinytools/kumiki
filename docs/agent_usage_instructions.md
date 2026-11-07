@@ -2,7 +2,7 @@
 
 ## Background
 
-When starting work in a workspace, if in doubt, run the **`init-kumiki-project`** skill (`.kigumi/docs/skills/init-kumiki-project/SKILL.md`).
+Before designing, read `.kigumi/docs/concepts.md`. If the folder has no `.venv/` or `.kigumi/kigumi.yaml`, it is not set up yet: ask the user to run Initialize Project from Kigumi (in its sidebar, or the Kigumi menu in the app), rather than making the venv yourself.
 
 
 

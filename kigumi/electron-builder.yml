@@ -30,7 +30,6 @@ files:
   - hosts/**
   - app-shell/**
   - agent/**
-  - skills/**
   - .kigumi/docs/**
   - templogo.png
   - "!jest.config.js"

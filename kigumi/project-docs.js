@@ -21,8 +21,6 @@ const EXTENSION_DOCS_PATHS = [
     path.resolve(__dirname, '.kigumi', 'docs'),
     path.resolve(__dirname, '..', 'docs'),
 ];
-// Kigumi-only skills, which the kumiki wheel does not ship.
-const SKILLS_SOURCE_PATH = path.resolve(__dirname, 'skills');
 // Website files and our own notes: not for an agent working in someone's project.
 const NOT_FOR_AGENTS = new Set(['internal', 'assets', 'stylesheets', 'index.md']);
 
@@ -113,7 +111,7 @@ function agentDocFiles(sourceDir) {
     return listFiles(sourceDir).filter((file) => !NOT_FOR_AGENTS.has(file.split('/')[0]));
 }
 
-/** Replace .kigumi/docs/ with the docs in `sourceDir`, the Kigumi skills, and a README. */
+/** Replace .kigumi/docs/ with the docs in `sourceDir` and a README. */
 function writeProjectDocs(projectRoot, sourceDir, kumikiVersion) {
     const target = path.join(projectRoot, PROJECT_DOCS_DIR);
     fs.rmSync(target, { recursive: true, force: true });
@@ -121,9 +119,6 @@ function writeProjectDocs(projectRoot, sourceDir, kumikiVersion) {
     for (const file of sourceDir ? agentDocFiles(sourceDir) : []) {
         fs.mkdirSync(path.dirname(path.join(target, file)), { recursive: true });
         fs.copyFileSync(path.join(sourceDir, file), path.join(target, file));
-    }
-    if (fs.existsSync(SKILLS_SOURCE_PATH)) {
-        fs.cpSync(SKILLS_SOURCE_PATH, path.join(target, 'skills'), { recursive: true });
     }
     fs.writeFileSync(path.join(target, 'README.md'), README, 'utf8');
     fs.writeFileSync(path.join(target, VERSION_FILE), `${kumikiVersion || 'unknown'}\n`, 'utf8');

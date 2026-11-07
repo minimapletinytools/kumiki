@@ -114,7 +114,7 @@ describe('project-initializer', () => {
     expect(fs.existsSync(path.join(projectDocsPath, 'concepts.md'))).toBe(true);
     expect(fs.existsSync(path.join(projectDocsPath, 'index.md'))).toBe(false);
     expect(fs.existsSync(path.join(projectDocsPath, 'internal'))).toBe(false);
-    expect(fs.existsSync(path.join(projectDocsPath, 'skills', 'init-kumiki-project', 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(projectDocsPath, 'skills'))).toBe(false);
     expect(fs.readFileSync(path.join(projectDocsPath, 'kumiki-version.txt'), 'utf8').trim()).toBe('0.9.0');
     expect(gitignoreContent).toContain('.venv/');
     expect(gitignoreContent).toContain('kigumi_exports/');

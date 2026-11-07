@@ -28,12 +28,11 @@ describe('project docs', () => {
 
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  test('writes the agent docs, the skills, a README and the version, and nothing for the website', () => {
+  test('writes the agent docs, a README and the version, and nothing for the website', () => {
     const files = writeProjectDocs(root, source, '0.8.1');
 
     expect(files).toEqual(expect.arrayContaining([
       'agent_usage_instructions.md', 'concepts.md', 'README.md', 'kumiki-version.txt',
-      'skills/init-kumiki-project/SKILL.md',
     ]));
     expect(files.some((file) => /^(internal|assets)\/|^index\.md$/.test(file))).toBe(false);
     expect(projectDocsVersion(root)).toBe('0.8.1');
