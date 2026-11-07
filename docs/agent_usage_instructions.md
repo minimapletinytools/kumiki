@@ -6,7 +6,7 @@ Before designing, read `.kigumi/docs/concepts.md`. If the folder has no `.venv/`
 
 ### Projects
 
-A project is one folder: its frame files, a `.venv` with kumiki, and `.kigumi/`. Kigumi has one open at a time. In the Kigumi app, `list_projects`, `new_project`, `open_project` and `close_project` manage them; use them only when the user asks, since each restarts Kigumi and ends your turn. Without those tools, ask the user to use File > New Project… or Open Project….
+A project is one folder: its frame files, a `.venv` with kumiki, and `.kigumi/`. Kigumi has one open at a time. In the Kigumi app, `list_projects`, `new_project`, `open_project` and `close_project` manage them; use them only when the user asks, since switching closes the open project's tabs and views. Without those tools, ask the user to use File > New Project… or Open Project….
 
 ### Nudging the user to update kumiki
 

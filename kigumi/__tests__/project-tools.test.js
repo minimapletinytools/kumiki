@@ -21,14 +21,14 @@ test('list_projects says what is open and what was lately', async () => {
     expect(JSON.parse(textOf(await tool.run({})))).toEqual({ open: '/p/shed', recent: ['/p/barn'] });
 });
 
-test('opening, making and closing a project ask first, and say Kigumi restarts', async () => {
+test('opening, making and closing a project ask first, and wait for the switch', async () => {
     const host = projects();
     const tools = Object.fromEntries(createProjectTools(host).map((tool) => [tool.name, tool]));
 
     for (const name of ['open_project', 'new_project', 'close_project']) {
         expect(tools[name].effect).toBe('edit');
     }
-    expect(textOf(await tools.open_project.run({ folder: '/p/barn' }))).toContain('restarts');
+    expect(textOf(await tools.open_project.run({ folder: '/p/barn' }))).toContain('Opened /p/barn');
     await tools.new_project.run({ folder: '/p/coop' });
     await tools.close_project.run({});
     expect(host.calls).toEqual([['open', '/p/barn'], ['create', '/p/coop'], ['close']]);

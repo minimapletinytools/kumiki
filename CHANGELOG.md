@@ -24,6 +24,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 - The standalone app's start page: New Project… (pick or make a folder, starting in Documents; Kigumi opens it and sets it up) and Open Project…, with Recent projects; with a project open, Browse Patterns and Browse Examples, which open the explorer on those trees. File has New Project…, Open Project…, Open Recent and Close Project. Open Frame File is gone: open frames from the explorer.
 - Agent tools to manage projects in the standalone app: `list_projects`, `new_project`, `open_project` and `close_project`.
+- Switching projects in the standalone app happens in place: the old project's tabs close (asking about unsaved edits) and the explorer starts over on the new one, with no restart. The agent's conversation carries on.
 - The standalone app remembers the project folders it has opened: File > Open Recent, and a Recent list on the welcome page when no folder is open.
 - The view's Parameters tab is now Kiwari: the frame's parameters, then its tools, each with what it does, its own parameters, a Run button, and what it gave shown under it.
 

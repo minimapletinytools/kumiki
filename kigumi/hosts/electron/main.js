@@ -224,7 +224,7 @@ async function chooseWorkspaceFolder() {
         properties: ['openDirectory', 'createDirectory'],
     });
     if (!canceled && filePaths.length > 0) {
-        openWorkspaceFolder(filePaths[0]);
+        await switchProject(filePaths[0]);
     }
 }
 
@@ -238,20 +238,22 @@ async function chooseNewProjectFolder() {
         properties: ['openDirectory', 'createDirectory'],
     });
     if (!canceled && filePaths.length > 0) {
-        createProject(filePaths[0]);
+        await createProject(filePaths[0]);
     }
 }
 
-/** Make `folder` (absolute) if need be, open it, and set it up as a project once it is open. */
-function createProject(folder) {
+/**
+ * Make `folder` (absolute) if need be, open it, and set it up as a project: its venv, kumiki and a
+ * starter frame. Return whether it was opened.
+ */
+async function createProject(folder) {
     checkNewProjectFolder(folder);
     fs.mkdirSync(folder, { recursive: true });
-    if (folder === workspaceFolder) {
-        void runAppCommand('kigumi.initializeProjectInWorkspace');
-        return;
+    if (!(await switchProject(folder))) {
+        return false;
     }
-    settings.set('app.setUpProject', folder);
-    openWorkspaceFolder(folder);
+    await runAppCommand('kigumi.initializeProjectInWorkspace');
+    return true;
 }
 
 function checkNewProjectFolder(folder) {
@@ -269,42 +271,33 @@ function checkProjectFolder(folder) {
     }
 }
 
-/** Close the project: Kigumi starts again with none open. */
+/** Close the project, leaving none open. */
 function closeWorkspaceFolder() {
-    if (workspaceFolder) {
-        restartOn(null);
-    }
+    return switchProject(null);
 }
-
-// How long the agent's project tools wait before restarting, so their answer gets back first.
-const PROJECT_SWITCH_DELAY_MS = 1500;
 
 /** What the agent's project tools (agent/project-tools.js) do here. */
 function agentProjects() {
-    const later = (switchProject) => setTimeout(() => {
-        try {
-            switchProject();
-        } catch (error) {
-            setStatus('error', error.message);
-        }
-    }, PROJECT_SWITCH_DELAY_MS);
     const expand = (folder) => (folder.startsWith('~') ? path.join(os.homedir(), folder.slice(1)) : folder);
+    const done = (switched, what) => {
+        if (!switched) throw new Error(`The user kept the project open (an editor had unsaved changes), so ${what} did not happen.`);
+    };
     return {
         current: () => workspaceFolder,
         recent: () => recentFolders().map((one) => one.path),
-        open: (folder) => {
+        open: async (folder) => {
             const target = expand(folder);
             checkProjectFolder(target);
-            later(() => openWorkspaceFolder(target));
+            done(await switchProject(target), `opening ${target}`);
         },
-        create: (folder) => {
+        create: async (folder) => {
             const target = expand(folder);
             checkNewProjectFolder(target);
-            later(() => createProject(target));
+            done(await createProject(target), `making ${target}`);
         },
-        close: () => {
+        close: async () => {
             if (!workspaceFolder) throw new Error('No project is open.');
-            later(closeWorkspaceFolder);
+            done(await closeWorkspaceFolder(), 'closing it');
         },
     };
 }
@@ -312,22 +305,98 @@ function agentProjects() {
 /** Open one of the recent folders, by path; one that isn't listed is ignored. */
 function openRecentFolder(folder) {
     if (recentFolders().some((one) => one.path === folder)) {
-        openWorkspaceFolder(folder);
+        return switchProject(folder);
+    }
+    return false;
+}
+
+let switching = null;
+
+/**
+ * Close the open project and open `folder` (or none) in its place, in this window: its tabs close,
+ * asking about unsaved edits first, and the explorer, views and runners start over on the new one.
+ * The agent and its conversation stay. Return whether it switched; false if the user kept an edit.
+ */
+async function switchProject(folder) {
+    if (folder === workspaceFolder) {
+        return true;
+    }
+    if (switching) {
+        await switching;
+        return switchProject(folder);
+    }
+    switching = (async () => {
+        if (!(await closeProjectTabs())) {
+            return false;
+        }
+        const old = kigumiApp;
+        kigumiApp = null;
+        if (old) {
+            await old.dispose();
+        }
+        workspaceFolder = folder;
+        settings.set('app.workspaceFolder', folder);
+        if (folder) {
+            settings.set('app.recentFolders', withRecentFolder(settings.get('app.recentFolders', []), folder));
+        }
+        logChannel.appendLine(`[app] Workspace: ${folder || '(none)'}`);
+        openProject();
+        buildMenu();
+        pushShellState();
+        return true;
+    })();
+    try {
+        return await switching;
+    } finally {
+        switching = null;
     }
 }
 
-function openWorkspaceFolder(folder) {
-    if (folder !== workspaceFolder) {
-        restartOn(folder);
+/** Close every tab that belongs to the project, asking about unsaved edits; false if the user kept one. */
+async function closeProjectTabs() {
+    const dirty = [...editorTabs].filter(([, tab]) => tab.isDirty).map(([id]) => id);
+    for (const id of dirty) {
+        const panel = connection.panels.get(id);
+        if (panel) panel.reveal();
+        if (!(await confirmCloseEditor(id))) {
+            return false;
+        }
     }
+    for (const panel of [...connection.panels.values()]) {
+        if (!PANELS_KEPT_ACROSS_PROJECTS.has(panel.type)) {
+            panel.dispose();
+        }
+    }
+    return true;
 }
 
-/** Start Kigumi again on `folder`, or on none: sessions, watchers and the explorer are rooted in it. */
-function restartOn(folder) {
-    settings.set('app.workspaceFolder', folder);
-    const cli = cliFolder();
-    app.relaunch({ args: process.argv.slice(1).filter((arg) => !cli || path.resolve(arg) !== cli) });
-    app.exit(0);
+// The app's own panels, which outlive a project: the agent and the log.
+const PANELS_KEPT_ACROSS_PROJECTS = new Set(['agent', 'log']);
+
+/** Start Kigumi's side of the open project: the host, the app, its commands and the explorer. */
+function openProject() {
+    setHost(createElectronHost({
+        window: mainWindow,
+        connection,
+        settings,
+        workspaceFolder,
+        locale: app.getLocale(),
+        log: (line) => logChannel.appendLine(line),
+        runCommand: runAppCommand,
+        setStatus,
+        setProgress,
+        openEditor: openEditorTab,
+        showLog: openLogTab,
+        mcp: mcpControls,
+    }));
+    kigumiApp = createKigumiApp({
+        extensionPath: KIGUMI_DIR,
+        storagePath: path.join(app.getPath('userData'), 'tools'),
+        channel: logChannel,
+        enableTestCommands: process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1',
+        bundledUv: bundledUvPath(),
+    });
+    kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
 }
 
 /** Show the explorer with the rows `keys` expanded, the first at the top; false if it has none of them. */
@@ -604,13 +673,28 @@ function knownKumikiSource() {
     return kumikiSource;
 }
 
+// The open project's panels, for the agent and the MCP server, which outlive a project.
+const livePanels = new Proxy({}, {
+    get(_target, key) {
+        const panels = kigumiApp && kigumiApp.panels;
+        if (key === 'then') {
+            return undefined; // not a promise
+        }
+        if (!panels) {
+            return typeof key === 'string' ? () => { throw new Error('No project is open.'); } : undefined;
+        }
+        const value = panels[key];
+        return typeof value === 'function' ? value.bind(panels) : value;
+    },
+});
+
 // What the agent panel and the MCP server work with (agent/agent.js).
 function agentHost() {
     knownKumikiSource();
     const files = createProjectFiles({ root: () => workspaceFolder,
         readOnly: () => [kumikiSource, kumikiExamples(kumikiSource)].filter(Boolean) });
     return viewHost({
-        panels: kigumiApp.panels,
+        panels: livePanels,
         run: runToolCommand,
         files,
         workspaceFolders: () => (workspaceFolder ? [workspaceFolder] : []),
@@ -824,7 +908,7 @@ function recentFoldersMenu() {
     return [
         ...recent.map((one) => ({
             label: `${one.name} — ${tildePath(one.path)}`,
-            click: () => openWorkspaceFolder(one.path),
+            click: () => void switchProject(one.path),
         })),
         { type: 'separator' },
         { label: 'Clear Recently Opened', click: () => clearRecentFolders() },
@@ -976,34 +1060,7 @@ async function start() {
         })();
     });
 
-    setHost(createElectronHost({
-        window: mainWindow,
-        connection,
-        settings,
-        workspaceFolder,
-        locale: app.getLocale(),
-        log: (line) => logChannel.appendLine(line),
-        runCommand: runAppCommand,
-        setStatus,
-        setProgress,
-        openEditor: openEditorTab,
-        showLog: openLogTab,
-        mcp: mcpControls,
-    }));
-
-    kigumiApp = createKigumiApp({
-        extensionPath: KIGUMI_DIR,
-        storagePath: path.join(userData, 'tools'),
-        channel: logChannel,
-        enableTestCommands: process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1',
-        bundledUv: bundledUvPath(),
-    });
-    kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
-    // A new project, opened just now: set it up (its venv, kumiki and a starter frame).
-    if (workspaceFolder && settings.get('app.setUpProject', null) === workspaceFolder) {
-        settings.set('app.setUpProject', null);
-        void runAppCommand('kigumi.initializeProjectInWorkspace');
-    }
+    openProject();
     if (agentEnabled() && settings.get('agent.showOnStartup', true)) {
         toggleAgentPanel();
     }
@@ -1056,6 +1113,8 @@ async function start() {
             settings,
             panels: () => kigumiApp && kigumiApp.panels,
             updates: () => updates,
+            switchProject,
+            agentProjects,
         };
         // A test driver run against the live app; its result sets the exit code.
         if (process.env.KIGUMI_TEST_SCRIPT) {
@@ -1097,7 +1156,7 @@ if (!app.requestSingleInstanceLock()) {
         mainWindow.focus();
         const requested = argv.slice(1).find((arg) => !arg.startsWith('-') && fs.existsSync(arg) && fs.statSync(arg).isDirectory());
         if (requested && path.resolve(requested) !== workspaceFolder) {
-            setStatus('info', `Kigumi is already open on ${path.basename(workspaceFolder || '')}. Use File > Open Project… to switch to ${path.basename(requested)}.`);
+            void switchProject(path.resolve(requested));
         }
     });
     app.whenReady().then(start);
