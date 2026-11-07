@@ -39,6 +39,19 @@
     opacity: 0.4;
     cursor: default;
 }
+/* Several buttons on one header, together at its right. */
+.lp-section-actions {
+    margin-left: auto;
+    display: inline-flex;
+    gap: 4px;
+}
+.lp-section-actions .lp-section-action {
+    margin-left: 0;
+}
+/* The eyeball while what it shows is hidden. */
+.lp-section-action-off {
+    opacity: 0.45;
+}
 /* ---- Layers panel (layers-panel.js) ---- */
 kigumi-layers-view {
     /* Takes the tree page's remaining height. min-height lets it shrink rather

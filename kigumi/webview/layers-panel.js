@@ -253,7 +253,7 @@ class LayersPanel {
             this._renderSection(
                 this._treeEl, 'measurements', t('viewer.layers.section.measurements'),
                 () => this._buildThreeDMeasurementRows(),
-                () => this._makeMeasurementsEyeButton(),
+                () => this._makeMeasurementsActions(),
             );
         }
         // Before the highlight, which may scroll to reveal a row: put the
@@ -614,12 +614,45 @@ class LayersPanel {
         return row;
     }
 
+    /** The 3D measurements section's buttons: save them, and show or hide them all. */
+    _makeMeasurementsActions() {
+        const actions = document.createElement('span');
+        actions.className = 'lp-section-actions';
+        actions.appendChild(this._makeMeasurementsSaveButton());
+        actions.appendChild(this._makeMeasurementsEyeButton());
+        return actions;
+    }
+
+    /**
+     * Save, greyed out with nothing to save. The 3D measurements have no panel of their own to
+     * carry it, as a drawing's does. Like that one, it saves every drawing the file holds.
+     */
+    _makeMeasurementsSaveButton() {
+        const drawing = (this.drawings || []).find((one) => one.id === THREE_D_MEASUREMENTS_ID);
+        const dirty = Boolean(drawing && drawing.dirty);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'lp-section-action';
+        button.dataset.action = 'save-measurements';
+        button.textContent = t('viewer.layers.drawing.save');
+        button.title = dirty
+            ? t('viewer.layers.measurements.save.title')
+            : t('viewer.layers.measurements.saved.title');
+        button.disabled = !dirty;
+        button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this._emit('kigumi-save-drawings', {});
+        });
+        return button;
+    }
+
     /** The eyeball on the 3D measurements section: all of them, or none. */
     _makeMeasurementsEyeButton() {
         const button = document.createElement('button');
         button.type = 'button';
-        button.className = 'lp-section-action';
-        button.textContent = this.measurementsHidden ? '\u25cb' : '\u25c9';
+        button.className = 'lp-section-action' + (this.measurementsHidden ? ' lp-section-action-off' : '');
+        button.dataset.action = 'toggle-measurements';
+        button.textContent = '\u{1F441}\uFE0F';
         button.title = this.measurementsHidden
             ? t('viewer.layers.measurements.show.title')
             : t('viewer.layers.measurements.hide.title');

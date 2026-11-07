@@ -189,6 +189,8 @@
   "viewer.layers.measurement.unresolved": "この寸法が指す特徴は見つかりません",
   "viewer.layers.measurements.hide.title": "すべての3D寸法を隠す",
   "viewer.layers.measurements.show.title": "すべての3D寸法を表示",
+  "viewer.layers.measurements.save.title": "3D寸法と、図面ファイルが管理するほかの図面を保存します",
+  "viewer.layers.measurements.saved.title": "保存するものはありません",
   "viewer.layers.section.tags": "タグ",
   "viewer.layers.section.drawings": "図面",
   "viewer.layers.drawing.open.title": "この図面を開く",

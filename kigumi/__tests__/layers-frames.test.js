@@ -223,3 +223,38 @@ describe('the runner’s frames', () => {
         expect(convert({ timbers: RUNNER_TIMBERS, frames: null }).frames).toBeNull();
     });
 });
+
+describe('the 3D measurements section', () => {
+    const MEASURE = { a: { timber: 'post', feature: 'top' }, b: { timber: 'sill', feature: 'top' } };
+    function withMeasurements(dirty) {
+        const panel = openPanel(null);
+        panel.setDrawings([{ id: 'three-d-measurements', dirty,
+            viewports: [{ id: 'main', measurements: [MEASURE] }] }], null, {});
+        return panel;
+    }
+    const buttons = (panel) => headerOf(panel, 'measurements').children[2].children;
+    const saveOf = (panel) => buttons(panel).find((button) => button.dataset.action === 'save-measurements');
+    const eyeOf = (panel) => buttons(panel).find((button) => button.dataset.action === 'toggle-measurements');
+
+    test('save is offered when they have changed', () => {
+        const panel = withMeasurements(true);
+        const emitted = [];
+        panel._emit = (type) => emitted.push(type);
+
+        expect(saveOf(panel).disabled).toBe(false);
+        saveOf(panel).dispatch('click', { stopPropagation() {} });
+        expect(emitted).toEqual(['kigumi-save-drawings']);
+    });
+
+    test('save is greyed out with nothing to save', () => {
+        expect(saveOf(withMeasurements(false)).disabled).toBe(true);
+        expect(saveOf(openPanel(null)).disabled).toBe(true);
+    });
+
+    test('show and hide is the eyeball, dimmed while they are hidden', () => {
+        const panel = withMeasurements(false);
+        expect(eyeOf(panel).textContent).toBe('\u{1F441}️');
+        panel.setDrawings(panel.drawings, null, { measurementsHidden: true });
+        expect(eyeOf(panel).className).toContain('lp-section-action-off');
+    });
+});

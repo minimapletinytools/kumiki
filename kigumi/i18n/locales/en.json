@@ -189,6 +189,8 @@
   "viewer.layers.measurement.unresolved": "This measurement names a feature that is no longer there",
   "viewer.layers.measurements.hide.title": "Hide every 3D measurement",
   "viewer.layers.measurements.show.title": "Show every 3D measurement",
+  "viewer.layers.measurements.save.title": "Save the 3D measurements, and every other drawing the drawings file holds",
+  "viewer.layers.measurements.saved.title": "Nothing to save",
   "viewer.layers.section.tags": "Tags",
   "viewer.layers.section.drawings": "drawings",
   "viewer.layers.drawing.open.title": "Open this drawing",
