@@ -27,7 +27,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
+          # Not a pinned version: GitHub retires those, and a retired one is cancelled at once.
+          - os: macos-latest
             target: --mac
           - os: windows-latest
             target: --win

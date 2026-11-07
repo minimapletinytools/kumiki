@@ -243,7 +243,7 @@ jobs:
       - build_kumiki
       - build_kigumi
       - build_kigumi_app
-    if: ${{ !cancelled() && needs.resolve_tag.result == 'success' && needs.build_kigumi_app.result != 'failure' && ((needs.resolve_tag.outputs.prefix == 'kumiki' && (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push')) || (needs.resolve_tag.outputs.prefix == 'kigumi' && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push'))) }}
+    if: ${{ !cancelled() && needs.resolve_tag.result == 'success' && ((needs.resolve_tag.outputs.prefix == 'kumiki' && (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push')) || (needs.resolve_tag.outputs.prefix == 'kigumi' && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push'))) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -261,8 +261,10 @@ jobs:
           name: kigumi-vsix
           path: release-assets
 
+      # Whichever installers built: a platform that failed or was cancelled doesn't hold back the rest.
       - name: Download the app's installers
-        if: ${{ needs.build_kigumi_app.result == 'success' }}
+        if: ${{ needs.build_kigumi_app.result != 'skipped' }}
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           pattern: kigumi-app-*
@@ -273,8 +275,10 @@ jobs:
         shell: bash
         run: |
           : > release-notes.md
-          if [ -d app-builds ]; then
-            cp app-builds/*.dmg app-builds/*.exe release-assets/
+          shopt -s nullglob
+          installers=(app-builds/*.dmg app-builds/*.exe)
+          if [ ${#installers[@]} -gt 0 ]; then
+            cp "${installers[@]}" release-assets/
             cat > release-notes.md <<'EOF'
           ## Kigumi app
 
