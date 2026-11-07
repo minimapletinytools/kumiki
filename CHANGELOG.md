@@ -8,7 +8,23 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-06
+
 ### kumiki
+
+#### Added
+
+- Generated drawings: `with_auto_drawings(frame)` makes a plan and one dimensioned shop drawing per distinct piece, and `match_timbers` finds the same piece among a frame's timbers, turned or mirrored.
+- Drawings: a viewport can have its own camera; drawings show the perfect timber within and centerplanes, dotted; slanted and compound-angle faces get dimensioned.
+- Joints declare preferred measurement pairs and datums (tongue and fork, cross lap, scarf stub tenon).
+- `kiwari.ratio`: two numbers read as one, such as a slope's rise and run.
+- `FrameWarning` for a joint whose timbers don't meet, even extended past their ends.
+
+#### Fixed
+
+- `Sticker` can be built again.
+- Feature extents no longer keep every built tree in memory.
+- `@frame` accepts `k: Kiwari | None`.
 
 #### Changed
 
@@ -31,6 +47,20 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - The example frames `my_cute_frame`, `coffee_table` and `assembly_preview_demo` (and the starter frame kigumi writes into a new project) are marked `@frame` rather than named `build_frame`, which is deprecated.
 
 ### kigumi
+
+#### Added
+
+- The standalone app: an explorer with an All Files tree, Monaco editor tabs, Cmd/Ctrl+P to go to a file, one Log tab for the whole app, and Mac and Windows installers attached to `kigumi-v*` releases.
+- A built-in agent in the standalone app: sign in to a Kigumi account or use an OpenRouter key; it edits frame files, checks they build and looks at the view. `agent.enabled: false` hides it.
+- An MCP server in the standalone app, so other agents can use Kigumi's tools.
+- Drawings: export as PNG; slide a dimension along its features; angles drawn from where the features reach.
+- A units option: inches, mm or shaku, each to a chosen precision.
+- The parameters panel has a section per kiwari when a file shows several frames.
+
+#### Fixed
+
+- A frame's generated drawings restart after a reload that failed, rather than staying half made.
+- The standalone app keeps its settings when an editor saves settings.json by deleting and recreating it.
 
 #### Changed
 

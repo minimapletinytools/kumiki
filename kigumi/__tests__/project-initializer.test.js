@@ -56,7 +56,7 @@ describe('project-initializer', () => {
         return createMockChildProcess({ stdoutText: '' });
       }
       if (snippet.includes('m.version("kumiki")')) {
-        return createMockChildProcess({ stdoutText: '0.8.0\n' });
+        return createMockChildProcess({ stdoutText: '0.9.0\n' });
       }
       if (snippet.includes('find_spec("kumiki")')) {
         return createMockChildProcess({ stdoutText: `${installedDocs}\n` });
@@ -115,7 +115,7 @@ describe('project-initializer', () => {
     expect(fs.existsSync(path.join(projectDocsPath, 'index.md'))).toBe(false);
     expect(fs.existsSync(path.join(projectDocsPath, 'internal'))).toBe(false);
     expect(fs.existsSync(path.join(projectDocsPath, 'skills', 'init-kumiki-project', 'SKILL.md'))).toBe(true);
-    expect(fs.readFileSync(path.join(projectDocsPath, 'kumiki-version.txt'), 'utf8').trim()).toBe('0.8.0');
+    expect(fs.readFileSync(path.join(projectDocsPath, 'kumiki-version.txt'), 'utf8').trim()).toBe('0.9.0');
     expect(gitignoreContent).toContain('.venv/');
     expect(gitignoreContent).toContain('kigumi_exports/');
     expect(gitignoreContent).toContain('.kigumi/logs/');
@@ -165,7 +165,7 @@ describe('project-initializer', () => {
           : createMockChildProcess({ exitCode: 1 });
       }
       if (snippet.includes('m.version("kumiki")')) {
-        return createMockChildProcess({ stdoutText: '0.8.0\n' });
+        return createMockChildProcess({ stdoutText: '0.9.0\n' });
       }
       return createMockChildProcess();
     });
@@ -208,13 +208,13 @@ describe('project-initializer', () => {
       const snippet = Array.isArray(args) && args[0] === '-c' ? String(args[1] || '') : '';
       if (snippet.includes('m.version("kumiki")')) {
         kumikiVersionProbeCall += 1;
-        return createMockChildProcess({ stdoutText: kumikiVersionProbeCall === 1 ? '0.8.0\n' : '0.8.1\n' });
+        return createMockChildProcess({ stdoutText: kumikiVersionProbeCall === 1 ? '0.9.0\n' : '0.9.1\n' });
       }
       return baseSpawn(command, args);
     });
 
     const initResult = await initializeWorkspaceProject(tmpRoot, null);
-    expect(initResult.kumikiVersion).toBe('0.8.0');
+    expect(initResult.kumikiVersion).toBe('0.9.0');
 
     // The update installs a newer kumiki, with newer docs; a stray file in .kigumi/docs/ goes.
     fs.writeFileSync(path.join(installedDocs, 'agent_usage_instructions.md'), '# Kumiki Usage Instructions\n\nnewer\n');
@@ -223,10 +223,10 @@ describe('project-initializer', () => {
     const updateResult = await updateWorkspaceKumiki(tmpRoot, null);
     const projectDocs = path.join(tmpRoot, '.kigumi', 'docs');
 
-    expect(updateResult.kumikiVersion).toBe('0.8.1');
+    expect(updateResult.kumikiVersion).toBe('0.9.1');
     expect(fs.readFileSync(path.join(projectDocs, 'agent_usage_instructions.md'), 'utf8')).toContain('newer');
     expect(fs.existsSync(path.join(projectDocs, 'stray.md'))).toBe(false);
-    expect(fs.readFileSync(path.join(projectDocs, 'kumiki-version.txt'), 'utf8').trim()).toBe('0.8.1');
+    expect(fs.readFileSync(path.join(projectDocs, 'kumiki-version.txt'), 'utf8').trim()).toBe('0.9.1');
   });
 
   test('updateWorkspaceKumiki moves an old project off docs/, keeping what the user changed', async () => {
