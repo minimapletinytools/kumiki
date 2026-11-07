@@ -37,6 +37,8 @@ def picked():
         assert module_spec is not None and module_spec.loader is not None
         module = importlib.util.module_from_spec(module_spec)
         module_spec.loader.exec_module(module)
+        # The flare these picks were laid out on, whatever the pattern's is now.
+        module.DOVETAIL_FLARE = module.atan(module.scalar(1) / module.scalar(6))
         beam = module.dovetailed_sawhorse().cut_timbers[0]
         root = beam.render_timber_with_cuts_csg_local()
         slot = types.SimpleNamespace(mesh_cache={"m#0": {
