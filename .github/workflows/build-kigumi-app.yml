@@ -58,28 +58,52 @@ jobs:
           node scripts/bundle-docs.js
           node scripts/fetch-uv.js
 
+      # The Developer ID certificate into a keychain of the job's own; electron-builder finds it there.
+      - name: Import the Mac signing certificate
+        if: ${{ matrix.target == '--mac' }}
+        shell: bash
+        env:
+          P12_BASE64: ${{ secrets.KIGUMI_APP_CSC_LINK }}
+          P12_PASSWORD: ${{ secrets.KIGUMI_APP_CSC_KEY_PASSWORD }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then
+            echo "No signing certificate; the Mac app is signed ad hoc."
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/signing.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          rm "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$keychain"
+          echo "KIGUMI_MAC_SIGNED=1" >> "$GITHUB_ENV"
+
       - name: Build app
         shell: bash
         run: |
           # An empty signing variable reads as a path to electron-builder.
-          for name in CSC_LINK CSC_KEY_PASSWORD WIN_CSC_LINK WIN_CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+          for name in WIN_CSC_LINK WIN_CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
             [ -n "${!name}" ] || unset "$name"
           done
           EXTRA_ARGS=()
-          if [ "${{ matrix.target }}" = "--mac" ] && [ -z "$CSC_LINK" ]; then
+          if [ "${{ matrix.target }}" = "--mac" ] && [ -z "$KIGUMI_MAC_SIGNED" ]; then
             # No Developer ID: sign the whole bundle ad hoc, which Gatekeeper lets
             # people open; electron-builder's unsigned build reads as "damaged".
             EXTRA_ARGS+=(-c.mac.identity=- -c.mac.hardenedRuntime=false)
           fi
           npx electron-builder --config electron-builder.yml ${{ matrix.target }} --publish never "${EXTRA_ARGS[@]}"
         env:
-          CSC_LINK: ${{ matrix.target == '--mac' && secrets.KIGUMI_APP_CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.target == '--mac' && secrets.KIGUMI_APP_CSC_KEY_PASSWORD || '' }}
           WIN_CSC_LINK: ${{ matrix.target == '--win' && secrets.KIGUMI_APP_WIN_CSC_LINK || '' }}
           WIN_CSC_KEY_PASSWORD: ${{ matrix.target == '--win' && secrets.KIGUMI_APP_WIN_CSC_KEY_PASSWORD || '' }}
           APPLE_ID: ${{ secrets.KIGUMI_APP_APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.KIGUMI_APP_APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.KIGUMI_APP_APPLE_TEAM_ID }}
+          # On the Mac, signs with the Developer ID imported above, if there is one.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.target == '--mac' && secrets.KIGUMI_APP_CSC_LINK != '' }}
 
       - uses: actions/upload-artifact@v4
