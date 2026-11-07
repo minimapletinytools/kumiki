@@ -8,6 +8,12 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kigumi
+
+#### Changed
+
+- The standalone app's built-in agent is off by default; `"agent.enabled": true` in settings turns it on.
+
 ## [0.9.0] - 2026-11-06
 
 ### kumiki

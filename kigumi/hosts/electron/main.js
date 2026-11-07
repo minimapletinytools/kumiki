@@ -46,9 +46,9 @@ const APP_DEFAULTS = {
     'app.editorCommand': '',
     // Names the explorer's "All files" leaves out; `*` matches anything.
     'app.filesExclude': [...DEFAULT_FILES_EXCLUDE],
-    // The agent panel: off hides it everywhere. An OpenRouter key, or none (then the Kigumi
-    // account). The model is an id from agent/models.js.
-    'agent.enabled': true,
+    // The agent panel: off (the default) hides it everywhere. An OpenRouter key, or none (then the
+    // Kigumi account). The model is an id from agent/models.js.
+    'agent.enabled': false,
     'agent.openrouterApiKey': '',
     'agent.model': '',
     'agent.showOnStartup': true,
@@ -160,7 +160,7 @@ function shellStatus() {
 
 /** Whether the built-in agent is offered at all (`agent.enabled`). */
 function agentEnabled() {
-    return Boolean(settings) && settings.get('agent.enabled', true) !== false;
+    return Boolean(settings) && settings.get('agent.enabled', false) === true;
 }
 
 function pushShellState() {
