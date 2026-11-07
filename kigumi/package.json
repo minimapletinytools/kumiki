@@ -256,6 +256,8 @@
     "test:ext:complex:grep": "node ./test/run-extension-tests.js --suite complex --grep",
     "test:all": "npm run test:unit && npm run test:ext",
     "app:start": "node scripts/start-app.js",
+    "web:start": "node hosts/web/server.js",
+    "test:web": "electron test/web/browser-smoke.js",
     "app:fetch-uv": "node scripts/fetch-uv.js",
     "app:dist": "npm run prepare:instructions && node scripts/bundle-docs.js && node scripts/fetch-uv.js && electron-builder --config electron-builder.yml",
     "test:app": "node test/app/run-app-tests.js",

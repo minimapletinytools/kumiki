@@ -172,6 +172,10 @@
     function renderWelcome() {
         const hasTabs = state.panels.some((panel) => panel.slot === 'center');
         $('welcome').hidden = hasTabs;
+        // A host may draw its own page here: the web version's projects (hosts/web/web-projects.js).
+        if (core.renderWelcome && core.renderWelcome(state, { el, command })) {
+            return;
+        }
         const button = (label, onClick, secondary) => {
             const element = el('button', secondary ? 'secondary' : '', label);
             element.addEventListener('click', onClick);

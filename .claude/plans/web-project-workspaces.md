@@ -1,6 +1,9 @@
 # Project workspaces on the web
 
-Status: intent only, not started. Written down while building the standalone app's project page
+Status: built on the `kigumi-web` branch (server-backed: see `kigumi/hosts/web/README.md`). Still to do: the
+agent and MCP, importing a .zip, a Python runtime in the browser itself (Pyodide), and hosting.
+
+Originally: intent only. Written down while building the standalone app's project page
 (New Project, Open Project, Recent projects; `list_projects` / `new_project` / `open_project` /
 `close_project` for the agent).
 
