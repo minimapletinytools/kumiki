@@ -187,6 +187,16 @@
             $('welcome-lead').textContent = 'Open a project folder to find its frames and patterns.';
             $('welcome-actions').replaceChildren(button('Open Folder…', () => command('openFolder')));
         }
+        const recent = state.workspace ? [] : (state.recentFolders || []);
+        $('welcome-recent').hidden = recent.length === 0;
+        $('welcome-recent-list').replaceChildren(...recent.map((folder) => {
+            const item = el('li');
+            const link = el('button', 'welcome-recent-folder', folder.name);
+            link.title = folder.path;
+            link.addEventListener('click', () => command('openRecentFolder', folder.path));
+            item.append(link, el('span', 'welcome-recent-path', folder.shown || folder.path));
+            return item;
+        }));
     }
 
     function renderStatus() {

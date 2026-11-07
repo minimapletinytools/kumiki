@@ -5,6 +5,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { app, net, protocol, Menu, dialog, safeStorage, shell: electronShell } = require('electron');
 const { setHost } = require('../../host');
@@ -18,6 +19,7 @@ const { createAppWindow } = require('./app-window');
 const { createElectronHost } = require('./electron-host');
 const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
+const { withRecentFolder, offeredRecentFolders } = require('./recent-folders');
 const { AgentSession } = require('../../agent/agent-session');
 const { createProjectFiles } = require('../../agent/project-files');
 const { createAccount } = require('../../agent/account');
@@ -46,6 +48,8 @@ const APP_DEFAULTS = {
     'app.editorCommand': '',
     // Names the explorer's "All files" leaves out; `*` matches anything.
     'app.filesExclude': [...DEFAULT_FILES_EXCLUDE],
+    // Project folders opened lately, newest first: File > Open Recent and the welcome page.
+    'app.recentFolders': [],
     // The agent panel: off (the default) hides it everywhere. An OpenRouter key, or none (then the
     // Kigumi account). The model is an id from agent/models.js.
     'agent.enabled': false,
@@ -155,7 +159,20 @@ function shellStatus() {
         autoRefresh: settings ? settings.get('viewer.autoRefreshOnFileChange', false) : false,
         agent: agentEnabled(),
         update: updates && updates.available ? { version: updates.available.version } : null,
+        recentFolders: recentFolders().map((one) => ({ ...one, shown: tildePath(one.path) })),
     };
+}
+
+/** The recent folders worth offering: still there, and not the one open. */
+function recentFolders() {
+    if (!settings) return [];
+    return offeredRecentFolders(settings.get('app.recentFolders', []),
+        { current: workspaceFolder, exists: (folder) => fs.existsSync(folder) && fs.statSync(folder).isDirectory() });
+}
+
+// The menu and the welcome page follow, as for any setting.
+function clearRecentFolders() {
+    settings.set('app.recentFolders', []);
 }
 
 /** Whether the built-in agent is offered at all (`agent.enabled`). */
@@ -206,10 +223,23 @@ async function chooseWorkspaceFolder() {
         title: 'Open Kigumi Project Folder',
         properties: ['openDirectory', 'createDirectory'],
     });
-    if (canceled || filePaths.length === 0 || filePaths[0] === workspaceFolder) {
+    if (!canceled && filePaths.length > 0) {
+        openWorkspaceFolder(filePaths[0]);
+    }
+}
+
+/** Open one of the recent folders, by path; one that isn't listed is ignored. */
+function openRecentFolder(folder) {
+    if (recentFolders().some((one) => one.path === folder)) {
+        openWorkspaceFolder(folder);
+    }
+}
+
+function openWorkspaceFolder(folder) {
+    if (folder === workspaceFolder) {
         return;
     }
-    settings.set('app.workspaceFolder', filePaths[0]);
+    settings.set('app.workspaceFolder', folder);
     // Sessions, watchers and the explorer are all rooted in the folder, so start over.
     const cli = cliFolder();
     app.relaunch({ args: process.argv.slice(1).filter((arg) => !cli || path.resolve(arg) !== cli) });
@@ -622,6 +652,8 @@ function copyMcpSetup(clientId = 'claude-code') {
 
 function onShellCommand(id, ...args) {
     if (id === 'openFolder') return chooseWorkspaceFolder();
+    if (id === 'openRecentFolder') return openRecentFolder(args[0]);
+    if (id === 'clearRecentFolders') return clearRecentFolders();
     if (id === 'openFrameFile') return chooseFrameFile();
     if (id === 'openLog') return openLogTab();
     if (id === 'openSettings') return openSettingsFile();
@@ -678,6 +710,27 @@ async function checkForUpdatesNow() {
     }
 }
 
+/** `folder`, with the home folder at its start written ~. */
+function tildePath(folder) {
+    const home = os.homedir();
+    return folder === home || folder.startsWith(home + path.sep) ? '~' + folder.slice(home.length) : folder;
+}
+
+function recentFoldersMenu() {
+    const recent = recentFolders();
+    if (recent.length === 0) {
+        return [{ label: 'No Recent Folders', enabled: false }];
+    }
+    return [
+        ...recent.map((one) => ({
+            label: `${one.name} — ${tildePath(one.path)}`,
+            click: () => openWorkspaceFolder(one.path),
+        })),
+        { type: 'separator' },
+        { label: 'Clear Recently Opened', click: () => clearRecentFolders() },
+    ];
+}
+
 function buildMenu() {
     const isMac = process.platform === 'darwin';
     const command = (label, id, accelerator) => ({ label, accelerator, click: () => runAppCommand(id) });
@@ -690,6 +743,7 @@ function buildMenu() {
                 command('Open in Viewer…', 'kigumi.quickOpenInViewer', acceleratorFor('kigumi.quickOpenInViewer')),
                 { type: 'separator' },
                 { label: 'Open Folder…', click: () => chooseWorkspaceFolder() },
+                { label: 'Open Recent', submenu: recentFoldersMenu() },
                 { label: 'Open Frame File…', accelerator: 'CmdOrCtrl+Shift+O', click: () => chooseFrameFile() },
                 { type: 'separator' },
                 {
@@ -767,6 +821,7 @@ async function start() {
     workspaceFolder = resolveWorkspaceFolder();
     if (workspaceFolder) {
         settings.set('app.workspaceFolder', workspaceFolder);
+        settings.set('app.recentFolders', withRecentFolder(settings.get('app.recentFolders', []), workspaceFolder));
     }
     logChannel = new LogChannel(path.join(userData, 'logs', 'kigumi.log'), {
         onShow: () => {

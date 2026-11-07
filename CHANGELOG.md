@@ -18,6 +18,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Added
 
+- The standalone app remembers the project folders it has opened: File > Open Recent, and a Recent list on the welcome page when no folder is open.
 - The view's Parameters tab is now Kiwari: the frame's parameters, then its tools, each with what it does, its own parameters, a Run button, and what it gave shown under it.
 
 ### kigumi

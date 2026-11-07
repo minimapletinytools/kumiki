@@ -320,6 +320,63 @@ body:not(.is-mac) .titlebar-drag-region {
     gap: 8px;
 }
 
+.welcome-recent {
+    min-width: 280px;
+    max-width: 480px;
+    text-align: left;
+}
+
+.welcome-recent[hidden] {
+    display: none;
+}
+
+.welcome-recent h2 {
+    margin: 0 0 4px;
+    color: var(--ka-fg);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.welcome-recent ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.welcome-recent li {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    min-width: 0;
+    padding: 2px 0;
+}
+
+.welcome-recent-folder {
+    flex: none;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--ka-accent);
+    font: inherit;
+    cursor: pointer;
+}
+
+.welcome-recent-folder:hover {
+    text-decoration: underline;
+}
+
+.welcome-recent-folder:focus-visible {
+    outline: 2px solid var(--ka-focus);
+    outline-offset: 2px;
+}
+
+.welcome-recent-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
 .welcome-actions button {
     padding: 6px 14px;
     border: 1px solid transparent;

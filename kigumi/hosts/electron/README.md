@@ -36,7 +36,7 @@ can later run in a browser.
 - `electron-host.js`: the Host (see `../../host.js`).
 
 Settings live in `<userData>/settings.json`: the extension's `kigumi.*` keys
-without the prefix, plus `app.workspaceFolder`, `app.editorCommand` (e.g.
+without the prefix, plus `app.workspaceFolder`, `app.recentFolders` (File > Open Recent, newest first), `app.editorCommand` (e.g.
 `"code -g {file}:{line}"`) and `app.filesExclude` (names the explorer's All Files leaves out). Kigumi > Open Settings File (or the gear in the
 status bar) opens it listing every key; edits apply without a restart. Auto
 refresh on save defaults to on in the app. `app.checkForUpdates` (on by default)
