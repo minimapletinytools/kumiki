@@ -15,6 +15,7 @@ kigumi_exports/dovetailed_sawhorse/, as an STL in millimetres.
 
 
 import pathlib
+from enum import Enum
 
 import numpy as np
 
@@ -42,14 +43,6 @@ DOVETAIL_TAPER = degrees(13)      # narrowing toward the top: point end up
 DOVETAIL_FLARE = degrees(14)
 TRIM_ALLOWANCE = inches(1)
 
-# The router template for a leg's socket in the beam, routed with a dovetail bit through the neck's
-# plane: the export tool's parameters.
-ROUTER_TEMPLATE = kiwari(
-    offset=kiwari.length(inches(1, 16), about="The guide bushing's radius less the bit's: 1/16\" for a 5/8\" bushing round a 1/2\" bit"),
-    top=kiwari.length(inches(1, 2), minimum=0, about="The template's thickness above the neck's plane"),
-    bottom=kiwari.length(inches(1), minimum=0, about="How far it runs below that plane, down onto the beam it sits on"),
-    width=kiwari.length(inches(2), minimum=0, about="How wide the template is round its opening"),
-)
 BEAM_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE   # the beam's top meets its +y side
 LEG_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE    # a leg's outer face meets its +width edge        # each leg is cut this much long at both ends, for the level trims
 
@@ -84,27 +77,64 @@ def _offset_convex(polygon: List[Tuple[float, float]], distance: float) -> List[
     return [(float(x), float(y)) for x, y in moved]
 
 
+class TemplateSides(Enum):
+    """Which of the opening's sides the template guides the router along, above the face."""
+    FOUR_SIDED = "4 sided"
+    TWO_SIDED_LR = "2 sided, left and right"    # the sides facing most along global -x and +x
+    TWO_SIDED_TB = "2 sided, top and bottom"    # the sides facing most along global -z and +z
+
+
+_ABOVE_FACE = mm(0.01)    # how far the two-sided template's open part keeps off the faces it would lie on
+
+_SIDES_FACING = {TemplateSides.TWO_SIDED_LR: np.array([1.0, 0.0, 0.0]),
+                 TemplateSides.TWO_SIDED_TB: np.array([0.0, 0.0, 1.0])}
+
+
+def _two_sides(opening: List[Tuple[float, float]], facing: np.ndarray) -> List[Tuple[np.ndarray, float]]:
+    """Return the opening's two sides facing most along -`facing` and +`facing` (2D), as (outward normal, offset) lines."""
+    points = np.array(opening)
+    edges = np.roll(points, -1, axis=0) - points
+    normals = np.stack([edges[:, 1], -edges[:, 0]], axis=1) / np.linalg.norm(edges, axis=1, keepdims=True)
+    along = normals @ facing
+    chosen = [int(np.argmin(along)), int(np.argmax(along))]
+    if np.linalg.norm(facing) < 0.3 or along[chosen[0]] > -0.5 * np.linalg.norm(facing) \
+            or along[chosen[1]] < 0.5 * np.linalg.norm(facing):
+        raise ValueError("the face has no two sides facing that way: it lies too nearly square to it")
+    return [(normals[i], float(normals[i] @ points[i])) for i in chosen]
+
+
 def router_template(face: CrossSection, body: CutCSG, offset: Numeric, jig_top: Numeric, jig_width: Numeric,
-                    jig_bottom: Numeric = 0) -> CutCSG:
+                    jig_bottom: Numeric = 0, sides: TemplateSides = TemplateSides.FOUR_SIDED) -> CutCSG:
     """Return a router template for cutting `face`'s outline: a frame jig_width wide round an opening.
 
     `face` is a convex planar outline, from `face_cross_section` (a face of a CSG) or `plane_cross_section`
     (a plane through one), in the same space as `body`. The opening is the face moved out by `offset`
     (the collar's radius less the bit's; negative moves it in). The jig runs `jig_top` along the face's
     normal and `jig_bottom` against it, and `body`, the piece being cut, is taken out of it.
+
+    With two `sides`, the part above the face guides along those two only: everything between their
+    lines is open, leaving two rails, and the part below the face is the whole frame as with four.
     """
     frame, region = face
     if len(region) != 1:
         raise ValueError(f"a router template needs one convex face outline, not {len(region)} pieces")
     opening = _offset_convex(region[0], float(offset))
     outside = _offset_convex(region[0], float(offset) + float(jig_width))
+    between = None
+    if sides is not TemplateSides.FOUR_SIDED:
+        # Everything between the two sides' lines, kept a hair inside them (the opening's own sides guide)
+        # and run past the outline, so none of its faces lies on another's.
+        facing = _SIDES_FACING[sides]
+        between = _offset_convex(region[0], float(offset) + float(jig_width) + float(mm(1)))
+        for normal, line_offset in _two_sides(opening, np.array([facing @ frame.u, facing @ frame.v])):
+            between = _clip_between(between, normal, -np.inf, line_offset - float(_ABOVE_FACE))
     # The face's 2D axes, turned if need be so they and its normal make a right-handed frame.
     u, v, normal = frame.u, frame.v, frame.normal
     flip = float(np.dot(np.cross(u, v), normal)) < 0
     if flip:
         v = -v
 
-    def extrusion(outline: List[Tuple[float, float]]) -> ConvexPolygonExtrusion:
+    def extrusion(outline: List[Tuple[float, float]], start: Numeric, end: Numeric) -> ConvexPolygonExtrusion:
         points = [create_v2(x, -y if flip else y) for x, y in outline]
         if flip:
             points.reverse()
@@ -112,9 +142,26 @@ def router_template(face: CrossSection, body: CutCSG, offset: Numeric, jig_top: 
             points=points,
             transform=Transform(position=create_v3(*frame.origin),
                                 orientation=Orientation.from_x_and_y(create_v3(*u), create_v3(*v))),
-            start_distance=-jig_bottom, end_distance=jig_top)
+            start_distance=start, end_distance=end)
 
-    return Difference(extrusion(outside), [extrusion(opening), body], label=CutCSGLabel("router_template"))
+    taken = [extrusion(opening, -jig_bottom, jig_top), body]
+    if between is not None:
+        # From a hair above the face, so its floor meets nothing lying in the face (the beam's arris, on
+        # the sawhorse), and to past the top: faces lying on others leave slivers an STL can't keep closed.
+        taken.insert(1, extrusion(between, _ABOVE_FACE, jig_top + mm(1)))
+    return Difference(extrusion(outside, -jig_bottom, jig_top), taken, label=CutCSGLabel("router_template"))
+
+
+# The router template for a leg's socket in the beam, routed with a dovetail bit through the neck's
+# plane: the export tool's parameters.
+ROUTER_TEMPLATE = kiwari(
+    offset=kiwari.length(inches(1, 16), about="The guide bushing's radius less the bit's: 1/16\" for a 5/8\" bushing round a 1/2\" bit"),
+    top=kiwari.length(inches(1, 2), minimum=0, about="The template's thickness above the neck's plane"),
+    bottom=kiwari.length(inches(1), minimum=0, about="How far it runs below that plane, down onto the beam it sits on"),
+    width=kiwari.length(inches(2), minimum=0, about="How wide the template is round its opening"),
+    sides=kiwari.choice(TemplateSides, TemplateSides.TWO_SIDED_LR,
+                        about="Which sides it guides along above the neck: the flanks are left and right"),
+)
 
 
 def _clip_between(polygon: List[Tuple[float, float]], along: np.ndarray, low: float, high: float) -> List[Tuple[float, float]]:
@@ -155,7 +202,7 @@ def _socket_template(beam: Timber, socket: Cutting, t: Kiwari) -> CutCSG:
     along = np.array([axis @ frame.u, axis @ frame.v])
     opening = _clip_between(outline, along, float(reach.min()), float(reach.max()))
     return router_template((frame, [opening]), body, t.length("offset"), t.length("top"), t.length("width"),
-                           t.length("bottom"))
+                           t.length("bottom"), t.choice("sides", TemplateSides))
 
 
 def _export_socket_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint], t: Kiwari) -> str:
