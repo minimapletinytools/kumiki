@@ -11,7 +11,10 @@ also looks straight down on a leg's level top, where the dovetail is marked out.
 """
 
 
+import numpy as np
+
 from kumiki import *
+from kumiki.csg.cross_sections import CrossSection
 from kumiki.drawings.auto_drawings import with_auto_drawings
 from kumiki.drawings.measure import ViewAxes
 
@@ -34,6 +37,69 @@ DOVETAIL_FLARE = atan(scalar(1) / scalar(6))
 TRIM_ALLOWANCE = inches(1)
 BEAM_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE   # the beam's top meets its +y side
 LEG_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE    # a leg's outer face meets its +width edge        # each leg is cut this much long at both ends, for the level trims
+
+
+def _offset_convex(polygon: List[Tuple[float, float]], distance: float) -> List[Tuple[float, float]]:
+    """Return a convex polygon with each edge moved `distance` outward (inward if negative), corners kept sharp."""
+    points = np.array(polygon, dtype=float)
+    if len(points) < 3:
+        raise ValueError("a face outline needs at least 3 corners")
+    edge_area = np.cross(points, np.roll(points, -1, axis=0)).sum() / 2
+    if edge_area < 0:
+        points = points[::-1]  # counter-clockwise, so an edge's outward normal is on its right
+    starts, ends = points, np.roll(points, -1, axis=0)
+    directions = ends - starts
+    directions /= np.linalg.norm(directions, axis=1, keepdims=True)
+    normals = np.stack([directions[:, 1], -directions[:, 0]], axis=1)
+    shifted = starts + normals * distance
+    corners = []
+    for i in range(len(points)):
+        # Edge i-1 and edge i, each a moved line, meet at corner i.
+        a_point, a_dir, b_point, b_dir = shifted[i - 1], directions[i - 1], shifted[i], directions[i]
+        turn = np.cross(a_dir, b_dir)
+        if abs(turn) < 1e-12:
+            continue  # a straight corner
+        t = np.cross(b_point - a_point, b_dir) / turn
+        corners.append(tuple(a_point + a_dir * t))
+    moved = np.array(corners)
+    moved_directions = np.roll(moved, -1, axis=0) - moved
+    if (np.cross(moved, np.roll(moved, -1, axis=0)).sum() <= 0
+            or np.any(np.cross(moved_directions, np.roll(moved_directions, -1, axis=0)) <= 0)):
+        raise ValueError(f"insetting the face by {-distance} closes it up")
+    return [(float(x), float(y)) for x, y in moved]
+
+
+def router_template(face: CrossSection, body: CutCSG, offset: Numeric, jig_top: Numeric, jig_width: Numeric,
+                    jig_bottom: Numeric = 0) -> CutCSG:
+    """Return a router template for cutting `face`'s outline: a frame jig_width wide round an opening.
+
+    `face` is a convex planar outline, from `face_cross_section` (a face of a CSG) or `plane_cross_section`
+    (a plane through one), in the same space as `body`. The opening is the face moved out by `offset`
+    (the collar's radius less the bit's; negative moves it in). The jig runs `jig_top` along the face's
+    normal and `jig_bottom` against it, and `body`, the piece being cut, is taken out of it.
+    """
+    frame, region = face
+    if len(region) != 1:
+        raise ValueError(f"a router template needs one convex face outline, not {len(region)} pieces")
+    opening = _offset_convex(region[0], float(offset))
+    outside = _offset_convex(region[0], float(offset) + float(jig_width))
+    # The face's 2D axes, turned if need be so they and its normal make a right-handed frame.
+    u, v, normal = frame.u, frame.v, frame.normal
+    flip = float(np.dot(np.cross(u, v), normal)) < 0
+    if flip:
+        v = -v
+
+    def extrusion(outline: List[Tuple[float, float]]) -> ConvexPolygonExtrusion:
+        points = [create_v2(x, -y if flip else y) for x, y in outline]
+        if flip:
+            points.reverse()
+        return ConvexPolygonExtrusion(
+            points=points,
+            transform=Transform(position=create_v3(*frame.origin),
+                                orientation=Orientation.from_x_and_y(create_v3(*u), create_v3(*v))),
+            start_distance=-jig_bottom, end_distance=jig_top)
+
+    return Difference(extrusion(outside), [extrusion(opening), body], label=CutCSGLabel("router_template"))
 
 
 def _leg_end(name: str) -> FeatureOverride:
