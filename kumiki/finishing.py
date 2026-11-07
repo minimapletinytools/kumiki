@@ -18,17 +18,22 @@ Kigumi runs the routine in the background after showing the frame, and shows eac
 is added. `frame.finish()` runs it straight away, for scripts and tests.
 
 A frame also offers tools: functions the viewer can run on demand, each returning text to show.
-Tools are experimental: the viewer doesn't list them yet, and their shape may change in a patch release::
+A tool can take parameters of its own, declared as a kiwari, set in the viewer before it runs.
+Tools are experimental: their shape may change in a patch release::
 
     frame = replace(frame, tools=[Tool("leg report", "How many legs there are",
                                        lambda: f"{k.count('legs')} legs")])
+
+    EXPORT = kiwari(scale=kiwari.number(1000, about="Model units to the file's"))
+    Tool("export", "Write the frame to an STL", lambda t: export(frame, t.number("scale")), kiwari=EXPORT)
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Optional
 
 if TYPE_CHECKING:
     from .drawings.drawing import Drawing
+    from .kiwari import Kiwari
 
 __all__ = ["Finishing", "FinishingCancelled", "Tool"]
 
@@ -70,7 +75,17 @@ class Finishing:
 
 @dataclass(frozen=True)
 class Tool:
-    """A tool a frame offers: `run()` returns the text the viewer shows. Experimental; may change."""
+    """A tool a frame offers, returning the text the viewer shows. Experimental; may change.
+
+    With a `kiwari`, `run` is given its resolved parameters; without one, it takes nothing.
+    """
     name: str
     description: str
-    run: Callable[[], str]
+    run: Callable[..., str]
+    kiwari: Optional["Kiwari"] = None
+
+    def call(self, values: Optional[Mapping[str, Any]] = None) -> str:
+        """Run the tool, with `values` laid over its kiwari's defaults if it has one."""
+        if self.kiwari is None:
+            return self.run()
+        return self.run(self.kiwari.resolve(values))

@@ -345,9 +345,10 @@ class TimberSummaryWire(TypedDict):
     cuts_count: int
 
 
-class ToolWire(TypedDict):
+class ToolWire(TypedDict, total=False):
     name: str
     description: str
+    kiwari: Dict[str, Any]  # its parameters, as a frame's kiwari section, if it takes any
 
 
 class FrameSummaryWire(TypedDict, total=False):
@@ -5113,18 +5114,26 @@ def _start_finishing(ss: SlotState, slot_name: str) -> Optional["Job"]:
 
 
 def _serialize_tools(frame: Any) -> List[ToolWire]:
-    """Return the frame's tools, by name and description, for the viewer to list."""
-    return [{"name": tool.name, "description": tool.description} for tool in getattr(frame, "tools", [])]
+    """Return the frame's tools for the viewer to list: name, description and any parameters."""
+    tools: List[ToolWire] = []
+    for tool in getattr(frame, "tools", []):
+        wire: ToolWire = {"name": tool.name, "description": tool.description}
+        declared = getattr(tool, "kiwari", None)
+        if declared is not None:
+            wire["kiwari"] = {**declared.to_payload(), "id": f"tool:{tool.name}", "frames": [], "canSave": False}
+        tools.append(wire)
+    return tools
 
 
-def run_tool(ss: SlotState, name: str) -> Dict[str, str]:
-    """Run the frame's tool `name` and return the text it gives."""
+def run_tool(ss: SlotState, name: str, values: Optional[Mapping[str, Any]] = None) -> Dict[str, str]:
+    """Run the frame's tool `name`, with `values` for its parameters if it takes any, and return the text it gives."""
     tools = list(getattr(ss.frame, "tools", []))
     tool = next((tool for tool in tools if tool.name == name), None)
     if tool is None:
         raise ValueError(f"No tool named {name!r}. Available: {[tool.name for tool in tools]}")
     with contextlib.redirect_stdout(sys.stderr):
-        output = tool.run()
+        # kumiki 0.9.0's Tool has no call, and no parameters.
+        output = tool.call(values) if hasattr(tool, "call") else tool.run()
     if not isinstance(output, str):
         raise TypeError(f"tool {name!r} returned {type(output).__name__}, expected str")
     return {"name": name, "output": output}
@@ -5435,7 +5444,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
     if command == "run_tool":
         ss = _resolve_slot(state, payload)
         name = _require_str(payload, "name", "run_tool requires payload.name")
-        return state, make_success_response(request_id, command, run_tool(ss, name)), False
+        return state, make_success_response(request_id, command, run_tool(ss, name, _opt_mapping(payload, "kiwari"))), False
 
     if command == "cancel_job":
         job_id = _require_str(payload, "jobId", "cancel_job requires payload.jobId")

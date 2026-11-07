@@ -255,13 +255,21 @@ def shed(k: Optional[Kiwari] = None) -> Frame:
 
 ### Tools
 
-Experimental: Kigumi doesn't show tools yet, and how they are declared may change in a patch release.
+Experimental: how tools are declared may change in a patch release.
 
-A frame can offer tools: functions Kigumi runs on demand, each returning text to show. Give each a name and a description. A tool is written inside the frame function, so it can use what the build computed:
+A frame can offer tools: functions Kigumi runs on demand, from its Kiwari tab, each returning text to show. Give each a name and a description. A tool is written inside the frame function, so it can use what the build computed:
 
 ```python
 frame = replace(frame, tools=[Tool("leg report", "How many legs, and how long",
                                    lambda: f"{len(legs)} legs, {leg_length} long")])
+```
+
+A tool can take parameters of its own, set in Kigumi before it runs: declare them as a kiwari, and `run` is given the resolved values.
+
+```python
+EXPORT = kiwari(scale=kiwari.number(1000, minimum=0, about="Model units to the file's"))
+
+Tool("export", "Write the frame to an STL", lambda t: export(frame, t.number("scale")), kiwari=EXPORT)
 ```
 
 ## Parameterizing with Kiwari

@@ -14,7 +14,9 @@ def posts(k: Optional[Kiwari] = None) -> Frame:
                          length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="post")
     frame = Frame(cut_timbers=[CutTimber(post, cuts=[])], name="posts",
                   tools=[Tool("count", "How many timbers", lambda: f"{len(frame.cut_timbers)} timbers"),
-                         Tool("not text", "Returns a number", lambda: 42)])
+                         Tool("not text", "Returns a number", lambda: 42),
+                         Tool("times", "The timber count times a factor", lambda t: f"{len(frame.cut_timbers) * t.count('factor')}",
+                              kiwari=kiwari(factor=kiwari.count(2, minimum=1)))])
 
     def later(finishing: Finishing) -> None:
         for name in ("first", "second"):
@@ -109,3 +111,18 @@ def test_a_tool_must_give_text(slot):
 def test_an_unknown_tool_says_what_there_is(slot):
     with pytest.raises(ValueError, match="count"):
         runner.run_tool(slot, "nope")
+
+
+def test_a_tool_s_parameters_go_to_the_viewer_as_a_kiwari_section(slot):
+    tools = {tool["name"]: tool for tool in runner._serialize_tools(slot.frame)}
+
+    assert "kiwari" not in tools["count"]
+    section = tools["times"]["kiwari"]
+    assert section["id"] == "tool:times" and [entry["key"] for entry in section["schema"]] == ["factor"]
+
+
+def test_a_tool_runs_with_the_values_it_is_sent(slot):
+    assert runner.run_tool(slot, "times") == {"name": "times", "output": "2"}
+    assert runner.run_tool(slot, "times", {"factor": {"value": 3}}) == {"name": "times", "output": "3"}
+    with pytest.raises(ValueError, match="at least 1"):
+        runner.run_tool(slot, "times", {"factor": {"value": 0}})

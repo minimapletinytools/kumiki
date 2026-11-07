@@ -355,7 +355,7 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'runTool') {
-                this.runTool(String(message.name || ''));
+                this.runTool(String(message.name || ''), message.kiwari || null);
                 return;
             }
             if (message.type === 'setRefreshOptions') {
@@ -1310,15 +1310,15 @@ class FrameViewSession {
         });
     }
 
-    /** Run the frame's tool `name` in the runner and send the viewer what it gave, or why it failed. */
-    async runTool(name) {
+    /** Run the frame's tool `name`, with `kiwari` for its parameters, and send the viewer what it gave or why it failed. */
+    async runTool(name, kiwari = null) {
         let reply;
         try {
             if (!this.runnerSession) {
                 throw new Error('the runner is not running');
             }
             this.log(`[tools] Running "${name}"`);
-            const result = await this.runnerSession.slotRequest('run_tool', this.slotName, { name });
+            const result = await this.runnerSession.slotRequest('run_tool', this.slotName, kiwari ? { name, kiwari } : { name });
             reply = { type: 'toolResult', name, output: (result && result.output) || '' };
         } catch (error) {
             const message = error.message || String(error);

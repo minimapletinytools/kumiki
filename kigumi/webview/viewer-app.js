@@ -179,8 +179,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this._measurementEndHighlights = new Map();
         this._measurementEndAsked = new Set();
         this.kiwariPanel = new ViewerKiwariPanel(this);
-        // The frame's tools ({name, description}) and, by name, how each last run went.
+        // The frame's tools ({name, description, kiwari}); by name, the parameters of each that
+        // takes any (kiwari-values.js's shape), and how each last run went.
         this.frameTools = [];
+        this.toolKiwari = {};
         this.toolRuns = {};
         this.toolsPanel = new ViewerToolsPanel(this);
         this.memberListPanel = new MemberListPanel(this, { t });
@@ -1271,9 +1273,18 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     setKiwariFromFrame(frameData) {
         this.kiwariSections = KigumiKiwariValues.sectionsFromPayload(frameData && frameData.kiwari, this.unitSystem());
         this.frameTools = Array.isArray(frameData && frameData.tools) ? frameData.tools : [];
-        // A tool's last result stays while the frame still offers it.
+        // A tool's last result stays while the frame still offers it, and what is typed in its
+        // parameters while they are the same parameters.
         const names = new Set(this.frameTools.map((tool) => tool.name));
         this.toolRuns = Object.fromEntries(Object.entries(this.toolRuns).filter(([name]) => names.has(name)));
+        const toolKiwari = {};
+        for (const tool of this.frameTools) {
+            const [state] = tool.kiwari ? KigumiKiwariValues.sectionsFromPayload([tool.kiwari], this.unitSystem()) : [];
+            if (!state) continue;
+            const before = this.toolKiwari[tool.name];
+            toolKiwari[tool.name] = before && JSON.stringify(before.schema) === JSON.stringify(state.schema) ? before : state;
+        }
+        this.toolKiwari = toolKiwari;
         this.requestUpdate();
     }
 
@@ -1281,13 +1292,20 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         if (!vscode) {
             return;
         }
+        const state = this.toolKiwari[name];
+        const wire = state ? KigumiKiwariValues.sectionsToWire([state], this.unitSystem()) : null;
+        if (state && !wire) {
+            return; // a box that does not read; the panel says which
+        }
         this.toolRuns = { ...this.toolRuns, [name]: { running: true } };
         this.requestUpdate();
-        vscode.postMessage({ type: 'runTool', name });
+        vscode.postMessage(wire ? { type: 'runTool', name, kiwari: wire[state.id] } : { type: 'runTool', name });
     }
 
     _changeKiwariSection(sectionId, change) {
         this.kiwariSections = KigumiKiwariValues.withSection(this.kiwariSections, sectionId, change);
+        this.toolKiwari = Object.fromEntries(Object.entries(this.toolKiwari)
+            .map(([name, state]) => [name, state.id === sectionId ? change(state) : state]));
         this.requestUpdate();
     }
 

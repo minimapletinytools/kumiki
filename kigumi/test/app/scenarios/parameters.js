@@ -33,14 +33,22 @@ module.exports = {
 
         // Under the parameters, the frame's tools: run from there, with what one gave shown under it.
         const tab = await inShell(`${viewDoc}.querySelector('.vsb-tab[data-tab="parameters"]').textContent.trim()`);
-        const tools = await inShell(`[...${viewDoc}.querySelectorAll('#tool-controls .tool-row .kiwari-key')].map((key) => key.textContent).join('|')`);
+        const tools = await inShell(`[...${viewDoc}.querySelectorAll('#tool-controls .tool-row > .kiwari-row-header .kiwari-key')].map((key) => key.textContent).join('|')`);
+        // Its own parameters, under it: one typed before running.
+        const toolParameters = await inShell(`[...${viewDoc}.querySelectorAll('#tool-controls .tool-parameters .kiwari-key')].map((key) => key.textContent).join('|')`);
+        await inShell(`(() => {
+            const box = ${viewDoc}.getElementById('kiwari-tool0-width');
+            box.value = '3in';
+            box.dispatchEvent(new Event('input', { bubbles: true }));
+        })()`);
         await inShell(`${viewDoc}.querySelector('#tool-controls .tool-run').click()`);
         const output = await waitFor(() => inShell(`${viewDoc}.querySelector('#tool-controls .tool-output')?.textContent || null`), { timeoutMs: 60000 })
             .catch(() => '');
         await capture('03f-kiwari-tools');
-        check('the Kiwari tab lists the frame\'s tools under its parameters, and runs one',
-            tab.includes('Kiwari') && tools === 'export router templates' && output.startsWith('Wrote 4 router templates'),
-            `tab "${tab}", tools "${tools}", output "${output.split('\n')[0]}"`);
+        check('the Kiwari tab lists the frame\'s tools under its parameters, with their own, and runs one',
+            tab.includes('Kiwari') && tools === 'export router templates' && toolParameters === 'offset|top|bottom|width'
+                && output.startsWith('Wrote 4 router templates'),
+            `tab "${tab}", tools "${tools}", its parameters "${toolParameters}", output "${output.split('\n')[0]}"`);
         await showTab('tree');
     },
 };

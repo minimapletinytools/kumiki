@@ -322,7 +322,7 @@
 #tool-controls {
     margin-top: 14px;
 }
-.tool-row .kiwari-row-header {
+.tool-row > .kiwari-row-header {
     justify-content: space-between;
 }
 .tool-status {
@@ -343,4 +343,13 @@
 }
 .tool-output-error {
     color: var(--hv-error);
+}
+.tool-parameters {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 2px;
+}
+.tool-parameters .kiwari-row {
+    padding: 4px 0;
 }

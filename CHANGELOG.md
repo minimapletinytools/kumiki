@@ -8,11 +8,17 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kumiki
+
+#### Added
+
+- A tool can take parameters: `Tool(name, description, run, kiwari=kiwari(...))`, and `run` is given the resolved values. A tool without a kiwari is run with nothing, as before.
+
 ### kigumi
 
 #### Added
 
-- The view's Parameters tab is now Kiwari: the frame's parameters, then its tools, each with what it does and a Run button, and what it gave shown under it.
+- The view's Parameters tab is now Kiwari: the frame's parameters, then its tools, each with what it does, its own parameters, a Run button, and what it gave shown under it.
 
 ### kigumi
 

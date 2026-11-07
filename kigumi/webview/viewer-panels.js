@@ -721,7 +721,7 @@ export class ViewerKiwariPanel {
     }
 }
 
-/** The frame's tools: each with what it does and a Run button, and what it last gave. */
+/** The frame's tools: each with what it does, its parameters if it takes any, a Run button, and what it last gave. */
 export class ViewerToolsPanel {
     constructor(app) {
         this.app = app;
@@ -749,8 +749,11 @@ export class ViewerToolsPanel {
                 </div>
                 ${tools.length
                     ? html`<div class="kiwari-list">
-                        ${tools.map((tool) => {
+                        ${tools.map((tool, index) => {
                             const run = this.app.toolRuns[tool.name];
+                            const state = this.app.toolKiwari[tool.name];
+                            const problems = state ? KigumiKiwariValues.problems(state, this.app.unitSystem()) : {};
+                            const blocked = Object.keys(problems).length > 0;
                             return html`
                                 <div class="kiwari-row tool-row">
                                     <div class="kiwari-row-header">
@@ -758,10 +761,16 @@ export class ViewerToolsPanel {
                                         <button
                                             type="button"
                                             class="kiwari-action tool-run"
-                                            ?disabled=${Boolean(run && run.running)}
+                                            ?disabled=${Boolean(run && run.running) || blocked}
+                                            title=${blocked ? t('viewer.kiwari.cannotBuild') : ''}
                                             @click=${() => this.app.runTool(tool.name)}>${t('viewer.tools.run')}</button>
                                     </div>
                                     ${tool.description ? html`<div class="kiwari-about">${tool.description}</div>` : ''}
+                                    ${state
+                                        ? html`<div class="tool-parameters">
+                                            ${state.schema.map((parameter) => this.app.kiwariPanel.renderParameter(state, `tool${index}`, parameter, problems))}
+                                        </div>`
+                                        : ''}
                                     ${this.renderResult(run)}
                                 </div>`;
                         })}

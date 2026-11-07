@@ -42,11 +42,14 @@ DOVETAIL_TAPER = degrees(13)      # narrowing toward the top: point end up
 DOVETAIL_FLARE = degrees(14)
 TRIM_ALLOWANCE = inches(1)
 
-# The router template for a leg's socket in the beam, routed with a dovetail bit through the neck's plane.
-JIG_OFFSET = inches(1, 16)    # the guide bushing's radius less the bit's: a 5/8" bushing round a 1/2" bit
-JIG_TOP = inches(1, 2)        # the template's thickness above the neck's plane
-JIG_BOTTOM = inches(1)        # how far it runs below that plane, down onto the beam it sits on
-JIG_WIDTH = inches(2)         # how wide the template is round its opening
+# The router template for a leg's socket in the beam, routed with a dovetail bit through the neck's
+# plane: the export tool's parameters.
+ROUTER_TEMPLATE = kiwari(
+    offset=kiwari.length(inches(1, 16), about="The guide bushing's radius less the bit's: 1/16\" for a 5/8\" bushing round a 1/2\" bit"),
+    top=kiwari.length(inches(1, 2), minimum=0, about="The template's thickness above the neck's plane"),
+    bottom=kiwari.length(inches(1), minimum=0, about="How far it runs below that plane, down onto the beam it sits on"),
+    width=kiwari.length(inches(2), minimum=0, about="How wide the template is round its opening"),
+)
 BEAM_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE   # the beam's top meets its +y side
 LEG_REFERENCE = TimberFeature.RIGHT_FRONT_EDGE    # a leg's outer face meets its +width edge        # each leg is cut this much long at both ends, for the level trims
 
@@ -130,7 +133,7 @@ def _clip_between(polygon: List[Tuple[float, float]], along: np.ndarray, low: fl
     return [(float(x), float(y)) for x, y in points]
 
 
-def _socket_template(beam: Timber, socket: Cutting) -> CutCSG:
+def _socket_template(beam: Timber, socket: Cutting, t: Kiwari) -> CutCSG:
     """Return the router template for one dovetail socket in the beam, in world space.
 
     Its opening is the dovetail's neck, over the stretch of it where the socket is in the beam; the
@@ -151,16 +154,17 @@ def _socket_template(beam: Timber, socket: Cutting) -> CutCSG:
     reach = mesh_cutcsg(Intersection(dovetail, body)).mesh.vertices @ axis - frame.origin @ axis
     along = np.array([axis @ frame.u, axis @ frame.v])
     opening = _clip_between(outline, along, float(reach.min()), float(reach.max()))
-    return router_template((frame, [opening]), body, JIG_OFFSET, JIG_TOP, JIG_WIDTH, JIG_BOTTOM)
+    return router_template((frame, [opening]), body, t.length("offset"), t.length("top"), t.length("width"),
+                           t.length("bottom"))
 
 
-def _export_socket_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint]) -> str:
+def _export_socket_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint], t: Kiwari) -> str:
     """Write each leg's socket template to an STL in millimetres, in kigumi_exports/, and say where."""
     folder = pathlib.Path.cwd() / "kigumi_exports" / "dovetailed_sawhorse"
     folder.mkdir(parents=True, exist_ok=True)
     written = []
     for leg, joint in zip(legs, joints):
-        mesh = mesh_cutcsg(_socket_template(beam, joint.cuttings["receiving_timber"])).mesh.copy()
+        mesh = mesh_cutcsg(_socket_template(beam, joint.cuttings["receiving_timber"], t)).mesh.copy()
         mesh.apply_scale(1000)
         path = folder / f"router template {leg.timber.ticket.path}.stl"
         mesh.export(path)
@@ -262,7 +266,7 @@ def dovetailed_sawhorse(k: Optional[Kiwari] = None) -> Frame:
                      source_joints=joints, name="Dovetailed sawhorse", kiwari=k,
                      tools=[Tool("export router templates",
                                  "Write the router template for each leg's socket in the beam to an STL, in mm",
-                                 lambda: _export_socket_templates(beam, legs, joints))])
+                                 lambda t: _export_socket_templates(beam, legs, joints, t), kiwari=ROUTER_TEMPLATE)])
     return with_auto_drawings(sawhorse, fixed_path="beam", extra_views=_leg_top_view)
 
 

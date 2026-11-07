@@ -3,7 +3,7 @@
 import pytest
 
 from kumiki import (CutTimber, Finishing, FinishingCancelled, Drawing, Frame, Tool, create_timber, create_v2,
-                    create_v3, mm)
+                    create_v3, kiwari, mm)
 from kumiki.frame_decorators import overlay_frames
 
 
@@ -66,3 +66,17 @@ def test_shown_together_frames_keep_their_routines_and_tools():
     shown = overlay_frames([first, second], "both")
 
     assert len(shown.finishing) == 1 and [tool.name for tool in shown.tools] == ["count"]
+
+
+def test_a_tool_without_parameters_is_run_with_nothing():
+    assert Tool("count", "Counts", lambda: "1").call() == "1"
+
+
+def test_a_tool_with_parameters_is_given_them_over_its_defaults():
+    tool = Tool("scale", "Says its scale and name", lambda t: f"{t.number('scale')} {t.text('name')}",
+                kiwari=kiwari(scale=kiwari.number(2, minimum=0), name=kiwari.text("jig")))
+
+    assert tool.call() == "2.0 jig"
+    assert tool.call({"scale": {"value": 5}}) == "5.0 jig"
+    with pytest.raises(ValueError, match="at least 0"):
+        tool.call({"scale": {"value": -1}})
