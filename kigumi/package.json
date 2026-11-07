@@ -34,7 +34,7 @@
     "onView:kigumi.explorer"
   ],
   "main": "./extension.js",
-  "icon": "templogo.png",
+  "icon": "extension-icon.png",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -51,7 +51,7 @@
           "type": "webview",
           "id": "kigumi.explorer",
           "name": "Kigumi Explorer 🐸",
-          "icon": "templogo.png"
+          "icon": "extension-icon.png"
         }
       ]
     },
