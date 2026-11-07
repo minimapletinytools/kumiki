@@ -30,10 +30,6 @@ PATTERN_REGISTRY = {
     # Structures (return Frame)
     "kumiki": lambda: (__import__("kumiki_example", fromlist=["create_sawhorse"]).create_sawhorse, []),
     "oscarshed": lambda: (__import__("oscarshed", fromlist=["create_oscarshed"]).create_oscarshed, []),
-    "gateway": lambda: (__import__("gateway_example", fromlist=["create_gateway"]).create_gateway, []),
-    "ladder": lambda: (__import__("ladder_example", fromlist=["create_ladder_frame"]).create_ladder_frame, []),
-    "honeycomb_shed": lambda: (__import__("new_shed", fromlist=["create_honeycomb_shed"]).create_honeycomb_shed, []),
-    "sillyshed": lambda: (__import__("sillyshed_example", fromlist=["create_sillyshed_frame"]).create_sillyshed_frame, []),
     "tinyhouse120": lambda: (__import__("tinyhouse120", fromlist=["create_tinyhouse120"]).create_tinyhouse120, []),
     # Joint examples (return PatternBook)
     "basic_joints": lambda: (__import__("patterns.basic_joints_examples", fromlist=["create_basic_joints_patternbook"]).create_basic_joints_patternbook, []),
