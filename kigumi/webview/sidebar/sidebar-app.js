@@ -45,6 +45,7 @@ class KigumiSidebar extends LitElement {
         selectedKey: { state: true },
         menuState: { state: true },
         options: { state: true },
+        mcp: { state: true },
         sections: { state: true },
     };
 
@@ -61,6 +62,7 @@ class KigumiSidebar extends LitElement {
         this.menuState = null;
         // The switches under "Kigumi options" (sidebar-controller.js sidebarOptions).
         this.options = [];
+        this.mcp = null;
         // Which titled sections are open: project status open, options closed, until toggled.
         this.sections = { status: true, options: false, ...(saved.sections || {}) };
         // Keys of unlisted folders already asked for (sidebarExpand).
@@ -94,6 +96,7 @@ class KigumiSidebar extends LitElement {
             this.groupByPatternbook = message.groupByPatternbook !== false;
             this.isScanning = !!message.isScanning;
             this.options = Array.isArray(message.options) ? message.options : [];
+            this.mcp = message.mcp || null;
             const unlisted = new Set();
             const walk = (nodes) => nodes.forEach((one) => {
                 if (one.lazyDir) unlisted.add(one.key);
@@ -314,7 +317,36 @@ class KigumiSidebar extends LitElement {
                         <input type="checkbox" data-option=${option.key} .checked=${option.value === true}
                             @change=${(event) => post({ type: 'sidebarSetOption', key: option.key, value: event.target.checked })}>
                         <span>${t(option.labelKey)}</span>
-                    </label>`)}
+                    </label>
+                    ${option.key === 'mcp.enabled' && option.value ? this.renderMcp() : nothing}`)}
+            </div>`;
+    }
+
+    /** With the MCP server on: where it is, the setups to copy for each agent, and who is connected. */
+    renderMcp() {
+        const mcp = this.mcp;
+        if (!mcp) return nothing;
+        if (!mcp.running) {
+            return html`<div class="ks-mcp"><div class="ks-mcp-note">${mcp.error || t('sidebar.mcp.starting')}</div></div>`;
+        }
+        const clients = mcp.clients || [];
+        const count = clients.length === 0 ? t('sidebar.mcp.agents.none')
+            : clients.length === 1 ? t('sidebar.mcp.agents.one') : t('sidebar.mcp.agents.many', { count: clients.length });
+        return html`
+            <div class="ks-mcp">
+                <div class="ks-mcp-address">
+                    <input type="text" readonly .value=${mcp.url} aria-label=${t('sidebar.mcp.address')}
+                        @focus=${(event) => event.target.select()}>
+                    <button class="ks-mcp-button" data-copy="address"
+                        @click=${() => post({ type: 'sidebarCopyMcp', client: 'address' })}>${t('sidebar.mcp.copy')}</button>
+                </div>
+                <div class="ks-mcp-note">${t('sidebar.mcp.copyFor')}</div>
+                <div class="ks-mcp-setups">
+                    ${(mcp.setups || []).map((setup) => html`
+                        <button class="ks-mcp-button" data-copy=${setup.id}
+                            @click=${() => post({ type: 'sidebarCopyMcp', client: setup.id })}>${setup.label}</button>`)}
+                </div>
+                <div class="ks-mcp-agents" title=${clients.map((client) => client.name || client.id || '').join(', ')}>${count}</div>
             </div>`;
     }
 

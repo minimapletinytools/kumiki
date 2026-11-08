@@ -93,6 +93,10 @@ class SidebarController {
         if (typeof host.onConfigChange === 'function') {
             this._subscriptions.push(host.onConfigChange(() => this.postState()));
         }
+        // And the MCP server's state: started, stopped, an agent connecting.
+        if (host.mcp && typeof host.mcp.onChange === 'function') {
+            this._subscriptions.push(host.mcp.onChange(() => this.postState()));
+        }
     }
 
     getSelectedElementData() {
@@ -112,6 +116,8 @@ class SidebarController {
             type: 'sidebarState',
             tree,
             options: sidebarOptions(getHost()),
+            // Kigumi's MCP server, where the host runs one: its address, setups and who is connected.
+            mcp: getHost().mcp ? getHost().mcp.state() : null,
             groupByPatternbook: this.model.getGroupByPatternbook(),
             isScanning: this.model.state.isScanning,
         }).catch((error) => this.log(`[sidebar] post failed: ${error.message || error}`));
@@ -150,6 +156,15 @@ class SidebarController {
                 const known = sidebarOptions(getHost()).some((option) => option.key === message.key);
                 if (known && typeof message.value === 'boolean') {
                     await getHost().updateConfig(message.key, message.value);
+                }
+            } else if (message.type === 'sidebarCopyMcp') {
+                const mcp = getHost().mcp;
+                const state = mcp && mcp.state();
+                if (!state || !state.running) return;
+                if (message.client === 'address') {
+                    await getHost().copyText(state.url);
+                } else if (state.setups.some((setup) => setup.id === message.client)) {
+                    mcp.copySetup(message.client);
                 }
             } else if (message.type === 'sidebarExpand') {
                 const folder = this._nodes.get(message.key);

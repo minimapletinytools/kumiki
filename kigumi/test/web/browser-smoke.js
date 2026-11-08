@@ -156,6 +156,23 @@ app.whenReady().then(async () => {
         }
         check('the settings gear turns the MCP server on, and an agent reaches the open project through it',
             folder === dir && running.settings.get('mcp.enabled') === true, `${mcpUrl}; ${folder}`);
+
+        const explorer = 'document.querySelector("#slot-left iframe")?.contentDocument';
+        await js(`(() => {
+            const header = ${explorer}.querySelector('.ks-section[data-section="options"] .ks-section-header');
+            if (header.getAttribute('aria-expanded') !== 'true') header.click();
+        })()`);
+        const mcpBox = await wait(`(() => {
+            const box = ${explorer}.querySelector('.ks-mcp');
+            const address = box && box.querySelector('.ks-mcp-address input');
+            return address && address.value ? { address: address.value, agents: box.querySelector('.ks-mcp-agents').textContent,
+                setups: [...box.querySelectorAll('.ks-mcp-setups button')].map((b) => b.textContent) } : null;
+        })()`, 10000);
+        await sleep(500);
+        fs.writeFileSync(path.join(__dirname, '..', '..', '.artifacts', 'web', 'mcp.png'), (await window.webContents.capturePage()).toPNG());
+        check('with MCP on, Kigumi options shows its address to copy, the setups, and how many agents are connected',
+            Boolean(mcpBox) && mcpBox.address === mcpUrl && mcpBox.setups.includes('Claude Code') && /agent/.test(mcpBox.agents),
+            JSON.stringify(mcpBox));
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'run', args: ['kigumi.openFrameFromSidebar', ${JSON.stringify(frame)}] })`);
         const doc = 'document.querySelector("#slot-center iframe:not([hidden])")?.contentDocument';
         const canvas = await wait(`${doc}?.querySelector('canvas')?.width`, 120000);
@@ -220,6 +237,28 @@ app.whenReady().then(async () => {
         check('a browser with no settings of its own starts with the agent off',
             await wait("document.querySelector('#toggle-right') && document.querySelector('#toggle-right').hidden", 20000) === true
             && running.settings.get('agent.enabled', false) === false);
+
+        // A second tab takes over; the first says so, and takes it back with Use here.
+        const second = new BrowserWindow({ width: 1200, height: 900, show: false, webPreferences: { backgroundThrottling: false } });
+        await second.loadURL(running.origin);
+        const secondRows = async () => second.webContents.executeJavaScript(
+            'document.querySelector("#slot-left iframe")?.contentDocument?.querySelectorAll(".ks-row").length || 0').catch(() => 0);
+        let rows = 0;
+        for (let i = 0; i < 80 && rows === 0; i++) {
+            rows = await secondRows();
+            if (!rows) await sleep(250);
+        }
+        const firstCovered = await wait("!!document.getElementById('web-taken-over')", 10000);
+        check('a second tab takes Kigumi over, and the first one says so', rows > 0 && firstCovered === true, `${rows} rows`);
+        await js("document.querySelector('#web-taken-over button').click()");
+        let secondCovered = false;
+        for (let i = 0; i < 80 && !secondCovered; i++) {
+            secondCovered = await second.webContents.executeJavaScript("!!document.getElementById('web-taken-over')").catch(() => false);
+            if (!secondCovered) await sleep(250);
+        }
+        const firstWorks = await wait('document.querySelector("#slot-left iframe")?.contentDocument?.querySelectorAll(".ks-row").length', 20000);
+        check('Use here takes it back', secondCovered && firstWorks > 0);
+        second.destroy();
 
         check('no content security policy violations', violations.length === 0, violations.slice(0, 2).join(' | '));
     } catch (error) {

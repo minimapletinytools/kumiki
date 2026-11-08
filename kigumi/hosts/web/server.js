@@ -1,6 +1,7 @@
 /**
  * Kigumi in a browser: an HTTP server on the loopback interface that runs Kigumi's core and its
- * Python runner, and serves the app's shell, explorer and viewers to one browser tab.
+ * Python runner, and serves the app's shell, explorer and viewers to one browser tab at a time (the
+ * newest; the one before offers to take it back).
  *
  * The browser holds the projects (hosts/web/web-projects.js keeps them in IndexedDB). The one open
  * is written into a working folder under the data folder, whose .venv links to one shared Python
@@ -119,9 +120,17 @@ function createWebServer({ pages, onMessage, onDisconnect = () => {} }) {
             }
             if (request.method !== 'GET') return reply(response, 405);
             if (pathname === '/events') {
-                if (stream) return reply(response, 409, 'Kigumi is open in another tab. Close it, then reload this one.');
                 const id = url.searchParams.get('client');
                 if (!id || !/^[a-zA-Z0-9-]{1,80}$/.test(id)) return reply(response, 400);
+                // The newest tab takes over: the one before is told, and its stream ends. Only one
+                // tab at a time drives Kigumi; the old one offers to take it back.
+                if (stream) {
+                    const old = stream;
+                    stream = null;
+                    client = null;
+                    old.write(`data: ${JSON.stringify({ type: 'web:takenOver' })}\n\n`);
+                    old.end();
+                }
                 client = id;
                 stream = response;
                 response.writeHead(200, {
@@ -131,6 +140,8 @@ function createWebServer({ pages, onMessage, onDisconnect = () => {} }) {
                 const heartbeat = setInterval(() => response.write(': heartbeat\n\n'), 15000);
                 response.on('close', () => {
                     clearInterval(heartbeat);
+                    // A tab taken over has already given way; only the current one's leaving matters.
+                    if (stream !== response) return;
                     stream = null;
                     client = null;
                     onDisconnect();
@@ -186,6 +197,11 @@ function sharedVenv(venv) {
         throw new Error(`No Python environment at ${candidate}. Make one with kumiki installed, and pass it as --venv.`);
     }
     return fs.realpathSync(candidate);
+}
+
+/** A project's name as a folder name. */
+function folderName(name) {
+    return name.replace(/[^\w .-]+/g, '_').replace(/^[ ._]+|[ ._]+$/g, '') || 'project';
 }
 
 /** Make `dir` a project Kigumi can run: its .venv the shared one, and the project's marker files. */
@@ -456,8 +472,10 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
             if (old) await old.dispose();
             project = null;
             if (next) {
-                const dir = path.join(projectsDir, next.id);
-                fs.rmSync(dir, { recursive: true, force: true });
+                // Under its id, so names can repeat; named for the project, which is what shows.
+                const home = path.join(projectsDir, next.id);
+                const dir = path.join(home, folderName(next.name));
+                fs.rmSync(home, { recursive: true, force: true });
                 prepareProjectDir(dir, python);
                 writeProjectFiles(dir, next.files || {});
                 if (starter && !fs.existsSync(path.join(dir, 'my_cute_frame.py'))) {

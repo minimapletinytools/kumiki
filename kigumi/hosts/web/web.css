@@ -45,3 +45,38 @@
     font-size: 12px;
     cursor: pointer;
 }
+
+/* Over a tab another tab has taken Kigumi from (transport.js). */
+.web-taken-over {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--ka-bg, #fff) 80%, transparent);
+}
+
+.web-taken-over-box {
+    padding: 20px 28px;
+    border: 1px solid var(--ka-border);
+    border-radius: 6px;
+    background: var(--ka-bg, #fff);
+    color: var(--ka-fg);
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.web-taken-over-box p {
+    margin: 0 0 12px;
+}
+
+.web-taken-over-box button {
+    padding: 6px 14px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: var(--ka-accent);
+    color: var(--ka-accent-fg);
+    font: inherit;
+    cursor: pointer;
+}

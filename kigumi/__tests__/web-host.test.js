@@ -64,22 +64,36 @@ describe('browser host HTTP boundary', () => {
         expect(receive).not.toHaveBeenCalled();
     });
 
-    test('delivers messages both ways, and turns away a second tab', async () => {
+    test('delivers messages both ways; a second tab takes over, and the first is told', async () => {
         const response = await fetch(`${origin}/events?client=first`, { signal: controller.signal });
         const reader = response.body.getReader();
         await reader.read();
-        expect((await fetch(`${origin}/events?client=second`)).status).toBe(409);
         web.send({ type: 'shell:state', panels: [] });
         expect(new TextDecoder().decode((await reader.read()).value)).toContain('"type":"shell:state"');
+
+        const second = await fetch(`${origin}/events?client=second`, { signal: controller.signal });
+        expect(second.status).toBe(200);
+        let told = '';
+        for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            told += new TextDecoder().decode(value);
+        }
+        expect(told).toContain('"type":"web:takenOver"');
+        const secondReader = second.body.getReader();
+        await secondReader.read();
+        web.send({ type: 'shell:state', panels: [] });
+        expect(new TextDecoder().decode((await secondReader.read()).value)).toContain('"type":"shell:state"');
         const post = (body, extra = {}) => fetch(`${origin}/message`, {
             method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'X-Kigumi-Client': 'first', ...extra }, body,
         });
-        expect((await post('{')).status).toBe(400);
-        expect((await post('{}')).status).toBe(400);
-        expect((await post('{"type":"shell:ready"}', { 'X-Kigumi-Client': 'second' })).status).toBe(403);
-        expect((await post('{"type":"shell:ready"}')).status).toBe(204);
+        expect((await post('{', { 'X-Kigumi-Client': 'second' })).status).toBe(400);
+        expect((await post('{}', { 'X-Kigumi-Client': 'second' })).status).toBe(400);
+        // Only the tab in charge is listened to.
+        expect((await post('{"type":"shell:ready"}')).status).toBe(403);
+        expect((await post('{"type":"shell:ready"}', { 'X-Kigumi-Client': 'second' })).status).toBe(204);
         expect(receive).toHaveBeenCalledWith({ type: 'shell:ready' });
-        expect((await post(JSON.stringify({ type: 'panel:message', data: 'x'.repeat(25 * 1024 * 1024) }))).status).toBe(413);
+        expect((await post(JSON.stringify({ type: 'panel:message', data: 'x'.repeat(25 * 1024 * 1024) }), { 'X-Kigumi-Client': 'second' })).status).toBe(413);
     });
 
     test('serves nothing outside the webview assets and its own files', async () => {

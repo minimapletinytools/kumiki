@@ -16,6 +16,9 @@ node hosts/web/server.js --port 8000 --venv /path/to/venv --data ~/.kigumi/web
 
 Node 22+. No build step and no added dependencies.
 
+One tab drives Kigumi at a time: opening it in another tab takes over, and the tab before says so,
+with **Use here** to take it back.
+
 ## Projects live in the browser
 
 The page with no project open lists the projects this browser holds (IndexedDB), with **New
@@ -56,9 +59,10 @@ asks for an OpenRouter key: paste one in its own settings (the gear in its panel
 with the other settings, in this browser, and never shown again. Conversations and the model list
 are kept on the server.
 
-**MCP server** is in the gear's list too, as in the app: Kigumi's tools for agents on the server's
+**MCP server** is in the gear's list and the explorer's Kigumi options, as in the app: Kigumi's tools for agents on the server's
 machine (Claude Code and others), on `127.0.0.1` with a token. "Copy MCP setup for Claude Code"
-puts the command that adds it on the clipboard.
+puts the command that adds it on the clipboard. Turned on, Kigumi options shows its address to copy,
+the setup to copy for each agent, and how many agents are connected.
 
 ## Files
 
@@ -85,7 +89,7 @@ frames run Python with the server account's access. A hosted version needs an au
 gateway and a sandboxed worker per user; see `.claude/plans/kigumi-web-port-findings.md`.
 
 Not here yet: signing in to a Kigumi account (use an OpenRouter key), importing a .zip,
-several tabs at once, and reconnecting after the server restarts (reload the page).
+several tabs driving Kigumi at once, and reconnecting after the server restarts (reload the page).
 
 ## Tests
 
