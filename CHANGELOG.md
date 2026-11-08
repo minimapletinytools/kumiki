@@ -10,6 +10,10 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kumiki
 
+#### Added
+
+- Example frame `ki_kanji`: the kanji 木 in timber, with a splined double butt joint and angled pegged mortise and tenons.
+
 #### Fixed
 
 - A mortise and tenon at an angle with an offset `tenon_position` now starts its tenon, shoulder, mortise and pegs on the mortise face; they used to sit off it, and with `bore_mortise_perpendicular_to_face` the tenon was cropped short. Angled joints with an offset tenon (such as `learn_to_timber_frame_shed`'s knee braces) change shape.
