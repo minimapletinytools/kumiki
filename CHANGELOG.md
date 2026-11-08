@@ -8,6 +8,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-08
+
 ### kumiki
 
 #### Removed
@@ -17,6 +19,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Added
 
 - A tool can take parameters: `Tool(name, description, run, kiwari=kiwari(...))`, and `run` is given the resolved values. A tool without a kiwari is run with nothing, as before.
+- `dovetailed_sawhorse`: `router_template`, a jig for routing a face's outline (two-sided, or guiding along only one pair of sides), and a tool that exports each leg socket's template to STL.
 
 #### Fixed
 
@@ -26,7 +29,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Added
 
-- Kigumi in a browser, with nothing on a server (`kigumi/hosts/pyodide`): the app's shell, explorer, viewers and code editor in the page, and Kigumi's core and kumiki in a Web Worker with Python in Pyodide. Projects live in the browser (IndexedDB), with a projects page that makes, opens, exports (.zip) and deletes them and says they are not saved to disk or the cloud. Build it with `npm run build` there; it is a static site.
+- Kigumi in a browser, at [kumiki.build/try](https://kumiki.build/try/), with nothing on a server (`kigumi/hosts/pyodide`): the app's shell, explorer, viewers and code editor in the page, and Kigumi's core and kumiki in a Web Worker with Python in Pyodide. Projects live in the browser (IndexedDB), with a projects page that makes, opens, exports (.zip) and deletes them and says they are not saved to disk or the cloud. Build it with `npm run build` there; it is a static site.
 - The browser version has the agent panel (off until turned on under Kigumi options), with an OpenRouter key or signed in: signing in opens a tab that comes back to the site's `auth.html`. Its panel says how the agent can be run there. MCP stays in the standalone app.
 - The agent's chat area says to sign in (or, where Kigumi accounts aren't set up, to add an OpenRouter key) until the agent can send requests, and its settings take an OpenRouter key, which is never shown again.
 - With the MCP server on, Kigumi options shows its address to copy, the setup to copy for each agent, and how many agents are connected.
@@ -38,8 +41,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - Switching projects in the standalone app happens in place: the old project's tabs close (asking about unsaved edits) and the explorer starts over on the new one, with no restart. The agent's conversation carries on.
 - The standalone app remembers the project folders it has opened: File > Open Recent, and a Recent list on the welcome page when no folder is open.
 - The view's Parameters tab is now Kiwari: the frame's parameters, then its tools, each with what it does, its own parameters, a Run button, and what it gave shown under it.
-
-### kigumi
+- The tree view has a save button beside the 3D measurements (greyed out with nothing to save), and an eyeball for show/hide.
 
 #### Fixed
 
