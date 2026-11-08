@@ -80,3 +80,20 @@
     font: inherit;
     cursor: pointer;
 }
+
+/* While Python and Kigumi start, the explorer's place is kept, saying so, rather than appearing later. */
+body:not(.kigumi-ready) .shell.is-left-hidden {
+    grid-template-columns: var(--left-width, 300px) 4px minmax(0, 1fr) auto auto;
+}
+
+body:not(.kigumi-ready) .slot-left[hidden] {
+    display: block;
+}
+
+body:not(.kigumi-ready) .slot-left::before {
+    content: "Starting Kigumi…";
+    display: block;
+    padding: 12px 16px;
+    color: var(--ka-fg-muted, #888);
+    font-size: 12px;
+}
