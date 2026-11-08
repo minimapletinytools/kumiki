@@ -65,6 +65,7 @@ const SIDEBAR_TO_HOST = Object.freeze([
     'sidebarRefresh',
     'sidebarRun',
     'sidebarSelect',
+    'sidebarSetOption',
     'sidebarToggleGroup',
 ]);
 

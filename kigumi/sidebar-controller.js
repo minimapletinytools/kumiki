@@ -9,6 +9,22 @@ const { SIDEBAR_TO_HOST } = require('./message-types');
 const { buildWebviewPage } = require('./webview-html');
 const { resolveLocale, loadCatalog } = require('./i18n');
 const { getHost } = require('./host');
+const { FEATURE_FLAGS } = require('./webview/feature-flags');
+
+/**
+ * The switches under "Kigumi options": settings for all of Kigumi, each shown only where the host
+ * has what it switches. `labelKey` is an i18n key; the page labels them.
+ */
+function sidebarOptions(host) {
+    const option = (key, labelKey, fallback = false) => ({ key, labelKey, value: host.getConfig(key, fallback) === true });
+    return [
+        option('viewer.autoRefreshOnFileChange', 'sidebar.options.autoRefresh'),
+        ...(host.agentPanel === true ? [option('agent.enabled', 'sidebar.options.agent')] : []),
+        ...(host.mcp ? [option('mcp.enabled', 'sidebar.options.mcp')] : []),
+        option('viewer.drawingBeta', 'sidebar.options.drawings'),
+        ...(FEATURE_FLAGS.assemblyPreview ? [option('viewer.assemblyPreview', 'sidebar.options.assemblyPreview')] : []),
+    ];
+}
 
 // Template placeholder → file under webview/.
 const SIDEBAR_ASSETS = [
@@ -72,6 +88,11 @@ class SidebarController {
             }),
         );
         this.model.ensureLoaded();
+        // A setting changed anywhere shows in the options at once.
+        const host = getHost();
+        if (typeof host.onConfigChange === 'function') {
+            this._subscriptions.push(host.onConfigChange(() => this.postState()));
+        }
     }
 
     getSelectedElementData() {
@@ -90,6 +111,7 @@ class SidebarController {
         this.surface.postMessage({
             type: 'sidebarState',
             tree,
+            options: sidebarOptions(getHost()),
             groupByPatternbook: this.model.getGroupByPatternbook(),
             isScanning: this.model.state.isScanning,
         }).catch((error) => this.log(`[sidebar] post failed: ${error.message || error}`));
@@ -123,6 +145,12 @@ class SidebarController {
                 this.model.toggleGroupByPatternbook();
             } else if (message.type === 'sidebarRefresh') {
                 await this.model.refresh(true);
+            } else if (message.type === 'sidebarSetOption') {
+                // Only the switches listed, and only on or off.
+                const known = sidebarOptions(getHost()).some((option) => option.key === message.key);
+                if (known && typeof message.value === 'boolean') {
+                    await getHost().updateConfig(message.key, message.value);
+                }
             } else if (message.type === 'sidebarExpand') {
                 const folder = this._nodes.get(message.key);
                 if (folder && folder.lazyDir) {
@@ -161,4 +189,4 @@ class SidebarController {
     }
 }
 
-module.exports = { SidebarController, SIDEBAR_ASSETS, renderSidebarPage };
+module.exports = { SidebarController, SIDEBAR_ASSETS, renderSidebarPage, sidebarOptions };
