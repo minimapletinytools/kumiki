@@ -13,16 +13,15 @@ from PIL import Image, ImageDraw
 
 KIGUMI = Path(__file__).resolve().parents[1]
 
-# The frame, traced from a render of it (pixels, y down): post, tie beam, two braces, pegs. The post is
-# a little wider than drawn, and the pegs bigger, to hold up at icon sizes.
-POST = [(937, 150), (965, 141), (1001.5, 137), (1038, 141), (1066, 150), (1066, 1688), (937, 1688)]
-BEAM_LEFT = [(369, 608), (486, 596), (604, 585), (721, 578), (838, 574), (955, 573), (955, 690), (369, 690)]
-BRACE_LEFT = [(955, 755), (930, 780), (852, 857), (768, 935), (690, 1001), (601, 1074), (511, 1141), (421, 1206),
-              (521, 1306), (955, 875)]
-SQUARE_PEGS = [(870, 647), (1133, 647)]
-ROUND_PEGS = [(970, 800), (1033, 800)]
-PEG = 34  # a peg's size
-MIDDLE = 1001.5
+# The frame, traced from a render of it (pixels, y down): post, tie beam, two braces, pegs.
+POST = [(781, 211), (805, 204), (838, 200), (871, 204), (895, 211), (895, 1560), (781, 1560)]
+BEAM_LEFT = [(215, 597), (328, 581), (441, 569), (555, 561), (668, 556), (781, 554), (781, 696), (215, 696)]
+BRACE_LEFT = [(781, 773), (752, 803), (686, 866), (614, 931), (537, 995), (459, 1052), (380, 1107), (318, 1142),
+              (298, 1159), (418, 1279), (781, 917)]
+SQUARE_PEGS = [(696, 668), (980, 668)]
+ROUND_PEGS = [(801, 825), (875, 825)]
+PEG = 40  # a peg's size, a little bigger than drawn, to hold up at icon sizes
+MIDDLE = 838
 
 
 def mirror(points):
@@ -30,11 +29,12 @@ def mirror(points):
 
 
 # The square the frame sits in, in the same pixels, and its colours.
-VIEW_X, VIEW_Y, VIEW = 102, 13, 1800
-SKY_TOP, SKY_BOTTOM = (206, 226, 199), (173, 203, 164)
-WOOD, WOOD_EDGE = (243, 230, 208), (110, 82, 55)
-BRASS, BRASS_EDGE = (214, 178, 95), (110, 82, 55)
-EDGE = 18  # outline width, in the frame's pixels
+VIEW_X, VIEW_Y, VIEW = 58, 100, 1560
+# Pale timber on the website's rust (website/src/layouts/Layout.astro, --accent), with brass pegs.
+SKY_TOP, SKY_BOTTOM = (190, 96, 44), (140, 56, 18)
+WOOD, WOOD_EDGE = (250, 240, 222), (58, 36, 20)
+BRASS, BRASS_EDGE = (232, 192, 98), (58, 36, 20)
+EDGE = 16  # outline width, in the frame's pixels
 CORNER = 0.22  # the rounded square's corner radius, as a share of its side
 
 SHAPES = [  # (points, fill, outline), back to front
