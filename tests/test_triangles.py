@@ -1,8 +1,10 @@
 import importlib.util
 import math
 from pathlib import Path
+from typing import Sequence
 
 import pytest
+import trimesh
 from sympy import Rational
 
 import kumiki.csg.triangles as triangles
@@ -195,7 +197,7 @@ class TestTriangles:
         assert mesh.volume > 0
         assert mesh.volume < 64.0
 
-    def test_cuts_with_no_ends_are_sized_to_the_solid_they_cut(self):
+    def test_cuts_with_no_ends_are_sized_to_the_solid_they_cut(self, monkeypatch):
         base = RectangularPrism(
             size=create_v2(scalar(2), scalar(2)),
             transform=Transform.identity(),
@@ -211,15 +213,12 @@ class TestTriangles:
         seen = []
         original = triangles._run_boolean
 
-        def spy(operation, meshes):
+        def spy(operation: str, meshes: Sequence[trimesh.Trimesh]) -> trimesh.Trimesh:
             seen.extend(meshes[1:])
             return original(operation, meshes)
 
-        triangles._run_boolean = spy
-        try:
-            mesh = triangulate_cutcsg(Difference(base=base, subtract=[top, hole])).mesh
-        finally:
-            triangles._run_boolean = original
+        monkeypatch.setattr(triangles, "_run_boolean", spy)
+        mesh = triangulate_cutcsg(Difference(base=base, subtract=[top, hole])).mesh
 
         assert mesh.is_watertight
         assert mesh.volume == pytest.approx(4.0 - 0.25 * math.pi * (32 / (2 * math.pi)) * math.sin(2 * math.pi / 32))
@@ -228,6 +227,7 @@ class TestTriangles:
     def test_the_dovetailed_sawhorse_legs_keep_their_cuts(self):
         path = Path(__file__).resolve().parents[1] / "patterns" / "structures" / "dovetailed_sawhorse.py"
         spec = importlib.util.spec_from_file_location("sawhorse_under_test", path)
+        assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         legs = [cut for cut in module.dovetailed_sawhorse().cut_timbers if cut.timber.ticket.path.startswith("leg")]
