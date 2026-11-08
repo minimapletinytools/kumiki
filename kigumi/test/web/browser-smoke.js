@@ -1,7 +1,8 @@
 /**
- * The web version end to end, in Chromium: make a project in the browser, view its starter frame,
- * see a change on the server reach the browser's copy, edit, close, reload, export it as a .zip,
- * open it again from the browser's copy, and delete it.
+ * The web version end to end, in Chromium: turn the agent panel on from the settings (kept in the
+ * browser), make a project in the browser, view its starter frame, see a change on the server reach
+ * the browser's copy, edit, close, reload, export it as a .zip, open it again from the browser's
+ * copy, and delete it; a browser with no settings of its own starts with the agent off.
  *
  * Electron is only the test's Chromium: the page has no preload or Node in it. The server runs in
  * this process, on a fresh data folder, with this checkout's .venv as its Python.
@@ -61,6 +62,30 @@ app.whenReady().then(async () => {
         })()`);
         check('the projects page warns that files live in the browser only', Boolean(page && page.includes('NOT to disk and NOT to the cloud')), page);
 
+        const agentShown = () => js(`(() => {
+            const slot = document.querySelector('#slot-right');
+            const frame = slot && !slot.hidden && slot.querySelector('iframe');
+            return !!(frame && frame.contentDocument && frame.contentDocument.body && frame.contentDocument.body.childElementCount);
+        })()`).catch(() => false);
+        check('the agent panel is off by default', running.settings.get('agent.enabled', false) === false
+            && await js("document.querySelector('#toggle-right').hidden") === true);
+        await js("document.querySelector('#status-settings').click()");
+        await wait("[...document.querySelectorAll('#quickpick-list .item')].some((item) => item.textContent.startsWith('Agent panel'))", 10000);
+        await js("[...document.querySelectorAll('#quickpick-list .item')].find((item) => item.textContent.startsWith('Agent panel')).click()");
+        check('the settings gear turns the agent panel on, and it opens', await wait(`(async () => {
+            const slot = document.querySelector('#slot-right');
+            const frame = slot && !slot.hidden && slot.querySelector('iframe');
+            return !!(frame && frame.contentDocument && frame.contentDocument.body && frame.contentDocument.body.childElementCount);
+        })()`, 20000) === true && running.settings.get('agent.enabled') === true);
+        check('the setting is kept in the browser', await wait(
+            "JSON.parse(localStorage.getItem('kigumi.web.settings') || '{}')['agent.enabled'] === true", 10000) === true);
+        fs.mkdirSync(path.join(__dirname, '..', '..', '.artifacts', 'web'), { recursive: true });
+        fs.writeFileSync(path.join(__dirname, '..', '..', '.artifacts', 'web', 'agent.png'), (await window.webContents.capturePage()).toPNG());
+        await window.reload();
+        check('after a reload, the browser\'s settings are the ones in force',
+            await wait("document.querySelector('#toggle-right') && !document.querySelector('#toggle-right').hidden", 20000) === true
+            && running.settings.get('agent.enabled') === true);
+
         await js(`(() => {
             document.querySelector('.web-new-project input').value = 'Shed';
             document.querySelector('.web-new-project button').click();
@@ -73,6 +98,11 @@ app.whenReady().then(async () => {
         check('New Project makes a project in the browser with the starter frame', Boolean(made), JSON.stringify(made && made.files));
         check('the new project opens', await wait(`document.querySelector('#status-workspace')?.textContent === 'Shed'`, 20000) === true,
             await workspaceName());
+        if (!(await agentShown())) await js("document.querySelector('#toggle-right').click()");
+        check('the agent panel is there with a project open', await wait(`(() => {
+            const frame = document.querySelector('#slot-right:not([hidden]) iframe');
+            return !!(frame && frame.contentDocument && frame.contentDocument.body.childElementCount);
+        })()`, 20000) === true);
 
         const dir = running.project.dir;
         const frame = path.join(dir, 'my_cute_frame.py');
@@ -134,6 +164,12 @@ app.whenReady().then(async () => {
         await js("window.confirm = () => true; [...document.querySelectorAll('.web-project .web-project-action')].find((b) => b.textContent === 'Delete').click()");
         check('Delete removes the project from the browser',
             await wait("window.kigumiWeb.listProjects().length === 0 && !document.querySelector('.web-project')", 10000) === true);
+
+        await js('localStorage.clear()');
+        await window.reload();
+        check('a browser with no settings of its own starts with the agent off',
+            await wait("document.querySelector('#toggle-right') && document.querySelector('#toggle-right').hidden", 20000) === true
+            && running.settings.get('agent.enabled', false) === false);
 
         check('no content security policy violations', violations.length === 0, violations.slice(0, 2).join(' | '));
     } catch (error) {

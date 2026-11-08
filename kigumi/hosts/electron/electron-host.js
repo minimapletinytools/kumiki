@@ -138,6 +138,9 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
         // The explorer lists the workspace's files too (sidebar-model.js); VS Code has its own.
         showsFileBrowser: true,
 
+        // The agent panel can be turned on (agent.enabled); the views' options offer it.
+        agentPanel: true,
+
         // The Log tab, all of it or one view's: what a view's "view log" opens.
         ...(showLog ? { showLog } : {}),
 

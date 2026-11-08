@@ -48,6 +48,8 @@
             window.kigumiWeb.downloadBase64(message.name, message.base64);
         } else if (message.type === 'web:files') {
             window.kigumiWeb.receiveFiles(message);
+        } else if (message.type === 'web:settings') {
+            window.kigumiWeb.storeSettings(message.values);
         } else {
             for (const listener of listeners) listener(message);
         }

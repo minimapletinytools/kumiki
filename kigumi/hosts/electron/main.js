@@ -20,12 +20,10 @@ const { createElectronHost } = require('./electron-host');
 const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
 const { createEditorTabs } = require('../../app-shell/editor-tabs');
+const { createAgentPanel } = require('../../agent/agent-panel');
 const { withRecentFolder, offeredRecentFolders } = require('./recent-folders');
-const { AgentSession } = require('../../agent/agent-session');
 const { createProjectFiles } = require('../../agent/project-files');
 const { createAccount } = require('../../agent/account');
-const { createConversationStore } = require('../../agent/conversation-store');
-const { loadCatalog, resolveLocale } = require('../../i18n');
 const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
 const { findKumikiSource, kumikiExamples, projectPython } = require('../../agent/kumiki-source');
@@ -493,7 +491,6 @@ function runToolCommand(id, args) {
     return handler(args);
 }
 
-let agentSession = null;
 let account = null;
 let modelList = null;
 // A kigumi://auth link that came before the account existed (a cold start from the browser).
@@ -525,7 +522,7 @@ function createAppModelList() {
             load: () => JSON.parse(fs.readFileSync(file, 'utf8')),
             save: (models) => fs.writeFileSync(file, JSON.stringify(models, null, 1)),
         },
-        onChange: () => agentSession && agentSession.postState(),
+        onChange: () => agentPanel && agentPanel.session && agentPanel.session.postState(),
     });
     refreshModels();
 }
@@ -544,7 +541,7 @@ function createAppAccount() {
         // leaves the browser tab loading forever.
         redirectTo: `${config.backendUrl.replace(/\/$/, '')}/auth/callback`,
         openExternal: (url) => electronShell.openExternal(url),
-        onChange: () => agentSession && agentSession.postState(),
+        onChange: () => agentPanel && agentPanel.session && agentPanel.session.postState(),
     });
     const link = pendingAuthLink || process.argv.find((arg) => arg.startsWith('kigumi://auth'));
     pendingAuthLink = null;
@@ -599,42 +596,17 @@ function agentHost() {
     });
 }
 
+// The agent's panel (agent/agent-panel.js), made once the window is.
+let agentPanel = null;
+
 // Shows or hides the agent. Hidden, it keeps its conversation.
 function toggleAgentPanel() {
-    if (!agentEnabled()) return;
-    if (!account) createAppAccount();
-    if (!modelList) createAppModelList();
-    if (connection.findPanel((panel) => panel.type === 'agent')) {
-        connection.setSideShown('right', !connection.layout.right);
-        return;
-    }
-    const surface = connection.createPanel('agent', { title: 'Agent' });
-    agentSession = new AgentSession({
-        host: agentHost(),
-        post: (message) => void surface.postMessage(message),
-        setting: (key, fallback) => settings.get(key, fallback),
-        setSetting: (key, value) => settings.set(key, value),
-        account,
-        models: modelList,
-        conversations: createConversationStore(path.join(app.getPath('userData'), 'conversations')),
-        strings: loadCatalog(resolveLocale(app.getLocale())),
-        log: (line) => logChannel.appendLine(line),
-    });
-    surface.onMessage((message) => agentSession && agentSession.handle(message));
-    surface.onDispose(() => {
-        if (agentSession) agentSession.stop();
-        agentSession = null;
-    });
-    surface.loadUrl(`${ORIGIN}/webview/agent/agent.html`);
-    connection.setSideShown('right', true);
-    refreshModels();
+    if (agentPanel) agentPanel.toggle();
 }
 
 /** Closes the agent panel once `agent.enabled` is turned off. */
 function closeAgentIfDisabled() {
-    if (agentEnabled() || !connection) return;
-    const panel = connection.findPanel((one) => one.type === 'agent');
-    if (panel) panel.dispose();
+    if (agentPanel) agentPanel.closeIfDisabled();
 }
 
 let mcpServer = null;
@@ -855,6 +827,12 @@ function buildMenu() {
                     click: () => runAppCommand('kigumi.toggleAutoRefreshOnFileChange'),
                 },
                 { type: 'separator' },
+                {
+                    label: 'Enable Agent Panel',
+                    type: 'checkbox',
+                    checked: agentEnabled(),
+                    click: () => settings.set('agent.enabled', !agentEnabled()),
+                },
                 ...(agentEnabled() ? [{ label: 'Toggle Agent', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() }] : []),
                 { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcpServer), click: () => copyMcpSetup() },
                 { type: 'separator' },
@@ -932,6 +910,20 @@ async function start() {
         closeRequest: confirmCloseEditor,
     });
     editors = createEditorTabs({ connection, editorUrl: `${ORIGIN}/webview/editor/editor.html`, log, setStatus, askToSave });
+    agentPanel = createAgentPanel({
+        connection,
+        pageUrl: `${ORIGIN}/webview/agent/agent.html`,
+        settings,
+        makeHost: agentHost,
+        prepare: () => {
+            if (!account) createAppAccount();
+            if (!modelList) createAppModelList();
+            return { account, models: modelList };
+        },
+        conversationsDir: path.join(userData, 'conversations'),
+        locale: app.getLocale(),
+        log,
+    });
     mainWindow.on('focus', () => pushShellState());
     // Quitting asks about each editor tab with unsaved edits, as closing one does.
     let closeConfirmed = false;
@@ -969,12 +961,16 @@ async function start() {
     updates.start();
     let checkingForUpdates = settings.get('app.checkForUpdates', true);
 
+    let agentWasEnabled = agentEnabled();
     settings.onChange(() => {
         if (settings.get('app.checkForUpdates', true) !== checkingForUpdates) {
             checkingForUpdates = settings.get('app.checkForUpdates', true);
             updates.start();
         }
         closeAgentIfDisabled();
+        // Turned on just now: show it, rather than leave the user to find its button.
+        if (agentEnabled() && !agentWasEnabled) toggleAgentPanel();
+        agentWasEnabled = agentEnabled();
         buildMenu();
         pushShellState();
         void syncMcpServer();
@@ -983,7 +979,7 @@ async function start() {
     void syncMcpServer();
 
     mainWindow.on('closed', async () => {
-        if (agentSession) agentSession.stop();
+        if (agentPanel) agentPanel.stop();
         updates.stop();
         if (mcpServer) await mcpServer.close();
         const current = kigumiApp;

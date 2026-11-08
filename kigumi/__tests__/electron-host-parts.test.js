@@ -96,6 +96,21 @@ describe('settings', () => {
     expect(fs.readdirSync(dir).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });
 
+  test('replace takes another\'s values whole, telling listeners only what changed', () => {
+    const file = path.join(dir, 'settings.json');
+    const store = new SettingsStore(file, { a: 1 });
+    store.set('a', 2);
+    store.set('b', 'x');
+    const changed = [];
+    store.onChange((key) => changed.push(key));
+
+    store.replace({ b: 'x', c: true });
+
+    expect(changed.sort()).toEqual(['a', 'c']);
+    expect(store.get('a')).toBe(1);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ b: 'x', c: true });
+  });
+
   test('a file gone between delete and recreate changes nothing', () => {
     const file = path.join(dir, 'settings.json');
     const store = new SettingsStore(file, {});

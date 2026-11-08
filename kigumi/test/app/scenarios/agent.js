@@ -58,5 +58,20 @@ module.exports = {
         const back = await waitFor(async () => menuHasAgent()
             && !(await inShell(`document.querySelector('#toggle-right').hidden`)), { timeoutMs: 5000 }).catch(() => false);
         check('turned back on, the button and menu item return', back);
+        check('turned on, the agent panel opens by itself',
+            await waitFor(() => agentPanel(), { timeoutMs: 5000 }).then(() => true, () => false));
+
+        const enableItem = () => Menu.getApplicationMenu().items.flatMap((item) => (item.submenu ? item.submenu.items : []))
+            .find((item) => item.label === 'Enable Agent Panel');
+        check('Kigumi > Enable Agent Panel is checked while it is on', enableItem() && enableItem().checked === true);
+        enableItem().click();
+        check('and unchecking it turns the agent off', await waitFor(() => settings.get('agent.enabled') === false && !agentPanel(),
+            { timeoutMs: 5000 }).then(() => true, () => false));
+
+        check('a view\'s options offer the agent panel', await openFrame() && await waitFor(() => inShell(`(() => {
+            const doc = document.querySelector('#slot-center iframe:not([hidden])').contentDocument;
+            return !!doc.querySelector('#beta-agent-toggle');
+        })()`), { timeoutMs: 10000 }).then(() => true, () => false));
+        settings.set('agent.enabled', true);
     },
 };

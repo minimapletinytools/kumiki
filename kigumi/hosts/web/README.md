@@ -43,6 +43,18 @@ Server: working folder <data>/projects/<id>/  (.venv → the shared environment)
 - The project page's button in the status bar (the project's name) closes the project and goes
   back to the list.
 
+## Settings and the agent
+
+Kigumi's settings are kept in the browser too (localStorage). The page sends them to the server
+when it connects, and the server's settings file mirrors them; each change goes back to the
+browser. A browser with none of its own starts from the defaults.
+
+The status bar's gear turns settings on and off; **Agent panel** is one (off by default), as is the
+checkbox in a view's options. Turned on, the agent opens on the right. Signing in to a Kigumi
+account doesn't work in a browser yet (it ends on a `kigumi://` link), so give the agent an
+OpenRouter key from its own settings (the gear in its panel). The key is kept with the other
+settings, in this browser. Conversations and the model list are kept on the server.
+
 ## Files
 
 | File | |
@@ -67,8 +79,8 @@ leave the working folder. These are local browser boundaries: there is no user a
 frames run Python with the server account's access. A hosted version needs an authenticated
 gateway and a sandboxed worker per user; see `.claude/plans/kigumi-web-port-findings.md`.
 
-Not here yet: the AI agent and MCP, importing a .zip, several tabs at once, and reconnecting after
-the server restarts (reload the page).
+Not here yet: signing in to a Kigumi account (use an OpenRouter key), MCP, importing a .zip,
+several tabs at once, and reconnecting after the server restarts (reload the page).
 
 ## Tests
 

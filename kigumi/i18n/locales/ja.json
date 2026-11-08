@@ -8,6 +8,7 @@
   "viewer.options.section.beta": "ベータ機能",
   "viewer.options.beta.assemblyPreview": "組み立てプレビュー",
   "viewer.options.beta.drawings": "図面",
+  "viewer.options.beta.agent": "エージェントパネル",
   "viewer.options.beta.mcp": "MCPサーバー(エージェント用)",
   "viewer.options.section.mcp": "MCPサーバー",
   "viewer.options.mcp.serving": "{url} で提供中",

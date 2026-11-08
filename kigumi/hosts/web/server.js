@@ -4,7 +4,8 @@
  *
  * The browser holds the projects (hosts/web/web-projects.js keeps them in IndexedDB). The one open
  * is written into a working folder under the data folder, whose .venv links to one shared Python
- * environment with kumiki; every change made there is sent back to the browser.
+ * environment with kumiki; every change made there is sent back to the browser. So are the
+ * settings: the browser keeps them, and the server's settings file mirrors what it sends.
  */
 
 const http = require('http');
@@ -23,6 +24,15 @@ const { SettingsStore, defaultsFromPackageJson } = require('../electron/settings
 const { LogChannel } = require('../electron/log-channel');
 const { createBrowserHost } = require('./browser-host');
 const { writeProjectFiles, readProjectFiles, watchProjectFiles } = require('./project-files');
+const { createAgentPanel } = require('../../agent/agent-panel');
+const { viewHost } = require('../../agent/agent');
+const { createProjectFiles } = require('../../agent/project-files');
+const { createAccount } = require('../../agent/account');
+const { createModelList } = require('../../agent/models');
+const { backendConfig } = require('../../agent/backend-config');
+const { findKumikiSource, kumikiExamples, projectPython } = require('../../agent/kumiki-source');
+const { pythonKumikiApi } = require('../../agent/kumiki-api');
+const { loadSystemPrompt } = require('../../agent/system-prompt');
 
 const KIGUMI_DIR = path.resolve(__dirname, '../..');
 const packageJson = require('../../package.json');
@@ -275,7 +285,7 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
             progress,
             version: `${packageJson.version} · web`,
             autoRefresh: settings.get('viewer.autoRefreshOnFileChange', true),
-            agent: false,
+            agent: agentPanel.enabled(),
         }),
         onCommand: (id, ...args) => {
             void onCommand(id, ...args).catch((error) => {
@@ -297,6 +307,96 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
         },
     });
 
+    // The agent (agent/agent-panel.js), on the open project. Signing in to a Kigumi account ends on a
+    // kigumi:// link a browser can't take, so here the agent runs on an OpenRouter key (its panel asks).
+    let account = null;
+    let modelList = null;
+    let kumikiSource = null;
+    let kumikiSourceFor = null;
+    const projectDir = () => (project ? project.dir : null);
+    function knownKumikiSource() {
+        if (kumikiSourceFor !== projectDir()) {
+            const asked = projectDir();
+            kumikiSourceFor = asked;
+            kumikiSource = null;
+            if (asked) void findKumikiSource(asked).then((folder) => { if (kumikiSourceFor === asked) kumikiSource = folder; });
+        }
+        return kumikiSource;
+    }
+    // The open project's panels, for the agent, which outlives a project.
+    const livePanels = new Proxy({}, {
+        get(_target, key) {
+            if (key === 'then') return undefined;
+            const panels = kigumiApp && kigumiApp.panels;
+            if (!panels) return typeof key === 'string' ? () => { throw new Error('No project is open.'); } : undefined;
+            const value = panels[key];
+            return typeof value === 'function' ? value.bind(panels) : value;
+        },
+    });
+    function runToolCommand(id, args) {
+        const handler = kigumiApp && kigumiApp.commands[id];
+        if (!handler) throw new Error(`Kigumi has no command ${id}`);
+        return handler(args);
+    }
+    function agentHost() {
+        knownKumikiSource();
+        return viewHost({
+            panels: livePanels,
+            run: runToolCommand,
+            files: createProjectFiles({ root: projectDir, readOnly: () => [kumikiSource, kumikiExamples(kumikiSource)].filter(Boolean) }),
+            workspaceFolders: () => (projectDir() ? [projectDir()] : []),
+            kumikiApi: pythonKumikiApi({ python: () => projectPython(projectDir()), cwd: projectDir }),
+            kumikiSource: knownKumikiSource,
+            kumikiExamples: () => kumikiExamples(knownKumikiSource()),
+            systemPrompt: loadSystemPrompt(),
+        });
+    }
+    const memory = new Map();
+    const agentPanel = createAgentPanel({
+        connection,
+        pageUrl: `${origin}/webview/agent/agent.html`,
+        settings,
+        makeHost: agentHost,
+        prepare: () => {
+            const config = backendConfig(process.env);
+            if (!account) {
+                account = createAccount({
+                    ...config,
+                    storage: { getItem: (key) => (memory.has(key) ? memory.get(key) : null),
+                        setItem: (key, value) => memory.set(key, value), removeItem: (key) => memory.delete(key) },
+                    redirectTo: `${String(config.backendUrl || '').replace(/\/$/, '')}/auth/callback`,
+                    openExternal: async (url) => connection.send({ type: 'browser:external', url }),
+                    onChange: () => agentPanel.session && agentPanel.session.postState(),
+                });
+            }
+            if (!modelList) {
+                const file = path.join(dataDir, 'models.json');
+                modelList = createModelList({
+                    backendUrl: config.backendUrl,
+                    storage: { load: () => JSON.parse(fs.readFileSync(file, 'utf8')),
+                        save: (models) => fs.writeFileSync(file, JSON.stringify(models, null, 1)) },
+                    onChange: () => agentPanel.session && agentPanel.session.postState(),
+                });
+            }
+            return { account, models: modelList };
+        },
+        conversationsDir: path.join(dataDir, 'conversations'),
+        locale: 'en',
+        log,
+    });
+
+    /** The settings quick pick, the status bar's gear: the switches people look for. */
+    async function chooseSetting() {
+        const onOff = (key, fallback = false) => (settings.get(key, fallback) === true ? 'on' : 'off');
+        const picked = await connection.pick([
+            { label: `Agent panel: ${onOff('agent.enabled')}`, value: 'agent.enabled' },
+            { label: `Auto refresh on file change: ${onOff('viewer.autoRefreshOnFileChange', true)}`, value: 'viewer.autoRefreshOnFileChange' },
+        ], 'Turn a setting on or off (kept in this browser)');
+        if (picked && picked.value) {
+            settings.set(picked.value, settings.get(picked.value, picked.value === 'viewer.autoRefreshOnFileChange') !== true);
+        }
+    }
+
     function sendProjectFiles(update) {
         if (project) web.send({ type: 'web:files', id: project.id, name: project.name, ...update });
     }
@@ -304,7 +404,7 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
     function startKigumi() {
         setHost(createBrowserHost({
             connection, workspaceFolder: project ? project.dir : null, settings, runCommand, setStatus, setProgress,
-            editors, showLog: openLog, log,
+            editors, showLog: openLog, log, agentPanel: true,
         }));
         kigumiApp = createKigumiApp({ extensionPath: KIGUMI_DIR, storagePath: path.join(dataDir, 'tools'), channel });
         kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
@@ -318,7 +418,7 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
             if (!(await editors.confirmClose(id))) return false;
         }
         for (const panel of [...connection.panels.values()]) {
-            if (panel.type !== 'log') panel.dispose();
+            if (panel.type !== 'log' && panel.type !== 'agent') panel.dispose();
         }
         return true;
     }
@@ -402,20 +502,34 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
         } else if (id === 'openLog') {
             openLog();
         } else if (id === 'openSettings') {
-            setStatus('info', `The web host's settings are in ${settings.filePath} on the server.`);
+            await chooseSetting();
+        } else if (id === 'toggleAgent') {
+            agentPanel.toggle();
+        } else if (id === 'web:settings') {
+            settings.replace((args[0] || {}).values);
         }
     }
 
     startKigumi();
-    const subscription = settings.onChange(() => connection.pushState());
+    let agentWasEnabled = agentPanel.enabled();
+    const subscription = settings.onChange(() => {
+        // The browser keeps the settings: each change goes back to it.
+        web.send({ type: 'web:settings', values: settings.values });
+        agentPanel.closeIfDisabled();
+        if (agentPanel.enabled() && !agentWasEnabled) agentPanel.toggle();
+        agentWasEnabled = agentPanel.enabled();
+        connection.pushState();
+    });
     return {
         origin,
         connection,
         get app() { return kigumiApp; },
         get project() { return project; },
+        settings,
         switchProject,
         async close() {
             subscription.dispose();
+            agentPanel.stop();
             if (projectWatch) projectWatch.dispose();
             await web.close();
             connection.dispose();

@@ -4,10 +4,14 @@
  *
  * The server works on a copy of the open project and sends back every change (`web:files`), which
  * is stored here, so closing the tab loses nothing. Nothing is saved to disk or to the cloud.
+ *
+ * Kigumi's settings are kept here too (localStorage): sent to the server when the page connects,
+ * and stored again each time they change (`web:settings`).
  */
 (function () {
     'use strict';
 
+    const SETTINGS_KEY = 'kigumi.web.settings';
     const DB_NAME = 'kigumi-web';
     const STORE = 'projects';
     const WARNING = 'Your files are saved to browser cache, NOT to disk and NOT to the cloud. '
@@ -190,14 +194,35 @@
         return true;
     }
 
+    function storedSettings() {
+        try {
+            const values = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+            return values && typeof values === 'object' && !Array.isArray(values) ? values : {};
+        } catch (_error) {
+            return {};
+        }
+    }
+
+    function storeSettings(values) {
+        try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(values || {}));
+        } catch (error) {
+            warn(error);
+        }
+    }
+
     window.kigumiWeb = Object.freeze({
         /** Called once by transport.js with how to send to the server. */
         connect(sendMessage) {
             send = sendMessage;
+            // First, before the shell asks for anything: this browser's settings are the ones in force.
+            command('web:settings', { values: storedSettings() });
             reload().catch(warn);
             if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
         },
         receiveFiles: (message) => receiveFiles(message).catch(warn),
+        storeSettings,
+        storedSettings,
         downloadBase64,
         renderWelcome,
         // For tests and the console.

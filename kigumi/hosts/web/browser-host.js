@@ -22,9 +22,10 @@ function languageOf(filePath) {
  * @param {{ open: (filePath: string, line?: number) => any }} options.editors  app-shell/editor-tabs.js
  * @param {(options: {source?: string}) => void} [options.showLog]
  * @param {(line: string) => void} [options.log]
+ * @param {boolean} [options.agentPanel]  whether the agent panel can be turned on
  */
 function createBrowserHost({ connection, workspaceFolder, settings, runCommand, setStatus, setProgress, editors,
-    showLog = null, log = () => {} }) {
+    showLog = null, log = () => {}, agentPanel = false }) {
     function watchFiles(baseDir, glob, { onCreate, onChange, onDelete } = {}) {
         if (!baseDir || !fs.existsSync(baseDir)) {
             return { dispose() {} };
@@ -55,6 +56,7 @@ function createBrowserHost({ connection, workspaceFolder, settings, runCommand, 
     return {
         locale: 'en',
         showsFileBrowser: true,
+        agentPanel,
         ...(showLog ? { showLog } : {}),
         getConfig: (key, fallback) => settings.get(key, fallback),
         updateConfig: async (key, value) => settings.set(key, value),
