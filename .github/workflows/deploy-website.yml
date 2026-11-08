@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the release tags, for Kigumi in the browser
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -39,6 +41,9 @@ jobs:
 
       - name: Build website
         working-directory: website
+        # The repo variable KIGUMI_TRY (true/false) puts Kigumi in the browser at /try, and links to it.
+        env:
+          PUBLIC_KIGUMI_TRY: ${{ vars.KIGUMI_TRY == 'true' && 'true' || 'false' }}
         run: npm run build
 
       - name: Set up uv
@@ -59,6 +64,17 @@ jobs:
 
       - name: Build documentation site
         run: make docs SITE_DIR=website/dist/docs
+
+      # Kigumi in the browser (kigumi/hosts/pyodide) at /try, from the latest kigumi release, not main.
+      - name: Build Kigumi in the browser
+        if: vars.KIGUMI_TRY == 'true'
+        run: |
+          TAG=$(git tag --list 'kigumi-v*' --sort=-v:refname | head -1)
+          echo "Kigumi in the browser from $TAG"
+          git worktree add "$RUNNER_TEMP/try" "$TAG"
+          (cd "$RUNNER_TEMP/try/kigumi" && npm ci --ignore-scripts)
+          (cd "$RUNNER_TEMP/try/kigumi/hosts/pyodide" && npm install && npm run build)
+          cp -R "$RUNNER_TEMP/try/kigumi/hosts/pyodide/dist" website/dist/try
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

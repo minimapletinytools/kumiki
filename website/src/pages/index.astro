@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const tryKigumi = import.meta.env.PUBLIC_KIGUMI_TRY === 'true';
 
 // The five clickable bullets ARE the navigation: the strip selects, the panel
 // slides. Each one has to say how the program works rather than what it is
@@ -163,6 +164,7 @@ const faqs = [
       </p>
       <div class="cta">
         <a class="btn btn-primary" href={`${base}/install`}>Get started</a>
+        {tryKigumi && <a class="btn btn-secondary" href={`${base}/try/`}>Try it in your browser</a>}
         <a class="btn btn-secondary" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">
           View on GitHub
         </a>
