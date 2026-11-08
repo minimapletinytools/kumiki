@@ -348,6 +348,8 @@
   "sidebar.mcp.agents.none": "No agents connected",
   "sidebar.mcp.agents.one": "1 agent connected",
   "sidebar.mcp.agents.many": "{count} agents connected",
+  "sidebar.closeProject": "Close Project",
+  "sidebar.closeProject.desc": "Close its tabs and go back to opening one",
   "sidebar.ui.groupByPatternbook": "Group by patternbook",
   "sidebar.ui.collapseAll": "Collapse all",
   "sidebar.ui.refresh": "Refresh",

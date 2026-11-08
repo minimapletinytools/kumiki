@@ -386,6 +386,7 @@ function openProject() {
         openEditor: openEditorTab,
         showLog: openLogTab,
         mcp: mcpControls,
+        closeProject: () => closeWorkspaceFolder(),
     }));
     kigumiApp = createKigumiApp({
         extensionPath: KIGUMI_DIR,

@@ -348,6 +348,8 @@
   "sidebar.mcp.agents.none": "接続中のエージェントはありません",
   "sidebar.mcp.agents.one": "1件のエージェントが接続中",
   "sidebar.mcp.agents.many": "{count}件のエージェントが接続中",
+  "sidebar.closeProject": "プロジェクトを閉じる",
+  "sidebar.closeProject.desc": "タブを閉じて、プロジェクトを開く画面に戻ります",
   "sidebar.ui.groupByPatternbook": "パターンブックでグループ化",
   "sidebar.ui.collapseAll": "すべて折りたたむ",
   "sidebar.ui.refresh": "更新",

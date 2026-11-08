@@ -508,6 +508,7 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
         setHost(createBrowserHost({
             connection, workspaceFolder: project ? project.dir : null, settings, runCommand, setStatus, setProgress,
             editors, showLog: openLog, log, agentPanel: true, mcp: mcp.controls,
+            closeProject: () => switchProject(null),
         }));
         kigumiApp = createKigumiApp({ extensionPath: KIGUMI_DIR, storagePath: path.join(dataDir, 'tools'), channel });
         kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));

@@ -26,7 +26,7 @@ function languageOf(filePath) {
  * @param {object} [options.mcp]  Kigumi's MCP server's controls (agent/mcp-service.js)
  */
 function createBrowserHost({ connection, workspaceFolder, settings, runCommand, setStatus, setProgress, editors,
-    showLog = null, log = () => {}, agentPanel = false, mcp = null }) {
+    showLog = null, log = () => {}, agentPanel = false, mcp = null, closeProject = null }) {
     function watchFiles(baseDir, glob, { onCreate, onChange, onDelete } = {}) {
         if (!baseDir || !fs.existsSync(baseDir)) {
             return { dispose() {} };
@@ -60,6 +60,8 @@ function createBrowserHost({ connection, workspaceFolder, settings, runCommand, 
         agentPanel,
         // Kigumi's MCP server, which the views' options turn on and copy the setup of.
         ...(mcp ? { mcp } : {}),
+        // Project status's Close Project: back to the projects page.
+        ...(closeProject ? { closeProject } : {}),
         ...(showLog ? { showLog } : {}),
         getConfig: (key, fallback) => settings.get(key, fallback),
         updateConfig: async (key, value) => settings.set(key, value),

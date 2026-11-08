@@ -113,6 +113,20 @@ describe('scanning', () => {
 });
 
 describe('status rows', () => {
+  test('Close Project shows only where the host can close a project (not VS Code), and one is open', async () => {
+    const closeRow = async () => {
+      const model = new SidebarModel();
+      await model.refresh(true);
+      return model.getTree().find((node) => node.type === 'closeProjectAction');
+    };
+    expect(await closeRow()).toBeUndefined();
+
+    setHost({ locale: 'en', workspaceRoots: () => workspaceRoots, getConfig: (_key, fallback) => fallback, closeProject: async () => {} });
+    expect((await closeRow()).action).toEqual({ command: 'kigumi.closeProject', arguments: [] });
+    workspaceRoots = [];
+    expect(await closeRow()).toBeUndefined();
+  });
+
   test('an initialized project shows its status and runs the project action', async () => {
     const model = new SidebarModel();
     await model.refresh(true);

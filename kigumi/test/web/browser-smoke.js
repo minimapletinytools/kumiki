@@ -225,6 +225,17 @@ app.whenReady().then(async () => {
             && !!document.querySelector('#slot-center iframe:not([hidden])')?.contentDocument?.querySelector('.monaco-editor')`, 30000);
         check('a file opens in an editor tab', editor === true);
 
+        await js(`(() => {
+            const row = [...${'document.querySelector("#slot-left iframe").contentDocument'}.querySelectorAll('.ks-status-action')]
+                .find((one) => one.textContent.includes('Close Project'));
+            row.click();
+        })()`);
+        check('Project status\'s Close Project goes back to the projects page, closing the tabs',
+            await wait(`!!document.querySelector('.web-project') && !document.querySelector('#web-storage-warning').hidden
+                && ![...document.querySelectorAll('.tab')].some((tab) => tab.textContent.includes('my_cute_frame'))`, 20000) === true
+            && running.project === null);
+        await js("document.querySelector('.web-project .welcome-recent-folder').click()");
+        await wait(`document.querySelector('#status-workspace')?.textContent === 'Shed'`, 20000);
         await js("document.querySelector('#status-workspace').click()");
         check('the status bar\'s project button goes back to the projects page',
             await wait(`!!document.querySelector('.web-project') && !document.querySelector('#web-storage-warning').hidden`, 20000) === true);
