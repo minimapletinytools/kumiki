@@ -23,6 +23,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Added
 
 - The agent's chat area says to sign in (or, where signing in isn't available, to add an OpenRouter key) until the agent can send requests, and its settings take an OpenRouter key, which is never shown again.
+- The web version has the agent's project tools too, by name, for the built-in agent and over MCP.
 - With the MCP server on, Kigumi options shows its address to copy, the setup to copy for each agent, and how many agents are connected.
 - The web version: opening Kigumi in a second tab takes over, and the first tab says so, with **Use here** to take it back. A web project's working folder is named for the project.
 - The explorer's top is two titled sections: **Project status** (open) and **Kigumi options** (closed until opened), with switches for auto refresh, the agent panel, the MCP server and the beta features. The frames, examples and patterns tree stays below, always open.

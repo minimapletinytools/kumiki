@@ -47,3 +47,12 @@ test('only a host that can switch projects offers the tools', () => {
     expect(names(viewHost({ ...base, projects: projects() }))).toEqual(
         expect.arrayContaining(['list_projects', 'open_project', 'new_project', 'close_project']));
 });
+
+test('where projects are named (the web version), the tools say name, not path', () => {
+    const named = Object.fromEntries(createProjectTools({ ...projects(), byName: true }).map((tool) => [tool.name, tool]));
+    const folders = Object.fromEntries(createProjectTools(projects()).map((tool) => [tool.name, tool]));
+    expect(named.open_project.shape.folder.description).toContain('name');
+    expect(named.open_project.shape.folder.description).not.toContain('absolute');
+    expect(folders.open_project.shape.folder.description).toContain('absolute path');
+    expect(named.list_projects.description).toContain('browser');
+});

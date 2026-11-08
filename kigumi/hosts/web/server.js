@@ -167,6 +167,8 @@ function createWebServer({ pages, onMessage, onDisconnect = () => {} }) {
     });
     return {
         server,
+        /** Whether a browser tab is connected. */
+        get connected() { return Boolean(stream); },
         send(message) {
             if (stream && !stream.write(`data: ${JSON.stringify(message)}\n\n`)) {
                 // End a stalled stream before geometry messages pile up without a bound.
@@ -365,6 +367,7 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
             kumikiApi: pythonKumikiApi({ python: () => projectPython(projectDir()), cwd: projectDir }),
             kumikiSource: knownKumikiSource,
             kumikiExamples: () => kumikiExamples(knownKumikiSource()),
+            projects: webProjects,
             systemPrompt: loadSystemPrompt(),
         });
     }
@@ -416,6 +419,47 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
         copyText: (text) => connection.send({ type: 'browser:clipboard', text }),
     });
 
+    // The agent's project tools (agent/project-tools.js), by name: the projects live in the browser,
+    // which keeps the server told of them (`web:projects`) and opens one when asked (`web:requestOpen`).
+    let knownProjects = [];
+    const pendingOpens = new Map();
+    function settleOpen(id, switched) {
+        const resolve = pendingOpens.get(id);
+        if (resolve) resolve(switched);
+    }
+    const kept = (switched, what) => {
+        if (!switched) throw new Error(`The user kept the project open (an editor had unsaved changes), so ${what} did not happen.`);
+    };
+    const webProjects = {
+        byName: true,
+        current: () => (project ? project.name : null),
+        recent: () => knownProjects.filter((one) => !project || one.id !== project.id).map((one) => one.name),
+        async open(name) {
+            const wanted = String(name).trim().toLowerCase();
+            const found = knownProjects.find((one) => one.id === name) || knownProjects.find((one) => one.name.trim().toLowerCase() === wanted);
+            if (!found) throw new Error(`This browser has no project named "${name}". list_projects lists them.`);
+            if (project && project.id === found.id) return;
+            if (!web.connected) throw new Error('No browser is connected to Kigumi, and the projects live in the browser.');
+            const opened = new Promise((resolve) => pendingOpens.set(found.id, resolve));
+            web.send({ type: 'web:requestOpen', id: found.id });
+            let timer;
+            const timedOut = new Promise((resolve) => { timer = setTimeout(() => resolve('timeout'), 30000); });
+            const result = await Promise.race([opened, timedOut]);
+            clearTimeout(timer);
+            pendingOpens.delete(found.id);
+            if (result === 'timeout') throw new Error(`The browser did not open "${found.name}" within 30 seconds.`);
+            kept(result, `opening ${found.name}`);
+        },
+        async create(name) {
+            const checked = checkProject({ id: require('crypto').randomUUID(), name: String(name) });
+            kept(await switchProject(checked, { starter: true }), `making ${checked.name}`);
+        },
+        async close() {
+            if (!project) throw new Error('No project is open.');
+            kept(await switchProject(null), 'closing it');
+        },
+    };
+
     /** The settings quick pick, the status bar's gear: the switches people look for. */
     async function chooseSetting() {
         const onOff = (key, fallback = false) => (settings.get(key, fallback) === true ? 'on' : 'off');
@@ -464,7 +508,10 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
      */
     function switchProject(next, { starter = false } = {}) {
         const run = async () => {
-            if (!(await closeProjectTabs())) return false;
+            if (!(await closeProjectTabs())) {
+                if (next) settleOpen(next.id, false);
+                return false;
+            }
             if (projectWatch) projectWatch.dispose();
             projectWatch = null;
             const old = kigumiApp;
@@ -502,6 +549,7 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
             // The browser's copy takes whatever the working folder now has, e.g. the starter frame.
             if (project) sendProjectFiles({ full: true, files: readProjectFiles(project.dir) });
             connection.pushState();
+            if (next) settleOpen(next.id, true);
             return true;
         };
         const done = switching.then(run, run);
@@ -542,6 +590,11 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
             await chooseSetting();
         } else if (id === 'toggleAgent') {
             agentPanel.toggle();
+        } else if (id === 'web:projects') {
+            // The browser's list of its projects, which the agent's project tools go by.
+            knownProjects = ((args[0] || {}).projects || [])
+                .filter((one) => one && typeof one.id === 'string' && PROJECT_ID.test(one.id) && typeof one.name === 'string')
+                .map(({ id: projectId, name }) => ({ id: projectId, name }));
         } else if (id === 'web:settings') {
             settings.replace((args[0] || {}).values);
         }

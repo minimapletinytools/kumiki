@@ -53,6 +53,8 @@
     async function reload() {
         const all = await transact('readonly', (store) => store.getAll());
         projects = (all || []).sort((a, b) => b.updated - a.updated);
+        // The server's agent tools go by this list (names only; the files stay here).
+        command('web:projects', { projects: projects.map(({ id, name }) => ({ id, name })) });
         if (lastRender) renderWelcome(...lastRender);
     }
 

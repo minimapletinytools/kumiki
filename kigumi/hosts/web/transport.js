@@ -74,6 +74,9 @@
             window.kigumiWeb.downloadBase64(message.name, message.base64);
         } else if (message.type === 'web:files') {
             window.kigumiWeb.receiveFiles(message);
+        } else if (message.type === 'web:requestOpen') {
+            // An agent asked to open one of this browser's projects.
+            window.kigumiWeb.openProject(message.id);
         } else if (message.type === 'web:settings') {
             window.kigumiWeb.storeSettings(message.values);
         } else {

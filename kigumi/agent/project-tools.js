@@ -15,13 +15,18 @@ const text = (value) => [{ type: 'text', text: typeof value === 'string' ? value
  * @param {(folder: string) => Promise<void>} projects.open  open an existing folder (throws if it isn't one)
  * @param {(folder: string) => Promise<void>} projects.create  make a new project folder, open it and set it up
  * @param {() => Promise<void>} projects.close  close the project, leaving none open
+ * @param {boolean} [projects.byName]  projects are named rather than folders (the web version, whose
+ *     projects live in the browser): `folder` is then a project's name
  */
 function createProjectTools(projects) {
-    const folder = (what) => z.string().describe(`${what} An absolute path.`);
+    const byName = projects.byName === true;
+    const folder = (what, named) => z.string().describe(byName ? named : `${what} An absolute path.`);
     return [
         {
             name: 'list_projects',
-            description: 'The project folder open in Kigumi, if any, and the ones opened recently.',
+            description: byName
+                ? 'The project open in Kigumi, if any, and the others this browser holds, by name.'
+                : 'The project folder open in Kigumi, if any, and the ones opened recently.',
             shape: {},
             effect: 'read',
             run: async () => text({ open: projects.current(), recent: projects.recent() }),
@@ -30,7 +35,7 @@ function createProjectTools(projects) {
             name: 'open_project',
             description: 'Open an existing project folder in Kigumi, in place of the one open: its tabs and '
                 + 'views close. Only when the user asks to switch projects.',
-            shape: { folder: folder('The project folder.') },
+            shape: { folder: folder('The project folder.', 'The project\'s name, as list_projects gives it.') },
             effect: 'edit',
             run: async ({ folder: target }) => {
                 await projects.open(target);
@@ -39,14 +44,18 @@ function createProjectTools(projects) {
         },
         {
             name: 'new_project',
-            description: 'Make a new project (its venv, kumiki and a starter frame) and open it in Kigumi. A folder '
-                + 'that does not exist yet is made; setting up an existing one overwrites nothing. Only when the '
-                + 'user asks for a new project.',
-            shape: { folder: folder('Where the new project goes, e.g. ~/Documents/shed written out in full.') },
+            description: byName
+                ? 'Make a new project in this browser, with a starter frame, and open it in Kigumi. Only when the '
+                    + 'user asks for a new project.'
+                : 'Make a new project (its venv, kumiki and a starter frame) and open it in Kigumi. A folder '
+                    + 'that does not exist yet is made; setting up an existing one overwrites nothing. Only when the '
+                    + 'user asks for a new project.',
+            shape: { folder: folder('Where the new project goes, e.g. ~/Documents/shed written out in full.', 'The new project\'s name.') },
             effect: 'edit',
             run: async ({ folder: target }) => {
                 await projects.create(target);
-                return text(`Made and opened a project in ${target}, with my_cute_frame.py to start from.`);
+                return text(byName ? `Made and opened the project ${target}, with my_cute_frame.py to start from.`
+                    : `Made and opened a project in ${target}, with my_cute_frame.py to start from.`);
             },
         },
         {

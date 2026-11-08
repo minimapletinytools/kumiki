@@ -64,6 +64,10 @@ machine (Claude Code and others), on `127.0.0.1` with a token. "Copy MCP setup f
 puts the command that adds it on the clipboard. Turned on, Kigumi options shows its address to copy,
 the setup to copy for each agent, and how many agents are connected.
 
+The agent's project tools work here too, by name: `list_projects`, `new_project`, `open_project` and
+`close_project`, for the built-in agent and over MCP. The page keeps the server told of the
+browser's projects (names only); opening one asks the page to send it.
+
 ## Files
 
 | File | |

@@ -150,6 +150,27 @@ app.whenReady().then(async () => {
             try {
                 const answer = await client.callTool({ name: 'get_workspace_folder', arguments: {} });
                 folder = JSON.parse(answer.content[0].text).workspaceFolder;
+
+                // The project tools, over MCP, by name: the projects live in the browser.
+                const call = async (name, args = {}) => {
+                    const result = await client.callTool({ name, arguments: args });
+                    if (result.isError) throw new Error(`${name}: ${result.content[0].text}`);
+                    return result.content[0].text;
+                };
+                const listed = JSON.parse(await call('list_projects'));
+                await call('new_project', { folder: 'Barn' });
+                const barnStored = await wait(`window.kigumiWeb.listProjects().some((p) => p.name === 'Barn' && p.files.includes('my_cute_frame.py'))`, 20000);
+                const barnOpen = running.project && running.project.name === 'Barn';
+                await call('open_project', { folder: 'shed' });
+                const shedBack = running.project && running.project.name === 'Shed';
+                await call('close_project');
+                const closed = running.project === null;
+                await call('open_project', { folder: 'Shed' });
+                const listedAfter = JSON.parse(await call('list_projects'));
+                check('over MCP, an agent lists, makes, opens and closes the browser\'s projects by name',
+                    listed.open === 'Shed' && barnStored === true && barnOpen && shedBack && closed
+                    && listedAfter.open === 'Shed' && listedAfter.recent.includes('Barn'),
+                    JSON.stringify({ listed, barnStored, barnOpen, shedBack, closed, listedAfter }));
             } finally {
                 await client.close();
             }
@@ -158,10 +179,13 @@ app.whenReady().then(async () => {
             folder === dir && running.settings.get('mcp.enabled') === true, `${mcpUrl}; ${folder}`);
 
         const explorer = 'document.querySelector("#slot-left iframe")?.contentDocument';
-        await js(`(() => {
-            const header = ${explorer}.querySelector('.ks-section[data-section="options"] .ks-section-header');
+        // The explorer is made again with each project switch: wait for the new one.
+        await wait(`(() => {
+            const header = ${explorer}?.querySelector('.ks-section[data-section="options"] .ks-section-header');
+            if (!header) return false;
             if (header.getAttribute('aria-expanded') !== 'true') header.click();
-        })()`);
+            return true;
+        })()`, 20000);
         const mcpBox = await wait(`(() => {
             const box = ${explorer}.querySelector('.ks-mcp');
             const address = box && box.querySelector('.ks-mcp-address input');
@@ -230,7 +254,7 @@ app.whenReady().then(async () => {
         await wait("!!document.querySelector('.web-project')", 20000);
         await js("window.confirm = () => true; [...document.querySelectorAll('.web-project .web-project-action')].find((b) => b.textContent === 'Delete').click()");
         check('Delete removes the project from the browser',
-            await wait("window.kigumiWeb.listProjects().length === 0 && !document.querySelector('.web-project')", 10000) === true);
+            await wait("!window.kigumiWeb.listProjects().some((p) => p.name === 'Shed') && document.querySelectorAll('.web-project').length === 1", 10000) === true);
 
         await js('localStorage.clear()');
         await window.reload();
