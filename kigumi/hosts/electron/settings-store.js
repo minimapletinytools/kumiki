@@ -137,6 +137,18 @@ class SettingsStore {
         this._fire(key);
     }
 
+    /** Replace every value with `values` (what someone else keeps, e.g. a browser), telling listeners what changed. */
+    replace(values) {
+        const before = this.values;
+        this.values = values && typeof values === 'object' && !Array.isArray(values) ? { ...values } : {};
+        this._write();
+        for (const key of new Set([...Object.keys(before), ...Object.keys(this.values)])) {
+            if (JSON.stringify(before[key]) !== JSON.stringify(this.values[key])) {
+                this._fire(key);
+            }
+        }
+    }
+
     dispose() {
         if (this.watcher) this.watcher.close();
         this.watcher = null;

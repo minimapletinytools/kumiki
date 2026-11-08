@@ -1,64 +1,94 @@
-# Kumiki in Pyodide (spike)
+# Kigumi in a browser
 
-Can kumiki run inside a web page, so Kigumi could live at kumiki.build/try with nothing to host? This
-folder is the first test of that: kumiki in [Pyodide](https://pyodide.org), in Node, with Manifold's
-WebAssembly build standing in for `manifold3d`.
+Kigumi as a static website: the app's shell, explorer, viewers and code editor in the page, and
+Kigumi's core and kumiki running in the browser itself, in a Web Worker with Python in
+[Pyodide](https://pyodide.org). Nothing runs on a server, so the built folder can go anywhere static
+files are served, such as kumiki.build/try.
+
+## Try it
 
 ```sh
-cd kigumi/hosts/pyodide && npm install
-node run-frame.mjs <repo> <repo>/patterns/structures/my_cute_frame.py my_cute_frame
+cd kigumi/hosts/pyodide
+npm install
+npm run build        # dist/: the site, with kumiki built from this checkout (uv build)
+npm run serve        # http://127.0.0.1:8123/
 ```
 
-`compare.py` builds a frame and meshes every timber, and prints each one's volume, face count and
-whether it is watertight, with timings. Run it natively for the reference:
-`.venv/bin/python kigumi/hosts/pyodide/compare.py <frame.py> <function>`.
+Open the page, make a project, and open its starter frame from the explorer. The first load fetches
+Pyodide (from jsDelivr), kumiki's packages and trimesh (from PyPI), so it needs the network.
 
-## What runs where
+## How it works
 
-- **Pyodide 0.28.3 (Python 3.13)** ships sympy, numpy, lxml, networkx, scipy and typing-extensions.
-  trimesh is pure Python and comes from PyPI (micropip).
-- **manifold3d** has no Pyodide build. kumiki uses only its booleans (`_manifold_boolean` in
-  `kumiki/csg/triangles.py`), so `manifold3d.py` here plays that part over npm `manifold-3d` (the
-  official WebAssembly build, which browser CAD tools such as OpenSCAD's playground use): a
-  `Manifold` from a `Mesh64`, `batch_boolean`, subtraction, `to_mesh64`.
-- kumiki itself loads from the repo unchanged.
+```text
+Page (dist/index.html)                         Web Worker (dist/worker.js)
+  the app's shell, explorer, viewers, editor     Kigumi's core (kigumi-app, the runner session, ...)
+  page/web-projects.js: projects (IndexedDB),      worker/shims/: fs over Pyodide's files, Python
+    settings (localStorage), the projects page       "processes" run in Pyodide, os, crypto, https
+  page/transport.js: messages to the worker   ⇄  Pyodide: kumiki (a wheel built from this checkout),
+    and panel pages shown as blobs                  manifold3d.py over Manifold's WebAssembly build,
+                                                     python/kigumi_pyodide.py: runner.py, a request
+                                                     at a time
+```
 
-## Findings (2026-11-07)
+- **The core is unchanged.** `build.mjs` bundles it with esbuild, with Node's modules played by
+  `worker/shims/`: files are Pyodide's (in memory, the same ones Python sees), and spawning Python
+  runs it in Pyodide (`python -c`, `-m`, a script, or `runner.py`, which `kigumi_pyodide.py` feeds
+  one request at a time and whose background jobs run after each reply: Pyodide has no threads).
+  Each bundled file gets its `__dirname` in Pyodide's file system, where `kigumi-files.json` puts
+  `runner.py`, the page templates, the translations and the docs.
+- **Projects live in the browser** (IndexedDB), as the projects page says: not on disk and not in
+  the cloud. Opening one writes its files into Pyodide's file system; every change there (an editor
+  save, a saved drawing) goes back to the browser's copy. Export .zip downloads a project; files
+  written to `kigumi_exports/` (an STL) download too. Settings are kept in localStorage.
+- **manifold3d** has no Pyodide build, and kumiki uses only its booleans: `manifold3d.py` plays that
+  part over npm `manifold-3d`, Manifold's own WebAssembly build.
+- **Panel pages** are shown as blobs (there is no server to fetch them from). A blob page also gets
+  the policy of the page that made it, so `index.html`'s content security policy allows inline
+  scripts and styles; each panel's own policy still applies on top.
 
-**It works.** kumiki imports and builds frames in Pyodide, and the stand-in meshes them.
+## Precision: kumiki's boxes
+
+Manifold's WebAssembly build hands back float32 vertices. kumiki meshes a half space as a box 2 km
+across and an infinite prism as 100 m long, and at a kilometre float32 is off by over a millimetre,
+enough to lose a cut (a dovetailed sawhorse leg lost 57% of its volume). The browser version sets
+them to 20 m and 10 m (`KUMIKI_TRIANGLES_HALF_SPACE_EXTENT`, `KUMIKI_TRIANGLES_PRISM_EXTENT`), with
+which these frames match native kumiki to within 5e-7 of each timber's volume:
 
 | Frame | Timbers | Mesh time, native | Mesh time, Pyodide |
 | --- | --- | --- | --- |
 | my_cute_frame | 4 | 0.02 s | 0.06 s |
 | dovetailed_sawhorse | 5 | 0.02 s | 0.05 s |
 | cat_corner_cot | 96 | 0.13 s | 0.25 s |
-| oscarshed | 25 | 0.11 s | 0.24 s (0.45 s with 1 km boxes) |
+| oscarshed | 25 | 0.11 s | 0.24 s |
 | tinyhouse120 | 75 | 0.52 s | 0.83 s |
 
-Loading Pyodide and its packages takes about 2.5 s, and importing kumiki about 2-3.5 s, once.
+But the cuts are fragile to those sizes natively too (with the same 20 m / 10 m, native loses cuts
+on two sawhorse legs). The fix is for kumiki to size each box to the solid it cuts.
 
-**Precision: the browser build hands back float32.** Its meshes are float32 in and out (`MeshOptions`
-takes a `tolerance`, which the stand-in sets small). Coordinates near a frame are precise to well
-under a micron in float32, but kumiki meshes a half space as a box 2 km across and infinite prisms
-100 m long, and chains booleans through those: an intersection of two half-space boxes came back
-1.3 mm off at a kilometre, and by the last boolean a sawhorse leg had lost a ¾" face (57% of its
-volume). Replaying the same operands through native manifold3d gives the same wrong answer, so the
-stand-in is faithful; the difference is in what kumiki hands it.
+## Not here yet
 
-With smaller boxes (prisms 10 m, half spaces 20 m) every frame above matches native to within 5e-7
-of each timber's volume, all 205 timbers watertight.
+- The agent and MCP (the agent needs its backend from a worker; MCP needs a server).
+- Importing a .zip as a project.
+- Pyodide and Manifold come from jsDelivr, and trimesh from PyPI: vendor them for working offline.
+- kumiki's boxes sized to the solid (see above).
 
-**But the box size is fragile natively too.** With those same 10 m / 20 m boxes, native manifold3d
-loses cuts on two sawhorse legs (31% of their volume); kumiki's own comment records the same at
-10 km. The cuts survive or not by luck with the box sizes, on both runtimes.
+## Tests and tools
 
-## Next
+```sh
+npm run build && env -u ELECTRON_RUN_AS_NODE ../../node_modules/.bin/electron test/browser-smoke.cjs
+```
 
-1. **kumiki: size each half-space box and infinite prism to the solid it cuts,** not to a fixed
-   size, so the booleans don't depend on luck (native and Pyodide alike). Check with the full test
-   suite and this comparison.
-2. Load kumiki and its packages in a browser page (a Web Worker), with `manifold-3d` from the same
-   origin.
-3. Kigumi's core in the page: run `kigumi/runner.py` in the worker, speaking its JSON-lines
-   protocol, with the project's files in Pyodide's file system (from the browser's storage), and the
-   existing shell, explorer and viewers on top.
+`test/browser-smoke.cjs` serves `dist/` and drives the app in Chromium (Electron as the browser
+only):
+1. It makes a project and builds its starter frame in a view, then opens the file in the editor.
+2. It checks that a change reaches the browser's copy, and that Example Frames and kumiki's patterns
+   are listed.
+3. It builds the 75-timber tiny house.
+4. It reloads, exports the .zip and checks it, reopens the project and deletes it.
+5. It checks there are no policy violations or page errors.
+
+Screenshots go to `test-artifacts/`.
+
+- `test/node-runner.mjs`: the worker's Python in Node, to debug the runner bridge without a browser.
+- `run-frame.mjs` and `compare.py`: build a frame in Pyodide (or natively) and print each timber's
+  volume and faces, to compare the two; `record_booleans.py` records one leg's booleans.

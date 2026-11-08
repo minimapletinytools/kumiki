@@ -24,10 +24,14 @@ SKIP_DIRS = {"__pycache__", "node_modules", "dist", "build", ".git", ".hg", ".sv
 
 
 def _might_contain_patternbook(src: str) -> bool:
-    return bool(re.search(r"^\s*patterns\s*=", src, flags=re.M))
+    # @pattern("group/name") above each pattern's function; `patterns = [...]` in older files.
+    return bool(re.search(r"^\s*(@pattern\b|patterns\s*=)", src, flags=re.M))
 
 
 def _might_contain_example(src: str) -> bool:
+    # @frame above a frame's function; `example =` or build_frame in older files.
+    if re.search(r"^\s*@frame\b", src, flags=re.M):
+        return True
     if re.search(r"^\s*example\s*=", src, flags=re.M):
         return True
     if re.search(r"^\s*def\s+build_frame\s*\(", src, flags=re.M):
@@ -72,6 +76,10 @@ def _extract_pattern_names_from_source(file_path: str) -> List[str]:
         return []
 
     names: List[str] = []
+
+    # @pattern("group/name")
+    for m in re.finditer(r'^\s*@pattern\(\s*[\'\"]([^\'\"]+)[\'\"]', src, flags=re.M):
+        names.append(m.group(1))
 
     # PatternMetadata("name", [...], "frame")
     for m in re.finditer(r'PatternMetadata\(\s*[\'\"]([^\'\"]+)[\'\"]', src):
@@ -206,7 +214,9 @@ def _collect_site_roots() -> List[str]:
     except Exception:
         pass
 
-    return sorted(site_roots)
+    # One entry per folder: the same one can come under two spellings (Pyodide's purelib and
+    # getsitepackages), and would list kumiki's examples twice.
+    return sorted({os.path.realpath(root) for root in site_roots})
 
 
 def _prioritize_site_packages(site_roots: List[str]) -> None:

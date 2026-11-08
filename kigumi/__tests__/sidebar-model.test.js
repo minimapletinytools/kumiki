@@ -113,6 +113,17 @@ describe('scanning', () => {
 });
 
 describe('status rows', () => {
+  test('when the newest kumiki can\'t be looked up, it says what is installed, with no update to offer', async () => {
+    const model = new SidebarModel();
+    await model.refresh(true);
+    model._state.kumikiInstalledVersion = '0.9.0';
+    model._state.kumikiLatestVersion = 'unknown';
+    const row = model.getTree().find((node) => node.type === 'kumikiVersionAction');
+    expect(row.key).toBe('kumiki-version-installed');
+    expect(row.label).toBe('Kumiki v0.9.0');
+    expect(row.action).toBeUndefined();
+  });
+
   test('Close Project shows only where the host can close a project (not VS Code), and one is open', async () => {
     const closeRow = async () => {
       const model = new SidebarModel();

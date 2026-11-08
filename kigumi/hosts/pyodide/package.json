@@ -1,10 +1,19 @@
 {
   "name": "kigumi-pyodide-spike",
   "private": true,
-  "description": "Kumiki in Pyodide, with Manifold's WebAssembly build standing in for manifold3d. See README.md.",
-  "type": "module",
+  "description": "Kigumi in a browser: Kigumi's core in a Web Worker, with kumiki in Pyodide. See README.md.",
   "dependencies": {
     "manifold-3d": "3.5.4",
     "pyodide": "0.28.3"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node serve.mjs",
+    "spike": "node run-frame.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "path-browserify": "1.0.1",
+    "buffer": "6.0.3"
   }
 }

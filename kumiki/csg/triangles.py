@@ -7,6 +7,7 @@ model and trimesh. All SymPy-to-float conversion happens here.
 
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence, Tuple, Union
@@ -34,8 +35,10 @@ from ..rule import Matrix, Numeric, Transform, V2, V3
 TRIANGLES_FLOAT_DIGITS = 8
 # Big enough for any frame, small enough for manifold: at 10 km a half space's box made long
 # sliver triangles that lost cuts (dovetailed sawhorse legs).
-TRIANGLES_PRISM_INFINITE_EXTENT = 100.0
-TRIANGLES_HALF_SPACE_INFINITE_EXTENT = TRIANGLES_PRISM_INFINITE_EXTENT * 10.0
+# The browser version (kigumi/hosts/pyodide) sets smaller ones: its Manifold hands back float32.
+TRIANGLES_PRISM_INFINITE_EXTENT = float(os.environ.get("KUMIKI_TRIANGLES_PRISM_EXTENT", 100.0))
+TRIANGLES_HALF_SPACE_INFINITE_EXTENT = float(os.environ.get("KUMIKI_TRIANGLES_HALF_SPACE_EXTENT",
+                                                            TRIANGLES_PRISM_INFINITE_EXTENT * 10.0))
 TRIANGLES_CYLINDER_SECTIONS = 32
 TRIANGLES_RAY_EPSILON = 1e-8
 TRIANGLES_TINY_COMPONENT_VOLUME_RATIO = 1e-4

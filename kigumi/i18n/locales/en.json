@@ -289,6 +289,8 @@
   "sidebar.initializeProjectAction.desc": "Create .kigumi config and .venv",
   "sidebar.currentWorkspace": "current workspace",
   "sidebar.projectInitialized": "Project Initialized",
+  "sidebar.kumikiInstalled": "Kumiki v{version}",
+  "sidebar.kumikiInstalled.desc": "couldn't check for a newer one",
   "sidebar.kumikiUpToDate": "Kumiki up to date: v{version}",
   "sidebar.kumikiUpToDate.desc": "latest from PyPI",
   "sidebar.updateKumikiAction": "Update Kumiki from v{installed} -> v{latest}",

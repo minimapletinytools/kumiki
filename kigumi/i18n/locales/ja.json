@@ -289,6 +289,8 @@
   "sidebar.initializeProjectAction.desc": ".kigumi設定と.venvを作成します",
   "sidebar.currentWorkspace": "現在のワークスペース",
   "sidebar.projectInitialized": "プロジェクト初期化済み",
+  "sidebar.kumikiInstalled": "Kumiki v{version}",
+  "sidebar.kumikiInstalled.desc": "新しい版を確認できませんでした",
   "sidebar.kumikiUpToDate": "Kumikiは最新です: v{version}",
   "sidebar.kumikiUpToDate.desc": "PyPIの最新版",
   "sidebar.updateKumikiAction": "Kumikiをv{installed}からv{latest}へ更新",

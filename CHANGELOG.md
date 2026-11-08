@@ -22,6 +22,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Added
 
+- Kigumi in a browser, with nothing on a server (`kigumi/hosts/pyodide`): the app's shell, explorer, viewers and code editor in the page, and Kigumi's core and kumiki in a Web Worker with Python in Pyodide. Projects live in the browser (IndexedDB), with a projects page that makes, opens, exports (.zip) and deletes them and says they are not saved to disk or the cloud. Build it with `npm run build` there; it is a static site.
 - The agent's chat area says to sign in (or, where Kigumi accounts aren't set up, to add an OpenRouter key) until the agent can send requests, and its settings take an OpenRouter key, which is never shown again.
 - With the MCP server on, Kigumi options shows its address to copy, the setup to copy for each agent, and how many agents are connected.
 - Project status ends with **Close Project** in the standalone app (not in VS Code, which has its own): its tabs close, asking about unsaved edits, and no project is open.
@@ -34,6 +35,11 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - The view's Parameters tab is now Kiwari: the frame's parameters, then its tools, each with what it does, its own parameters, a Run button, and what it gave shown under it.
 
 ### kigumi
+
+#### Fixed
+
+- The explorer lists kumiki's own patterns and every one of its examples again: discovery looked for the old `patterns = [...]` and `build_frame`, not `@pattern` and `@frame`. Each example is listed once.
+- With the newest kumiki unknown (offline), Project status says which kumiki is installed, rather than offering an update to "vunknown".
 
 #### Changed
 

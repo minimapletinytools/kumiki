@@ -460,7 +460,16 @@ class SidebarModel {
         if (initStatus && initStatus.isInitialized) {
             const installed = this._state.kumikiInstalledVersion || 'unknown';
             const latest = this._state.kumikiLatestVersion || 'unknown';
-            if (installed !== 'unknown' && installed === latest) {
+            if (installed !== 'unknown' && latest === 'unknown') {
+                // The newest couldn't be looked up (offline, or the browser version): say what is installed.
+                nodes.push(node({
+                    key: 'kumiki-version-installed',
+                    type: 'kumikiVersionAction',
+                    label: t('sidebar.kumikiInstalled', { version: installed }),
+                    description: t('sidebar.kumikiInstalled.desc'),
+                    icon: 'package',
+                }));
+            } else if (installed !== 'unknown' && installed === latest) {
                 nodes.push(node({
                     key: 'kumiki-version-up-to-date',
                     type: 'kumikiVersionAction',
