@@ -31,8 +31,7 @@ const { pythonKumikiApi } = require('../../agent/kumiki-api');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { SecureStorage } = require('./secure-storage');
 const { viewHost, sharedTools } = require('../../agent/agent');
-const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
-const { MCP_CLIENTS, mcpSetupText } = require('../../agent/mcp-setup');
+const { createMcpService } = require('../../agent/mcp-service');
 const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
@@ -609,92 +608,22 @@ function closeAgentIfDisabled() {
     if (agentPanel) agentPanel.closeIfDisabled();
 }
 
-let mcpServer = null;
-let mcpError = null;
-const mcpListeners = new Set();
+// Kigumi's MCP server (agent/mcp-service.js), made once the window is.
+let mcp = null;
 
-/** The MCP server as the options panel shows it: on or off, where, and who has been talking to it. */
-function mcpState() {
-    return {
-        enabled: settings.get('mcp.enabled', false) === true,
-        running: Boolean(mcpServer),
-        url: mcpServer ? mcpServer.url : null,
-        error: mcpError,
-        clients: mcpServer ? mcpServer.clients() : [],
-        setups: MCP_CLIENTS.map(({ id, label }) => ({ id, label })),
-    };
-}
-
-function notifyMcp() {
-    const state = mcpState();
-    for (const listener of [...mcpListeners]) {
-        listener(state);
-    }
-}
-
-// What the host offers the views about MCP (host.js, `mcp`).
+// What the host offers the views about MCP (host.js, `mcp`), before and after the server is made.
 const mcpControls = {
-    state: mcpState,
-    onChange(listener) {
-        mcpListeners.add(listener);
-        return { dispose: () => mcpListeners.delete(listener) };
-    },
-    copySetup: (clientId) => copyMcpSetup(clientId),
+    state: () => mcp.controls.state(),
+    onChange: (listener) => mcp.controls.onChange(listener),
+    copySetup: (clientId) => mcp.copySetup(clientId),
 };
 
-// Serves Kigumi's tools over MCP while `mcp.enabled` is on, on the port and token in settings.
-async function syncMcpServer() {
-    const wanted = settings.get('mcp.enabled', false) === true;
-    const port = Number(settings.get('mcp.port', 7345)) || 0;
-    if (mcpServer && (!wanted || mcpServer.port !== port)) {
-        await mcpServer.close();
-        logChannel.appendLine('[mcp] Stopped');
-        mcpServer = null;
-    }
-    if (!wanted) {
-        mcpError = null;
-    }
-    if (!wanted || mcpServer || !kigumiApp) {
-        notifyMcp();
-        return;
-    }
-    let token = settings.get('mcp.token', '');
-    if (!token) {
-        token = newToken();
-        settings.set('mcp.token', token);
-    }
-    try {
-        mcpServer = await startMcpHttpServer({
-            tools: sharedTools(agentHost()),
-            token,
-            port,
-            version: packageJson.version,
-            log: (line) => logChannel.appendLine(line),
-            onClientsChange: notifyMcp,
-        });
-        mcpError = null;
-        logChannel.appendLine(`[mcp] Serving Kigumi's tools at ${mcpServer.url}`);
-    } catch (error) {
-        mcpError = `Could not start on port ${port}: ${error.message || error}`;
-        logChannel.appendLine(`[mcp] ${mcpError}`);
-        setStatus('error', `Kigumi's MCP server could not start on port ${port}: ${error.message || error}`);
-    }
-    notifyMcp();
+function syncMcpServer() {
+    return mcp ? mcp.sync() : Promise.resolve();
 }
 
-// Puts what adds Kigumi to an agent (mcp-setup.js) on the clipboard; Claude Code's by default.
-function copyMcpSetup(clientId = 'claude-code') {
-    if (!mcpServer) {
-        setStatus('warning', 'Turn on the MCP server first (options, beta features).');
-        return;
-    }
-    const text = mcpSetupText(clientId, mcpServer.url, settings.get('mcp.token', ''));
-    if (!text) {
-        return;
-    }
-    require('electron').clipboard.writeText(text);
-    const client = MCP_CLIENTS.find((one) => one.id === clientId);
-    setStatus('info', `Copied the MCP setup for ${client ? client.label : clientId}.`);
+function copyMcpSetup(clientId) {
+    if (mcp) mcp.copySetup(clientId);
 }
 
 function onShellCommand(id, ...args) {
@@ -834,7 +763,7 @@ function buildMenu() {
                     click: () => settings.set('agent.enabled', !agentEnabled()),
                 },
                 ...(agentEnabled() ? [{ label: 'Toggle Agent', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() }] : []),
-                { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcpServer), click: () => copyMcpSetup() },
+                { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcp && mcp.running), click: () => copyMcpSetup() },
                 { type: 'separator' },
                 { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
                 { label: 'Show Log', accelerator: 'CmdOrCtrl+Shift+U', click: () => openLogTab() },
@@ -924,6 +853,15 @@ async function start() {
         locale: app.getLocale(),
         log,
     });
+    mcp = createMcpService({
+        settings,
+        tools: () => sharedTools(agentHost()),
+        ready: () => Boolean(kigumiApp),
+        version: packageJson.version,
+        log,
+        setStatus,
+        copyText: (text) => require('electron').clipboard.writeText(text),
+    });
     mainWindow.on('focus', () => pushShellState());
     // Quitting asks about each editor tab with unsaved edits, as closing one does.
     let closeConfirmed = false;
@@ -981,7 +919,7 @@ async function start() {
     mainWindow.on('closed', async () => {
         if (agentPanel) agentPanel.stop();
         updates.stop();
-        if (mcpServer) await mcpServer.close();
+        if (mcp) await mcp.close();
         const current = kigumiApp;
         kigumiApp = null;
         connection.dispose();

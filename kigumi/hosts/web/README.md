@@ -51,9 +51,14 @@ browser. A browser with none of its own starts from the defaults.
 
 The status bar's gear turns settings on and off; **Agent panel** is one (off by default), as is the
 checkbox in a view's options. Turned on, the agent opens on the right. Signing in to a Kigumi
-account doesn't work in a browser yet (it ends on a `kigumi://` link), so give the agent an
-OpenRouter key from its own settings (the gear in its panel). The key is kept with the other
-settings, in this browser. Conversations and the model list are kept on the server.
+account doesn't work in a browser yet (it ends on a `kigumi://` link), so the agent's chat area
+asks for an OpenRouter key: paste one in its own settings (the gear in its panel). The key is kept
+with the other settings, in this browser, and never shown again. Conversations and the model list
+are kept on the server.
+
+**MCP server** is in the gear's list too, as in the app: Kigumi's tools for agents on the server's
+machine (Claude Code and others), on `127.0.0.1` with a token. "Copy MCP setup for Claude Code"
+puts the command that adds it on the clipboard.
 
 ## Files
 
@@ -79,7 +84,7 @@ leave the working folder. These are local browser boundaries: there is no user a
 frames run Python with the server account's access. A hosted version needs an authenticated
 gateway and a sandboxed worker per user; see `.claude/plans/kigumi-web-port-findings.md`.
 
-Not here yet: signing in to a Kigumi account (use an OpenRouter key), MCP, importing a .zip,
+Not here yet: signing in to a Kigumi account (use an OpenRouter key), importing a .zip,
 several tabs at once, and reconnecting after the server restarts (reload the page).
 
 ## Tests

@@ -77,6 +77,31 @@ app.whenReady().then(async () => {
             const frame = slot && !slot.hidden && slot.querySelector('iframe');
             return !!(frame && frame.contentDocument && frame.contentDocument.body && frame.contentDocument.body.childElementCount);
         })()`, 20000) === true && running.settings.get('agent.enabled') === true);
+        const signIn = await wait(`(() => {
+            const doc = document.querySelector('#slot-right iframe').contentDocument;
+            const note = doc.querySelector('.welcome-sign-in-needed, .welcome-set-key');
+            const shown = [...doc.querySelectorAll('.welcome-sign-in-needed, .welcome-set-key')]
+                .find((one) => one.offsetParent !== null);
+            return shown ? shown.textContent : null;
+        })()`, 10000);
+        check('with no key, the agent\'s chat area asks for an OpenRouter key (signing in can\'t finish in a browser)',
+            Boolean(signIn && signIn.includes('OpenRouter key')), signIn);
+        await js(`(() => {
+            const doc = document.querySelector('#slot-right iframe').contentDocument;
+            doc.getElementById('btn-settings').click();
+            const input = doc.getElementById('setting-openrouter-key');
+            input.value = 'sk-or-web-test';
+            input.dispatchEvent(new Event('change'));
+        })()`);
+        const usingKey = await wait(`(() => {
+            const doc = document.querySelector('#slot-right iframe').contentDocument;
+            return !doc.body.classList.contains('needs-key') && doc.getElementById('route-note').textContent.includes('OpenRouter key')
+                && doc.getElementById('setting-openrouter-key').value === '' && doc.getElementById('setting-openrouter-key-note').textContent;
+        })()`, 10000);
+        check('a key typed in the agent\'s settings is used, kept in the browser, and not shown again',
+            Boolean(usingKey) && running.settings.get('agent.openrouterApiKey') === 'sk-or-web-test'
+            && await js("JSON.parse(localStorage.getItem('kigumi.web.settings') || '{}')['agent.openrouterApiKey'] === 'sk-or-web-test'"),
+            usingKey);
         check('the setting is kept in the browser', await wait(
             "JSON.parse(localStorage.getItem('kigumi.web.settings') || '{}')['agent.enabled'] === true", 10000) === true);
         fs.mkdirSync(path.join(__dirname, '..', '..', '.artifacts', 'web'), { recursive: true });
@@ -106,6 +131,31 @@ app.whenReady().then(async () => {
 
         const dir = running.project.dir;
         const frame = path.join(dir, 'my_cute_frame.py');
+
+        running.settings.set('mcp.port', 0); // any free port, so a Kigumi app already serving MCP is no matter
+        await js("document.querySelector('#status-settings').click()");
+        await wait("[...document.querySelectorAll('#quickpick-list .item')].some((item) => item.textContent.startsWith('MCP server'))", 10000);
+        await js("[...document.querySelectorAll('#quickpick-list .item')].find((item) => item.textContent.startsWith('MCP server')).click()");
+        const deadline = Date.now() + 10000;
+        while (!running.mcp.running && Date.now() < deadline) await sleep(200);
+        let folder = null;
+        const mcpUrl = running.mcp.controls.state().url;
+        if (mcpUrl) {
+            const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
+            const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+            const client = new Client({ name: 'web-smoke-agent', version: '1.0' });
+            await client.connect(new StreamableHTTPClientTransport(new URL(mcpUrl), {
+                requestInit: { headers: { Authorization: `Bearer ${running.settings.get('mcp.token')}` } },
+            }));
+            try {
+                const answer = await client.callTool({ name: 'get_workspace_folder', arguments: {} });
+                folder = JSON.parse(answer.content[0].text).workspaceFolder;
+            } finally {
+                await client.close();
+            }
+        }
+        check('the settings gear turns the MCP server on, and an agent reaches the open project through it',
+            folder === dir && running.settings.get('mcp.enabled') === true, `${mcpUrl}; ${folder}`);
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'run', args: ['kigumi.openFrameFromSidebar', ${JSON.stringify(frame)}] })`);
         const doc = 'document.querySelector("#slot-center iframe:not([hidden])")?.contentDocument';
         const canvas = await wait(`${doc}?.querySelector('canvas')?.width`, 120000);

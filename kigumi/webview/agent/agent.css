@@ -881,3 +881,53 @@ textarea {
     color: var(--ka-muted);
     text-align: center;
 }
+
+/* The welcome while the agent has no way to send requests (status.js showRoute). */
+.welcome-sign-in,
+.welcome-sign-in-needed,
+.welcome-sign-in-buttons,
+.welcome-set-key {
+    display: none;
+}
+body.needs-sign-in .welcome-sign-in,
+body.needs-key .welcome-sign-in,
+body.needs-sign-in .welcome-sign-in-needed,
+body.needs-sign-in .welcome-sign-in-buttons,
+body.needs-key .welcome-set-key {
+    display: block;
+}
+.welcome-sign-in-buttons {
+    margin: 4px 0 0;
+}
+.welcome-sign-in-buttons .sign-in-chip {
+    display: inline-block;
+    width: auto;
+    margin: 0 4px;
+}
+body.needs-sign-in .suggestions,
+body.needs-key .suggestions {
+    display: none;
+}
+.welcome-sign-in p {
+    margin: 0 0 8px;
+    font-weight: 600;
+}
+
+/* The OpenRouter key, in the settings menu: set or replaced here, never shown. */
+.settings-key {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.settings-key input {
+    padding: 4px 6px;
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font: inherit;
+}
+.settings-key-note {
+    font-size: 11px;
+    opacity: 0.75;
+}

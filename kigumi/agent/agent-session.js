@@ -37,6 +37,8 @@ const PANEL_SETTINGS = {
     'agent.planMode': { fallback: false, valid: (value) => typeof value === 'boolean' },
     // The most one step may write, in tokens; the backend allows up to 32k.
     'agent.maxOutputTokens': { fallback: 8000, valid: (value) => [8000, 16000, 32000].includes(value) },
+    // Set from the panel, but never sent back to it: the panel only learns whether one is set.
+    'agent.openrouterApiKey': { fallback: '', valid: (value) => typeof value === 'string' && value.length < 300, secret: true },
 };
 
 /** What the agent says to carry on after a turn that failed. */
@@ -89,7 +91,7 @@ const HANDLERS = {
     },
     'agent:setSetting'({ key, value }) {
         if (!Object.hasOwn(PANEL_SETTINGS, key)) return;
-        if (PANEL_SETTINGS[key].valid(value)) this.setSetting(key, value);
+        if (PANEL_SETTINGS[key].valid(value)) this.setSetting(key, typeof value === 'string' ? value.trim() : value);
         this.postState();
     },
     'agent:listFiles'() {
@@ -200,7 +202,8 @@ class AgentSession {
             model: this.model.id,
             via: route ? route.via : null,
             account: this.account ? this.account.state() : { configured: false },
-            settings: Object.fromEntries(Object.keys(PANEL_SETTINGS).map((key) => [key, this.panelSetting(key)])),
+            settings: Object.fromEntries(Object.keys(PANEL_SETTINGS).map((key) => [key,
+                PANEL_SETTINGS[key].secret ? Boolean(this.panelSetting(key)) : this.panelSetting(key)])),
             strings: this.strings,
         });
     }

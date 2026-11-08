@@ -33,6 +33,9 @@
                     <option value="32000" data-i18n="agent.settings.outputLimit.32000">32k tokens</option>
                 </select></label>
             <label><input id="setting-startup" type="checkbox"> <span data-i18n="agent.settings.startup">Open the agent when Kigumi starts</span></label>
+            <label class="settings-key"><span data-i18n="agent.settings.openrouterKey">OpenRouter key</span>
+                <input id="setting-openrouter-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…"></label>
+            <div id="setting-openrouter-key-note" class="settings-key-note"></div>
         </div>
         <div id="history-menu" class="history-menu" hidden>
             <div id="history-list"></div>
@@ -42,6 +45,15 @@
             <div class="agent-welcome" id="welcome">
                 <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
                 <p data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
+                <!-- Shown instead of the suggestions until the agent has a way to send requests (status.js). -->
+                <div class="welcome-sign-in">
+                    <p class="welcome-sign-in-needed" data-i18n="agent.welcome.signIn">Please sign in to use the agent.</p>
+                    <p class="welcome-sign-in-buttons">
+                        <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
+                        <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
+                    </p>
+                    <p class="welcome-set-key" data-i18n="agent.welcome.setKey">Please add an OpenRouter key in the agent's settings to use the agent.</p>
+                </div>
                 <div class="suggestions">
                     <button class="suggestion-chip" data-i18n="agent.suggest.selected">What do I have selected?</button>
                     <button class="suggestion-chip" data-i18n="agent.suggest.build">Why didn't this frame build?</button>

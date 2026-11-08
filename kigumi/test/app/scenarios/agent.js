@@ -14,6 +14,9 @@ module.exports = {
         const note = await read(`doc.getElementById('route-note').textContent`);
         check('the agent lists the models and, with no key, offers signing in',
             models >= 4 && note.includes('Sign in') && note.includes('GitHub'), `${models} models; ${note}`);
+        const askToSignIn = await read(`[...doc.querySelectorAll('.welcome-sign-in-needed')].some((one) => one.offsetParent !== null)
+            && [...doc.querySelectorAll('.suggestions')].every((one) => one.offsetParent === null)`);
+        check('with no key, the chat area says to sign in, in place of the suggestions', askToSignIn === true);
 
         settings.set('agent.openrouterApiKey', 'sk-or-test');
         await read(`(() => { const select = doc.getElementById('model-select'); select.value = 'claude-haiku-4.5';

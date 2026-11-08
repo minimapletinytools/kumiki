@@ -22,8 +22,9 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Added
 
+- The agent's chat area says to sign in (or, where signing in isn't available, to add an OpenRouter key) until the agent can send requests, and its settings take an OpenRouter key, which is never shown again.
 - An **Agent panel** switch, off by default, in every view's options and in the standalone app's Kigumi menu (Enable Agent Panel); turned on, the agent opens.
-- Kigumi in a browser (`npm run web:start`, see `kigumi/hosts/web/README.md`): the shell, explorer, viewers and code editor, with a Node server running Kigumi and Python. Projects live in the browser (IndexedDB): make, open, export as .zip and delete them from its projects page, which warns that they are not saved to disk or the cloud. Settings are kept in the browser too, and the agent works there (on an OpenRouter key; turn it on from the status bar's gear).
+- Kigumi in a browser (`npm run web:start`, see `kigumi/hosts/web/README.md`): the shell, explorer, viewers and code editor, with a Node server running Kigumi and Python. Projects live in the browser (IndexedDB): make, open, export as .zip and delete them from its projects page, which warns that they are not saved to disk or the cloud. Settings are kept in the browser too, and the agent works there (on an OpenRouter key; turn it on from the status bar's gear), as does the MCP server.
 - The standalone app's start page: New Project… (pick or make a folder, starting in Documents; Kigumi opens it and sets it up) and Open Project…, with Recent projects; with a project open, Browse Patterns and Browse Examples, which open the explorer on those trees. File has New Project…, Open Project…, Open Recent and Close Project. Open Frame File is gone: open frames from the explorer.
 - Agent tools to manage projects in the standalone app: `list_projects`, `new_project`, `open_project` and `close_project`.
 - Switching projects in the standalone app happens in place: the old project's tabs close (asking about unsaved edits) and the explorer starts over on the new one, with no restart. The agent's conversation carries on.

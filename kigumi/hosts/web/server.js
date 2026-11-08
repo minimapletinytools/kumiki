@@ -25,7 +25,8 @@ const { LogChannel } = require('../electron/log-channel');
 const { createBrowserHost } = require('./browser-host');
 const { writeProjectFiles, readProjectFiles, watchProjectFiles } = require('./project-files');
 const { createAgentPanel } = require('../../agent/agent-panel');
-const { viewHost } = require('../../agent/agent');
+const { viewHost, sharedTools } = require('../../agent/agent');
+const { createMcpService } = require('../../agent/mcp-service');
 const { createProjectFiles } = require('../../agent/project-files');
 const { createAccount } = require('../../agent/account');
 const { createModelList } = require('../../agent/models');
@@ -360,8 +361,12 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
         prepare: () => {
             const config = backendConfig(process.env);
             if (!account) {
+                // No sign-in here (see above): an account without its sign-in service, so the panel
+                // asks for an OpenRouter key rather than offering buttons that can't finish.
                 account = createAccount({
                     ...config,
+                    supabaseUrl: null,
+                    supabaseKey: null,
                     storage: { getItem: (key) => (memory.has(key) ? memory.get(key) : null),
                         setItem: (key, value) => memory.set(key, value), removeItem: (key) => memory.delete(key) },
                     redirectTo: `${String(config.backendUrl || '').replace(/\/$/, '')}/auth/callback`,
@@ -385,14 +390,28 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
         log,
     });
 
+    // Kigumi's tools for agents on this machine (Claude Code and others), over MCP, as in the app.
+    const mcp = createMcpService({
+        settings,
+        tools: () => sharedTools(agentHost()),
+        version: packageJson.version,
+        log,
+        setStatus,
+        copyText: (text) => connection.send({ type: 'browser:clipboard', text }),
+    });
+
     /** The settings quick pick, the status bar's gear: the switches people look for. */
     async function chooseSetting() {
         const onOff = (key, fallback = false) => (settings.get(key, fallback) === true ? 'on' : 'off');
         const picked = await connection.pick([
             { label: `Agent panel: ${onOff('agent.enabled')}`, value: 'agent.enabled' },
             { label: `Auto refresh on file change: ${onOff('viewer.autoRefreshOnFileChange', true)}`, value: 'viewer.autoRefreshOnFileChange' },
+            { label: `MCP server, for agents on this machine: ${onOff('mcp.enabled')}`, value: 'mcp.enabled' },
+            ...(mcp.running ? [{ label: 'Copy MCP setup for Claude Code', value: 'copyMcpSetup' }] : []),
         ], 'Turn a setting on or off (kept in this browser)');
-        if (picked && picked.value) {
+        if (picked && picked.value === 'copyMcpSetup') {
+            mcp.copySetup('claude-code');
+        } else if (picked && picked.value) {
             settings.set(picked.value, settings.get(picked.value, picked.value === 'viewer.autoRefreshOnFileChange') !== true);
         }
     }
@@ -404,7 +423,7 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
     function startKigumi() {
         setHost(createBrowserHost({
             connection, workspaceFolder: project ? project.dir : null, settings, runCommand, setStatus, setProgress,
-            editors, showLog: openLog, log, agentPanel: true,
+            editors, showLog: openLog, log, agentPanel: true, mcp: mcp.controls,
         }));
         kigumiApp = createKigumiApp({ extensionPath: KIGUMI_DIR, storagePath: path.join(dataDir, 'tools'), channel });
         kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
@@ -519,17 +538,21 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
         if (agentPanel.enabled() && !agentWasEnabled) agentPanel.toggle();
         agentWasEnabled = agentPanel.enabled();
         connection.pushState();
+        void mcp.sync();
     });
+    void mcp.sync();
     return {
         origin,
         connection,
         get app() { return kigumiApp; },
         get project() { return project; },
         settings,
+        mcp,
         switchProject,
         async close() {
             subscription.dispose();
             agentPanel.stop();
+            await mcp.close();
             if (projectWatch) projectWatch.dispose();
             await web.close();
             connection.dispose();
