@@ -77,15 +77,20 @@ app.whenReady().then(async () => {
             const frame = slot && !slot.hidden && slot.querySelector('iframe');
             return !!(frame && frame.contentDocument && frame.contentDocument.body && frame.contentDocument.body.childElementCount);
         })()`, 20000) === true && running.settings.get('agent.enabled') === true);
-        const signIn = await wait(`(() => {
+        const notice = await wait(`(() => {
             const doc = document.querySelector('#slot-right iframe').contentDocument;
-            const note = doc.querySelector('.welcome-sign-in-needed, .welcome-set-key');
-            const shown = [...doc.querySelectorAll('.welcome-sign-in-needed, .welcome-set-key')]
-                .find((one) => one.offsetParent !== null);
-            return shown ? shown.textContent : null;
+            const box = doc.querySelector('.web-agent-notice');
+            if (!box || box.offsetParent === null) return null;
+            return { text: box.textContent.replace(/\\s+/g, ' ').trim(),
+                signIn: [...box.querySelectorAll('.sign-in-chip')].filter((b) => b.offsetParent !== null).map((b) => b.textContent) };
         })()`, 10000);
-        check('with no key, the agent\'s chat area asks for an OpenRouter key (signing in can\'t finish in a browser)',
-            Boolean(signIn && signIn.includes('OpenRouter key')), signIn);
+        check('the agent panel says how to run the agent here: sign in, MCP, or the app',
+            Boolean(notice) && notice.text.includes('coming soon') && notice.text.includes('MCP') && notice.text.includes('standalone app')
+                && notice.signIn.join() === 'GitHub,Google', JSON.stringify(notice));
+        const callback = await fetch(`${running.origin}/auth/callback?error=access_denied&error_description=Denied`,
+            { headers: { 'Sec-Fetch-Site': 'cross-site' } });
+        check('sign-in comes back to the server, which answers rather than turning the browser away',
+            callback.status === 400 && (await callback.text()).includes("Sign-in didn't finish"), String(callback.status));
         await js(`(() => {
             const doc = document.querySelector('#slot-right iframe').contentDocument;
             doc.getElementById('btn-settings').click();

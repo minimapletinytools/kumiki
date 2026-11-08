@@ -67,7 +67,7 @@ function shellPage(html) {
 }
 
 /** Return an HTTP server and shell transport; reject cross-origin control requests. */
-function createWebServer({ pages, onMessage, onDisconnect = () => {} }) {
+function createWebServer({ pages, onMessage, onDisconnect = () => {}, onAuthCallback = null }) {
     let origin;
     let stream = null;
     let client = null;
@@ -88,8 +88,16 @@ function createWebServer({ pages, onMessage, onDisconnect = () => {} }) {
         response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
         response.setHeader('Referrer-Policy', 'no-referrer');
         response.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
-        if (request.headers.host !== new URL(origin).host
-            || (request.headers.origin && request.headers.origin !== origin)
+        if (request.headers.host !== new URL(origin).host) {
+            return reply(response, 403, 'Use the server URL printed at startup.');
+        }
+        // Sign-in comes back here from the sign-in provider's site, so it is the one page another site
+        // may send the browser to. The code it carries is no use without what this server keeps.
+        if (onAuthCallback && request.method === 'GET' && request.url.startsWith('/auth/callback')) {
+            const { status, html } = await onAuthCallback(new URL(request.url, origin).search);
+            return reply(response, status, html, TYPES['.html']);
+        }
+        if ((request.headers.origin && request.headers.origin !== origin)
             || request.headers['sec-fetch-site'] === 'cross-site') {
             return reply(response, 403, 'Use the server URL printed at startup.');
         }
@@ -251,6 +259,7 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
 
     const web = createWebServer({
         pages,
+        onAuthCallback: (search) => finishSignIn(search),
         onMessage: (message) => receive && receive(message),
         onDisconnect: () => {
             // A fresh page cannot finish a quick pick the previous one opened.
@@ -326,8 +335,8 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
         },
     });
 
-    // The agent (agent/agent-panel.js), on the open project. Signing in to a Kigumi account ends on a
-    // kigumi:// link a browser can't take, so here the agent runs on an OpenRouter key (its panel asks).
+    // The agent (agent/agent-panel.js), on the open project. Signing in to a Kigumi account comes back
+    // to this server (/auth/callback), which must be one of the sign-in service's redirect URLs.
     let account = null;
     let modelList = null;
     let kumikiSource = null;
@@ -374,21 +383,18 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
     const memory = new Map();
     const agentPanel = createAgentPanel({
         connection,
-        pageUrl: `${origin}/webview/agent/agent.html`,
+        // ?host=web: the panel shows the web version's notice about running the agent.
+        pageUrl: `${origin}/webview/agent/agent.html?host=web`,
         settings,
         makeHost: agentHost,
         prepare: () => {
             const config = backendConfig(process.env);
             if (!account) {
-                // No sign-in here (see above): an account without its sign-in service, so the panel
-                // asks for an OpenRouter key rather than offering buttons that can't finish.
                 account = createAccount({
                     ...config,
-                    supabaseUrl: null,
-                    supabaseKey: null,
                     storage: { getItem: (key) => (memory.has(key) ? memory.get(key) : null),
                         setItem: (key, value) => memory.set(key, value), removeItem: (key) => memory.delete(key) },
-                    redirectTo: `${String(config.backendUrl || '').replace(/\/$/, '')}/auth/callback`,
+                    redirectTo: `${origin}/auth/callback`,
                     openExternal: async (url) => connection.send({ type: 'browser:external', url }),
                     onChange: () => agentPanel.session && agentPanel.session.postState(),
                 });
@@ -459,6 +465,24 @@ async function start({ port = 7346, dataDir = path.join(os.homedir(), '.kigumi',
             kept(await switchProject(null), 'closing it');
         },
     };
+
+    /** Finish signing in from where the sign-in page sent the browser back to; the page to show there. */
+    async function finishSignIn(search) {
+        const page = (title, text) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title>`
+            + '<style>body{font:16px system-ui,sans-serif;display:grid;place-items:center;min-height:90vh;margin:0}'
+            + 'main{max-width:420px;text-align:center}p{color:#6e6e73}</style></head>'
+            + `<body><main><h1>${title}</h1><p>${text}</p></main></body></html>`;
+        try {
+            if (!account) throw new Error('Kigumi was restarted since sign-in began.');
+            await account.completeSignIn(`kigumi://auth${search}`);
+            log('[account] signed in');
+            return { status: 200, html: page("You're signed in", 'Go back to the Kigumi tab. You can close this one.') };
+        } catch (error) {
+            log(`[account] sign-in failed: ${error.message}`);
+            const text = String(error.message || error).replace(/[<>&"]/g, '');
+            return { status: 400, html: page("Sign-in didn't finish", `${text}. Go back to Kigumi and try again.`) };
+        }
+    }
 
     /** The settings quick pick, the status bar's gear: the switches people look for. */
     async function chooseSetting() {

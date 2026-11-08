@@ -113,6 +113,23 @@ describe('browser host HTTP boundary', () => {
     });
 });
 
+test('sign-in comes back from another site to /auth/callback only; other pages still turn it away', async () => {
+    const seen = [];
+    const web = createWebServer({ pages: new PageStore({ origin: '', webviewDir }), onMessage: () => {},
+        onAuthCallback: async (search) => { seen.push(search); return { status: 200, html: 'signed in' }; } });
+    const origin = await web.listen(0);
+    try {
+        const crossSite = { headers: { 'Sec-Fetch-Site': 'cross-site' } };
+        const back = await fetch(`${origin}/auth/callback?code=abc`, crossSite);
+        expect(back.status).toBe(200);
+        expect(await back.text()).toBe('signed in');
+        expect(seen).toEqual(['?code=abc']);
+        expect((await fetch(origin, crossSite)).status).toBe(403);
+    } finally {
+        await web.close();
+    }
+});
+
 describe('a web project\'s files', () => {
     test('only the project\'s own text files travel', () => {
         expect(isProjectFile('my_frame.py')).toBe(true);

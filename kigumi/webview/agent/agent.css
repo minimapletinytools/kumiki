@@ -931,3 +931,46 @@ body.needs-key .suggestions {
     font-size: 11px;
     opacity: 0.75;
 }
+
+/* The web version's notice: how the agent can be run there, shown signed in or out. It takes the
+   place of the sign-in prompt, and its sign-in buttons go once signed in. */
+.web-agent-notice {
+    display: none;
+    max-width: 340px;
+    margin: 0 auto 12px;
+    text-align: left;
+    font-size: 12px;
+}
+body.host-web .web-agent-notice {
+    display: block;
+}
+body.host-web .welcome-sign-in {
+    display: none;
+}
+.web-agent-notice-lead {
+    margin: 0 0 6px;
+    font-weight: 600;
+}
+.web-agent-notice ol {
+    margin: 0;
+    padding-left: 18px;
+}
+.web-agent-notice li {
+    margin: 0 0 6px;
+}
+.web-agent-sign-in {
+    display: block;
+    margin-top: 4px;
+}
+.web-agent-sign-in .sign-in-chip {
+    display: inline-block;
+    width: auto;
+    margin-right: 4px;
+}
+body.signed-in .web-agent-sign-in {
+    display: none;
+}
+
+.web-agent-notice a {
+    color: var(--ka-accent);
+}

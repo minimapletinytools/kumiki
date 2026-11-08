@@ -49,6 +49,7 @@ export class Status {
         // Until there is a key or an account to send with, the chat area says so instead of offering
         // suggestions: sign in where Kigumi accounts are set up, else add a key.
         const ready = via === 'openrouter' || Boolean(account.signedIn);
+        document.body.classList.toggle('signed-in', Boolean(account.signedIn));
         document.body.classList.toggle('needs-sign-in', !ready && Boolean(account.configured));
         document.body.classList.toggle('needs-key', !ready && !account.configured);
     }

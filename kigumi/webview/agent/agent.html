@@ -45,6 +45,20 @@
             <div class="agent-welcome" id="welcome">
                 <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
                 <p data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
+                <!-- The web version's ways to run the agent, shown signed in or out (main.js, ?host=web). -->
+                <div class="web-agent-notice">
+                    <p class="web-agent-notice-lead" data-i18n="agent.web.lead">Kigumi-hosted agent subscriptions are coming soon. Until then, you can:</p>
+                    <ol>
+                        <li><span data-i18n="agent.web.signIn">Sign in and use your $1 of promo credit (it comes out of my pocket ;__;)</span>
+                            <span class="web-agent-sign-in">
+                                <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
+                                <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
+                            </span></li>
+                        <li data-i18n="agent.web.mcp">Connect your own agent over MCP (under Kigumi options in the left sidebar)</li>
+                        <li><a href="https://github.com/minimapletinytools/kumiki/releases" target="_blank" rel="noopener noreferrer"
+                            data-i18n="agent.web.app">Download the standalone app and use your own agent</a></li>
+                    </ol>
+                </div>
                 <!-- Shown instead of the suggestions until the agent has a way to send requests (status.js). -->
                 <div class="welcome-sign-in">
                     <p class="welcome-sign-in-needed" data-i18n="agent.welcome.signIn">Please sign in to use the agent.</p>

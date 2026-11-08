@@ -53,11 +53,17 @@ when it connects, and the server's settings file mirrors them; each change goes 
 browser. A browser with none of its own starts from the defaults.
 
 The status bar's gear turns settings on and off; **Agent panel** is one (off by default), as is the
-checkbox in a view's options. Turned on, the agent opens on the right. Signing in to a Kigumi
-account doesn't work in a browser yet (it ends on a `kigumi://` link), so the agent's chat area
-asks for an OpenRouter key: paste one in its own settings (the gear in its panel). The key is kept
-with the other settings, in this browser, and never shown again. Conversations and the model list
-are kept on the server.
+checkbox in a view's options. Turned on, the agent opens on the right, saying how it can be run
+here: sign in to a Kigumi account (with promo credit), connect your own agent over MCP, or get the
+standalone app. An OpenRouter key works too (the gear in the agent's panel); it is kept with the
+other settings, in this browser, and never shown again. Conversations and the model list are kept
+on the server.
+
+Signing in comes back to this server, at `<server>/auth/callback`, which must be one of the
+sign-in service's redirect URLs: in the Supabase dashboard (Authentication > URL Configuration),
+add `http://127.0.0.1:*/auth/callback` for running it locally, and the hosted address when there is
+one. It is the one page the server takes from another site; the code it carries is no use without
+what the server keeps.
 
 **MCP server** is in the gear's list and the explorer's Kigumi options, as in the app: Kigumi's tools for agents on the server's
 machine (Claude Code and others), on `127.0.0.1` with a token. "Copy MCP setup for Claude Code"
@@ -92,7 +98,7 @@ leave the working folder. These are local browser boundaries: there is no user a
 frames run Python with the server account's access. A hosted version needs an authenticated
 gateway and a sandboxed worker per user; see `.claude/plans/kigumi-web-port-findings.md`.
 
-Not here yet: signing in to a Kigumi account (use an OpenRouter key), importing a .zip,
+Not here yet: importing a .zip,
 several tabs driving Kigumi at once, and reconnecting after the server restarts (reload the page).
 
 ## Tests

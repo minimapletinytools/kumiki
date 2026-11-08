@@ -39,6 +39,9 @@ $('btn-clear').addEventListener('click', () => {
     reset();
     menus.closeHistory();
 });
+// In the web version the panel says how the agent can be run there (agent.html, .web-agent-notice).
+if (new URLSearchParams(location.search).get('host') === 'web') document.body.classList.add('host-web');
+
 $('messages').addEventListener('click', (event) => {
     if (event.target.classList.contains('sign-in-chip')) post({ type: 'agent:signIn', provider: event.target.dataset.provider });
     else if (event.target.classList.contains('suggestion-chip')) composer.send(event.target.textContent);
