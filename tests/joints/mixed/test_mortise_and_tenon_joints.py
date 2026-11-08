@@ -1749,3 +1749,56 @@ class TestAnAngledBraceIntoARoughPost:
         overlap = trimesh.boolean.intersection([mesh("post"), mesh("brace")], engine="manifold")
 
         assert overlap.volume < 1e-8  # under a hundredth of a cubic centimetre
+
+
+class TestAnOffsetTenonInAnAngledBoredMortise:
+    """A 45-degree stroke tenoned into a post, its tenon flush with the stroke's underside, the
+    mortise bored square to the post face."""
+
+    def test_the_tenon_fills_the_mortise(self):
+        import trimesh
+        from kumiki.csg.cutcsg import adopt_csg
+        from kumiki.csg.triangles import triangulate_cutcsg
+        from kumiki.timber import Frame
+
+        post = create_timber(
+            bottom_position=create_v3(0, 0, 0), length=inches(60), size=create_v2(inches(4), inches(4)),
+            length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0), ticket="post")
+        stroke = create_timber(
+            bottom_position=create_v3(0, 0, inches(30)), length=inches(30), size=create_v2(inches(4), inches(6)),
+            length_direction=create_v3(-cos(pi / 4), 0, -sin(pi / 4)), width_direction=create_v3(0, 1, 0),
+            ticket="stroke")
+        underside = stroke.get_closest_oriented_long_face_from_global_direction(create_v3(0, 0, -1)).to.face()
+        flush = inches(5, 4) if underside == TimberFace.FRONT else -inches(5, 4)
+        mortise_depth = inches(7, 4)
+        tenon_thickness = inches(3, 2)
+        tenon_width = inches(7, 2)
+        joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=post, butt_timber=stroke, butt_timber_end=TimberEnd.BOTTOM,
+                front_face_on_butt_timber=TimberLongFace.RIGHT),
+            tenon_width_relative_to_joint=tenon_width,
+            tenon_height_relative_to_joint=tenon_thickness,
+            tenon_length=inches(4),
+            mortise_depth=mortise_depth,
+            tenon_position=create_v2(scalar(0), flush),
+            bore_mortise_perpendicular_to_face=True,
+        )
+        frame = Frame.from_joints(joints=[joint])
+
+        def mesh(name):
+            cut = next(c for c in frame.cut_timbers if c.timber.ticket.path == name)
+            local = cut.render_timber_with_cuts_csg_local()
+            triangles = triangulate_cutcsg(adopt_csg(cut.timber.transform, Transform.identity(), local)).mesh
+            return trimesh.Trimesh(vertices=triangles.vertices, faces=triangles.faces, process=False)
+
+        post_envelope = trimesh.creation.box(
+            extents=[float(inches(4)), float(inches(4)), float(inches(60))],
+            transform=trimesh.transformations.translation_matrix([0, 0, float(inches(30))]))
+        tenon_in_post = trimesh.boolean.intersection([mesh("stroke"), post_envelope], engine="manifold")
+        # The bored hole, less the triangle the 45-degree tenon leaves empty at its inner bottom corner.
+        tenon_section = tenon_width / sin(pi / 4) * mortise_depth - mortise_depth * mortise_depth / 2
+        expected = float(tenon_thickness * tenon_section)
+
+        assert trimesh.boolean.intersection([mesh("post"), mesh("stroke")], engine="manifold").volume < 1e-8
+        assert abs(tenon_in_post.volume - expected) < 0.01 * expected

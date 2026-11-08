@@ -1052,6 +1052,32 @@ class PegPositionResult:
     stickout_length: Numeric
 
 
+def locate_tenon_origin_on_shoulder(
+    shoulder_plane: Plane, tenon_timber: TimberLike, tenon_end: TimberEnd, tenon_position: V2,
+) -> V3:
+    """Return where the tenon's axis meets `shoulder_plane`, in global space.
+
+    `tenon_position` is the tenon's offset from the timber's centerline, in the tenon timber's
+    local X and Y.
+    """
+    shoulder_point_global = mark_distance_from_end_along_centerline(
+        shoulder_plane, tenon_timber, tenon_end,
+    ).locate().position
+    offset_global = (
+        tenon_timber.get_face_direction_global(TimberFace.RIGHT) * tenon_position[0]
+        + tenon_timber.get_face_direction_global(TimberFace.FRONT) * tenon_position[1]
+    )
+    tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
+    # Slide back along the tenon's axis onto the plane; on an angled joint the offset leaves it.
+    return (
+        shoulder_point_global
+        + offset_global
+        - tenon_end_direction
+        * (safe_dot_product(offset_global, shoulder_plane.normal)
+           / safe_dot_product(tenon_end_direction, shoulder_plane.normal))
+    )
+
+
 def compute_peg_positions(
     arrangement: ButtJointTimberArrangement,
     shoulder_plane: Plane,
@@ -1085,20 +1111,7 @@ def compute_peg_positions(
     tenon_face: TimberLongFace = arrangement.front_face_on_butt_timber
     peg_face: TimberFace = tenon_face.to.face()
 
-    shoulder_mark = mark_distance_from_end_along_centerline(
-        shoulder_plane,
-        tenon_timber,
-        tenon_end,
-    )
-    shoulder_point_global = shoulder_mark.locate().position
-
-    tenon_right = tenon_timber.get_face_direction_global(TimberFace.RIGHT)
-    tenon_front = tenon_timber.get_face_direction_global(TimberFace.FRONT)
-    marking_origin_global = (
-        shoulder_point_global
-        + tenon_right * tenon_position[0]
-        + tenon_front * tenon_position[1]
-    )
+    marking_origin_global = locate_tenon_origin_on_shoulder(shoulder_plane, tenon_timber, tenon_end, tenon_position)
 
     tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
 
@@ -1139,9 +1152,9 @@ def compute_peg_positions(
         )
 
     if tenon_face in [TimberLongFace.RIGHT, TimberLongFace.LEFT]:
-        tenon_lateral_direction = tenon_front
+        tenon_lateral_direction = tenon_timber.get_face_direction_global(TimberFace.FRONT)
     else:
-        tenon_lateral_direction = tenon_right
+        tenon_lateral_direction = tenon_timber.get_face_direction_global(TimberFace.RIGHT)
 
     results: List[PegPositionResult] = []
 

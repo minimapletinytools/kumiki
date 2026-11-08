@@ -64,6 +64,7 @@ from ..shavings.build_a_butt import (
     PegPositionSpace,
     SimplePegParameters,
     compute_peg_positions,
+    locate_tenon_origin_on_shoulder,
     compute_butt_joint_shoulder,
     tusk_tenon_geometry,
     TuskTenonGeometryResult,
@@ -206,18 +207,8 @@ def cut_mortise_and_tenon_joint(
             arrangement,
             mortise_shoulder_distance_from_centerline_or_centerplane,
         )
-    shoulder_from_tenon_end_mark = mark_distance_from_end_along_centerline(shoulder_plane, tenon_timber, tenon_end)
-
     tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
-    shoulder_point_global = shoulder_from_tenon_end_mark.locate().position
-
-    tenon_right = tenon_timber.get_face_direction_global(TimberFace.RIGHT)
-    tenon_front = tenon_timber.get_face_direction_global(TimberFace.FRONT)
-    marking_origin_global = (
-        shoulder_point_global
-        + tenon_right * tenon_position[0]
-        + tenon_front * tenon_position[1]
-    )
+    marking_origin_global = locate_tenon_origin_on_shoulder(shoulder_plane, tenon_timber, tenon_end, tenon_position)
 
     tenon_orientation = compute_timber_orientation(
         safe_normalize_vector(tenon_end_direction), tenon_timber.get_width_direction_global()
@@ -285,7 +276,7 @@ def cut_mortise_and_tenon_joint(
 
         mortise_hole_end_crop_global = HalfSpace(
             normal=mortise_hole_length_oblique_direction,
-            offset=end_crop_distance + safe_dot_product(mortise_hole_length_oblique_direction, shoulder_point_global),
+            offset=end_crop_distance + safe_dot_product(mortise_hole_length_oblique_direction, marking_origin_global),
             label=CutCSGLabel("tenon_crop_to_mortise_length"),
         )
 
