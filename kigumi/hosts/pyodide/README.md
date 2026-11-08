@@ -48,16 +48,19 @@ Page (dist/index.html)                         Web Worker (dist/worker.js)
 
 ## Precision
 
-Manifold's WebAssembly build takes and hands back float32 vertices. kumiki meshes each half space
-and open-ended prism as a box sized to the timber it cuts, so the coordinates stay small, and the
-browser's timbers match native kumiki to within 1e-5 of each one's volume:
+Manifold's WebAssembly build takes and hands back float32 vertices, though it works in double.
+`manifold3d.py` sets each mesh's vertices exactly, going in and coming out, through `warpBatch`,
+which sees them as doubles: rounded to float32, a sliver triangle tilts, and the viewer shaded it as
+a crease across a flat face (the dovetailed sawhorse's legs). With that, the browser's meshes match
+native kumiki's, triangle for triangle, and each timber's volume to within 1e-7:
 
 | Frame | Timbers | Mesh time, native | Mesh time, Pyodide |
 | --- | --- | --- | --- |
-| my_cute_frame | 4 | 0.03 s | 0.06 s |
-| dovetailed_sawhorse | 5 | 0.03 s | 0.06 s |
-| oscarshed | 25 | 0.16 s | 0.25 s |
-| tinyhouse120 | 75 | 0.55 s | 0.85 s |
+| my_cute_frame | 4 | 0.03 s | 0.07 s |
+| dovetailed_sawhorse | 5 | 0.03 s | 0.07 s |
+| ki_kanji | 5 | 0.04 s | 0.08 s |
+| oscarshed | 25 | 0.18 s | 0.28 s |
+| tinyhouse120 | 75 | 0.58 s | 0.98 s |
 
 ## The agent
 
