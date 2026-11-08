@@ -13,6 +13,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Changed
 
 - The browser version's agent panel is on by default (Kigumi options turns it off).
+- With no project open, Project status offers **Open Project…** and up to five recent projects (the standalone app's folders, the browser's projects; VS Code's opens a folder) instead of Initialize Project.
 
 ## [0.9.1] - 2026-11-08
 

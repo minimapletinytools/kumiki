@@ -54,6 +54,9 @@ function emptyState(overrides = {}) {
     };
 }
 
+/** How many recent projects Project status lists when none is open. */
+const MAX_RECENT_PROJECTS = 5;
+
 function node(fields) {
     return { data: {}, ...fields };
 }
@@ -412,10 +415,38 @@ class SidebarModel {
         return nodes;
     }
 
+    // With no project open: Open Project and the recent ones, where the host has them.
+    _openProjectNodes() {
+        const { projects } = getHost();
+        if (!projects || typeof projects.open !== 'function') return [];
+        const recent = typeof projects.recent === 'function' ? projects.recent().slice(0, MAX_RECENT_PROJECTS) : [];
+        return [
+            node({
+                key: 'open-project-action',
+                type: 'openProjectAction',
+                label: t('sidebar.openProject'),
+                description: t('sidebar.openProject.desc'),
+                icon: 'folder-opened',
+                action: open('kigumi.openProject'),
+            }),
+            ...recent.map((project) => node({
+                key: `recent-project:${project.id}`,
+                type: 'openProjectAction',
+                label: project.label,
+                description: project.description || t('sidebar.recentProject.desc'),
+                icon: 'history',
+                action: open('kigumi.openRecentProject', project.id),
+            })),
+        ];
+    }
+
     // The project status, kumiki version and website rows.
     _statusNodes() {
         const nodes = [];
         const { initStatus } = this._state;
+        if (getHost().workspaceRoots().length === 0 && getHost().projects) {
+            return [...this._openProjectNodes(), this._websiteNode()];
+        }
         const isLocalDev = !!(initStatus && initStatus.projectStatus === 'local-dev');
         const hasProject = !!(initStatus && (initStatus.hasExistingProject || initStatus.isInitialized));
 
@@ -489,14 +520,7 @@ class SidebarModel {
             }
         }
 
-        nodes.push(node({
-            key: 'kumiki-website-action',
-            type: 'kumikiWebsiteAction',
-            label: t('sidebar.goToWebsiteAction'),
-            description: 'github.com/minimapletinytools/kumiki',
-            icon: 'link-external',
-            action: open('kigumi.openWebsite'),
-        }));
+        nodes.push(this._websiteNode());
 
         // Back to no project open, where the host can do that (the standalone app, not VS Code).
         const host = getHost();
@@ -512,6 +536,17 @@ class SidebarModel {
         }
 
         return nodes;
+    }
+
+    _websiteNode() {
+        return node({
+            key: 'kumiki-website-action',
+            type: 'kumikiWebsiteAction',
+            label: t('sidebar.goToWebsiteAction'),
+            description: 'github.com/minimapletinytools/kumiki',
+            icon: 'link-external',
+            action: open('kigumi.openWebsite'),
+        });
     }
 
     // The workspace folder, when the host shows a file browser (VS Code has its own).

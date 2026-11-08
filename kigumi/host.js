@@ -46,6 +46,9 @@
  *   Kigumi's MCP server, where the host runs one (the standalone app's main.js)
  * @property {() => Promise<any>} [closeProject]  close the open project, leaving none: tabs close, asking about
  *   unsaved edits (the standalone app; VS Code has its own)
+ * @property {{open: () => Promise<any>, recent?: () => Array<{id: string, label: string, description?: string}>,
+ *   openRecent?: (id: string) => Promise<any>}} [projects]  opening a project when none is open: the host's own
+ *   way to choose one, and its recent ones (the standalone app's folders, the browser's projects)
  * @property {boolean} [agentPanel]  the host has Kigumi's agent panel, turned on by `agent.enabled`
  * @property {boolean} [showsFileBrowser]  the explorer lists the workspace's files ("All files"); off where the host has its own
  * @property {(options: {source?: string}) => void} [showLog]  show Kigumi's log, or one view's (`source`, its file name);

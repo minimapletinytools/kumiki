@@ -24,9 +24,10 @@ function languageOf(filePath) {
  * @param {(line: string) => void} [options.log]
  * @param {boolean} [options.agentPanel]  whether the agent panel can be turned on
  * @param {object} [options.mcp]  Kigumi's MCP server's controls (agent/mcp-service.js)
+ * @param {object} [options.projects]  opening a project (host.js `projects`)
  */
 function createBrowserHost({ connection, workspaceFolder, settings, runCommand, setStatus, setProgress, editors,
-    showLog = null, log = () => {}, agentPanel = false, mcp = null, closeProject = null }) {
+    showLog = null, log = () => {}, agentPanel = false, mcp = null, closeProject = null, projects = null }) {
     function watchFiles(baseDir, glob, { onCreate, onChange, onDelete } = {}) {
         if (!baseDir || !fs.existsSync(baseDir)) {
             return { dispose() {} };
@@ -62,6 +63,8 @@ function createBrowserHost({ connection, workspaceFolder, settings, runCommand, 
         ...(mcp ? { mcp } : {}),
         // Project status's Close Project: back to the projects page.
         ...(closeProject ? { closeProject } : {}),
+        // Project status's Open Project and recent projects, with none open.
+        ...(projects ? { projects } : {}),
         ...(showLog ? { showLog } : {}),
         getConfig: (key, fallback) => settings.get(key, fallback),
         updateConfig: async (key, value) => settings.set(key, value),

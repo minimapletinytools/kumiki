@@ -11,7 +11,7 @@ const { ContextMenu, menuPosition } = KigumiContextMenu;
 const payload = window.__KIGUMI_INITIAL_PAYLOAD__ || {};
 const t = KigumiI18n.createTranslator(payload.i18n && payload.i18n.strings);
 const ROW_ACTIONS = payload.rowActions || {};
-const STATUS_TYPES = new Set(['projectStatusAction', 'kumikiVersionAction', 'kumikiWebsiteAction', 'closeProjectAction']);
+const STATUS_TYPES = new Set(['projectStatusAction', 'kumikiVersionAction', 'kumikiWebsiteAction', 'closeProjectAction', 'openProjectAction']);
 
 const hostApi = window.__kigumiVsCode
     || (typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null);

@@ -65,6 +65,8 @@ function registerSidebarView(context, viewId, resourceRoot, onSurface) {
 
 function createVscodeHost() {
     return {
+        // Project status's Open Folder…, with no folder open (VS Code keeps its own recent ones).
+        projects: { open: () => Promise.resolve(vscode.commands.executeCommand('workbench.action.files.openFolder')) },
         get locale() {
             return vscode.env && vscode.env.language;
         },

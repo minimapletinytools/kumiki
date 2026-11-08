@@ -387,6 +387,12 @@ function openProject() {
         showLog: openLogTab,
         mcp: mcpControls,
         closeProject: () => closeWorkspaceFolder(),
+        // Project status's Open Project and recent folders, with none open.
+        projects: {
+            open: () => chooseWorkspaceFolder(),
+            recent: () => recentFolders().map((one) => ({ id: one.path, label: one.name, description: tildePath(one.path) })),
+            openRecent: (folder) => openRecentFolder(folder),
+        },
     }));
     kigumiApp = createKigumiApp({
         extensionPath: KIGUMI_DIR,

@@ -138,6 +138,30 @@ describe('status rows', () => {
     expect(await closeRow()).toBeUndefined();
   });
 
+  test('with no project open, Open Project and the recent ones take the place of Initialize Project', async () => {
+    workspaceRoots = [];
+    setHost({
+      locale: 'en', workspaceRoots: () => workspaceRoots, getConfig: (_key, fallback) => fallback,
+      projects: { open: async () => {}, recent: () => [1, 2, 3, 4, 5, 6].map((n) => ({ id: `p${n}`, label: `Project ${n}` })) },
+    });
+    const model = new SidebarModel();
+    await model.refresh(true);
+    const tree = model.getTree();
+    expect(tree.find((row) => row.type === 'projectStatusAction')).toBeUndefined();
+    const rows = tree.filter((row) => row.type === 'openProjectAction');
+    expect(rows[0].action).toEqual({ command: 'kigumi.openProject', arguments: [] });
+    expect(rows.slice(1).map((row) => row.label)).toEqual(['Project 1', 'Project 2', 'Project 3', 'Project 4', 'Project 5']);
+    expect(rows[1].action).toEqual({ command: 'kigumi.openRecentProject', arguments: ['p1'] });
+    expect(tree.some((row) => row.type === 'kumikiWebsiteAction')).toBe(true);
+  });
+
+  test('with a project open, there is no Open Project row', async () => {
+    setHost({ locale: 'en', workspaceRoots: () => workspaceRoots, getConfig: (_key, fallback) => fallback, projects: { open: async () => {} } });
+    const model = new SidebarModel();
+    await model.refresh(true);
+    expect(model.getTree().find((row) => row.type === 'openProjectAction')).toBeUndefined();
+  });
+
   test('an initialized project shows its status and runs the project action', async () => {
     const model = new SidebarModel();
     await model.refresh(true);

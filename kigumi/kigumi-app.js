@@ -261,6 +261,13 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         'kigumi.closeProject': () => {
             if (typeof host.closeProject === 'function') void host.closeProject();
         },
+        // Not awaited either: opening a project disposes this app too.
+        'kigumi.openProject': () => {
+            if (host.projects) void host.projects.open();
+        },
+        'kigumi.openRecentProject': (id) => {
+            if (host.projects && typeof host.projects.openRecent === 'function') void host.projects.openRecent(id);
+        },
         'kigumi.refreshSidebar': () => sidebarModel.refresh(true),
         'kigumi.refreshPatterns': () => sidebarModel.refresh(true),
         'kigumi.toggleGroupByPatternbook': () => sidebarModel.toggleGroupByPatternbook(),

@@ -66,6 +66,9 @@ app.whenReady().then(async () => {
         const warning = await wait("document.querySelector('#web-storage-warning')?.textContent", 20000);
         check('the projects page warns that files live in the browser only', Boolean(warning && warning.includes('NOT to disk')));
         await shot('start');
+        const startStatus = await wait(`(${explorer}?.body?.innerText || '').includes('Open Project') ? ${explorer}.body.innerText : null`, 30000);
+        check('with no project open, Project status offers Open Project, not Initialize Project',
+            Boolean(startStatus && !startStatus.includes('Initialize Project')));
         check('the agent panel is open from the start', await wait(`!!document.querySelector('#slot-right iframe') && !document.querySelector('#slot-right').hidden`, 30000) === true);
 
         await js(`(() => {
@@ -180,6 +183,12 @@ app.whenReady().then(async () => {
         await wait("document.body.classList.contains('kigumi-ready')", 240000);
         const reloaded = await wait(`document.querySelector('.web-project .welcome-recent-folder')?.textContent`, 30000);
         check('after a reload the browser still has the project', reloaded === 'Shed', reloaded);
+        const recentRow = await wait(`[...(${explorer}?.querySelectorAll('.ks-status-label') || [])].some((label) => label.textContent === 'Shed') || null`, 30000);
+        check('Project status lists it as a recent project', recentRow === true);
+        await js(`[...${explorer}.querySelectorAll('.ks-status-action')].find((row) => row.textContent.includes('Shed')).click()`);
+        check('clicking it there opens it', await wait(`document.querySelector('#status-workspace')?.textContent === 'Shed'`, 30000) === true);
+        await js("document.querySelector('#status-workspace').click()");
+        await wait("!document.querySelector('#status-workspace') || document.querySelector('#status-workspace').textContent !== 'Shed'", 30000);
 
         await js("document.querySelector('.web-project .web-project-action').click()");
         const deadline = Date.now() + 10000;

@@ -238,6 +238,11 @@ async function start() {
         setHost(createBrowserHost({
             connection, workspaceFolder: project ? project.dir : null, settings, runCommand, setStatus, setProgress,
             editors, showLog: openLog, log, closeProject: () => switchProject(null), agentPanel: true,
+            projects: {
+                open: () => pickProject(),
+                recent: () => knownProjects.map((one) => ({ id: one.id, label: one.name, description: 'In this browser' })),
+                openRecent: async (id) => post({ type: 'web:requestOpen', id }),
+            },
         }));
         kigumiApp = createKigumiApp({ extensionPath: '/kigumi', storagePath: `${DATA}/tools`, channel });
         kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
@@ -300,6 +305,16 @@ async function start() {
         const done = switching.then(run, run);
         switching = done.catch(() => false);
         return done;
+    }
+
+    /** Project status's Open Project: one of the projects kept in this browser. */
+    async function pickProject() {
+        if (knownProjects.length === 0) {
+            setStatus('info', 'No projects yet: make one with New Project.');
+            return;
+        }
+        const picked = await connection.pick(knownProjects.map((one) => ({ label: one.name, value: one.id })), 'Open a project kept in this browser');
+        if (picked && picked.value) post({ type: 'web:requestOpen', id: picked.value });
     }
 
     function checkProject({ id, name } = {}) {
@@ -488,6 +503,8 @@ async function start() {
             await switchProject(null);
         } else if (id === 'web:projects') {
             knownProjects = ((args[0] || {}).projects || []).filter((one) => one && PROJECT_ID.test(one.id));
+            // With none open, Project status lists them.
+            if (!project && kigumiApp) await runCommand('kigumi.refreshSidebar');
         } else if (id === 'web:settings') {
             settings.replace((args[0] || {}).values);
         } else if (id === 'web:store') {
