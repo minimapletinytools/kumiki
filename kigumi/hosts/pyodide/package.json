@@ -1,0 +1,10 @@
+{
+  "name": "kigumi-pyodide-spike",
+  "private": true,
+  "description": "Kumiki in Pyodide, with Manifold's WebAssembly build standing in for manifold3d. See README.md.",
+  "type": "module",
+  "dependencies": {
+    "manifold-3d": "3.5.4",
+    "pyodide": "0.28.3"
+  }
+}

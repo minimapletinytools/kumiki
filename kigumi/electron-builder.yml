@@ -36,6 +36,7 @@ files:
   - "!test-frame.py"
   - "!**/__tests__/**"
   - "!scripts/**"
+  - "!hosts/pyodide/**"
   - "!test/**"
 extraResources:
   - from: build-app/uv/${os}-${arch}

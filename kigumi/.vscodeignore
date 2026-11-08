@@ -6,6 +6,7 @@ install.sh
 INSTALL.md
 CURSOR-INSTALL.md
 hosts/electron/**
+hosts/pyodide/**
 test/**
 scripts/fetch-uv.js
 electron-builder.yml
