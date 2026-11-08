@@ -30,8 +30,6 @@ const MANIFOLD_URL = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.js
 // kumiki's dependencies: Pyodide's own, and trimesh (pure Python) from PyPI.
 const PYODIDE_PACKAGES = ['numpy', 'sympy', 'lxml', 'networkx', 'scipy', 'typing-extensions', 'micropip'];
 const PYPI_PACKAGES = ['trimesh==4.11.3'];
-// See README: kumiki's half-space and infinite-prism boxes, in metres, until it sizes them to the solid.
-const BOX_EXTENTS = { KUMIKI_TRIANGLES_PRISM_EXTENT: '10', KUMIKI_TRIANGLES_HALF_SPACE_EXTENT: '20' };
 
 const HOME = '/home/pyodide';
 const DATA = `${HOME}/kigumi`;
@@ -47,7 +45,7 @@ const status = (text) => post({ type: 'web:loading', text });
 async function bootPython() {
     status('Loading Python…');
     const { loadPyodide } = await import(/* webpackIgnore: true */ `${PYODIDE_URL}pyodide.mjs`);
-    const py = await loadPyodide({ indexURL: PYODIDE_URL, env: { HOME, ...BOX_EXTENTS } });
+    const py = await loadPyodide({ indexURL: PYODIDE_URL, env: { HOME } });
     status('Loading kumiki’s packages…');
     await py.loadPackage(PYODIDE_PACKAGES, { messageCallback: () => {} });
     const micropip = py.pyimport('micropip');

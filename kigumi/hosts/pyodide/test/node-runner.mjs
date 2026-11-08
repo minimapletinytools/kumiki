@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 const dist = new URL('../dist/', import.meta.url).pathname;
 const [frame] = process.argv.slice(2);
-const py = await loadPyodide({ env: { HOME: '/home/pyodide', KUMIKI_TRIANGLES_PRISM_EXTENT: '10', KUMIKI_TRIANGLES_HALF_SPACE_EXTENT: '20' } });
+const py = await loadPyodide({ env: { HOME: '/home/pyodide' } });
 await py.loadPackage(['numpy', 'sympy', 'lxml', 'networkx', 'scipy', 'typing-extensions', 'micropip'], { messageCallback: () => {} });
 await py.pyimport('micropip').install('trimesh==4.11.3');
 const wheel = JSON.parse(fs.readFileSync(path.join(dist, 'manifest.json'))).wheel;

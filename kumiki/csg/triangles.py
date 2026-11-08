@@ -7,8 +7,8 @@ model and trimesh. All SymPy-to-float conversion happens here.
 
 from __future__ import annotations
 
-import os
 import sys
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence, Tuple, Union
 
@@ -33,12 +33,14 @@ from ..rule import Matrix, Numeric, Transform, V2, V3
 
 
 TRIANGLES_FLOAT_DIGITS = 8
-# Big enough for any frame, small enough for manifold: at 10 km a half space's box made long
-# sliver triangles that lost cuts (dovetailed sawhorse legs).
-# The browser version (kigumi/hosts/pyodide) sets smaller ones: its Manifold hands back float32.
-TRIANGLES_PRISM_INFINITE_EXTENT = float(os.environ.get("KUMIKI_TRIANGLES_PRISM_EXTENT", 100.0))
-TRIANGLES_HALF_SPACE_INFINITE_EXTENT = float(os.environ.get("KUMIKI_TRIANGLES_HALF_SPACE_EXTENT",
-                                                            TRIANGLES_PRISM_INFINITE_EXTENT * 10.0))
+# A half space or open-ended prism is meshed as a box sized to the solid it cuts (see _Reach):
+# manifold's tolerance grows with a solid's size, so one big box loses fine cuts.
+# This size is only for one meshed with nothing to cut.
+TRIANGLES_PRISM_INFINITE_EXTENT = 100.0
+TRIANGLES_HALF_SPACE_INFINITE_EXTENT = 100.0
+# How far past the solid's bounding sphere a sized box reaches, as a share of its radius, plus a floor.
+TRIANGLES_REACH_MARGIN = 1.0
+TRIANGLES_REACH_MIN = 0.01
 TRIANGLES_CYLINDER_SECTIONS = 32
 TRIANGLES_RAY_EPSILON = 1e-8
 TRIANGLES_TINY_COMPONENT_VOLUME_RATIO = 1e-4
@@ -49,6 +51,50 @@ TRIANGLES_PATH_TESSELLATION_TOLERANCE = 0.0005
 
 
 Float3 = Tuple[float, float, float]
+
+
+@dataclass(frozen=True)
+class _Reach:
+    """The sphere an unbounded solid must cover: the solid it cuts, plus a margin."""
+    center: np.ndarray
+    radius: float
+
+
+_REACH: ContextVar[Optional[_Reach]] = ContextVar("kumiki_triangles_reach", default=None)
+
+
+def _reach_of(mesh: trimesh.Trimesh) -> Optional[_Reach]:
+    if len(mesh.vertices) == 0:
+        return None
+    low, high = np.asarray(mesh.bounds, dtype=float)
+    radius = float(np.linalg.norm(high - low)) / 2.0
+    return _Reach(center=(low + high) / 2.0, radius=radius * (1.0 + TRIANGLES_REACH_MARGIN) + TRIANGLES_REACH_MIN)
+
+
+def _within(reach: Optional[_Reach], mesh_fn, *args):
+    """Mesh with infinite solids sized to `reach` (or to the enclosing one, if None)."""
+    if reach is None:
+        return mesh_fn(*args)
+    token = _REACH.set(reach)
+    try:
+        return mesh_fn(*args)
+    finally:
+        _REACH.reset(token)
+
+
+def _is_bounded(csg: CutCSG) -> bool:
+    """Whether a solid is finite, so its mesh does not depend on the reach."""
+    if isinstance(csg, HalfSpace):
+        return False
+    if isinstance(csg, (RectangularPrism, Cylinder, ConvexPolygonExtrusion, PathExtrusion)):
+        return csg.start_distance is not None and csg.end_distance is not None
+    if isinstance(csg, Difference):
+        return _is_bounded(csg.base)
+    if isinstance(csg, Intersection):
+        return _is_bounded(csg.left) or _is_bounded(csg.right)
+    if isinstance(csg, SolidUnion):
+        return all(_is_bounded(child) for child in csg.children)
+    return True
 
 
 @dataclass(frozen=True)
@@ -202,7 +248,12 @@ def _mesh_difference(csg: Difference) -> TriangleMesh:
             vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64)
         )
         return TriangleMesh(mesh=empty, face_sources=tuple())
-    meshes = [triangulate_cutcsg(csg.base).mesh]
+    base = triangulate_cutcsg(csg.base).mesh
+    return _within(_reach_of(base), _mesh_difference_cuts, csg, base)
+
+
+def _mesh_difference_cuts(csg: Difference, base: trimesh.Trimesh) -> TriangleMesh:
+    meshes = [base]
     for child in csg.subtract:
         # Flattening a SolidUnion into its individual members (rather than
         # unioning them first) is normally the safer, cheaper path -- see
@@ -232,10 +283,13 @@ def _mesh_intersection(csg: Intersection) -> TriangleMesh:
             vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64)
         )
         return TriangleMesh(mesh=empty, face_sources=tuple())
-    meshes = [
-        triangulate_cutcsg(csg.left).mesh,
-        triangulate_cutcsg(csg.right).mesh,
-    ]
+    # A bounded side is meshed first, and the other sized to it.
+    sides = [csg.left, csg.right]
+    order = sorted(range(2), key=lambda index: not _is_bounded(sides[index]))
+    meshes: list = [None, None]
+    meshes[order[0]] = triangulate_cutcsg(sides[order[0]]).mesh
+    reach = _reach_of(meshes[order[0]]) if _is_bounded(sides[order[0]]) else None
+    meshes[order[1]] = _within(reach, lambda: triangulate_cutcsg(sides[order[1]]).mesh)
     result_mesh = _run_boolean("intersection", meshes)
     return TriangleMesh(mesh=result_mesh)
 
@@ -287,7 +341,12 @@ def _manifold_boolean(operation: str, meshes: Sequence[trimesh.Trimesh]) -> trim
     if operation == "union":
         solid = Manifold.batch_boolean(solids, OpType.Add)
     elif operation == "difference":
-        solid = solids[0] - Manifold.batch_boolean(solids[1:], OpType.Add)
+        # One cut at a time, each worked out before the next: a batch (or a lazily built chain, which
+        # manifold flattens into one) has lost or overcut cuts (dovetailed sawhorse legs).
+        solid = solids[0]
+        for cut in solids[1:]:
+            solid = solid - cut
+            solid.status()
     elif operation == "intersection":
         solid = Manifold.batch_boolean(solids, OpType.Intersect)
     else:
@@ -298,7 +357,7 @@ def _manifold_boolean(operation: str, meshes: Sequence[trimesh.Trimesh]) -> trim
 
 
 def _mesh_rectangular_prism(prism: RectangularPrism) -> trimesh.Trimesh:
-    start_distance, end_distance = _finite_extent_pair(prism.start_distance, prism.end_distance)
+    start_distance, end_distance = _finite_extent_pair(prism.start_distance, prism.end_distance, *_axis_of(prism.transform))
     length = end_distance - start_distance
     if length <= 0:
         size_x = _numeric_to_float(prism.size[0])
@@ -325,7 +384,9 @@ def _mesh_rectangular_prism(prism: RectangularPrism) -> trimesh.Trimesh:
 
 
 def _mesh_cylinder(cylinder: Cylinder) -> trimesh.Trimesh:
-    start_distance, end_distance = _finite_extent_pair(cylinder.start_distance, cylinder.end_distance)
+    start_distance, end_distance = _finite_extent_pair(cylinder.start_distance, cylinder.end_distance,
+                                                       _vector3_to_numpy(cylinder.position),
+                                                       _normalize_vector(_vector3_to_numpy(cylinder.axis_direction)))
     height = end_distance - start_distance
     if height <= 0:
         radius = _numeric_to_float(cylinder.radius)
@@ -357,18 +418,21 @@ def _mesh_cylinder(cylinder: Cylinder) -> trimesh.Trimesh:
 def _mesh_half_space(half_space: HalfSpace) -> trimesh.Trimesh:
     unit_normal = _normalize_vector(_vector3_to_numpy(half_space.normal))
     plane_point = _half_space_point_on_plane(half_space)
+    reach = _REACH.get()
+    if reach is None:
+        width, depth = 2.0 * TRIANGLES_HALF_SPACE_INFINITE_EXTENT, TRIANGLES_HALF_SPACE_INFINITE_EXTENT
+    else:
+        # Centred under the reach, deep enough to pass it: it covers all of the reach on its side.
+        height = float(np.dot(reach.center - plane_point, unit_normal))
+        plane_point = reach.center - unit_normal * height
+        width = 2.0 * reach.radius
+        depth = max(height + reach.radius, TRIANGLES_REACH_MIN)
 
     transform = np.eye(4)
     transform[:3, :3] = _basis_from_z_axis(unit_normal)
-    transform[:3, 3] = plane_point + unit_normal * (TRIANGLES_HALF_SPACE_INFINITE_EXTENT / 2.0)
+    transform[:3, 3] = plane_point + unit_normal * (depth / 2.0)
 
-    mesh = trimesh.creation.box(
-        extents=[
-            TRIANGLES_HALF_SPACE_INFINITE_EXTENT * 2.0,
-            TRIANGLES_HALF_SPACE_INFINITE_EXTENT * 2.0,
-            TRIANGLES_HALF_SPACE_INFINITE_EXTENT,
-        ]
-    )
+    mesh = trimesh.creation.box(extents=[width, width, depth])
     mesh.apply_transform(transform)
     return _finalize_mesh(mesh)
 
@@ -377,7 +441,7 @@ def _mesh_convex_polygon_extrusion(extrusion: ConvexPolygonExtrusion) -> trimesh
     if not extrusion.is_valid():
         raise ValueError("ConvexPolygonExtrusion must be valid before triangulation")
 
-    start_distance, end_distance = _finite_extent_pair(extrusion.start_distance, extrusion.end_distance)
+    start_distance, end_distance = _finite_extent_pair(extrusion.start_distance, extrusion.end_distance, *_axis_of(extrusion.transform))
     if end_distance <= start_distance:
         raise ValueError("ConvexPolygonExtrusion must have positive height after finite conversion")
 
@@ -412,7 +476,7 @@ def _mesh_convex_polygon_extrusion(extrusion: ConvexPolygonExtrusion) -> trimesh
 
 
 def _mesh_path_extrusion(extrusion: PathExtrusion) -> trimesh.Trimesh:
-    start_distance, end_distance = _finite_extent_pair(extrusion.start_distance, extrusion.end_distance)
+    start_distance, end_distance = _finite_extent_pair(extrusion.start_distance, extrusion.end_distance, *_axis_of(extrusion.transform))
     if end_distance <= start_distance:
         raise ValueError("PathExtrusion must have positive height after finite conversion")
 
@@ -499,11 +563,29 @@ def _mesh_convex_polygon_loft(loft: ConvexPolygonSimpleLoft) -> trimesh.Trimesh:
 
 
 def _finite_extent_pair(
-    start_distance: Optional[Numeric], end_distance: Optional[Numeric]
+    start_distance: Optional[Numeric], end_distance: Optional[Numeric], origin: np.ndarray, axis: np.ndarray
 ) -> Tuple[float, float]:
-    start = -TRIANGLES_PRISM_INFINITE_EXTENT if start_distance is None else _numeric_to_float(start_distance)
-    end = TRIANGLES_PRISM_INFINITE_EXTENT if end_distance is None else _numeric_to_float(end_distance)
+    """A prism's ends along its axis (from `origin` along the unit `axis`), an open end just past the reach."""
+    reach = _REACH.get()
+    if reach is None:
+        low, high = -TRIANGLES_PRISM_INFINITE_EXTENT, TRIANGLES_PRISM_INFINITE_EXTENT
+    else:
+        along = float(np.dot(reach.center - origin, axis))
+        low, high = along - reach.radius, along + reach.radius
+    start = low if start_distance is None else _numeric_to_float(start_distance)
+    end = high if end_distance is None else _numeric_to_float(end_distance)
+    # An open end that falls short of the other (the prism misses the reach) still gives a thin solid.
+    if start_distance is None and start >= end:
+        start = end - TRIANGLES_REACH_MIN
+    if end_distance is None and end <= start:
+        end = start + TRIANGLES_REACH_MIN
     return start, end
+
+
+def _axis_of(transform: Transform) -> Tuple[np.ndarray, np.ndarray]:
+    """A transform's origin and its local +Z, along which a prism runs."""
+    matrix = _transform_to_numpy(transform)
+    return matrix[:3, 3], matrix[:3, 2]
 
 
 def _half_space_point_on_plane(half_space: HalfSpace) -> np.ndarray:

@@ -61,6 +61,7 @@ app.whenReady().then(async () => {
         check('Python, kumiki and Kigumi start in the page', ready === true, `${Math.round((Date.now() - started) / 1000)} s`);
         const warning = await wait("document.querySelector('#web-storage-warning')?.textContent", 20000);
         check('the projects page warns that files live in the browser only', Boolean(warning && warning.includes('NOT to disk')));
+        await shot('start');
 
         await js(`(() => {
             document.querySelector('.web-new-project input').value = 'Shed';

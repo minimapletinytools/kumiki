@@ -1,7 +1,7 @@
 """manifold3d's API, as kumiki uses it, over Manifold's WebAssembly build (npm manifold-3d) in Pyodide.
 
-Only what kumiki/csg/triangles.py calls: Manifold(Mesh64(...)), Manifold.batch_boolean, subtraction
-and to_mesh64. The browser build takes float32 vertices, so each mesh is given a tolerance of its
+Only what kumiki/csg/triangles.py calls: Manifold(Mesh64(...)), Manifold.batch_boolean, subtraction,
+status and to_mesh64. The browser build takes float32 vertices, so each mesh is given a tolerance of its
 own instead of the one float32 input would get (which grows with a solid's size).
 """
 import numpy as np
@@ -49,6 +49,9 @@ class Manifold:
 
     def __sub__(self, other):
         return Manifold(_js=self._js.subtract(other._js))
+
+    def status(self):
+        return self._js.status()
 
     def to_mesh64(self):
         js_mesh = self._js.getMesh()

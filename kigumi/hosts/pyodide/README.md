@@ -46,31 +46,24 @@ Page (dist/index.html)                         Web Worker (dist/worker.js)
   the policy of the page that made it, so `index.html`'s content security policy allows inline
   scripts and styles; each panel's own policy still applies on top.
 
-## Precision: kumiki's boxes
+## Precision
 
-Manifold's WebAssembly build hands back float32 vertices. kumiki meshes a half space as a box 2 km
-across and an infinite prism as 100 m long, and at a kilometre float32 is off by over a millimetre,
-enough to lose a cut (a dovetailed sawhorse leg lost 57% of its volume). The browser version sets
-them to 20 m and 10 m (`KUMIKI_TRIANGLES_HALF_SPACE_EXTENT`, `KUMIKI_TRIANGLES_PRISM_EXTENT`), with
-which these frames match native kumiki to within 5e-7 of each timber's volume:
+Manifold's WebAssembly build takes and hands back float32 vertices. kumiki meshes each half space
+and open-ended prism as a box sized to the timber it cuts, so the coordinates stay small, and the
+browser's timbers match native kumiki to within 1e-5 of each one's volume:
 
 | Frame | Timbers | Mesh time, native | Mesh time, Pyodide |
 | --- | --- | --- | --- |
-| my_cute_frame | 4 | 0.02 s | 0.06 s |
-| dovetailed_sawhorse | 5 | 0.02 s | 0.05 s |
-| cat_corner_cot | 96 | 0.13 s | 0.25 s |
-| oscarshed | 25 | 0.11 s | 0.24 s |
-| tinyhouse120 | 75 | 0.52 s | 0.83 s |
-
-But the cuts are fragile to those sizes natively too (with the same 20 m / 10 m, native loses cuts
-on two sawhorse legs). The fix is for kumiki to size each box to the solid it cuts.
+| my_cute_frame | 4 | 0.03 s | 0.06 s |
+| dovetailed_sawhorse | 5 | 0.03 s | 0.06 s |
+| oscarshed | 25 | 0.16 s | 0.25 s |
+| tinyhouse120 | 75 | 0.55 s | 0.85 s |
 
 ## Not here yet
 
 - The agent and MCP (the agent needs its backend from a worker; MCP needs a server).
 - Importing a .zip as a project.
 - Pyodide and Manifold come from jsDelivr, and trimesh from PyPI: vendor them for working offline.
-- kumiki's boxes sized to the solid (see above).
 
 ## Tests and tools
 

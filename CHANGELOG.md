@@ -18,6 +18,10 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 - A tool can take parameters: `Tool(name, description, run, kiwari=kiwari(...))`, and `run` is given the resolved values. A tool without a kiwari is run with nothing, as before.
 
+#### Fixed
+
+- Meshing sizes half spaces and open-ended prisms to the timber they cut, rather than 1 km and 100 m boxes, and subtracts cuts one at a time: manifold had overcut two dovetailed sawhorse legs whenever the box sizes changed.
+
 ### kigumi
 
 #### Added

@@ -3,12 +3,8 @@ import json, sys, time, importlib.util
 
 def run(frame_file, function):
     t0 = time.time()
-    import kumiki, os
-    import kumiki.csg.triangles as T
+    import kumiki
     from kumiki.csg.triangles import mesh_cutcsg
-    if os.environ.get('PRISM_EXTENT'):
-        T.TRIANGLES_PRISM_INFINITE_EXTENT = float(os.environ['PRISM_EXTENT'])
-        T.TRIANGLES_HALF_SPACE_INFINITE_EXTENT = float(os.environ['HALF_SPACE_EXTENT'])
     t_import = time.time() - t0
     spec = importlib.util.spec_from_file_location("frame_under_test", frame_file)
     module = importlib.util.module_from_spec(spec)

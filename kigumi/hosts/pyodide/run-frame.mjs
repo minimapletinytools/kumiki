@@ -3,9 +3,8 @@
 //
 //   node run-frame.mjs <repo> <frame.py> <frame function>
 //
-// TRIMESH=trimesh==4.11.3 pins trimesh; PRISM_EXTENT and HALF_SPACE_EXTENT set kumiki's box sizes for
-// infinite prisms and half spaces (see README); DEBUG=<folder> records the booleans of one sawhorse
-// leg there (record_booleans.py) instead.
+// TRIMESH=trimesh==4.11.3 pins trimesh; DEBUG=<folder> records the booleans of one sawhorse leg there
+// (record_booleans.py) instead.
 import { loadPyodide } from 'pyodide';
 import Manifold from 'manifold-3d';
 import fs from 'fs';
@@ -28,8 +27,7 @@ if (process.env.DEBUG) {
   process.exit(0);
 }
 const result = await py.runPythonAsync(`
-import sys, json, os
-os.environ.update(${JSON.stringify({PRISM_EXTENT: process.env.PRISM_EXTENT || '', HALF_SPACE_EXTENT: process.env.HALF_SPACE_EXTENT || ''})})
+import sys, json
 sys.path[:0] = ['/home/pyodide', '/repo']
 import compare
 json.dumps(compare.run(${JSON.stringify(frameFile.replace(repo, '/repo'))}, ${JSON.stringify(fn)}))
