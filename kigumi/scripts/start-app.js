@@ -17,7 +17,7 @@ const electron = require('electron');
 
 const ROOT = path.join(__dirname, '..');
 const DEV_DIR = path.join(ROOT, 'build-app', 'dev');
-const ICON = path.join(ROOT, 'templogo.png');
+const ICON = path.join(ROOT, 'app-icon.png');
 const MAIN = path.join(ROOT, 'hosts', 'electron', 'main.js');
 // Changes when the bundle is made differently, so an older copy is made again.
 const BUNDLE_FORMAT = 3;

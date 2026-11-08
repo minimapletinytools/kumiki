@@ -9,7 +9,7 @@ const { BrowserWindow, ipcMain, shell: electronShell } = require('electron');
 
 const SHELL_PRELOAD = path.join(__dirname, 'shell-preload.js');
 // The window's icon where the platform takes one from the window (Windows, Linux).
-const APP_ICON = path.join(__dirname, '..', '..', 'templogo.png');
+const APP_ICON = path.join(__dirname, '..', '..', 'app-icon.png');
 
 function createAppWindow({ origin, log = () => {} }) {
     const shellUrl = `${origin}/webview/shell/shell.html`;

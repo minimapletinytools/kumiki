@@ -123,7 +123,7 @@ const shell = fs.readFileSync(path.join(KIGUMI, 'webview/shell/shell.html'), 'ut
 const index = shell
     .replace(/<meta http-equiv="Content-Security-Policy" content="[^"]*">/, `<meta http-equiv="Content-Security-Policy" content="${SHELL_POLICY}">`)
     .replace('<head>', '<head>\n    <base href="webview/shell/">')
-    .replace('<link rel="stylesheet" href="shell.css">', '<link rel="stylesheet" href="shell.css">\n    <link rel="stylesheet" href="../../page/web.css">')
+    .replace('<link rel="stylesheet" href="shell.css">', '<link rel="stylesheet" href="shell.css">\n    <link rel="stylesheet" href="../../page/web.css">\n    <link rel="icon" type="image/png" href="../../page/favicon.png">')
     .replace('<script src="shell.js">', ['zip.js', 'web-projects.js', 'transport.js']
         .map((name) => `<script src="../../page/${name}"></script>`).join('\n    ') + '\n    <script src="shell.js">');
 if (index === shell || !index.includes('page/transport.js')) throw new Error('shell.html changed: update build.mjs');

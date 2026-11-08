@@ -54,4 +54,5 @@ agent/conversation-store.js
 agent/tools.js
 agent/mcp-http.js
 agent/mcp-setup.js
-templogo.png
+app-icon.png
+logo.svg

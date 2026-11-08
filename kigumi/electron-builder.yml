@@ -31,7 +31,7 @@ files:
   - app-shell/**
   - agent/**
   - .kigumi/docs/**
-  - templogo.png
+  - app-icon.png
   - "!jest.config.js"
   - "!test-frame.py"
   - "!**/__tests__/**"
@@ -43,7 +43,7 @@ extraResources:
     to: uv
     filter:
       - "uv*"
-icon: templogo.png
+icon: app-icon.png
 # Sign-in comes back from the browser on kigumi://auth.
 protocols:
   - name: Kigumi
