@@ -8,6 +8,12 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kigumi
+
+#### Changed
+
+- The browser version's agent panel is on by default (Kigumi options turns it off).
+
 ## [0.9.1] - 2026-11-08
 
 ### kumiki

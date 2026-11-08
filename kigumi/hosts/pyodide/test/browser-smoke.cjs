@@ -66,6 +66,7 @@ app.whenReady().then(async () => {
         const warning = await wait("document.querySelector('#web-storage-warning')?.textContent", 20000);
         check('the projects page warns that files live in the browser only', Boolean(warning && warning.includes('NOT to disk')));
         await shot('start');
+        check('the agent panel is open from the start', await wait(`!!document.querySelector('#slot-right iframe') && !document.querySelector('#slot-right').hidden`, 30000) === true);
 
         await js(`(() => {
             document.querySelector('.web-new-project input').value = 'Shed';
@@ -108,7 +109,7 @@ app.whenReady().then(async () => {
         })()`, 15000);
         check('a change to a project file reaches the browser\'s copy', synced === true);
 
-        // The agent: turned on, its panel opens with how it can be run here, and its tools work.
+        // The agent: its panel says how it can be run here, and its tools work.
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'web:settings',
             args: [{ values: { ...window.kigumiWeb.storedSettings(), 'agent.enabled': true } }] })`);
         const agent = 'document.querySelector("#slot-right iframe")?.contentDocument';

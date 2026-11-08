@@ -130,6 +130,8 @@ async function start() {
     const packageJson = JSON.parse(fs.readFileSync('/kigumi/package.json', 'utf8'));
     const settings = new SettingsStore(`${DATA}/settings.json`, {
         ...defaultsFromPackageJson(packageJson), 'viewer.autoRefreshOnFileChange': true,
+        // On here, unlike the standalone app: the browser has no other agent to reach Kigumi with.
+        'agent.enabled': true,
     });
     const channel = new LogChannel(`${DATA}/logs/kigumi.log`);
     const log = (line) => channel.appendLine(line);
