@@ -32,6 +32,8 @@ app.whenReady().then(async () => {
     window.webContents.on('console-message', (event) => {
         const text = String(event.message || '');
         if (text.includes('Content Security Policy')) violations.push(text);
+        // Kigumi's backend lets only its own sites ask it for the model list; the agent keeps its built-in one.
+        if (/kigumi-backend.*blocked by CORS|kigumi-backend.*net::ERR_FAILED/.test(text)) return;
         if (event.level === 'error' || /Uncaught/.test(text)) errors.push(text);
     });
     const downloaded = [];
@@ -54,6 +56,8 @@ app.whenReady().then(async () => {
     const explorer = 'document.querySelector("#slot-left iframe")?.contentDocument';
     const view = 'document.querySelector("#slot-center iframe:not([hidden])")?.contentDocument';
     try {
+        // A fresh browser: nothing left from an earlier run.
+        await session.defaultSession.clearStorageData();
         const started = Date.now();
         await window.loadURL(`http://127.0.0.1:${PORT}/`);
         window.showInactive();
@@ -104,6 +108,50 @@ app.whenReady().then(async () => {
         })()`, 15000);
         check('a change to a project file reaches the browser\'s copy', synced === true);
 
+        // The agent: turned on, its panel opens with how it can be run here, and its tools work.
+        await js(`window.kigumiShell.send({ type: 'shell:command', command: 'web:settings',
+            args: [{ values: { ...window.kigumiWeb.storedSettings(), 'agent.enabled': true } }] })`);
+        const agent = 'document.querySelector("#slot-right iframe")?.contentDocument';
+        const notice = await wait(`(() => {
+            const doc = ${agent};
+            const element = doc && doc.querySelector('.web-agent-notice');
+            return element && doc.defaultView.getComputedStyle(element).display !== 'none' ? element.textContent : null;
+        })()`, 60000);
+        check('turned on, the agent opens and says how it can be run here', Boolean(notice && notice.includes('coming soon')));
+        await shot('agent');
+        const tool = (name, input = {}) => js(`new Promise((resolve) => {
+            const id = Math.random();
+            const worker = window.__kigumiWorker;
+            const listen = (event) => {
+                if (event.data && event.data.type === 'test:agentToolResult' && event.data.id === id) {
+                    worker.removeEventListener('message', listen);
+                    resolve(event.data.error ? 'ERROR ' + event.data.error : event.data.result.map((part) => part.text || '').join('\\n'));
+                }
+            };
+            worker.addEventListener('message', listen);
+            worker.postMessage({ type: 'test:agentTool', id, name: ${JSON.stringify(name)}, input: ${JSON.stringify(input)} });
+        })`);
+        const found = await tool('search_files', { pattern: 'def my_cute_frame' });
+        check("the agent's search finds a line in the project", found.includes('my_cute_frame.py:'), found.slice(0, 120));
+        const api = await tool('kumiki_api', { name: 'create_axis_aligned_timber' });
+        check("the agent's kumiki_api looks a name up in kumiki", api.includes('create_axis_aligned_timber') && !api.startsWith('ERROR'), api.slice(0, 120));
+        // The tab signing in opens: noted, not opened.
+        await js(`window.open = (url) => { window.__signInUrl = url; return {}; }; true`);
+        await js(`${agent}.querySelector('.web-agent-sign-in .sign-in-chip[data-provider="github"]').click()`);
+        const signInHref = await wait('window.__signInUrl', 15000);
+        const signInUrl = signInHref ? new URL(signInHref) : null;
+        check('signing in opens the provider in a tab, coming back to auth.html',
+            Boolean(signInUrl && signInUrl.hostname.endsWith('supabase.co') && (signInUrl.searchParams.get('redirect_to') || '').endsWith('/auth.html')),
+            signInHref && signInHref.slice(0, 100));
+        // Coming back to auth.html hands the code to this tab, which tries it (a made-up one fails).
+        const authWindow = new BrowserWindow({ show: false });
+        await authWindow.loadURL(`http://127.0.0.1:${PORT}/auth.html?code=not-a-real-code`);
+        const refused = await wait(`(document.querySelector('#status-message')?.textContent || '').includes('Could not sign in') || null`, 30000);
+        check('auth.html hands sign-in back to the Kigumi tab', refused === true);
+        if (!authWindow.isDestroyed()) authWindow.destroy();
+        const listed = await tool('list_projects');
+        check("the agent's list_projects names the open project", listed.includes('"open": "Shed"'), listed.replace(/\s+/g, ' ').slice(0, 120));
+
         // A bigger frame from kumiki's examples: the 120 sq ft tiny house.
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'browseExamples', args: [] })`);
         const houseRow = await wait(`(() => {
@@ -129,8 +177,8 @@ app.whenReady().then(async () => {
 
         await window.reload();
         await wait("document.body.classList.contains('kigumi-ready')", 240000);
-        const listed = await wait(`document.querySelector('.web-project .welcome-recent-folder')?.textContent`, 30000);
-        check('after a reload the browser still has the project', listed === 'Shed', listed);
+        const reloaded = await wait(`document.querySelector('.web-project .welcome-recent-folder')?.textContent`, 30000);
+        check('after a reload the browser still has the project', reloaded === 'Shed', reloaded);
 
         await js("document.querySelector('.web-project .web-project-action').click()");
         const deadline = Date.now() + 10000;
@@ -148,7 +196,8 @@ app.whenReady().then(async () => {
         await js("document.querySelector('#status-workspace').click()");
         await wait("!!document.querySelector('.web-project')", 30000);
         await js("window.confirm = () => true; [...document.querySelectorAll('.web-project .web-project-action')].find((b) => b.textContent === 'Delete').click()");
-        check('Delete removes the project from the browser', await wait("window.kigumiWeb.listProjects().length === 0", 10000) === true);
+        check('Delete removes the project from the browser', await wait("window.kigumiWeb.listProjects().length === 0", 10000) === true,
+            JSON.stringify(await js('window.kigumiWeb.listProjects()')));
 
         check('no content security policy violations', violations.length === 0, violations.slice(0, 2).join(' | '));
         check('no errors in the page', errors.length === 0, errors.slice(0, 3).join(' | '));

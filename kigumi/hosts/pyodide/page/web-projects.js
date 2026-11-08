@@ -12,6 +12,8 @@
     'use strict';
 
     const SETTINGS_KEY = 'kigumi.web.settings';
+    // The agent's account session and model list (the worker's web:store).
+    const STORE_KEY = 'kigumi.web.store';
     const DB_NAME = 'kigumi-web';
     const STORE = 'projects';
     const WARNING = 'Your files are saved to browser cache, NOT to disk and NOT to the cloud. '
@@ -213,17 +215,36 @@
         }
     }
 
+    function readJson(key) {
+        try {
+            const values = JSON.parse(localStorage.getItem(key) || '{}');
+            return values && typeof values === 'object' && !Array.isArray(values) ? values : {};
+        } catch (_error) {
+            return {};
+        }
+    }
+
+    function storeValues(values) {
+        try {
+            localStorage.setItem(STORE_KEY, JSON.stringify(values || {}));
+        } catch (error) {
+            warn(error);
+        }
+    }
+
     window.kigumiWeb = Object.freeze({
         /** Called once by transport.js with how to send to the server. */
         connect(sendMessage) {
             send = sendMessage;
             // First, before the shell asks for anything: this browser's settings are the ones in force.
             command('web:settings', { values: storedSettings() });
+            command('web:store', { values: readJson(STORE_KEY) });
             reload().catch(warn);
             if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
         },
         receiveFiles: (message) => receiveFiles(message).catch(warn),
         storeSettings,
+        storeValues,
         storedSettings,
         downloadBase64,
         renderWelcome,

@@ -59,9 +59,25 @@ browser's timbers match native kumiki to within 1e-5 of each one's volume:
 | oscarshed | 25 | 0.16 s | 0.25 s |
 | tinyhouse120 | 75 | 0.55 s | 0.85 s |
 
+## The agent
+
+The agent panel is here as in the standalone app: off until **Agent panel** is turned on under
+Kigumi options. It runs in the worker, and its requests go from there to OpenRouter (with the
+user's own key) or to Kigumi's backend (signed in). Its tools work on the project in Pyodide's files
+and ask Pyodide's Python about kumiki.
+
+- **Signing in** opens the provider in a new tab, which comes back to `auth.html`; that hands the
+  code to the Kigumi tab (a BroadcastChannel). If the browser blocks the tab, Kigumi's own tab goes
+  instead, and `auth.html` brings it back to finish. The account's session is kept in localStorage.
+- **For a site to sign in from**, two settings outside this repo name it: the Supabase project's
+  redirect URLs need its `auth.html` (e.g. `https://kumiki.build/try/auth.html`), and kigumi-backend's
+  `ALLOWED_ORIGINS` needs its origin. Without the second, signed-in requests and the model list are
+  refused (the agent keeps its built-in model list); an OpenRouter key works anywhere.
+- **Conversations** are kept only until the page is reloaded.
+
 ## Not here yet
 
-- The agent and MCP (the agent needs its backend from a worker; MCP needs a server).
+- MCP: other agents connect to a server, and a web page can't be one. The standalone app has it.
 - Importing a .zip as a project.
 - Pyodide and Manifold come from jsDelivr, and trimesh from PyPI: vendor them for working offline.
 
@@ -76,9 +92,11 @@ only):
 1. It makes a project and builds its starter frame in a view, then opens the file in the editor.
 2. It checks that a change reaches the browser's copy, and that Example Frames and kumiki's patterns
    are listed.
-3. It builds the 75-timber tiny house.
-4. It reloads, exports the .zip and checks it, reopens the project and deletes it.
-5. It checks there are no policy violations or page errors.
+3. It turns the agent on and checks its panel, its search, kumiki_api and project tools, and signing
+   in: the provider's page asked for, and `auth.html` handing the code back.
+4. It builds the 75-timber tiny house.
+5. It reloads, exports the .zip and checks it, reopens the project and deletes it.
+6. It checks there are no policy violations or page errors.
 
 Screenshots go to `test-artifacts/`.
 

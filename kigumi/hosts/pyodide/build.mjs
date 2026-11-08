@@ -1,6 +1,7 @@
 // Build Kigumi in a browser into dist/: static files, nothing to run on a server.
 //
 //   dist/index.html            the app's shell page, with the page scripts (page/) before shell.js
+//   dist/auth.html             where signing in to the agent's account comes back to
 //   dist/worker.js             Kigumi's core and its Node stand-ins (worker/), bundled
 //   dist/webview/              the shell, explorer, viewer and editor pages and their assets
 //   dist/page/                 the page's scripts: the worker connection and the projects page
@@ -12,6 +13,7 @@
 
 import * as esbuild from 'esbuild';
 import { execFileSync } from 'child_process';
+import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -33,6 +35,7 @@ const shims = {
     os: path.join(HERE, 'worker/shims/os.js'),
     https: path.join(HERE, 'worker/shims/https.js'),
     crypto: path.join(HERE, 'worker/shims/crypto.js'),
+    worker_threads: path.join(HERE, 'worker/shims/worker_threads.js'),
     path: path.join(HERE, 'node_modules/path-browserify/index.js'),
 };
 
@@ -93,7 +96,13 @@ await esbuild.build({
 
 // The pages and their assets, and the page's own scripts.
 copyDir(path.join(KIGUMI, 'webview'), path.join(DIST, 'webview'));
-copyDir(path.join(HERE, 'page'), path.join(DIST, 'page'));
+copyDir(path.join(HERE, 'page'), path.join(DIST, 'page'), (file) => /auth\.(html|js)$/.test(file));
+
+// The sign-in page, its script inline and allowed by its hash.
+const authScript = fs.readFileSync(path.join(HERE, 'page/auth.js'), 'utf8');
+const authHash = createHash('sha256').update(authScript).digest('base64');
+fs.writeFileSync(path.join(DIST, 'auth.html'), fs.readFileSync(path.join(HERE, 'page/auth.html'), 'utf8')
+    .replace('AUTHHASH', authHash).replace('AUTHSCRIPT', () => authScript));
 
 // The shell page's policy. Panels are shown as blobs, and a blob page also gets the policy of the page
 // that made it, so this one allows what the panels need (inline scripts and styles); each panel's own
@@ -125,6 +134,9 @@ const runtimeFiles = [
     path.join(KIGUMI, 'package.json'),
     path.join(KIGUMI, 'legacy-doc-hashes.json'),
     ...fs.readdirSync(KIGUMI).filter((name) => name.endsWith('.py')).map((name) => path.join(KIGUMI, name)),
+    // The agent's instructions and its kumiki_api tool's script.
+    path.join(KIGUMI, 'agent/system-prompt.md'),
+    path.join(KIGUMI, 'agent/kumiki_api.py'),
     ...walk(path.join(KIGUMI, 'webview'), (file) => file.endsWith('.html')),
     ...walk(path.join(KIGUMI, 'i18n/locales'), (file) => file.endsWith('.json')),
     ...walk(path.join(REPO, 'docs'), (file) => file.endsWith('.md') && !file.includes(`${path.sep}internal${path.sep}`)),

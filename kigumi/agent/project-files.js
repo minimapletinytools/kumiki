@@ -16,6 +16,11 @@ const fs = require('fs');
 const path = require('path');
 const { Worker } = require('worker_threads');
 
+/** search-worker.js's search, run without a thread. */
+function searchInPlace(options) {
+    return require('./search-worker').search(options);
+}
+
 /** Never walked into when listing or searching; never written. Git's hooks and installed packages run code. */
 const PROTECTED = new Set(['.git', '.venv', 'node_modules', '.kigumi', '__pycache__']);
 /** How long a search may take: a pattern can be slow enough to hang it otherwise. */
@@ -134,7 +139,8 @@ function createProjectFiles({ root, readOnly = () => [] }) {
             // Said, not left as "No matches": a search of .venv stops long before its end.
             const cut = files.length >= MAX_SEARCHED_FILES
                 ? [`(searched only the first ${MAX_SEARCHED_FILES} files; give a smaller folder or a file_glob)`] : [];
-            const found = await new Promise((resolveSearch, rejectSearch) => {
+            // No threads (the browser, already off the page's thread): search here.
+            const found = !Worker ? searchInPlace({ files, root: base(), pattern, ignoreCase, maxMatches }) : await new Promise((resolveSearch, rejectSearch) => {
                 const worker = new Worker(path.join(__dirname, 'search-worker.js'), {
                     workerData: { files, root: base(), pattern, ignoreCase, maxMatches },
                 });

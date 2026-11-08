@@ -1,6 +1,6 @@
 /**
  * search_files' search (project-files.js search), in a worker thread so a slow pattern can be
- * stopped without the app's main process hanging on it.
+ * stopped without the app's main process hanging on it; where there are no threads, run in place.
  */
 
 const fs = require('fs');
@@ -33,8 +33,13 @@ function search({ files, root, pattern, ignoreCase, maxMatches }) {
     return matches;
 }
 
-try {
-    parentPort.postMessage({ matches: search(workerData) });
-} catch (error) {
-    parentPort.postMessage({ error: error.message });
+// Started as a thread: search and reply. Required (the browser, with no threads): just the search.
+if (parentPort) {
+    try {
+        parentPort.postMessage({ matches: search(workerData) });
+    } catch (error) {
+        parentPort.postMessage({ error: error.message });
+    }
 }
+
+module.exports = { search };

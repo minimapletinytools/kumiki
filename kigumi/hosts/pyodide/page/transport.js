@@ -59,6 +59,10 @@
             window.kigumiWeb.receiveFiles(message);
         } else if (message.type === 'web:settings') {
             window.kigumiWeb.storeSettings(message.values);
+        } else if (message.type === 'web:store') {
+            window.kigumiWeb.storeValues(message.values);
+        } else if (message.type === 'browser:signIn') {
+            signIn(message.url);
         } else if (message.type === 'web:requestOpen') {
             window.kigumiWeb.openProject(message.id);
         } else {
@@ -67,6 +71,42 @@
         }
     };
     worker.onerror = (event) => showStatus(`Kigumi's worker failed: ${event.message}`, true);
+
+    // Signing in: the provider's page in a new tab, which comes back to auth.html. If the browser
+    // blocks the tab, this one goes there, and auth.html brings it back here afterwards.
+    const AUTH_CHANNEL = 'kigumi-auth';
+    const AUTH_LINK_KEY = 'kigumi.web.authLink';
+    function signIn(url) {
+        const target = new URL(url);
+        if (target.protocol !== 'https:') return;
+        const tab = window.open(target.href, '_blank');
+        if (tab) tab.opener = null;
+        else window.location.assign(target.href);
+    }
+    function deliverAuthLink(url) {
+        if (typeof url === 'string' && url.startsWith(new URL('auth.html', base).href)) {
+            worker.postMessage({ type: 'web:authLink', url });
+            return true;
+        }
+        return false;
+    }
+    if ('BroadcastChannel' in window) {
+        const channel = new BroadcastChannel(AUTH_CHANNEL);
+        channel.onmessage = (event) => {
+            if (event.data && event.data.type === 'authLink' && deliverAuthLink(event.data.url)) {
+                channel.postMessage({ type: 'received' });
+            }
+        };
+    }
+    try {
+        const pending = localStorage.getItem(AUTH_LINK_KEY);
+        if (pending) {
+            localStorage.removeItem(AUTH_LINK_KEY);
+            deliverAuthLink(pending);
+        }
+    } catch (_error) {
+        // No storage: sign-in that came back in this tab is lost, and can be tried again.
+    }
 
     function send(message) {
         worker.postMessage(message);

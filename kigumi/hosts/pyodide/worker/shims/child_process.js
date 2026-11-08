@@ -139,4 +139,26 @@ function unsupported(name) {
     return () => { throw new Error(`child_process.${name} isn't available in the browser`); };
 }
 
-module.exports = { spawn, exec: unsupported('exec'), execFile: unsupported('execFile'), execSync: unsupported('execSync'), spawnSync: unsupported('spawnSync') };
+/** A one-shot Python command, its output given to `callback(error, stdout, stderr)` at the end. */
+function execFile(command, args = [], options = {}, callback = undefined) {
+    if (typeof options === 'function') {
+        callback = options;
+        options = {};
+    }
+    const child = spawn(command, args, options);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (text) => { stdout += text; });
+    child.stderr.on('data', (text) => { stderr += text; });
+    let done = false;
+    const finish = (error) => {
+        if (done) return;
+        done = true;
+        if (callback) callback(error, stdout, stderr);
+    };
+    child.once('error', (error) => finish(error));
+    child.once('close', (code) => finish(code ? Object.assign(new Error(`${command} exited with ${code}`), { code }) : null));
+    return child;
+}
+
+module.exports = { spawn, execFile, exec: unsupported('exec'), execSync: unsupported('execSync'), spawnSync: unsupported('spawnSync') };

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-AUTHHASH'; style-src 'unsafe-inline'">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kigumi sign-in</title>
+    <style>
+        body { font: 14px system-ui, sans-serif; margin: 0; display: grid; place-items: center; min-height: 100vh; background: #f8f8f8; color: #222; }
+        @media (prefers-color-scheme: dark) { body { background: #1e1e1e; color: #ddd; } }
+    </style>
+</head>
+<body>
+    <p id="message">Signing in to Kigumi…</p>
+    <script>AUTHSCRIPT</script>
+</body>
+</html>

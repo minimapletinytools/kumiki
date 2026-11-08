@@ -27,6 +27,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Added
 
 - Kigumi in a browser, with nothing on a server (`kigumi/hosts/pyodide`): the app's shell, explorer, viewers and code editor in the page, and Kigumi's core and kumiki in a Web Worker with Python in Pyodide. Projects live in the browser (IndexedDB), with a projects page that makes, opens, exports (.zip) and deletes them and says they are not saved to disk or the cloud. Build it with `npm run build` there; it is a static site.
+- The browser version has the agent panel (off until turned on under Kigumi options), with an OpenRouter key or signed in: signing in opens a tab that comes back to the site's `auth.html`. Its panel says how the agent can be run there. MCP stays in the standalone app.
 - The agent's chat area says to sign in (or, where Kigumi accounts aren't set up, to add an OpenRouter key) until the agent can send requests, and its settings take an OpenRouter key, which is never shown again.
 - With the MCP server on, Kigumi options shows its address to copy, the setup to copy for each agent, and how many agents are connected.
 - Project status ends with **Close Project** in the standalone app (not in VS Code, which has its own): its tabs close, asking about unsaved edits, and no project is open.

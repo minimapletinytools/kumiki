@@ -15,9 +15,10 @@ const text = (value) => [{ type: 'text', text: typeof value === 'string' ? value
  * @param {(folder: string) => Promise<void>} projects.open  open an existing folder (throws if it isn't one)
  * @param {(folder: string) => Promise<void>} projects.create  make a new project folder, open it and set it up
  * @param {() => Promise<void>} projects.close  close the project, leaving none open
+ * @param {boolean} [projects.byName]  projects are named, not folders (the browser, which keeps them itself)
  */
 function createProjectTools(projects) {
-    const folder = (what) => z.string().describe(`${what} An absolute path.`);
+    const folder = (what) => z.string().describe(projects.byName ? `${what} Its name.` : `${what} An absolute path.`);
     return [
         {
             name: 'list_projects',
@@ -42,7 +43,7 @@ function createProjectTools(projects) {
             description: 'Make a new project (its venv, kumiki and a starter frame) and open it in Kigumi. A folder '
                 + 'that does not exist yet is made; setting up an existing one overwrites nothing. Only when the '
                 + 'user asks for a new project.',
-            shape: { folder: folder('Where the new project goes, e.g. ~/Documents/shed written out in full.') },
+            shape: { folder: projects.byName ? folder('The new project.') : folder('Where the new project goes, e.g. ~/Documents/shed written out in full.') },
             effect: 'edit',
             run: async ({ folder: target }) => {
                 await projects.create(target);
