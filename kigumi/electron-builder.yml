@@ -44,6 +44,13 @@ extraResources:
     filter:
       - "uv*"
 icon: app-icon.png
+# Where updates come from. Builds don't publish (--publish never; release.yml attaches them), but
+# this makes electron-builder write the update files (latest-mac.yml, latest.yml) beside the
+# installers. The app reads them from the newest kigumi release itself (hosts/electron/auto-update.js).
+publish:
+  provider: github
+  owner: minimapletinytools
+  repo: kumiki
 # Sign-in comes back from the browser on kigumi://auth.
 protocols:
   - name: Kigumi

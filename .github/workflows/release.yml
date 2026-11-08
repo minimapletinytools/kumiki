@@ -279,11 +279,17 @@ jobs:
           installers=(app-builds/*.dmg app-builds/*.exe)
           if [ ${#installers[@]} -gt 0 ]; then
             cp "${installers[@]}" release-assets/
+            # What the app updates itself from (hosts/electron/auto-update.js): the Mac's signed .zips,
+            # and each platform's update file and blockmaps (for downloading only what changed).
+            for file in app-builds/*-mac-*.zip app-builds/latest-mac.yml app-builds/latest.yml app-builds/*.blockmap; do
+              if [ -f "$file" ]; then cp "$file" release-assets/; fi
+            done
             cat > release-notes.md <<'EOF'
           ## Kigumi app
 
           - **macOS**: `-mac-arm64.dmg` for Apple Silicon, `-mac-x64.dmg` for Intel.
           - **Windows**: `-windows-setup.exe`. If Windows protects your PC, click **More info** > **Run anyway**.
+          - Already installed? The app updates itself: it offers each new version, or look with **Check for Updates…**.
 
           EOF
           fi

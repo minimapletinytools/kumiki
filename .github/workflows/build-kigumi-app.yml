@@ -115,4 +115,6 @@ jobs:
             kigumi/dist-app/*.exe
             kigumi/dist-app/*.AppImage
             kigumi/dist-app/*.deb
+            kigumi/dist-app/latest*.yml
+            kigumi/dist-app/*.blockmap
           if-no-files-found: error

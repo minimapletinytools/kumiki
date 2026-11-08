@@ -25,6 +25,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - The browser version's agent panel is on by default (Kigumi options turns it off).
 - With no project open, Project status offers **Open Project…** and up to five recent projects (the standalone app's folders, the browser's projects; VS Code's opens a folder) instead of Initialize Project.
 - A new logo, 木 as a small timber frame, for the standalone app, the VS Code extension and the browser version's tab (`kigumi/scripts/make-logo.py` draws it).
+- The standalone app updates itself on the Mac and Windows: an available update offers **Install and Restart**, downloads in the background and restarts into the new version (or goes in when Kigumi next quits). Releases carry the update files it reads (`latest-mac.yml`, `latest.yml`, the Mac's .zips). Versions before this one still offer the download.
 
 ## [0.9.1] - 2026-11-08
 

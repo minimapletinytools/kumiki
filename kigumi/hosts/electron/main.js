@@ -33,6 +33,7 @@ const { SecureStorage } = require('./secure-storage');
 const { viewHost, sharedTools } = require('../../agent/agent');
 const { createMcpService } = require('../../agent/mcp-service');
 const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
+const { createAutoInstaller } = require('./auto-update');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
 const ORIGIN = 'kigumi://app';
@@ -658,21 +659,66 @@ async function fetchReleases() {
     return response.json();
 }
 
-/** Offer the available update: download it, read its notes, skip it, or leave it for later. */
+// Installing updates in place (auto-update.js), made when first needed.
+let autoInstaller = null;
+function installer() {
+    if (!autoInstaller) {
+        autoInstaller = createAutoInstaller({ autoUpdater: require('electron-updater').autoUpdater,
+            packaged: app.isPackaged, platform: process.platform, log: (line) => logChannel.appendLine(line) });
+    }
+    return autoInstaller;
+}
+
+/**
+ * Offer the available update: install it in place (the Mac and Windows, from a release with an
+ * update file), else download it; or read its notes, skip it, or leave it for later.
+ */
 async function showUpdate(release = updates && updates.available) {
     if (!release || !mainWindow || mainWindow.isDestroyed()) return;
+    const inPlace = installer().canInstall(release);
     const { response } = await dialog.showMessageBox(mainWindow, {
         type: 'info',
         message: `Kigumi ${release.version} is available`,
-        detail: `You have ${packageJson.version}. Download the new version and install it over this one; `
+        detail: `You have ${packageJson.version}. `
+            + (inPlace ? 'Kigumi downloads the new version and restarts into it; '
+                : 'Download the new version and install it over this one; ')
             + 'your settings and projects are kept.',
-        buttons: ['Download', 'Release Notes', 'Skip This Version', 'Later'],
+        buttons: [inPlace ? 'Install and Restart' : 'Download', 'Release Notes', 'Skip This Version', 'Later'],
         defaultId: 0,
         cancelId: 3,
     });
-    if (response === 0) void electronShell.openExternal(downloadUrl(release, process.platform, process.arch));
+    if (response === 0) {
+        if (inPlace) await installUpdate(release);
+        else void electronShell.openExternal(downloadUrl(release, process.platform, process.arch));
+    }
     if (response === 1) void electronShell.openExternal(release.page);
     if (response === 2) updates.skip(release.version);
+}
+
+/** Download `release`, showing how far along in the status bar, then restart into it. */
+async function installUpdate(release) {
+    const title = `Downloading Kigumi ${release.version}`;
+    setProgress(`${title}…`);
+    try {
+        await installer().download(release, { onProgress: (percent) => setProgress(`${title}… ${percent}%`) });
+    } catch (error) {
+        logChannel.appendLine(`[update] [error] ${error.stack || error}`);
+        const { response } = await dialog.showMessageBox(mainWindow, {
+            type: 'warning', message: `Could not install Kigumi ${release.version}`,
+            detail: `${error.message || error}\n\nYou can download it and install it over this one instead.`,
+            buttons: ['Download', 'Cancel'], defaultId: 0, cancelId: 1,
+        });
+        if (response === 0) void electronShell.openExternal(downloadUrl(release, process.platform, process.arch));
+        return;
+    } finally {
+        setProgress(null);
+    }
+    const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'info', message: `Kigumi ${release.version} is ready`,
+        detail: 'Restart now to use it, or it goes in the next time Kigumi quits.',
+        buttons: ['Restart Now', 'Later'], defaultId: 0, cancelId: 1,
+    });
+    if (response === 0) installer().restart();
 }
 
 /** Kigumi > Check for Updates…: look now, and say what was found. */
