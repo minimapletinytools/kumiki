@@ -19,12 +19,11 @@ const { createAppWindow } = require('./app-window');
 const { createElectronHost } = require('./electron-host');
 const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
 const { LogChannel } = require('./log-channel');
+const { createEditorTabs } = require('../../app-shell/editor-tabs');
+const { createAgentPanel } = require('../../agent/agent-panel');
 const { withRecentFolder, offeredRecentFolders } = require('./recent-folders');
-const { AgentSession } = require('../../agent/agent-session');
 const { createProjectFiles } = require('../../agent/project-files');
 const { createAccount } = require('../../agent/account');
-const { createConversationStore } = require('../../agent/conversation-store');
-const { loadCatalog, resolveLocale } = require('../../i18n');
 const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
 const { findKumikiSource, kumikiExamples, projectPython } = require('../../agent/kumiki-source');
@@ -32,8 +31,7 @@ const { pythonKumikiApi } = require('../../agent/kumiki-api');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { SecureStorage } = require('./secure-storage');
 const { viewHost, sharedTools } = require('../../agent/agent');
-const { startMcpHttpServer, newToken } = require('../../agent/mcp-http');
-const { MCP_CLIENTS, mcpSetupText } = require('../../agent/mcp-setup');
+const { createMcpService } = require('../../agent/mcp-service');
 const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
@@ -354,7 +352,7 @@ async function switchProject(folder) {
 
 /** Close every tab that belongs to the project, asking about unsaved edits; false if the user kept one. */
 async function closeProjectTabs() {
-    const dirty = [...editorTabs].filter(([, tab]) => tab.isDirty).map(([id]) => id);
+    const dirty = editors.dirtyIds();
     for (const id of dirty) {
         const panel = connection.panels.get(id);
         if (panel) panel.reveal();
@@ -388,6 +386,7 @@ function openProject() {
         openEditor: openEditorTab,
         showLog: openLogTab,
         mcp: mcpControls,
+        closeProject: () => closeWorkspaceFolder(),
     }));
     kigumiApp = createKigumiApp({
         extensionPath: KIGUMI_DIR,
@@ -451,135 +450,27 @@ function openLogTab({ source } = {}) {
     surface.loadUrl(`${ORIGIN}/webview/shell/log.html`);
 }
 
-// Editor tabs by panel id: whether each has unsaved edits, and how to ask it for them.
-const editorTabs = new Map();
+// Code editor tabs (app-shell/editor-tabs.js), made once the window is.
+let editors = null;
 
 function openEditorTab(filePath, line = 1) {
-    const existing = connection.findPanel((panel) => panel.type === 'editor' && panel.filePath === filePath);
-    if (existing) {
-        existing.reveal();
-        if (line > 1) {
-            void existing.postMessage({ type: 'revealLine', line });
-        }
-        return existing;
-    }
-
-    let fileContent = '';
-    try {
-        fileContent = fs.readFileSync(filePath, 'utf8');
-    } catch (error) {
-        logChannel.appendLine(`[editor] Failed to read ${filePath}: ${error.message}`);
-        setStatus('error', `Cannot open ${path.basename(filePath)}: ${error.message}`);
-        return null;
-    }
-
-    const baseName = path.basename(filePath);
-    const surface = connection.createPanel('editor', { title: baseName, filePath });
-    const pendingContent = new Map();
-    let nextRequest = 1;
-    const tab = {
-        name: baseName,
-        isDirty: false,
-        // What the editor holds now, unsaved edits included.
-        content() {
-            const requestId = nextRequest++;
-            return new Promise((resolve, reject) => {
-                const timer = setTimeout(() => {
-                    pendingContent.delete(requestId);
-                    reject(new Error(`${baseName} did not answer`));
-                }, 3000);
-                pendingContent.set(requestId, (content) => {
-                    clearTimeout(timer);
-                    resolve(content);
-                });
-                void surface.postMessage({ type: 'getContent', requestId });
-            });
-        },
-        save(content) {
-            fs.writeFileSync(filePath, content, 'utf8');
-            fileContent = content;
-            tab.isDirty = false;
-            surface.title = baseName;
-            void surface.postMessage({ type: 'saved' });
-        },
-    };
-    editorTabs.set(surface.id, tab);
-
-    surface.onMessage(async (message) => {
-        if (!message) return;
-        if (message.type === 'editorReady') {
-            void surface.postMessage({ type: 'init', filePath, content: fileContent, line });
-        } else if (message.type === 'editorDirty') {
-            tab.isDirty = !!message.isDirty;
-            surface.title = tab.isDirty ? `● ${baseName}` : baseName;
-        } else if (message.type === 'editorContent') {
-            const resolve = pendingContent.get(message.requestId);
-            pendingContent.delete(message.requestId);
-            if (resolve) resolve(message.content);
-        } else if (message.type === 'editorSave') {
-            try {
-                tab.save(message.content);
-            } catch (error) {
-                setStatus('error', `Failed to save ${baseName}: ${error.message}`);
-            }
-        }
-    });
-
-    // Changes made elsewhere -- another editor, an agent -- come into the tab. Polled: an editor
-    // that saves by renaming the file would leave an fs.watch watching nothing.
-    const onDiskChange = () => {
-        let content;
-        try {
-            content = fs.readFileSync(filePath, 'utf8');
-        } catch {
-            return;
-        }
-        if (content === fileContent) {
-            return; // our own save, or nothing that matters
-        }
-        fileContent = content;
-        if (tab.isDirty) {
-            setStatus('warning', `${baseName} changed on disk; the tab keeps your unsaved edits.`);
-            return;
-        }
-        void surface.postMessage({ type: 'externalUpdate', content });
-    };
-    fs.watchFile(filePath, { interval: 1000 }, onDiskChange);
-    surface.onDispose(() => {
-        fs.unwatchFile(filePath, onDiskChange);
-        editorTabs.delete(surface.id);
-    });
-
-    surface.loadUrl(`${ORIGIN}/webview/editor/editor.html`);
-    return surface;
+    return editors.open(filePath, line);
 }
 
-// Before an editor tab with unsaved edits closes: save, discard, or keep it open.
-async function confirmCloseEditor(panelId) {
-    const tab = editorTabs.get(panelId);
-    if (!tab || !tab.isDirty) {
-        return true;
-    }
+function confirmCloseEditor(panelId) {
+    return editors.confirmClose(panelId);
+}
+
+async function askToSave(name) {
     const { response } = await dialog.showMessageBox(mainWindow, {
         type: 'warning',
         buttons: ['Save', "Don't Save", 'Cancel'],
         defaultId: 0,
         cancelId: 2,
-        message: `Do you want to save the changes you made to ${tab.name}?`,
+        message: `Do you want to save the changes you made to ${name}?`,
         detail: "Your changes will be lost if you don't save them.",
     });
-    if (response === 2) {
-        return false;
-    }
-    if (response === 0) {
-        try {
-            tab.save(await tab.content());
-        } catch (error) {
-            setStatus('error', `Failed to save ${tab.name}: ${error.message}`);
-            return false;
-        }
-    }
-    return true;
+    return ['save', 'discard', 'cancel'][response];
 }
 
 // Opens settings.json, listing every setting with its current value.
@@ -600,7 +491,6 @@ function runToolCommand(id, args) {
     return handler(args);
 }
 
-let agentSession = null;
 let account = null;
 let modelList = null;
 // A kigumi://auth link that came before the account existed (a cold start from the browser).
@@ -632,7 +522,7 @@ function createAppModelList() {
             load: () => JSON.parse(fs.readFileSync(file, 'utf8')),
             save: (models) => fs.writeFileSync(file, JSON.stringify(models, null, 1)),
         },
-        onChange: () => agentSession && agentSession.postState(),
+        onChange: () => agentPanel && agentPanel.session && agentPanel.session.postState(),
     });
     refreshModels();
 }
@@ -651,7 +541,7 @@ function createAppAccount() {
         // leaves the browser tab loading forever.
         redirectTo: `${config.backendUrl.replace(/\/$/, '')}/auth/callback`,
         openExternal: (url) => electronShell.openExternal(url),
-        onChange: () => agentSession && agentSession.postState(),
+        onChange: () => agentPanel && agentPanel.session && agentPanel.session.postState(),
     });
     const link = pendingAuthLink || process.argv.find((arg) => arg.startsWith('kigumi://auth'));
     pendingAuthLink = null;
@@ -706,130 +596,35 @@ function agentHost() {
     });
 }
 
+// The agent's panel (agent/agent-panel.js), made once the window is.
+let agentPanel = null;
+
 // Shows or hides the agent. Hidden, it keeps its conversation.
 function toggleAgentPanel() {
-    if (!agentEnabled()) return;
-    if (!account) createAppAccount();
-    if (!modelList) createAppModelList();
-    if (connection.findPanel((panel) => panel.type === 'agent')) {
-        connection.setSideShown('right', !connection.layout.right);
-        return;
-    }
-    const surface = connection.createPanel('agent', { title: 'Agent' });
-    agentSession = new AgentSession({
-        host: agentHost(),
-        post: (message) => void surface.postMessage(message),
-        setting: (key, fallback) => settings.get(key, fallback),
-        setSetting: (key, value) => settings.set(key, value),
-        account,
-        models: modelList,
-        conversations: createConversationStore(path.join(app.getPath('userData'), 'conversations')),
-        strings: loadCatalog(resolveLocale(app.getLocale())),
-        log: (line) => logChannel.appendLine(line),
-    });
-    surface.onMessage((message) => agentSession && agentSession.handle(message));
-    surface.onDispose(() => {
-        if (agentSession) agentSession.stop();
-        agentSession = null;
-    });
-    surface.loadUrl(`${ORIGIN}/webview/agent/agent.html`);
-    connection.setSideShown('right', true);
-    refreshModels();
+    if (agentPanel) agentPanel.toggle();
 }
 
 /** Closes the agent panel once `agent.enabled` is turned off. */
 function closeAgentIfDisabled() {
-    if (agentEnabled() || !connection) return;
-    const panel = connection.findPanel((one) => one.type === 'agent');
-    if (panel) panel.dispose();
+    if (agentPanel) agentPanel.closeIfDisabled();
 }
 
-let mcpServer = null;
-let mcpError = null;
-const mcpListeners = new Set();
+// Kigumi's MCP server (agent/mcp-service.js), made once the window is.
+let mcp = null;
 
-/** The MCP server as the options panel shows it: on or off, where, and who has been talking to it. */
-function mcpState() {
-    return {
-        enabled: settings.get('mcp.enabled', false) === true,
-        running: Boolean(mcpServer),
-        url: mcpServer ? mcpServer.url : null,
-        error: mcpError,
-        clients: mcpServer ? mcpServer.clients() : [],
-        setups: MCP_CLIENTS.map(({ id, label }) => ({ id, label })),
-    };
-}
-
-function notifyMcp() {
-    const state = mcpState();
-    for (const listener of [...mcpListeners]) {
-        listener(state);
-    }
-}
-
-// What the host offers the views about MCP (host.js, `mcp`).
+// What the host offers the views about MCP (host.js, `mcp`), before and after the server is made.
 const mcpControls = {
-    state: mcpState,
-    onChange(listener) {
-        mcpListeners.add(listener);
-        return { dispose: () => mcpListeners.delete(listener) };
-    },
-    copySetup: (clientId) => copyMcpSetup(clientId),
+    state: () => mcp.controls.state(),
+    onChange: (listener) => mcp.controls.onChange(listener),
+    copySetup: (clientId) => mcp.copySetup(clientId),
 };
 
-// Serves Kigumi's tools over MCP while `mcp.enabled` is on, on the port and token in settings.
-async function syncMcpServer() {
-    const wanted = settings.get('mcp.enabled', false) === true;
-    const port = Number(settings.get('mcp.port', 7345)) || 0;
-    if (mcpServer && (!wanted || mcpServer.port !== port)) {
-        await mcpServer.close();
-        logChannel.appendLine('[mcp] Stopped');
-        mcpServer = null;
-    }
-    if (!wanted) {
-        mcpError = null;
-    }
-    if (!wanted || mcpServer || !kigumiApp) {
-        notifyMcp();
-        return;
-    }
-    let token = settings.get('mcp.token', '');
-    if (!token) {
-        token = newToken();
-        settings.set('mcp.token', token);
-    }
-    try {
-        mcpServer = await startMcpHttpServer({
-            tools: sharedTools(agentHost()),
-            token,
-            port,
-            version: packageJson.version,
-            log: (line) => logChannel.appendLine(line),
-            onClientsChange: notifyMcp,
-        });
-        mcpError = null;
-        logChannel.appendLine(`[mcp] Serving Kigumi's tools at ${mcpServer.url}`);
-    } catch (error) {
-        mcpError = `Could not start on port ${port}: ${error.message || error}`;
-        logChannel.appendLine(`[mcp] ${mcpError}`);
-        setStatus('error', `Kigumi's MCP server could not start on port ${port}: ${error.message || error}`);
-    }
-    notifyMcp();
+function syncMcpServer() {
+    return mcp ? mcp.sync() : Promise.resolve();
 }
 
-// Puts what adds Kigumi to an agent (mcp-setup.js) on the clipboard; Claude Code's by default.
-function copyMcpSetup(clientId = 'claude-code') {
-    if (!mcpServer) {
-        setStatus('warning', 'Turn on the MCP server first (options, beta features).');
-        return;
-    }
-    const text = mcpSetupText(clientId, mcpServer.url, settings.get('mcp.token', ''));
-    if (!text) {
-        return;
-    }
-    require('electron').clipboard.writeText(text);
-    const client = MCP_CLIENTS.find((one) => one.id === clientId);
-    setStatus('info', `Copied the MCP setup for ${client ? client.label : clientId}.`);
+function copyMcpSetup(clientId) {
+    if (mcp) mcp.copySetup(clientId);
 }
 
 function onShellCommand(id, ...args) {
@@ -962,8 +757,14 @@ function buildMenu() {
                     click: () => runAppCommand('kigumi.toggleAutoRefreshOnFileChange'),
                 },
                 { type: 'separator' },
+                {
+                    label: 'Enable Agent Panel',
+                    type: 'checkbox',
+                    checked: agentEnabled(),
+                    click: () => settings.set('agent.enabled', !agentEnabled()),
+                },
                 ...(agentEnabled() ? [{ label: 'Toggle Agent', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() }] : []),
-                { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcpServer), click: () => copyMcpSetup() },
+                { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcp && mcp.running), click: () => copyMcpSetup() },
                 { type: 'separator' },
                 { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
                 { label: 'Show Log', accelerator: 'CmdOrCtrl+Shift+U', click: () => openLogTab() },
@@ -1038,11 +839,35 @@ async function start() {
         log,
         closeRequest: confirmCloseEditor,
     });
+    editors = createEditorTabs({ connection, editorUrl: `${ORIGIN}/webview/editor/editor.html`, log, setStatus, askToSave });
+    agentPanel = createAgentPanel({
+        connection,
+        pageUrl: `${ORIGIN}/webview/agent/agent.html`,
+        settings,
+        makeHost: agentHost,
+        prepare: () => {
+            if (!account) createAppAccount();
+            if (!modelList) createAppModelList();
+            return { account, models: modelList };
+        },
+        conversationsDir: path.join(userData, 'conversations'),
+        locale: app.getLocale(),
+        log,
+    });
+    mcp = createMcpService({
+        settings,
+        tools: () => sharedTools(agentHost()),
+        ready: () => Boolean(kigumiApp),
+        version: packageJson.version,
+        log,
+        setStatus,
+        copyText: (text) => require('electron').clipboard.writeText(text),
+    });
     mainWindow.on('focus', () => pushShellState());
     // Quitting asks about each editor tab with unsaved edits, as closing one does.
     let closeConfirmed = false;
     mainWindow.on('close', (event) => {
-        const dirty = [...editorTabs].filter(([, tab]) => tab.isDirty).map(([id]) => id);
+        const dirty = editors.dirtyIds();
         if (closeConfirmed || dirty.length === 0) {
             return;
         }
@@ -1075,12 +900,16 @@ async function start() {
     updates.start();
     let checkingForUpdates = settings.get('app.checkForUpdates', true);
 
+    let agentWasEnabled = agentEnabled();
     settings.onChange(() => {
         if (settings.get('app.checkForUpdates', true) !== checkingForUpdates) {
             checkingForUpdates = settings.get('app.checkForUpdates', true);
             updates.start();
         }
         closeAgentIfDisabled();
+        // Turned on just now: show it, rather than leave the user to find its button.
+        if (agentEnabled() && !agentWasEnabled) toggleAgentPanel();
+        agentWasEnabled = agentEnabled();
         buildMenu();
         pushShellState();
         void syncMcpServer();
@@ -1089,9 +918,9 @@ async function start() {
     void syncMcpServer();
 
     mainWindow.on('closed', async () => {
-        if (agentSession) agentSession.stop();
+        if (agentPanel) agentPanel.stop();
         updates.stop();
-        if (mcpServer) await mcpServer.close();
+        if (mcp) await mcp.close();
         const current = kigumiApp;
         kigumiApp = null;
         connection.dispose();

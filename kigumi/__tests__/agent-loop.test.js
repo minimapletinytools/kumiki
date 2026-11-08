@@ -692,13 +692,24 @@ describe('the agent session', () => {
         agent.handle({ type: 'agent:setModel', id: 'claude-sonnet-5' });
 
         expect(values['agent.model']).toBe('claude-sonnet-5');
-        expect(posted.pop()).toEqual({
+        const state = posted.pop();
+        expect(state).toEqual({
             type: 'agent:state', models: MODELS.map(({ id, label }) => ({ id, label })), model: 'claude-sonnet-5', via: 'openrouter',
             account: { configured: false },
+            // The key is set from the panel, which only learns that there is one.
             settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
-                'agent.maxOutputTokens': 8000 },
+                'agent.maxOutputTokens': 8000, 'agent.openrouterApiKey': true },
             strings: {},
         });
+        expect(JSON.stringify(state)).not.toContain('sk-or');
+    });
+
+    test('the panel sets the OpenRouter key, trimmed, and can clear it', () => {
+        const { agent, values } = session();
+        agent.handle({ type: 'agent:setSetting', key: 'agent.openrouterApiKey', value: '  sk-or-new  ' });
+        expect(values['agent.openrouterApiKey']).toBe('sk-or-new');
+        agent.handle({ type: 'agent:setSetting', key: 'agent.openrouterApiKey', value: '' });
+        expect(values['agent.openrouterApiKey']).toBe('');
     });
 
     test('signed in, requests carry the account\'s token; a turn ends with its cost and the balance is fetched again', async () => {

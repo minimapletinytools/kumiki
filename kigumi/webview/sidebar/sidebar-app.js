@@ -11,7 +11,7 @@ const { ContextMenu, menuPosition } = KigumiContextMenu;
 const payload = window.__KIGUMI_INITIAL_PAYLOAD__ || {};
 const t = KigumiI18n.createTranslator(payload.i18n && payload.i18n.strings);
 const ROW_ACTIONS = payload.rowActions || {};
-const STATUS_TYPES = new Set(['projectStatusAction', 'kumikiVersionAction', 'kumikiWebsiteAction']);
+const STATUS_TYPES = new Set(['projectStatusAction', 'kumikiVersionAction', 'kumikiWebsiteAction', 'closeProjectAction']);
 
 const hostApi = window.__kigumiVsCode
     || (typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null);
@@ -44,6 +44,9 @@ class KigumiSidebar extends LitElement {
         focusedKey: { state: true },
         selectedKey: { state: true },
         menuState: { state: true },
+        options: { state: true },
+        mcp: { state: true },
+        sections: { state: true },
     };
 
     constructor() {
@@ -57,6 +60,11 @@ class KigumiSidebar extends LitElement {
         this.selectedKey = saved.selectedKey || null;
         this.focusedKey = this.selectedKey;
         this.menuState = null;
+        // The switches under "Kigumi options" (sidebar-controller.js sidebarOptions).
+        this.options = [];
+        this.mcp = null;
+        // Which titled sections are open: project status open, options closed, until toggled.
+        this.sections = { status: true, options: false, ...(saved.sections || {}) };
         // Keys of unlisted folders already asked for (sidebarExpand).
         this.requestedFolders = new Set();
         this.contextMenu = new ContextMenu();
@@ -87,6 +95,8 @@ class KigumiSidebar extends LitElement {
             this.tree = Array.isArray(message.tree) ? message.tree : [];
             this.groupByPatternbook = message.groupByPatternbook !== false;
             this.isScanning = !!message.isScanning;
+            this.options = Array.isArray(message.options) ? message.options : [];
+            this.mcp = message.mcp || null;
             const unlisted = new Set();
             const walk = (nodes) => nodes.forEach((one) => {
                 if (one.lazyDir) unlisted.add(one.key);
@@ -124,6 +134,7 @@ class KigumiSidebar extends LitElement {
                 filter: this.filter,
                 overrides: [...this.overrides.entries()],
                 selectedKey: this.selectedKey,
+                sections: this.sections,
             });
         }
     }
@@ -284,6 +295,61 @@ class KigumiSidebar extends LitElement {
         }
     }
 
+    /** A titled section above the tree, opened and closed from its title. */
+    renderSection(id, title, body) {
+        const open = this.sections[id] === true;
+        return html`
+            <section class="ks-section ${open ? 'is-open' : ''}" data-section=${id}>
+                <button class="ks-section-header" aria-expanded=${String(open)}
+                    @click=${() => { this.sections = { ...this.sections, [id]: !open }; this.saveState(); }}>
+                    <span class="codicon ${open ? 'codicon-chevron-down' : 'codicon-chevron-right'}"></span>
+                    <span class="ks-section-title">${title}</span>
+                </button>
+                ${open ? body : nothing}
+            </section>`;
+    }
+
+    renderKigumiOptions() {
+        return html`
+            <div class="ks-options">
+                ${this.options.map((option) => html`
+                    <label class="ks-option">
+                        <input type="checkbox" data-option=${option.key} .checked=${option.value === true}
+                            @change=${(event) => post({ type: 'sidebarSetOption', key: option.key, value: event.target.checked })}>
+                        <span>${t(option.labelKey)}</span>
+                    </label>
+                    ${option.key === 'mcp.enabled' && option.value ? this.renderMcp() : nothing}`)}
+            </div>`;
+    }
+
+    /** With the MCP server on: where it is, the setups to copy for each agent, and who is connected. */
+    renderMcp() {
+        const mcp = this.mcp;
+        if (!mcp) return nothing;
+        if (!mcp.running) {
+            return html`<div class="ks-mcp"><div class="ks-mcp-note">${mcp.error || t('sidebar.mcp.starting')}</div></div>`;
+        }
+        const clients = mcp.clients || [];
+        const count = clients.length === 0 ? t('sidebar.mcp.agents.none')
+            : clients.length === 1 ? t('sidebar.mcp.agents.one') : t('sidebar.mcp.agents.many', { count: clients.length });
+        return html`
+            <div class="ks-mcp">
+                <div class="ks-mcp-address">
+                    <input type="text" readonly .value=${mcp.url} aria-label=${t('sidebar.mcp.address')}
+                        @focus=${(event) => event.target.select()}>
+                    <button class="ks-mcp-button" data-copy="address"
+                        @click=${() => post({ type: 'sidebarCopyMcp', client: 'address' })}>${t('sidebar.mcp.copy')}</button>
+                </div>
+                <div class="ks-mcp-note">${t('sidebar.mcp.copyFor')}</div>
+                <div class="ks-mcp-setups">
+                    ${(mcp.setups || []).map((setup) => html`
+                        <button class="ks-mcp-button" data-copy=${setup.id}
+                            @click=${() => post({ type: 'sidebarCopyMcp', client: setup.id })}>${setup.label}</button>`)}
+                </div>
+                <div class="ks-mcp-agents" title=${clients.map((client) => client.name || client.id || '').join(', ')}>${count}</div>
+            </div>`;
+    }
+
     renderStatus() {
         return html`
             <div class="ks-status">
@@ -375,7 +441,8 @@ class KigumiSidebar extends LitElement {
         const rows = this.rows();
         const focusedIndex = rows.findIndex((row) => row.node.key === this.focusedKey);
         return html`
-            ${this.renderStatus()}
+            ${this.renderSection('status', t('sidebar.section.projectStatus'), this.renderStatus())}
+            ${this.renderSection('options', t('sidebar.section.options'), this.renderKigumiOptions())}
             ${this.renderToolbar()}
             <div class="ks-tree" role="tree" tabindex="0" aria-label=${t('sidebar.ui.treeLabel')}
                 aria-activedescendant=${focusedIndex === -1 ? nothing : `ks-row-${focusedIndex}`}

@@ -53,8 +53,22 @@ const TREE = [
   },
 ];
 
+// A host with settings, as every host has; `config` is what they hold.
+let config;
+function settingsHost(extra = {}) {
+  config = { 'viewer.autoRefreshOnFileChange': true };
+  const listeners = new Set();
+  return {
+    locale: 'en',
+    getConfig: (key, fallback) => (key in config ? config[key] : fallback),
+    updateConfig: async (key, value) => { config[key] = value; listeners.forEach((listener) => listener((k) => k === key)); },
+    onConfigChange: (listener) => { listeners.add(listener); return { dispose: () => listeners.delete(listener) }; },
+    ...extra,
+  };
+}
+
 beforeEach(() => {
-  setHost({ locale: 'en' });
+  setHost(settingsHost());
 });
 
 async function attached() {
@@ -178,4 +192,42 @@ test('reveal asks the page to expand the rows it has, and says which', async () 
   surface.posted.length = 0;
   expect(controller.reveal(['not-a-row'])).toEqual([]);
   expect(surface.posted).toEqual([]);
+});
+
+test('Kigumi options lists the switches the host has, and sets one from the page', async () => {
+  setHost(settingsHost({ agentPanel: true }));
+  const { surface } = await attached();
+  const options = () => surface.posted.filter((m) => m.type === 'sidebarState').pop().options;
+
+  expect(options().map((o) => o.key)).toEqual(expect.arrayContaining(['viewer.autoRefreshOnFileChange', 'agent.enabled', 'viewer.drawingBeta']));
+  expect(options().map((o) => o.key)).not.toContain('mcp.enabled');
+  expect(options().find((o) => o.key === 'agent.enabled').value).toBe(false);
+
+  await surface.send({ type: 'sidebarSetOption', key: 'agent.enabled', value: true });
+  expect(config['agent.enabled']).toBe(true);
+  expect(options().find((o) => o.key === 'agent.enabled').value).toBe(true);
+
+  await surface.send({ type: 'sidebarSetOption', key: 'agent.openrouterApiKey', value: true });
+  await surface.send({ type: 'sidebarSetOption', key: 'viewer.drawingBeta', value: 'yes' });
+  expect(config).not.toHaveProperty('agent.openrouterApiKey');
+  expect(config).not.toHaveProperty('viewer.drawingBeta');
+});
+
+test('with MCP on, the sidebar gets its state, copies its address or a setup, and nothing else', async () => {
+  const copied = [];
+  const setups = [];
+  const mcp = {
+    state: () => ({ running: true, url: 'http://127.0.0.1:7345/mcp', clients: [{ name: 'a' }], setups: [{ id: 'claude-code', label: 'Claude Code' }] }),
+    onChange: () => ({ dispose() {} }),
+    copySetup: (id) => setups.push(id),
+  };
+  setHost(settingsHost({ mcp, copyText: async (text) => copied.push(text) }));
+  const { surface } = await attached();
+
+  expect(surface.posted.filter((m) => m.type === 'sidebarState').pop().mcp.url).toBe('http://127.0.0.1:7345/mcp');
+  await surface.send({ type: 'sidebarCopyMcp', client: 'address' });
+  await surface.send({ type: 'sidebarCopyMcp', client: 'claude-code' });
+  await surface.send({ type: 'sidebarCopyMcp', client: 'not-a-client' });
+  expect(copied).toEqual(['http://127.0.0.1:7345/mcp']);
+  expect(setups).toEqual(['claude-code']);
 });

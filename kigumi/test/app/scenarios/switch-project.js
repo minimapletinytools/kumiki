@@ -7,7 +7,7 @@ const path = require('path');
 
 module.exports = {
     name: 'switch-project',
-    async run({ check, waitFor, connection, switchProject, agentProjects, runAppCommand, openFrame, settings, REPO }) {
+    async run({ check, waitFor, inShell, connection, switchProject, agentProjects, runAppCommand, openFrame, settings, REPO }) {
         const explorerRoot = async () => {
             const snapshot = await runAppCommand('kigumi.testGetSidebarSnapshot', { forceRefresh: false }).catch(() => null);
             return snapshot && snapshot.state ? snapshot.state.workspaceRoot : null;
@@ -28,6 +28,17 @@ module.exports = {
             check('the agent\'s open_project switches back in place',
                 await waitFor(async () => await explorerRoot() === REPO, { timeoutMs: 15000 }).then(() => true, () => false));
             check('a frame builds in a view after switching back', await openFrame());
+
+            const closeRow = await waitFor(() => inShell(`(() => {
+                const doc = document.querySelector('#slot-left iframe')?.contentDocument;
+                const row = doc && [...doc.querySelectorAll('.ks-status-action')].find((one) => one.textContent.includes('Close Project'));
+                if (!row) return false;
+                row.click();
+                return true;
+            })()`), { timeoutMs: 15000 }).catch(() => false);
+            check('Project status\'s Close Project closes it, leaving none open',
+                closeRow && await waitFor(() => settings.get('app.workspaceFolder') === null, { timeoutMs: 15000 }).then(() => true, () => false));
+            await switchProject(REPO);
 
             await agentProjects().close();
             check('close_project leaves no project open', settings.get('app.workspaceFolder') === null);

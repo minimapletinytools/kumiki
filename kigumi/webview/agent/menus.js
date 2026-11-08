@@ -13,7 +13,7 @@ function ago(time) {
 }
 
 export class Menus {
-    constructor({ settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, outputLimit, banner }, { post }) {
+    constructor({ settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, outputLimit, keyInput, keyNote, banner }, { post }) {
         Object.assign(this, { settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, outputLimit, banner, post });
         this.modeRadios = [...settingsMenu.querySelectorAll('input[name="permission-mode"]')];
         this.allowedTools = [];
@@ -32,6 +32,16 @@ export class Menus {
         }
         startupToggle.addEventListener('change', () => post({ type: 'agent:setSetting', key: 'agent.showOnStartup', value: startupToggle.checked }));
         outputLimit.addEventListener('change', () => post({ type: 'agent:setSetting', key: 'agent.maxOutputTokens', value: Number(outputLimit.value) }));
+        // A key typed here is sent once, on Enter or leaving the box, and the box empties again.
+        this.keyInput = keyInput;
+        this.keyNote = keyNote;
+        const sendKey = () => {
+            if (!keyInput.value.trim()) return;
+            post({ type: 'agent:setSetting', key: 'agent.openrouterApiKey', value: keyInput.value.trim() });
+            keyInput.value = '';
+        };
+        keyInput.addEventListener('change', sendKey);
+        keyInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') sendKey(); });
     }
 
     closeHistory() {
@@ -43,6 +53,13 @@ export class Menus {
         for (const radio of this.modeRadios) radio.checked = radio.value === mode;
         this.startupToggle.checked = settings['agent.showOnStartup'] !== false;
         this.outputLimit.value = String(settings['agent.maxOutputTokens'] || 8000);
+        const hasKey = settings['agent.openrouterApiKey'] === true;
+        this.keyNote.replaceChildren(document.createTextNode(hasKey ? t('agent.settings.openrouterKey.saved') : t('agent.settings.openrouterKey.none')));
+        if (hasKey) {
+            const clear = Object.assign(document.createElement('button'), { className: 'link-btn', textContent: t('agent.settings.openrouterKey.clear') });
+            clear.addEventListener('click', () => this.post({ type: 'agent:setSetting', key: 'agent.openrouterApiKey', value: '' }));
+            this.keyNote.append(' ', clear);
+        }
         const planning = settings['agent.planMode'] === true;
         this.banner.hidden = !planning && mode === 'ask';
         this.banner.textContent = planning ? t('agent.banner.plan') : MODE_BANNERS[mode] ? t(MODE_BANNERS[mode]) : '';

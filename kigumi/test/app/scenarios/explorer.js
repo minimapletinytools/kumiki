@@ -5,7 +5,7 @@ const path = require('path');
 
 module.exports = {
     name: 'explorer',
-    async run({ check, inShell, waitFor, capture, runAppCommand, connection, REPO, FRAME }) {
+    async run({ check, inShell, waitFor, capture, runAppCommand, connection, settings, REPO, FRAME }) {
         const sidebar = await waitFor(async () => {
             const snapshot = await runAppCommand('kigumi.testGetSidebarSnapshot', { forceRefresh: false });
             return snapshot && snapshot.state.workspaceRoot && !snapshot.state.isScanning ? snapshot : null;
@@ -80,5 +80,25 @@ module.exports = {
         } finally {
             await inExplorer(`row('files-root')?.querySelector('.ks-twistie')?.click(); return true;`);
         }
+
+        // Above the tree: Project status, open, and Kigumi options, closed until opened.
+        const sections = await inExplorer(`return [...doc.querySelectorAll('.ks-section')].map((one) => ({
+            id: one.dataset.section, open: one.querySelector('.ks-section-header').getAttribute('aria-expanded'),
+            rows: one.querySelectorAll('.ks-status-row, .ks-option').length }));`);
+        check('the explorer has Project status open and Kigumi options closed, above the tree',
+            JSON.stringify(sections) === JSON.stringify([{ id: 'status', open: 'true', rows: sections[0].rows }, { id: 'options', open: 'false', rows: 0 }])
+                && sections[0].rows > 0, JSON.stringify(sections));
+        await inExplorer(`doc.querySelector('.ks-section[data-section="options"] .ks-section-header').click(); return true;`);
+        const drawingsBefore = settings.get('viewer.drawingBeta', false);
+        const toggled = await waitFor(() => inExplorer(`const box = doc.querySelector('.ks-option input[data-option="viewer.drawingBeta"]');
+            if (!box) return false; box.click(); return true;`), { timeoutMs: 5000 }).catch(() => false);
+        const changed = await waitFor(() => settings.get('viewer.drawingBeta', false) !== drawingsBefore, { timeoutMs: 5000 })
+            .then(() => true, () => false);
+        await capture('01b-explorer-options');
+        settings.set('viewer.drawingBeta', drawingsBefore);
+        const shownBack = await waitFor(() => inExplorer(`return doc.querySelector('.ks-option input[data-option="viewer.drawingBeta"]').checked === ${drawingsBefore};`),
+            { timeoutMs: 5000 }).then(() => true, () => false);
+        await inExplorer(`doc.querySelector('.ks-section[data-section="options"] .ks-section-header').click(); return true;`);
+        check('Kigumi options switches a setting, and shows one changed elsewhere', toggled && changed && shownBack);
     },
 };

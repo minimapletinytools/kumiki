@@ -23,7 +23,8 @@ const composer = new Composer({
 }, { post, isBusy: () => busy, onSent: (text, imageUrls) => conversation.userBubble(text, imageUrls) });
 const menus = new Menus({
     settingsButton: $('btn-settings'), settingsMenu: $('settings-menu'), historyButton: $('btn-history'), historyMenu: $('history-menu'),
-    historyList: $('history-list'), alwaysAllowed: $('always-allowed'), startupToggle: $('setting-startup'), outputLimit: $('setting-output-limit'), banner: $('bypass-banner'),
+    historyList: $('history-list'), alwaysAllowed: $('always-allowed'), startupToggle: $('setting-startup'), outputLimit: $('setting-output-limit'),
+    keyInput: $('setting-openrouter-key'), keyNote: $('setting-openrouter-key-note'), banner: $('bypass-banner'),
 }, { post });
 
 function reset() {
@@ -39,7 +40,8 @@ $('btn-clear').addEventListener('click', () => {
     menus.closeHistory();
 });
 $('messages').addEventListener('click', (event) => {
-    if (event.target.classList.contains('suggestion-chip')) composer.send(event.target.textContent);
+    if (event.target.classList.contains('sign-in-chip')) post({ type: 'agent:signIn', provider: event.target.dataset.provider });
+    else if (event.target.classList.contains('suggestion-chip')) composer.send(event.target.textContent);
 });
 
 // A reopened conversation: drawn again from what the panel showed.

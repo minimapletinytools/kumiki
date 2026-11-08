@@ -1717,7 +1717,18 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             assemblyPreviewAvailable: Boolean(FEATURE_FLAGS.assemblyPreview),
             // Whether the host runs Kigumi's MCP server; its state is `mcpState`.
             mcpAvailable: INITIAL_PAYLOAD.mcpAvailable === true,
+            agentAvailable: INITIAL_PAYLOAD.agentAvailable === true,
+            // Whether the host has the agent panel, and whether it is turned on (agent.enabled).
+            agentEnabled: this.agentEnabledSetting === undefined
+                ? INITIAL_PAYLOAD.agentEnabled === true : this.agentEnabledSetting,
         };
+    }
+
+    /** Turn the agent panel on or off: a setting, shown in the options at once. */
+    setAgentEnabled(enabled) {
+        this.agentEnabledSetting = Boolean(enabled);
+        this.setBetaFeature('agent', enabled);
+        this.requestUpdate();
     }
 
     /** Put what adds Kigumi's MCP server to an agent (a setup id of `mcpState`) on the clipboard. */

@@ -489,6 +489,19 @@ class SidebarModel {
             action: open('kigumi.openWebsite'),
         }));
 
+        // Back to no project open, where the host can do that (the standalone app, not VS Code).
+        const host = getHost();
+        if (typeof host.closeProject === 'function' && host.workspaceRoots().length > 0) {
+            nodes.push(node({
+                key: 'close-project-action',
+                type: 'closeProjectAction',
+                label: t('sidebar.closeProject'),
+                description: t('sidebar.closeProject.desc'),
+                icon: 'close',
+                action: open('kigumi.closeProject'),
+            }));
+        }
+
         return nodes;
     }
 

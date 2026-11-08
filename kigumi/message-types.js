@@ -60,11 +60,13 @@ const TO_EXTENSION_REPLIES = Object.freeze([
 
 /** Sidebar page to host. Handled in sidebar-controller's handleMessage. */
 const SIDEBAR_TO_HOST = Object.freeze([
+    'sidebarCopyMcp',
     'sidebarExpand',
     'sidebarReady',
     'sidebarRefresh',
     'sidebarRun',
     'sidebarSelect',
+    'sidebarSetOption',
     'sidebarToggleGroup',
 ]);
 

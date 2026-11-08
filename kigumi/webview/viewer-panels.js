@@ -277,6 +277,12 @@ export class ViewerSettingsPanel {
                         @change=${(event) => this.app.setBetaFeature('drawingBeta', event.target.checked)}>
                     ${t('viewer.options.beta.drawings')}
                 </label>
+                ${this.app.panelFlags.agentAvailable ? html`
+                <label>
+                    <input id="beta-agent-toggle" type="checkbox" .checked=${this.app.panelFlags.agentEnabled}
+                        @change=${(event) => this.app.setAgentEnabled(event.target.checked)}>
+                    ${t('viewer.options.beta.agent')}
+                </label>` : ''}
                 ${this.app.panelFlags.mcpAvailable ? html`
                 <label>
                     <input id="beta-mcp-toggle" type="checkbox" .checked=${Boolean(this.app.mcpState && this.app.mcpState.enabled)}

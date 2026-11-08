@@ -33,6 +33,7 @@ const BETA_FEATURE_SETTINGS = Object.freeze({
     assemblyPreview: 'viewer.assemblyPreview',
     drawingBeta: 'viewer.drawingBeta',
     mcp: 'mcp.enabled',
+    agent: 'agent.enabled',
 });
 
 function assemblyPreviewSettingEnabled() {

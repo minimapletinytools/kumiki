@@ -257,6 +257,10 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         'kigumi.projectHeaderAction': () => runProjectHeaderAction(),
         'kigumi.updateKumiki': () => runProjectHeaderUpdateAction(),
         'kigumi.openWebsite': () => host.openExternal(KUMIKI_WEBSITE),
+        // Not awaited: closing the project disposes this app, the one running the command.
+        'kigumi.closeProject': () => {
+            if (typeof host.closeProject === 'function') void host.closeProject();
+        },
         'kigumi.refreshSidebar': () => sidebarModel.refresh(true),
         'kigumi.refreshPatterns': () => sidebarModel.refresh(true),
         'kigumi.toggleGroupByPatternbook': () => sidebarModel.toggleGroupByPatternbook(),

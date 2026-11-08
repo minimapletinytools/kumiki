@@ -156,6 +156,8 @@ function getWebviewContent(surface, frameData, geometryData, profiling, uiState 
             drawingBetaSetting: getHost().getConfig('viewer.drawingBeta', false) === true,
             // The host runs Kigumi's MCP server (the standalone app): the options show it.
             mcpAvailable: Boolean(getHost().mcp),
+            agentAvailable: getHost().agentPanel === true,
+            agentEnabled: getHost().getConfig('agent.enabled', false) === true,
             i18n: { locale, strings: loadCatalog(locale) },
         },
     });
