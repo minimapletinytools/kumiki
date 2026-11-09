@@ -135,9 +135,9 @@ on :)
 
 ### Developing Kigumi
 
-Kigumi is 100% AI slop, and it seems to not even be that awful :). Still, it's designed with more
-care than I sometimes let on. There's no written architecture guide yet, and I'm opinionated about
-it, so a bug report or feature request is often better than a pull request.
+Kigumi is written almost entirely with AI coding agents, under close direction. There's no written
+architecture guide yet, and its design is opinionated, so a bug report or feature request is often
+better than a pull request.
 
 Pull requests that change anything under `kigumi/` need a signed
 [Contributor License Agreement](CLA.md). The CLA bot asks on your first such PR and tells you what
