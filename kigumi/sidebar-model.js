@@ -31,6 +31,7 @@ const ROW_ACTIONS = Object.freeze({
     openInNewWindow: { command: 'kigumi.openPatternInNewWindow', icon: 'link-external', labelKey: 'sidebar.action.openInNewWindow', inline: false },
     openInViewer: { command: 'kigumi.openInViewer', icon: 'eye', labelKey: 'sidebar.action.openInViewer', inline: false },
     revealInFileManager: { command: 'kigumi.revealInFileManager', icon: 'folder-opened', labelKey: REVEAL_LABEL_KEY, inline: false },
+    newFile: { command: 'kigumi.newFile', icon: 'new-file', labelKey: 'sidebar.action.newFile', inline: false },
 });
 
 const LIBRARY_SECTIONS = new Set(['shipped-patterns', 'dependency-patterns']);
@@ -558,7 +559,7 @@ class SidebarModel {
         const entries = this._files.entries(dirPath);
         return node({
             expanded: false,
-            rowActions: ['revealInFileManager'],
+            rowActions: ['newFile', 'revealInFileManager'],
             ...fields,
             lazyDir: entries === null ? dirPath : undefined,
             children: entries === null ? [] : entries.map((entry) => (entry.isDirectory
@@ -582,7 +583,7 @@ class SidebarModel {
             label: entry.name,
             icon,
             action: open('kigumi.openFileSource', entry.filePath),
-            rowActions: entry.name.endsWith('.py') ? ['openInViewer', 'revealInFileManager'] : ['revealInFileManager'],
+            rowActions: entry.name.endsWith('.py') ? ['openInViewer', 'newFile', 'revealInFileManager'] : ['newFile', 'revealInFileManager'],
             data: { filePath: entry.filePath },
         });
     }
@@ -615,7 +616,6 @@ class SidebarModel {
                 t('sidebar.noFrameDefinitionsFound'),
                 this._state.workspaceRoot ? '' : t('sidebar.openAWorkspace'),
             ));
-            return nodes;
         }
         nodes.push(...frames.map((frameFile) => this._frameNode(
             `frame-file:workspace:${frameFile.filePath}`,
@@ -623,6 +623,16 @@ class SidebarModel {
             frameFile.filePath,
             frameFile,
         )));
+        // Last in the list: a row that makes a new frame file.
+        if (this._state.workspaceRoot) {
+            nodes.push(node({
+                key: 'frames-new',
+                type: 'newFrameAction',
+                label: t('sidebar.newFrame'),
+                icon: 'add',
+                action: open('kigumi.newFrame'),
+            }));
+        }
         return nodes;
     }
 

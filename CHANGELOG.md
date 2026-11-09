@@ -10,6 +10,12 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kigumi
 
+#### Added
+
+- **New Frame…**, the last row of the explorer's frames list: name a frame and Kigumi writes `<name>.py` at the top of the project with one post to start from, then lists and opens it.
+- **New File…** in the right-click menu of the explorer's All Files tree (the standalone app and the browser version): a file in that folder, or under a subfolder named with it, opened once made.
+- Hosts can ask for a line of text (`host.askText`): the app's quick pick takes typed text, and VS Code uses its input box.
+
 #### Changed
 
 - The browser version's agent panel opens with a warning: the standalone app with your own agent gives much better results, the panel is for trying Kumiki out, and its $1 of sign-in credit can't be topped up. Its download link goes to kumiki.build/install.

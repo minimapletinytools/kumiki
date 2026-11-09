@@ -299,17 +299,23 @@
     // Quick pick
     // ---------------------------------------------------------------------
 
-    const quickpick = { requestId: null, items: [], visible: [], selected: 0 };
+    // `input`: a text box (connection.ask) rather than a list to choose from.
+    const quickpick = { requestId: null, items: [], visible: [], selected: 0, input: false, prompt: '' };
     const QUICKPICK_SHOWN = 300;
 
-    function closeQuickPick(index) {
+    function closeQuickPick(index, text) {
         if (quickpick.requestId === null) return;
-        core.send({ type: 'quickpick:result', requestId: quickpick.requestId, index });
+        core.send({ type: 'quickpick:result', requestId: quickpick.requestId, index, ...(typeof text === 'string' ? { text } : {}) });
         quickpick.requestId = null;
         $('quickpick').hidden = true;
     }
 
     function renderQuickPick() {
+        if (quickpick.input) {
+            quickpick.visible = [];
+            $('quickpick-list').replaceChildren(el('div', 'empty', quickpick.prompt));
+            return;
+        }
         const needle = $('quickpick-filter').value.trim().toLowerCase();
         quickpick.visible = [];
         let pendingSeparator = null;
@@ -353,15 +359,20 @@
         if (selected) selected.scrollIntoView({ block: 'nearest' });
     }
 
-    function showQuickPick({ requestId, placeholder, items }) {
+    function showQuickPick({ requestId, placeholder, items, input, prompt, value }) {
         if (quickpick.requestId !== null) closeQuickPick(null);
-        Object.assign(quickpick, { requestId, items: items || [], selected: 0 });
+        Object.assign(quickpick, { requestId, items: items || [], selected: 0, input: Boolean(input), prompt: prompt || '' });
         const filter = $('quickpick-filter');
-        filter.placeholder = placeholder || '';
-        filter.value = '';
+        filter.placeholder = input ? '' : placeholder || '';
+        filter.value = input ? value || '' : '';
         $('quickpick').hidden = false;
         renderQuickPick();
         filter.focus();
+        if (input) {
+            // The name selected without its extension, ready to type over.
+            const dot = filter.value.lastIndexOf('.');
+            filter.setSelectionRange(0, dot > 0 ? dot : filter.value.length);
+        }
     }
 
     function setupQuickPick() {
@@ -382,7 +393,8 @@
                 renderQuickPick();
             } else if (event.key === 'Enter') {
                 event.preventDefault();
-                if (choices[quickpick.selected]) closeQuickPick(choices[quickpick.selected].index);
+                if (quickpick.input) closeQuickPick(null, filter.value);
+                else if (choices[quickpick.selected]) closeQuickPick(choices[quickpick.selected].index);
             } else if (event.key === 'Escape') {
                 event.preventDefault();
                 closeQuickPick(null);

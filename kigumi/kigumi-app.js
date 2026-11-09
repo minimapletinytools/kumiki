@@ -15,6 +15,7 @@ const { SidebarModel } = require('./sidebar-model');
 const { SidebarController } = require('./sidebar-controller');
 const { DEFAULT_FILES_EXCLUDE, listFiles } = require('./sidebar-files');
 const { NewPythonFileWatcher } = require('./new-python-file-watcher');
+const newFiles = require('./new-files');
 const { normalizeRetentionDays, pruneOldLogFiles } = require('./log-retention');
 const {
     getInitializationStatus,
@@ -535,6 +536,74 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             } catch (error) {
                 outputChannel.appendLine(`Duplicate pattern error: ${error.message}\n${error.stack}`);
                 host.showMessage('error', t('message.failedToDuplicatePattern', { error: error.message }));
+            }
+        },
+
+        // New File: in the explorer row's folder (a file's own folder), or the project's.
+        'kigumi.newFile': async (target) => {
+            const root = getWorkspaceRoot();
+            if (!root) {
+                host.showMessage('error', t('message.openWorkspaceFolderFirst'));
+                return;
+            }
+            const data = target && typeof target === 'object' && target.data ? target.data : {};
+            const dir = data.dirPath || (data.filePath ? path.dirname(data.filePath) : root);
+            const folder = path.relative(root, dir) || path.basename(root);
+            let value = newFiles.unusedName(dir, 'untitled', '.py');
+            let prompt = t('message.newFilePrompt', { folder });
+            for (;;) {
+                const text = await host.askText({ prompt, value });
+                if (text === undefined) return;
+                const { filePath, error } = newFiles.newFilePath(root, dir, text);
+                if (error) {
+                    // Asked again, saying what was wrong.
+                    prompt = t(error, { name: text.trim() });
+                    value = text;
+                    continue;
+                }
+                try {
+                    newFiles.createFile(filePath);
+                } catch (createError) {
+                    host.showMessage('error', t('message.newFileFailed', { error: createError.message }));
+                    return;
+                }
+                await sidebarModel.openFolder(path.dirname(filePath));
+                await sidebarModel.refreshFiles();
+                await host.showFile(filePath);
+                return;
+            }
+        },
+
+        // New Frame: a frame file at the project's top, with one post to start from.
+        'kigumi.newFrame': async () => {
+            const root = getWorkspaceRoot();
+            if (!root) {
+                host.showMessage('error', t('message.openWorkspaceFolderFirst'));
+                return;
+            }
+            let value = newFiles.unusedName(root, 'my_frame', '');
+            let prompt = t('message.newFramePrompt');
+            for (;;) {
+                const text = await host.askText({ prompt, value });
+                if (text === undefined) return;
+                const frame = newFiles.frameName(text);
+                const filePath = frame.error ? null : path.join(root, `${frame.name}.py`);
+                const error = frame.error || (fs.existsSync(filePath) ? 'message.newFrameExists' : null);
+                if (error) {
+                    prompt = t(error, { name: frame.name ? `${frame.name}.py` : text.trim() });
+                    value = text;
+                    continue;
+                }
+                try {
+                    newFiles.createFile(filePath, newFiles.newFrameSource(frame));
+                } catch (createError) {
+                    host.showMessage('error', t('message.newFileFailed', { error: createError.message }));
+                    return;
+                }
+                await sidebarModel.refresh(true);
+                await host.showFile(filePath);
+                await openFileInViewer(filePath);
+                return;
             }
         },
 

@@ -33,6 +33,8 @@
  * @property {(filePath: string) => Promise<void>} showFile  show a file to the user (VS Code: in an editor)
  * @property {(filePath: string) => Promise<void>} showSourceBesideViewer  when a file opens in the viewer
  * @property {(items: Array<{label, description?, detail?, separator?, value?}>, options?: {placeholder?}) => Promise<object|undefined>} pickOne
+ * @property {(options: {prompt: string, value?: string}) => Promise<string|undefined>} askText  a line of text, such as a
+ *   file name: `value` is filled in, with its name before the extension selected; undefined if cancelled
  * @property {(options: {message: string, detail?: string, action: string}) => Promise<boolean>} confirm  modal yes/no
  * @property {(title: string, task: () => Promise<any>) => Promise<any>} withProgress
  * @property {(url: string) => Promise<void>} openExternal

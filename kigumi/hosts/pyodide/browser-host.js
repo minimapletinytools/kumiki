@@ -127,6 +127,7 @@ function createBrowserHost({ connection, workspaceFolder, settings, runCommand, 
             return surface && surface.filePath ? { filePath: surface.filePath, languageId: languageOf(surface.filePath) } : null;
         },
         pickOne: (items, options = {}) => connection.pick(items, options.placeholder),
+        askText: (options) => connection.ask(options),
         watchFiles,
         onDocumentChange(callback) {
             return watchFiles(workspaceFolder, '**/*.py', {

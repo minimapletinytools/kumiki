@@ -235,6 +235,8 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
                 : null;
         },
 
+        askText: (options) => connection.ask(options),
+
         async pickOne(items, { placeholder } = {}) {
             return connection.pick(items, placeholder);
         },

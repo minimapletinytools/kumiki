@@ -136,6 +136,11 @@ function createVscodeHost() {
             return this.showFile(filePath);
         },
 
+        async askText({ prompt, value = '' }) {
+            const dot = value.lastIndexOf('.');
+            return vscode.window.showInputBox({ prompt, value, valueSelection: [0, dot > 0 ? dot : value.length] });
+        },
+
         async pickOne(items, { placeholder, matchOnDescription, matchOnDetail } = {}) {
             const quickPickItems = items.map((item) => (item.separator
                 ? { label: item.label, kind: vscode.QuickPickItemKind.Separator }

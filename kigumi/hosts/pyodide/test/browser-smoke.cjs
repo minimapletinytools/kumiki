@@ -112,6 +112,45 @@ app.whenReady().then(async () => {
         })()`, 15000);
         check('a change to a project file reaches the browser\'s copy', synced === true);
 
+        // New Frame (the last row of the frames list) and New File (a folder's right-click menu): each asks
+        // for a name in the quick pick, and the file reaches the browser's copy.
+        const savedFile = (name) => `(async () => {
+            const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web', 1); r.onsuccess = () => resolve(r.result); });
+            const record = await new Promise((resolve) => { const r = db.transaction('projects').objectStore('projects').getAll(); r.onsuccess = () => resolve(r.result.find((p) => p.name === 'Shed')); });
+            db.close();
+            return record && typeof record.files[${JSON.stringify(name)}] === 'string' ? record.files[${JSON.stringify(name)}] : null;
+        })()`;
+        const answer = (text) => js(`(() => {
+            const input = document.querySelector('#quickpick-filter');
+            input.value = ${JSON.stringify(text)};
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            return true;
+        })()`);
+        await js(`${explorer}.querySelector('.ks-row[data-key="frames-new"]').click(); true`);
+        const framePrompt = await wait(`!document.querySelector('#quickpick').hidden && document.querySelector('#quickpick-filter').value`, 15000);
+        await answer('Garden Shed');
+        const newFrame = await wait(savedFile('garden_shed.py'), 30000);
+        const newFrameRow = await wait(`!!${explorer}?.querySelector('.ks-row[data-key$="garden_shed.py"][data-key^="frame-file:workspace:"]') || null`, 120000);
+        const newFrameTimbers = await wait(`${view}?.querySelectorAll('.lp-row-timber').length === 1 || null`, 240000);
+        check('New Frame asks for a name, then makes, lists and shows the frame', framePrompt === 'my_frame'
+            && Boolean(newFrame && newFrame.includes('def garden_shed(')) && newFrameRow === true && newFrameTimbers === true,
+            `${framePrompt}, row ${newFrameRow}, view ${newFrameTimbers}`);
+        await shot('new-frame');
+
+        await js(`(() => {
+            const row = ${explorer}.querySelector('.ks-row[data-key="files-root"]');
+            const box = row.getBoundingClientRect();
+            row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: box.left + 20, clientY: box.top + 5 }));
+            return true;
+        })()`);
+        const menuItem = await wait(`[...(${explorer}?.querySelectorAll('.ks-menu-item') || [])].some((item) => item.textContent.includes('New File')) || null`, 10000);
+        await js(`[...${explorer}.querySelectorAll('.ks-menu-item')].find((item) => item.textContent.includes('New File')).click(); true`);
+        const filePrompt = await wait(`!document.querySelector('#quickpick').hidden && document.querySelector('#quickpick-filter').value`, 15000);
+        await answer('notes/plan.txt');
+        const newFile = await wait(`(async () => (await ${savedFile('notes/plan.txt')}) === '' || null)()`, 30000);
+        check('a folder\'s right-click menu has New File, which makes the file it is given', menuItem === true
+            && filePrompt === 'untitled.py' && newFile === true, `${filePrompt}, saved ${newFile}`);
+
         // The agent: its panel says how it can be run here, and its tools work.
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'web:settings',
             args: [{ values: { ...window.kigumiWeb.storedSettings(), 'agent.enabled': true } }] })`);

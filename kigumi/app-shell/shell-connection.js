@@ -258,6 +258,15 @@ class ShellConnection {
         });
     }
 
+    // Shows the quick pick as a text box; resolves with what was typed, or undefined.
+    ask({ prompt, value } = {}) {
+        const requestId = this.nextPick++;
+        return new Promise((resolve) => {
+            this.pendingPicks.set(requestId, { ask: true, resolve });
+            this.send({ type: 'quickpick:show', requestId, input: true, prompt: prompt || '', value: value || '', items: [] });
+        });
+    }
+
     receive(message) {
         if (!message || typeof message.type !== 'string') {
             return;
@@ -298,7 +307,8 @@ class ShellConnection {
                 const pending = this.pendingPicks.get(message.requestId);
                 if (pending) {
                     this.pendingPicks.delete(message.requestId);
-                    pending.resolve(Number.isInteger(message.index) ? pending.items[message.index] : undefined);
+                    if (pending.ask) pending.resolve(typeof message.text === 'string' ? message.text : undefined);
+                    else pending.resolve(Number.isInteger(message.index) ? pending.items[message.index] : undefined);
                 }
                 break;
             }

@@ -297,7 +297,7 @@ describe('test snapshot', () => {
     const frames = snapshot.roots.find((root) => root.key === 'frames-root');
 
     expect(snapshot.state.frameCount).toBe(1);
-    expect(frames.childLabels).toEqual(['frame.py']);
+    expect(frames.childLabels).toEqual(['frame.py', 'New Frame…']);
     expect(snapshot.groupByPatternbook).toBe(true);
   });
 });
@@ -376,13 +376,13 @@ describe('all files', () => {
     const byLabel = (label) => findNode(rootOf(model, 'filesRoot').children, (one) => one.label === label);
 
     expect(byLabel('b_frame.py')).toMatchObject({
-      icon: 'fish2-very-sad', rowActions: ['openInViewer', 'revealInFileManager'],
+      icon: 'fish2-very-sad', rowActions: ['openInViewer', 'newFile', 'revealInFileManager'],
       action: { command: 'kigumi.openFileSource', arguments: [frame] },
     });
     expect(byLabel('book.py').icon).toBe('library');
-    expect(byLabel('a_notes.txt')).toMatchObject({ icon: 'file', rowActions: ['revealInFileManager'] });
-    expect(byLabel('patterns').rowActions).toEqual(['revealInFileManager']);
-    expect(rootOf(model, 'filesRoot').rowActions).toEqual(['revealInFileManager']);
+    expect(byLabel('a_notes.txt')).toMatchObject({ icon: 'file', rowActions: ['newFile', 'revealInFileManager'] });
+    expect(byLabel('patterns').rowActions).toEqual(['newFile', 'revealInFileManager']);
+    expect(rootOf(model, 'filesRoot').rowActions).toEqual(['newFile', 'revealInFileManager']);
   });
 
   test('a folder outside the workspace is not listed', async () => {
