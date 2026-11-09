@@ -8,6 +8,14 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-08
+
+### kumiki
+
+#### Fixed
+
+- A `Cutting` given a plain string as its `label` (rather than a `CutCSGLabel`) no longer breaks the layers tree: `label_name` warns and names the node `<bad label: ...>`.
+
 ### kigumi
 
 #### Added
@@ -22,6 +30,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Fixed
 
+- A view whose layers tree fails to build logs it as an error, with the traceback and the line in your file, so the agent's `read_view_log` sees it.
 - The browser version's meshes match the standalone app's: flat faces at an angle (the dovetailed sawhorse's legs) no longer show stray triangle creases. Manifold's WebAssembly build rounded vertices to float32; they now go in and come out exact.
 
 ## [0.9.2] - 2026-11-08
