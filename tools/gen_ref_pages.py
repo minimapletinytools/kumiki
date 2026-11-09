@@ -71,9 +71,7 @@ SUPPORTING_ORDER = ["cutcsg", "patternbook", "triangles", "blueprint"]
 
 DISPLAY_NAMES = {
     "cutcsg": "CutCSG",
-    # "Pattern Book" (no suffix) is docs/patternbook.md's own top-level nav entry -- this is
-    # the patternbook.py *module*'s API reference page, kept distinguishable from that.
-    "patternbook": "Pattern Book (API)",
+    "patternbook": "Pattern Book",
     "mixed": "Mortise and Tenon (Mixed)",
     "butt": "Butt Joints",
     "corner": "Corner Joints",
@@ -82,6 +80,13 @@ DISPLAY_NAMES = {
     "board": "Board Joints",
     "free": "Free Joints",
     "decorative": "Decorative Joints",
+}
+
+
+# A line at the top of a module's page, pointing at the guide to it.
+INTROS = {
+    "patternbook": "To write your own pattern files for Kigumi's explorer, see "
+    "[Writing pattern files](../patternbook.md).\n",
 }
 
 
@@ -158,6 +163,8 @@ def _write_page(dotted_module: str, only_members: list[str] | None) -> str:
 
     with mkdocs_gen_files.open(doc_path, "w") as fd:
         fd.write(f"# `{full_ident}`\n\n")
+        if dotted_module in INTROS:
+            fd.write(INTROS[dotted_module] + "\n")
         fd.write(NOTE_TEMPLATE.format(example=example_name) + "\n")
         fd.write(f"::: {full_ident}\n")
         if members:

@@ -1,4 +1,4 @@
-# Pattern System
+# Writing pattern files
 
 ## Overview
 

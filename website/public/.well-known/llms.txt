@@ -55,7 +55,7 @@ Kumiki is purpose-built for AI agent-assisted design workflows (Claude, Cursor, 
 - [Getting Started & Installation](https://kumiki.build/install): Download the Kigumi app for Mac or Windows, try it in the browser, or install the VS Code extension; Kigumi sets up Python and Kumiki itself.
 - [Documentation Index](https://kumiki.build/docs/): Overview of documentation, tutorials, and library structure.
 - [Concepts & Design Theory](https://kumiki.build/docs/concepts/): Fundamental orientation, local transforms, the Perfect Timber Within model, reference features, and tolerance rules.
-- [Pattern Book](https://kumiki.build/docs/patternbook/): Reusable parametric timber patterns, joint recipes, and how to compose bents and bays.
+- [Writing pattern files](https://kumiki.build/docs/patternbook/): How to mark functions with `@pattern` so Kigumi lists them in its explorer.
 - [API Reference](https://kumiki.build/docs/reference/): Comprehensive Python API reference generated from source docstrings covering all classes, modules, and functions.
 - [Full LLM Context & Agent Guide](https://kumiki.build/llms-full.txt): Comprehensive single-file text reference containing the full agent guide, joint catalog, concepts, and working code examples.
 

@@ -88,5 +88,4 @@ plugins:
 nav:
   - Home: index.md
   - Concepts: concepts.md
-  - Pattern Book: patternbook.md
   - API Reference: reference/

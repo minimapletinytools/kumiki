@@ -1,30 +1,27 @@
 # Kumiki
 
-Kumiki is a programmatic CAD library for designing
-timber-framed structures and woodworking joinery in Python. It's used together
-with [kigumi](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi),
-a VS Code extension for viewing and iterating on your kumiki designs.
+Kumiki is a programmatic CAD library for designing timber-framed structures and woodworking
+joinery in Python. You see your designs in [Kigumi](https://kumiki.build/install), its viewer: a
+desktop app for Mac and Windows, an extension for VS Code and Cursor, or
+[in your browser](https://kumiki.build/try/).
 
-For the full kigumi + VS Code setup, see [Getting Started](https://kumiki.build/install).
+To install Kigumi and start a project, see [Get started](https://kumiki.build/install).
 
 ## Where to go next
 
 - **[Concepts](concepts.md)** &mdash; coordinate system, timber/board terminology, and Kumiki's
   overall design philosophy. Start here if you're authoring designs by hand.
-- **[Pattern Book](patternbook.md)** &mdash; the `Pattern` system that powers the kigumi sidebar's
-  built-in joint examples, and how to add your own.
 - **[API Reference](reference/)** &mdash; every public class and function, generated straight
   from the library's docstrings. Everything here is also reachable directly as
   `kumiki.<name>` after `from kumiki import *` or `import kumiki`.
 
-## For AI Agents & LLMs
+## For AI agents
 
-Kumiki is purpose-built for agentic AI coding. Agents designing timber structures should consult:
-
-- **[llms.txt](https://kumiki.build/llms.txt)** &mdash; fast project summary and agent quickstart conventions.
-- **[llms-full.txt](https://kumiki.build/llms-full.txt)** &mdash; complete consolidated documentation, prompt guidelines, and joint catalog in a single file.
+Agents designing timber structures should read the
+**[agent usage instructions](https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md)**:
+how to write a frame, the conventions to follow, and the joints to reach for.
 
 ## Links
 
 - [GitHub](https://github.com/minimapletinytools/kumiki)
-- [kumiki.build](https://kumiki.build) &mdash; the kigumi viewer and getting-started guide
+- [kumiki.build](https://kumiki.build) &mdash; downloads and the getting-started guide
