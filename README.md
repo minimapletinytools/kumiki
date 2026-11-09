@@ -16,9 +16,9 @@
 
 <p align="center">
   <a href="https://pypi.org/project/kumiki/"><img alt="PyPI" src="https://img.shields.io/pypi/v/kumiki?label=kumiki"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi"><img alt="VS Code Marketplace" src="https://img.shields.io/visual-studio-marketplace/v/minimaple.kigumi?label=kigumi"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi"><img alt="Kigumi" src="https://img.shields.io/open-vsx/v/minimaple/kigumi?label=kigumi"></a>
   <a href="https://github.com/minimapletinytools/kumiki/actions/workflows/pytest.yml"><img alt="Tests" src="https://github.com/minimapletinytools/kumiki/actions/workflows/pytest.yml/badge.svg"></a>
-  <a href="https://discord.gg/cQhUG7WJ8"><img alt="Discord" src="https://img.shields.io/discord/1525951446103883936?label=discord"></a>
+  <a href="https://discord.gg/cQhUG7WJ8"><img alt="Discord" src="https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white"></a>
 </p>
 
 ![A tiny house frame designed in Kumiki](tinyhouse120.png)
