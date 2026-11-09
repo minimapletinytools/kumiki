@@ -245,6 +245,9 @@ jobs:
       - build_kigumi_app
     if: ${{ !cancelled() && needs.resolve_tag.result == 'success' && ((needs.resolve_tag.outputs.prefix == 'kumiki' && (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push')) || (needs.resolve_tag.outputs.prefix == 'kigumi' && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push'))) }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write  # to redeploy the website
 
     steps:
       - name: Download kumiki assets
@@ -302,3 +305,10 @@ jobs:
           body_path: release-notes.md
           generate_release_notes: true
           files: release-assets/*
+
+      # The website's download links point at the newest kigumi release, now that its installers are attached.
+      - name: Redeploy the website
+        if: ${{ needs.resolve_tag.outputs.prefix == 'kigumi' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-website.yml --repo "$GITHUB_REPOSITORY" --ref main

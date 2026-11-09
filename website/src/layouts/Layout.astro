@@ -13,7 +13,7 @@ export interface Props {
 
 const {
   title,
-  description = 'Kumiki is an open-source programmatic CAD library for Python designed for timber framing and woodworking joinery, with real parametric joinery and live 3D preview in VS Code via Kigumi.',
+  description = 'Kumiki is an open-source programmatic CAD library for Python designed for timber framing and woodworking joinery, with parametric joinery and live 3D preview in Kigumi, on Mac, Windows, VS Code or the web.',
   image = '/photos/tinyhouse120_angle.png',
   canonicalPath,
   type = 'website',
@@ -70,16 +70,16 @@ const graphNodes: any[] = [
     '@id': 'https://kumiki.build/#software-kigumi',
     name: 'Kigumi',
     applicationCategory: 'DeveloperApplication, CADApplication',
-    operatingSystem: 'Visual Studio Code, Cursor',
+    operatingSystem: 'macOS, Windows, Visual Studio Code, Cursor, web browser',
     offers: {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
     },
     description:
-      'Interactive 3D timber frame viewer and CSG inspection tool for Visual Studio Code and Cursor.',
-    url: 'https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi',
-    installUrl: 'https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi',
+      'Interactive 3D timber frame viewer for Kumiki: a desktop app for macOS and Windows, an extension for Visual Studio Code and Cursor, and a browser version.',
+    url: 'https://kumiki.build/install',
+    installUrl: 'https://kumiki.build/install',
   },
 ];
 
@@ -110,7 +110,11 @@ const structuredData = {
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
-    <link rel="icon" type="image/png" href={`${base}/photos/wedged_half_dovetail.png`} />
+    <link rel="icon" type="image/png" href={`${base}/favicon.png`} />
+    <link rel="apple-touch-icon" href={`${base}/logo.png`} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Shippori+Mincho+B1:wght@600;700&display=swap" />
 
     <!-- Canonical & Agent Discovery Links -->
     <link rel="canonical" href={canonicalUrl} />
@@ -138,20 +142,19 @@ const structuredData = {
     <meta name="keywords" content="timber framing, woodworking CAD, programmatic CAD, Python CAD, Japanese joinery, parametric joinery, Kigumi, mortise and tenon, dovetail joint, VS Code CAD, agentic CAD, AI timber framing" />
     <meta name="author" content="minimaple" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href={`${base}/`}>
-        <span class="brand-mark">組</span>
+        <img class="brand-mark" src={`${base}/favicon.png`} alt="" width="34" height="34" />
         <span class="brand-text">Kumiki</span>
       </a>
-      <nav class="site-nav">
-        <a href={`${base}/install`}>Install</a>
+      <nav class="site-nav" aria-label="Site">
+        <a href={`${base}/install`}>Download</a>
         {tryKigumi && <a href={`${base}/try/`}>Try it</a>}
-        <a href="https://kumiki.build/docs/" target="_blank" rel="noreferrer">Docs</a>
+        <a href="https://kumiki.build/docs/">Docs</a>
         <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">Videos</a>
         <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">GitHub</a>
         <a href={`${base}/about`}>About</a>
@@ -163,61 +166,59 @@ const structuredData = {
     <footer class="site-footer">
       <div class="footer-nav">
         <div class="footer-col">
-          <span class="footer-heading">Product</span>
-          <a href={`${base}/install`}>Install Guide</a>
-          <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi" target="_blank" rel="noreferrer">VS Code Extension</a>
-          <a href="https://open-vsx.org/extension/minimaple/kigumi" target="_blank" rel="noreferrer">OpenVSX (Cursor)</a>
+          <h2 class="footer-heading">Kigumi</h2>
+          <a href={`${base}/install`}>Download the app</a>
+          {tryKigumi && <a href={`${base}/try/`}>Try it in your browser</a>}
+          <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi" target="_blank" rel="noreferrer">VS Code extension</a>
+          <a href="https://open-vsx.org/extension/minimaple/kigumi" target="_blank" rel="noreferrer">Open VSX (Cursor)</a>
           <a href="https://github.com/minimapletinytools/kumiki/releases" target="_blank" rel="noreferrer">Releases</a>
         </div>
         <div class="footer-col">
-          <span class="footer-heading">Documentation</span>
-          <a href="https://kumiki.build/docs/" target="_blank" rel="noreferrer">Docs Overview</a>
-          <a href="https://kumiki.build/docs/concepts/" target="_blank" rel="noreferrer">Concepts</a>
-          <a href="https://kumiki.build/docs/patternbook/" target="_blank" rel="noreferrer">Pattern Book</a>
-          <a href="https://kumiki.build/docs/reference/" target="_blank" rel="noreferrer">API Reference</a>
+          <h2 class="footer-heading">Documentation</h2>
+          <a href="https://kumiki.build/docs/">Overview</a>
+          <a href="https://kumiki.build/docs/concepts/">Concepts</a>
+          <a href="https://kumiki.build/docs/patternbook/">Pattern book</a>
+          <a href="https://kumiki.build/docs/reference/">API reference</a>
         </div>
         <div class="footer-col">
-          <span class="footer-heading">AI &amp; Agents</span>
-          <a href={`${base}/llms.txt`}>Agent Summary (llms.txt)</a>
-          <a href={`${base}/llms-full.txt`}>Full Agent Guide (llms-full.txt)</a>
-          <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md" target="_blank" rel="noreferrer">Agent Instructions</a>
+          <h2 class="footer-heading">For agents</h2>
+          <a href={`${base}/llms.txt`}>llms.txt</a>
+          <a href={`${base}/llms-full.txt`}>llms-full.txt</a>
+          <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md" target="_blank" rel="noreferrer">Authoring instructions</a>
         </div>
         <div class="footer-col">
-          <span class="footer-heading">Community &amp; Code</span>
+          <h2 class="footer-heading">Project</h2>
           <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">GitHub</a>
-          <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">Video Tutorials</a>
-          <a href={`${base}/about`}>About Kumiki</a>
+          <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">Videos</a>
+          <a href={`${base}/about`}>About</a>
           <a href="mailto:minimapletinytools@gmail.com">Contact</a>
         </div>
       </div>
       <div class="footer-bottom">
-        <span>&copy; 2026 minimaple &middot; Open source under MPL-2.0 &middot; <a href={`${base}/privacy`}>Privacy</a> &middot; <a href={`${base}/terms`}>Terms</a></span>
-        <span>Kumiki &amp; Kigumi</span>
+        <span>&copy; 2026 minimaple. Kumiki and Kigumi are open source under the MPL-2.0.</span>
+        <span class="footer-legal"><a href={`${base}/privacy`}>Privacy</a> <a href={`${base}/terms`}>Terms</a></span>
       </div>
     </footer>
-
     <style is:global>
       :root {
-        /* Warm, because the subject is timber -- a cold grey palette would be
-           a lie about what this is for. Seriousness comes from structure and
-           density instead: a deeper ground so renders sit ON something rather
-           than dissolving into the page, a wider type scale, and less
-           rounding. */
-        --bg: #efe9de;
-        --bg-deep: #e5dccd;
-        --surface: #fdfaf4;
-        --paper: #fffdf8;
-        --ink: #191410;
-        --ink-soft: #574c3e;
-        --ink-faint: #8a7c68;
-        --accent: #9c3f12;
-        --accent-soft: #e8a26c;
-        --border: #cdbfa5;
-        --border-soft: #ded3c0;
-        --shadow: 0 1px 2px rgba(25, 20, 16, 0.05), 0 12px 32px rgba(25, 20, 16, 0.09);
-        --shadow-lift: 0 2px 4px rgba(25, 20, 16, 0.06), 0 22px 50px rgba(25, 20, 16, 0.13);
-        --max: 1280px;
-        --radius: 0.35rem;
+        /* Paper, sumi ink and indigo: a carpenter's drawing, not a craft shop. The timber colour
+           stays in the renders and in the bands they sit on. */
+        --paper: #f4f4f1;
+        --sheet: #ffffff;
+        --wood: #ebe4d6;
+        --ink: #1e1f22;
+        --ink-soft: #4a4d53;
+        --ink-faint: #75787e;
+        --rule: #d6d7d2;
+        --rule-strong: #b3b5ae;
+        --accent: #2c4e80;
+        --accent-deep: #213c63;
+        --accent-tint: #e4eaf3;
+        --serif: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", Georgia, serif;
+        --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --max: 1200px;
+        --radius: 4px;
       }
 
       * { box-sizing: border-box; }
@@ -225,193 +226,150 @@ const structuredData = {
       html, body {
         margin: 0;
         padding: 0;
-        background: var(--bg);
+        background: var(--paper);
         color: var(--ink);
-        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        line-height: 1.55;
+        font-family: var(--sans);
+        font-size: 17px;
+        line-height: 1.6;
         -webkit-font-smoothing: antialiased;
       }
 
       a { color: var(--accent); text-decoration: none; }
-      a:hover { text-decoration: underline; }
+      a:hover { text-decoration: underline; text-underline-offset: 0.18em; }
+      a:focus-visible, button:focus-visible, summary:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        border-radius: 2px;
+      }
 
       .site-header {
         max-width: var(--max);
         margin: 0 auto;
-        padding: 1.5rem 1.5rem 1.2rem;
+        padding: 1.4rem 1.5rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 1rem;
+        flex-wrap: wrap;
       }
-
       .brand {
         display: inline-flex;
         align-items: center;
-        gap: 0.6rem;
+        gap: 0.65rem;
         color: var(--ink);
+        font-family: var(--serif);
         font-weight: 700;
-        font-size: 1.15rem;
-        letter-spacing: 0.01em;
+        font-size: 1.3rem;
       }
       .brand:hover { text-decoration: none; }
-      .brand-mark {
-        display: inline-grid;
-        place-items: center;
-        width: 2rem;
-        height: 2rem;
-        background: var(--ink);
-        color: var(--surface);
-        border-radius: var(--radius);
-        font-size: 1.05rem;
-        font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
-      }
+      .brand-mark { width: 34px; height: 34px; border-radius: 7px; display: block; }
 
-      .site-nav {
-        display: flex;
-        gap: 1.5rem;
-        font-weight: 500;
-        font-size: 0.94rem;
-      }
+      .site-nav { display: flex; flex-wrap: wrap; gap: 0.4rem 1.6rem; font-size: 0.95rem; }
       .site-nav a { color: var(--ink-soft); }
       .site-nav a:hover { color: var(--ink); text-decoration: none; }
 
-      main {
-        max-width: var(--max);
-        margin: 0 auto;
-        padding: 1rem 1.5rem 4rem;
-      }
-      main.wide { max-width: none; padding: 0 0 4rem; }
+      main { max-width: var(--max); margin: 0 auto; padding: 1rem 1.5rem 5rem; }
+      main.wide { max-width: none; padding: 0 0 5rem; }
       /* The column a wide page puts its own content back into. */
       .column { max-width: var(--max); margin: 0 auto; padding: 0 1.5rem; }
 
       .site-footer {
-        max-width: var(--max);
-        margin: 0 auto;
-        padding: 3rem 1.5rem 2.5rem;
-        color: var(--ink-soft);
-        font-size: 0.9rem;
-        border-top: 1px solid var(--border);
-      }
-      .footer-nav {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 2rem;
-        margin-bottom: 2.5rem;
-      }
-      .footer-col {
-        display: flex;
-        flex-direction: column;
-        gap: 0.55rem;
-      }
-      .footer-heading {
-        font-size: 0.74rem;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: var(--ink-faint);
-        margin-bottom: 0.2rem;
-      }
-      .footer-col a {
+        border-top: 1px solid var(--rule);
         color: var(--ink-soft);
         font-size: 0.92rem;
       }
-      .footer-col a:hover {
-        color: var(--accent);
+      .footer-nav {
+        max-width: var(--max);
+        margin: 0 auto;
+        padding: 3rem 1.5rem 2rem;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 2rem;
       }
-      .footer-bottom a {
-        color: inherit;
+      .footer-col { display: flex; flex-direction: column; gap: 0.5rem; }
+      .footer-heading {
+        font-family: var(--sans);
+        font-size: 0.92rem;
+        font-weight: 600;
+        letter-spacing: 0;
+        color: var(--ink);
+        margin: 0 0 0.25rem;
       }
+      .footer-col a { color: var(--ink-soft); }
+      .footer-col a:hover { color: var(--accent); }
       .footer-bottom {
+        max-width: var(--max);
+        margin: 0 auto;
+        padding: 1.25rem 1.5rem 2.5rem;
         display: flex;
         flex-wrap: wrap;
         justify-content: space-between;
-        gap: 1rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid var(--border-soft);
+        gap: 0.75rem 1.5rem;
         font-size: 0.85rem;
         color: var(--ink-faint);
       }
+      .footer-legal { display: flex; gap: 1.25rem; }
+      .footer-bottom a { color: inherit; }
 
-      /* A real scale, so the page asserts a hierarchy instead of running at one
-         size throughout. */
-      h1, h2, h3 { line-height: 1.15; letter-spacing: -0.021em; font-weight: 650; }
-      h1 { font-size: clamp(2.6rem, 5.4vw, 4rem); }
-      h2 { font-size: clamp(1.75rem, 3vw, 2.4rem); }
-      h3 { font-size: 1.12rem; letter-spacing: -0.01em; }
+      h1, h2 { font-family: var(--serif); font-weight: 700; line-height: 1.15; letter-spacing: -0.005em; margin: 0; }
+      h1 { font-size: clamp(2.4rem, 5vw, 3.7rem); }
+      h2 { font-size: clamp(1.7rem, 3vw, 2.35rem); }
+      h3 { font-size: 1.08rem; font-weight: 600; line-height: 1.35; margin: 0; }
+      p { margin: 0; }
 
-      /* The label above a section: small, spaced, quiet. Does the work a big
-         heading would otherwise have to do twice. */
-      .eyebrow {
-        font-size: 0.74rem;
-        font-weight: 700;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: var(--ink-faint);
-        margin: 0 0 0.75rem;
-      }
+      /* What a section is about, when its heading doesn't say: sentence case, in the accent. */
+      .kicker { color: var(--accent); font-weight: 500; font-size: 0.95rem; margin: 0 0 0.6rem; }
 
-      /* A full-width band. Sections that read as decisions rather than as one
-         long column. */
-      .band { background: var(--bg-deep); border-block: 1px solid var(--border-soft); }
-      .band-inner { max-width: var(--max); margin: 0 auto; padding: 4.5rem 1.5rem; }
+      /* A full-width band: the timber colour, for the sections the renders sit in. */
+      .band { background: var(--wood); }
+      .band-inner { max-width: var(--max); margin: 0 auto; padding: 5rem 1.5rem; }
 
-      /* Every render sits on a surface with an edge. These images are pale
-         cream on a pale cream page, and without this they dissolve into it. */
+      /* A render on its sheet: white, with an edge, as a print pinned to a board. */
       .plate {
         display: block;
         width: 100%;
         height: auto;
-        background: var(--paper);
-        border: 1px solid var(--border);
+        background: var(--sheet);
+        border: 1px solid var(--rule-strong);
         border-radius: var(--radius);
-        box-shadow: var(--shadow);
       }
 
       .status {
         display: inline-block;
-        margin-left: 0.6rem;
-        padding: 0.16rem 0.5rem;
-        border-radius: 999px;
-        font-size: 0.62rem;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        vertical-align: 0.18em;
-        border: 1px solid currentColor;
+        padding: 0.05rem 0.45rem;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.5;
+        color: var(--accent);
+        background: var(--accent-tint);
       }
-      .status-soon { color: var(--ink-faint); }
-      .status-beta { color: var(--accent); }
 
       .btn {
         display: inline-flex;
         align-items: center;
-        gap: 0.55rem;
-        padding: 0.85rem 1.35rem;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
         border-radius: var(--radius);
-        font-weight: 600;
+        font-family: var(--sans);
+        font-weight: 500;
         font-size: 1rem;
+        line-height: 1.3;
         border: 1px solid transparent;
-        transition: transform 0.06s ease, background-color 0.15s ease, border-color 0.15s ease;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
       }
-      .btn:hover { text-decoration: none; transform: translateY(-1px); }
-      .btn:active { transform: translateY(0); }
-
-      .btn-primary {
-        background: var(--ink);
-        color: var(--surface);
-      }
-      .btn-primary:hover { background: #2c241a; }
-
-      .btn-secondary {
-        background: var(--surface);
-        color: var(--ink);
-        border-color: var(--border);
-      }
+      .btn:hover { text-decoration: none; }
+      .btn-primary { background: var(--accent); color: #fff; }
+      .btn-primary:hover { background: var(--accent-deep); }
+      .btn-secondary { background: var(--sheet); color: var(--ink); border-color: var(--rule-strong); }
       .btn-secondary:hover { border-color: var(--ink); }
+      .btn-sm { padding: 0.45rem 0.85rem; font-size: 0.9rem; }
 
-      code, pre {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      code, pre { font-family: var(--mono); font-size: 0.9em; }
+
+      @media (prefers-reduced-motion: reduce) {
+        * { transition: none !important; scroll-behavior: auto !important; }
       }
     </style>
   </body>
