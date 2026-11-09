@@ -104,8 +104,11 @@ def test_label_name_names_a_plain_string_label_as_bad_and_warns():
     from kumiki.csg.feature_paths import label_name
     from kumiki.ticket import TimberTicket
     from kumiki.timber import Cutting
-    timber = create_timber(create_v3(0, 0, 0), mm(1000), create_v2(mm(100), mm(100)),
-                           create_v3(0, 0, 1), create_v3(1, 0, 0), ticket=TimberTicket(path="post"))
-    cutting = Cutting(timber=timber, negative_csg=HalfSpace(normal=create_v3(0, 0, 1), offset=mm(900)), label="trim")
+    timber = create_timber(length=mm(1000), size=create_v2(mm(100), mm(100)), bottom_position=create_v3(0, 0, 0),
+                           length_direction=create_v3(0, 0, 1), width_direction=create_v3(1, 0, 0),
+                           ticket=TimberTicket(path="post"))
+    # A plain string, as a user might write: what this test is about.
+    cutting = Cutting(timber=timber, negative_csg=HalfSpace(normal=create_v3(0, 0, 1), offset=mm(900)),
+                      label="trim")  # ty: ignore[invalid-argument-type]
     with pytest.warns(UserWarning, match="on timber 'post' has label 'trim'"):
         assert label_name(cutting) == "<bad label: 'trim'>"
