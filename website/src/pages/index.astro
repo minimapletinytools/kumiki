@@ -176,7 +176,7 @@ const faqs = [
         </p>
       </div>
       <figure class="sheet">
-        <img src={`${base}/photos/tinyhouse120_angle.png`} alt="A tiny house frame designed in Kumiki" />
+        <img src={`${base}/photos/tinyhouse120_angle.png`} alt="A tiny house frame designed in Kumiki" fetchpriority="high" decoding="async" />
         <figcaption class="title-block">
           <div><span>Frame</span>Tiny house</div>
           <div><span>Source</span><code>tinyhouse120.py</code></div>
@@ -225,9 +225,9 @@ const faqs = [
                 </ul>
               </div>
               <div class="panel-media">
-                <img class="plate" src={feature.image} alt={feature.imageAlt} loading="lazy" />
+                <img class="plate" src={feature.image} alt={feature.imageAlt} loading="lazy" decoding="async" />
                 {feature.second && (
-                  <img class="plate plate-second" src={feature.second} alt={feature.secondAlt} loading="lazy" />
+                  <img class="plate plate-second" src={feature.second} alt={feature.secondAlt} loading="lazy" decoding="async" />
                 )}
               </div>
             </section>
@@ -245,7 +245,7 @@ const faqs = [
         {gallery.map((photo, i) => (
           <figure>
             <button class="thumb" type="button" data-index={i} aria-label={`Open larger view: ${photo.alt}`}>
-              <img src={photo.src} alt={photo.alt} loading="lazy" />
+              <img src={photo.src} alt={photo.alt} loading="lazy" decoding="async" />
             </button>
           </figure>
         ))}

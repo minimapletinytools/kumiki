@@ -55,11 +55,52 @@ The new timber's `BOTTOM` end is at `timber1`, its `TOP` end at `timber2`.
 
 ### Arrangements
 
-TODO
+Most joint functions take an arrangement naming the timbers, which ends meet, and (when needed) a reference long face (`TimberLongFace.FRONT`, `BACK`, `LEFT` or `RIGHT`):
+
+```python
+ButtJointTimberArrangement(butt_timber, receiving_timber, butt_timber_end,
+                           front_face_on_butt_timber=None, top_face_on_butt_timber=None)
+DoubleButtJointTimberArrangement(butt_timber_1, butt_timber_2, receiving_timber,
+                                 butt_timber_1_end, butt_timber_2_end, front_face_on_butt_timber_1=None)
+CornerJointTimberArrangement(timber1, timber2, timber1_end, timber2_end, front_face_on_timber1=None)
+CrossJointTimberArrangement(timber1, timber2, front_face_on_timber1=None)
+SpliceJointTimberArrangement(timber1, timber2, timber1_end, timber2_end, front_face_on_timber1=None)
+# ends: TimberEnd.BOTTOM or TimberEnd.TOP
+```
 
 ### Common Joints
 
-TODO
+Reach for the `cut_basic_*` variants first (they size the cut from the timbers); call the underlying `cut_*` function when you need explicit dimensions.
+
+```python
+# Butt joints (beam into post, joist into beam)
+cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber, mortise_timber, tenon_end, use_peg=False) -> Joint
+cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber, mortise_timber, tenon_end) -> Joint
+cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(housed_timber, receiving_timber, housed_timber_end,
+                                                           housed_timber_face, receiving_timber_shoulder_inset=0) -> Joint
+cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(dovetail_timber, receiving_timber, dovetail_timber_end,
+                                                             dovetail_timber_face, receiving_timber_shoulder_inset, ...) -> Joint
+cut_basic_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint
+cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: DoubleButtJointTimberArrangement,
+                                                                     slot_facing_end_on_receiving_timber: TimberEnd) -> Joint
+
+# Corner joints (mudsills, plates, rafters at a peak)
+cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint
+cut_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint
+cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint
+cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement,
+                                                                tongue_thickness=None, tongue_position=0) -> Joint
+
+# Cross joints (crossing beams or boards)
+cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint
+cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint
+
+# Splice joints (extending sills, girts or plates end-to-end)
+cut_basic_plain_splice_lap_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint
+cut_basic_lapped_gooseneck_joint_on_aligned_timbers(gooseneck_timber, receiving_timber,
+                                                    receiving_timber_end, gooseneck_timber_face) -> Joint
+cut_basic_kanawa_tsugi_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint
+```
 
 ## The frame
 
@@ -70,7 +111,7 @@ def my_frame(k: Optional[Kiwari] = None) -> Frame:
     return Frame.from_joints(joints, additional_unjointed_timbers=None, name="my frame", kiwari=k)
 ```
 
-## Exampel: A complete small frame
+## Example: A complete small frame
 
 Four posts on a footprint, a beam along the top of each long side, and a rail across each end, all
 in basic mortise and tenons. It builds, and every timber meets the rest.

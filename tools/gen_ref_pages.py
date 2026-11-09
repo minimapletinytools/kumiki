@@ -67,10 +67,23 @@ JOINTS_ORDER = [
 # Lower-level or rarely-looked-up-directly modules -- listed after Core, under "Supporting
 # Reference". Anything from kumiki/__init__.py not mentioned here or above still gets a page
 # (appended here automatically), just with a guessed display name.
-SUPPORTING_ORDER = ["cutcsg", "patternbook", "triangles", "blueprint"]
+SUPPORTING_ORDER = [
+    "kiwari",
+    "frame_decorators",
+    "drawings.drawing",
+    "drawings.layout",
+    "finishing",
+    "csg.cutcsg",
+    "patternbook",
+    "csg.triangles",
+    "blueprint",
+]
 
 DISPLAY_NAMES = {
     "cutcsg": "CutCSG",
+    "csg.cutcsg": "CutCSG",
+    "pathcsg": "PathCSG",
+    "csg.pathcsg": "PathCSG",
     "patternbook": "Pattern Book",
     "mixed": "Mortise and Tenon (Mixed)",
     "butt": "Butt Joints",
@@ -160,8 +173,15 @@ def _write_page(dotted_module: str, only_members: list[str] | None) -> str:
     full_ident = f"kumiki.{dotted_module}"
     members = only_members if only_members is not None else _locally_defined_public_names(dotted_module)
     example_name = members[0] if members else parts[-1]
+    display_title = _display_name(parts[-1])
 
     with mkdocs_gen_files.open(doc_path, "w") as fd:
+        fd.write("---\n")
+        fd.write(
+            f"description: \"Python API reference for {full_ident} ({display_title}) in Kumiki, "
+            f"the programmatic CAD library for timber framing and woodworking joinery.\"\n"
+        )
+        fd.write("---\n\n")
         fd.write(f"# `{full_ident}`\n\n")
         if dotted_module in INTROS:
             fd.write(INTROS[dotted_module] + "\n")

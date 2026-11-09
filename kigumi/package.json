@@ -1,23 +1,35 @@
 {
   "name": "kigumi",
   "displayName": "Kigumi",
-  "description": "Kigumi is a viewer tool for kumiki designs",
+  "description": "Interactive 3D viewer and CAD environment for Kumiki timber framing and woodworking joinery in Python",
   "version": "0.9.3",
   "publisher": "minimaple",
   "license": "Elastic-2.0",
+  "homepage": "https://kumiki.build",
+  "bugs": {
+    "url": "https://github.com/minimapletinytools/kumiki/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/minimapletinytools/kumiki/kigumi"
+    "url": "https://github.com/minimapletinytools/kumiki"
   },
   "engines": {
     "vscode": "^1.63.0"
   },
   "keywords": [
     "cad",
+    "3d",
     "timber",
+    "timber-framing",
     "woodworking",
-    "geometry",
-    "viewer"
+    "joinery",
+    "carpentry",
+    "kumiki",
+    "kigumi",
+    "python",
+    "parametric",
+    "viewer",
+    "csg"
   ],
   "categories": [
     "Visualization"

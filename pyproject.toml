@@ -1,16 +1,33 @@
 [project]
 name = "kumiki"
 version = "0.9.3"
-description = "A library for programmatic timber frame CAD design"
+description = "Programmatic CAD library for timber framing, woodworking joinery, and architectural framing in Python"
 requires-python = ">=3.10"
 license = "MPL-2.0"
 authors = [{ name = "minimaple" }]
 readme = "README.md"
-keywords = ["timber", "woodworking", "cad", "parametric"]
+keywords = [
+    "timber",
+    "timber-framing",
+    "woodworking",
+    "carpentry",
+    "joinery",
+    "japanese-joinery",
+    "kigumi",
+    "kumiki",
+    "cad",
+    "parametric",
+    "csg",
+    "3d",
+    "architecture",
+    "mortise-and-tenon",
+    "dovetail",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Manufacturing",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -19,8 +36,11 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Topic :: Artistic Software",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
     "Topic :: Scientific/Engineering",
     "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
     # Used only for the exact-rational LP backstop in kumiki/assembly.py
@@ -45,9 +65,13 @@ render = ["pyglet>=1.5,<2", "scipy>=1.7.0"]
 render-matplotlib = ["matplotlib>=3.5.0"]
 
 [project.urls]
-Homepage = "https://github.com/minimapletinytools/kumiki"
-Repository = "https://github.com/minimapletinytools/kumiki"
+Homepage = "https://kumiki.build"
 Documentation = "https://kumiki.build/docs/"
+Repository = "https://github.com/minimapletinytools/kumiki"
+Issues = "https://github.com/minimapletinytools/kumiki/issues"
+Changelog = "https://github.com/minimapletinytools/kumiki/blob/main/CHANGELOG.md"
+"Try in Browser" = "https://kumiki.build/try/"
+"Download Kigumi" = "https://kumiki.build/install"
 
 [build-system]
 requires = ["hatchling"]
