@@ -97,3 +97,15 @@ class TestFrameTimberLookup:
         assert frame.resolved_timber_path_of(second) == ResolvedTimberPath("post", 1)
         assert present(frame.cut_timber_at(ResolvedTimberPath("post", 1)), "post#1").timber is second
         assert frame.cut_timber_at(ResolvedTimberPath("post", 2)) is None
+
+
+def test_label_name_names_a_plain_string_label_as_bad_and_warns():
+    from kumiki.csg.cutcsg import HalfSpace
+    from kumiki.csg.feature_paths import label_name
+    from kumiki.ticket import TimberTicket
+    from kumiki.timber import Cutting
+    timber = create_timber(create_v3(0, 0, 0), mm(1000), create_v2(mm(100), mm(100)),
+                           create_v3(0, 0, 1), create_v3(1, 0, 0), ticket=TimberTicket(path="post"))
+    cutting = Cutting(timber=timber, negative_csg=HalfSpace(normal=create_v3(0, 0, 1), offset=mm(900)), label="trim")
+    with pytest.warns(UserWarning, match="on timber 'post' has label 'trim'"):
+        assert label_name(cutting) == "<bad label: 'trim'>"

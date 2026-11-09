@@ -3,10 +3,11 @@
 TODO rename this file to "FeatureHandle"
 """
 
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Sequence, Tuple, Union
 
-from .cutcsg import (CSGFeature, CutCSG, DerivedEdgeFeature, DerivedPointFeature, Difference, F_co, Intersection,
+from .cutcsg import (CSGFeature, CutCSG, CutCSGLabel, DerivedEdgeFeature, DerivedPointFeature, Difference, F_co, Intersection,
                      OwnedFeatureHit, SolidUnion, csg_children, shared_ancestor)
 from ..identity import (DerivedFeaturePath, FeaturePath, FeatureRef, ResolvedJointPath,
                        ResolvedTimberPath, SingleFeaturePath)
@@ -49,8 +50,20 @@ class FeatureHandle(Generic[F_co]):
 
 
 def label_name(labeled: Union[CutCSG, 'Cutting']) -> Optional[str]:
-    """Return the label name of a CSG node or Cutting, or None."""
-    return labeled.label.name
+    """Return the label name of a CSG node or Cutting, or None.
+
+    A label that is not a CutCSGLabel (e.g. a plain string) warns and names the node "<bad label: ...>".
+    """
+    label = labeled.label
+    if isinstance(label, CutCSGLabel):
+        return label.name
+    timber = getattr(labeled, "timber", None)
+    on = f" on timber {timber.ticket.path!r}" if timber is not None else ""
+    warnings.warn(
+        f"A {type(labeled).__name__}{on} has label {label!r}, a {type(label).__name__}, not a CutCSGLabel. "
+        f"Write label=CutCSGLabel({label!r}) instead."
+    )
+    return f"<bad label: {label!r}>"
 
 
 def _labelled_children(node: CutCSG) -> List[CutCSG]:

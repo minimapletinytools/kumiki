@@ -872,7 +872,12 @@ class FrameViewSession {
                     { assemblyPreviewSetting: assemblyPreviewSettingEnabled() }
                 );
             } catch (err) {
-                this.log(`[layers] get_layers_tree failed: ${err.message || err}`);
+                // An error, so read_view_log filtered to errors finds it; the frame still draws.
+                const details = extractRunnerErrorDetails(err);
+                const where = details.traceback ? describeTracebackLocation(details.traceback, { prefer: this.filePath }) : null;
+                this.logBlock('error', `[layers] Building the tree failed, so the tree is empty: `
+                    + `${details.type ? `${details.type}: ` : ''}${details.message}`
+                    + `${where ? `\n${where}` : ''}${details.traceback ? `\n${details.traceback}` : ''}`);
             }
             this.profiler.markTiming(timing, 'runner.get_layers_tree.end');
 
