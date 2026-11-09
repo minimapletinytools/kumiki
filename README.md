@@ -1,72 +1,156 @@
-# Kumiki
+<h1 align="center">Kumiki</h1>
 
-Kumiki is a PROGRAMMATIC CAD library for timber framing and woodworking.
+<p align="center">
+  <b>Programmatic CAD for timber framing and woodworking.</b><br>
+  Design frames and joinery in Python, and see them in 3D with Kigumi.
+</p>
 
-As a programmatic CAD tool, it is well suited for usage with AI agents 🤖
+<p align="center">
+  <a href="https://github.com/minimapletinytools/kumiki/releases">Releases</a> ·
+  <a href="https://kumiki.build/try/">Try it online</a> ·
+  <a href="https://kumiki.build">Website</a> ·
+  <a href="https://kumiki.build/docs/">Docs</a> ·
+  <a href="https://github.com/minimapletinytools/kumiki/discussions">Discussions</a> ·
+  <a href="https://discord.gg/cQhUG7WJ8">Discord</a>
+</p>
 
-Kumiki is used together with Kigumi--a VSCode extension for viewing your kumiki designs!
+<p align="center">
+  <a href="https://pypi.org/project/kumiki/"><img alt="PyPI" src="https://img.shields.io/pypi/v/kumiki?label=kumiki"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi"><img alt="VS Code Marketplace" src="https://img.shields.io/visual-studio-marketplace/v/minimaple.kigumi?label=kigumi"></a>
+  <a href="https://github.com/minimapletinytools/kumiki/actions/workflows/pytest.yml"><img alt="Tests" src="https://github.com/minimapletinytools/kumiki/actions/workflows/pytest.yml/badge.svg"></a>
+  <a href="https://discord.gg/cQhUG7WJ8"><img alt="Discord" src="https://img.shields.io/discord/1525951446103883936?label=discord"></a>
+</p>
 
-Kumiki is in FREE and OPEN SOURCE (FOSS), try it out! There are many more features to come. 
+![A tiny house frame designed in Kumiki](tinyhouse120.png)
 
-![](tinyhouse120.png)
+Kumiki is a **programmatic** CAD library for timber framing and woodworking. You write a frame as
+Python: timbers, the joints that connect them, and the drawings that describe them. Change a
+timber and every joint that touches it is recut.
 
-Expect frequent breaking changes accompanied by a minor version bump. Have your AI agent fix any borken frames due to API changes based on the changelog.
+Because designs are code, Kumiki works well with AI agents 🤖. Describe what you want to build,
+and your agent writes the frame.
 
-## setup
+Kumiki is free and open source. Try it out! There are many more features to come.
 
-Kumiki is best used with Kigumi. Kigumi is available as a standalone app, or as a [VSCode extension](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi). There is also a [web beta version](https://kumiki.build/try/) with limited agent functionality if you just want to try it out. The standalone app with your own agent is the preferred way to use kigumi.
+> [!NOTE]
+> Expect breaking changes, each with a minor version bump. Your agent can fix frames broken by an
+> API change using the [changelog](CHANGELOG.md).
 
-You can of course use Kumiki without Kigumi if you want to do that for some reason.
+## Features
 
-## your first kumiki project
+- **Parametric joinery.** More than 30 joints (mortise and tenon, dovetails, laps, scarfs, pegs,
+  wedges and more), each worked out from the timbers it joins.
+- **Live 3D preview in Kigumi.** Select down to a face, walk a joint's CSG tree, use X-ray and
+  section views, and measure.
+- **Drawings (beta).** Plans and dimensioned shop drawings, generated from the frame itself.
+- **Assembly order (beta).** Kumiki works out the order a frame goes together, and plays it back.
+- **Export.** STL, OBJ, 3MF and STEP.
+- **Built for agents.** Kigumi installs agent instructions with each project, has an agent of its
+  own, and an MCP server so your agent can see what it built.
 
-Hit the new project button in kigumi or create a folder and open it. Then click "Initialize Project" in the kigumi side menu. Click "new frame" to create a new project file or ask your agent to make one for you.
+## Get started
 
-## viewing the built in patterns and examples
+Kumiki is best used with **Kigumi**, its viewer:
 
-Kigumi ships with a patternbook and several examples. These can be explored through the kigumi menu. You can choose to "view source" or "duplicate in workspace" if you want to modify the patterns. 
+| | |
+|---|---|
+| **Desktop app** (recommended) | Mac and Windows, from the [releases page](https://github.com/minimapletinytools/kumiki/releases) or [kumiki.build/install](https://kumiki.build/install). Use it with your own agent. |
+| **VS Code extension** | From the [Marketplace](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi), or [Open VSX](https://open-vsx.org/extension/minimaple/kigumi) for Cursor. |
+| **In your browser** (beta) | [kumiki.build/try](https://kumiki.build/try/). Nothing to install, with a limited agent: good for a first look. |
 
-## making changes
+Kigumi sets up Python and Kumiki for you. You can also use Kumiki on its own with
+`pip install kumiki`.
 
-Kigumi designs are built with CODE. You can write this CODE yourself, or you can ask AI to write the CODE for you.
+### Your first project
 
-Kigumi installs with a set of AI agent instructions. The installed `kumiki` Python package includes the Kumiki library source files, built-in patterns, and the `docs/` content, so those resources are present in the Python environment used by Kigumi. Using human like prompting should serve you pretty well. Using carpentry or woodworknig terminology will serve you better. Please refer to the patternbook for the list of available joints. It's best to build your structure in increments previewing each step along the way but I won't stop you from asking your agent to "build me a house". You can implement your own joints as well. The AI agents currently struggle with this especially if you are unfamiliar with terminology and geometry conventions for prompting it, so don't expect much. Someday I'll have better prompting examples and skills to share here. Stay tuned.
+In the app, click **New Project** and pick a folder. In VS Code, open a folder and click
+**Initialize Project** in the Kigumi sidebar. Then click **New Frame…** at the bottom of the frames
+list, or ask your agent to make one for you.
 
-To learn more about authoring Kumiki designs without AI, please start with [docs/concepts.md](docs/concepts.md) to learn more about Kumiki's design philosophy, and then proceed with the various example structures that ship with Kumiki.
-Kumiki is very SIMPLE and VERBOSE by design. So it LOOKS complex but in actuality, it is quite simple to understand. A typical structure is built as follows:
+### Patterns and examples
 
-- estabalish a footprint
-- erect foundational timbers on the footprint
-- join foundational timbers with additional timbers to complete the "shape" of the structure
-- cut joints on timbers to properly connect the timbers completing the structure
+Kumiki ships with a pattern book of joints and several example frames, listed in Kigumi's
+explorer. Choose **View Source** to read one, or **Duplicate to Workspace** to make your own copy.
 
-Understanding Kumiki will also allow you to better instruct the agent to implement your designs! For example, instead of saying "I want my building to be an L shape" you might say "establish an L shaped footprint for the building". If you ever have questions, you can also just ask the agent to explain!
+## Designing frames
 
-## Drawing Support (BETA)
+Kumiki designs are built with code. You can write it yourself, or ask an agent to write it for
+you.
 
-kumiki/kigumi supports generating drawings/plans/blueprints. There are 3 ways in general to create drawings:
+### With an agent
 
-- algorithmically generated drawings
-- coded drawings
-- manually added drawings
+Kigumi installs a set of agent instructions in each project. The installed `kumiki` package
+includes the library's source, its patterns and its docs, so your agent has everything it needs in
+the project's Python environment.
 
-Ask your agent to add drawings to your file to get start. To manually add your own drawings, open the drawing you want to modify and select the features you want to measure from, hit the measure button or "m" and then select the feature to measure to. If there are no drawings, you can create one by selecting the timber(s) you want to draw and hit "draw timber" or you can generate a drawing of your entire frame by pressning "draw frame" when nothing is selected.
+Plain prompts work well, and carpentry and woodworking terms work better. See the pattern book for
+the joints available. It's best to build a structure in steps, previewing each one, but I won't
+stop you from asking your agent to "build me a house". You can implement your own joints too,
+though agents struggle with that today, especially without the terms for the geometry you want.
+Better prompting examples and skills are coming.
 
-You can also export as STEP or STL files to generate drawings in another software.
+### By hand
 
-# Contributing
+Start with [docs/concepts.md](docs/concepts.md) for Kumiki's design philosophy, then read the
+example frames that ship with it. Kumiki is simple and verbose by design: it *looks* complex, but
+each step is easy to follow. A typical structure is built like this:
 
-If you'd like to contribute new joints, you can always create a new file in kumiki/joints/community and add yourself as a CODEOWNER for that file. These joints may eventually be promoted to the main joint folder. 
+1. Establish a footprint.
+2. Raise foundational timbers on the footprint.
+3. Join them with more timbers to complete the structure's shape.
+4. Cut joints where the timbers meet.
 
-If you'd like to contribute it's best to first contact me. There are plenty of joints and new features to work on :).
+Knowing these steps helps you direct an agent, too. Instead of "I want my building to be an L
+shape", try "establish an L-shaped footprint for the building". And if you have questions, ask
+the agent to explain.
 
-## Developing Kigumi
+## Drawings (beta)
 
-Kigumi is 100% AI SLOP and it seems to not even be that awful :). Still, it's designed with more care than I might sometimes pretends. It may be best to open a bug report of feature request in github vs making a PR as I have no documented architectural guidance for kigumi yet simultaneously highly opinionated. Pull requests that change anything under `kigumi/` need a signed [Contributor License Agreement](CLA.md) before they can be merged. The CLA bot asks on your first such PR and tells you exactly what to comment; you only sign once. Contributions to kumiki need no CLA.
+Kumiki and Kigumi make drawings, plans and blueprints in three ways:
 
-# License
+- **Generated** from the frame.
+- **Coded** in your frame file.
+- **Added by hand** in Kigumi.
 
-- **kumiki** (the Python library, its patterns and docs) is under the [Mozilla Public License 2.0](LICENSE).
-- **kigumi** (the viewer: the VS Code extension and desktop app, in `kigumi/`) is under the [Elastic License 2.0](kigumi/LICENSE). You may use, modify and redistribute it freely, including commercially. What you may not do is offer it to others as a hosted or managed service -- the hosted web version of kigumi is published only by the project owner.
+Ask your agent to add drawings to your file to get started. To add a dimension by hand, open a
+drawing, select the feature to measure from, press the measure button (or <kbd>M</kbd>) and select
+the feature to measure to. With no drawings yet, select timbers and press **draw timber**, or
+press **draw frame** with nothing selected to draw the whole frame.
 
-Releases of kigumi up to and including 0.7.2 were under MPL-2.0 and remain so. Third-party files bundled with kigumi, such as those in `kigumi/webview/vendor/`, keep their own licenses.
+You can also export STEP or STL files and make drawings in other software.
+
+## Community
+
+- **Questions and ideas:** [GitHub Discussions](https://github.com/minimapletinytools/kumiki/discussions)
+- **Chat:** [Discord](https://discord.gg/cQhUG7WJ8)
+- **Bugs and feature requests:** [Issues](https://github.com/minimapletinytools/kumiki/issues)
+
+## Contributing
+
+To contribute a new joint, add a file in `kumiki/joints/community` and add yourself as its
+CODEOWNER. Community joints may later be promoted to the main joint folder.
+
+For anything bigger, please get in touch first. There are plenty of joints and features to work
+on :)
+
+### Developing Kigumi
+
+Kigumi is 100% AI slop, and it seems to not even be that awful :). Still, it's designed with more
+care than I sometimes let on. There's no written architecture guide yet, and I'm opinionated about
+it, so a bug report or feature request is often better than a pull request.
+
+Pull requests that change anything under `kigumi/` need a signed
+[Contributor License Agreement](CLA.md). The CLA bot asks on your first such PR and tells you what
+to comment; you only sign once. Contributions to kumiki need no CLA.
+
+## License
+
+- **kumiki** (the Python library, its patterns and docs) is under the
+  [Mozilla Public License 2.0](LICENSE).
+- **kigumi** (the viewer: the VS Code extension and desktop app, in `kigumi/`) is under the
+  [Elastic License 2.0](kigumi/LICENSE). You may use, modify and redistribute it freely, including
+  commercially. You may not offer it to others as a hosted or managed service: the hosted web
+  version of kigumi is published only by the project owner.
+
+Releases of kigumi up to and including 0.7.2 were under MPL-2.0 and remain so. Third-party files
+bundled with kigumi, such as those in `kigumi/webview/vendor/`, keep their own licenses.
