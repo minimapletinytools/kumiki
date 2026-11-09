@@ -12,12 +12,15 @@
 
 /**
  * How the agent loop treats a model, unless its `harness` says otherwise:
- *   nudgeAfter           tool calls in a turn without an edit before a write-early reminder; 0 for none
+ *   reasoningEffort      how hard the model thinks before each step (OpenRouter's reasoning effort); '' for its default
  *   keepToolResults      tool results kept whole (request.js trimOldToolResults)
  *   summariseAt          tokens (estimated) past which a turn starts by summarising the conversation
  *   imagesInToolResults  whether images may stay in tool results, rather than go in a user message after
  */
-const HARNESS = Object.freeze({ nudgeAfter: 6, keepToolResults: 8, summariseAt: 100000, imagesInToolResults: false });
+const HARNESS = Object.freeze({ reasoningEffort: 'medium', keepToolResults: 8, summariseAt: 100000, imagesInToolResults: false });
+
+/** The reasoning efforts OpenRouter takes. */
+const REASONING_EFFORTS = ['', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 
 const MODELS = [
     { id: 'deepseek-v4.1-flash', label: 'DeepSeek V4.1 Flash', openrouter: 'deepseek/deepseek-v4.1-flash', images: true, contextWindow: 1048576 },
@@ -40,7 +43,8 @@ function harnessOf(model) {
 function validHarness(harness) {
     if (!harness || typeof harness !== 'object') return null;
     const valid = Object.fromEntries(Object.entries(harness).filter(([key, value]) => key in HARNESS
-        && typeof value === typeof HARNESS[key] && (typeof value !== 'number' || (Number.isFinite(value) && value >= 0))));
+        && typeof value === typeof HARNESS[key] && (typeof value !== 'number' || (Number.isFinite(value) && value >= 0))
+        && (key !== 'reasoningEffort' || REASONING_EFFORTS.includes(value))));
     return Object.keys(valid).length ? valid : null;
 }
 
@@ -106,4 +110,4 @@ function routeModel(model, { openrouterKey, backend } = {}) {
     return null;
 }
 
-module.exports = { MODELS, HARNESS, findModel, harnessOf, validModels, createModelList, routeModel };
+module.exports = { MODELS, HARNESS, REASONING_EFFORTS, findModel, harnessOf, validModels, createModelList, routeModel };

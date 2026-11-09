@@ -6,13 +6,16 @@
  * Scored on the task's checks, with steps, cost and time. Costs real money, on the OpenRouter key in
  * KIGUMI_EVAL_OPENROUTER_KEY.
  *
- *   node test/evals/run-evals.js [--models a,b] [--tasks a,b] [--repeat n] [--max-steps n] [--out results.json] [--keep]
+ *   node test/evals/run-evals.js [--models a,b] [--tasks a,b] [--repeat n] [--max-steps n] [--effort e]
+ *                                [--out results.json] [--transcripts dir] [--keep]
  *
  * A task's prompts run as turns of one conversation. Each result has its prompt tokens and how many
- * were read from the cache.
+ * were read from the cache, and each step's time and tokens written.
  *
- * --max-steps is the most steps in a turn (the app's 40 by default). --keep leaves each run's project
- * folder, to see what the agent wrote.
+ * --max-steps is the most steps in a turn (the app's 40 by default). --effort sets the reasoning
+ * effort (models.js REASONING_EFFORTS; "" for the model's default). --transcripts writes each run as
+ * Markdown, reasoning and tool calls included, for reading what the agent did (the scratch folder
+ * test/evals/transcripts by default). --keep leaves each run's project folder.
  */
 
 const fs = require('fs');
@@ -21,7 +24,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 
 const { runTurn, languageModelFor, MAX_STEPS } = require('../../agent/agent-loop');
-const { MODELS, findModel, harnessOf, routeModel } = require('../../agent/models');
+const { MODELS, REASONING_EFFORTS, findModel, harnessOf, routeModel } = require('../../agent/models');
 const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { createProjectFiles } = require('../../agent/project-files');
 const { pythonKumikiApi } = require('../../agent/kumiki-api');
@@ -74,6 +77,45 @@ function headlessHost(files, { kumikiSource, examples }) {
     };
 }
 
+/** Text of `content`, a log entry's: a string, or parts. */
+function partsText(content, limit) {
+    const cut = (text) => (text.length > limit ? `${text.slice(0, limit)}\n[…${text.length - limit} more characters]` : text);
+    if (typeof content === 'string') return cut(content);
+    return (content || []).map((part) => {
+        if (part.type === 'text') return cut(part.text);
+        if (part.type === 'reasoning') return `> **thinking** ${cut(part.text).replace(/\n/g, '\n> ')}`;
+        if (part.type === 'tool-call') return `**${part.toolName}** \`${JSON.stringify(part.input).slice(0, 300)}\``;
+        if (part.type === 'tool-result') {
+            const value = part.output && part.output.value;
+            const text = Array.isArray(value) ? value.map((v) => v.text || `[${v.type}]`).join('\n') : JSON.stringify(part.output);
+            return `\`\`\`\n${cut(text)}\n\`\`\``;
+        }
+        return `[${part.type}]`;
+    }).join('\n\n');
+}
+
+/** `result`'s run as Markdown: the conversation, each step's time and tokens, then the checks. */
+function transcript(result, log) {
+    const lines = [`# ${result.task} · ${result.model}${result.effort !== undefined ? ` · effort ${result.effort || 'default'}` : ''}`, '',
+        `${result.passed ? 'PASS' : 'FAIL'}: ${result.checks.map((c) => `${c.passed ? '✓' : '✗'} ${c.said}`).join('; ')}`,
+        `${result.tools} tool calls, ${result.steps.length} steps, ${result.seconds}s, $${result.costUsd.toFixed(4)}`, ''];
+    let step = 0;
+    for (const entry of log) {
+        if (entry.role === 'assistant') {
+            const s = result.steps[step++];
+            lines.push(`## Step ${step}${s ? ` (${s.seconds}s, ${s.output ?? '?'} tokens written, ${s.reasoning ?? '?'} reasoning)` : ''}`);
+            lines.push(partsText(entry.content, 4000), '');
+        } else if (entry.role === 'tool') {
+            lines.push(partsText(entry.content, 1500), '');
+        } else if (entry.role === 'user') {
+            lines.push(`## User`, partsText(entry.content, 4000), '');
+        } else if (entry.note || entry.summary) {
+            lines.push(`*[${entry.note || 'summary'}] ${String(entry.text || entry.summary).slice(0, 600)}*`, '');
+        }
+    }
+    return lines.join('\n');
+}
+
 /** Run `task` on `modelId`; `languageModel` stands in for the real one in tests. */
 async function runOne(task, modelId, key, { languageModel: given = null } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), `kigumi-eval-${task.name}-`));
@@ -95,7 +137,13 @@ async function runOne(task, modelId, key, { languageModel: given = null } = {}) 
     let costUsd = 0;
     let failure = null;
     const log = [];
-    const tokens = { prompt: 0, cached: 0 };
+    const tokens = { prompt: 0, cached: 0, output: 0, reasoning: 0 };
+    // Each step's time, and what it wrote.
+    const steps = [];
+    let stepStarted = Date.now();
+    const effort = option('effort', null);
+    if (effort !== null && !REASONING_EFFORTS.includes(effort)) throw new Error(`No reasoning effort ${effort}`);
+    const harness = { ...harnessOf(model), ...(effort !== null ? { reasoningEffort: effort } : {}) };
     // The last turn's reply, for checks on what the agent said.
     let reply = '';
     const languageModel = given || await languageModelFor(routeModel(model, { openrouterKey: key }));
@@ -104,7 +152,7 @@ async function runOne(task, modelId, key, { languageModel: given = null } = {}) 
         for (const prompt of task.prompts) {
             reply = '';
             const result = await runTurn({
-                model: languageModel, images: model.images, cacheMarks: Boolean(model.cacheMarks), harness: harnessOf(model),
+                model: languageModel, images: model.images, cacheMarks: Boolean(model.cacheMarks), harness,
                 maxSteps: Number(option('max-steps', String(MAX_STEPS))), tools, files, system: instructions(host),
                 log, prompt: [{ role: 'user', content: prompt, shown: { text: prompt, images: 0 } }], askPermission: async () => true,
                 onEvent: (event) => {
@@ -117,10 +165,16 @@ async function runOne(task, modelId, key, { languageModel: given = null } = {}) 
                     if (event.type === 'agent:context') {
                         tokens.prompt += event.tokens;
                         tokens.cached += event.cached || 0;
+                        tokens.output += event.output || 0;
+                        tokens.reasoning += event.reasoning || 0;
+                        steps.push({ seconds: Math.round((Date.now() - stepStarted) / 100) / 10, prompt: event.tokens,
+                            output: event.output, reasoning: event.reasoning });
+                        stepStarted = Date.now();
                     }
                 },
             });
             costUsd += result.costUsd || 0;
+            stepStarted = Date.now();
         }
     } catch (error) {
         failure = String(error.message || error);
@@ -132,12 +186,13 @@ async function runOne(task, modelId, key, { languageModel: given = null } = {}) 
         return { passed: Boolean(passed), said };
     });
     if (!process.argv.includes('--keep')) fs.rmSync(root, { recursive: true, force: true });
-    return {
-        task: task.name, model: modelId, ...(process.argv.includes('--keep') ? { project: root } : {}), passed: !failure && checks.every((check) => check.passed), checks,
+    const result = {
+        task: task.name, model: modelId, effort: harness.reasoningEffort, ...(process.argv.includes('--keep') ? { project: root } : {}), passed: !failure && checks.every((check) => check.passed), checks,
         tools: toolCalls.length, toolsUsed: Object.fromEntries([...new Set(toolCalls)].map((name) => [name, toolCalls.filter((t) => t === name).length])),
-        promptTokens: tokens.prompt, cachedTokens: tokens.cached, cacheRate: tokens.prompt ? tokens.cached / tokens.prompt : 0,
+        promptTokens: tokens.prompt, cachedTokens: tokens.cached, outputTokens: tokens.output, reasoningTokens: tokens.reasoning, steps, cacheRate: tokens.prompt ? tokens.cached / tokens.prompt : 0,
         notices, notes: log.filter((entry) => entry.note).map(({ note, text }) => ({ note, text })), calls, costUsd, seconds: Math.round((Date.now() - started) / 1000), failure,
     };
+    return { ...result, transcript: transcript(result, log) };
 }
 
 async function main() {
@@ -148,14 +203,20 @@ async function main() {
         .map((name) => TASKS.find((task) => task.name === name) || (() => { throw new Error(`No task ${name}`); })());
     const repeat = Number(option('repeat', '1'));
     const results = [];
+    const transcripts = option('transcripts', path.join(__dirname, 'transcripts'));
+    fs.mkdirSync(transcripts, { recursive: true });
     for (const modelId of models) {
         for (const task of tasks) {
             for (let i = 0; i < repeat; i++) {
-                const result = await runOne(task, modelId, key);
+                const { transcript: text, ...result } = await runOne(task, modelId, key);
                 results.push(result);
+                const file = path.join(transcripts, `${modelId}-${task.name}-${result.effort || 'default'}-${i + 1}.md`);
+                fs.writeFileSync(file, text);
                 console.log(`${result.passed ? 'PASS' : 'FAIL'} ${modelId} ${task.name}: ${result.checks.map((c) => `${c.passed ? '✓' : '✗'} ${c.said}`).join('; ')}`
-                    + ` | ${result.tools} tool calls, $${result.costUsd.toFixed(4)}, ${Math.round(result.cacheRate * 100)}% cached, ${result.seconds}s`
-                    + `${result.notices.length ? ` | ${result.notices.join(' ')}` : ''}${result.failure ? ` | ${result.failure}` : ''}`);
+                    + ` | ${result.tools} tool calls, ${result.steps.length} steps, ${result.reasoningTokens} reasoning tokens,`
+                    + ` $${result.costUsd.toFixed(4)}, ${Math.round(result.cacheRate * 100)}% cached, ${result.seconds}s`
+                    + `${result.notices.length ? ` | ${result.notices.join(' ')}` : ''}${result.failure ? ` | ${result.failure}` : ''}`
+                    + `\n  ${path.relative(process.cwd(), file)}`);
             }
         }
     }
@@ -177,4 +238,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { headlessHost, runOne };
+module.exports = { headlessHost, runOne, transcript };

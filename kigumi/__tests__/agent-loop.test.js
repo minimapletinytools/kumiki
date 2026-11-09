@@ -98,12 +98,12 @@ describe('the model table', () => {
 
     test("a model's harness is the defaults with what the backend sets, of the right types", async () => {
         const listed = [{ id: 'm', label: 'M', openrouter: 'x/m', images: true, contextWindow: 1000,
-            harness: { nudgeAfter: 0, keepToolResults: 'many', summariseAt: -1, imagesInToolResults: true, unknown: 1 } }];
+            harness: { reasoningEffort: 'low', keepToolResults: 'many', summariseAt: -1, imagesInToolResults: true, unknown: 1 } }];
         const models = createModelList({ backendUrl: 'https://api.example', fetch: async () => ({ ok: true, json: async () => ({ models: listed }) }) });
         await models.refresh();
 
-        expect(models.list()[0].harness).toEqual({ nudgeAfter: 0, imagesInToolResults: true });
-        expect(harnessOf(models.list()[0])).toEqual({ ...HARNESS, nudgeAfter: 0, imagesInToolResults: true });
+        expect(models.list()[0].harness).toEqual({ reasoningEffort: 'low', imagesInToolResults: true });
+        expect(harnessOf(models.list()[0])).toEqual({ ...HARNESS, reasoningEffort: 'low', imagesInToolResults: true });
         expect(harnessOf(MODELS[0])).toEqual(HARNESS);
     });
 });
@@ -338,36 +338,24 @@ describe('the agent loop', () => {
         expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain('[Kigumi note: Your call read {}');
     });
 
-    test('after six looks without writing, progress reminders repeat every six calls', async () => {
-        const readTool = { name: 'read', description: 'Read.', shape: { n: z.number().optional() }, effect: 'read',
-            run: async ({ n }) => [{ type: 'text', text: `line ${n}` }] };
-        const looks = (from, count) => Array.from({ length: count }, (_, i) => [call(`c${from + i}`, 'read', { n: from + i }), finish('tool-calls')]);
-        const model = scripted(...looks(0, 30), [...say('1', 'Done.'), finish('stop')]);
-        await runTurn({ model, images: true, tools: [readTool], system: 'sys', log: [], prompt: go(), askPermission: async () => true,
+    test("each step asks for the harness's reasoning effort, and none when it is unset", async () => {
+        const model = scripted([call('c1', 'look'), finish('tool-calls')], [...say('1', 'Done.'), finish('stop')]);
+        await runTurn({ model, images: true, tools: [lookTool], system: 'sys', log: [], prompt: go(), askPermission: async () => true,
             onEvent: () => {} });
-        const told = (i) => (JSON.stringify(model.doStreamCalls[i].prompt).match(/without changing anything/g) || []).length;
-        expect(told(5)).toBe(0);
-        expect(told(6)).toBe(1);
-        expect(told(11)).toBe(1);
-        expect(told(12)).toBe(2);
-        expect(told(30)).toBe(5);
+        for (const request of model.doStreamCalls) {
+            expect(request.providerOptions.openrouter.reasoning).toEqual({ effort: HARNESS.reasoningEffort });
+        }
 
-        // A model whose harness says none gets none.
-        const quiet = scripted(...looks(0, 8), [...say('1', 'Done.'), finish('stop')]);
-        await runTurn({ model: quiet, images: true, harness: { ...HARNESS, nudgeAfter: 0 }, tools: [readTool], system: 'sys', log: [],
-            prompt: go(), askPermission: async () => true, onEvent: () => {} });
-        expect(JSON.stringify(quiet.doStreamCalls)).not.toContain('without changing anything');
+        const plain = scripted([...say('1', 'Done.'), finish('stop')]);
+        await runTurn({ model: plain, images: true, harness: { ...HARNESS, reasoningEffort: '' }, tools: [lookTool], system: 'sys',
+            log: [], prompt: go(), askPermission: async () => true, onEvent: () => {} });
+        expect(plain.doStreamCalls[0].providerOptions).toBeUndefined();
     });
 
-    test('research in earlier turns does not count toward a reminder', async () => {
-        const prior = await turn(scripted(...Array.from({ length: 8 }, (_, i) => [call(`c${i}`, 'look'), finish('tool-calls')]),
-            [...say('1', 'Still researching.'), finish('stop')]));
-        const model = scripted([call('c8', 'look'), finish('tool-calls')], [...say('2', 'It looks fine.'), finish('stop')]);
-
-        const { log } = await turn(model, { log: prior.log });
-
-        // The first turn's reminder stays in the log; the second turn adds none.
-        expect(log.filter((entry) => entry.note === 'nudge')).toHaveLength(1);
+    test('many looks without a change add no reminder', async () => {
+        const looks = Array.from({ length: 12 }, (_, i) => [call(`c${i}`, 'look'), finish('tool-calls')]);
+        const { log } = await turn(scripted(...looks, [...say('1', 'Done.'), finish('stop')]));
+        expect(log.filter((entry) => entry.note)).toEqual([]);
     });
 
     test('only the latest screenshot is sent; earlier ones become a note', async () => {
@@ -498,11 +486,11 @@ describe('the agent loop', () => {
         expect(summaries()[1]).toContain('x_pos = x  # newer');
     });
 
-    test('each step reports how full the conversation is', async () => {
+    test('each step reports how full the conversation is, and what it wrote', async () => {
         const events = [];
         await runTurn({ model: scripted([...say('1', 'Hi.'), finish('stop')]), images: true, contextWindow: 200000, tools: [],
             system: 's', log: [], prompt: go(), askPermission: async () => true, onEvent: (event) => events.push(event) });
-        expect(events).toContainEqual({ type: 'agent:context', tokens: 10, window: 200000, cached: 0 });
+        expect(events).toContainEqual({ type: 'agent:context', tokens: 10, window: 200000, cached: 0, output: 5, reasoning: 0 });
     });
 
         test('an image the user attached is dropped like a screenshot once a later one comes', () => {

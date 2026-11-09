@@ -42,5 +42,8 @@ const STARTER = fs.readFileSync(path.join(REPO, 'patterns', 'structures', 'my_cu
         expect(result.checks.map((check) => check.said)).toEqual(['it builds', 'frame.py unchanged', 'the reply gives the count']);
         expect(result.passed).toBe(true);
         expect(result.cacheRate).toBeCloseTo(0.6);
+        expect(result.steps).toEqual([expect.objectContaining({ prompt: 100, output: 5 })]);
+        expect(result.transcript).toContain('## Step 1');
+        expect(result.transcript).toContain('Four timbers, joined with mortise and tenon.');
     }, 120000);
 });

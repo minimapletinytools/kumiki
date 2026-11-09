@@ -26,10 +26,6 @@ const MAX_STREAM_CONTINUATIONS = 2;
 const NOTES = {
     continuation: () => 'The previous response stream ended without a completion signal. Continue from where you left '
         + 'off, using the tool results already in this conversation. Do not repeat completed changes.',
-    nudge: (looks) => `You have made ${looks} tool calls this turn without changing anything. If the current request is `
-        + 'to write or change a frame, write a first version now. Use kumiki_api for specific signatures and let actual '
-        + 'build errors guide further lookups. Do not reread files you already have. Only report writing, running, or '
-        + 'building after the corresponding tool has actually done it.',
     repeat: (call) => `Your call ${call} gave the same result as the same call earlier this turn. To see something else, `
         + 'change the arguments: read_file reads on from `offset`.',
 };
@@ -71,6 +67,11 @@ function toModelContent(content, images) {
 }
 
 const WRITE_TOOLS = new Set(['write_file', 'edit_file']);
+
+/** The request options that set `harness`'s reasoning effort; none for the model's default. */
+function reasoningOptions(harness) {
+    return harness.reasoningEffort ? { openrouter: { reasoning: { effort: harness.reasoningEffort } } } : undefined;
+}
 
 const SUMMARY_REQUEST = 'Summarise our conversation so far for carrying on the work: what the user wants, what '
     + 'has been done (files changed and how), what was found, and what is left. Keep file paths, names and '
@@ -123,7 +124,7 @@ async function summariseIfLarge({ model, system, log, upTo = log.length, abortSi
     // Streamed like every other request, which is all the backend carries cost reports for.
     let failure = null;
     const result = streamText({
-        model, system, abortSignal, maxRetries: 2, maxOutputTokens: MAX_OUTPUT_TOKENS,
+        model, system, abortSignal, maxRetries: 2, maxOutputTokens: MAX_OUTPUT_TOKENS, providerOptions: reasoningOptions(harness),
         messages: [...buildRequest(earlier, { keep: 0, imagesInToolResults: harness.imagesInToolResults }),
             { role: 'user', content: SUMMARY_REQUEST }],
         onError: ({ error }) => { failure = error; },
@@ -215,13 +216,10 @@ async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, c
         onEvent({ type: 'agent:notice', key: 'agent.notice.summarised', text: 'The earlier conversation was summarised, to keep each step small.' });
     }
     const steps = [];
-    let looks = 0;
-    let nudgedAt = null;
     // Repeated looks this step, noted after its tool results.
     let repeats = [];
     const toolSet = toToolSet(tools, { images, askPermission, onRepeat: (call) => repeats.push(call) });
     const request = () => buildRequest(log, { keep: harness.keepToolResults, imagesInToolResults: harness.imagesInToolResults, cacheMarks });
-    const nudgeAfter = harness.nudgeAfter;
     for (let continuations = 0; ; continuations++) {
         const before = steps.length;
         let failure = null;
@@ -235,30 +233,21 @@ async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, c
             abortSignal,
             // Retry transient request failures before streaming begins.
             maxRetries: 2,
-            prepareStep: () => {
-                if (nudgeAfter > 0 && looks >= nudgeAfter && (nudgedAt === null || looks - nudgedAt >= nudgeAfter)) {
-                    nudgedAt = looks;
-                    log.push({ note: 'nudge', text: NOTES.nudge(looks) });
-                }
-                return { messages: request() };
-            },
+            providerOptions: reasoningOptions(harness),
+            prepareStep: () => ({ messages: request() }),
             onStepEnd: (step) => {
                 steps.push(step);
                 log.push(...step.response.messages);
                 log.push(...repeats.map((call) => ({ note: 'repeat', text: NOTES.repeat(call) })));
                 repeats = [];
-                for (const call of step.toolCalls || []) {
-                    if (WRITE_TOOLS.has(call.toolName)) {
-                        looks = 0;
-                        nudgedAt = null;
-                    } else {
-                        looks += 1;
-                    }
-                }
-                const tokens = step.usage && step.usage.inputTokens;
-                const cached = step.usage && step.usage.inputTokenDetails && step.usage.inputTokenDetails.cacheReadTokens;
+                const usage = step.usage || {};
+                const tokens = usage.inputTokens;
+                const cached = usage.inputTokenDetails && usage.inputTokenDetails.cacheReadTokens;
+                const reasoning = usage.outputTokenDetails && usage.outputTokenDetails.reasoningTokens;
                 if (typeof tokens === 'number') {
-                    onEvent({ type: 'agent:context', tokens, window: contextWindow || null, ...(typeof cached === 'number' ? { cached } : {}) });
+                    onEvent({ type: 'agent:context', tokens, window: contextWindow || null, ...(typeof cached === 'number' ? { cached } : {}),
+                        ...(typeof usage.outputTokens === 'number' ? { output: usage.outputTokens } : {}),
+                        ...(typeof reasoning === 'number' ? { reasoning } : {}) });
                 }
             },
             onError: ({ error }) => { failure = error; },

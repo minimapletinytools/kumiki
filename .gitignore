@@ -191,3 +191,6 @@ kigumi/.artifacts
 # with no .gitmodules entry, and every `git submodule foreach` after that
 # (actions/checkout's post-job cleanup runs one) fails with exit code 128.
 .claude/worktrees/
+
+# Agent eval transcripts (kigumi/test/evals/run-evals.js)
+kigumi/test/evals/transcripts/

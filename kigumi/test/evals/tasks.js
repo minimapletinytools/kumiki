@@ -22,6 +22,8 @@ const timbers = (count) => (report) => [report.ok && report.timbers.length === c
 const unchanged = (file, content) => (_report, project) => [project.read(file) === content, `${file} ${project.read(file) === content ? 'unchanged' : 'changed'}`];
 const span = (report, axis) => Math.max(...report.timbers.map((t) => t.max[axis])) - Math.min(...report.timbers.map((t) => t.min[axis]));
 
+const BROKEN_FACE = changed(STARTER, 'front_face_on_butt_timber=TimberLongFace.FRONT', 'front_face_on_butt_timber=TimberLongFace.RIGHT');
+
 const TASKS = [
     {
         name: 'fix-attribute',
@@ -33,7 +35,7 @@ const TASKS = [
     },
     {
         name: 'fix-face',
-        files: { 'frame.py': changed(STARTER, 'front_face_on_butt_timber=TimberLongFace.FRONT', 'front_face_on_butt_timber=TimberLongFace.RIGHT') },
+        files: { 'frame.py': BROKEN_FACE },
         prompts: ['frame.py fails to build, can you fix it?'],
         target: 'frame.py',
         checks: [builds, timbers(4), holdsTogether],
@@ -66,6 +68,16 @@ const TASKS = [
         target: 'frame.py',
         checks: [builds, unchanged('frame.py', STARTER),
             (_report, project) => [/\b(4|four)\b/i.test(project.reply), 'the reply gives the count']],
+    },
+    {
+        // A question about a failure: find the cause and say it, without changing the file.
+        name: 'explain-error',
+        files: { 'frame.py': BROKEN_FACE },
+        prompts: ['Why does frame.py fail to build? Just explain, don\'t change anything.'],
+        target: 'frame.py',
+        checks: [unchanged('frame.py', BROKEN_FACE),
+            (_report, project) => [/front_face_on_butt_timber|\bRIGHT\b/.test(project.reply), 'the reply names the face given'],
+            (_report, project) => [/\b(FRONT|BACK)\b/.test(project.reply), 'the reply says which face would work']],
     },
     {
         name: 'two-turns',
