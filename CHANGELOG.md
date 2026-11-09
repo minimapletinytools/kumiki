@@ -10,6 +10,10 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kigumi
 
+#### Changed
+
+- The browser version's agent panel opens with a warning: the standalone app with your own agent gives much better results, the panel is for trying Kumiki out, and its $1 of sign-in credit can't be topped up. Its download link goes to kumiki.build/install.
+
 #### Fixed
 
 - The browser version's meshes match the standalone app's: flat faces at an angle (the dovetailed sawhorse's legs) no longer show stray triangle creases. Manifold's WebAssembly build rounded vertices to float32; they now go in and come out exact.

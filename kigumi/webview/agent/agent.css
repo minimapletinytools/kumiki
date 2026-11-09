@@ -947,6 +947,25 @@ body.host-web .web-agent-notice {
 body.host-web .welcome-sign-in {
     display: none;
 }
+/* What the browser version's agent is for, above everything else in its notice. */
+.web-agent-warning {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--ka-warning);
+    border-left-width: 4px;
+    border-radius: 6px;
+    background: var(--ka-chrome-bg);
+    font-size: 13px;
+    line-height: 1.45;
+}
+.web-agent-warning p {
+    margin: 0;
+}
+.web-agent-warning .web-agent-warning-title {
+    margin-bottom: 4px;
+    font-weight: 700;
+    color: var(--ka-warning);
+}
 .web-agent-notice-lead {
     margin: 0 0 6px;
     font-weight: 600;

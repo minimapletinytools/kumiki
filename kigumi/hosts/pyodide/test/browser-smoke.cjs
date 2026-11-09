@@ -121,7 +121,7 @@ app.whenReady().then(async () => {
             const element = doc && doc.querySelector('.web-agent-notice');
             return element && doc.defaultView.getComputedStyle(element).display !== 'none' ? element.textContent : null;
         })()`, 60000);
-        check('turned on, the agent opens and says how it can be run here', Boolean(notice && notice.includes('coming soon')));
+        check('turned on, the agent opens and says how it can be run here', Boolean(notice && notice.includes('much better results')));
         await shot('agent');
         const tool = (name, input = {}) => js(`new Promise((resolve) => {
             const id = Math.random();
