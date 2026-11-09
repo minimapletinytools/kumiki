@@ -1,3 +1,5 @@
+create a new structure, this should be of the "wood" kanji character. the verlctical0 stroke isa 4x4, the two horizontal beams are 4x5s (so slightly wider in vertical axkis) and the 2 side strokes should be 4x4s. join the side storkes to the center with morties and tenon joints with 1 round peg, join the horizontal beams (2 of them) with a double butt joint using square pegs. then see if you can make a decortaive cut on the strokes to give them a curved appearance on the top side of them.
+
 
 :: 11/3/2026 dovetail sawhores video script (actually the non-kumiki one)
 
@@ -223,6 +225,24 @@ DONE/IGNORE-I think you need to rework hidden selection... we only want to be ab
   -another idea is to expand PTW planes to rough stock dimensions? that way they aren't hidden, this might just be better?
 DONE/IGNORE-add types to runner.py
 
+DONE-improve the nothing-opened page in kigumi
+  -no open frame file, in fact get rid of file open frame entirely, the sidebar should eb used instead.
+  -project workspace browser
+    -the page should have "new project" which opens the file browser defaluting to mydocuments and lets you choose a project folder
+    -the page should show "recent projects" as well
+    -for web, it saves in your browser cache, and you can have multiple  project workspaces (this is a separate project to do but laying out the intetn here now)
+      -make sure to put a warning that says "your files are saved to browser cache, NOT to disk and NOT to the cloud. we aren't doing cloud fies yet.
+      -in web, we need an export to disk that saves the projecw orkspace to a zip file and lets you download it or something
+  -can you add some new tools for the assistiant to open/close project workspaces and create new ones
+    -update the agent usage insturction doc preamble on how to do project management, kEEP IT BRIEF
+  -do these work if you odn't have a workspace open? if so, please d oth efollowing:
+    -browse patterns hould open the sidebar and epand teh patterns tree
+    -add browse examples that does the same thing
+
+DONE-add support to run @tools from the parameter section
+  -do this for generating saw horse router jig lol
+  -router jig template function? takes a timber and a flat profile (extrusion or prism), adds a "template blcok over both, cuts out the timber, and then cuts out the profile extruding upwards to make the template based on bit + collar paraemetrs. shouldn't be too hard? would be cool if it makes mid supports too for extra wide profiles...
+
 -NEXT RELEASE TODO
   DONE-end cuts should be given their own intersection group, dovetailed_sawhores currentyl uses PERFECT, and no where else sets the group. We should make a new group, cross intersects but not shoulderplane
     -prioritize axis aligned measurements
@@ -241,28 +261,29 @@ DONE/IGNORE-add types to runner.py
     DONE-if you do the callback thing, let tools be dedfined in the callback
     IGNORE-disable the draw button when drawings are being generated
   DONE-how to do self update?
+  DONE-setup GHA release for binary app
+  	-test end to end
+  DONE-3d drawings need a save measurement button
+  DONE-r8ecent folders
+  DONE-do strcuture/example cleanup
+  DONE-move application setting sto their own menu in the sidebra
+  DONE-initialize project button should go away when no project is open, instead, it should be "open project" and maybe list recent projects (maybe use the same code we used fro the main view when no project is open)
+  DONE-do auto update (need mac code signing)
+
 
   -maybe do drawing prettifier pass
   -test agent created drawings
   -finish the sawhorse and add tools
-  -do strcuture/example cleanup
   -check that edges are being highlighted correctly in 2d drawing mesaurements
   -add joints/arrangement stuff to cheat sheet
   -mega update wesite
   -make a new video 
-  -setup GHA release for binary app
-  	-test end to end
+  -d osome more testing
 
 
 
--do auto update (need mac code signing)
+-msg modes on r/woodworking if they will allow promo
 
-
-
-
--add support to run @tools from the parameter section
-  -do this for generating saw horse router jig lol
-  -router jig template function? takes a timber and a flat profile (extrusion or prism), adds a "template blcok over both, cuts out the timber, and then cuts out the profile extruding upwards to make the template based on bit + collar paraemetrs. shouldn't be too hard? would be cool if it makes mid supports too for extra wide profiles...
 -then you can see if all features are visible through the views and warn if not
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
 -decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)

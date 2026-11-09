@@ -8,26 +8,19 @@ Kumiki is used together with Kigumi--a VSCode extension for viewing your kumiki 
 
 Kumiki is in FREE and OPEN SOURCE (FOSS), try it out! There are many more features to come. 
 
-![](oscarshed.png)
+![](tinyhouse120.png)
 
-
-Expect frequent breaking changes accompanied by a minor version bump. The AI agent should be able to easily address any breaking API changes based on the changelog.
+Expect frequent breaking changes accompanied by a minor version bump. Have your AI agent fix any borken frames due to API changes based on the changelog.
 
 ## setup
 
-Kumiki is best used with Kigumi. To install Kigumi, install [VSCode](https://code.visualstudio.com/) and install the [Kigumi](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi) extension.
+Kumiki is best used with Kigumi. Kigumi is available as a standalone app, or as a [VSCode extension](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi). There is also a [web beta version](https://kumiki.build/try/) with limited agent functionality if you just want to try it out. The standalone app with your own agent is the preferred way to use kigumi.
 
-I think Kigumi also requires [python3](https://www.python.org/downloads/), the rest of the dependencies get installed automagically for you.
-
-You can of course use Kumiki without Kigumi. You can still use Kigumi to setup your Kumiki projects and its dependencies.
+You can of course use Kumiki without Kigumi if you want to do that for some reason.
 
 ## your first kumiki project
 
-Create a folder for your Kumiki project and open that folder in VSCode. Then click "Initialize Project" from the Kumiki menu. You may also run "kigumi: initialize project" command from the command pallete. This will create a placeholder my_cute_frame.py project file for you that you can build on! 
-
-Open the Kigumi menu by clicking on the Kigumi extension icon in the left side bar.
-You may also open Kigumi by opening the command palette in VScode (cmd/ctrl+shift+p). Start typing "kigumi" and choose the "View: Show Kigumi" command. 
-You can open a Kumiki project file directly by choosing "Kigumi: Open Current File in Viewer" in the command pallete when that file is focused.
+Hit the new project button in kigumi or create a folder and open it. Then click "Initialize Project" in the kigumi side menu. Click "new frame" to create a new project file or ask your agent to make one for you.
 
 ## viewing the built in patterns and examples
 
@@ -49,15 +42,17 @@ Kumiki is very SIMPLE and VERBOSE by design. So it LOOKS complex but in actualit
 
 Understanding Kumiki will also allow you to better instruct the agent to implement your designs! For example, instead of saying "I want my building to be an L shape" you might say "establish an L shaped footprint for the building". If you ever have questions, you can also just ask the agent to explain!
 
-## Drawing Support
+## Drawing Support (BETA)
 
-Drawing support (for making plans or per-member blueprints) is coming very soon!
+kumiki/kigumi supports generating drawings/plans/blueprints. There are 3 ways in general to create drawings:
 
-For now, your best bet right now is to export as STEP or STL files and generate drawings in another software. Kumiki/Kigumi will add support for this in 3 stages:
+- algorithmically generated drawings
+- coded drawings
+- manually added drawings
 
-1. ability to measure features relative to each other in Kigumi
-2. ability to generate and export drawings inside kigumi
+Ask your agent to add drawings to your file to get start. To manually add your own drawings, open the drawing you want to modify and select the features you want to measure from, hit the measure button or "m" and then select the feature to measure to. If there are no drawings, you can create one by selecting the timber(s) you want to draw and hit "draw timber" or you can generate a drawing of your entire frame by pressning "draw frame" when nothing is selected.
 
+You can also export as STEP or STL files to generate drawings in another software.
 
 # Contributing
 
@@ -65,19 +60,9 @@ If you'd like to contribute new joints, you can always create a new file in kumi
 
 If you'd like to contribute it's best to first contact me. There are plenty of joints and new features to work on :).
 
-## Developing Kumiki
-
-To setup for local development, just check out this repo and use `uv` to manage all your dependencies. The `Makefile` has convenient shortcuts for all your setup and testing needs.
-
-Kigumi has a separate project scanning flow such that it can be used with the Kumiki repo itself as the workspace. Just use Kigumi like you normally would to test Kumiki.
-
 ## Developing Kigumi
 
-Kigumi is 100% AI SLOP and it seems to not even be that awful :). Still, it's designed with more care than I might sometimes pretends. It may be best to open a bug report of feature request in github vs making a PR as I have no documented architectural guidance for kigumi yet simultaneously highly opinionated.
-
-## Contributor License Agreement
-
-Pull requests that change anything under `kigumi/` need a signed [Contributor License Agreement](CLA.md) before they can be merged. The CLA bot asks on your first such PR and tells you exactly what to comment; you only sign once. Contributions to kumiki need no CLA.
+Kigumi is 100% AI SLOP and it seems to not even be that awful :). Still, it's designed with more care than I might sometimes pretends. It may be best to open a bug report of feature request in github vs making a PR as I have no documented architectural guidance for kigumi yet simultaneously highly opinionated. Pull requests that change anything under `kigumi/` need a signed [Contributor License Agreement](CLA.md) before they can be merged. The CLA bot asks on your first such PR and tells you exactly what to comment; you only sign once. Contributions to kumiki need no CLA.
 
 # License
 
