@@ -31,6 +31,7 @@ const { pythonKumikiApi } = require('../../agent/kumiki-api');
 const { agentTools, instructions } = require('../../agent/agent');
 const { Checkpoints } = require('../../agent/checkpoints');
 const { TASKS } = require('./tasks');
+const { describeFrame } = require('../../frame-description');
 
 const REPO = path.resolve(__dirname, '..', '..', '..');
 const PYTHON = path.join(REPO, '.venv', 'bin', 'python');
@@ -68,7 +69,14 @@ function headlessHost(files, { kumikiSource, examples }) {
     const build = async (file) => asBuildReport(await buildFrame(files.resolve(file)));
     return {
         files,
-        frames: { shows: (file) => String(file).endsWith('.py'), check: build, rebuild: build },
+        frames: {
+            shows: (file) => String(file).endsWith('.py'), check: build, rebuild: build,
+            describe: async (file) => {
+                const report = await buildFrame(files.resolve(file));
+                if (!report.ok) return { ok: false, error: report.error };
+                return { ok: true, ...describeFrame(report.view.frame, report.view.geometry, report.view.layers) };
+            },
+        },
         view: null,
         kumikiApi: pythonKumikiApi({ python: () => PYTHON, env: { PYTHONPATH: REPO } }),
         kumikiSource: () => kumikiSource,

@@ -87,15 +87,6 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve =
             })),
         },
         {
-            name: 'describe_frame',
-            description: "Lists each timber in a view with its bounding box (metres, Z up) and the timbers it "
-                + 'touches, and says whether every timber is connected to the rest. Use it to check that timbers '
-                + 'you joined actually meet.',
-            shape: { panel_id: panelId },
-            effect: 'read',
-            run: async ({ panel_id: id }) => text(await run('kigumi.automationDescribeFrame', viewOptions(id))),
-        },
-        {
             name: 'read_view_log',
             description: "A view's log: what the Python runner printed building the frame, including errors "
                 + 'and tracebacks.',

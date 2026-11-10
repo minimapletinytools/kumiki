@@ -323,9 +323,9 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         'kigumi.automationBuildReport': async (options = {}) => withSession(options,
             (session) => buildReport(session, options), { entries: [] }),
 
-        // Where the view's timbers are, and which touch (frame-description.js).
+        // Where the view's timbers are, which way their faces look, which touch, and their joints (frame-description.js).
         'kigumi.automationDescribeFrame': async (options = {}) => withSession(options, async (session) => (session._lastFrameData
-            ? { ok: true, filePath: session.filePath, ...describeFrame(session._lastFrameData, session._lastGeometryData) }
+            ? { ok: true, filePath: session.filePath, ...describeFrame(session._lastFrameData, session._lastGeometryData, session._lastLayersData) }
             : { ok: false, reason: 'not-built', filePath: session.filePath })),
 
         'kigumi.automationReadSessionLogs': async (options = {}) => withSession(options, async (session) => {

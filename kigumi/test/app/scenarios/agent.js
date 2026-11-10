@@ -33,16 +33,17 @@ module.exports = {
         const limit = await waitFor(() => settings.get('agent.maxOutputTokens') === 32000, { timeoutMs: 5000 }).catch(() => false);
         await capture('agent-settings');
         await read(`doc.getElementById('btn-settings').click()`);
-        settings.set('agent.maxOutputTokens', 8000);
-        check('the settings menu sets the longest step', shown === '8000' && limit, `shown ${shown}, now ${settings.get('agent.maxOutputTokens')}`);
+        settings.set('agent.maxOutputTokens', 16000);
+        check('the settings menu sets the longest step', shown === '16000' && limit, `shown ${shown}, now ${settings.get('agent.maxOutputTokens')}`);
 
         // What an edit by the agent runs: the view's file built as it is, and that build's problems.
         await openFrame(FRAME);
         const report = await runAppCommand('kigumi.automationBuildReport', { filePath: FRAME, graceMs: 0 });
         const described = await runAppCommand('kigumi.automationDescribeFrame', { filePath: FRAME });
-        check("describe_frame gives a view's timbers with what each touches, all one group for a frame that holds together",
+        check("describe_frame gives a view's timbers with their faces, what each touches and its joints, all one group",
             described && described.ok && described.timbers.length === 4 && described.groups.length === 1
-                && described.timbers.every((one) => one.min && one.touches.length > 0),
+                && described.timbers.every((one) => one.min && one.touches.length > 0 && one.joints.length === 2
+                    && Object.keys(one.faces).length === 6 && /^[+-][XYZ]$/.test(one.faces.TOP)),
             JSON.stringify(described && { groups: described.groups, first: described.timbers && described.timbers[0] }).slice(0, 300));
         check('a view\'s file builds on request, reporting that build\'s problems',
             report && report.ok === true && Array.isArray(report.entries) && report.entries.length === 0, JSON.stringify(report).slice(0, 200));

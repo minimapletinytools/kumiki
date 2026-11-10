@@ -4,7 +4,7 @@ const path = require('path');
 
 const { createPanelDirectory } = require('../agent/panel-directory');
 const { createKigumiTools } = require('../agent/tools');
-const { viewFrames, checkFrameTool } = require('../agent/frames');
+const { viewFrames, checkFrameTool, describeFrameTool } = require('../agent/frames');
 const { sharedTools, agentTools, viewHost } = require('../agent/agent');
 const { startMcpHttpServer } = require('../agent/mcp-http');
 const { MCP_CLIENTS, mcpSetupText } = require('../agent/mcp-setup');
@@ -83,8 +83,10 @@ describe('the tools', () => {
         expect(shared).toEqual(expect.arrayContaining(['list_panels', 'screenshot', 'check_frame', 'kumiki_api']));
         expect(shared).not.toContain('edit_file');
         expect(own).toEqual([...shared, 'list_files', 'search_files', 'read_file', 'write_file', 'edit_file', 'update_todos']);
-        // Headless: no views, so no view tools.
-        expect(sharedTools({ ...host, view: null, kumikiApi: null }).map((tool) => tool.name)).toEqual(['check_frame']);
+        // Headless: no views, so no view tools; a host whose frames can be described still has describe_frame.
+        expect(sharedTools({ ...host, view: null, kumikiApi: null }).map((tool) => tool.name)).toEqual(['check_frame', 'describe_frame']);
+        const noDescribe = { ...host.frames, describe: undefined };
+        expect(sharedTools({ ...host, frames: noDescribe, view: null, kumikiApi: null }).map((tool) => tool.name)).toEqual(['check_frame']);
     });
 
     test('check_frame opens the file in a view and reports that build', async () => {
@@ -97,6 +99,25 @@ describe('the tools', () => {
         expect(check.effect).toBe('run');
         expect(textOf(await check.run({ file_path: '/p/a.py' }))).toEqual({ ok: true, entries: [] });
         expect(ran).toEqual([['kigumi.automationOpenFileInViewer', '/p/a.py'], ['kigumi.automationBuildReport', '/p/a.py']]);
+    });
+
+    test('describe_frame opens the file in a view and gives its timbers as YAML, or why it has none', async () => {
+        const described = { ok: true, name: 'F', extent: null, groups: [['post']], note: 'Every timber touches the rest of the frame.', joints: [],
+            timbers: [{ name: 'post', size: { length: 1, width: 0.1, height: 0.1 }, bottom: [0, 0, 0], top: [0, 0, 1],
+                faces: { TOP: '+Z', BOTTOM: '-Z', RIGHT: '+X', LEFT: '-X', FRONT: '+Y', BACK: '-Y' }, min: [0, 0, 0], max: [1, 1, 1], touches: [], joints: [] }] };
+        let answer = described;
+        const ran = [];
+        const describe = describeFrameTool(viewFrames({ panels: directory(), files: { resolve: (file) => file }, run: async (id, args) => {
+            ran.push(id);
+            return id === 'kigumi.automationOpenFileInViewer' ? { ok: true, filePath: args.filePath } : answer;
+        } }));
+
+        const yaml = (await describe.run({ file_path: '/p/a.py' }))[0].text;
+        expect(ran).toEqual(['kigumi.automationOpenFileInViewer', 'kigumi.automationDescribeFrame']);
+        expect(yaml).toContain('frame: F');
+        expect(yaml).toContain('faces: {TOP: +Z');
+        answer = { ok: false, reason: 'not-built', filePath: '/p/a.py' };
+        expect(textOf(await describe.run({ file_path: '/p/a.py' }))).toEqual(answer);
     });
 
     test('check_frame and open_in_viewer take a file in the project, relative or absolute, and refuse one outside', async () => {

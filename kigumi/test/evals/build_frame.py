@@ -1,6 +1,7 @@
 """Build a frame file the way Kigumi's runner finds its frame, and say how it came out, as JSON:
 whether it built (else the error and traceback), its warnings, each timber's box as cut, and the groups of
-timbers that touch (more than one: some joint cuts into air). For the agent evals (run-evals.js)."""
+timbers that touch (more than one: some joint cuts into air). For the agent evals (run-evals.js), which
+also describe the frame from `view`: what a view holds of it (the frame, its meshes' boxes, its layers tree)."""
 
 import contextlib
 import importlib.util
@@ -57,11 +58,20 @@ def build(path):
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         boxes = [cut_box(runner, cut, f"{cut.timber.ticket.path}#{i}") for i, cut in enumerate(frame.cut_timbers)]
     names = [cut.timber.ticket.path for cut in frame.cut_timbers]
+    entries, _accessories = runner._assign_member_keys(frame)
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        view = {
+            "frame": runner.serialize_frame(frame),
+            # Each box as a mesh of its two corners, which is all frame-description.js reads of one.
+            "geometry": {"meshes": [{"memberKey": e["memberKey"], "vertices": [*b[0], *b[1]]} for e, b in zip(entries, boxes)]},
+            "layers": runner.serialize_layers(frame),
+        }
     return {
         "ok": True,
         "warnings": [str(w.message) for w in caught if not issubclass(w.category, (DeprecationWarning, SyntaxWarning))],
         "timbers": [{"name": n, "min": [round(v, 4) for v in b[0]], "max": [round(v, 4) for v in b[1]]} for n, b in zip(names, boxes)],
         "groups": [[names[i] for i in group] for group in groups_of(boxes)],
+        "view": view,
     }
 
 

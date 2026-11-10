@@ -16,7 +16,7 @@
 const { createKigumiTools } = require('./tools');
 const { createProjectTools } = require('./project-tools');
 const { createFileTools } = require('./file-tools');
-const { viewFrames, checkFrameTool } = require('./frames');
+const { viewFrames, checkFrameTool, describeFrameTool } = require('./frames');
 const { kumikiApiTool } = require('./kumiki-api');
 const { todoTool, withBuildCheck, withCheckpoints } = require('./session-tools');
 const { PLAN_MODE_NOTE } = require('./permissions');
@@ -34,6 +34,7 @@ function sharedTools(host) {
         ...(host.view ? createKigumiTools(host.view) : []),
         ...(host.projects ? createProjectTools(host.projects) : []),
         checkFrameTool(host.frames),
+        ...(host.frames.describe ? [describeFrameTool(host.frames)] : []),
         ...(host.kumikiApi ? [kumikiApiTool(host.kumikiApi)] : []),
     ];
 }
