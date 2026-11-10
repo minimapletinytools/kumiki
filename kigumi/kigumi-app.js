@@ -574,6 +574,33 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             }
         },
 
+        // Delete File, from an explorer row: asked first; views open on it close.
+        'kigumi.deleteFile': async (target) => {
+            const data = target && typeof target === 'object' && target.data ? target.data : {};
+            const filePath = typeof target === 'string' ? target : data.filePath;
+            if (!filePath) {
+                host.showMessage('error', t('message.noFilePathProvided'));
+                return;
+            }
+            const name = path.basename(filePath);
+            const confirmed = await host.confirm({
+                message: t('message.deleteFileConfirm', { name }),
+                detail: t('message.deleteFileDetail'),
+                action: t('message.deleteFileAction'),
+            });
+            if (!confirmed) return;
+            await Promise.allSettled(allSessions()
+                .filter((session) => session.filePath === filePath)
+                .map((session) => session.dispose()));
+            try {
+                fs.rmSync(filePath);
+            } catch (error) {
+                host.showMessage('error', t('message.deleteFileFailed', { error: error.message }));
+                return;
+            }
+            await sidebarModel.refresh(true);
+        },
+
         // New Frame: a frame file at the project's top, with one post to start from.
         'kigumi.newFrame': async () => {
             const root = getWorkspaceRoot();

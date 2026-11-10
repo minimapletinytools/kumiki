@@ -10,6 +10,10 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kigumi
 
+#### Added
+
+- **Delete File…** in the explorer's right-click menu, on files in All Files (the standalone app and the browser version) and on the project's frames: asked first, and views open on the file close.
+
 #### Changed
 
 - The built-in agent asks for medium reasoning effort, and no longer reminds itself to write a first version after a few looks (it fired on questions too).

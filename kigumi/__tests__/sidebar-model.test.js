@@ -266,6 +266,16 @@ describe('row actions', () => {
     expect(group.rowActions).toEqual(['viewSource', 'duplicate']);
   });
 
+  test('a project frame can be deleted; a library frame can not', () => {
+    const model = new SidebarModel();
+    model._state.frames = [{ filePath: '/ws/frame.py', relativePath: 'frame.py' }];
+    model._state.shippedExamples = [{ sourceFile: '/deps/example.py', name: 'example' }];
+    const tree = model.getTree();
+
+    expect(findNode(tree, (node) => node.label === 'frame.py').rowActions).toContain('deleteFile');
+    expect(findNode(tree, (node) => node.label === 'example').rowActions).not.toContain('deleteFile');
+  });
+
   test('every row action names a known action', () => {
     const model = new SidebarModel();
     model._state.frames = [{ filePath: '/ws/frame.py', relativePath: 'frame.py' }];
@@ -376,11 +386,11 @@ describe('all files', () => {
     const byLabel = (label) => findNode(rootOf(model, 'filesRoot').children, (one) => one.label === label);
 
     expect(byLabel('b_frame.py')).toMatchObject({
-      icon: 'fish2-very-sad', rowActions: ['openInViewer', 'newFile', 'revealInFileManager'],
+      icon: 'fish2-very-sad', rowActions: ['openInViewer', 'newFile', 'revealInFileManager', 'deleteFile'],
       action: { command: 'kigumi.openFileSource', arguments: [frame] },
     });
     expect(byLabel('book.py').icon).toBe('library');
-    expect(byLabel('a_notes.txt')).toMatchObject({ icon: 'file', rowActions: ['newFile', 'revealInFileManager'] });
+    expect(byLabel('a_notes.txt')).toMatchObject({ icon: 'file', rowActions: ['newFile', 'revealInFileManager', 'deleteFile'] });
     expect(byLabel('patterns').rowActions).toEqual(['newFile', 'revealInFileManager']);
     expect(rootOf(model, 'filesRoot').rowActions).toEqual(['newFile', 'revealInFileManager']);
   });

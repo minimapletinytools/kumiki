@@ -151,6 +151,29 @@ app.whenReady().then(async () => {
         check('a folder\'s right-click menu has New File, which makes the file it is given', menuItem === true
             && filePrompt === 'untitled.py' && newFile === true, `${filePrompt}, saved ${newFile}`);
 
+        // Delete File, from the new frame's right-click menu: asked first, then gone from the list and the browser's copy.
+        const shedRow = `${explorer}.querySelector('.ks-row[data-key$="garden_shed.py"][data-key^="frame-file:workspace:"]')`;
+        await js(`(() => {
+            const row = ${shedRow};
+            const box = row.getBoundingClientRect();
+            row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: box.left + 20, clientY: box.top + 5 }));
+            return true;
+        })()`);
+        const deleteItem = await wait(`[...(${explorer}?.querySelectorAll('.ks-menu-item') || [])].some((item) => item.textContent.includes('Delete File')) || null`, 10000);
+        await js(`[...${explorer}.querySelectorAll('.ks-menu-item')].find((item) => item.textContent.includes('Delete File')).click(); true`);
+        const asked = await wait(`!document.querySelector('#quickpick').hidden || null`, 15000);
+        await js(`(() => {
+            const input = document.querySelector('#quickpick-filter');
+            input.value = 'Delete';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            return true;
+        })()`);
+        const deleted = await wait(`(async () => (await ${savedFile('garden_shed.py')}) === null || null)()`, 30000);
+        const unlisted = await wait(`!${shedRow} || null`, 60000);
+        check('a frame\'s right-click menu has Delete File, which asks, then removes the frame', deleteItem === true
+            && asked === true && deleted === true && unlisted === true, `asked ${asked}, deleted ${deleted}, unlisted ${unlisted}`);
+
         // The agent: its panel says how it can be run here, and its tools work.
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'web:settings',
             args: [{ values: { ...window.kigumiWeb.storedSettings(), 'agent.enabled': true } }] })`);

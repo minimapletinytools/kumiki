@@ -32,6 +32,7 @@ const ROW_ACTIONS = Object.freeze({
     openInViewer: { command: 'kigumi.openInViewer', icon: 'eye', labelKey: 'sidebar.action.openInViewer', inline: false },
     revealInFileManager: { command: 'kigumi.revealInFileManager', icon: 'folder-opened', labelKey: REVEAL_LABEL_KEY, inline: false },
     newFile: { command: 'kigumi.newFile', icon: 'new-file', labelKey: 'sidebar.action.newFile', inline: false },
+    deleteFile: { command: 'kigumi.deleteFile', icon: 'trash', labelKey: 'sidebar.action.deleteFile', inline: false },
 });
 
 const LIBRARY_SECTIONS = new Set(['shipped-patterns', 'dependency-patterns']);
@@ -583,7 +584,7 @@ class SidebarModel {
             label: entry.name,
             icon,
             action: open('kigumi.openFileSource', entry.filePath),
-            rowActions: entry.name.endsWith('.py') ? ['openInViewer', 'newFile', 'revealInFileManager'] : ['newFile', 'revealInFileManager'],
+            rowActions: [...(entry.name.endsWith('.py') ? ['openInViewer'] : []), 'newFile', 'revealInFileManager', 'deleteFile'],
             data: { filePath: entry.filePath },
         });
     }
@@ -592,14 +593,14 @@ class SidebarModel {
         return node({ key, type: 'placeholder', label, description, icon: 'circle-slash' });
     }
 
-    _frameNode(key, label, filePath, data) {
+    _frameNode(key, label, filePath, data, rowActions = ['viewSource', 'openInViewer']) {
         return node({
             key,
             type: 'frameFile',
             label,
             icon: 'fish2-very-sad',
             action: open('kigumi.openFrameFromSidebar', filePath),
-            rowActions: ['viewSource', 'openInViewer'],
+            rowActions,
             data,
         });
     }
@@ -622,6 +623,7 @@ class SidebarModel {
             frameFile.relativePath,
             frameFile.filePath,
             frameFile,
+            ['viewSource', 'openInViewer', 'deleteFile'],
         )));
         // Last in the list: a row that makes a new frame file.
         if (this._state.workspaceRoot) {

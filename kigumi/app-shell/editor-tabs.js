@@ -97,6 +97,8 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
             try {
                 content = fs.readFileSync(filePath, 'utf8');
             } catch {
+                // Deleted: the tab goes too, unless it holds unsaved edits.
+                if (!fs.existsSync(filePath) && !tab.isDirty) surface.dispose();
                 return;
             }
             if (content === fileContent) {
