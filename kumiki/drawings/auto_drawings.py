@@ -56,7 +56,7 @@ def _plan_sheets() -> Dict[str, Sheet]:
             for view, (right, up, look) in PLAN_VIEWS.items()}
 
 
-def _shop_sheets(timber: PerfectTimberWithin) -> Dict[str, Sheet]:
+def shop_sheets(timber: PerfectTimberWithin) -> Dict[str, Sheet]:
     """Return one sheet per long face, square on, the length across the sheet."""
     along = timber.get_length_direction_global()
     axes = {"width": timber.get_width_direction_global(), "height": timber.get_height_direction_global()}
@@ -94,8 +94,9 @@ def _rows(handles: Sequence[FeatureHandle], solve: DrawingSolve) -> List[Row]:
 
 
 def _dimension(cut_timbers: Sequence[CutTimber], targets: Sequence[FeatureHandle], known: Sequence[FeatureHandle],
-               sheets: Mapping[str, Sheet], solve: DrawingSolve, policy: Policy) -> AutoDimensioning:
-    """Return dimensions in `sheets` solving `targets`, starting from `known`."""
+               sheets: Mapping[str, Sheet], solve: DrawingSolve, policy: Policy, onto_edges: bool = True) -> AutoDimensioning:
+    """Return dimensions in `sheets` solving `targets`, starting from `known`; with `onto_edges`, picked
+    faces are moved onto their nearest edges."""
     carriers = solve.carriers
     directed = list({_feature_key(handle): handle for handle in [*targets, *known]}.values())
     assumptions = square_assumptions(directed, carriers)
@@ -114,15 +115,13 @@ def _dimension(cut_timbers: Sequence[CutTimber], targets: Sequence[FeatureHandle
 
     known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
     result = auto_dimension(sheet_candidates(visible, views, solve), measurable, known_rows, solve, policy)
-    return faces_to_edges(result, cut_timbers, directed, views, carriers)
+    return faces_to_edges(result, cut_timbers, directed, views, carriers) if onto_edges else result
 
 
-def plan_drawing(cut_timbers: Sequence[CutTimber], fixed_path: str, name: str,
-                 dimensioned: Optional[Sequence[CutTimber]] = None, policy: Policy = DEFAULT_POLICY) -> Drawing:
-    """Return the whole frame in world elevations, dimensioned from the timber at `fixed_path`.
-
-    `dimensioned` is which members the plan dimensions (all of them by default); every timber is drawn.
-    """
+def solve_plan(cut_timbers: Sequence[CutTimber], fixed_path: str, dimensioned: Optional[Sequence[CutTimber]] = None,
+               policy: Policy = DEFAULT_POLICY, onto_edges: bool = True) -> AutoDimensioning:
+    """Return the plan's dimensions in the world's top and front elevations, from the timber at `fixed_path`:
+    its reference faces and bottom end. `dimensioned` is which members are solved (all by default)."""
     solve = DrawingSolve(cut_timbers)
     fixed = next(cut for cut in cut_timbers if cut.timber.ticket.path == fixed_path)
     body = fixed.get_extended_rough_csg_with_perfect_features_local()
@@ -134,8 +133,13 @@ def plan_drawing(cut_timbers: Sequence[CutTimber], fixed_path: str, name: str,
     targets = [required.handle for cut in (dimensioned or cut_timbers) for required in planning_features(cut)]
     # The fixed timber's own faces are solved too.
     targets = list({_feature_key(handle): handle for handle in targets + faces}.values())
+    return _dimension(cut_timbers, targets, known, _plan_sheets(), solve, policy, onto_edges)
 
-    result = _dimension(cut_timbers, targets, known, _plan_sheets(), solve, policy)
+
+def plan_drawing(cut_timbers: Sequence[CutTimber], fixed_path: str, name: str,
+                 dimensioned: Optional[Sequence[CutTimber]] = None, policy: Policy = DEFAULT_POLICY) -> Drawing:
+    """Return the whole frame in world elevations, dimensioned by solve_plan; every timber is drawn."""
+    result = solve_plan(cut_timbers, fixed_path, dimensioned, policy)
     measurements: Dict = {ELEVATION_IDS[view]: [] for view in PLAN_VIEWS}
     for pick in result.picks:
         measurements[ELEVATION_IDS[pick.candidate.view]].append(pick.candidate.measure)
@@ -151,6 +155,19 @@ def in_views(views: Sequence[str]) -> Criterion:
     return criterion
 
 
+def solve_piece(cut: CutTimber, extra_views: Mapping[str, ViewAxes] = {}, policy: Policy = DEFAULT_POLICY,
+                onto_edges: bool = True) -> AutoDimensioning:
+    """Return one piece's dimensions on its four long faces and any `extra_views`, solving every required
+    feature from its reference faces and bottom end."""
+    solve = DrawingSolve([cut])
+    targets = list({_feature_key(required.handle): required.handle for required in required_features(cut)}.values())
+    known = [handle for handle in targets if is_reference(handle)] + [_end_datum(targets, cut.timber)]
+    sheets = {**shop_sheets(cut.timber), **{label: _sheet(axes) for label, axes in extra_views.items()}}
+    if extra_views:
+        policy = replace(policy, prefer=(in_views(list(extra_views)), *policy.prefer))
+    return _dimension([cut], targets, known, sheets, solve, policy, onto_edges)
+
+
 def piece_drawing(group: SymmetricTimberGroup, extra_views: Mapping[str, ViewAxes] = {},
                   policy: Policy = DEFAULT_POLICY) -> Drawing:
     """Return one shop drawing for a group of matching pieces, dimensioned on its representative.
@@ -160,22 +177,16 @@ def piece_drawing(group: SymmetricTimberGroup, extra_views: Mapping[str, ViewAxe
     representative's path.
     """
     cut = group.representative
-    solve = DrawingSolve([cut])
-    targets = list({_feature_key(required.handle): required.handle for required in required_features(cut)}.values())
-    known = [handle for handle in targets if is_reference(handle)] + [_end_datum(targets, cut.timber)]
+    result = solve_piece(cut, extra_views, policy)
     labels = {view: view.capitalize() for view in SHOP_VIEWS}
     labels.update({label: label for label in extra_views})
-    sheets = {**_shop_sheets(cut.timber), **{label: _sheet(axes) for label, axes in extra_views.items()}}
-    if extra_views:
-        policy = replace(policy, prefer=(in_views(list(extra_views)), *policy.prefer))
-    result = _dimension([cut], targets, known, sheets, solve, policy)
 
     viewports = (covering_page(columns(
         rows(*(Viewport(label=labels[view]) for view in SHOP_VIEWS)),
         rows(Viewport(label="Preview"), *(Viewport(label=label, camera=axes) for label, axes in extra_views.items())),
     )),)
     ids = _ids_by_label(viewports)
-    measurements: Dict[ViewportId, List] = {ids[labels[view]]: [] for view in sheets}
+    measurements: Dict[ViewportId, List] = {ids[labels[view]]: [] for view in labels}
     for pick in result.picks:
         measurements[ids[labels[pick.candidate.view]]].append(pick.candidate.measure)
     path = cut.timber.ticket.path

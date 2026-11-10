@@ -85,22 +85,10 @@ Defines:
 """
 
 import math
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Optional
 
 from kumiki import *
-from kumiki.csg.assumptions import sheet_axis_assumptions, square_assumptions
-from kumiki.csg.carriers import Row
-from kumiki.csg.cutcsg import Datum, MidplaneFeature, OwnedFeatureHit, measured_by_default
-from kumiki.csg.feature_paths import FeatureHandle, hit_identity
-from kumiki.csg.required_features import planning_features, required_features
-from kumiki.drawings.auto_dimensioning import (DEFAULT_POLICY, AutoDimensioning, Policy, auto_dimension, derived_edge_anchors,
-                                               measurable_targets,
-                                               coincidence_assumptions, is_reference, sheet_candidates, faces_to_edges,
-                                               without_edges_on_faces)
-from kumiki.drawings.drawing import ViewAxes
-from kumiki.drawings.measure_solving import DrawingSolve
-from kumiki.drawings.visibility import visible_by_view
-from kumiki.geometry import Plane
+from kumiki.drawings.auto_drawings import with_auto_drawings
 
 
 # ============================================================================
@@ -1988,210 +1976,15 @@ def create_cot_roof_beams() -> list[Timber]:
 # ============================================================================
 # AUTO DRAWINGS
 # ============================================================================
-# Adapted from my_cute_frame_drawing_test.py: the frame's drawings are dimensioned by
-# kumiki.drawings.auto_dimensioning, one measurement at a time, working from a fixed timber's
-# reference features and bottom end. The recipe is:
-#
-#   1. solve the plan in the world's top and front elevations, all the frame's members at once;
-#   2. solve each distinct piece (match_timbers) on its own four long faces, as a shop drawing.
-#
-# The plan draws every timber but dimensions only the members: boards are cut to fit between
-# them (see _plan_timbers). auto_dimension only measures what a view can see (see
-# visible_by_view), so the targets are also thinned to the features some view shows: a hidden
-# face cannot be measured in that drawing, and leaving it in would make the solve scan for
-# dimensions that cannot exist. Features a view does show but cannot dimension -- a blind
-# mortise's bottom, a shoulder that lands on the member's end -- are still reported by
-# auto_dimension when it finishes.
 
-#: World elevations for the plan: name -> (right, up, look).
-_DRAWING_VIEWS = {
-    "top": ((1, 0, 0), (0, 1, 0), (0, 0, -1)),
-    "front": ((1, 0, 0), (0, 0, 1), (0, 1, 0)),
-}
+def _is_member(cut: CutTimber) -> bool:
+    """Whether the plan dimensions this timber: everything but the boards.
 
-#: Shop drawing views: face axis and sign, as kigumi builds them.
-_SHOP_VIEWS = {"front": ("height", 1), "right": ("width", 1), "back": ("height", -1), "left": ("width", -1)}
-
-
-def _feature_key(handle: FeatureHandle) -> Tuple:
-    return hit_identity(handle.feature, handle.owner)
-
-
-def _world_sheet(view: str) -> Tuple[ViewAxes, Transform]:
-    """The camera and the sheet a world elevation draws on."""
-    right, up, look = (create_v3(*axis) for axis in _DRAWING_VIEWS[view])
-    return (ViewAxes(look=look, right=right, up=up),
-            Transform(position=create_v3(0, 0, 0), orientation=Orientation.from_x_and_y(right, up)))
-
-
-def _shop_sheets(timber: PerfectTimberWithin) -> Dict[str, Tuple[ViewAxes, Transform]]:
-    """One sheet per long face, square on, the length across the sheet."""
-    along = timber.get_length_direction_global()
-    axes = {"width": timber.get_width_direction_global(), "height": timber.get_height_direction_global()}
-    sheets = {}
-    for view, (axis, sign) in _SHOP_VIEWS.items():
-        normal = axes[axis] * sign
-        up = normal.cross(along)
-        sheets[view] = (ViewAxes(look=-normal, right=along, up=up),
-                        Transform(position=create_v3(0, 0, 0), orientation=Orientation.from_x_and_y(along, up)))
-    return sheets
-
-
-def _end_datum(targets: Sequence[FeatureHandle], timber: PerfectTimberWithin) -> FeatureHandle:
-    """The face nearest the bottom end square to the length, other than one to avoid measuring from (a
-    tenon's tip): where a piece's length is measured from."""
-    along = [float(v) for v in timber.get_length_direction_global()]
-    ends = []
-    for handle in targets:
-        plane = handle.feature.locate_simple_unbounded(handle.owner)
-        if not isinstance(plane, Plane) or handle.feature.properties.datum is Datum.AVOID:
-            continue
-        normal = [float(v) for v in timber.transform.local_to_global_direction(plane.normal)]
-        if abs(abs(sum(a * b for a, b in zip(normal, along))) - 1) > 1e-9:
-            continue
-        point = [float(v) for v in timber.transform.local_to_global(plane.point)]
-        ends.append((sum(a * b for a, b in zip(point, along)), handle))
-    return min(ends, key=lambda end: end[0])[1]
-
-
-def _rows(handles: Sequence[FeatureHandle], solve: DrawingSolve) -> List[Row]:
-    return [row for handle in handles for row in solve.dof_rows(handle)]
-
-
-def _plan_timbers(cut_timbers: Sequence[CutTimber]) -> List[CutTimber]:
-    """The frame's members, which the plan dimensions: everything but the boards.
-
-    Infill and floor boards are cut to fit between members, so they are left to their own
-    shop drawings. Dimensioning every board in the plan as well costs several times more and
-    repeats what those sheets already say.
+    Infill and floor boards are cut to fit between members, so they are left to their own shop
+    drawings. Dimensioning every board in the plan as well costs several times more and repeats
+    what those sheets already say.
     """
-    board_tags = {"board", "floor_board"}
-    return [cut for cut in cut_timbers
-            if not any(tag.name in board_tags for tag in cut.timber.ticket.tags)]
-
-
-def _solve_plan(
-    cut_timbers: Sequence[CutTimber],
-    fixed_path: str,
-    policy: Policy = DEFAULT_POLICY,
-) -> AutoDimensioning:
-    """Dimension the frame's members in the top and front elevations, from the fixed timber."""
-    solve = DrawingSolve(cut_timbers)
-    carriers = solve.carriers
-
-    fixed = next(cut for cut in cut_timbers if cut.timber.ticket.path == fixed_path)
-    body = fixed.get_extended_rough_csg_with_perfect_features_local()
-    faces = [FeatureHandle(timber=fixed.timber, hit=OwnedFeatureHit(feature=feature, owner=body))
-             for feature in body.get_declared_features()
-             if feature.feature_type().name == "FACE" and not isinstance(feature, MidplaneFeature)
-             and measured_by_default(feature.properties.purpose)]
-    known = [handle for handle in faces if is_reference(handle)] + [_end_datum(faces, fixed.timber)]
-
-    targets = [required.handle for cut in _plan_timbers(cut_timbers) for required in planning_features(cut)]
-    directed = list({_feature_key(handle): handle for handle in targets + faces}.values())
-    assumptions = square_assumptions(directed, carriers)
-    sheets = {view: _world_sheet(view) for view in _DRAWING_VIEWS}
-    for _, sheet in sheets.values():
-        assumptions += sheet_axis_assumptions(directed, carriers, sheet)
-
-    views = {view: axes for view, (axes, _) in sheets.items()}
-    anchors = [handle for handle in directed if not isinstance(handle.feature, MidplaneFeature)]
-    # Edges where faces meet (a shoulder against a face) draw as points, which a slanted face needs.
-    anchors += [edge for cut in cut_timbers for edge in derived_edge_anchors(
-        cut, [handle for handle in directed if handle.timber is cut.timber], views)]
-    # Edges lying on a face seen edge-on are measured through that face, and moved onto after solving.
-    visible = without_edges_on_faces(visible_by_view(anchors, views, cut_timbers), views)
-    measurable, visible = measurable_targets(targets, visible, views, cut_timbers, directed, carriers)
-    assumptions += coincidence_assumptions(visible, views, solve)
-
-    known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
-    candidates = sheet_candidates(visible, views, solve)
-    result = auto_dimension(candidates, measurable, known_rows, solve, policy)
-    return faces_to_edges(result, cut_timbers, directed, views, solve.carriers)
-
-
-def _solve_member(cut: CutTimber, policy: Policy = DEFAULT_POLICY) -> AutoDimensioning:
-    """Dimension one member on its own four long faces, from its reference features and bottom end."""
-    solve = DrawingSolve([cut])
-    carriers = solve.carriers
-
-    targets = list({_feature_key(required.handle): required.handle
-                    for required in required_features(cut)}.values())
-    known = [handle for handle in targets if is_reference(handle)] + [_end_datum(targets, cut.timber)]
-    sheets = _shop_sheets(cut.timber)
-    assumptions = square_assumptions(targets, carriers)
-    for _, sheet in sheets.values():
-        assumptions += sheet_axis_assumptions(targets, carriers, sheet)
-
-    views = {view: axes for view, (axes, _) in sheets.items()}
-    anchors = [handle for handle in targets if not isinstance(handle.feature, MidplaneFeature)]
-    anchors += derived_edge_anchors(cut, targets, views)
-    visible = without_edges_on_faces(visible_by_view(anchors, views, [cut]), views)
-    measurable, visible = measurable_targets(targets, visible, views, [cut], targets, carriers)
-    assumptions += coincidence_assumptions(visible, views, solve)
-
-    known_rows = _rows(known, solve) + [row for assumption in assumptions for row in assumption.rows]
-    candidates = sheet_candidates(visible, views, solve)
-    result = auto_dimension(candidates, measurable, known_rows, solve, policy)
-    return faces_to_edges(result, [cut], targets, views, solve.carriers)
-
-
-def _plan_drawing(cut_timbers: Sequence[CutTimber], fixed_path: str, name: str) -> Drawing:
-    """The whole frame in world elevations, one measurement per solution step."""
-    result = _solve_plan(cut_timbers, fixed_path)
-    measurements: Dict = {ELEVATION_IDS[view]: [] for view in _DRAWING_VIEWS}
-    for pick in result.picks:
-        measurements[ELEVATION_IDS[pick.candidate.view]].append(pick.candidate.measure)
-    return Drawing(
-        name=name,
-        timbers=[cut.timber for cut in cut_timbers],
-        viewports=elevation_viewports(),
-        measurements=measurements,
-    )
-
-
-def _piece_drawing(group: SymmetricTimberGroup) -> Drawing:
-    """One shop drawing for a group of matching members (match_timbers), dimensioned on its representative.
-
-    Named with how many to make and how many of those are mirrored; its id stays the representative's
-    path, so the drawings file's edits keep finding it.
-    """
-    cut = group.representative
-    result = _solve_member(cut)
-    measurements: Dict = {SHOP_DRAWING_IDS[view]: [] for view in _SHOP_VIEWS}
-    for pick in result.picks:
-        measurements[SHOP_DRAWING_IDS[pick.candidate.view]].append(pick.candidate.measure)
-    path = cut.timber.ticket.path
-    return Drawing(
-        name=f"{path}{_count(group)} (generated)",
-        drawing_id=DrawingId(f"{path} (generated)"),
-        timbers=[cut.timber],
-        viewports=shop_drawing_viewports(),
-        measurements=measurements,
-    )
-
-
-def _count(group: SymmetricTimberGroup) -> str:
-    """Return " ×N" for a group of N > 1, with ", M mirrored" when M of them are reflections."""
-    if not group.matches:
-        return ""
-    mirrored = sum(1 for match in group.matches if match.kind is SymmetryKind.REFLECTION)
-    return f" ×{1 + len(group.matches)}" + (f", {mirrored} mirrored" if mirrored else "")
-
-
-def _with_auto_drawings(frame: Frame, fixed_path: str) -> Frame:
-    """*frame* with a finishing routine adding a generated plan drawing and a shop drawing per distinct piece."""
-    cut_timbers = list(frame.cut_timbers)
-
-    def generate(finishing: Finishing) -> None:
-        groups = match_timbers(cut_timbers)
-        finishing.progress(0, 1 + len(groups), "plan")
-        finishing.add_drawing(_plan_drawing(cut_timbers, fixed_path, f"{frame.name} plan (generated)"))
-        for done, group in enumerate(groups, start=1):
-            finishing.progress(done, 1 + len(groups), group.representative.timber.ticket.path)
-            finishing.add_drawing(_piece_drawing(group))
-
-    return frame.with_finishing(generate)
+    return not any(tag.name in {"board", "floor_board"} for tag in cut.timber.ticket.tags)
 
 
 # ============================================================================
@@ -2298,4 +2091,4 @@ def cat_corner_cot(k: Optional[Kiwari] = None) -> Frame:
         name="Cat Corner Cot",
         footprints=[cot_footprint],
     )
-    return _with_auto_drawings(frame, fixed_path="cot_post_BL")
+    return with_auto_drawings(frame, fixed_path="cot_post_BL", dimensioned=_is_member)

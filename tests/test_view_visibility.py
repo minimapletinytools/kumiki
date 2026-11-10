@@ -9,6 +9,7 @@ import pytest
 
 from kumiki.csg.cutcsg import CutCSGLabel, Difference, RectangularPrism
 from kumiki.csg.required_features import required_features
+from kumiki.drawings.auto_drawings import shop_sheets
 from kumiki.drawings.visibility import nearest_visible_depth, sight_is_blocked
 from kumiki.rule import Transform, create_v2, create_v3, scalar
 
@@ -41,7 +42,7 @@ def left_side():
         warnings.simplefilter("ignore")
         pattern = runpy.run_path(str(PATTERN))
     cut = next(c for c in pattern["_load_cute_frame"]()().cut_timbers if c.timber.ticket.path == "Left Side")
-    look = np.array([float(v) for v in pattern["_shop_sheets"](cut.timber)["front"][0].look])
+    look = np.array([float(v) for v in shop_sheets(cut.timber)["front"][0].look])
     root = cut.render_timber_with_cuts_csg_local()
 
     def depth(name, reach=3.0):
