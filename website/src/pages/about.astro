@@ -4,19 +4,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 <Layout
   title="About Kumiki — Programmatic CAD & Japanese Timber Framing"
-  description="Learn about the origin and philosophy of Kumiki: bringing Japanese carpentry traditions (kumiki, kigumi, kiwari) into modern software engineering and agentic coding workflows."
+  description="Why Kumiki exists, and who's behind it."
   canonicalPath="/about"
   image="/photos/oscarshed_built.png"
 >
   <section class="about">
-    <p class="kicker">About the project</p>
-    <h1>Japanese joinery, and decades of writing software</h1>
+    <h1>About</h1>
 
     <div class="prose">
-      <p class="lead">
-        Kumiki exists because the two things I do — Japanese carpentry and writing
-        software — turned out to be the same thing.
-      </p>
       <p>
         Like many others, I went headfirst into Japanese carpentry during COVID. I've also been
         designing games and software with some intensity for decades. Kumiki is the combined
@@ -59,12 +54,6 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .about h1 {
     font-size: clamp(2.1rem, 4vw, 2.9rem);
     margin: 0 0 1.8rem;
-  }
-  .prose .lead {
-    font-size: 1.2rem;
-    color: var(--ink);
-    padding-bottom: 1.2rem;
-    border-bottom: 1px solid var(--border-soft);
   }
   .prose p {
     color: var(--ink-soft);
