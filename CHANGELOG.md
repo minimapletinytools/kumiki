@@ -19,6 +19,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - The built-in agent asks for medium reasoning effort, and no longer reminds itself to write a first version after a few looks (it fired on questions too).
 - The agent's default output limit per step is now 16k tokens, since reasoning counts toward it.
 - The agent's `describe_frame` takes a frame file and answers in YAML: each timber's ends, the world direction each of its faces looks, its box as cut, what it touches and its joints.
+- The Kigumi logo's 木 is wood brown rather than pale cream, so it stands out from its light background, down to the browser tab's favicon.
 
 ## [0.9.3] - 2026-11-08
 
