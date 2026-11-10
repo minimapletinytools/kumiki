@@ -180,7 +180,9 @@ async function runOne(task, modelId, key, { languageModel: given = null } = {}) 
         failure = String(error.message || error);
     }
     const report = await buildFrame(path.join(root, task.target));
-    const project = { read: (name) => fs.readFileSync(path.join(root, name), 'utf8'), reply, tools: toolCalls.length };
+    // A file the agent never wrote reads as empty, so the checks on it fail rather than throw.
+    const read = (name) => (fs.existsSync(path.join(root, name)) ? fs.readFileSync(path.join(root, name), 'utf8') : '');
+    const project = { read, reply, tools: toolCalls.length };
     const checks = task.checks.map((check) => {
         const [passed, said] = check(report, project);
         return { passed: Boolean(passed), said };
@@ -212,6 +214,8 @@ async function main() {
                 results.push(result);
                 const file = path.join(transcripts, `${modelId}-${task.name}-${result.effort || 'default'}-${i + 1}.md`);
                 fs.writeFileSync(file, text);
+                // After every run, so a crash later keeps what came before.
+                if (option('out', null)) fs.writeFileSync(option('out', null), JSON.stringify(results, null, 1));
                 console.log(`${result.passed ? 'PASS' : 'FAIL'} ${modelId} ${task.name}: ${result.checks.map((c) => `${c.passed ? '✓' : '✗'} ${c.said}`).join('; ')}`
                     + ` | ${result.tools} tool calls, ${result.steps.length} steps, ${result.reasoningTokens} reasoning tokens,`
                     + ` $${result.costUsd.toFixed(4)}, ${Math.round(result.cacheRate * 100)}% cached, ${result.seconds}s`
