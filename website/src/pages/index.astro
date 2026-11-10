@@ -12,13 +12,12 @@ const features = [
     label: 'Program your frames',
     kicker: 'Python in, frame out',
     heading: 'Frame designs are parametric programs',
-    body: `Timbers, joints and assemblies are ordinary Python. Change a span and every
-      joint that depends on it moves. Keep a frame in git, review a change as a diff,
-      import a bent you already built and place it four times.`,
+    body: `Timbers and joints are defined through python functions provided by kumiki. All code is parametric: Change a dimension and every
+      joint that depends on it updates. Author your code agentically or by hand.
     points: [
       'Joints are functions: precise, customizable and documented',
-      'Patterns compose: a bent becomes a bay becomes a building',
-      'Any coding agent can write them, or Kigumi’s own',
+      'Patterns compose: the same brace can be used under each beam',
+      'Author your design together with any AI agent',
     ],
     image: `${base}/photos/feature_code.png`,
     imageAlt: 'Python source declaring mitered and keyed lap joints at a frame corner',
@@ -32,9 +31,9 @@ const features = [
     heading: 'Kigumi shows the frame as you write it',
     body: `Kigumi runs your frame and draws it: as a desktop app for Mac and Windows, as a
       VS Code extension, or in your browser. Select a timber and read its dimensions, walk
-      into a joint's CSG tree, hide layers, cut sections and measure.`,
+      into a joint's geometry tree, hide layers, cut sections and measure.`,
     points: [
-      'Selection down to a single face, edge or joint feature',
+      'Inspect geometry down to a single face, edge or joint feature',
       'Layers, tags and per-member visibility for picking a frame apart',
       'X-ray and section views for reading a joint from the inside',
     ],
@@ -52,9 +51,9 @@ const features = [
       Each one is a parametric joint that recuts itself when the timbers it joins move,
       change size, or meet at a different angle.`,
     points: [
-      'Housings, shoulders, reliefs and pegs derived from the timbers, not drawn by hand',
-      'Many configurations for each joint, with simple versions for plain, square frames',
-      'More than 30 joints, with more added regularly',
+      'Housings, shoulders, reliefs and pegs derived from the timbers,',
+      'Highly configurable joints for complex designs and simple plain versions for square frames',
+      'Dozens of joints, with more being added regularly',
     ],
     image: `${base}/photos/half_blind_cross_lap_joint_xray.png`,
     imageAlt: 'X-ray of a half-blind cross lap joint with keys',
@@ -71,7 +70,7 @@ const features = [
       out the views from the timbers themselves: you never place a viewport or a scale.`,
     points: [
       'A plan, and a dimensioned drawing for each distinct piece',
-      'Customized in code, where the drawing is part of the design',
+      'Generated and customized in code, where the drawing is part of the design',
       'Add a dimension by hand in Kigumi, and export sheets as PNG',
     ],
     image: `${base}/photos/feature_drawing.png`,
@@ -126,12 +125,12 @@ const faqs = [
   {
     question: 'How does Kumiki compare to OpenSCAD, CadQuery or FreeCAD for woodworking?',
     answer:
-      'General-purpose CAD treats a joint as boolean cutouts you draw by hand, which break when timber sizes or spans change. In Kumiki, joinery (mortise and tenon, dovetails, scarfs, half-laps, gooseneck splices, housings, pegs) is parametric: change a dimension or a span and the cuts, housings and clearances are recut across the frame.',
+      'General-purpose CAD is.. general purpose. Joints are difficult to draw and aren't easily reused. Kumiki is a domain specific CAD application. Joinery (mortise and tenon, dovetails, scarfs, half-laps, gooseneck splices, housings, pegs) is created from purpose built functions that will fit the shape of the joint to whatever member it joints. And unlike FreeCAD, all designs are written with code which is best suited for agentic authoring.'
   },
   {
     question: 'Can I use AI agents (Claude, Codex, Cursor, Copilot) to design frames with Kumiki?',
     answer:
-      'Yes. Frames are plain Python with exact dimensions, which agents write well. Give an agent the authoring instructions and the concepts documentation, or use the agent built into Kigumi. Kigumi’s MCP server lets the agents you already use build frames and look at them in the app.',
+      'Yes. Frames are plain Python with exact dimensions, which agents write well. Kigumi projects ship with authoring instructions and the concepts documentation, that the agent will find automatically. Kigumi’s MCP server lets the agents you already use build frames and look at them in the app.',
   },
   {
     question: 'What joints does Kumiki support?',
@@ -141,7 +140,7 @@ const faqs = [
   {
     question: 'Can Kumiki export 3D models and files for fabrication?',
     answer:
-      'Yes. Kumiki exports frames and individual timbers to STL, OBJ and 3MF for rendering and 3D printing, and to STEP for CNC and other CAD software. Drawings export as PNG.',
+      'Yes. Kumiki exports frames and individual timbers to STL, OBJ and 3MF for rendering and 3D printing, and to STEP for CNC and other CAD software. Drawings export as PNG and SVG will be supported soon.',
   },
 ];
 ---
@@ -156,11 +155,9 @@ const faqs = [
   <div class="column">
     <section class="hero">
       <div class="hero-copy">
-        <h1>Timber frames and joinery, designed in code</h1>
+        <h1>Programmatic Timber Framing and Woodworking CAD</h1>
         <p class="tagline">
-          Kumiki is an open-source Python library for timber framing and woodworking. Its joints
-          are parametric: change a timber and every cut that touches it is recut. Kigumi, its
-          viewer, shows the frame as you write it.
+          Kumiki is an open-source Python library for timber framing and woodworking. Designs are just programs and every joint is parametrically sized to the timbers it joins. Since everything is built from code, kumiki frames can be authored with support from AI agents.
         </p>
         <div class="cta">
           <a class="btn btn-primary" id="download" href={appDownloads.macArm}
