@@ -23,49 +23,45 @@
 
 ![A tiny house frame designed in Kumiki](tinyhouse120.png)
 
-Kumiki is a **programmatic** CAD library for timber framing and woodworking. You write a frame as
-Python: timbers, the joints that connect them, and the drawings that describe them. Change a
-timber and every joint that touches it is recut.
+kumiki is a **programmatic** CAD library for timber framing and woodworking. Designs are written as programs which are flexible, parametric, and precise.
 
-Because designs are code, Kumiki works well with AI agents 🤖. Describe what you want to build,
-and your agent writes the frame.
+Because designs are code, Kumiki works well with AI agents 🤖. Agents are good at using tools but even better at writing code.
 
-Kumiki is free and open source. Try it out! There are many more features to come.
+kigumi is the standalone viewer app for viewing kumiki frames and plans and also serves as a development environment.
 
 > [!NOTE]
-> Expect breaking changes, each with a minor version bump. Your agent can fix frames broken by an
-> API change using the [changelog](CHANGELOG.md).
+> kumiki is under active development. Minor version bumps may result in breaking changes, Your agent can easily fix any frames that break due to suc upgrades based on the [changelog](CHANGELOG.md).
 
 ## Features
 
-- **Parametric joinery.** More than 30 joints (mortise and tenon, dovetails, laps, scarfs, pegs,
-  wedges and more), each worked out from the timbers it joins.
-- **Live 3D preview in Kigumi.** Select down to a face, walk a joint's CSG tree, use X-ray and
+- **Parametric joinery.** Dozens of joints (mortise and tenon, dovetails, laps, scarfs, pegs,
+  wedges and more), each parametrically sized to the timbers it joins.
+- **Examples and Patterns** Extensive examples and patterns to explore what's possible and provide one-shot learning for your AI agent.
+- **3D renders in Kigumi.** Select down to a face, walk a joint's CSG tree, use X-ray and
   section views, and measure.
-- **Drawings (beta).** Plans and dimensioned shop drawings, generated from the frame itself.
-- **Assembly order (beta).** Kumiki works out the order a frame goes together, and plays it back.
+- **Drawings (beta).** Plans and dimensioned shop drawings, so you can permit and actually build your designs.
+- **Dissamblies (beta).** Kumiki works out the order a frame goes together, and plays it back.
 - **Export.** STL, OBJ, 3MF and STEP.
 - **Built for agents.** Kigumi installs agent instructions with each project, has an agent of its
   own, and an MCP server so your agent can see what it built.
 
 ## Get started
 
-Kumiki is best used with **Kigumi**, its viewer:
+kumiki is used with the **kigumi** viewer:
 
 | | |
 |---|---|
 | **Desktop app** (recommended) | Mac and Windows, from the [releases page](https://github.com/minimapletinytools/kumiki/releases) or [kumiki.build/install](https://kumiki.build/install). Use it with your own agent. |
 | **VS Code extension** | From the [Marketplace](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi), or [Open VSX](https://open-vsx.org/extension/minimaple/kigumi) for Cursor. |
-| **In your browser** (beta) | [kumiki.build/try](https://kumiki.build/try/). Nothing to install, with a limited agent: good for a first look. |
-
-Kigumi sets up Python and Kumiki for you. You can also use Kumiki on its own with
-`pip install kumiki`.
+| **In your browser** (beta) | [kumiki.build/try](https://kumiki.build/try/). Nothing to install, with a limited agent: good for a first look. Token subscriptions coming soon. |
 
 ### Your first project
 
 In the app, click **New Project** and pick a folder. In VS Code, open a folder and click
 **Initialize Project** in the Kigumi sidebar. Then click **New Frame…** at the bottom of the frames
-list, or ask your agent to make one for you.
+list.
+
+OR set up the MCP and ask your agent to setup the project for you (see below)
 
 ### Patterns and examples
 
@@ -79,16 +75,22 @@ you.
 
 ### With an agent
 
-Kigumi installs a set of [agent usage instructions](docs/agent_usage_instructions.md) and an
-[API cheat sheet](docs/api_cheat_sheet.md) in each project. The installed `kumiki` package
-includes the library's source, its patterns and its docs, so your agent has everything it needs in
-the project's Python environment.
+Open your coding agent in your kigumi project folder. It's also good idea to connect your agent to the kigumi MCP.
 
 Plain prompts work well, and carpentry and woodworking terms work better. See the pattern book for
-the joints available. It's best to build a structure in steps, previewing each one, but I won't
-stop you from asking your agent to "build me a house". You can implement your own joints too,
-though agents struggle with that today, especially without the terms for the geometry you want.
-Better prompting examples and skills are coming.
+the joints available. The agent can implement its own custom joints too! It's best to build a structure in steps, previewing each one and modifying as you go. No one can stop youfrom asking your agent to "build me a house". 
+
+#### Connecting your agent to the kigumi MCP
+
+The kigumi MCP (model context protocol) exposes kigumi functionality to your agent so it can manage your project and preview your frames for automation. 
+
+To setup the MCP expand the "MCP" row in the left file explorer and make sure "enable MCP server for agents" is checked. Then copy for your agent. If you're unsure, just copy the "URL and token" option and ask your agent to connect to it.
+
+#### How does it work? 
+
+kigumi projects install with a set of [agent usage instructions](docs/agent_usage_instructions.md) and an
+[API cheat sheet](docs/api_cheat_sheet.md) and the entire `kumiki` library source is available as well so the agent so your agent has everything it needs!
+
 
 ### By hand
 
@@ -109,9 +111,9 @@ the agent to explain.
 
 Kumiki and Kigumi make drawings, plans and blueprints in three ways:
 
-- **Generated** from the frame.
-- **Coded** in your frame file.
-- **Added by hand** in Kigumi.
+- **Generated** from the frame using `with_auto_drawings`.
+- **Coded** one at a time in your frame file.
+- **Added manually** in Kigumi.
 
 Ask your agent to add drawings to your file to get started. To add a dimension by hand, open a
 drawing, select the feature to measure from, press the measure button (or <kbd>M</kbd>) and select
@@ -131,8 +133,9 @@ You can also export STEP or STL files and make drawings in other software.
 To contribute a new joint, add a file in `kumiki/joints/community` and add yourself as its
 CODEOWNER. Community joints may later be promoted to the main joint folder.
 
-For anything bigger, please get in touch first. There are plenty of joints and features to work
-on :)
+For anything bigger, please get in touch first. There is plenty of work to be done :).
+
+Low effort vibe coded PRs will likely be ignored. Just open an issue instead if you're not wanting to understand the code. I have tokens to spare.
 
 ### Developing Kigumi
 
