@@ -105,6 +105,8 @@ patterns[0].raise_at()  # at the origin
 
 ## Existing pattern files
 
+Which joint suits which job, with the pattern file to start from for each, is in `api_cheat_sheet.md` ("Which joint for the job").
+
 | File | Patterns |
 |------|---------|
 | `patterns/basic_joints_patterns.py` | 17 — one per basic joint type |
