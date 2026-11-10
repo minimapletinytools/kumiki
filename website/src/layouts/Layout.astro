@@ -1,10 +1,13 @@
 ---
+import { kigumiVersion, releasePage } from '../kigumi-release';
+
 export interface Props {
   title: string;
   description?: string;
   image?: string;
   canonicalPath?: string;
   type?: string;
+  keywords?: string;
   faqs?: { question: string; answer: string }[];
   /** Let the page run full width and manage its own columns, so full-bleed
       section bands are actually full width rather than faked with 100vw. */
@@ -17,6 +20,7 @@ const {
   image = '/photos/tinyhouse120_angle.png',
   canonicalPath,
   type = 'website',
+  keywords = 'timber framing, woodworking CAD, programmatic CAD, Python CAD, Japanese joinery, parametric joinery, Kigumi, Kumiki, mortise and tenon, dovetail joint, scarf joint, kanawa-tsugi, koshikake kama-tsugi, VS Code CAD, agentic CAD, AI timber framing, OpenSCAD alternative, CadQuery alternative',
   faqs,
   wide = false,
 } = Astro.props;
@@ -35,7 +39,9 @@ const graphNodes: any[] = [
     '@id': 'https://kumiki.build/#website',
     url: 'https://kumiki.build/',
     name: 'Kumiki',
+    alternateName: ['Kumiki CAD', 'Kumiki & Kigumi'],
     description: 'Programmatic CAD library for Python designed for timber framing and woodworking joinery.',
+    inLanguage: 'en',
     publisher: {
       '@type': 'Organization',
       name: 'minimaple',
@@ -43,6 +49,7 @@ const graphNodes: any[] = [
     },
     sameAs: [
       'https://github.com/minimapletinytools/kumiki',
+      'https://pypi.org/project/kumiki/',
       'https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi',
       'https://open-vsx.org/extension/minimaple/kigumi',
       'https://www.youtube.com/playlist?list=PLWKU1B561fyM',
@@ -54,16 +61,38 @@ const graphNodes: any[] = [
     name: 'Kumiki',
     applicationCategory: 'CADApplication, DeveloperApplication',
     operatingSystem: 'Cross-platform (macOS, Linux, Windows)',
+    softwareVersion: kigumiVersion,
     offers: {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
     },
     description:
-      'Programmatic CAD library for Python designed for timber framing and woodworking with parametric joinery and agentic workflows.',
+      'Programmatic CAD library for Python designed for timber framing and woodworking with parametric joinery, 2D shop drawings, assembly order verification, and AI agent workflows.',
+    featureList: [
+      'Parametric Japanese and Western timber joinery (mortise and tenon, dovetail, scarf, gooseneck, lap, housing)',
+      'Exact symbolic rational arithmetic for dimensions and angles',
+      'Wood grain orientation and reference arris/face semantics',
+      'Automated 2D shop drawings and elevations',
+      'Physical assembly sequence solver and timeline playback',
+      'STEP, STL, OBJ, and 3MF export',
+    ],
+    screenshot: `${siteUrl}/photos/tinyhouse120_angle.png`,
     url: 'https://kumiki.build',
+    downloadUrl: 'https://pypi.org/project/kumiki/',
     codeRepository: 'https://github.com/minimapletinytools/kumiki',
     license: 'https://www.mozilla.org/MPL/2.0/',
+  },
+  {
+    '@type': 'SoftwareSourceCode',
+    '@id': 'https://kumiki.build/#source-kumiki',
+    name: 'kumiki',
+    codeRepository: 'https://github.com/minimapletinytools/kumiki',
+    programmingLanguage: 'Python',
+    runtimePlatform: 'Python >=3.10',
+    version: kigumiVersion,
+    license: 'https://www.mozilla.org/MPL/2.0/',
+    targetProduct: { '@id': 'https://kumiki.build/#software-kumiki' },
   },
   {
     '@type': 'SoftwareApplication',
@@ -71,17 +100,42 @@ const graphNodes: any[] = [
     name: 'Kigumi',
     applicationCategory: 'DeveloperApplication, CADApplication',
     operatingSystem: 'macOS, Windows, Visual Studio Code, Cursor, web browser',
+    softwareVersion: kigumiVersion,
     offers: {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'USD',
     },
     description:
-      'Interactive 3D timber frame viewer for Kumiki: a desktop app for macOS and Windows, an extension for Visual Studio Code and Cursor, and a browser version.',
+      'Interactive 3D timber frame viewer and editor for Kumiki: a desktop app for macOS and Windows, an extension for Visual Studio Code and Cursor, and a browser version with a built-in AI agent and MCP server.',
     url: 'https://kumiki.build/install',
     installUrl: 'https://kumiki.build/install',
+    downloadUrl: 'https://kumiki.build/install',
+    releaseNotes: releasePage,
+    screenshot: `${siteUrl}/photos/double_sawhorse_xray.png`,
   },
 ];
+
+const effectivePath = canonicalPath || pathname;
+if (effectivePath && effectivePath !== '/') {
+  graphNodes.push({
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Kumiki',
+        item: siteUrl,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: title.split('—')[0].trim(),
+        item: canonicalUrl,
+      },
+    ],
+  });
+}
 
 if (faqs && faqs.length > 0) {
   graphNodes.push({
@@ -123,6 +177,7 @@ const structuredData = {
 
     <!-- Open Graph / Facebook -->
     <meta property="og:site_name" content="Kumiki" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:type" content={type} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:title" content={title} />
@@ -138,7 +193,7 @@ const structuredData = {
     <meta name="twitter:image" content={imageUrl} />
 
     <!-- SEO Meta Tags -->
-    <meta name="keywords" content="timber framing, woodworking CAD, programmatic CAD, Python CAD, Japanese joinery, parametric joinery, Kigumi, mortise and tenon, dovetail joint, VS Code CAD, agentic CAD, AI timber framing" />
+    <meta name="keywords" content={keywords} />
     <meta name="author" content="minimaple" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <!-- JSON-LD Structured Data -->
@@ -153,6 +208,7 @@ const structuredData = {
       <nav class="site-nav" aria-label="Site">
         <a href={`${base}/install`}>Download</a>
         {tryKigumi && <a href={`${base}/try/`}>Try it</a>}
+        <a href={`${base}/joints`}>Joints</a>
         <a href="https://kumiki.build/docs/">Docs</a>
         <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">Videos</a>
         <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">GitHub</a>
@@ -176,6 +232,7 @@ const structuredData = {
           <h2 class="footer-heading">Documentation</h2>
           <a href="https://kumiki.build/docs/">Overview</a>
           <a href="https://kumiki.build/docs/concepts/">Concepts</a>
+          <a href={`${base}/joints`}>Joint catalog</a>
           <a href="https://kumiki.build/docs/reference/">API reference</a>
         </div>
         <div class="footer-col">
@@ -183,6 +240,7 @@ const structuredData = {
           <a href={`${base}/llms.txt`}>llms.txt</a>
           <a href={`${base}/llms-full.txt`}>llms-full.txt</a>
           <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md" target="_blank" rel="noreferrer">Authoring instructions</a>
+          <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/api_cheat_sheet.md" target="_blank" rel="noreferrer">API cheat sheet</a>
         </div>
         <div class="footer-col">
           <h2 class="footer-heading">Project</h2>

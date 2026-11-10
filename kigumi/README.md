@@ -1,49 +1,58 @@
 # Kigumi
 
-Kigumi is a VS Code extension that renders [kumiki](https://github.com/minimapletinytools/kumiki) frames. 
+Kigumi is the 3D viewer and CAD environment for [Kumiki](https://kumiki.build), an open-source programmatic CAD library for designing timber-framed structures and woodworking joinery in Python.
+
+- **Website & Downloads:** [kumiki.build](https://kumiki.build)
+- **Try in your browser:** [kumiki.build/try](https://kumiki.build/try/)
+- **Documentation & API Reference:** [kumiki.build/docs](https://kumiki.build/docs/)
+- **GitHub Repository:** [minimapletinytools/kumiki](https://github.com/minimapletinytools/kumiki)
 
 ## Prerequisites
 
-To use Kigumi, you need:
+To use the Kigumi VS Code extension, you need:
 
-- **VS Code** with the Kigumi extension installed
-- **uv** or **Python** so Kigumi has something to bootstrap the python virtual environment.
+- **VS Code** (or Cursor / VSCodium) with the Kigumi extension installed
+- **uv** or **Python** so Kigumi has something to bootstrap the Python virtual environment.
   - Preferred: install `uv` ahead of time: https://docs.astral.sh/uv/getting-started/installation/
-  - Auto-bootstrap fallback: Kigumi tries `python3.13`, then `python3`/`python` (or `py -3.13`/`py -3` on Windows) and installs uv into a throwaway virtual environment at `.kigumi/uv-bootstrap/`
+  - Auto-bootstrap fallback: Kigumi tries `python3.13`, then `python3`/`python` (or `py -3.13`/`py -3` on Windows) and installs `uv` into a throwaway virtual environment at `.kigumi/uv-bootstrap/`
 
 Kigumi does NOT require pre-installed packages. It handles dependency setup in a project-local virtual environment automatically.
 
 ## Initialization
 
-Kigumi is built around the VSCode workspace (i.e. a folder) where all your kimuki project files live. 
+Kigumi is built around the VS Code workspace (i.e. a folder) where all your Kumiki project files live.
 
-To initialize a project, Open a folder in VScode that will be your workspace. Then open the Kigumi sidebar and hit the initialize project button. This will generate several files in your workspace including an example frame, agent instructions, and a project settings file.
+To initialize a project, open a folder in VS Code that will be your workspace. Then open the Kigumi sidebar and click **Initialize Project**. This generates an example frame (`my_cute_frame.py`), AI agent authoring instructions (`.kigumi/docs/`), and a project settings file.
 
-The sidebar will also check for any Kimuki updates and you can optionally choose to update to the latest version.
+The sidebar also checks for Kumiki updates so you can update to the latest version.
 
 The sidebar contains a project file explorer. *Click on a frame to open it in the Kigumi viewer*.
 
-You can also use the *"Kigumi: Open Current File in Viewer"* command from the command palette to quickly open the current file. To open the command pallete press "cmd/ctrl + shift + p".
+You can also use the *"Kigumi: Open Current File in Viewer"* command from the command palette (`Cmd/Ctrl + Shift + P`) to quickly open the current file.
 
-The sidebar also contains a pattern book explorer which provides various examples of things you can do with kumiki. You can also choose to view or clone the source of any pattern you like here.
+The sidebar also contains a pattern book explorer which provides built-in examples of joints and structures you can build with Kumiki. You can view the source or duplicate any pattern into your workspace.
 
-## Usage
+## Features
 
-Once you open a project, it will create a new tab where you can view the frame. The viewer is pretty intuitive, and you can scroll down to see more options and features. 
-Right now the viewer has mainly view-only features that you can play around. Write operations happen on the frame python file itself. 
+Once you open a frame, Kigumi renders an interactive 3D view alongside your Python code:
 
-In the future, there will be more interactive features in the viewer such as assembly, drawing generation, and measuring. 
-
+- **Live 3D inspection:** Select individual timbers, faces, edges, or joint features, and walk the CSG cut tree.
+- **X-ray and section views:** Inspect internal mortises, tenons, pegs, wedges, and splines.
+- **Parametric controls (Kiwari):** Adjust dimensions, angles, and counts live in the parameters panel.
+- **2D shop drawings & measurements (beta):** View generated or coded elevation and piece drawings, add manual point-to-point measurements (`M`), and export sheets as PNG.
+- **Assembly timeline (beta):** Scrub through the computed assembly/disassembly sequence to verify how joints slide together.
+- **CAD export:** Export frames and timbers to STEP, STL, OBJ, and 3MF.
 
 # Details
 
-## Runtime Contract for Kimuki files
+## Runtime Contract for Kumiki files
 
-When Kigumi imports a Python module, it uses reflection to resolve what to render in this order:
+When Kigumi imports a Python module, it discovers functions decorated with `@frame` (or `@pattern` for pattern books). For older files, it also falls back to resolving:
 
-1. Module-level `example`
-2. `build_frame()` function
-3. Module-level `patternbook`
+1. `@frame`-decorated functions returning a `Frame`
+2. Module-level `example`
+3. `build_frame()` function
+4. Module-level `patternbook`
 
 `example` may be either:
 

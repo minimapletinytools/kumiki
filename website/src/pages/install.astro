@@ -3,12 +3,31 @@ import Layout from '../layouts/Layout.astro';
 import { appDownloads, kigumiVersion, marketplace, openVsx, releasePage } from '../kigumi-release';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const tryKigumi = import.meta.env.PUBLIC_KIGUMI_TRY === 'true';
+
+const installFaqs = [
+  {
+    question: 'Do I need to install Python before using Kigumi?',
+    answer:
+      'No. When you create or initialize a project in Kigumi, it sets up a project-local Python environment and installs Kumiki automatically, offering to install uv if no Python is present on your computer.',
+  },
+  {
+    question: 'How do I connect Claude Code, Codex, or Antigravity to Kigumi?',
+    answer:
+      'Point your coding agent at the Kumiki authoring instructions (docs/agent_usage_instructions.md) and enable Kigumi’s built-in MCP server in the desktop app so the agent can build frames, read session logs, and inspect screenshots.',
+  },
+  {
+    question: 'Can I install Kumiki directly with pip or uv?',
+    answer:
+      'Yes. Run pip install kumiki or uv add kumiki in any Python >=3.10 environment to build frames, export STEP/STL/3MF meshes, or render headless PNG views with kumiki.kigumi_at_home.',
+  },
+];
 ---
 <Layout
   title="Get Started with Kumiki & Kigumi — Timber Framing CAD for Mac, Windows, VS Code and the Web"
   description="Download Kigumi for Mac or Windows, try it in your browser, or install the VS Code extension, and design your first timber frame with Kumiki."
   canonicalPath="/install"
   image="/photos/feature_code.png"
+  faqs={installFaqs}
 >
   <article class="install">
     <h1>Get started</h1>

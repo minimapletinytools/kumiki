@@ -18,7 +18,8 @@ To install Kigumi and start a project, see [Get started](https://kumiki.build/in
 ## For AI agents
 
 Agents designing timber structures should read the
-**[agent usage instructions](https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md)**:
+**[agent usage instructions](https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md)**
+and **[API cheat sheet](https://github.com/minimapletinytools/kumiki/blob/main/docs/api_cheat_sheet.md)**:
 how to write a frame, the conventions to follow, and the joints to reach for.
 
 ## Links

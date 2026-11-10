@@ -79,7 +79,8 @@ you.
 
 ### With an agent
 
-Kigumi installs a set of agent instructions in each project. The installed `kumiki` package
+Kigumi installs a set of [agent usage instructions](docs/agent_usage_instructions.md) and an
+[API cheat sheet](docs/api_cheat_sheet.md) in each project. The installed `kumiki` package
 includes the library's source, its patterns and its docs, so your agent has everything it needs in
 the project's Python environment.
 
