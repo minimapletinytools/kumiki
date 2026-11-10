@@ -1,3 +1,47 @@
+:: 11/09/2026 agent eval prompt collection
+
+:: 11/09/2026 new video script
+
+In this video I'll walk you through how to install and use the latest verison of kumiki.
+
+Kumiki is a programmatic CAD tool for timber framing and woodworking. 
+
+What that means is designs are written as programs which allows better parameteriaztion, mroe flexibility, and of course agents write code much better than can use programs which is what many existing CAD programs do to enable agentic functions.
+
+kumiki is contains dozens of joints wit more being added later, and the latest version introduces support for genrating plans and drawings as well. 
+
+Kumiki work stogether with the kigumi viewer app, and the new version ships as an easy to install standalone app. Go to the release page and download the latest version for your OS.
+
+Install the app and open it. For agentic programming, you'll want to connect your AI agent. I'll go ahead and use the Claude app for this and I'll show the setup in 2 different ways.
+
+For the easy setup, open kigumi options > enable the MCP server for agents, and click the URL and token copy button
+
+In claude, open a new coding session. Make sure the coding session is NOT a cloud session.
+
+Then ask the agent "pls connect to the MCP <paste>"
+
+once connected ask the agent to create a new project and you'll be off to the races.
+
+So what's happening under the hood is that kigumi works with project worskpaces on your computer--afolder containing all your project files. You can create this folder yourself and open it in kigumi ( file > open folder) and you can open the same project in your claude coding session.
+
+Regardless, you'll still want to connect to the MCP as it exposes additional agentic automation functionality.
+
+Once you're set up, you can now prompt the agent to make a project.  The latest models have gotten really good with 3d reasoning and will actually do pretty good with a vague prompt. So let's go ahead and try that
+
+"build me birdhouse, it should have 5 sides held together with dovetail joints. the bottom should be held in with grooves, have a single slanted roof held onto the side picees with mortise and tenon joints"
+
+(text only: please let me know in the comments about the joinery crime I just committed here)
+
+the results are pretty good. To be fair, you miht be acused of AI slop if you post this as is online. Teh AI Agent still isn' tamaving at woodworking and even less so with timebr framing, so you'll likely get better results if you walk your agent through one member at a time. 
+
+Making odification is easy. For eaxmple, I'll select one of the faces and ask the agent to make just my selected face largere. The agent will know which face is selected if you connected the kigumi MCP. if not, you can hit this copy for AI button instead and psate it into your prompt.
+
+
+
+
+
+:: 11/08/2026 wood kanji prompt
+
 create a new structure, this should be of the "wood" kanji character. the verlctical0 stroke isa 4x4, the two horizontal beams are 4x5s (so slightly wider in vertical axkis) and the 2 side strokes should be 4x4s. join the side storkes to the center with morties and tenon joints with 1 round peg, join the horizontal beams (2 of them) with a double butt joint using square pegs. then see if you can make a decortaive cut on the strokes to give them a curved appearance on the top side of them.
 
 
@@ -243,7 +287,7 @@ DONE-add support to run @tools from the parameter section
   -do this for generating saw horse router jig lol
   -router jig template function? takes a timber and a flat profile (extrusion or prism), adds a "template blcok over both, cuts out the timber, and then cuts out the profile extruding upwards to make the template based on bit + collar paraemetrs. shouldn't be too hard? would be cool if it makes mid supports too for extra wide profiles...
 
--NEXT RELEASE TODO
+DONE-NEXT RELEASE TODO
   DONE-end cuts should be given their own intersection group, dovetailed_sawhores currentyl uses PERFECT, and no where else sets the group. We should make a new group, cross intersects but not shoulderplane
     -prioritize axis aligned measurements
   DONE-the active view you are measuring in should be highlighted somehow
@@ -270,18 +314,25 @@ DONE-add support to run @tools from the parameter section
   DONE-initialize project button should go away when no project is open, instead, it should be "open project" and maybe list recent projects (maybe use the same code we used fro the main view when no project is open)
   DONE-do auto update (need mac code signing)
 
+DONE-file creation/deletion in sidebar (web/standalone only) test it.
 
-  -maybe do drawing prettifier pass
-  -test agent created drawings
-  -finish the sawhorse and add tools
-  -check that edges are being highlighted correctly in 2d drawing mesaurements
-  -add joints/arrangement stuff to cheat sheet
-  -mega update wesite
-  -make a new video 
-  -d osome more testing
+DONE-add codex and agy support for mcp copy
+-dio mega update wesite
+  DONE-rewrite content to be not slop ugh
+  -add animation header image/video
+  -add discussion and discord links 
+  -see if agent can generate all joints.... 
+-do mega agent  docs and example refactor
+-maybe do drawing prettifier pass
+-test agent created drawings
+-finish the sawhorse and add tools
+-check that edges are being highlighted correctly in 2d drawing mesaurements
+-add joints/arrangement stuff to cheat sheet
 
+-make a new video 
+-d osome more testing
 
-
+-allow MCP to access seletion history
 -msg modes on r/woodworking if they will allow promo
 
 -then you can see if all features are visible through the views and warn if not
