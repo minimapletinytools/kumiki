@@ -21,9 +21,14 @@ const MAX_STEPS = 40;
 const MAX_OUTPUT_TOKENS = 16000;
 /** Continuations after a stream closes without a completion signal, within the turn's step limit. */
 const MAX_STREAM_CONTINUATIONS = 2;
+/** Retries after a step spends its whole output on reasoning and does nothing. */
+const MAX_THINKING_RETRIES = 2;
 
 /** What Kigumi tells the model, by note kind. */
 const NOTES = {
+    thinking: () => 'Your last step reached its output limit while still thinking, before it wrote or called '
+        + 'anything. Stop deliberating: act now with what you have, e.g. write the file and build it, and let the '
+        + 'build tell you what to fix.',
     continuation: () => 'The previous response stream ended without a completion signal. Continue from where you left '
         + 'off, using the tool results already in this conversation. Do not repeat completed changes.',
     repeat: (call) => `Your call ${call} gave the same result as the same call earlier this turn. To see something else, `
@@ -216,11 +221,12 @@ async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, c
         onEvent({ type: 'agent:notice', key: 'agent.notice.summarised', text: 'The earlier conversation was summarised, to keep each step small.' });
     }
     const steps = [];
+    let thinkingRetries = 0;
     // Repeated looks this step, noted after its tool results.
     let repeats = [];
     const toolSet = toToolSet(tools, { images, askPermission, onRepeat: (call) => repeats.push(call) });
     const request = () => buildRequest(log, { keep: harness.keepToolResults, imagesInToolResults: harness.imagesInToolResults, cacheMarks });
-    for (let continuations = 0; ; continuations++) {
+    for (let continuations = 0; ;) {
         const before = steps.length;
         let failure = null;
         const result = streamText({
@@ -274,6 +280,16 @@ async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, c
         }
         if (failure) throw failure;
         const last = steps.at(-1);
+        // A step that thought until its output ran out, and wrote and called nothing: told to act, and retried.
+        if (!abortSignal?.aborted && steps.length > before && last.finishReason === 'length' && !last.toolCalls.length
+            && !(last.text || '').trim() && thinkingRetries < MAX_THINKING_RETRIES && steps.length < maxSteps) {
+            thinkingRetries += 1;
+            log.push({ note: 'thinking', text: NOTES.thinking() });
+            onEvent({ type: 'agent:notice', key: 'agent.notice.thinkingLimit',
+                params: { attempt: thinkingRetries, attempts: MAX_THINKING_RETRIES },
+                text: `A step reached its output limit while thinking. Asking it to act (${thinkingRetries}/${MAX_THINKING_RETRIES}).` });
+            continue;
+        }
         if (abortSignal?.aborted || steps.length === before || last.finishReason !== 'other'
             || (last.rawFinishReason && last.rawFinishReason !== 'other') || last.toolCalls.length || steps.length >= maxSteps
             || continuations >= MAX_STREAM_CONTINUATIONS) break;
@@ -281,6 +297,7 @@ async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, c
         onEvent({ type: 'agent:notice', key: 'agent.notice.continuing',
             params: { attempt: continuations + 1, attempts: MAX_STREAM_CONTINUATIONS },
             text: `The response stream ended early. Continuing automatically (${continuations + 1}/${MAX_STREAM_CONTINUATIONS}).` });
+        continuations += 1;
     }
     const notice = earlyEnd(steps, maxSteps);
     if (notice && !abortSignal?.aborted) onEvent({ type: 'agent:notice', ...notice });

@@ -20,6 +20,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - The agent's default output limit per step is now 16k tokens, since reasoning counts toward it.
 - The agent's `describe_frame` takes a frame file and answers in YAML: each timber's ends, the world direction each of its faces looks, its box as cut, what it touches and its joints.
 - The Kigumi logo's 木 is wood brown rather than pale cream, so it stands out from its light background, down to the browser tab's favicon.
+- When the agent spends a whole step thinking and hits its output limit without writing anything, it's told to act and retried (twice at most), instead of the turn ending.
 
 ## [0.9.3] - 2026-11-08
 

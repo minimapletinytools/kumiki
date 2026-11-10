@@ -170,6 +170,29 @@ describe('the agent loop', () => {
         expect(events.at(-1)).toMatchObject({ type: 'agent:notice', key: 'agent.notice.outputLimit', text: expect.stringContaining('output limit') });
     });
 
+    test('a step that thinks until its output runs out is told to act, and retried', async () => {
+        const thinks = [{ type: 'reasoning-start', id: 'r' }, { type: 'reasoning-delta', id: 'r', delta: 'Hmm, the faces…' },
+            { type: 'reasoning-end', id: 'r' }, finish('length')];
+        const model = scripted(thinks, [call('c1', 'change', { what: 'frame.py' }), finish('tool-calls')], [...say('1', 'Written.'), finish('stop')]);
+        const { events, log } = await turn(model);
+
+        expect(changeTool.run).toHaveBeenCalledWith({ what: 'frame.py' }, expect.anything());
+        expect(log.filter((entry) => entry.note === 'thinking')).toHaveLength(1);
+        expect(JSON.stringify(model.doStreamCalls[1].prompt)).toContain('Stop deliberating');
+        expect(events).toContainEqual(expect.objectContaining({ type: 'agent:notice', key: 'agent.notice.thinkingLimit', params: { attempt: 1, attempts: 2 } }));
+        expect(events).toContainEqual({ type: 'agent:text', text: 'Written.' });
+        expect(events.filter((event) => event.key === 'agent.notice.outputLimit')).toEqual([]);
+    });
+
+    test('a step that only ever thinks is retried twice, then the turn stops at the output limit', async () => {
+        const thinks = () => [{ type: 'reasoning-start', id: 'r' }, { type: 'reasoning-delta', id: 'r', delta: '…' },
+            { type: 'reasoning-end', id: 'r' }, finish('length')];
+        const model = scripted(thinks(), thinks(), thinks(), thinks());
+        const { events } = await turn(model);
+        expect(model.doStreamCalls).toHaveLength(3);
+        expect(events.at(-1)).toMatchObject({ type: 'agent:notice', key: 'agent.notice.outputLimit' });
+    });
+
     test('an OpenRouter stream closed mid-reasoning continues from its partial response', async () => {
         const chunk = (delta, finish_reason = null) => `data: ${JSON.stringify({
             id: 'gen-test', model: 'deepseek/deepseek-v4.1-flash', created: 0,
