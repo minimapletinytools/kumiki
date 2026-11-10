@@ -39,7 +39,7 @@ const STARTER = fs.readFileSync(path.join(REPO, 'patterns', 'structures', 'my_cu
 
         const result = await runOne(TASKS.find((task) => task.name === 'question'), 'deepseek-v4.1-flash', null, { languageModel: model });
 
-        expect(result.checks.map((check) => check.said)).toEqual(['it builds', 'frame.py unchanged', 'the reply gives the count']);
+        expect(result.checks.map((check) => check.said)).toEqual(['it builds', 'frame.py unchanged', 'the reply gives the count', '0 tool calls, at most 5']);
         expect(result.passed).toBe(true);
         expect(result.cacheRate).toBeCloseTo(0.6);
         expect(result.steps).toEqual([expect.objectContaining({ prompt: 100, output: 5 })]);

@@ -180,7 +180,7 @@ async function runOne(task, modelId, key, { languageModel: given = null } = {}) 
         failure = String(error.message || error);
     }
     const report = await buildFrame(path.join(root, task.target));
-    const project = { read: (name) => fs.readFileSync(path.join(root, name), 'utf8'), reply };
+    const project = { read: (name) => fs.readFileSync(path.join(root, name), 'utf8'), reply, tools: toolCalls.length };
     const checks = task.checks.map((check) => {
         const [passed, said] = check(report, project);
         return { passed: Boolean(passed), said };
