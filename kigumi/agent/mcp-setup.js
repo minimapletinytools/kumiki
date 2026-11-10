@@ -6,6 +6,8 @@
 /** The agents there is setup for, in the order offered. */
 const MCP_CLIENTS = Object.freeze([
     { id: 'claude-code', label: 'Claude Code' },
+    { id: 'codex', label: 'Codex' },
+    { id: 'antigravity', label: 'Antigravity (agy)' },
     { id: 'claude-desktop', label: 'Claude Desktop' },
     { id: 'cursor', label: 'Cursor' },
     { id: 'vscode', label: 'VS Code' },
@@ -20,6 +22,11 @@ function mcpSetupText(clientId, url, token) {
     switch (clientId) {
         case 'claude-code':
             return `claude mcp add --transport http kigumi ${url} --header "Authorization: ${authorization}"`;
+        case 'codex':
+            // Its `mcp add` takes a token only from an environment variable; this goes in ~/.codex/config.toml.
+            return `[mcp_servers.kigumi]\nurl = "${url}"\nhttp_headers = { Authorization = "${authorization}" }`;
+        case 'antigravity':
+            return `agy mcp add --header "Authorization: ${authorization}" kigumi ${url}`;
         case 'claude-desktop':
             // It runs servers as commands; mcp-remote stands in for one reached over HTTP.
             return json({ mcpServers: { kigumi: {

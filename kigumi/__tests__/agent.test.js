@@ -262,6 +262,9 @@ describe('the MCP server', () => {
             expect(text).toContain(token);
         }
         expect(JSON.parse(mcpSetupText('vscode', server.url, token)).servers.kigumi.type).toBe('http');
+        expect(mcpSetupText('antigravity', server.url, token))
+            .toBe(`agy mcp add --header "Authorization: Bearer ${token}" kigumi ${server.url}`);
+        expect(mcpSetupText('codex', server.url, token)).toContain(`http_headers = { Authorization = "Bearer ${token}" }`);
         expect(mcpSetupText('nobody', server.url, token)).toBeNull();
     });
 });

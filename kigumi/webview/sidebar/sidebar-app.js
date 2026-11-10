@@ -64,7 +64,7 @@ class KigumiSidebar extends LitElement {
         this.options = [];
         this.mcp = null;
         // Which titled sections are open: project status open, options closed, until toggled.
-        this.sections = { status: true, options: false, ...(saved.sections || {}) };
+        this.sections = { status: true, mcp: false, options: false, ...(saved.sections || {}) };
         // Keys of unlisted folders already asked for (sidebarExpand).
         this.requestedFolders = new Set();
         this.contextMenu = new ContextMenu();
@@ -312,14 +312,29 @@ class KigumiSidebar extends LitElement {
     renderKigumiOptions() {
         return html`
             <div class="ks-options">
-                ${this.options.map((option) => html`
-                    <label class="ks-option">
-                        <input type="checkbox" data-option=${option.key} .checked=${option.value === true}
-                            @change=${(event) => post({ type: 'sidebarSetOption', key: option.key, value: event.target.checked })}>
-                        <span>${t(option.labelKey)}</span>
-                    </label>
-                    ${option.key === 'mcp.enabled' && option.value ? this.renderMcp() : nothing}`)}
+                ${this.options.filter((option) => option.key !== 'mcp.enabled').map((option) => this.renderOption(option))}
             </div>`;
+    }
+
+    renderOption(option) {
+        return html`
+            <label class="ks-option">
+                <input type="checkbox" data-option=${option.key} .checked=${option.value === true}
+                    @change=${(event) => post({ type: 'sidebarSetOption', key: option.key, value: event.target.checked })}>
+                <span>${t(option.labelKey)}</span>
+            </label>`;
+    }
+
+    /** Its own section, above the options: what it is for, the switch, and the setups once it is on. */
+    renderMcpSection() {
+        const option = this.options.find((one) => one.key === 'mcp.enabled');
+        if (!option) return nothing;
+        return this.renderSection('mcp', t('sidebar.section.mcp'), html`
+            <div class="ks-options">
+                <div class="ks-mcp-note">${t('sidebar.mcp.intro')}</div>
+                ${this.renderOption(option)}
+                ${option.value ? this.renderMcp() : nothing}
+            </div>`);
     }
 
     /** With the MCP server on: where it is, the setups to copy for each agent, and who is connected. */
@@ -442,6 +457,7 @@ class KigumiSidebar extends LitElement {
         const focusedIndex = rows.findIndex((row) => row.node.key === this.focusedKey);
         return html`
             ${this.renderSection('status', t('sidebar.section.projectStatus'), this.renderStatus())}
+            ${this.renderMcpSection()}
             ${this.renderSection('options', t('sidebar.section.options'), this.renderKigumiOptions())}
             ${this.renderToolbar()}
             <div class="ks-tree" role="tree" tabindex="0" aria-label=${t('sidebar.ui.treeLabel')}

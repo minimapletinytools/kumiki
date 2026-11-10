@@ -13,9 +13,11 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Added
 
 - **Delete File…** in the explorer's right-click menu, on files in All Files (the standalone app and the browser version) and on the project's frames: asked first, and views open on the file close.
+- Codex and Antigravity (`agy`) in the MCP server's copy-setup buttons: a `~/.codex/config.toml` block, and an `agy mcp add` command.
 
 #### Changed
 
+- The MCP server has its own section in the explorer, **MCP server for agents**, above Kigumi options, saying what it is for.
 - The built-in agent asks for medium reasoning effort, and no longer reminds itself to write a first version after a few looks (it fired on questions too).
 - The agent's default output limit per step is now 16k tokens, since reasoning counts toward it.
 - The agent's `describe_frame` takes a frame file and answers in YAML: each timber's ends, the world direction each of its faces looks, its box as cut, what it touches and its joints.
