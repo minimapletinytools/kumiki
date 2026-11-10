@@ -36,7 +36,7 @@ const PANEL_SETTINGS = {
     'agent.showOnStartup': { fallback: true, valid: (value) => typeof value === 'boolean' },
     'agent.planMode': { fallback: false, valid: (value) => typeof value === 'boolean' },
     // The most one step may write, in tokens; the backend allows up to 32k.
-    'agent.maxOutputTokens': { fallback: 8000, valid: (value) => [8000, 16000, 32000].includes(value) },
+    'agent.maxOutputTokens': { fallback: 16000, valid: (value) => [8000, 16000, 32000].includes(value) },
     // Set from the panel, but never sent back to it: the panel only learns whether one is set.
     'agent.openrouterApiKey': { fallback: '', valid: (value) => typeof value === 'string' && value.length < 300, secret: true },
 };

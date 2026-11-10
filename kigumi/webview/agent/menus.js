@@ -52,7 +52,7 @@ export class Menus {
         const mode = settings['agent.permissionMode'] || 'ask';
         for (const radio of this.modeRadios) radio.checked = radio.value === mode;
         this.startupToggle.checked = settings['agent.showOnStartup'] !== false;
-        this.outputLimit.value = String(settings['agent.maxOutputTokens'] || 8000);
+        this.outputLimit.value = String(settings['agent.maxOutputTokens'] || 16000);
         const hasKey = settings['agent.openrouterApiKey'] === true;
         this.keyNote.replaceChildren(document.createTextNode(hasKey ? t('agent.settings.openrouterKey.saved') : t('agent.settings.openrouterKey.none')));
         if (hasKey) {

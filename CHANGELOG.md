@@ -13,6 +13,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Changed
 
 - The built-in agent asks for medium reasoning effort, and no longer reminds itself to write a first version after a few looks (it fired on questions too).
+- The agent's default output limit per step is now 16k tokens, since reasoning counts toward it.
 
 ## [0.9.3] - 2026-11-08
 

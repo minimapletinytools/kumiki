@@ -17,8 +17,8 @@ const { HARNESS } = require('./models');
 
 /** Steps in one turn, each a model call and the tools it asks for. */
 const MAX_STEPS = 40;
-/** Per step, unless the user's setting says more. Unset, a provider may reserve its maximum (64k for Haiku) against the balance. */
-const MAX_OUTPUT_TOKENS = 8000;
+/** Per step, unless the user's setting says otherwise. Reasoning counts toward it: 8k ran out at medium effort. Unset, a provider may reserve its maximum (64k for Haiku) against the balance. */
+const MAX_OUTPUT_TOKENS = 16000;
 /** Continuations after a stream closes without a completion signal, within the turn's step limit. */
 const MAX_STREAM_CONTINUATIONS = 2;
 
