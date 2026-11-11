@@ -11,8 +11,6 @@ on:
       - 'tools/gen_ref_pages.py'
       - 'pyproject.toml'
       - '.github/workflows/deploy-website.yml'
-    # A browser-only release of Kigumi: /try from that tag, without a full release.
-    tags: ['kigumi-web-*']
   workflow_dispatch:
 
 permissions:

@@ -79,13 +79,15 @@ gh workflow run .github/workflows/publish-kigumi.yml --ref main -f target=both -
 ## Browser-only release (kumiki.build/try)
 
 To update just the browser version, without releasing the app, VS Code extension or PyPI: push an
-annotated `kigumi-web-YYYY-MM-DD` tag (add `.2` for a second one that day) on the commit to ship.
-`deploy-website.yml` runs on it and builds /try from the newest `kigumi-v*` or `kigumi-web-*` tag,
-so it holds until the next full kigumi release. It does not trigger `release.yml`.
+annotated `kigumi-web-YYYY-MM-DD` tag (add `.2` for a second one that day) on the commit to ship,
+then run the website deploy on main. `deploy-website.yml` builds /try from the newest `kigumi-v*` or
+`kigumi-web-*` tag, so it holds until the next full kigumi release. The tag does not trigger
+`release.yml`, nor the deploy: the github-pages environment only deploys from main.
 
 ```bash
 git tag -a kigumi-web-2026-11-10 -m "Kigumi in the browser" <commit>
 git push origin kigumi-web-2026-11-10
+gh workflow run deploy-website.yml --ref main
 ```
 
 ## Verify dispatch
