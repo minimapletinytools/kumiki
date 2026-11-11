@@ -1,7 +1,6 @@
 /**
- * The built-in agent's file tools, in the same shape as Kigumi's (agent/tools.js): list, search, read,
- * write and edit files, inside the project only, through a project-files interface
- * (agent/project-files.js for Node; a web host gives its own).
+ * Shared text-file tools for built-in agents and MCP clients: list, search, read, write and edit.
+ * Access goes through the project-files interface, including its read-only library roots.
  */
 
 const { z } = require('zod');

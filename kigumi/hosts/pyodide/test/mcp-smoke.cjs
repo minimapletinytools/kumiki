@@ -68,11 +68,17 @@ app.whenReady().then(async () => {
         assert.ok(Array.isArray(JSON.parse(result.content[0].text).panels));
         const tool = (name, args) => call('tools/call', { name, arguments: args });
         const names = (await call('tools/list')).tools.map(one => one.name);
-        for (const name of ['new_project', 'list_projects', 'open_project', 'close_project', 'new_file', 'delete_file', 'rename_file']) assert.ok(names.includes(name), name);
+        for (const name of ['new_project', 'list_projects', 'open_project', 'close_project', 'new_file', 'delete_file', 'rename_file', 'list_files', 'search_files', 'read_file', 'write_file', 'edit_file']) assert.ok(names.includes(name), name);
         assert.ok(!(await tool('new_project', { folder: 'MCP files' })).isError);
         const createdFile = await tool('new_file', { file_path: 'notes/a.txt', content: 'hello' });
         assert.ok(!createdFile.isError, JSON.stringify(createdFile));
         assert.ok((await tool('new_file', { file_path: 'notes/a.txt', content: 'overwrite' })).isError);
+        assert.ok(!(await tool('write_file', { file_path: 'src/frame.py', content: 'width = 1\n' })).isError);
+        assert.ok(!(await tool('edit_file', { file_path: 'src/frame.py', old_string: 'width = 1', new_string: 'width = 2' })).isError);
+        assert.match((await tool('read_file', { file_path: 'src/frame.py' })).content[0].text, /width = 2/);
+        assert.match((await tool('list_files', {})).content[0].text, /src\/frame.py/);
+        assert.match((await tool('search_files', { pattern: 'width' })).content[0].text, /width = 2/);
+        assert.ok((await tool('write_file', { file_path: '../outside.py', content: 'no' })).isError);
         assert.ok(!(await tool('new_file', { file_path: 'notes/occupied.txt' })).isError);
         assert.ok((await tool('rename_file', { file_path: 'notes/a.txt', new_path: 'notes/occupied.txt' })).isError);
         assert.ok(!(await tool('rename_file', { file_path: 'notes/a.txt', new_path: 'notes/b.txt' })).isError);

@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const { createProjectFiles } = require('../agent/project-files');
 const { createFileManagementTools } = require('../agent/file-management-tools');
-const { sharedTools, agentTools } = require('../agent/agent');
+const { mcpTools, agentTools } = require('../agent/agent');
 const { Checkpoints } = require('../agent/checkpoints');
 let root, files, tools;
 beforeEach(() => {
@@ -46,7 +46,7 @@ test('rejects directories, missing files, and symlinks outside the project', asy
 });
 test('MCP exposes the operations and built-in agent undo restores both sides of rename and deletion', async () => {
   const host = { files, frames: {} };
-  expect(sharedTools(host).map(t => t.name)).toEqual(expect.arrayContaining(['new_file', 'delete_file', 'rename_file']));
+  expect(mcpTools(host, { fileAccess: true }).map(t => t.name)).toEqual(expect.arrayContaining(['new_file', 'delete_file', 'rename_file']));
   const checkpoints = new Checkpoints(files);
   const own = Object.fromEntries(agentTools(host, { checkpoints: () => checkpoints }).map(t => [t.name, t]));
   await files.create('old', 'original');
@@ -61,4 +61,20 @@ test('MCP exposes the operations and built-in agent undo restores both sides of 
   expect(await files.read('deleted')).toBe('keep');
   expect(await files.read('new')).toBeNull();
   expect(await files.read('created')).toBeNull();
+});
+test('web MCP has the full filesystem workflow; standalone MCP omits file access by default', async () => {
+  const host = { files, frames: {} };
+  const names = ['list_files', 'search_files', 'read_file', 'write_file', 'edit_file', 'new_file', 'delete_file', 'rename_file'];
+  for (const name of names) expect(mcpTools(host).map(t => t.name)).not.toContain(name);
+  const web = mcpTools(host, { fileAccess: true });
+  expect(web.map(t => t.name)).toEqual(expect.arrayContaining(names));
+  expect(new Set(web.map(t => t.name)).size).toBe(web.length);
+  const tools = Object.fromEntries(web.map(t => [t.name, t]));
+  await tools.write_file.run({ file_path: 'src/frame.py', content: 'width = 1\n' });
+  await tools.edit_file.run({ file_path: 'src/frame.py', old_string: 'width = 1', new_string: 'width = 2' });
+  expect((await tools.read_file.run({ file_path: 'src/frame.py' }))[0].text).toContain('width = 2');
+  expect((await tools.list_files.run({}))[0].text).toContain('src/frame.py');
+  expect((await tools.search_files.run({ pattern: 'width' }))[0].text).toContain('width = 2');
+  await expect(tools.write_file.run({ file_path: '../outside', content: 'no' })).rejects.toThrow('outside');
+  await expect(tools.edit_file.run({ file_path: 'src/frame.py', old_string: 'missing', new_string: 'no' })).rejects.toThrow('not found');
 });

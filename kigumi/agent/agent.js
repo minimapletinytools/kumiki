@@ -34,12 +34,25 @@ function sharedTools(host) {
     return [
         ...(host.view ? createKigumiTools(host.view) : []),
         ...(host.projects ? createProjectTools(host.projects) : []),
-        ...(host.files && host.files.create && host.files.deleteFile && host.files.rename
-            ? createFileManagementTools({ files: host.files }) : []),
         checkFrameTool(host.frames),
         ...(host.frames.describe ? [describeFrameTool(host.frames)] : []),
         ...(host.kumikiApi ? [kumikiApiTool(host.kumikiApi)] : []),
     ];
+}
+
+/** Return the file tools supported by the host's project storage. */
+function filesystemTools(host) {
+    if (!host.files) return [];
+    return [
+        ...createFileTools({ files: host.files }),
+        ...(host.files.create && host.files.deleteFile && host.files.rename
+            ? createFileManagementTools({ files: host.files }) : []),
+    ];
+}
+
+/** Return MCP tools, including file access when the client cannot access the project directly. */
+function mcpTools(host, { fileAccess = false } = {}) {
+    return [...sharedTools(host), ...(fileAccess ? filesystemTools(host) : [])];
 }
 
 /**
@@ -53,11 +66,10 @@ function sharedTools(host) {
  * @param {(toolCallId: string, before: string, after: string) => void} [hooks.onPictures]  a view before and after an edit
  */
 function agentTools(host, { checkpoints, onTodos = () => {}, onPictures = () => {} }) {
-    const fileTools = createFileTools({ files: host.files }).map((tool) => withCheckpoints(
+    const fileTools = filesystemTools(host).map((tool) => withCheckpoints(
         withBuildCheck(tool, { files: host.files, frames: host.frames, onPictures }),
         { files: host.files, checkpoints }));
-    const shared = sharedTools(host).map((tool) => withCheckpoints(tool, { files: host.files, checkpoints }));
-    return [...shared, ...fileTools, todoTool(onTodos)];
+    return [...sharedTools(host), ...fileTools, todoTool(onTodos)];
 }
 
 /** The built-in agent's system prompt. */
@@ -66,4 +78,4 @@ function instructions(host, { planMode = false } = {}) {
     return planMode ? `${prompt}\n\n${PLAN_MODE_NOTE}` : prompt;
 }
 
-module.exports = { viewHost, sharedTools, agentTools, instructions };
+module.exports = { viewHost, sharedTools, mcpTools, agentTools, instructions };
