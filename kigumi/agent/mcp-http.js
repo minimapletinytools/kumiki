@@ -9,6 +9,7 @@
 
 const http = require('http');
 const crypto = require('crypto');
+const { MCP_INSTRUCTIONS } = require('./kumiki-docs');
 
 const PATH = '/mcp';
 
@@ -24,7 +25,7 @@ function sameToken(given, expected) {
 
 function buildServer(tools, version) {
     const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
-    const server = new McpServer({ name: 'kigumi', version });
+    const server = new McpServer({ name: 'kigumi', version }, { instructions: MCP_INSTRUCTIONS });
     for (const tool of tools) {
         server.registerTool(
             tool.name,

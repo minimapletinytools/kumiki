@@ -1,6 +1,7 @@
 const { createProjectFiles } = require('./project-files');
 const { findKumikiSource, kumikiExamples, projectPython } = require('./kumiki-source');
 const { pythonKumikiApi } = require('./kumiki-api');
+const { kumikiDocsFolder } = require('./kumiki-docs');
 const { loadSystemPrompt } = require('./system-prompt');
 const { viewHost } = require('./agent');
 
@@ -38,6 +39,7 @@ function createProjectContext({ root, panels, run, projects }) {
             kumikiApi: pythonKumikiApi({ python: () => projectPython(root()), cwd: root }),
             kumikiSource: knownSource,
             kumikiExamples: () => kumikiExamples(knownSource()),
+            kumikiDocs: () => kumikiDocsFolder(knownSource(), root()),
             systemPrompt: loadSystemPrompt(),
             projects: projects(),
         });

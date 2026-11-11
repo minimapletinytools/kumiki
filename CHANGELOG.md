@@ -13,6 +13,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 #### Added
 
 - **Delete File…** in the explorer's right-click menu, on files in All Files (the standalone app and the browser version) and on the project's frames: asked first, and views open on the file close.
+- The MCP server tells agents to read kumiki's usage instructions and API cheat sheet before writing frames, and gives them a `kumiki_docs` tool to read them, for agents that can't see the project's `.kigumi/docs/` (Claude desktop or claude.ai through the browser version).
 - Codex and Antigravity (`agy`) in the MCP server's copy-setup buttons: a `~/.codex/config.toml` block, and an `agy mcp add` command.
 
 #### Changed

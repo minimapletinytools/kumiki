@@ -232,6 +232,8 @@ app.whenReady().then(async () => {
         check("the agent's search finds a line in the project", found.includes('my_cute_frame.py:'), found.slice(0, 120));
         const api = await tool('kumiki_api', { name: 'create_axis_aligned_timber' });
         check("the agent's kumiki_api looks a name up in kumiki", api.includes('create_axis_aligned_timber') && !api.startsWith('ERROR'), api.slice(0, 120));
+        const sheet = await tool('kumiki_docs', { name: 'api_cheat_sheet' });
+        check('kumiki_docs reads the cheat sheet from the browser\'s kumiki', sheet.startsWith('# API cheat sheet'), sheet.slice(0, 120));
         // The tab signing in opens: noted, not opened.
         await js(`window.open = (url) => { window.__signInUrl = url; return {}; }; true`);
         await js(`${agent}.querySelector('.web-agent-sign-in .sign-in-chip[data-provider="github"]').click()`);

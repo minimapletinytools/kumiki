@@ -10,6 +10,7 @@
  *   kumikiApi       (name, {members, source}) => Promise<string> (agent/kumiki-api.js); null without one
  *   kumikiSource()  the kumiki library's folder, which the agent may read; or null
  *   kumikiExamples() kumiki's example frames' folder; or null
+ *   kumikiDocs()    kumiki's docs folder, for MCP clients (agent/kumiki-docs.js); or null
  *   systemPrompt    (kumikiSource, kumikiExamples) => string (agent/system-prompt.js)
  */
 
@@ -19,14 +20,15 @@ const { createFileManagementTools } = require('./file-management-tools');
 const { createFileTools } = require('./file-tools');
 const { viewFrames, checkFrameTool, describeFrameTool } = require('./frames');
 const { kumikiApiTool } = require('./kumiki-api');
+const { kumikiDocsTool } = require('./kumiki-docs');
 const { todoTool, withBuildCheck, withCheckpoints } = require('./session-tools');
 const { PLAN_MODE_NOTE } = require('./permissions');
 
 /** A host over the app's views. */
 function viewHost({ panels, run, files, workspaceFolders = () => [files.root()].filter(Boolean), kumikiApi = null,
-    kumikiSource = () => null, kumikiExamples = () => null, systemPrompt = () => '', projects = null }) {
+    kumikiSource = () => null, kumikiExamples = () => null, kumikiDocs = () => null, systemPrompt = () => '', projects = null }) {
     return { files, frames: viewFrames({ panels, run, files }), view: { panels, run, workspaceFolders, resolve: (file) => files.resolve(file) },
-        kumikiApi, kumikiSource, kumikiExamples, systemPrompt, projects };
+        kumikiApi, kumikiSource, kumikiExamples, kumikiDocs, systemPrompt, projects };
 }
 
 /** The tools any agent gets: the built-in one, and others over MCP. */
@@ -50,9 +52,13 @@ function filesystemTools(host) {
     ];
 }
 
-/** Return MCP tools, including file access when the client cannot access the project directly. */
+/**
+ * Return MCP tools: the shared ones, kumiki's docs (the built-in agent reads .kigumi/docs/ instead),
+ * and file access when the client cannot access the project directly.
+ */
 function mcpTools(host, { fileAccess = false } = {}) {
-    return [...sharedTools(host), ...(fileAccess ? filesystemTools(host) : [])];
+    return [...sharedTools(host), ...(host.kumikiDocs ? [kumikiDocsTool(host.kumikiDocs)] : []),
+        ...(fileAccess ? filesystemTools(host) : [])];
 }
 
 /**
