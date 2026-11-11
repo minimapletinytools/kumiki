@@ -213,7 +213,7 @@ test('Kigumi options lists the switches the host has, and sets one from the page
   expect(config).not.toHaveProperty('viewer.drawingBeta');
 });
 
-test('with MCP on, the sidebar gets its state, copies its address or a setup, and nothing else', async () => {
+test('with MCP on, the sidebar gets its state, copies authenticated setups, and nothing else', async () => {
   const copied = [];
   const setups = [];
   const mcp = {
@@ -228,6 +228,6 @@ test('with MCP on, the sidebar gets its state, copies its address or a setup, an
   await surface.send({ type: 'sidebarCopyMcp', client: 'address' });
   await surface.send({ type: 'sidebarCopyMcp', client: 'claude-code' });
   await surface.send({ type: 'sidebarCopyMcp', client: 'not-a-client' });
-  expect(copied).toEqual(['http://127.0.0.1:7345/mcp']);
+  expect(copied).toEqual([]);
   expect(setups).toEqual(['claude-code']);
 });

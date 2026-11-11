@@ -161,9 +161,7 @@ class SidebarController {
                 const mcp = getHost().mcp;
                 const state = mcp && mcp.state();
                 if (!state || !state.running) return;
-                if (message.client === 'address') {
-                    await getHost().copyText(state.url);
-                } else if (state.setups.some((setup) => setup.id === message.client)) {
+                if (state.setups.some((setup) => setup.id === message.client)) {
                     mcp.copySetup(message.client);
                 }
             } else if (message.type === 'sidebarExpand') {

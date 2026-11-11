@@ -69,7 +69,10 @@ function readFileSync(target, options) {
 
 function writeFileSync(target, data, options) {
     const bytes = typeof data === 'string' ? data : new Uint8Array(data.buffer ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) : data);
-    attempt('open', target, () => FS().writeFile(String(target), bytes));
+    const flag = typeof options === 'object' ? options.flag : undefined;
+    // Emscripten's O_WRONLY | O_CREAT | O_EXCL implements Node's exclusive-create mode.
+    const flags = flag === 'wx' ? 1 | 64 | 128 : flag;
+    attempt('open', target, () => FS().writeFile(String(target), bytes, { flags }));
 }
 
 function appendFileSync(target, data) {

@@ -15,6 +15,7 @@
 
 const { createKigumiTools } = require('./tools');
 const { createProjectTools } = require('./project-tools');
+const { createFileManagementTools } = require('./file-management-tools');
 const { createFileTools } = require('./file-tools');
 const { viewFrames, checkFrameTool, describeFrameTool } = require('./frames');
 const { kumikiApiTool } = require('./kumiki-api');
@@ -33,6 +34,8 @@ function sharedTools(host) {
     return [
         ...(host.view ? createKigumiTools(host.view) : []),
         ...(host.projects ? createProjectTools(host.projects) : []),
+        ...(host.files && host.files.create && host.files.deleteFile && host.files.rename
+            ? createFileManagementTools({ files: host.files }) : []),
         checkFrameTool(host.frames),
         ...(host.frames.describe ? [describeFrameTool(host.frames)] : []),
         ...(host.kumikiApi ? [kumikiApiTool(host.kumikiApi)] : []),
@@ -53,7 +56,8 @@ function agentTools(host, { checkpoints, onTodos = () => {}, onPictures = () => 
     const fileTools = createFileTools({ files: host.files }).map((tool) => withCheckpoints(
         withBuildCheck(tool, { files: host.files, frames: host.frames, onPictures }),
         { files: host.files, checkpoints }));
-    return [...sharedTools(host), ...fileTools, todoTool(onTodos)];
+    const shared = sharedTools(host).map((tool) => withCheckpoints(tool, { files: host.files, checkpoints }));
+    return [...shared, ...fileTools, todoTool(onTodos)];
 }
 
 /** The built-in agent's system prompt. */

@@ -7,6 +7,7 @@
 const { z } = require('zod');
 
 const EDIT_TOOLS = new Set(['write_file', 'edit_file']);
+const CHECKPOINT_TOOLS = new Set([...EDIT_TOOLS, 'new_file', 'delete_file', 'rename_file']);
 
 /** The build report's result as text for the agent, appended to an edit's own. */
 function describeBuild(report) {
@@ -64,11 +65,13 @@ function withBuildCheck(tool, { files, frames, onPictures }) {
 
 /** `tool`, keeping each file it writes as it was before the turn first changed it (`checkpoints()`). */
 function withCheckpoints(tool, { files, checkpoints }) {
-    if (!EDIT_TOOLS.has(tool.name)) return tool;
+    if (!CHECKPOINT_TOOLS.has(tool.name)) return tool;
     return {
         ...tool,
         run: async (args, context) => {
-            await checkpoints().beforeWrite(files.resolve(args.file_path || '', { write: true }));
+            const targets = [files.resolve(args.file_path || '', { write: true })];
+            if (tool.name === 'rename_file') targets.push(files.resolve(args.new_path, { write: true }));
+            for (const target of targets) await checkpoints().beforeWrite(target);
             return tool.run(args, context);
         },
     };

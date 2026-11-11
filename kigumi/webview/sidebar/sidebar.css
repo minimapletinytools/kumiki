@@ -410,23 +410,6 @@ button {
     margin: 0 0 4px 20px;
 }
 
-.ks-mcp-address {
-    display: flex;
-    gap: 4px;
-}
-
-.ks-mcp-address input {
-    flex: 1;
-    min-width: 0;
-    padding: 2px 4px;
-    border: 1px solid var(--ks-input-border);
-    border-radius: 2px;
-    background: var(--ks-input-bg);
-    color: var(--ks-input-fg);
-    font: inherit;
-    font-size: 11px;
-}
-
 .ks-mcp-setups {
     display: flex;
     flex-wrap: wrap;

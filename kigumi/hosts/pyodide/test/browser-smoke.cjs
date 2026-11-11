@@ -62,6 +62,11 @@ app.whenReady().then(async () => {
         await window.loadURL(`http://127.0.0.1:${PORT}/`);
         window.showInactive();
         const loading = await wait("document.getElementById('kw-loading') && getComputedStyle(document.querySelector('.welcome-keys')).display === 'none'", 20000);
+        const emojis = await js(`({ logs: [...document.querySelectorAll('.kw-parade span')].map(one => one.textContent),
+            rider: document.querySelector('.kw-load-rider')?.textContent })`);
+        check('the loading parade uses logs only, with the beaver on the bar', emojis.logs.length > 0
+            && emojis.logs.every(emoji => emoji === '🪵') && emojis.rider === '🦫');
+        await shot('loading');
         const ready = await wait("document.body.classList.contains('kigumi-ready')", 240000);
         check('Python, kumiki and Kigumi start in the page', ready === true, `${Math.round((Date.now() - started) / 1000)} s`);
         const welcomeBack = await wait("!document.getElementById('kw-loading') && getComputedStyle(document.querySelector('.welcome-keys')).display !== 'none'", 10000);
