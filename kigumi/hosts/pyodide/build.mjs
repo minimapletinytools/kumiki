@@ -31,7 +31,6 @@ function virtualPath(file) {
 
 const shims = {
     fs: path.join(HERE, 'worker/shims/fs.js'),
-    child_process: path.join(HERE, 'worker/shims/child_process.js'),
     os: path.join(HERE, 'worker/shims/os.js'),
     https: path.join(HERE, 'worker/shims/https.js'),
     crypto: path.join(HERE, 'worker/shims/crypto.js'),
@@ -91,7 +90,14 @@ await esbuild.build({
             .filter(key => process.env[key]).map(key => [key, process.env[key]]))) },
     alias: shims,
     inject: [path.join(HERE, 'worker/shims/globals.mjs')],
-    plugins: [dirnamePlugin],
+    plugins: [dirnamePlugin, {
+        name: 'python-runtime',
+        setup(build) {
+            build.onResolve({ filter: /(^|\/)python-runtime$/ }, () => ({
+                path: path.join(HERE, 'worker/python-runtime.js'),
+            }));
+        },
+    }],
     external: ['electron'],
     logLevel: 'warning',
     sourcemap: 'linked',

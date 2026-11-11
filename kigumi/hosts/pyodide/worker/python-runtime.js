@@ -1,7 +1,5 @@
-// child_process, for the browser worker: Python "processes" run in Pyodide (python/kigumi_pyodide.py).
-// A one-shot command (python -c, -m, a script) runs to the end and reports its output; the runner
-// (runner.py) is a session fed its stdin a line at a time.
-const runtime = require('./runtime');
+/** Pyodide execution using the runner's stream protocol; running Python is not interruptible. */
+const runtime = require('./shims/runtime');
 
 class Emitter {
     constructor() { this._listeners = {}; }
@@ -28,19 +26,22 @@ function bridge() {
     return runtime.py.pyimport('kigumi_pyodide');
 }
 
-function spawnRunner(child, args, cwd) {
+function attachRunner(child, args, cwd) {
     let session = null;
     let buffer = '';
     const queue = [];
     let running = false;
+    let finished = false;
     const finish = (code) => {
-        if (child.exitCode !== null) return;
+        if (finished) return;
+        finished = true;
+        queue.length = 0;
         child.exitCode = code;
         child.emit('exit', code, null);
         child.emit('close', code, null);
     };
     const drain = () => {
-        if (running) return;
+        if (running || finished) return;
         running = true;
         setTimeout(() => {
             try {
@@ -60,6 +61,7 @@ function spawnRunner(child, args, cwd) {
     };
     child.stdin = {
         write(data) {
+            if (finished) return false;
             buffer += String(data);
             let at;
             while ((at = buffer.indexOf('\n')) >= 0) {
@@ -73,6 +75,7 @@ function spawnRunner(child, args, cwd) {
         on() { return this; },
     };
     setTimeout(() => {
+        if (child.killed) return;
         try {
             const py = bridge();
             session = py.RunnerSession(args[0], JSON.stringify(args.slice(1)),
@@ -98,6 +101,7 @@ function spawnRunner(child, args, cwd) {
 
 function spawnOnce(child, args, cwd) {
     setTimeout(() => {
+        if (child.killed) return;
         let result;
         try {
             result = JSON.parse(bridge().run_command(JSON.stringify(args), cwd || ''));
@@ -111,11 +115,17 @@ function spawnOnce(child, args, cwd) {
         child.emit('exit', result.code, null);
         child.emit('close', result.code, null);
     }, 0);
-    child.kill = () => { child.killed = true; return true; };
+    child.kill = () => {
+        if (child.exitCode !== null || child.killed) return false;
+        child.killed = true;
+        child.emit('exit', null, 'SIGTERM');
+        child.emit('close', null, 'SIGTERM');
+        return true;
+    };
 }
 
-/** Any command is Python here: `command` is a venv's python or `python3`, and `args` its argv. */
-function spawn(command, args = [], options = {}) {
+/** Start an operation in the managed Python interpreter. */
+function startProcess(command, args = [], options = {}, runner = false) {
     const child = new Emitter();
     child.pid = nextPid++;
     child.exitCode = null;
@@ -123,21 +133,20 @@ function spawn(command, args = [], options = {}) {
     child.stdout = new Emitter();
     child.stderr = new Emitter();
     child.stdin = { write() { return true; }, end() {}, on() { return this; } };
-    if (!runtime.py) {
+    if (command !== 'pyodide' || !runtime.py) {
         setTimeout(() => {
-            child.emit('error', new Error(`Python isn't loaded yet (${command})`));
+            child.emit('error', new Error(command !== 'pyodide' ? `Unsupported interpreter: ${command}` : 'Python is not loaded yet'));
             child.emit('close', 1, null);
         }, 0);
         return child;
     }
-    if (args.length && /(^|\/)runner\.py$/.test(args[0])) spawnRunner(child, args, options.cwd);
+    if (runner) attachRunner(child, args, options.cwd);
     else spawnOnce(child, args, options.cwd);
     return child;
 }
 
-function unsupported(name) {
-    return () => { throw new Error(`child_process.${name} isn't available in the browser`); };
-}
+function spawn(command, args, options) { return startProcess(command, args, options); }
+function spawnRunner(command, args, options) { return startProcess(command, args, options, true); }
 
 /** A one-shot Python command, its output given to `callback(error, stdout, stderr)` at the end. */
 function execFile(command, args = [], options = {}, callback = undefined) {
@@ -157,8 +166,11 @@ function execFile(command, args = [], options = {}, callback = undefined) {
         if (callback) callback(error, stdout, stderr);
     };
     child.once('error', (error) => finish(error));
-    child.once('close', (code) => finish(code ? Object.assign(new Error(`${command} exited with ${code}`), { code }) : null));
+    child.once('close', (code) => finish(code !== 0 ? Object.assign(new Error(`${command} exited with ${code}`), { code }) : null));
     return child;
 }
 
-module.exports = { spawn, execFile, exec: unsupported('exec'), execSync: unsupported('execSync'), spawnSync: unsupported('spawnSync') };
+module.exports = { spawn, spawnRunner, execFile,
+    getVenvPythonCandidates: () => ['pyodide'],
+    isPythonAvailable: (command) => command === 'pyodide',
+    managedEnvironment: true, canInstallPackages: false, canInterrupt: false };

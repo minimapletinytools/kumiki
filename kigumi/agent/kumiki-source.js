@@ -5,14 +5,14 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execFile } = require('child_process');
+const { execFile, isPythonAvailable } = require('../python-runtime');
 const { getVenvPythonCandidates } = require('../python-env');
 
 const SNIPPET = 'import os, kumiki; print(os.path.dirname(os.path.abspath(kumiki.__file__)))';
 
 /** The project's own Python (its .venv's), or null. */
 function projectPython(projectRoot) {
-    return (projectRoot && getVenvPythonCandidates(projectRoot).find((candidate) => fs.existsSync(candidate))) || null;
+    return (projectRoot && getVenvPythonCandidates(projectRoot).find((candidate) => isPythonAvailable(candidate))) || null;
 }
 
 /** The kumiki package's folder for the project at `projectRoot`, or null. */

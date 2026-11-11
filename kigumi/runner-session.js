@@ -3,7 +3,8 @@
  * The runner handles loading examples, reloading on edits, and returning frame data.
  */
 
-const { spawn } = require('child_process');
+const pythonRuntime = require('./python-runtime');
+const { spawnRunner } = pythonRuntime;
 const path = require('path');
 const fs = require('fs');
 const { resolveProjectEnvironment } = require('./project-root');
@@ -79,7 +80,7 @@ class PythonRunnerSession {
                 return null;
             }
             const pythonPath = match[1].trim();
-            if (pythonPath && fs.existsSync(pythonPath)) {
+            if (pythonPath && pythonRuntime.isPythonAvailable(pythonPath)) {
                 return pythonPath;
             }
         } catch (error) {
@@ -102,7 +103,7 @@ class PythonRunnerSession {
 
         for (const root of searchRoots) {
             for (const candidate of getVenvPythonCandidates(root)) {
-                if (fs.existsSync(candidate)) {
+                if (pythonRuntime.isPythonAvailable(candidate)) {
                     return candidate;
                 }
             }
@@ -195,6 +196,10 @@ class PythonRunnerSession {
 
     async ensurePythonEnvironmentInternal() {
         fs.mkdirSync(path.join(this.projectRoot, '.kigumi'), { recursive: true });
+        if (pythonRuntime.managedEnvironment) {
+            await this.checkKumikiVersionCompatibility(this.getPythonCommand());
+            return;
+        }
         const { createdVenv } = await ensureProjectVenv(this.projectRoot);
 
         const pythonCmd = this.getPythonCommand();
@@ -311,7 +316,7 @@ class PythonRunnerSession {
                 this.channel.appendLine(`Starting runner: ${pythonCmd} ${this.runnerScriptPath} ${this.filePath}`);
 
                 const runnerArgs = [this.runnerScriptPath, this.filePath, this.projectRoot || ''];
-                this.process = spawn(pythonCmd, runnerArgs, {
+                this.process = spawnRunner(pythonCmd, runnerArgs, {
                     cwd: this.projectRoot,
                     stdio: ['pipe', 'pipe', 'pipe'],
                     env: { ...process.env, KIGUMI_VERSION: getKigumiVersion() },

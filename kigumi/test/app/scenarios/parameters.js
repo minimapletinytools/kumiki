@@ -46,8 +46,8 @@ module.exports = {
             .catch(() => '');
         await capture('03f-kiwari-tools');
         check('the Kiwari tab lists the frame\'s tools under its parameters, with their own, and runs one',
-            tab.includes('Kiwari') && tools === 'export router templates' && toolParameters === 'offset|top|bottom|width|sides'
-                && output.startsWith('Wrote 4 router templates'),
+            tab.includes('Kiwari') && tools === 'export router templates' && toolParameters === 'offset|top|bottom|width|sides|supports|support_thickness|clamp_width|clamp_depth|clamp_clearance|tail_clamp_length'
+                && output.startsWith('Wrote 8 router templates'),
             `tab "${tab}", tools "${tools}", its parameters "${toolParameters}", output "${output.split('\n')[0]}"`);
         await showTab('tree');
     },

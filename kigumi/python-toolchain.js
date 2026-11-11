@@ -11,6 +11,7 @@ const fs = require('fs');
 const https = require('https');
 const os = require('os');
 const path = require('path');
+const pythonRuntime = require('./python-runtime');
 const { runCommand, getVenvPython } = require('./python-env');
 
 const MIN_PYTHON = [3, 10];
@@ -355,7 +356,7 @@ async function resolveToolchain(cwd) {
 // Creates <root>/.venv if missing; returns { createdVenv, pythonPath }.
 async function ensureProjectVenv(root) {
     const pythonPath = getVenvPython(root);
-    if (fs.existsSync(pythonPath)) {
+    if (pythonRuntime.isPythonAvailable(pythonPath)) {
         return { createdVenv: false, pythonPath };
     }
 
@@ -380,6 +381,9 @@ async function ensurePip(root, pythonPath) {
 
 // `pip install <args>` into the venv at pythonPath, through uv when available.
 async function pipInstall(root, pythonPath, args) {
+    if (!pythonRuntime.canInstallPackages) {
+        throw new Error('This Python runtime ships with Kigumi; package installation is not supported.');
+    }
     const uv = await findUv(root);
     if (uv) {
         return runCommand(uv, ['pip', 'install', '--python', pythonPath, ...args], { cwd: root });

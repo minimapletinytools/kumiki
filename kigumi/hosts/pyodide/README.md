@@ -22,7 +22,7 @@ Pyodide (from jsDelivr), kumiki's packages and trimesh (from PyPI), so it needs 
 ```text
 Page (dist/index.html)                         Web Worker (dist/worker.js)
   the app's shell, explorer, viewers, editor     Kigumi's core (kigumi-app, the runner session, ...)
-  page/web-projects.js: projects (IndexedDB),      worker/shims/: fs over Pyodide's files, Python
+  page/web-projects.js: projects (IndexedDB),      worker/: fs over Pyodide's files, Python
     settings (localStorage), the projects page       "processes" run in Pyodide, os, crypto, https
   page/transport.js: messages to the worker   ⇄  Pyodide: kumiki (a wheel built from this checkout),
     and panel pages shown as blobs                  manifold3d.py over Manifold's WebAssembly build,
@@ -30,12 +30,17 @@ Page (dist/index.html)                         Web Worker (dist/worker.js)
                                                      at a time
 ```
 
-- **The core is unchanged.** `build.mjs` bundles it with esbuild, with Node's modules played by
-  `worker/shims/`: files are Pyodide's (in memory, the same ones Python sees), and spawning Python
-  runs it in Pyodide (`python -c`, `-m`, a script, or `runner.py`, which `kigumi_pyodide.py` feeds
-  one request at a time and whose background jobs run after each reply: Pyodide has no threads).
-  Each bundled file gets its `__dirname` in Pyodide's file system, where `kigumi-files.json` puts
-  `runner.py`, the page templates, the translations and the docs.
+- **The application and runner protocol are shared.** `build.mjs` selects the Pyodide implementation
+  of `python-runtime.js`. Native hosts use Node subprocesses; the browser uses
+  `worker/python-runtime.js` and `python/kigumi_pyodide.py`. Runner creation is explicit, independent
+  of the script filename. Python is managed by the site build: projects need no placeholder venv,
+  and package installation is unavailable. Queued calls can be cancelled, but executing synchronous
+  Python cannot be interrupted without terminating the worker. Files still use the focused `fs`
+  adapter over Pyodide's in-memory filesystem.
+- **Shell behavior is shared.** `app-shell/host-services.js` supplies document state, panel inspection,
+  settings access and file watching to desktop and browser hosts. `project-lifecycle.js` serializes
+  project switches and confirms unsaved edits; hosts supply project persistence. Agent project
+  context and log panels are shared too. Page stores supply their bridge URL and CSP source per instance.
 - **Projects live in the browser** (IndexedDB), as the projects page says: not on disk and not in
   the cloud. Opening one writes its files into Pyodide's file system; every change there (an editor
   save, a saved drawing) goes back to the browser's copy. Export .zip downloads a project; files

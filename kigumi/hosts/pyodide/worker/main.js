@@ -13,28 +13,27 @@ const path = require('path');
 const fs = require('fs');
 const runtime = require('./shims/runtime');
 const { PageStore, injectBridge } = require('../../../app-shell/page-store');
-const { ShellConnection, PanelSurface } = require('../../../app-shell/shell-connection');
+const { ShellConnection } = require('../../../app-shell/shell-connection');
+const { createProjectLifecycle } = require('../../../app-shell/project-lifecycle');
+const { createLogPanel } = require('../../../app-shell/log-panel');
 const { createEditorTabs } = require('../../../app-shell/editor-tabs');
 const { webviewDir } = require('../../../webview-html');
 const { setHost } = require('../../../host');
 const { createKigumiApp } = require('../../../kigumi-app');
 const { ensureKigumiYaml } = require('../../../project-root');
 const { getInlineExampleFrameContent } = require('../../../project-initializer');
-const { SettingsStore, defaultsFromPackageJson } = require('../../electron/settings-store');
-const { LogChannel } = require('../../electron/log-channel');
+const { SettingsStore, defaultsFromPackageJson } = require('../../../app-shell/settings-store');
+const { LogChannel } = require('../../../app-shell/log-channel');
 const { createBrowserHost } = require('../browser-host');
 const { writeProjectFiles, readProjectFiles, watchProjectFiles } = require('../project-files');
 const { createAgentPanel } = require('../../../agent/agent-panel');
-const { createProjectFiles } = require('../../../agent/project-files');
 const { createAccount } = require('../../../agent/account');
 const { backendConfig } = require('../../../agent/backend-config');
 const { createMcpRelay } = require('../../../agent/mcp-relay');
 const browserBackend = backendConfig(typeof KIGUMI_WEB_BACKEND_CONFIG === 'undefined' ? {} : KIGUMI_WEB_BACKEND_CONFIG);
 const { createModelList } = require('../../../agent/models');
-const { findKumikiSource, kumikiExamples, projectPython } = require('../../../agent/kumiki-source');
-const { pythonKumikiApi } = require('../../../agent/kumiki-api');
-const { loadSystemPrompt } = require('../../../agent/system-prompt');
-const { viewHost, sharedTools } = require('../../../agent/agent');
+const { createProjectContext } = require('../../../agent/project-context');
+const { sharedTools } = require('../../../agent/agent');
 const { createFileTools } = require('../../../agent/file-tools');
 
 const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';
@@ -88,20 +87,9 @@ async function bootPython() {
     return py;
 }
 
-/** Write a project's stand-in .venv (the core looks for its python) and its marker files. */
+/** Create the project's marker for the managed Python runtime. */
 function prepareProjectDir(dir) {
-    fs.mkdirSync(path.join(dir, '.venv', 'bin'), { recursive: true });
-    for (const name of ['python3', 'python']) fs.writeFileSync(path.join(dir, '.venv', 'bin', name), '#!pyodide\n');
     ensureKigumiYaml(dir);
-    fs.writeFileSync(path.join(dir, '.kigumi', 'kigumi.yaml'), [
-        'schema_version: 1',
-        `project_root: '${dir}'`,
-        `python_path: '${dir}/.venv/bin/python3'`,
-        `venv_path: '${dir}/.venv'`,
-        'local_dev: false',
-        'browser: true',
-        '',
-    ].join('\n'));
 }
 
 function folderName(name) {
@@ -148,7 +136,7 @@ async function start() {
     class BlobPageStore extends PageStore {
         serve(html) {
             const id = String(this.nextId++);
-            const page = injectBridge(html).replace(`src="/webview/shell/panel-bridge.js"`, `src="${BASE}/webview/shell/panel-bridge.js"`);
+            const page = injectBridge(html, this.bridgeUrl);
             this.pages.set(id, page);
             post({ type: 'web:page', id, html: page });
             return `kigumi-page:${id}`;
@@ -161,9 +149,8 @@ async function start() {
             }
         }
     }
-    const pages = new BlobPageStore({ origin: BASE, webviewDir });
-    // Pages' security policies name where their scripts come from: this site, whatever its path.
-    Object.defineProperty(PanelSurface.prototype, 'cspSource', { get: () => self.location.origin });
+    const pages = new BlobPageStore({ origin: BASE, webviewDir, cspSource: self.location.origin,
+        bridgeUrl: `${BASE}/webview/shell/panel-bridge.js` });
 
     let connection;
     let kigumiApp = null;
@@ -171,7 +158,6 @@ async function start() {
     let projectWatch = null;
     let shown = null;
     let progress = null;
-    let switching = Promise.resolve();
     let knownProjects = [];
 
     function setStatus(level, message) {
@@ -193,19 +179,6 @@ async function start() {
             return undefined;
         }
     }
-    function openLog() {
-        const existing = connection.findPanel((panel) => panel.type === 'log');
-        if (existing) return existing.reveal();
-        const panel = connection.createPanel('log', { title: 'Log' });
-        const subscription = channel.onEntry((entry) => panel.postMessage({ type: 'logEntry', entry }));
-        panel.onDispose(() => subscription.dispose());
-        panel.onMessage((message) => {
-            if (message && message.type === 'logReady') panel.postMessage({ type: 'logEntries', entries: channel.entries, filePath: null });
-        });
-        panel.loadUrl(`${BASE}/webview/shell/log.html`);
-        return undefined;
-    }
-
     connection = new ShellConnection({
         transport: { send: post, onMessage: (callback) => { receive = callback; } },
         pages,
@@ -238,6 +211,9 @@ async function start() {
         },
     });
 
+    const openLog = createLogPanel({ connection, channel, pageUrl: `${BASE}/webview/shell/log.html`,
+        openLocation: (filePath, line) => editors.open(filePath, line) });
+
     function sendProjectFiles(update) {
         if (project) post({ type: 'web:files', id: project.id, name: project.name, ...update });
     }
@@ -256,64 +232,42 @@ async function start() {
         kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
     }
 
-    /** Close the open project's tabs, asking about unsaved edits; false if the user kept one. */
-    async function closeProjectTabs() {
-        for (const id of editors.dirtyIds()) {
-            const panel = connection.panels.get(id);
-            if (panel) panel.reveal();
-            if (!(await editors.confirmClose(id))) return false;
-        }
-        for (const panel of [...connection.panels.values()]) {
-            if (!PANELS_KEPT_ACROSS_PROJECTS.has(panel.type)) panel.dispose();
-        }
-        return true;
-    }
-
-    /** Open `next` ({ id, name, files? }) in place of the open project, or none. */
-    function switchProject(next, { starter = false } = {}) {
-        const run = async () => {
-            if (!(await closeProjectTabs())) return false;
-            if (projectWatch) projectWatch.dispose();
-            projectWatch = null;
-            const old = kigumiApp;
-            kigumiApp = null;
-            if (old) await old.dispose();
-            project = null;
-            if (next) {
-                const home = path.join(PROJECTS, next.id);
-                const dir = path.join(home, folderName(next.name));
-                fs.rmSync(home, { recursive: true, force: true });
-                fs.mkdirSync(dir, { recursive: true });
-                prepareProjectDir(dir);
-                writeProjectFiles(dir, next.files || {});
-                if (starter && !fs.existsSync(path.join(dir, 'my_cute_frame.py'))) {
-                    fs.writeFileSync(path.join(dir, 'my_cute_frame.py'), getInlineExampleFrameContent());
-                }
-                project = { id: next.id, name: next.name, dir };
-                projectWatch = watchProjectFiles(dir, {
-                    onFiles: (update) => sendProjectFiles(update),
-                    onExport: (relative, filePath) => {
-                        const size = fs.statSync(filePath).size;
-                        if (size > MAX_DOWNLOAD_BYTES) {
-                            setStatus('warning', `${path.basename(filePath)} is too large to download (${Math.round(size / 1048576)} MB).`);
-                            return;
-                        }
-                        post({ type: 'browser:download', name: path.basename(relative), base64: fs.readFileSync(filePath).toString('base64') });
-                    },
-                });
-                log(`[web] Project: ${next.name} (${next.id})`);
-            } else {
-                log('[web] Project: (none)');
+    const switchProject = createProjectLifecycle({ connection, editors, replace: async (next, { starter = false } = {}) => {
+        if (projectWatch) projectWatch.dispose();
+        projectWatch = null;
+        const old = kigumiApp;
+        kigumiApp = null;
+        if (old) await old.dispose();
+        project = null;
+        if (next) {
+            const home = path.join(PROJECTS, next.id);
+            const dir = path.join(home, folderName(next.name));
+            fs.rmSync(home, { recursive: true, force: true });
+            fs.mkdirSync(dir, { recursive: true });
+            prepareProjectDir(dir);
+            writeProjectFiles(dir, next.files || {});
+            if (starter && !fs.existsSync(path.join(dir, 'my_cute_frame.py'))) {
+                fs.writeFileSync(path.join(dir, 'my_cute_frame.py'), getInlineExampleFrameContent());
             }
-            startKigumi();
-            if (project) sendProjectFiles({ full: true, files: readProjectFiles(project.dir) });
-            connection.pushState();
-            return true;
-        };
-        const done = switching.then(run, run);
-        switching = done.catch(() => false);
-        return done;
-    }
+            project = { id: next.id, name: next.name, dir };
+            projectWatch = watchProjectFiles(dir, {
+                onFiles: (update) => sendProjectFiles(update),
+                onExport: (relative, filePath) => {
+                    const size = fs.statSync(filePath).size;
+                    if (size > MAX_DOWNLOAD_BYTES) {
+                        setStatus('warning', `${path.basename(filePath)} is too large to download (${Math.round(size / 1048576)} MB).`);
+                        return;
+                    }
+                    post({ type: 'browser:download', name: path.basename(relative), base64: fs.readFileSync(filePath).toString('base64') });
+                },
+            });
+            log(`[web] Project: ${next.name} (${next.id})`);
+        } else {
+            log('[web] Project: (none)');
+        }
+        startKigumi();
+        if (project) sendProjectFiles({ full: true, files: readProjectFiles(project.dir) });
+    } });
 
     /** Project status's Open Project: one of the projects kept in this browser. */
     async function pickProject() {
@@ -349,7 +303,6 @@ async function start() {
     }
 
     // The agent: as the standalone app's (hosts/electron/main.js), its requests sent from here.
-    const PANELS_KEPT_ACROSS_PROJECTS = new Set(['agent', 'log']);
     const agentEnabled = () => settings.get('agent.enabled', false) === true;
     // What the page keeps for the account and the model list (localStorage), as web:store.
     const stored = {};
@@ -402,32 +355,6 @@ async function start() {
         });
     };
 
-    // The kumiki library's source, which the agent may read: inside Pyodide's site-packages.
-    let kumikiSource = null;
-    let kumikiSourceFor = null;
-    function knownKumikiSource() {
-        const dir = project ? project.dir : null;
-        if (kumikiSourceFor !== dir) {
-            kumikiSourceFor = dir;
-            kumikiSource = null;
-            void findKumikiSource(dir).then((folder) => {
-                if (kumikiSourceFor === dir) kumikiSource = folder;
-            });
-        }
-        return kumikiSource;
-    }
-
-    // The open project's panels, for the agent, which outlives a project.
-    const livePanels = new Proxy({}, {
-        get(_target, key) {
-            const panels = kigumiApp && kigumiApp.panels;
-            if (key === 'then') return undefined;
-            if (!panels) return typeof key === 'string' ? () => { throw new Error('No project is open.'); } : undefined;
-            const value = panels[key];
-            return typeof value === 'function' ? value.bind(panels) : value;
-        },
-    });
-
     /** Wait until the project `id` is the one open; the page opens it (web:requestOpen). */
     async function projectOpened(id) {
         for (let waited = 0; waited < 60000; waited += 100) {
@@ -471,22 +398,8 @@ async function start() {
         return handler(args);
     }
 
-    function agentHost() {
-        knownKumikiSource();
-        const files = createProjectFiles({ root: () => (project ? project.dir : null),
-            readOnly: () => [kumikiSource, kumikiExamples(kumikiSource)].filter(Boolean) });
-        return viewHost({
-            panels: livePanels,
-            run: runToolCommand,
-            files,
-            workspaceFolders: () => (project ? [project.dir] : []),
-            kumikiApi: pythonKumikiApi({ python: () => projectPython(project && project.dir), cwd: () => project && project.dir }),
-            kumikiSource: knownKumikiSource,
-            kumikiExamples: () => kumikiExamples(knownKumikiSource()),
-            systemPrompt: loadSystemPrompt(),
-            projects: agentProjects(),
-        });
-    }
+    const agentHost = createProjectContext({ root: () => project ? project.dir : null,
+        panels: () => kigumiApp && kigumiApp.panels, run: runToolCommand, projects: agentProjects });
 
     runTestTool = ({ id, name, input }) => {
         const host = agentHost();

@@ -20,8 +20,7 @@ From `kigumi/`:
 
 The window is a web page with a fixed layout -- explorer on the left, tabs in
 the middle, an optional right panel, a status bar -- whose panels are iframes.
-Only the transport and the window are Electron-specific, so the same shell
-can later run in a browser.
+The same shell also runs in the browser through the Pyodide host.
 
 - `../../webview/shell/`: the shell page (`shell.html`, `shell.js`), the
   quick pick, the Log panel, and `panel-bridge.js`, which gives each panel page
@@ -33,7 +32,12 @@ can later run in a browser.
   `kigumi:shell`, exposed to the page by `shell-preload.js`).
 - `main.js`: startup, the `kigumi://app` protocol, menus, the Log panel.
 - `update-check.js`: looking for a newer kigumi release (`kigumi-v*` tags on GitHub).
-- `electron-host.js`: the Host (see `../../host.js`).
+- `electron-host.js`: native dialogs, clipboard and editor launch, composed with the shared services
+  in `../../app-shell/host-services.js` (see `../../host.js` for the Host contract).
+- `../../app-shell/project-lifecycle.js`: serialized project switching and dirty-tab confirmation.
+- `../../agent/project-context.js`: the agent's live project/panel context, shared with the browser.
+- `../../python-runtime.js`: native Python execution, selected in place of the Pyodide runtime by
+  the host build. Shared runner and discovery code use this interface, not host-specific process APIs.
 
 Settings live in `<userData>/settings.json`: the extension's `kigumi.*` keys
 without the prefix, plus `app.workspaceFolder`, `app.recentFolders` (File > Open Recent, newest first), `app.editorCommand` (e.g.

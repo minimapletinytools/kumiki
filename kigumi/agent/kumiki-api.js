@@ -38,7 +38,7 @@ function kumikiApiTool(lookup) {
  */
 function pythonKumikiApi({ python, cwd = () => null, env = {} }) {
     const path = require('path');
-    const { execFile } = require('child_process');
+    const { execFile } = require('../python-runtime');
     return (name, { members, source } = {}) => new Promise((resolve, reject) => {
         const command = python();
         if (!command) {

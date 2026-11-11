@@ -1,10 +1,10 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createMatcher } = require('../hosts/electron/glob-match');
-const { SettingsStore, defaultsFromPackageJson } = require('../hosts/electron/settings-store');
+const { createMatcher } = require('../app-shell/glob-match');
+const { SettingsStore, defaultsFromPackageJson } = require('../app-shell/settings-store');
 const { TabList } = require('../app-shell/tab-list');
-const { LogChannel, classify, rotateIfLarge } = require('../hosts/electron/log-channel');
+const { LogChannel, classify, rotateIfLarge } = require('../app-shell/log-channel');
 
 describe('glob matching for file watches', () => {
   test.each([
