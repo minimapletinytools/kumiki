@@ -18,6 +18,27 @@ const path = require('path');
 function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) {
     // By panel id: whether each tab has unsaved edits, and how to ask it for them.
     const tabs = new Map();
+    const listeners = new Set();
+    let revision = 0;
+    function changed(filePath, tab, saved) {
+        tab.version = ++revision;
+        for (const listener of listeners) listener({ filePath,
+            languageId: filePath.endsWith('.py') ? 'python' : 'plaintext', isDirty: tab.isDirty, saved });
+    }
+
+    function onDocumentChange(callback) {
+        listeners.add(callback);
+        return { dispose: () => listeners.delete(callback) };
+    }
+
+    async function getDocumentState(filePath) {
+        const tab = [...tabs.values()].find((one) => one.filePath === filePath);
+        if (tab) return { isDirty: tab.isDirty, version: tab.version,
+            save: async () => { tab.save(await tab.content()); return true; } };
+        let version = 0;
+        try { version = fs.statSync(filePath).mtimeMs; } catch {}
+        return { isDirty: false, version, save: async () => true };
+    }
 
     function open(filePath, line = 1) {
         const existing = connection.findPanel((panel) => panel.type === 'editor' && panel.filePath === filePath);
@@ -44,6 +65,8 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
         let nextRequest = 1;
         const tab = {
             name: baseName,
+            filePath,
+            version: ++revision,
             isDirty: false,
             // What the editor holds now, unsaved edits included.
             content() {
@@ -65,7 +88,8 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
                 fileContent = content;
                 tab.isDirty = false;
                 surface.title = baseName;
-                void surface.postMessage({ type: 'saved' });
+                void surface.postMessage({ type: 'saved', content });
+                changed(filePath, tab, true);
             },
         };
         tabs.set(surface.id, tab);
@@ -76,6 +100,7 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
                 void surface.postMessage({ type: 'init', filePath, content: fileContent, line });
             } else if (message.type === 'editorDirty') {
                 tab.isDirty = !!message.isDirty;
+                changed(filePath, tab, false);
                 surface.title = tab.isDirty ? `● ${baseName}` : baseName;
             } else if (message.type === 'editorContent') {
                 const resolve = pendingContent.get(message.requestId);
@@ -110,6 +135,7 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
                 return;
             }
             void surface.postMessage({ type: 'externalUpdate', content });
+            changed(filePath, tab, true);
         };
         fs.watchFile(filePath, { interval: 1000 }, onDiskChange);
         surface.onDispose(() => {
@@ -147,7 +173,7 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
         return [...tabs].filter(([, tab]) => tab.isDirty).map(([id]) => id);
     }
 
-    return { tabs, open, confirmClose, dirtyIds };
+    return { tabs, open, confirmClose, dirtyIds, getDocumentState, onDocumentChange };
 }
 
 module.exports = { createEditorTabs };

@@ -1,0 +1,62 @@
+const state = require('../hosts/pyodide/worker/shims/runtime');
+const runtime = require('../hosts/pyodide/worker/python-runtime');
+beforeEach(() => jest.useFakeTimers());
+afterEach(() => { state.py = null; jest.useRealTimers(); });
+test('cancelling queued execution prevents Python side effects and rejects execFile', () => {
+  const pyimport = jest.fn();
+  state.py = { pyimport };
+  const callback = jest.fn();
+  runtime.execFile('pyodide', ['-c', 'print(1)'], {}, callback).kill();
+  jest.runAllTimers();
+  expect(pyimport).not.toHaveBeenCalled();
+  expect(callback).toHaveBeenCalledWith(expect.any(Error), '', '');
+  expect(runtime.canInterrupt).toBe(false);
+  expect(runtime.canInstallPackages).toBe(false);
+});
+test('cancelling a queued runner never creates a Python session', () => {
+  const pyimport = jest.fn();
+  state.py = { pyimport };
+  const runner = runtime.spawnRunner('pyodide', ['runner.py', 'frame.py']);
+  const close = jest.fn();
+  runner.on('close', close);
+  runner.kill();
+  jest.runAllTimers();
+  expect(pyimport).not.toHaveBeenCalled();
+  expect(close).toHaveBeenCalledTimes(1);
+});
+test('runner creation is explicit and independent of the script filename', () => {
+  const handle = jest.fn().mockReturnValue(true);
+  const start = jest.fn().mockReturnValue(true);
+  const RunnerSession = jest.fn(() => ({ start, handle, alive: true }));
+  state.py = { pyimport: () => ({ RunnerSession }) };
+  const runner = runtime.spawnRunner('pyodide', ['renamed-runner.py', 'frame.py']);
+  runner.stdin.write('{"id":1}\n');
+  jest.runAllTimers();
+  expect(start).toHaveBeenCalledTimes(1);
+  expect(handle).toHaveBeenCalledWith('{"id":1}');
+  runner.kill();
+});
+test('native commands cannot silently execute as Python', () => {
+  const pyimport = jest.fn();
+  state.py = { pyimport };
+  const callback = jest.fn();
+  runtime.execFile('uv', ['pip', 'install', 'package'], {}, callback);
+  jest.runAllTimers();
+  expect(callback).toHaveBeenCalledWith(expect.objectContaining({ message: 'Unsupported interpreter: uv' }), '', '');
+  expect(pyimport).not.toHaveBeenCalled();
+});
+test('cancelling an existing runner drops queued requests and settles once', () => {
+  const handle = jest.fn();
+  state.py = { pyimport: () => ({ RunnerSession: () => ({ start: () => true, handle, alive: true }) }) };
+  const runner = runtime.spawnRunner('pyodide', ['runner.py']);
+  jest.runAllTimers();
+  const close = jest.fn();
+  runner.on('close', close);
+  runner.stdin.write('{"id":1}\n');
+  runner.kill();
+  runner.kill();
+  jest.runAllTimers();
+  expect(handle).not.toHaveBeenCalled();
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(runner.stdin.write('ignored\n')).toBe(false);
+});

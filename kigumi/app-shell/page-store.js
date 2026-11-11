@@ -9,9 +9,9 @@ const path = require('path');
 const BRIDGE_PATH = '/webview/shell/panel-bridge.js';
 
 // Adds the bridge as the first script in <head>, with the page's nonce.
-function injectBridge(html) {
+function injectBridge(html, bridgeUrl = BRIDGE_PATH) {
     const nonce = /nonce="([^"]+)"/.exec(html);
-    const tag = `<script${nonce ? ` nonce="${nonce[1]}"` : ''} src="${BRIDGE_PATH}"></script>`;
+    const tag = `<script${nonce ? ` nonce="${nonce[1]}"` : ''} src="${bridgeUrl}"></script>`;
     const head = /<head[^>]*>/i.exec(html);
     if (!head) {
         return tag + html;
@@ -21,8 +21,10 @@ function injectBridge(html) {
 }
 
 class PageStore {
-    constructor({ origin, webviewDir }) {
+    constructor({ origin, webviewDir, cspSource = origin, bridgeUrl = BRIDGE_PATH }) {
         this.origin = origin;
+        this.cspSource = cspSource;
+        this.bridgeUrl = bridgeUrl;
         this.webviewDir = webviewDir;
         this.pages = new Map();
         this.nextId = 1;
@@ -30,7 +32,7 @@ class PageStore {
 
     serve(html) {
         const id = String(this.nextId++);
-        this.pages.set(id, injectBridge(html));
+        this.pages.set(id, injectBridge(html, this.bridgeUrl));
         return `${this.origin}/page/${id}`;
     }
 

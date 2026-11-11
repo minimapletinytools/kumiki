@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { isPythonAvailable, managedEnvironment } = require('./python-runtime');
 const path = require('path');
 const https = require('https');
 const {
@@ -351,7 +352,7 @@ async function getWorkspaceKumikiVersionInfo(workspaceRoot, filePath) {
     const pythonPath = getVenvPython(resolvedRoot);
 
     let installedVersion = 'unknown';
-    if (fs.existsSync(pythonPath)) {
+    if (isPythonAvailable(pythonPath)) {
         try {
             installedVersion = await getInstalledKumikiVersion(resolvedRoot, pythonPath);
         } catch (_error) {
@@ -432,7 +433,7 @@ function getInitializationStatus(workspaceRoot, filePath) {
     const hasKigumiYaml = fs.existsSync(path.join(resolvedRoot, KUMIKI_YAML_RELATIVE_PATH))
         || fs.existsSync(path.join(resolvedRoot, LEGACY_KIGUMI_YAML_NAME));
     const hasProjectYaml = fs.existsSync(path.join(resolvedRoot, '.kigumi', 'kigumi.yaml'));
-    const hasVenvPython = fs.existsSync(getVenvPython(resolvedRoot));
+    const hasVenvPython = isPythonAvailable(getVenvPython(resolvedRoot));
     const hasExampleFile = fs.existsSync(path.join(resolvedRoot, 'my_cute_frame.py'));
     const hasExistingProject = hasKigumiYaml || hasProjectYaml || hasVenvPython || hasExampleFile;
 
@@ -452,7 +453,7 @@ function getInitializationStatus(workspaceRoot, filePath) {
         hasProjectYaml,
         hasVenvPython,
         hasExampleFile,
-        isInitialized: projectStatus === 'existing-project' && hasKigumiYaml && hasProjectYaml && hasVenvPython && hasExampleFile,
+        isInitialized: projectStatus === 'existing-project' && hasKigumiYaml && (managedEnvironment || hasProjectYaml) && hasVenvPython && hasExampleFile,
     };
 }
 

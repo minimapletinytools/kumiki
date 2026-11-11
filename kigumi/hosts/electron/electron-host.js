@@ -6,8 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { clipboard, dialog, shell: electronShell } = require('electron');
-const { createMatcher } = require('./glob-match');
-const { requestWebviewRoundTrip } = require('../../webview-request');
+const { createShellHostServices } = require('../../app-shell/host-services');
 
 const CODE_CLI_CANDIDATES = [
     '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
@@ -27,23 +26,20 @@ function onPath(command) {
     return null;
 }
 
-function languageOf(filePath) {
-    return filePath && filePath.endsWith('.py') ? 'python' : 'plaintext';
-}
-
 /**
  * @param {object} options
  * @param {Electron.BrowserWindow} options.window
  * @param {import('../../app-shell/shell-connection').ShellConnection} options.connection
- * @param {import('./settings-store').SettingsStore} options.settings
+ * @param {import('../../app-shell/settings-store').SettingsStore} options.settings
  * @param {string|null} options.workspaceFolder
+ * @param {object} options.documents  shared editor document service
  * @param {string} options.locale
  * @param {(line: string) => void} options.log
  * @param {(command: string, ...args: any[]) => Promise<any>} options.runCommand
  * @param {(level: string, text: string) => void} options.setStatus
  * @param {(title: string|null) => void} options.setProgress
  */
-function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress, openEditor = null, showLog = null, mcp = null, closeProject = null, projects = null }) {
+function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress, openEditor = null, documents, showLog = null, mcp = null, closeProject = null, projects = null }) {
     function openExternalEditor(filePath, line = 1) {
         const template = settings.get('app.editorCommand', '');
         if (template) {
@@ -68,72 +64,10 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
         openExternalEditor(filePath, line);
     }
 
-    // The app's own panels besides its views, for agents (see agent/panel-directory.js). The views
-    // come from the app's sessions; the agent panel is the one asking.
-    function listPanels() {
-        return [...connection.panels.values()]
-            .filter((panel) => !['viewer', 'agent'].includes(panel.type))
-            .map((panel) => ({
-                id: `tab:${panel.id}`,
-                kind: panel.type,
-                title: panel.title,
-                filePath: panel.filePath || null,
-                active: Boolean(panel.active),
-                visible: Boolean(panel.visible),
-                central: panel.slot === 'center',
-            }));
-    }
-
-    async function describePanel(id) {
-        const panel = connection.panels.get(String(id).replace(/^tab:/, ''));
-        if (!panel) {
-            return null;
-        }
-        if (panel.type === 'editor') {
-            return requestWebviewRoundTrip(panel, {
-                requestType: 'describePanelRequest',
-                resultType: 'describePanelResult',
-                requestId: `describe-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
-                timeoutMs: 4000,
-                label: 'describePanel',
-            });
-        }
-        return { kind: panel.type, title: panel.title };
-    }
-
-    function watchFiles(baseDir, glob, { onCreate, onChange, onDelete } = {}) {
-        if (!baseDir || !fs.existsSync(baseDir)) {
-            return { dispose() {} };
-        }
-        const matches = createMatcher(glob);
-        let watcher;
-        try {
-            watcher = fs.watch(baseDir, { recursive: glob.includes('/') }, (eventType, filename) => {
-                if (!filename) return;
-                const relative = filename.toString().split(path.sep).join('/');
-                if (!matches(relative)) return;
-                const fsPath = path.join(baseDir, filename.toString());
-                if (eventType === 'change') {
-                    if (onChange) onChange(fsPath);
-                } else if (fs.existsSync(fsPath)) {
-                    // Editors often save by replacing the file, which arrives as a rename.
-                    (onCreate || onChange || (() => {}))(fsPath);
-                } else if (onDelete) {
-                    onDelete(fsPath);
-                }
-            });
-        } catch (error) {
-            log(`[watch] Could not watch ${baseDir}: ${error.message}`);
-            return { dispose() {} };
-        }
-        return { dispose: () => watcher.close() };
-    }
-
     return {
         locale,
 
-        listPanels,
-        describePanel,
+        ...createShellHostServices({ connection, settings, workspaceFolder, documents, setProgress, log }),
 
         // The explorer lists the workspace's files too (sidebar-model.js); VS Code has its own.
         showsFileBrowser: true,
@@ -150,20 +84,6 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
 
         // Kigumi's MCP server, which the views' options show and copy the setup of.
         mcp,
-
-        getConfig: (key, fallback) => settings.get(key, fallback),
-
-        updateConfig: async (key, value) => settings.set(key, value),
-
-        onConfigChange: (callback) => settings.onChange((changedKey) => callback((key) => key === changedKey)),
-
-        workspaceRoots: () => (workspaceFolder ? [workspaceFolder] : []),
-
-        workspaceRootFor(filePath) {
-            if (!workspaceFolder) return null;
-            const relative = path.relative(workspaceFolder, filePath);
-            return relative && !relative.startsWith('..') && !path.isAbsolute(relative) ? workspaceFolder : null;
-        },
 
         async showMessage(level, text, ...actions) {
             if (actions.length === 0) {
@@ -192,15 +112,6 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
             return response === 0;
         },
 
-        async withProgress(title, task) {
-            setProgress(title);
-            try {
-                return await task();
-            } finally {
-                setProgress(null);
-            }
-        },
-
         openExternal: (url) => electronShell.openExternal(url),
 
         copyText: async (text) => clipboard.writeText(text),
@@ -218,43 +129,8 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
         // The app shows sources on request only.
         async showSourceBesideViewer() {},
 
-        async getDocumentState(filePath) {
-            let version = 0;
-            try {
-                version = fs.statSync(filePath).mtimeMs;
-            } catch (_error) {
-                version = 0;
-            }
-            return { isDirty: false, version, save: async () => true };
-        },
-
-        activeFile() {
-            const surface = connection.activePanel;
-            return surface && surface.filePath
-                ? { filePath: surface.filePath, languageId: languageOf(surface.filePath) }
-                : null;
-        },
-
-        askText: (options) => connection.ask(options),
-
-        async pickOne(items, { placeholder } = {}) {
-            return connection.pick(items, placeholder);
-        },
-
-        watchFiles,
-
-        // Every save of a Python file in the workspace.
-        onDocumentChange(callback) {
-            return watchFiles(workspaceFolder, '**/*.py', {
-                onChange: (filePath) => callback({ filePath, languageId: 'python', isDirty: false, saved: true }),
-            });
-        },
-
         runCommand,
 
-        createViewerSurface({ title, filePath }) {
-            return connection.createPanel('viewer', { title, filePath });
-        },
     };
 }
 

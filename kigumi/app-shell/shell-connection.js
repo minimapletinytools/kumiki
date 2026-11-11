@@ -42,7 +42,7 @@ class PanelSurface {
 
     get visible() { return this.connection.isShowing(this); }
     get active() { return this.visible && this.connection.isFocused(); }
-    get cspSource() { return this.connection.pages.origin; }
+    get cspSource() { return this.connection.pages.cspSource; }
 
     resourceUri(absPath) {
         return this.connection.pages.resourceUri(absPath);

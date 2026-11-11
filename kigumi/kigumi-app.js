@@ -9,6 +9,7 @@ const { createPanelDirectory } = require('./agent/panel-directory');
 const { describeFrame } = require('./frame-description');
 const { buildReport } = require('./build-report');
 const fs = require('fs');
+const { canInstallPackages } = require('./python-runtime');
 const { FrameViewSession } = require('./frame-view-session');
 const { PythonRunnerSession } = require('./runner-session');
 const { SidebarModel } = require('./sidebar-model');
@@ -811,6 +812,10 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
     }
 
     async function runProjectHeaderUpdateAction() {
+        if (!canInstallPackages) {
+            await host.showMessage('info', 'Kumiki is bundled with this version of Kigumi. Reload the site to use its latest release.');
+            return;
+        }
         const activeFilePath = getActivePythonFilePath();
         const workspaceRoot = getWorkspaceRoot();
         if (!workspaceRoot && !activeFilePath) {

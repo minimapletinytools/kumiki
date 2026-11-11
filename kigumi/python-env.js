@@ -8,7 +8,7 @@
  * frame-scanner.js.
  */
 
-const { spawn } = require('child_process');
+const { spawn, getVenvPythonCandidates } = require('./python-runtime');
 const path = require('path');
 const fs = require('fs');
 
@@ -69,21 +69,6 @@ function kumikiCompatiblePipSpec(kigumiVersion = getKigumiVersion(), minimum = n
 // Candidate paths to a project virtual-environment interpreter, most-preferred
 // first. Callers that also accept a system interpreter append their own
 // fallback command names (e.g. 'python3').
-function getVenvPythonCandidates(root) {
-    if (process.platform === 'win32') {
-        return [
-            path.join(root, '.venv', 'Scripts', 'python.exe'),
-            path.join(root, 'venv', 'Scripts', 'python.exe'),
-        ];
-    }
-    return [
-        path.join(root, '.venv', 'bin', 'python3'),
-        path.join(root, '.venv', 'bin', 'python'),
-        path.join(root, 'venv', 'bin', 'python3'),
-        path.join(root, 'venv', 'bin', 'python'),
-    ];
-}
-
 // The preferred (first) virtual-environment interpreter path for a project.
 function getVenvPython(root) {
     return getVenvPythonCandidates(root)[0];

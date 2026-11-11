@@ -107,6 +107,21 @@ app.whenReady().then(async () => {
         })()`, 60000);
         check('the frame file opens in the code editor', Boolean(editorText));
         await shot('editor');
+        await js(`(() => {
+            const model = ${view}.defaultView.monaco.editor.getModels()[0];
+            model.setValue(model.getValue() + '\\n# unsaved buffer rendered\\n');
+            return true;
+        })()`);
+        await wait(`document.querySelector('#tabs')?.textContent.includes('●') || null`, 10000);
+        await js(`window.kigumiShell.send({ type: 'shell:command', command: 'run', args: ['kigumi.render'] })`);
+        const bufferSaved = await wait(`(async () => {
+            const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web', 1); r.onsuccess = () => resolve(r.result); });
+            const record = await new Promise((resolve) => { const r = db.transaction('projects').objectStore('projects').getAll(); r.onsuccess = () => resolve(r.result.find((p) => p.name === 'Shed')); });
+            db.close();
+            return record && record.files['my_cute_frame.py'].includes('# unsaved buffer rendered');
+        })()`, 15000);
+        check('render saves unsaved editor content through the shared host', bufferSaved === true);
+
         await js(`window.__kigumiWorker.postMessage({ type: 'test:appendToFile', file: ${JSON.stringify(filePath)}, text: '\\n# edited in the browser\\n' })`);
         const synced = await wait(`(async () => {
             const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web', 1); r.onsuccess = () => resolve(r.result); });
@@ -201,6 +216,13 @@ app.whenReady().then(async () => {
             worker.addEventListener('message', listen);
             worker.postMessage({ type: 'test:agentTool', id, name: ${JSON.stringify(name)}, input: ${JSON.stringify(input)} });
         })`);
+        const listedPanels = JSON.parse(await tool('list_panels'));
+        const editorPanel = listedPanels.panels.find((panel) => panel.kind === 'editor' && panel.filePath === filePath);
+        check('agent tools list the browser editor panel', Boolean(editorPanel));
+        if (editorPanel) {
+            const description = JSON.parse(await tool('describe_panel', { panel_id: editorPanel.id }));
+            check('agent tools describe the browser editor', description.kind === 'editor' && description.filePath === filePath);
+        }
         const found = await tool('search_files', { pattern: 'def my_cute_frame' });
         check("the agent's search finds a line in the project", found.includes('my_cute_frame.py:'), found.slice(0, 120));
         const api = await tool('kumiki_api', { name: 'create_axis_aligned_timber' });

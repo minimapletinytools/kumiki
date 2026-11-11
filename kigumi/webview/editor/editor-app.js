@@ -7,6 +7,7 @@
     const vscode = window.acquireVsCodeApi();
     const container = document.getElementById('editor-container');
 
+    let applyingExternalUpdate = false;
     let editor = null;
     let currentFilePath = null;
     let isDirty = false;
@@ -67,11 +68,10 @@
 
             // Track dirty changes
             model.onDidChangeContent(() => {
+                if (applyingExternalUpdate) return;
                 const nowDirty = editor.getValue() !== originalContent;
-                if (nowDirty !== isDirty) {
-                    isDirty = nowDirty;
-                    vscode.postMessage({ type: 'editorDirty', isDirty });
-                }
+                isDirty = nowDirty;
+                vscode.postMessage({ type: 'editorDirty', isDirty });
             });
 
             // Save shortcut (Cmd+S / Ctrl+S)
@@ -132,18 +132,17 @@
 
             case 'saved':
                 if (editor) {
-                    originalContent = editor.getValue();
-                    if (isDirty) {
-                        isDirty = false;
-                        vscode.postMessage({ type: 'editorDirty', isDirty: false });
-                    }
+                    originalContent = message.content;
+                    isDirty = editor.getValue() !== originalContent;
+                    if (isDirty) vscode.postMessage({ type: 'editorDirty', isDirty: true });
                 }
                 break;
 
             case 'externalUpdate':
                 if (editor && !isDirty && message.content !== undefined) {
                     originalContent = message.content;
-                    editor.setValue(message.content);
+                    applyingExternalUpdate = true;
+                    try { editor.setValue(message.content); } finally { applyingExternalUpdate = false; }
                 }
                 break;
         }

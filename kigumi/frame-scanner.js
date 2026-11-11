@@ -8,7 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn } = require('./python-runtime');
 const { getVenvPythonCandidates } = require('./python-env');
 const { systemPythonCommands } = require('./python-toolchain');
 

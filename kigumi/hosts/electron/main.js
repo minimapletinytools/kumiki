@@ -17,20 +17,19 @@ const { ShellConnection } = require('../../app-shell/shell-connection');
 const { PageStore } = require('../../app-shell/page-store');
 const { createAppWindow } = require('./app-window');
 const { createElectronHost } = require('./electron-host');
-const { SettingsStore, defaultsFromPackageJson } = require('./settings-store');
-const { LogChannel } = require('./log-channel');
+const { SettingsStore, defaultsFromPackageJson } = require('../../app-shell/settings-store');
+const { LogChannel } = require('../../app-shell/log-channel');
+const { createProjectLifecycle } = require('../../app-shell/project-lifecycle');
+const { createLogPanel } = require('../../app-shell/log-panel');
 const { createEditorTabs } = require('../../app-shell/editor-tabs');
 const { createAgentPanel } = require('../../agent/agent-panel');
 const { withRecentFolder, offeredRecentFolders } = require('./recent-folders');
-const { createProjectFiles } = require('../../agent/project-files');
 const { createAccount } = require('../../agent/account');
 const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
-const { findKumikiSource, kumikiExamples, projectPython } = require('../../agent/kumiki-source');
-const { pythonKumikiApi } = require('../../agent/kumiki-api');
-const { loadSystemPrompt } = require('../../agent/system-prompt');
 const { SecureStorage } = require('./secure-storage');
-const { viewHost, sharedTools } = require('../../agent/agent');
+const { createProjectContext } = require('../../agent/project-context');
+const { sharedTools } = require('../../agent/agent');
 const { createMcpService } = require('../../agent/mcp-service');
 const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
 const { createAutoInstaller } = require('./auto-update');
@@ -309,68 +308,12 @@ function openRecentFolder(folder) {
     return false;
 }
 
-let switching = null;
+let projectLifecycle = null;
 
-/**
- * Close the open project and open `folder` (or none) in its place, in this window: its tabs close,
- * asking about unsaved edits first, and the explorer, views and runners start over on the new one.
- * The agent and its conversation stay. Return whether it switched; false if the user kept an edit.
- */
-async function switchProject(folder) {
-    if (folder === workspaceFolder) {
-        return true;
-    }
-    if (switching) {
-        await switching;
-        return switchProject(folder);
-    }
-    switching = (async () => {
-        if (!(await closeProjectTabs())) {
-            return false;
-        }
-        const old = kigumiApp;
-        kigumiApp = null;
-        if (old) {
-            await old.dispose();
-        }
-        workspaceFolder = folder;
-        settings.set('app.workspaceFolder', folder);
-        if (folder) {
-            settings.set('app.recentFolders', withRecentFolder(settings.get('app.recentFolders', []), folder));
-        }
-        logChannel.appendLine(`[app] Workspace: ${folder || '(none)'}`);
-        openProject();
-        buildMenu();
-        pushShellState();
-        return true;
-    })();
-    try {
-        return await switching;
-    } finally {
-        switching = null;
-    }
+/** Switch projects after confirming unsaved editor changes. */
+function switchProject(folder) {
+    return projectLifecycle(folder);
 }
-
-/** Close every tab that belongs to the project, asking about unsaved edits; false if the user kept one. */
-async function closeProjectTabs() {
-    const dirty = editors.dirtyIds();
-    for (const id of dirty) {
-        const panel = connection.panels.get(id);
-        if (panel) panel.reveal();
-        if (!(await confirmCloseEditor(id))) {
-            return false;
-        }
-    }
-    for (const panel of [...connection.panels.values()]) {
-        if (!PANELS_KEPT_ACROSS_PROJECTS.has(panel.type)) {
-            panel.dispose();
-        }
-    }
-    return true;
-}
-
-// The app's own panels, which outlive a project: the agent and the log.
-const PANELS_KEPT_ACROSS_PROJECTS = new Set(['agent', 'log']);
 
 /** Start Kigumi's side of the open project: the host, the app, its commands and the explorer. */
 function openProject() {
@@ -385,6 +328,7 @@ function openProject() {
         setStatus,
         setProgress,
         openEditor: openEditorTab,
+        documents: editors,
         showLog: openLogTab,
         mcp: mcpControls,
         closeProject: () => closeWorkspaceFolder(),
@@ -431,31 +375,7 @@ function browseExamples() {
 }
 
 /** The Log tab, showing everything, or `source` (a view's file name) only. */
-function openLogTab({ source } = {}) {
-    status.logBadge = false;
-    const existing = connection.findPanel((panel) => panel.type === 'log');
-    if (existing) {
-        existing.reveal();
-        if (typeof source === 'string') void existing.postMessage({ type: 'logShowSource', source });
-        return;
-    }
-    const surface = connection.createPanel('log', { title: 'Log' });
-    const subscription = logChannel.onEntry((entry) => {
-        void surface.postMessage({ type: 'logEntry', entry });
-    });
-    surface.onMessage((message) => {
-        if (message && message.type === 'logReady') {
-            void surface.postMessage({ type: 'logEntries', entries: logChannel.entries, filePath: logChannel.filePath,
-                ...(typeof source === 'string' ? { source } : {}) });
-        } else if (message && message.type === 'openLogFile') {
-            void electronShell.openPath(logChannel.filePath);
-        } else if (message && message.type === 'openLogLocation' && typeof message.filePath === 'string') {
-            openEditorTab(message.filePath, Number(message.lineNumber) || 1);
-        }
-    });
-    surface.onDispose(() => subscription.dispose());
-    surface.loadUrl(`${ORIGIN}/webview/shell/log.html`);
-}
+let openLogTab = null;
 
 // Code editor tabs (app-shell/editor-tabs.js), made once the window is.
 let editors = null;
@@ -556,52 +476,8 @@ function createAppAccount() {
 }
 
 // The kumiki library's source, which the agent may read: found once per project.
-let kumikiSource = null;
-let kumikiSourceFor = null;
-function knownKumikiSource() {
-    if (kumikiSourceFor !== workspaceFolder) {
-        kumikiSourceFor = workspaceFolder;
-        kumikiSource = null;
-        const asked = workspaceFolder;
-        void findKumikiSource(asked).then((folder) => {
-            if (kumikiSourceFor === asked) kumikiSource = folder;
-        });
-    }
-    return kumikiSource;
-}
-
-// The open project's panels, for the agent and the MCP server, which outlive a project.
-const livePanels = new Proxy({}, {
-    get(_target, key) {
-        const panels = kigumiApp && kigumiApp.panels;
-        if (key === 'then') {
-            return undefined; // not a promise
-        }
-        if (!panels) {
-            return typeof key === 'string' ? () => { throw new Error('No project is open.'); } : undefined;
-        }
-        const value = panels[key];
-        return typeof value === 'function' ? value.bind(panels) : value;
-    },
-});
-
-// What the agent panel and the MCP server work with (agent/agent.js).
-function agentHost() {
-    knownKumikiSource();
-    const files = createProjectFiles({ root: () => workspaceFolder,
-        readOnly: () => [kumikiSource, kumikiExamples(kumikiSource)].filter(Boolean) });
-    return viewHost({
-        panels: livePanels,
-        run: runToolCommand,
-        files,
-        workspaceFolders: () => (workspaceFolder ? [workspaceFolder] : []),
-        kumikiApi: pythonKumikiApi({ python: () => projectPython(workspaceFolder), cwd: () => workspaceFolder }),
-        kumikiSource: knownKumikiSource,
-        kumikiExamples: () => kumikiExamples(knownKumikiSource()),
-        systemPrompt: loadSystemPrompt(),
-        projects: agentProjects(),
-    });
-}
+const agentHost = createProjectContext({ root: () => workspaceFolder,
+    panels: () => kigumiApp && kigumiApp.panels, run: runToolCommand, projects: agentProjects });
 
 // The agent's panel (agent/agent-panel.js), made once the window is.
 let agentPanel = null;
@@ -892,6 +768,20 @@ async function start() {
         closeRequest: confirmCloseEditor,
     });
     editors = createEditorTabs({ connection, editorUrl: `${ORIGIN}/webview/editor/editor.html`, log, setStatus, askToSave });
+    openLogTab = createLogPanel({ connection, channel: logChannel, pageUrl: `${ORIGIN}/webview/shell/log.html`,
+        filePath: logChannel.filePath, openFile: () => electronShell.openPath(logChannel.filePath),
+        openLocation: openEditorTab, onShow: () => { status.logBadge = false; } });
+    projectLifecycle = createProjectLifecycle({ connection, editors, current: () => workspaceFolder, replace: async (folder) => {
+        const old = kigumiApp;
+        kigumiApp = null;
+        if (old) await old.dispose();
+        workspaceFolder = folder;
+        settings.set('app.workspaceFolder', folder);
+        if (folder) settings.set('app.recentFolders', withRecentFolder(settings.get('app.recentFolders', []), folder));
+        logChannel.appendLine(`[app] Workspace: ${folder || '(none)'}`);
+        openProject();
+        buildMenu();
+    } });
     agentPanel = createAgentPanel({
         connection,
         pageUrl: `${ORIGIN}/webview/agent/agent.html`,
