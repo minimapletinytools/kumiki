@@ -17,6 +17,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
+- The browser version shows a loading card while Python and kumiki load: a progress bar through the start-up steps (with each package as it loads), the steps ticked off, and a parade of logs and beavers. The projects page appears once Kigumi is ready.
 - The sidebar notices a frame or pattern written into an existing file, such as one just made with New File, and one taken out or deleted. Each save only re-reads that file; the scan, which runs Python, happens only when its `@frame` / `@pattern` count changes, and skips the shipped patterns.
 - The MCP server has its own section in the explorer, **MCP server for agents**, above Kigumi options, saying what it is for.
 - The built-in agent asks for medium reasoning effort, and no longer reminds itself to write a first version after a few looks (it fired on questions too).

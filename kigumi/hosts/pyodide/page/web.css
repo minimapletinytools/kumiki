@@ -97,3 +97,161 @@ body:not(.kigumi-ready) .slot-left::before {
     color: var(--ka-fg-muted, #888);
     font-size: 12px;
 }
+
+/* The loading card (loading.js): in place of the welcome contents until Kigumi is ready. */
+body.kw-is-loading .welcome > :not(h1):not(.kw-loading) {
+    display: none;
+}
+
+.kw-loading {
+    --kw-wood: #c48c52;
+    --kw-wood-dark: #a26a36;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: min(440px, 100%);
+    padding: 0 16px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.kw-parade {
+    display: flex;
+    gap: 6px;
+    font-size: 30px;
+    line-height: 1;
+    height: 44px;
+    align-items: flex-end;
+}
+
+.kw-parade span {
+    display: inline-block;
+    animation: kw-dance 1.1s ease-in-out infinite;
+    transform-origin: 50% 90%;
+}
+
+.kw-parade span:nth-child(2n) { animation-delay: -0.55s; }
+.kw-parade span:nth-child(3n) { animation-duration: 0.9s; }
+
+@keyframes kw-dance {
+    0%, 100% { transform: translateY(0) rotate(-8deg); }
+    50% { transform: translateY(-12px) rotate(8deg); }
+}
+
+.kw-load-track {
+    position: relative;
+    width: 100%;
+    height: 14px;
+    margin-top: 6px;
+    border: 1px solid var(--ka-border);
+    border-radius: 999px;
+    background: var(--ka-chrome-bg);
+}
+
+.kw-load-fill {
+    position: relative;
+    width: 0;
+    height: 100%;
+    border-radius: 999px;
+    background:
+        repeating-linear-gradient(115deg, transparent 0 10px, rgba(0, 0, 0, 0.09) 10px 13px),
+        linear-gradient(var(--kw-wood), var(--kw-wood-dark));
+    background-size: 40px 100%, 100% 100%;
+    animation: kw-grain 1.2s linear infinite;
+    transition: width 0.4s ease-out;
+}
+
+@keyframes kw-grain {
+    to { background-position: 40px 0, 0 0; }
+}
+
+/* The beaver at the bar's leading edge, gnawing along. */
+.kw-load-rider {
+    position: absolute;
+    right: -14px;
+    top: -22px;
+    font-size: 22px;
+    line-height: 1;
+    animation: kw-gnaw 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes kw-gnaw {
+    from { transform: rotate(-10deg); }
+    to { transform: rotate(6deg) translateY(-2px); }
+}
+
+.kw-load-step {
+    margin: 4px 0 0;
+    color: var(--ka-fg);
+    font-size: 15px;
+}
+
+.kw-load-detail {
+    min-height: 1.3em;
+    margin: 0;
+    color: var(--ka-muted);
+    font-family: var(--ka-mono);
+    font-size: 11px;
+}
+
+.kw-load-steps {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ka-muted);
+    font-size: 12px;
+}
+
+.kw-load-steps li::before {
+    content: "○ ";
+}
+
+.kw-load-steps li.is-current {
+    color: var(--ka-fg);
+    font-weight: 600;
+}
+
+.kw-load-steps li.is-current::before {
+    content: "◐ ";
+}
+
+.kw-load-steps li.is-done::before {
+    content: "✓ ";
+    color: var(--kw-wood-dark);
+}
+
+.kw-load-note {
+    max-width: 360px;
+    margin: 6px 0 0;
+    color: var(--ka-muted);
+    font-size: 12px;
+}
+
+.kw-loading.is-failed .kw-load-step {
+    color: var(--ka-error);
+}
+
+.kw-loading.is-failed .kw-load-fill {
+    background: var(--ka-error);
+    animation: none;
+}
+
+.kw-loading.is-failed .kw-parade span,
+.kw-loading.is-failed .kw-load-rider {
+    animation: none;
+    filter: grayscale(1);
+    opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kw-parade span,
+    .kw-load-fill,
+    .kw-load-rider {
+        animation: none;
+    }
+}

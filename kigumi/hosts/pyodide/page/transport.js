@@ -41,12 +41,15 @@
             if (url) setTimeout(() => URL.revokeObjectURL(url), 5000);
             pageUrls.delete(message.id);
         } else if (message.type === 'web:loading') {
-            showStatus(message.text);
+            if (message.text) showStatus(message.text);
+            if (window.kigumiLoading) window.kigumiLoading.update(message.text, message.step, message.detail);
         } else if (message.type === 'web:ready') {
             document.body.classList.add('kigumi-ready');
             showStatus('');
+            if (window.kigumiLoading) window.kigumiLoading.done();
         } else if (message.type === 'web:failed') {
             showStatus(`Kigumi couldn't start: ${message.message.split('\n')[0]}`, true);
+            if (window.kigumiLoading) window.kigumiLoading.fail(`Kigumi couldn't start: ${message.message.split('\n')[0]}`);
             console.error(message.message);
         } else if (message.type === 'browser:external') {
             const url = new URL(message.url);
@@ -70,7 +73,10 @@
             for (const listener of listeners) listener(delivered);
         }
     };
-    worker.onerror = (event) => showStatus(`Kigumi's worker failed: ${event.message}`, true);
+    worker.onerror = (event) => {
+        showStatus(`Kigumi's worker failed: ${event.message}`, true);
+        if (window.kigumiLoading) window.kigumiLoading.fail(`Kigumi's worker failed: ${event.message}`);
+    };
 
     // Signing in: the provider's page in a new tab, which comes back to auth.html. If the browser
     // blocks the tab, this one goes there, and auth.html brings it back here afterwards.

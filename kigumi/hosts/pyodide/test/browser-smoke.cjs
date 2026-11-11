@@ -61,8 +61,12 @@ app.whenReady().then(async () => {
         const started = Date.now();
         await window.loadURL(`http://127.0.0.1:${PORT}/`);
         window.showInactive();
+        const loading = await wait("document.getElementById('kw-loading') && getComputedStyle(document.querySelector('.welcome-keys')).display === 'none'", 20000);
         const ready = await wait("document.body.classList.contains('kigumi-ready')", 240000);
         check('Python, kumiki and Kigumi start in the page', ready === true, `${Math.round((Date.now() - started) / 1000)} s`);
+        const welcomeBack = await wait("!document.getElementById('kw-loading') && getComputedStyle(document.querySelector('.welcome-keys')).display !== 'none'", 10000);
+        check('a loading card stands in for the welcome page while Kigumi starts, and goes once it is ready',
+            loading === true && welcomeBack === true, `card ${loading}, welcome back ${welcomeBack}`);
         const warning = await wait("document.querySelector('#web-storage-warning')?.textContent", 20000);
         check('the projects page warns that files live in the browser only', Boolean(warning && warning.includes('NOT to disk')));
         await shot('start');

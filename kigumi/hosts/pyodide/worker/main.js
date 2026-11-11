@@ -49,18 +49,24 @@ const MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024;
 const BASE = new URL('.', self.location.href).href.replace(/\/$/, '');
 
 const post = (message) => self.postMessage(message);
-const status = (text) => post({ type: 'web:loading', text });
+// `step` is the start-up step (page/loading.js STEPS); `detail` a package as it loads.
+const status = (text, step, detail) => post({ type: 'web:loading', text, step, detail });
 
 /** Load Pyodide, kumiki and its packages, Manifold, and Kigumi's own files. */
 async function bootPython() {
-    status('Loading Python…');
+    status('Loading Python…', 0);
     const { loadPyodide } = await import(/* webpackIgnore: true */ `${PYODIDE_URL}pyodide.mjs`);
     const py = await loadPyodide({ indexURL: PYODIDE_URL, env: { HOME } });
-    status('Loading kumiki’s packages…');
-    await py.loadPackage(PYODIDE_PACKAGES, { messageCallback: () => {} });
+    status('Loading kumiki’s packages…', 1);
+    await py.loadPackage(PYODIDE_PACKAGES, {
+        messageCallback: (message) => {
+            if (/^Loaded /.test(message)) status(null, 1, String(message).replace(/\s+from\s.*$/, ''));
+        },
+    });
     const micropip = py.pyimport('micropip');
+    status(null, 1, `Installing ${PYPI_PACKAGES.join(', ')}`);
     await micropip.install(PYPI_PACKAGES);
-    status('Loading kumiki…');
+    status('Loading kumiki…', 2, '');
     const manifest = await (await fetch(`${BASE}/manifest.json`)).json();
     await py.runPythonAsync(`import micropip\nawait micropip.install(${JSON.stringify(`${BASE}/${manifest.wheel}`)}, deps=False)`);
     const Manifold = (await import(/* webpackIgnore: true */ MANIFOLD_URL)).default;
@@ -125,7 +131,7 @@ async function start() {
     };
 
     await bootPython();
-    status('Starting Kigumi…');
+    status('Starting Kigumi…', 3, '');
 
     const packageJson = JSON.parse(fs.readFileSync('/kigumi/package.json', 'utf8'));
     const settings = new SettingsStore(`${DATA}/settings.json`, {
