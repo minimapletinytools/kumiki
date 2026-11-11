@@ -15,6 +15,7 @@
 
 const { createKigumiTools } = require('./tools');
 const { createProjectTools } = require('./project-tools');
+const { createFileManagementTools } = require('./file-management-tools');
 const { createFileTools } = require('./file-tools');
 const { viewFrames, checkFrameTool, describeFrameTool } = require('./frames');
 const { kumikiApiTool } = require('./kumiki-api');
@@ -39,6 +40,21 @@ function sharedTools(host) {
     ];
 }
 
+/** Return the file tools supported by the host's project storage. */
+function filesystemTools(host) {
+    if (!host.files) return [];
+    return [
+        ...createFileTools({ files: host.files }),
+        ...(host.files.create && host.files.deleteFile && host.files.rename
+            ? createFileManagementTools({ files: host.files }) : []),
+    ];
+}
+
+/** Return MCP tools, including file access when the client cannot access the project directly. */
+function mcpTools(host, { fileAccess = false } = {}) {
+    return [...sharedTools(host), ...(fileAccess ? filesystemTools(host) : [])];
+}
+
 /**
  * The built-in agent's tools: the shared ones, file tools whose edits rebuild the view showing the
  * file and are kept for undo, and a to-do list.
@@ -50,7 +66,7 @@ function sharedTools(host) {
  * @param {(toolCallId: string, before: string, after: string) => void} [hooks.onPictures]  a view before and after an edit
  */
 function agentTools(host, { checkpoints, onTodos = () => {}, onPictures = () => {} }) {
-    const fileTools = createFileTools({ files: host.files }).map((tool) => withCheckpoints(
+    const fileTools = filesystemTools(host).map((tool) => withCheckpoints(
         withBuildCheck(tool, { files: host.files, frames: host.frames, onPictures }),
         { files: host.files, checkpoints }));
     return [...sharedTools(host), ...fileTools, todoTool(onTodos)];
@@ -62,4 +78,4 @@ function instructions(host, { planMode = false } = {}) {
     return planMode ? `${prompt}\n\n${PLAN_MODE_NOTE}` : prompt;
 }
 
-module.exports = { viewHost, sharedTools, agentTools, instructions };
+module.exports = { viewHost, sharedTools, mcpTools, agentTools, instructions };

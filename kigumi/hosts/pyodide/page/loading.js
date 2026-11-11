@@ -1,6 +1,6 @@
 /**
  * The web version's loading card: in the welcome area until Kigumi is ready (transport.js says when),
- * a log-and-beaver parade, a progress bar through the start-up steps the worker reports, and the
+ * a log parade, a progress bar through the start-up steps the worker reports, and the
  * steps ticked off. The bar creeps on within a step, so a slow download never looks stuck.
  */
 (function () {
@@ -35,7 +35,7 @@
 
         const parade = el('div', 'kw-parade');
         parade.setAttribute('aria-hidden', 'true');
-        for (const emoji of ['🪵', '🦫', '🪵', '🪵', '🦫', '🪵']) parade.appendChild(el('span', null, emoji));
+        for (const emoji of ['🪵', '🪵', '🪵', '🪵', '🪵', '🪵']) parade.appendChild(el('span', null, emoji));
 
         const track = el('div', 'kw-load-track');
         track.id = 'kw-load-track';

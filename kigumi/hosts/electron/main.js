@@ -29,7 +29,7 @@ const { backendConfig } = require('../../agent/backend-config');
 const { createModelList } = require('../../agent/models');
 const { SecureStorage } = require('./secure-storage');
 const { createProjectContext } = require('../../agent/project-context');
-const { sharedTools } = require('../../agent/agent');
+const { mcpTools } = require('../../agent/agent');
 const { createMcpService } = require('../../agent/mcp-service');
 const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
 const { createAutoInstaller } = require('./auto-update');
@@ -798,7 +798,7 @@ async function start() {
     });
     mcp = createMcpService({
         settings,
-        tools: () => sharedTools(agentHost()),
+        tools: () => mcpTools(agentHost()),
         ready: () => Boolean(kigumiApp),
         version: packageJson.version,
         log,

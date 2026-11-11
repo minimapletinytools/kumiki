@@ -349,12 +349,6 @@ class KigumiSidebar extends LitElement {
             : clients.length === 1 ? t('sidebar.mcp.agents.one') : t('sidebar.mcp.agents.many', { count: clients.length });
         return html`
             <div class="ks-mcp">
-                <div class="ks-mcp-address">
-                    <input type="text" readonly .value=${mcp.url} aria-label=${t('sidebar.mcp.address')}
-                        @focus=${(event) => event.target.select()}>
-                    <button class="ks-mcp-button" data-copy="address"
-                        @click=${() => post({ type: 'sidebarCopyMcp', client: 'address' })}>${t('sidebar.mcp.copy')}</button>
-                </div>
                 <div class="ks-mcp-note">${t('sidebar.mcp.copyFor')}</div>
                 <div class="ks-mcp-setups">
                     ${(mcp.setups || []).map((setup) => html`

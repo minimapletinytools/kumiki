@@ -33,8 +33,7 @@ const { createMcpRelay } = require('../../../agent/mcp-relay');
 const browserBackend = backendConfig(typeof KIGUMI_WEB_BACKEND_CONFIG === 'undefined' ? {} : KIGUMI_WEB_BACKEND_CONFIG);
 const { createModelList } = require('../../../agent/models');
 const { createProjectContext } = require('../../../agent/project-context');
-const { sharedTools } = require('../../../agent/agent');
-const { createFileTools } = require('../../../agent/file-tools');
+const { mcpTools } = require('../../../agent/agent');
 
 const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';
 const MANIFOLD_URL = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.5.4/manifold.js';
@@ -403,7 +402,7 @@ async function start() {
 
     runTestTool = ({ id, name, input }) => {
         const host = agentHost();
-        const tool = [...sharedTools(host), ...createFileTools({ files: host.files })].find((one) => one.name === name);
+        const tool = mcpTools(host, { fileAccess: true }).find((one) => one.name === name);
         Promise.resolve().then(() => tool.run(input || {})).then(
             (result) => post({ type: 'test:agentToolResult', id, result }),
             (error) => post({ type: 'test:agentToolResult', id, error: String(error && error.message || error) }));
@@ -455,7 +454,7 @@ async function start() {
 
     const mcp = createMcpRelay({
         settings, storage: store, account: () => prepareAgent().account, backendUrl: browserBackend.backendUrl,
-        tools: () => sharedTools(agentHost()), setStatus,
+        tools: () => mcpTools(agentHost(), { fileAccess: true }), setStatus,
         copyText: (text) => post({ type: 'browser:clipboard', text }),
     });
     startKigumi();

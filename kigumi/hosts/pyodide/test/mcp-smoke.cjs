@@ -1,5 +1,5 @@
 /** Exercise the browser MCP controls against the local authenticated Cloudflare fixture. */
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, session } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const assert = require('assert/strict');
@@ -33,10 +33,11 @@ app.whenReady().then(async () => {
             }
             throw new Error(`Timed out: ${code}`);
         };
+        await session.defaultSession.clearStorageData();
         await window.loadURL('http://127.0.0.1:8127/manifest.json');
-        const session = { access_token: config.token, refresh_token: 'test-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600,
+        const accountSession = { access_token: config.token, refresh_token: 'test-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600,
             token_type: 'bearer', user: { id: '11111111-1111-4111-8111-111111111111', email: 'test@kigumi.test', aud: 'authenticated' } };
-        await js(`localStorage.clear(); localStorage.setItem('kigumi.web.store', ${JSON.stringify(JSON.stringify({ 'sb-supabase-auth-token': JSON.stringify(session) }))});
+        await js(`localStorage.clear(); localStorage.setItem('kigumi.web.store', ${JSON.stringify(JSON.stringify({ 'sb-supabase-auth-token': JSON.stringify(accountSession) }))});
             localStorage.setItem('kigumi.web.settings', JSON.stringify({'agent.enabled':true,'agent.showOnStartup':false,'mcp.enabled':false}));`);
         await window.loadURL('http://127.0.0.1:8127/');
         await wait("document.body.classList.contains('kigumi-ready')");
@@ -47,6 +48,7 @@ app.whenReady().then(async () => {
         await wait(`${explorer}?.querySelector('input[data-option="mcp.enabled"]')`);
         await js(`${explorer}.querySelector('input[data-option="mcp.enabled"]').click()`);
         await wait(`${explorer}?.querySelector('button[data-copy="url"]')`, 30000);
+        assert.equal(await js(`!!${explorer}.querySelector('[data-copy="address"]')`), false);
         await js(`${explorer}.querySelector('button[data-copy="url"]').click()`);
         const setup = await wait('window.mcpSetup', 10000);
         const url = setup.match(/URL: (.+)/)[1];
@@ -64,6 +66,37 @@ app.whenReady().then(async () => {
         assert.ok((await call('tools/list')).tools.some(tool => tool.name === 'list_panels'));
         const result = await call('tools/call', { name: 'list_panels', arguments: {} });
         assert.ok(Array.isArray(JSON.parse(result.content[0].text).panels));
+        const tool = (name, args) => call('tools/call', { name, arguments: args });
+        const names = (await call('tools/list')).tools.map(one => one.name);
+        for (const name of ['new_project', 'list_projects', 'open_project', 'close_project', 'new_file', 'delete_file', 'rename_file', 'list_files', 'search_files', 'read_file', 'write_file', 'edit_file']) assert.ok(names.includes(name), name);
+        assert.ok(!(await tool('new_project', { folder: 'MCP files' })).isError);
+        const createdFile = await tool('new_file', { file_path: 'notes/a.txt', content: 'hello' });
+        assert.ok(!createdFile.isError, JSON.stringify(createdFile));
+        assert.ok((await tool('new_file', { file_path: 'notes/a.txt', content: 'overwrite' })).isError);
+        assert.ok(!(await tool('write_file', { file_path: 'src/frame.py', content: 'width = 1\n' })).isError);
+        assert.ok(!(await tool('edit_file', { file_path: 'src/frame.py', old_string: 'width = 1', new_string: 'width = 2' })).isError);
+        assert.match((await tool('read_file', { file_path: 'src/frame.py' })).content[0].text, /width = 2/);
+        assert.match((await tool('list_files', {})).content[0].text, /src\/frame.py/);
+        assert.match((await tool('search_files', { pattern: 'width' })).content[0].text, /width = 2/);
+        assert.ok((await tool('write_file', { file_path: '../outside.py', content: 'no' })).isError);
+        assert.ok(!(await tool('new_file', { file_path: 'notes/occupied.txt' })).isError);
+        assert.ok((await tool('rename_file', { file_path: 'notes/a.txt', new_path: 'notes/occupied.txt' })).isError);
+        assert.ok(!(await tool('rename_file', { file_path: 'notes/a.txt', new_path: 'notes/b.txt' })).isError);
+        assert.ok((await tool('new_file', { file_path: '../outside.txt' })).isError);
+        await wait(`(async () => {
+            const db = await new Promise(resolve => { const req = indexedDB.open('kigumi-web', 1); req.onsuccess = () => resolve(req.result); });
+            const project = await new Promise(resolve => { const req = db.transaction('projects').objectStore('projects').getAll(); req.onsuccess = () => resolve(req.result.find(one => one.name === 'MCP files')); });
+            db.close();
+            return project?.files['notes/b.txt'] === 'hello' && !('notes/a.txt' in project.files);
+        })()`);
+        assert.ok(!(await tool('delete_file', { file_path: 'notes/b.txt' })).isError);
+        assert.ok((await tool('delete_file', { file_path: 'notes/b.txt' })).isError);
+        await wait(`${explorer}?.querySelector('[data-section="mcp"] .ks-section-header')`);
+        await js(`(() => {
+            const doc = ${explorer};
+            if (!doc.querySelector('input[data-option="mcp.enabled"]')) doc.querySelector('[data-section="mcp"] .ks-section-header').click();
+        })()`);
+        await wait(`${explorer}?.querySelector('input[data-option="mcp.enabled"]')`);
         await js(`${explorer}.querySelector('input[data-option="mcp.enabled"]').click()`);
         let status;
         for (let i = 0; i < 50; i++) {
@@ -72,7 +105,7 @@ app.whenReady().then(async () => {
             await sleep(100);
         }
         assert.equal(status, 410);
-        console.log('PASS: signed-in browser, sidebar enable/copy, public MCP initialize/list/call, real list_panels tool, disable/revoke');
+        console.log('PASS: signed-in browser, sidebar enable/copy, public MCP initialize/list/call, project/file management, collision/path checks, disable/revoke');
     } catch (error) {
         console.error(error);
         process.exitCode = 1;

@@ -113,6 +113,27 @@ function createProjectFiles({ root, readOnly = () => [] }) {
             await fs.promises.writeFile(target, content, 'utf8');
             return target;
         },
+        async create(file, content = '') {
+            const target = resolve(file, { write: true });
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.writeFileSync(target, content, { encoding: 'utf8', flag: 'wx' });
+            return target;
+        },
+        async deleteFile(file) {
+            const target = resolve(file, { write: true });
+            if (!fs.statSync(target).isFile()) throw new Error(`${file} is not a file.`);
+            fs.unlinkSync(target);
+            return target;
+        },
+        async rename(file, destination) {
+            const source = resolve(file, { write: true });
+            const target = resolve(destination, { write: true });
+            if (!fs.statSync(source).isFile()) throw new Error(`${file} is not a file.`);
+            if (fs.existsSync(target)) throw new Error(`${destination} already exists.`);
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.renameSync(source, target);
+            return target;
+        },
         async remove(file) {
             await fs.promises.rm(resolve(file, { write: true }), { force: true });
         },
