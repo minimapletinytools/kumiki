@@ -106,3 +106,32 @@ Screenshots go to `test-artifacts/`.
 - `test/node-runner.mjs`: the worker's Python in Node, to debug the runner bridge without a browser.
 - `run-frame.mjs` and `compare.py`: build a frame in Pyodide (or natively) and print each timber's
   volume and faces, to compare the two; `record_booleans.py` records one leg's booleans.
+
+## Remote MCP
+
+Sign in through the agent panel, enable MCP in the sidebar, and copy the setup for
+an external agent. The browser opens an outbound WebSocket to `kigumi-backend` on
+Cloudflare; the copied HTTPS URL and bearer token grant access to this tab's shared
+Kigumi tools. Keep the tab open and awake while using it. File-editing tools from
+the built-in agent are not exposed by this connection.
+
+Each tab gets its own relay session. Reloading the page creates a new URL and token;
+sessions expire after 24 hours. After expiry, switch MCP off and on and copy the new
+setup. Turning MCP off immediately closes the connection and aborts connection setup.
+Failed credential revocations are kept locally and retried, including after sign-out.
+The browser serializes remote operations and validates their arguments. Calls lost
+on disconnect are not replayed; inspect the current state before retrying an edit.
+
+
+Test the complete MCP flow with a sibling `kigumi-backend` checkout (or set
+`KIGUMI_BACKEND_DIR` to its path), after installing both repositories' Node dependencies:
+
+```sh
+KIGUMI_BACKEND_URL=http://127.0.0.1:8789 KIGUMI_SUPABASE_URL=https://supabase.test KIGUMI_SUPABASE_KEY=test-public npm run build
+env -u ELECTRON_RUN_AS_NODE ../../node_modules/.bin/electron test/mcp-smoke.cjs
+```
+
+The test seeds a signed-in test account, uses the real sidebar controls and shared
+tools, and talks to a local Cloudflare Worker. It does not contact production auth
+or require account secrets. The backend CI runs this cross-repository test. These
+build-time variables also allow staging deployments; omit them for production.

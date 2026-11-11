@@ -97,6 +97,8 @@ function createAccount({ supabaseUrl, supabaseKey, backendUrl, storage, redirect
             if (client) await client.auth.signOut({ scope: 'local' });
         },
 
+        userId: () => user ? user.id : null,
+
         refreshBalance,
 
         /** fetch, carrying a current access token: one per model request, so a long turn never sends a stale one. */
