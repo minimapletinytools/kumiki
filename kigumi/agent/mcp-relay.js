@@ -4,6 +4,7 @@ const { MCP_CLIENTS, mcpSetupText } = require('./mcp-setup');
 
 function createMcpRelay({ settings, account, backendUrl, tools, copyText, setStatus, WebSocketClass = WebSocket, fetch: fetcher = (...args) => fetch(...args), storage = null }) {
     let session = null;
+    let owner = null;
     let socket = null;
     let error = null;
     let generation = 0;
@@ -92,7 +93,7 @@ function createMcpRelay({ settings, account, backendUrl, tools, copyText, setSta
                 if (message.v !== 1 || typeof message.id !== 'string') throw new Error('Invalid relay message');
                 let reply;
                 try {
-                    if (epoch !== generation || ws !== socket || Date.now() > message.deadline) throw new Error('Call expired');
+                    if (owner !== account().userId() || epoch !== generation || ws !== socket || Date.now() > message.deadline) throw new Error('Call expired');
                     const available = tools();
                     if (message.method === 'tools/list') {
                         reply = { tools: available.map(tool => ({ name: tool.name, description: tool.description,
@@ -121,7 +122,12 @@ function createMcpRelay({ settings, account, backendUrl, tools, copyText, setSta
         };
     }
     function sync() {
-        if (!state().enabled) return stop();
+        const currentOwner = account().userId();
+        if (owner !== currentOwner) {
+            void stop();
+            owner = currentOwner;
+        }
+        if (!currentOwner || !state().enabled) return stop();
         void revokePending();
         if (socket || connecting) return connecting || Promise.resolve();
         const epoch = generation;

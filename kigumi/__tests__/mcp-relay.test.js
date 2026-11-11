@@ -12,7 +12,7 @@ test('validates calls and revokes access when disabled', async () => {
     const run = jest.fn(async ({ count }) => [{ type: 'text', text: String(count) }]);
     const relay = createMcpRelay({
         settings: { get: () => enabled },
-        account: () => ({ fetchWithToken: async (url) => {
+        account: () => ({ userId: () => 'alice', fetchWithToken: async (url) => {
             requests.push(url);
             return { ok: true, json: async () => url.endsWith('/mcp-sessions')
                 ? { id: 'one', token: 'secret', revokeToken: 'delete-only', url: 'https://relay.test/mcp/one' } : { ticket: 'ticket' } };
@@ -47,7 +47,7 @@ test('disabling aborts setup immediately and never opens a late socket', async (
     const Socket = jest.fn();
     const revoke = jest.fn(async () => ({ ok: true }));
     const relay = createMcpRelay({
-        settings: { get: () => enabled }, account: () => ({ fetchWithToken: (_url, init) => {
+        settings: { get: () => enabled }, account: () => ({ userId: () => 'alice', fetchWithToken: (_url, init) => {
             signal = init.signal;
             return new Promise(resolve => { finish = resolve; });
         } }), backendUrl: 'https://relay.test', tools: () => [], copyText() {}, setStatus() {},
@@ -68,7 +68,7 @@ test('retains failed revocations across reloads without account access', async (
     const values = { 'kigumi.mcp.revocations': JSON.stringify([['old', 'delete-only']]) };
     const storage = { getItem: key => values[key], setItem: (key, value) => { values[key] = value; } };
     const fetcher = jest.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ ok: true });
-    const relay = createMcpRelay({ settings: { get: () => false }, account: () => { throw new Error('signed out'); },
+    const relay = createMcpRelay({ settings: { get: () => false }, account: () => ({ userId: () => null, fetchWithToken: () => { throw new Error('signed out'); } }),
         backendUrl: 'https://relay.test', tools: () => [], copyText() {}, setStatus() {}, WebSocketClass: class {},
         storage, fetch: fetcher });
     await relay.sync();
@@ -76,4 +76,28 @@ test('retains failed revocations across reloads without account access', async (
     await jest.advanceTimersByTimeAsync(5000);
     expect(JSON.parse(values['kigumi.mcp.revocations'])).toEqual([]);
     jest.useRealTimers();
+});
+
+
+test('switching accounts revokes the old relay without an intermediate sign-out', async () => {
+    let user = 'alice';
+    const sockets = [];
+    const revocations = [];
+    class Socket {
+        constructor() { this.readyState = 1; sockets.push(this); }
+        close() { this.readyState = 3; }
+    }
+    const relay = createMcpRelay({ settings: { get: () => true },
+        account: () => ({ userId: () => user, fetchWithToken: async url => ({ ok: true,
+            json: async () => url.endsWith('/mcp-sessions') ? { id: user, revokeToken: `delete-${user}`, url: `https://relay.test/mcp/${user}` } : { ticket: 't' } }) }),
+        backendUrl: 'https://relay.test', tools: () => [], copyText() {}, setStatus() {}, WebSocketClass: Socket,
+        fetch: async (url, init) => { revocations.push([url, init.headers.Authorization]); return { ok: true }; },
+    });
+    await relay.sync();
+    user = 'bob';
+    const switched = relay.sync();
+    expect(sockets[0].readyState).toBe(3);
+    await switched;
+    expect(revocations).toContainEqual(['https://relay.test/mcp/alice/revoke', 'Bearer delete-alice']);
+    expect(relay.controls.state().url).toBe('https://relay.test/mcp/bob');
 });
