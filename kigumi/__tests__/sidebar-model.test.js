@@ -83,6 +83,34 @@ describe('scanning', () => {
     expect(scanWorkspaceForFrames).toHaveBeenCalledTimes(1);
   });
 
+  test("refreshWorkspace rescans the workspace's files only, keeping the shipped patterns", async () => {
+    discoverDependencyContent.mockResolvedValue({
+      kumikiPatterns: [{ name: 'shipped one' }], kumikiExamples: [], dependencyPatterns: [], dependencyExamples: [],
+    });
+    const model = new SidebarModel();
+    await model.refresh(true);
+    const shipped = model.state.shippedPatterns;
+    expect(discoverDependencyContent).toHaveBeenCalledTimes(1);
+
+    scanWorkspaceForFrames.mockResolvedValue({ scanErrors: [], patternbookFiles: [],
+      frameFiles: [{ filePath: '/ws/box.py', relativePath: 'box.py', chosenFrameName: 'box', allFrameNames: ['box'] }] });
+    await model.refreshWorkspace();
+
+    expect(scanWorkspaceForFrames).toHaveBeenCalledTimes(2);
+    expect(discoverDependencyContent).toHaveBeenCalledTimes(1);
+    expect(model.state.shippedPatterns).toBe(shipped);
+    expect(model.listsFile('/ws/box.py')).toBe(true);
+    expect(model.listsFile('/ws/other.py')).toBe(false);
+    expect(model.state.isScanning).toBe(false);
+  });
+
+  test('refreshWorkspace before any scan does a full one', async () => {
+    const model = new SidebarModel();
+    await model.refreshWorkspace();
+    expect(scanWorkspaceForFrames).toHaveBeenCalledTimes(1);
+    expect(discoverDependencyContent).toHaveBeenCalledTimes(1);
+  });
+
   test('an uninitialized project is not scanned', async () => {
     getInitializationStatus.mockReturnValue({ projectStatus: 'no-project', isInitialized: false, hasExistingProject: false });
     const model = new SidebarModel();

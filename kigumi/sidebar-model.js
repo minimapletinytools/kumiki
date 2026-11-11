@@ -163,6 +163,30 @@ class SidebarModel {
         return this._scanPromise;
     }
 
+    /**
+     * Rescan only the workspace's own files, keeping the shipped patterns and kumiki versions from the
+     * last full scan (they change only with kumiki). A full scan instead when there has been none.
+     */
+    async refreshWorkspace() {
+        if (this._scanPromise) {
+            await this._scanPromise.catch(() => {});
+        }
+        if (!this._state.workspaceRoot) {
+            return this.refresh(true);
+        }
+        this._scanPromise = this._runFullScan({ workspaceOnly: true })
+            .finally(() => {
+                this._scanPromise = null;
+            });
+        return this._scanPromise;
+    }
+
+    /** Whether the sidebar lists `filePath` as a frame file or a pattern book. */
+    listsFile(filePath) {
+        const listed = (entries) => (entries || []).some((entry) => entry.filePath === filePath);
+        return listed(this._state.frames) || listed(this._state.workspacePatternbooks);
+    }
+
     async getTestSnapshot(options = {}) {
         if (options.forceRefresh !== false) {
             await this.refresh(true);
@@ -194,7 +218,7 @@ class SidebarModel {
         };
     }
 
-    async _runFullScan() {
+    async _runFullScan({ workspaceOnly = false } = {}) {
         const workspaceRoot = getHost().workspaceRoots()[0] || null;
         if (!workspaceRoot) {
             this._state = emptyState({
@@ -212,11 +236,23 @@ class SidebarModel {
             return;
         }
 
+        const timeoutSeconds = getHost().getConfig('explorer.scanTimeoutSeconds', 15);
+        const timeoutMs = Math.max(1000, Number(timeoutSeconds) * 1000);
+        if (workspaceOnly) {
+            const result = await this._scanWorkspace(workspaceRoot, timeoutMs).catch(
+                (error) => ({ frames: this._state.frames, patternbooks: this._state.workspacePatternbooks,
+                    scanErrors: [{ filePath: workspaceRoot, reason: `Workspace scan failed: ${error?.message || error}` }] }),
+            );
+            this._state = { ...this._state, workspaceRoot, initStatus, frames: result.frames,
+                workspacePatternbooks: result.patternbooks, scanErrors: result.scanErrors, isScanning: false };
+            this._logScanIssues();
+            this._fire();
+            return;
+        }
+
         const versionInfoPromise = this.options.getKumikiVersionInfo
             ? this.options.getKumikiVersionInfo(workspaceRoot)
             : Promise.resolve({ installedVersion: 'unknown', latestVersion: 'unknown' });
-        const timeoutSeconds = getHost().getConfig('explorer.scanTimeoutSeconds', 15);
-        const timeoutMs = Math.max(1000, Number(timeoutSeconds) * 1000);
 
         this._state = { ...this._state, workspaceRoot, initStatus, isScanning: true };
         this._fire();

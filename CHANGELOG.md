@@ -17,6 +17,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
+- The sidebar notices a frame or pattern written into an existing file, such as one just made with New File, and one taken out or deleted. Each save only re-reads that file; the scan, which runs Python, happens only when its `@frame` / `@pattern` count changes, and skips the shipped patterns.
 - The MCP server has its own section in the explorer, **MCP server for agents**, above Kigumi options, saying what it is for.
 - The built-in agent asks for medium reasoning effort, and no longer reminds itself to write a first version after a few looks (it fired on questions too).
 - The agent's default output limit per step is now 16k tokens, since reasoning counts toward it.

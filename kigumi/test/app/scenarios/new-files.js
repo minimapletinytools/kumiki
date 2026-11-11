@@ -9,6 +9,7 @@ module.exports = {
     async run({ check, inShell, waitFor, capture, runAppCommand, connection, REPO }) {
         const frameFile = path.join(REPO, 'kigumi_app_test_frame.py');
         const folder = path.join(REPO, 'kigumi-app-test-new');
+        const lateFrame = path.join(REPO, 'kigumi_app_test_late_frame.py');
         const inExplorer = (body) => inShell(`(() => {
             const doc = document.querySelector("#slot-left iframe")?.contentDocument;
             if (!doc) return null;
@@ -63,7 +64,25 @@ module.exports = {
             check('right-click > New File makes the file it is given and opens it',
                 chose && fileSuggested === 'untitled.py' && fileMade === true && opened === true,
                 `${fileSuggested}, made ${fileMade}, opened ${opened}`);
+
+            // A new file that only later gets a frame, as when New File is followed by writing one: the save
+            // that adds @frame lists it, with no refresh asked for; the save that takes it out unlists it.
+            const listsLate = async () => Boolean(await inExplorer(`return !!row(${JSON.stringify(`frame-file:workspace:${lateFrame}`)});`));
+            fs.writeFileSync(lateFrame, '');
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            const listedEmpty = await listsLate();
+            fs.writeFileSync(lateFrame, `from typing import Optional\nfrom kumiki import *\n\n\n@frame\ndef late_frame(k: Optional[Kiwari] = None) -> Frame:\n`
+                + `    post = create_axis_aligned_timber(bottom_position=create_v3(0, 0, 0), length=mm(500), size=create_v2(mm(90), mm(90)), `
+                + `length_direction=TimberFace.TOP, width_direction=TimberFace.RIGHT, ticket="post")\n`
+                + `    return Frame(cut_timbers=[CutTimber(post)], name="late")\n`);
+            const listedLater = await waitFor(() => listsLate().then((yes) => yes || null), { timeoutMs: 20000 }).catch(() => false);
+            fs.writeFileSync(lateFrame, 'x = 1\n');
+            const unlisted = await waitFor(() => listsLate().then((yes) => !yes || null), { timeoutMs: 20000 }).catch(() => false);
+            check('a frame written into an empty file is listed on that save, and unlisted when taken out, without a refresh',
+                !listedEmpty && listedLater === true && unlisted === true,
+                `empty listed ${listedEmpty}, later ${listedLater}, unlisted ${unlisted}`);
         } finally {
+            fs.rmSync(lateFrame, { force: true });
             fs.rmSync(frameFile, { force: true });
             fs.rmSync(folder, { recursive: true, force: true });
         }

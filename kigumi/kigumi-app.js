@@ -14,7 +14,7 @@ const { PythonRunnerSession } = require('./runner-session');
 const { SidebarModel } = require('./sidebar-model');
 const { SidebarController } = require('./sidebar-controller');
 const { DEFAULT_FILES_EXCLUDE, listFiles } = require('./sidebar-files');
-const { NewPythonFileWatcher } = require('./new-python-file-watcher');
+const { FrameFileWatcher } = require('./frame-file-watcher');
 const newFiles = require('./new-files');
 const { normalizeRetentionDays, pruneOldLogFiles } = require('./log-retention');
 const {
@@ -143,7 +143,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         }
         if (affects('sidebar.autoRefreshOnNewFile')) {
             autoRefreshSidebarOnNewFile = host.getConfig('sidebar.autoRefreshOnNewFile', true);
-            newPythonFileWatcher.setEnabled(autoRefreshSidebarOnNewFile);
+            frameFileWatcher.setEnabled(autoRefreshSidebarOnNewFile);
             outputChannel.appendLine(`[kigumi] Auto refresh sidebar on new file: ${autoRefreshSidebarOnNewFile ? 'enabled' : 'disabled'}`);
         }
     }));
@@ -190,16 +190,18 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
     });
     disposables.push(sidebarController, sidebarModel);
 
-    const newPythonFileWatcher = new NewPythonFileWatcher(
+    // A frame or pattern added to or taken from a workspace file rescans the workspace (frame-file-watcher.js).
+    const frameFileWatcher = new FrameFileWatcher(
         getWorkspaceRoot(),
         () => {
-            void sidebarModel.refresh(true);
+            void sidebarModel.refreshWorkspace();
         },
         (message) => outputChannel.appendLine(`[kigumi] [sidebar-watch] ${message}`),
+        { isListed: (filePath) => sidebarModel.listsFile(filePath) },
     );
-    newPythonFileWatcher.setEnabled(autoRefreshSidebarOnNewFile);
-    newPythonFileWatcher.start();
-    disposables.push(newPythonFileWatcher);
+    frameFileWatcher.setEnabled(autoRefreshSidebarOnNewFile);
+    frameFileWatcher.start();
+    disposables.push(frameFileWatcher);
 
     // The "All files" tree lists only opened folders; a file created or deleted in one lists it again.
     if (host.showsFileBrowser && getWorkspaceRoot()) {
