@@ -86,6 +86,9 @@ await esbuild.build({
     format: 'esm',
     platform: 'browser',
     target: 'es2022',
+    define: { KIGUMI_WEB_BACKEND_CONFIG: JSON.stringify(Object.fromEntries(
+        ['KIGUMI_BACKEND_URL', 'KIGUMI_SUPABASE_URL', 'KIGUMI_SUPABASE_KEY']
+            .filter(key => process.env[key]).map(key => [key, process.env[key]]))) },
     alias: shims,
     inject: [path.join(HERE, 'worker/shims/globals.mjs')],
     plugins: [dirnamePlugin],

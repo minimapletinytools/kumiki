@@ -28,6 +28,8 @@ const { createAgentPanel } = require('../../../agent/agent-panel');
 const { createProjectFiles } = require('../../../agent/project-files');
 const { createAccount } = require('../../../agent/account');
 const { backendConfig } = require('../../../agent/backend-config');
+const { createMcpRelay } = require('../../../agent/mcp-relay');
+const browserBackend = backendConfig(typeof KIGUMI_WEB_BACKEND_CONFIG === 'undefined' ? {} : KIGUMI_WEB_BACKEND_CONFIG);
 const { createModelList } = require('../../../agent/models');
 const { findKumikiSource, kumikiExamples, projectPython } = require('../../../agent/kumiki-source');
 const { pythonKumikiApi } = require('../../../agent/kumiki-api');
@@ -237,7 +239,7 @@ async function start() {
     function startKigumi() {
         setHost(createBrowserHost({
             connection, workspaceFolder: project ? project.dir : null, settings, runCommand, setStatus, setProgress,
-            editors, showLog: openLog, log, closeProject: () => switchProject(null), agentPanel: true,
+            editors, showLog: openLog, log, mcp: mcp.controls, closeProject: () => switchProject(null), agentPanel: true,
             projects: {
                 open: () => pickProject(),
                 recent: () => knownProjects.map((one) => ({ id: one.id, label: one.name, description: 'In this browser' })),
@@ -355,7 +357,7 @@ async function start() {
     let agentPanel = null;
 
     function prepareAgent() {
-        const config = backendConfig({});
+        const config = browserBackend;
         if (!account) {
             account = createAccount({
                 ...config,
@@ -363,7 +365,13 @@ async function start() {
                 // page/auth.html hands the code back to this page (web:authLink).
                 redirectTo: new URL('auth.html', `${BASE}/`).href,
                 openExternal: (url) => post({ type: 'browser:signIn', url }),
-                onChange: () => agentPanel && agentPanel.session && agentPanel.session.postState(),
+                onChange: () => {
+                    if (agentPanel && agentPanel.session) agentPanel.session.postState();
+                    setTimeout(() => {
+                        if (!account.state().signedIn && settings.get('mcp.enabled', false)) settings.set('mcp.enabled', false);
+                        else void mcp.sync();
+                    }, 0);
+                },
             });
         }
         if (!modelList) {
@@ -526,12 +534,19 @@ async function start() {
         }
     }
 
+    const mcp = createMcpRelay({
+        settings, storage: store, account: () => prepareAgent().account, backendUrl: browserBackend.backendUrl,
+        tools: () => sharedTools(agentHost()), setStatus,
+        copyText: (text) => post({ type: 'browser:clipboard', text }),
+    });
     startKigumi();
     // Not opened on the settings arriving at start: showOnStartup decides that, below.
     let agentWasEnabled = true;
+    let mcpReady = false;
     settings.onChange(() => {
         // The page keeps the settings: each change goes back to it.
         post({ type: 'web:settings', values: settings.values });
+        if (mcpReady) void mcp.sync();
         agentPanel.closeIfDisabled();
         // Turned on just now: show it, rather than leave the user to find its button.
         if (agentEnabled() && !agentWasEnabled) agentPanel.toggle();
@@ -543,6 +558,8 @@ async function start() {
         if (message.authLink) onAuthLink(message.authLink);
         else receive(message);
     }
+    mcpReady = true;
+    void mcp.sync();
     agentWasEnabled = agentEnabled();
     if (agentEnabled() && settings.get('agent.showOnStartup', true)) agentPanel.toggle();
     self.__kigumi = { connection, settings, get project() { return project; }, get app() { return kigumiApp; }, switchProject, knownProjects: () => knownProjects };
