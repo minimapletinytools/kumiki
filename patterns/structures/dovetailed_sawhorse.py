@@ -29,7 +29,9 @@ from kumiki.drawings.measure import ViewAxes
 
 SAWHORSE = kiwari(
     leg_distance=kiwari.length(inches(22), about="Centre to centre along the beam, where the legs meet its top"),
-    leg_y_splay_angle=kiwari.angle(degrees(12), about="How far the legs lean out toward the beam's ends"),
+    leg_y_splay_angle=kiwari.angle(
+        optional=True, about="How far the legs lean out toward the beam's ends. "
+                             "By default, atan of the leg's thickness over the beam's height"),
     leg_side_splay=kiwari.ratio(
         optional=True, parts=("rise", "run"), minimum=1,
         about="How far the legs splay out to the side; the slope is determined by the rise and run, at least 1:1. "
@@ -441,7 +443,10 @@ def _leg(k: Kiwari, beam: Timber, end: int, side: int):
         # Seen along the beam, the leg rises `slope` for each unit it runs out: atan(slope) from the floor.
         lean_sin = 1 / sqrt(1 + slope * slope)
         lean_cos = slope * lean_sin
-    up = safe_normalize_vector(create_v3(-end * tan(k.angle("leg_y_splay_angle")), -side * lean_sin / lean_cos, 1))
+    y_splay = k.angle("leg_y_splay_angle")
+    if y_splay is None:
+        y_splay = atan(leg_size[1] / beam_height)
+    up = safe_normalize_vector(create_v3(-end * tan(y_splay), -side * lean_sin / lean_cos, 1))
     outward = create_v3(0, side * lean_cos, lean_sin)  # the leg's face normal, square to the beam
     along_beam = create_v3(1, 0, 0)
     width = safe_normalize_vector(along_beam - up * safe_dot_product(along_beam, up))

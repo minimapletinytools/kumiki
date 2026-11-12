@@ -1295,7 +1295,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 498,
+          "lineno": 503,
           "name": "dovetailed_sawhorse"
         }
       ],
@@ -1304,7 +1304,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/dovetailed_sawhorse.py",
-      "sha256": "d5074a44fe144cb0fb7c78a364f0e83f275094193fd81ad9c57a8fc6b2a76d13",
+      "sha256": "b675c42e16233a31d7e16372340879840f6aa6cf0bed9329a54049e9a95d0422",
       "warnings": []
     },
     "patterns/structures/horsey_example.py": {
@@ -1434,7 +1434,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-12T04:35:57.598023+00:00",
+  "generated_at": "2026-11-12T04:45:12.662092+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }
