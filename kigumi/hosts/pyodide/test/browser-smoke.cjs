@@ -120,7 +120,7 @@ app.whenReady().then(async () => {
         await wait(`document.querySelector('#tabs')?.textContent.includes('●') || null`, 10000);
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'run', args: ['kigumi.render'] })`);
         const bufferSaved = await wait(`(async () => {
-            const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web', 1); r.onsuccess = () => resolve(r.result); });
+            const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web'); r.onsuccess = () => resolve(r.result); });
             const record = await new Promise((resolve) => { const r = db.transaction('projects').objectStore('projects').getAll(); r.onsuccess = () => resolve(r.result.find((p) => p.name === 'Shed')); });
             db.close();
             return record && record.files['my_cute_frame.py'].includes('# unsaved buffer rendered');
@@ -129,7 +129,7 @@ app.whenReady().then(async () => {
 
         await js(`window.__kigumiWorker.postMessage({ type: 'test:appendToFile', file: ${JSON.stringify(filePath)}, text: '\\n# edited in the browser\\n' })`);
         const synced = await wait(`(async () => {
-            const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web', 1); r.onsuccess = () => resolve(r.result); });
+            const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web'); r.onsuccess = () => resolve(r.result); });
             const record = await new Promise((resolve) => { const r = db.transaction('projects').objectStore('projects').getAll(); r.onsuccess = () => resolve(r.result.find((p) => p.name === 'Shed')); });
             db.close();
             return record && record.files['my_cute_frame.py'].includes('# edited in the browser');
@@ -139,7 +139,7 @@ app.whenReady().then(async () => {
         // New Frame (the last row of the frames list) and New File (a folder's right-click menu): each asks
         // for a name in the quick pick, and the file reaches the browser's copy.
         const savedFile = (name) => `(async () => {
-            const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web', 1); r.onsuccess = () => resolve(r.result); });
+            const db = await new Promise((resolve) => { const r = indexedDB.open('kigumi-web'); r.onsuccess = () => resolve(r.result); });
             const record = await new Promise((resolve) => { const r = db.transaction('projects').objectStore('projects').getAll(); r.onsuccess = () => resolve(r.result.find((p) => p.name === 'Shed')); });
             db.close();
             return record && typeof record.files[${JSON.stringify(name)}] === 'string' ? record.files[${JSON.stringify(name)}] : null;
@@ -300,8 +300,23 @@ app.whenReady().then(async () => {
         check('opening it again works from the browser\'s copy', await wait(`document.querySelector('#status-workspace')?.textContent === 'Shed'`, 30000) === true);
         await js("document.querySelector('#status-workspace').click()");
         await wait("!!document.querySelector('.web-project')", 30000);
-        await js("window.confirm = () => true; [...document.querySelectorAll('.web-project .web-project-action')].find((b) => b.textContent === 'Delete').click()");
-        check('Delete removes the project from the browser', await wait("window.kigumiWeb.listProjects().length === 0", 10000) === true,
+        const scrolls = await js(`['welcome', 'welcome-recent-list'].every((id) => getComputedStyle(document.getElementById(id)).overflowY === 'auto')`);
+        check('the projects page, and its list of projects, scroll when they are too long', scrolls === true);
+        await js("document.querySelector('.web-project .web-project-action.is-danger').click()");
+        await wait("!!document.querySelector('dialog.web-delete[open]')", 5000);
+        await shot('delete');
+        const lockedUntilTyped = await js(`(() => {
+            const dialog = document.querySelector('dialog.web-delete');
+            const confirm = dialog.querySelector('.web-delete-confirm');
+            const input = dialog.querySelector('input');
+            const before = confirm.disabled;
+            input.value = 'Shed';
+            input.dispatchEvent(new Event('input'));
+            return before && !confirm.disabled;
+        })()`);
+        await js("document.querySelector('dialog.web-delete .web-delete-confirm').click()");
+        check('Delete warns, waits for the name to be typed, then removes the project from the browser',
+            lockedUntilTyped === true && await wait("window.kigumiWeb.listProjects().length === 0", 10000) === true,
             JSON.stringify(await js('window.kigumiWeb.listProjects()')));
 
         check('no content security policy violations', violations.length === 0, violations.slice(0, 2).join(' | '));

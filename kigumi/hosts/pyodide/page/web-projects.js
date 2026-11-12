@@ -144,10 +144,50 @@
 
     async function deleteProject(id, openId) {
         const record = await getProject(id);
-        if (!record || !window.confirm(`Delete "${record.name}" from this browser? Export it first to keep a copy.`)) return;
+        if (!record || !await confirmDelete(record)) return;
         if (id === openId) command('web:closeProject');
         await deleteRecord(id);
         await reload();
+    }
+
+    /** Ask before deleting `record` for good: its name typed in, with a last chance to export it. */
+    function confirmDelete(record) {
+        const el = (tag, className, text) => Object.assign(document.createElement(tag), { className, textContent: text || '' });
+        const dialog = el('dialog', 'web-delete');
+        const count = Object.keys(record.files || {}).length;
+        const input = Object.assign(el('input'), { type: 'text', autocomplete: 'off', spellcheck: false });
+        input.setAttribute('aria-label', 'Project name');
+        const exportButton = Object.assign(el('button', 'web-delete-export', 'Export .zip first'), { type: 'button' });
+        exportButton.addEventListener('click', () => void exportProject(record.id).catch(warn));
+        const cancel = Object.assign(el('button', '', 'Cancel'), { type: 'button' });
+        const remove = Object.assign(el('button', 'web-delete-confirm', 'Delete forever'), { type: 'button', disabled: true });
+        input.addEventListener('input', () => { remove.disabled = input.value.trim() !== record.name.trim(); });
+        const actions = el('div', 'web-delete-actions');
+        actions.append(exportButton, el('span', 'web-delete-spacer'), cancel, remove);
+        const name = el('strong', '', record.name);
+        const typeIt = el('label', 'web-delete-type', 'Type ');
+        typeIt.append(el('code', '', record.name), ' to confirm:', input);
+        dialog.append(el('h2', '', '⚠ Delete this project forever?'), name,
+            el('p', '', `This deletes the project and all ${count} file${count === 1 ? '' : 's'} in it. `
+                + 'The project lives only in this browser: there is no other copy, no trash and no undo. '
+                + 'Once deleted, it is gone for good.'),
+            el('p', '', 'Export a .zip first if you might want it back.'), typeIt, actions);
+        document.body.appendChild(dialog);
+        return new Promise((resolve) => {
+            const finish = (answer) => {
+                dialog.close();
+                dialog.remove();
+                resolve(answer);
+            };
+            cancel.addEventListener('click', () => finish(false));
+            remove.addEventListener('click', () => finish(!remove.disabled));
+            dialog.addEventListener('cancel', (event) => {
+                event.preventDefault();
+                finish(false);
+            });
+            dialog.showModal();
+            input.focus();
+        });
     }
 
     function download(name, bytes, type) {
@@ -232,7 +272,7 @@
                 `${count} file${count === 1 ? '' : 's'} · ${new Date(record.updated).toLocaleString()}`);
             const exportButton = tools.el('button', 'web-project-action', 'Export .zip');
             exportButton.addEventListener('click', () => void exportProject(record.id).catch(warn));
-            const remove = tools.el('button', 'web-project-action', 'Delete');
+            const remove = tools.el('button', 'web-project-action is-danger', 'Delete…');
             remove.addEventListener('click', () => void deleteProject(record.id, openId).catch(warn));
             item.append(open, when, exportButton, remove);
             return item;

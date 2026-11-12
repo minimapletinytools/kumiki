@@ -255,3 +255,85 @@ body.kw-is-loading .welcome > :not(h1):not(.kw-loading) {
         animation: none;
     }
 }
+
+/* Deleting a project for good (web-projects.js confirmDelete). */
+.web-delete {
+    max-width: 440px;
+    padding: 20px 24px;
+    border: 2px solid var(--ka-error);
+    border-radius: 6px;
+    background: var(--ka-bg, #fff);
+    color: var(--ka-fg);
+    text-align: left;
+}
+
+.web-delete::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.web-delete h2 {
+    margin: 0 0 8px;
+    color: var(--ka-error);
+    font-size: 16px;
+}
+
+.web-delete p {
+    margin: 8px 0;
+    font-size: 13px;
+}
+
+.web-delete-type {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: baseline;
+    margin-top: 12px;
+    font-size: 13px;
+}
+
+.web-delete-type input {
+    flex: 1 1 100%;
+    padding: 5px 8px;
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font: inherit;
+}
+
+.web-delete-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.web-delete-spacer {
+    flex: 1;
+}
+
+.web-delete-actions button {
+    padding: 5px 12px;
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ka-fg);
+    font: inherit;
+    cursor: pointer;
+}
+
+.web-delete-actions .web-delete-confirm {
+    border-color: var(--ka-error);
+    background: var(--ka-error);
+    color: #fff;
+}
+
+.web-delete-actions .web-delete-confirm:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* A project's Delete button, in the list. */
+.web-project-action.is-danger {
+    border-color: var(--ka-error);
+    color: var(--ka-error);
+}
