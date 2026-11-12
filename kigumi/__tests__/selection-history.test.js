@@ -3,8 +3,8 @@ const { createPanelDirectory } = require('../agent/panel-directory');
 const { createKigumiTools } = require('../agent/tools');
 
 const member = (key) => ({ key, name: key });
-const entry = (keys, feature = null, panelId = 'viewer:/p/a.py') => ({
-    panelId, filePath: '/p/a.py', view: '3d', selection: { frameName: 'a', members: keys.map(member), feature },
+const entry = (keys, feature = null, panelId = 'viewer:/p/a.py', filePath = '/p/a.py') => ({
+    panelId, filePath, view: '3d', selection: { frameName: 'a', members: keys.map(member), feature },
 });
 
 describe('the selection history', () => {
@@ -39,5 +39,21 @@ describe('the selection history', () => {
         expect(tool.effect).toBe('read');
         const { selections } = JSON.parse((await tool.run({}))[0].text);
         expect(selections).toEqual([expect.objectContaining({ relativePath: 'a.py', panelId: 'viewer:/p/a.py' })]);
+    });
+
+    test('get_selection_history with a file gives only that file\'s selections', async () => {
+        const selectionHistory = createSelectionHistory();
+        selectionHistory.record(entry(['post']));
+        selectionHistory.record(entry(['beam'], null, 'viewer:/p/b.py', '/p/b.py'));
+        selectionHistory.record(entry(['sill']));
+        const panels = createPanelDirectory({ views: () => [], host: { workspaceRootFor: () => '/p' }, selectionHistory });
+        const tool = createKigumiTools({ panels, run: async () => ({}), resolve: (file) => `/p/${file}` })
+            .find((one) => one.name === 'get_selection_history');
+
+        const keys = async (args) => JSON.parse((await tool.run(args))[0].text).selections.map((one) => one.selection.members[0].key);
+        expect(await keys({ file_path: 'a.py' })).toEqual(['sill', 'post']);
+        expect(await keys({ file_path: 'b.py' })).toEqual(['beam']);
+        expect(await keys({ file_path: 'a.py', limit: 1 })).toEqual(['sill']);
+        expect(await keys({})).toEqual(['sill', 'beam', 'post']);
     });
 });

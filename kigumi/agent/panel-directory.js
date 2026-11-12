@@ -99,8 +99,10 @@ function createPanelDirectory({ views, host, selectionHistory = null }) {
     }
 
     /** The last `count` selections made in the views, newest first, each with its file relative to the project. */
-    function recentSelections(count) {
-        return (selectionHistory ? selectionHistory.list(count) : []).map((entry) => {
+    /** The last `count` selections, newest first; only those in `filePath` when given. */
+    function recentSelections(count, filePath) {
+        const all = selectionHistory ? selectionHistory.list() : [];
+        return all.filter((entry) => !filePath || entry.filePath === filePath).slice(0, count).map((entry) => {
             const root = entry.filePath && typeof host.workspaceRootFor === 'function' ? host.workspaceRootFor(entry.filePath) : null;
             return root ? { ...entry, relativePath: path.relative(root, entry.filePath) } : entry;
         });
