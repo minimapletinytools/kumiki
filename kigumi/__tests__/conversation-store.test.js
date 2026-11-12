@@ -2,7 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { createConversationStore, MAX_CONVERSATIONS } = require('../agent/conversation-store');
+const { createConversationStore, MAX_CONVERSATIONS, BLOB_AT } = require('../agent/conversation-store');
 
 describe('the conversation store', () => {
     let base;
@@ -41,5 +41,45 @@ describe('the conversation store', () => {
         }
         expect(store.list('/p')).toHaveLength(MAX_CONVERSATIONS);
         expect(store.load('/p', 'c0')).toBeNull();
+    });
+
+    test('drops conversations past the retention, on save and on prune', () => {
+        let days = 0;
+        const kept = createConversationStore(base, { retentionDays: () => days });
+        const old = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+        const recent = new Date().toISOString();
+        kept.save('/a', conversation('old', old));
+        kept.save('/b', { ...conversation('blobbed', old), transcript: ['x'.repeat(BLOB_AT)] });
+        kept.save('/a', conversation('new', recent));
+        expect(kept.list('/a').map((entry) => entry.id)).toEqual(['new', 'old']);
+
+        days = 7;
+        expect(kept.list('/a').map((entry) => entry.id)).toEqual(['new']);
+        kept.prune();
+        expect(kept.load('/a', 'old')).toBeNull();
+        expect(kept.load('/b', 'blobbed')).toBeNull();
+        expect(kept.load('/a', 'new')).not.toBeNull();
+        const blobs = fs.readdirSync(base).flatMap((name) => (fs.existsSync(path.join(base, name, 'blobs'))
+            ? fs.readdirSync(path.join(base, name, 'blobs')) : []));
+        expect(blobs).toEqual([]);
+    });
+
+    test('clears everything, and says how much it takes', () => {
+        store.save('/a', conversation('one', '2026-10-24T10:00:00.000Z'));
+        expect(store.usage()).toBeGreaterThan(0);
+        store.clear();
+        expect(store.list('/a')).toEqual([]);
+        expect(store.usage()).toBe(0);
+    });
+
+    test('tells onFiles each write and delete, relative to the base', () => {
+        const updates = [];
+        const mirrored = createConversationStore(base, { onFiles: (update) => updates.push(update) });
+        mirrored.save('/a', conversation('one', '2026-10-24T10:00:00.000Z'));
+        const written = updates.flatMap((update) => Object.keys(update.changed));
+        expect(written).toEqual(expect.arrayContaining([expect.stringMatching(/^[0-9a-f]{16}\/one\.json$/),
+            expect.stringMatching(/^[0-9a-f]{16}\/index\.json$/)]));
+        mirrored.clear();
+        expect(updates[updates.length - 1].deleted).toEqual([expect.stringMatching(/^[0-9a-f]{16}$/)]);
     });
 });

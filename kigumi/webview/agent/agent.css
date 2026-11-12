@@ -414,18 +414,113 @@ textarea {
     .dots i, .tool-chip.is-running .tool-name::before { animation: none; opacity: 0.6; }
 }
 
-.settings-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 8px 12px;
+/* MCP and agent settings: a row under the header that opens in place. */
+.settings-row {
+    flex: none;
     border-bottom: 1px solid var(--ka-border);
     background: var(--ka-chrome-bg);
     font-size: 12px;
 }
+.settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    color: var(--ka-muted);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.settings-toggle:hover {
+    color: var(--ka-fg);
+    background: var(--ka-hover);
+}
+.settings-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 4px 12px 10px;
+}
+.settings-group,
+.agent-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.settings-subheading {
+    margin-top: 6px;
+    color: var(--ka-muted);
+}
+.settings-hint-block {
+    color: var(--ka-muted);
+    font-size: 11px;
+}
+.mcp-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-left: 20px;
+}
+.mcp-url {
+    word-break: break-all;
+}
+.mcp-setups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.mcp-setup {
+    padding: 1px 6px;
+    border: 1px solid var(--ka-border);
+    border-radius: 3px;
+    background: transparent;
+    color: var(--ka-fg);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+.mcp-setup:hover {
+    background: var(--ka-hover);
+}
+.settings-storage {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+    color: var(--ka-muted);
+    font-size: 11px;
+}
 
 .settings-menu[hidden],
+.settings-group[hidden],
+.agent-settings[hidden],
+.mcp-details[hidden],
+.settings-storage [hidden],
 .bypass-banner[hidden] {
+    display: none;
+}
+
+/* With the built-in agent off, only the settings show. */
+.agent-off-note {
+    display: none;
+    padding: 12px;
+    color: var(--ka-muted);
+    font-size: 12px;
+}
+body.agent-off .agent-off-note {
+    display: block;
+}
+body.agent-off .agent-messages,
+body.agent-off .agent-footer,
+body.agent-off .history-menu,
+body.agent-off #model-select,
+body.agent-off #btn-history,
+body.agent-off #btn-clear {
     display: none;
 }
 
@@ -913,7 +1008,7 @@ body.needs-key .suggestions {
     font-weight: 600;
 }
 
-/* The OpenRouter key, in the settings menu: set or replaced here, never shown. */
+/* The OpenRouter key, in the settings: set or replaced here, never shown. */
 .settings-key {
     display: flex;
     flex-direction: column;

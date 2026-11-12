@@ -1,10 +1,11 @@
 /**
- * The agent's panel in a Kigumi window: shown on the right, hidden without losing its conversation,
- * and closed when `agent.enabled` is turned off (it is off by default). The host gives where the
- * page is served and how the account is kept.
+ * The agent's panel in a Kigumi window: shown on the right, hidden without losing its conversation.
+ * It always opens, for its MCP and agent settings; the built-in agent's chat shows only while
+ * `agent.enabled` is on (it is off by default). The host gives where the page is served, how the
+ * account is kept and its MCP server's controls.
  */
 
-const { AgentSession } = require('./agent-session');
+const { AgentSession, CONVERSATION_RETENTION } = require('./agent-session');
 const { createConversationStore } = require('./conversation-store');
 const { loadCatalog, resolveLocale } = require('../i18n');
 
@@ -16,12 +17,22 @@ const { loadCatalog, resolveLocale } = require('../i18n');
  * @param {() => object} options.makeHost  the agent's host (agent/agent.js), made when the panel opens
  * @param {() => { account: object|null, models: object }} options.prepare  the account and model list, made once
  * @param {string} options.conversationsDir
+ * @param {(update: object) => void} [options.onConversationFiles]  conversation-store.js's onFiles
+ * @param {object|null} [options.mcp]  the host's MCP controls (host.js `mcp`): state, onChange, copySetup
  * @param {string} options.locale
  * @param {(line: string) => void} options.log
  */
-function createAgentPanel({ connection, pageUrl, settings, makeHost, prepare, conversationsDir, locale, log }) {
+function createAgentPanel({ connection, pageUrl, settings, makeHost, prepare, conversationsDir, onConversationFiles = null,
+    mcp = null, locale, log }) {
     let session = null;
     const enabled = () => settings.get('agent.enabled', false) === true;
+    const conversations = createConversationStore(conversationsDir, {
+        retentionDays: () => {
+            const days = settings.get('agent.conversationRetentionDays', CONVERSATION_RETENTION.fallback);
+            return CONVERSATION_RETENTION.valid(days) ? days : CONVERSATION_RETENTION.fallback;
+        },
+        onFiles: onConversationFiles,
+    });
 
     function refreshModels(models) {
         if (models && typeof models.refresh === 'function') {
@@ -29,13 +40,17 @@ function createAgentPanel({ connection, pageUrl, settings, makeHost, prepare, co
         }
     }
 
-    /** Show the agent, or hide it if shown. Hidden, it keeps its conversation. */
+    /** Show the panel, or hide it if shown. Hidden, it keeps its conversation. */
     function toggle() {
-        if (!enabled()) return;
         const { account, models } = prepare();
         if (connection.findPanel((panel) => panel.type === 'agent')) {
             connection.setSideShown('right', !connection.layout.right);
             return;
+        }
+        try {
+            conversations.prune();
+        } catch (error) {
+            log(`[agent] could not delete old conversations: ${error.message}`);
         }
         const surface = connection.createPanel('agent', { title: 'Agent' });
         session = new AgentSession({
@@ -45,13 +60,14 @@ function createAgentPanel({ connection, pageUrl, settings, makeHost, prepare, co
             setSetting: (key, value) => settings.set(key, value),
             account,
             models,
-            conversations: createConversationStore(conversationsDir),
+            conversations,
+            mcp,
             strings: loadCatalog(resolveLocale(locale)),
             log,
         });
         surface.onMessage((message) => session && session.handle(message));
         surface.onDispose(() => {
-            if (session) session.stop();
+            if (session) session.dispose();
             session = null;
         });
         surface.loadUrl(pageUrl);
@@ -59,17 +75,18 @@ function createAgentPanel({ connection, pageUrl, settings, makeHost, prepare, co
         refreshModels(models);
     }
 
-    /** Close the panel once `agent.enabled` is off. */
-    function closeIfDisabled() {
-        if (enabled()) return;
-        const panel = connection.findPanel((one) => one.type === 'agent');
-        if (panel) panel.dispose();
-    }
-
     return {
         enabled,
         toggle,
-        closeIfDisabled,
+        /** Show the panel, opening it if it isn't. */
+        show() {
+            if (connection.findPanel((panel) => panel.type === 'agent')) connection.setSideShown('right', true);
+            else toggle();
+        },
+        /** Show the settings again after one changed elsewhere (agent.enabled from the menu). */
+        refresh() {
+            if (session) session.postState();
+        },
         get session() { return session; },
         stop() {
             if (session) session.stop();

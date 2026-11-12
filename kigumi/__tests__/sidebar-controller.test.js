@@ -213,21 +213,11 @@ test('Kigumi options lists the switches the host has, and sets one from the page
   expect(config).not.toHaveProperty('viewer.drawingBeta');
 });
 
-test('with MCP on, the sidebar gets its state, copies authenticated setups, and nothing else', async () => {
-  const copied = [];
-  const setups = [];
-  const mcp = {
-    state: () => ({ running: true, url: 'http://127.0.0.1:7345/mcp', clients: [{ name: 'a' }], setups: [{ id: 'claude-code', label: 'Claude Code' }] }),
-    onChange: () => ({ dispose() {} }),
-    copySetup: (id) => setups.push(id),
-  };
-  setHost(settingsHost({ mcp, copyText: async (text) => copied.push(text) }));
+test('MCP is set up in the agent panel: the sidebar has no switch or state for it', async () => {
+  const mcp = { state: () => ({ running: true }), onChange: () => ({ dispose() {} }), copySetup() {} };
+  setHost(settingsHost({ mcp, agentPanel: true }));
   const { surface } = await attached();
-
-  expect(surface.posted.filter((m) => m.type === 'sidebarState').pop().mcp.url).toBe('http://127.0.0.1:7345/mcp');
-  await surface.send({ type: 'sidebarCopyMcp', client: 'address' });
-  await surface.send({ type: 'sidebarCopyMcp', client: 'claude-code' });
-  await surface.send({ type: 'sidebarCopyMcp', client: 'not-a-client' });
-  expect(copied).toEqual([]);
-  expect(setups).toEqual(['claude-code']);
+  const state = surface.posted.filter((m) => m.type === 'sidebarState').pop();
+  expect(state.options.map((o) => o.key)).not.toContain('mcp.enabled');
+  expect(state).not.toHaveProperty('mcp');
 });

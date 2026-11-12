@@ -105,7 +105,6 @@
         $('slot-right').hidden = !showRight;
         $('splitter-right').hidden = !showRight;
         $('toggle-right').classList.toggle('is-active', showRight);
-        $('toggle-right').hidden = state.agent !== true;
         $('update-available').hidden = !state.update;
         $('update-available').title = state.update ? `Kigumi ${state.update.version} is available` : '';
 

@@ -708,8 +708,10 @@ describe('the agent session', () => {
             type: 'agent:state', models: MODELS.map(({ id, label }) => ({ id, label })), model: 'claude-sonnet-5', via: 'openrouter',
             account: { configured: false },
             // The key is set from the panel, which only learns that there is one.
-            settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
+            settings: { 'agent.enabled': false, 'mcp.enabled': false, 'agent.conversationRetentionDays': 30,
+                'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
                 'agent.maxOutputTokens': 16000, 'agent.openrouterApiKey': true },
+            conversationBytes: null,
             strings: {},
         });
         expect(JSON.stringify(state)).not.toContain('sk-or');
@@ -721,6 +723,37 @@ describe('the agent session', () => {
         expect(values['agent.openrouterApiKey']).toBe('sk-or-new');
         agent.handle({ type: 'agent:setSetting', key: 'agent.openrouterApiKey', value: '' });
         expect(values['agent.openrouterApiKey']).toBe('');
+    });
+
+    test('the panel follows the MCP server and copies its setups', () => {
+        const listeners = [];
+        const copied = [];
+        const mcp = { state: () => ({ enabled: true, running: true }), copySetup: (id) => copied.push(id),
+            onChange: (listener) => { listeners.push(listener); return { dispose: () => listeners.splice(0) }; } };
+        const posted = [];
+        const agent = new AgentSession({ host: hostOf(), post: (message) => posted.push(message), setting: (_key, fallback) => fallback, mcp });
+        agent.handle({ type: 'agent:ready' });
+        listeners[0]();
+        agent.handle({ type: 'agent:copyMcpSetup', client: 'codex' });
+
+        expect(posted.filter((message) => message.type === 'agent:mcp')).toEqual([
+            { type: 'agent:mcp', state: { enabled: true, running: true } }, { type: 'agent:mcp', state: { enabled: true, running: true } }]);
+        expect(copied).toEqual(['codex']);
+        agent.dispose();
+        expect(listeners).toEqual([]);
+    });
+
+    test('the panel sets how long conversations are kept, pruning at once, and can delete them all', () => {
+        const calls = [];
+        const { agent, posted, values } = session();
+        agent.conversations = { prune: () => calls.push('prune'), clear: () => calls.push('clear'), usage: () => 0, list: () => [] };
+        agent.handle({ type: 'agent:setSetting', key: 'agent.conversationRetentionDays', value: 7 });
+        agent.handle({ type: 'agent:setSetting', key: 'agent.conversationRetentionDays', value: 5 });
+        expect(values['agent.conversationRetentionDays']).toBe(7);
+
+        agent.handle({ type: 'agent:clearConversations' });
+        expect(calls).toEqual(['prune', 'prune', 'clear']);
+        expect(posted.map((message) => message.type)).toEqual(expect.arrayContaining(['agent:replay', 'agent:conversations']));
     });
 
     test('signed in, requests carry the account\'s token; a turn ends with its cost and the balance is fetched again', async () => {

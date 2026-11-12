@@ -43,6 +43,16 @@ const canRun = typeof electron === 'string' && fs.existsSync(electron) && (proce
         expect(result.setModel).toEqual({ type: 'agent:setModel', id: 'm2' });
     });
 
+    test('the settings row shows the MCP server, copies a setup, and deletes past conversations', () => {
+        expect(result.mcpShown).toContain('http://127.0.0.1:7345/mcp');
+        expect(result.copyMcp).toEqual({ type: 'agent:copyMcpSetup', client: 'claude-code' });
+        expect(result.clearConversations).toEqual({ type: 'agent:clearConversations' });
+    });
+
+    test('with the built-in agent off, only the settings show', () => {
+        expect(result.off).toEqual({ settings: true, chat: false, note: true });
+    });
+
     test('history, new conversation, and stop while busy each ask the session', () => {
         expect(result.history).toEqual({ type: 'agent:listConversations' });
         expect(result.clear).toEqual({ type: 'agent:clear' });

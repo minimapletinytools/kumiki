@@ -60,6 +60,8 @@
             window.kigumiWeb.downloadBase64(message.name, message.base64);
         } else if (message.type === 'web:files') {
             window.kigumiWeb.receiveFiles(message);
+        } else if (message.type === 'web:conversationFiles') {
+            window.kigumiWeb.receiveConversationFiles(message);
         } else if (message.type === 'web:settings') {
             window.kigumiWeb.storeSettings(message.values);
         } else if (message.type === 'web:store') {

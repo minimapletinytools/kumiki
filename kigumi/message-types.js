@@ -37,9 +37,8 @@ const TO_EXTENSION = Object.freeze([
     'exportDrawingPng',
     'requestSaveViewerSettings',
     'runTool',
-    'copyMcpSetup',
-    'requestMcpState',
     'saveParameters',
+    'selectionChanged',
     'setBetaFeature',
     'setRefreshOptions',
     'updateMeasurement',
@@ -60,7 +59,6 @@ const TO_EXTENSION_REPLIES = Object.freeze([
 
 /** Sidebar page to host. Handled in sidebar-controller's handleMessage. */
 const SIDEBAR_TO_HOST = Object.freeze([
-    'sidebarCopyMcp',
     'sidebarExpand',
     'sidebarReady',
     'sidebarRefresh',

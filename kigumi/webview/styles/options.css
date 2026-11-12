@@ -1,32 +1,4 @@
-/* The options panel and frame parameters (viewer-panels.js), the MCP section included. */
-/* The options' MCP server section: whole rows among the options' pills. */
-.mcp-status,
-.mcp-copy,
-.mcp-clients {
-    flex: 1 1 100%;
-}
-.mcp-status {
-    word-break: break-all;
-}
-.mcp-copy {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-}
-.mcp-clients-title {
-    color: var(--hv-title);
-    margin-bottom: 2px;
-}
-.mcp-client {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 2px 0;
-}
-.mcp-client-name {
-    font-weight: 600;
-}
+/* The options panel and frame parameters (viewer-panels.js). */
 /* Frame parameters (kiwari): the sidebar's parameters page, not rendered at all when a
    frame takes no parameters. */
 #kiwari-controls {

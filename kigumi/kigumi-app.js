@@ -6,6 +6,7 @@
 
 const path = require('path');
 const { createPanelDirectory } = require('./agent/panel-directory');
+const { createSelectionHistory } = require('./agent/selection-history');
 const { describeFrame } = require('./frame-description');
 const { buildReport } = require('./build-report');
 const fs = require('fs');
@@ -94,6 +95,12 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
     const standaloneRunners = new Set();   // PythonRunnerSession instances not owned by any session
     const disposables = [];
     let patternSlotCounter = 0;
+    const selectionHistory = createSelectionHistory();
+    // A view's panel id, as the panel directory below names it.
+    const panelIdOf = (session) => (session.sessionType === 'pattern' ? `pattern:${session.slotName}` : `viewer:${session.filePath}`);
+    const recordSelection = (session, { view, drawing, selection }) => selectionHistory.record({
+        panelId: panelIdOf(session), filePath: session.filePath, slotName: session.slotName, view, drawing, selection,
+    });
 
     let openInSplitView = host.getConfig('viewer.openInSplitView', false);
     let autoRefreshOnFileChange = host.getConfig('viewer.autoRefreshOnFileChange', false);
@@ -1019,6 +1026,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                 patternName,
                 openInSplitView,
                 autoRefreshOnFileChange,
+                onSelection: recordSelection,
             }
         );
         patternSessions.set(slotName, patternSession);
@@ -1093,7 +1101,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                     frameSessions.delete(disposedFilePath);
                 }
             },
-            { slotName: 'main', sessionType: 'main', openInSplitView, autoRefreshOnFileChange }
+            { slotName: 'main', sessionType: 'main', openInSplitView, autoRefreshOnFileChange, onSelection: recordSelection }
         );
         frameSessions.set(normalizedFilePath || filePath, session);
         await session.initialize();
@@ -1193,11 +1201,12 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         }
     }
 
-    // What an agent can ask about: the open views, and the host's own panels.
+    // What an agent can ask about: the open views, the host's own panels, and recent selections.
     const panels = createPanelDirectory({
+        selectionHistory,
         views: () => [
-            ...[...frameSessions.values()].map((session) => ({ id: `viewer:${session.filePath}`, session })),
-            ...[...patternSessions.entries()].map(([slotName, session]) => ({ id: `pattern:${slotName}`, session })),
+            ...[...frameSessions.values()].map((session) => ({ id: panelIdOf(session), session })),
+            ...[...patternSessions.values()].map((session) => ({ id: panelIdOf(session), session })),
         ],
         host,
     });

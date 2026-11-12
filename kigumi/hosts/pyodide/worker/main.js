@@ -5,8 +5,8 @@
  *
  * Where the core expects Node, the stand-ins in ./shims/ work through Pyodide: files are Pyodide's
  * (in memory), and Python "processes" run in it (../python/kigumi_pyodide.py). The page holds the
- * projects (IndexedDB) and the settings (localStorage); the open project is written into Pyodide's
- * files, and every change made there goes back to the page.
+ * projects and the agent's saved conversations (IndexedDB) and the settings (localStorage); the open
+ * project is written into Pyodide's files, and every change made there goes back to the page.
  */
 
 const path = require('path');
@@ -43,6 +43,7 @@ const PYPI_PACKAGES = ['trimesh==4.11.3'];
 
 const HOME = '/home/pyodide';
 const DATA = `${HOME}/kigumi`;
+const CONVERSATIONS = `${DATA}/conversations`;
 const PROJECTS = `${HOME}/projects`;
 const PROJECT_ID = /^[a-zA-Z0-9-]{1,64}$/;
 const MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024;
@@ -188,7 +189,6 @@ async function start() {
             progress,
             version: `${packageJson.version} · browser`,
             autoRefresh: settings.get('viewer.autoRefreshOnFileChange', true),
-            agent: agentEnabled(),
         }),
         onCommand: (id, ...args) => {
             void onCommand(id, ...args).catch((error) => {
@@ -313,6 +313,19 @@ async function start() {
     let account = null;
     let modelList = null;
     let agentPanel = null;
+    let markConversationsRestored;
+    const conversationsRestored = new Promise((resolve) => { markConversationsRestored = resolve; });
+
+    /** Write the agent's saved conversations the page kept ({ relative path: content }) where the store reads them. */
+    function restoreConversations(files) {
+        for (const [relative, content] of Object.entries(files || {})) {
+            const target = path.join(CONVERSATIONS, relative);
+            if (typeof content !== 'string' || !target.startsWith(`${CONVERSATIONS}/`)) continue;
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.writeFileSync(target, content);
+        }
+        markConversationsRestored();
+    }
 
     function prepareAgent() {
         const config = browserBackend;
@@ -414,7 +427,11 @@ async function start() {
         settings,
         makeHost: agentHost,
         prepare: prepareAgent,
-        conversationsDir: `${DATA}/conversations`,
+        conversationsDir: CONVERSATIONS,
+        // The page keeps them (IndexedDB), and gives them back at start (web:conversations).
+        onConversationFiles: (update) => post({ type: 'web:conversationFiles', ...update }),
+        mcp: { state: () => mcp.controls.state(), onChange: (listener) => mcp.controls.onChange(listener),
+            copySetup: (clientId) => mcp.controls.copySetup(clientId) },
         locale: (self.navigator && self.navigator.language) || 'en',
         log,
     });
@@ -435,6 +452,8 @@ async function start() {
             settings.replace((args[0] || {}).values);
         } else if (id === 'web:store') {
             Object.assign(stored, (args[0] || {}).values);
+        } else if (id === 'web:conversations') {
+            restoreConversations((args[0] || {}).files);
         } else if (id === 'toggleAgent') {
             agentPanel.toggle();
         } else if (id === 'run') {
@@ -465,9 +484,9 @@ async function start() {
         // The page keeps the settings: each change goes back to it.
         post({ type: 'web:settings', values: settings.values });
         if (mcpReady) void mcp.sync();
-        agentPanel.closeIfDisabled();
+        agentPanel.refresh();
         // Turned on just now: show it, rather than leave the user to find its button.
-        if (agentEnabled() && !agentWasEnabled) agentPanel.toggle();
+        if (agentEnabled() && !agentWasEnabled) agentPanel.show();
         agentWasEnabled = agentEnabled();
         connection.pushState();
     });
@@ -479,7 +498,9 @@ async function start() {
     mcpReady = true;
     void mcp.sync();
     agentWasEnabled = agentEnabled();
-    if (agentEnabled() && settings.get('agent.showOnStartup', true)) agentPanel.toggle();
+    // After the page gave back the saved conversations, so the panel can open the latest.
+    await Promise.race([conversationsRestored, new Promise((resolve) => setTimeout(resolve, 5000))]);
+    if (agentEnabled() && settings.get('agent.showOnStartup', true)) agentPanel.show();
     self.__kigumi = { connection, settings, get project() { return project; }, get app() { return kigumiApp; }, switchProject, knownProjects: () => knownProjects };
 }
 

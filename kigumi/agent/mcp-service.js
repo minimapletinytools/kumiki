@@ -73,7 +73,7 @@ function createMcpService({ settings, tools, ready = () => true, version, log, s
     /** Put what adds Kigumi to an agent (mcp-setup.js) on the clipboard; Claude Code's by default. */
     function copySetup(clientId = 'claude-code') {
         if (!server) {
-            setStatus('warning', 'Turn on the MCP server first (options, beta features).');
+            setStatus('warning', 'Turn on the MCP server first (MCP and agent settings, in the agent panel).');
             return;
         }
         const text = mcpSetupText(clientId, server.url, settings.get('mcp.token', ''));
