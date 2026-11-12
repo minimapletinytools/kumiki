@@ -10,6 +10,10 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kumiki
 
+#### Changed
+
+- The dovetailed sawhorse's router templates trace the dovetail's wide face, and the leg template sits on it, away from the leg. Its export writes one beam template and one leg template for each mirrored pair of legs, A and B, in place of a socket and tail for every leg. Its parameters: `offset` is now `beam_bushing_offset` (default 0) and `leg_bushing_offset` (default 3/16"), and `top`, `bottom` and `width` are `top_depth`, `bottom_depth` and `base_support_width`.
+
 #### Fixed
 
 - A mortise and tenon joint with `bore_mortise_perpendicular_to_face` at an angle other than 45 degrees cut its mortise the wrong length: too short for the tenon when the brace leans close to the post, too long when it stands steep. A tenon running along the mortise face, rather than into it, is now refused instead of divided by zero.

@@ -831,6 +831,7 @@
           "irrational_angle_37_degrees",
           "joint_plane_aligned_notched_2sided",
           "brace_joint_mortise_and_tenon",
+          "steep_brace_joint_mortise_and_tenon",
           "mortise_and_tenon_corner_joint",
           "tusked_mortise_and_tenon",
           "tusked_mortise_and_tenon_entry_from_top",
@@ -898,6 +899,11 @@
             "tags": []
           },
           {
+            "path": "butt_joints/mortise_and_tenon/steep_brace_joint_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
             "path": "corner_joints/mortise_and_tenon/mortise_and_tenon_corner_joint",
             "pattern_type": "frame",
             "tags": []
@@ -945,7 +951,7 @@
         ]
       },
       "relative_path": "mixed/mortise_and_tenon_joints_patterns.py",
-      "sha256": "701dde990885d257ba1d2295548e2ef6be10ffedf630816686929140d7b21a39",
+      "sha256": "9a3e226d8fd8e70e3101983ac891a19d1bcfe9f8e81a691a67597c1661fc16ce",
       "warnings": []
     },
     "patterns/onlypoop/n_legged_stool.py": {
@@ -1289,7 +1295,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 296,
+          "lineno": 498,
           "name": "dovetailed_sawhorse"
         }
       ],
@@ -1298,7 +1304,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/dovetailed_sawhorse.py",
-      "sha256": "0099db9e8cc8e9d5ba2f4e5e85127fcaa73cf2ebd5f3c5a01488e0c2bf50d487",
+      "sha256": "d5074a44fe144cb0fb7c78a364f0e83f275094193fd81ad9c57a8fc6b2a76d13",
       "warnings": []
     },
     "patterns/structures/horsey_example.py": {
@@ -1317,6 +1323,24 @@
       "patternbook": null,
       "relative_path": "structures/horsey_example.py",
       "sha256": "223cf75aeb5054066655f1b71910306f8f73fd71049d0442e0c9035394ea465b",
+      "warnings": []
+    },
+    "patterns/structures/ki_kanji.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "ki_kanji",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 107,
+          "name": "ki_kanji"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_ki_kanji",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "structures/ki_kanji.py",
+      "sha256": "575bbb10f04c032ce1ec985c8c5173946ff637b39c19caaaf86c63f9d27d4297",
       "warnings": []
     },
     "patterns/structures/learn_to_timber_frame_shed.py": {
@@ -1410,7 +1434,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-07T19:43:18.895332+00:00",
+  "generated_at": "2026-11-12T04:35:57.598023+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

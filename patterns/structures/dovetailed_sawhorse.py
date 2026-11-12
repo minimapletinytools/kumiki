@@ -9,9 +9,9 @@ bottom arris. The floor is at z=0.
 Drawings are generated: a plan, and a shop drawing for the beam and one for the four legs. The legs'
 also looks straight down on a leg's level top, where the dovetail is marked out.
 
-Its tool "export router templates" writes two router templates for each leg to
-kigumi_exports/dovetailed_sawhorse/, as STLs in millimetres: one for its socket in the beam, and one
-for its tail.
+Its tool "export router templates" writes router templates to kigumi_exports/dovetailed_sawhorse/, as
+STLs in millimetres: one for a leg's socket in the beam, and one for its tail. The legs come in two
+mirrored pairs, so there are two sets: A for legs +x +y and -x -y, B for +x -y and -x +y.
 """
 
 
@@ -21,7 +21,7 @@ from enum import Enum
 import numpy as np
 
 from kumiki import *
-from kumiki.csg.cross_sections import CrossSection, face_cross_section
+from kumiki.csg.cross_sections import CrossSection, PlaneFrame, cross_section_polygons, face_cross_section
 from kumiki.csg.triangles import mesh_cutcsg
 from kumiki.drawings.auto_drawings import with_auto_drawings
 from kumiki.drawings.measure import ViewAxes
@@ -210,13 +210,15 @@ def tail_template(face: CrossSection, offset: Numeric, thickness: Numeric) -> Cu
                            label=CutCSGLabel("tail_template"))
 
 
-# The router template for a leg's socket in the beam, routed with a dovetail bit through the neck's
-# plane: the export tool's parameters.
+# The router templates for a leg's socket in the beam, routed with a dovetail bit through the neck's
+# plane, and for its tail, routed from the leg's inner face: the export tool's parameters. Both trace
+# the dovetail's wide face, where the bit is widest in the socket and narrowest round the tail.
 ROUTER_TEMPLATE = kiwari(
-    offset=kiwari.length(inches(1, 16), about="The guide bushing's radius less the bit's: 1/16\" for a 5/8\" bushing round a 1/2\" bit"),
-    top=kiwari.length(inches(1, 2), minimum=0, about="The templates' thickness off the neck's plane: the socket's above it, the tail's below"),
-    bottom=kiwari.length(inches(1), minimum=0, about="How far it runs below that plane, down onto the beam it sits on"),
-    width=kiwari.length(inches(2), minimum=0, about="How wide the template is round its opening"),
+    beam_bushing_offset=kiwari.length(inches(0), about="The guide bushing's radius less the bit's at the widest point of the cut"),
+    leg_bushing_offset=kiwari.length(inches(3, 16), about="The guide bushing's radius less the bit's at the narrowest point of the cut"),
+    top_depth=kiwari.length(inches(1, 2), minimum=0, about="The templates' thickness: the beam template's above the neck's plane, the leg template's behind the wide face"),
+    bottom_depth=kiwari.length(inches(1), minimum=0, about="How far the beam template runs below the neck's plane, down onto the beam it sits on"),
+    base_support_width=kiwari.length(inches(2), minimum=0, about="How wide the beam template is round its opening"),
     sides=kiwari.choice(TemplateSides, TemplateSides.TWO_SIDED_LR,
                         about="Which sides it guides along above the neck: the flanks are left and right"),
     supports=kiwari.count(0, minimum=0, about="How many strips to leave across the socket template's opening, as supports, "
@@ -334,44 +336,53 @@ def _clip_between(polygon: List[Tuple[float, float]], along: np.ndarray, low: fl
 def _templates(beam: Timber, socket: Cutting, t: Kiwari) -> Tuple[CutCSG, CutCSG]:
     """Return the router templates for one dovetail's socket in the beam and for its tail, in world space.
 
-    Both are shaped by the dovetail's neck, over the stretch of it where the socket is in the beam. The
-    socket's opening is the neck moved out by the offset, with the uncut beam taken out of its
-    underside, so it sits on the beam; the tail's is the neck moved in by it. Each has clamp slots in
-    its router side, the face away from the neck's plane; the tail's is thickened to keep `CLAMP_FLOOR`
-    under its slot.
+    Both trace the dovetail's wide face, seen square to it, over the stretch where the socket is in the
+    beam. The beam template lies on the neck's plane, its opening the wide face moved out by the beam
+    offset, with the uncut beam taken out of its underside so it sits on the beam. The leg template lies
+    on the wide face, on the side away from the leg, as the wide face moved in by the leg offset. Each
+    has clamp slots in its router side, the face away from the leg; the leg template is thickened to keep
+    `CLAMP_FLOOR` under its slot.
     """
     body = adopt_csg(beam.transform, None, CutTimber(beam, cuts=[]).render_timber_with_cuts_csg_local())
     assert socket.negative_csg is not None, "a socket is a cut"
     dovetail = adopt_csg(beam.transform, None, socket.negative_csg)
     assert isinstance(dovetail, (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)), "the socket is the dovetail's solid"
-    neck = next(feature for feature in dovetail.get_declared_features() if feature.name == "dovetail_neck")
-    plane = neck.locate_simple_unbounded(dovetail)
-    assert plane is not None, "the dovetail's neck is a flat face"
-    neck_face = face_cross_section(neck, dovetail, None, plane.point, float(beam.length))
-    assert neck_face is not None, "the dovetail's neck can be cut by its own plane"
-    frame, (outline,) = neck_face
+    faces = {feature.name: feature for feature in dovetail.get_declared_features()}
+    neck_plane = faces["dovetail_neck"].locate_simple_unbounded(dovetail)
+    wide_plane = faces["dovetail_wide_face"].locate_simple_unbounded(dovetail)
+    assert neck_plane is not None and wide_plane is not None, "the dovetail's neck and wide face are flat"
+    neck_face = face_cross_section(faces["dovetail_neck"], dovetail, None, neck_plane.point, float(beam.length))
+    wide_face = face_cross_section(faces["dovetail_wide_face"], dovetail, None, wide_plane.point, float(beam.length))
+    assert neck_face is not None and wide_face is not None, "the dovetail's faces can be cut by their own planes"
+    frame = neck_face[0]
+    (wide_corners,) = cross_section_polygons(wide_face)
+    # The wide face is parallel to the neck, a leg's thickness in: its outline in the neck's 2D axes.
+    wide_outline = [frame.to_2d(corner) for corner in wide_corners]
+    depth = float((as_ndarray(neck_plane.point) - as_ndarray(wide_plane.point)) @ frame.normal)
+    wide_frame = PlaneFrame.with_axes(frame.origin - frame.normal * depth, frame.u, frame.v, frame.normal)
     # Where the socket starts and stops along the dovetail, from the corners of the part in the beam.
     axis = np.array([float(value) for value in dovetail.transform.orientation.matrix[:, 2]])
     reach = mesh_cutcsg(Intersection(dovetail, body)).mesh.vertices @ axis - frame.origin @ axis
     along = np.array([axis @ frame.u, axis @ frame.v])
-    neck_in_beam = (frame, [_clip_between(outline, along, float(reach.min()), float(reach.max()))])
-    socket_template = router_template(neck_in_beam, body, t.length("offset"), t.length("top"), t.length("width"),
-                                      t.length("bottom"), t.choice("sides", TemplateSides),
+    outline = _clip_between(wide_outline, along, float(reach.min()), float(reach.max()))
+    beam_offset, leg_offset = t.length("beam_bushing_offset"), t.length("leg_bushing_offset")
+    top = t.length("top_depth")
+    socket_template = router_template((frame, [outline]), body, beam_offset, top, t.length("base_support_width"),
+                                      t.length("bottom_depth"), t.choice("sides", TemplateSides),
                                       t.count("supports"), t.length("support_thickness"))
     # Clamp slots, into each template's router side: the socket's two run diagonally out to the top left
     # and bottom right from over the beam beside the opening, the tail's down from its narrow top end.
-    width, depth = t.length("clamp_width"), t.length("clamp_depth")
-    top = t.length("top")
-    opening = _offset_convex(neck_in_beam[1][0], float(t.length("offset")))
+    width, depth_of_slot = t.length("clamp_width"), t.length("clamp_depth")
+    opening = _offset_convex(outline, float(beam_offset))
     beam_seen = (mesh_cutcsg(body).mesh.vertices - frame.origin) @ np.array([frame.u, frame.v]).T
     footprint = _convex_hull(beam_seen)
     socket_template = Difference(socket_template, [
         _diagonal_slot(frame, opening, footprint, np.array(toward), width, t.length("clamp_clearance"),
-                       top - depth, top + mm(1))
+                       top - depth_of_slot, top + mm(1))
         for toward in ((-1.0, 0.0, 1.0), (1.0, 0.0, -1.0))], label=CutCSGLabel("socket_template"))
-    tail_thickness = max(top, depth + CLAMP_FLOOR)
-    tail = tail_template(neck_in_beam, t.length("offset"), tail_thickness)
-    tail_outline = np.array(_offset_convex(neck_in_beam[1][0], -float(t.length("offset"))))
+    tail_thickness = max(top, depth_of_slot + CLAMP_FLOOR)
+    tail = tail_template((wide_frame, [outline]), leg_offset, tail_thickness)
+    tail_outline = np.array(_offset_convex(outline, -float(leg_offset)))
     up = np.array([frame.u[2], frame.v[2]]) / np.linalg.norm([frame.u[2], frame.v[2]])
     # The top end: the edge facing most up, the slot from its middle along its inward normal.
     starts, ends = tail_outline, np.roll(tail_outline, -1, axis=0)
@@ -381,26 +392,33 @@ def _templates(beam: Timber, socket: Cutting, t: Kiwari) -> Tuple[CutCSG, CutCSG
         normals = -normals
     top_edge = int(np.argmax(normals @ up))
     tip = (starts[top_edge] + ends[top_edge]) / 2
-    tail = Difference(tail, [_slot(frame, tip, -normals[top_edge], -float(mm(1)), float(t.length("tail_clamp_length")), width,
-                                   -tail_thickness - mm(1), -tail_thickness + depth)],
+    tail = Difference(tail, [_slot(wide_frame, tip, -normals[top_edge], -float(mm(1)), float(t.length("tail_clamp_length")), width,
+                                   -tail_thickness - mm(1), -tail_thickness + depth_of_slot)],
                       label=CutCSGLabel("tail_template"))
     return socket_template, tail
 
 
+# The legs come in two mirrored pairs, each a half-turn of the other about the beam's middle: one
+# leg of each stands for its pair.
+TEMPLATE_PAIRS = {"A": "leg +x +y", "B": "leg +x -y"}
+
+
 def _export_templates(beam: Timber, legs: List[CutTimber], joints: List[Joint], t: Kiwari) -> str:
-    """Write each leg's socket and tail templates to STLs in millimetres, in kigumi_exports/, and say where."""
+    """Write the beam and leg templates for each pair of legs to STLs in millimetres, in kigumi_exports/, and say where."""
     folder = pathlib.Path.cwd() / "kigumi_exports" / "dovetailed_sawhorse"
     folder.mkdir(parents=True, exist_ok=True)
+    joint_of = {leg.timber.ticket.path: joint for leg, joint in zip(legs, joints)}
     written = []
-    for leg, joint in zip(legs, joints):
-        socket_template, tail = _templates(beam, joint.cuttings["receiving_timber"], t)
-        for part, template in (("socket", socket_template), ("tail", tail)):
+    for pair, leg in TEMPLATE_PAIRS.items():
+        beam_template, leg_template = _templates(beam, joint_of[leg].cuttings["receiving_timber"], t)
+        for part, template in (("beam_template", beam_template), ("leg_template", leg_template)):
             mesh = mesh_cutcsg(template).mesh.copy()
             mesh.apply_scale(1000)
-            path = folder / f"router template {leg.timber.ticket.path} {part}.stl"
+            path = folder / f"{pair} {part}.stl"
             mesh.export(path)
             written.append(path.name)
-    return f"Wrote {len(written)} router templates to {folder}:\n" + "\n".join(written)
+    return (f"Wrote {len(written)} router templates to {folder}:\n" + "\n".join(written)
+            + "\nA is for legs +x +y and -x -y, B for +x -y and -x +y.")
 
 
 def _leg_end(name: str) -> FeatureOverride:
