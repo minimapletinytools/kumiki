@@ -18,9 +18,10 @@ CROP = (38, 100, 1638, 1700)
 # The viewer's floor reflection under the post (x from, x to, from y): painted over with the background beside it.
 REFLECTION = (770, 906, 1563)
 CORNER = 0.22  # the rounded square's corner radius, as a share of its side
-CONTRAST = 1.15  # a little more than the render, so the timber holds up when small
-# The timber's colour: the render's pale timber is too close to its pale background to read.
-WOOD = (196, 140, 82)
+CONTRAST = 1.0  # walnut on cream holds up when small without more
+# Walnut timber on cream, in place of the render's pale timber on mint green.
+WOOD = (140, 92, 54)
+BACKGROUND = (240, 233, 220)
 
 
 def timber_mask(image):
@@ -32,10 +33,10 @@ def timber_mask(image):
 
 
 def wood_coloured(image):
-    """`image` with its timber tinted WOOD, keeping the render's shading, outlines and pegs."""
+    """`image` with its timber tinted WOOD, keeping the render's shading, outlines and pegs, on BACKGROUND."""
     lightness = image.convert('L').point(lambda v: min(255, int(v * 1.04)))
     tinted = Image.merge('RGB', [lightness.point(lambda v, c=c: int(v * c / 255)) for c in WOOD])
-    return Image.composite(tinted, image, timber_mask(image))
+    return Image.composite(tinted, Image.new('RGB', image.size, BACKGROUND), timber_mask(image))
 
 
 def render(size, inset=0.0, contrast=CONTRAST):
@@ -62,7 +63,7 @@ def main():
     # macOS draws an app icon's rounded square at 824 of 1024 px.
     render(1024, inset=100 / 1024).save(KIGUMI / 'app-icon.png', optimize=True)
     # A browser tab shows it at 16 px: more contrast still.
-    render(64, contrast=1.3).save(KIGUMI / 'hosts/pyodide/page/favicon.png', optimize=True)
+    render(64, contrast=1.15).save(KIGUMI / 'hosts/pyodide/page/favicon.png', optimize=True)
     print('Wrote extension-icon.png, app-icon.png and hosts/pyodide/page/favicon.png')
 
 

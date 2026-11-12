@@ -104,8 +104,8 @@ body.kw-is-loading .welcome > :not(h1):not(.kw-loading) {
 }
 
 .kw-loading {
-    --kw-wood: #c48c52;
-    --kw-wood-dark: #a26a36;
+    --kw-wood: #8c5c36;
+    --kw-wood-dark: #6b4426;
     display: flex;
     flex-direction: column;
     align-items: center;
