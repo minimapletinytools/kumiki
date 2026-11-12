@@ -1,6 +1,6 @@
 # kigumi architecture: runner and app core (2026-10-29)
 
-The agent got this treatment already (`archive/agent-architecture.md`). This is the same for the rest of
+The agent got this treatment already (`../archive/agent-architecture.md`). This is the same for the rest of
 kigumi: what is there, what it should be, and an order that keeps it working at every step.
 
 ## What is there

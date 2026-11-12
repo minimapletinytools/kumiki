@@ -78,7 +78,7 @@ Sections 3, 6 and 7 wait on the open questions marked **Q**.
 
 ## 8. Auto drawing
 
-- No generator exists yet: required features and the solver do (archive/featuresolving-plan.md, Part 2 E
+- No generator exists yet: required features and the solver do (../archive/featuresolving-plan.md, Part 2 E
   is the missing piece).
 - Greedy: add the measurement that removes the most unknowns; ties go to ones from the reference
   face/edge. Each placed in a view where its features are visible (section 5).
