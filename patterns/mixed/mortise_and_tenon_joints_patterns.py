@@ -513,6 +513,25 @@ def example_brace_joint(position=None, use_round_timbers=False) -> Frame:
     Args:
         position: Optional offset position (V3) to translate the joint
     """
+    return _mortised_brace_frame(position, use_round_timbers, scalar(1, 2), scalar(1, 2),
+                                 name="Brace Joint with Mortise and Tenon")
+
+
+@pattern("butt_joints/mortise_and_tenon/steep_brace_joint_mortise_and_tenon")
+def example_steep_brace_joint(position=None, use_round_timbers=False) -> Frame:
+    """
+    The brace joint with an uneven brace: it meets timber1 at its middle and timber2 a quarter
+    of the way along, so it enters one at 26.6 degrees and the other at 63.4.
+
+    Both mortises are bored square to the face, so each hole is stretched along the slope to
+    the tenon's footprint: longer at the shallow end, shorter at the steep one.
+    """
+    return _mortised_brace_frame(position, use_round_timbers, scalar(1, 2), scalar(1, 4),
+                                 name="Steep Brace Joint with Mortise and Tenon")
+
+
+def _mortised_brace_frame(position, use_round_timbers, share_of_timber1, share_of_timber2, name) -> Frame:
+    """A corner with a brace mortised into both timbers, meeting each at that share of its length."""
     if position is None:
         position = create_v3(0, 0, 0)
     
@@ -526,8 +545,8 @@ def example_brace_joint(position=None, use_round_timbers=False) -> Frame:
     brace_timber = join_plane_aligned_on_plane_aligned_timbers(
         timber1=timber1,
         timber2=timber2,
-        location_on_timber1=timber1.length / scalar(2),
-        location_on_timber2=timber2.length / scalar(2),
+        location_on_timber1=timber1.length * share_of_timber1,
+        location_on_timber2=timber2.length * share_of_timber2,
         stickout=Stickout.nostickout(),
         size=timber1.size,
         orientation_long_face_on_timber1=TimberLongFace.RIGHT,
@@ -607,7 +626,7 @@ def example_brace_joint(position=None, use_round_timbers=False) -> Frame:
     
     # Combine miter + both mortise-and-tenon joints into a single Frame
     # Frame.from_joints will handle merging cuts on timbers that appear in multiple joints
-    return Frame.from_joints([miter_joint, joint1, joint2], name="Brace Joint with Mortise and Tenon")
+    return Frame.from_joints([miter_joint, joint1, joint2], name=name)
 
 
 @pattern("corner_joints/mortise_and_tenon/mortise_and_tenon_corner_joint")

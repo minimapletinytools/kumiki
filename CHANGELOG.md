@@ -8,6 +8,12 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kumiki
+
+#### Fixed
+
+- A mortise and tenon joint with `bore_mortise_perpendicular_to_face` at an angle other than 45 degrees cut its mortise the wrong length: too short for the tenon when the brace leans close to the post, too long when it stands steep. A tenon running along the mortise face, rather than into it, is now refused instead of divided by zero.
+
 ### kigumi
 
 #### Changed

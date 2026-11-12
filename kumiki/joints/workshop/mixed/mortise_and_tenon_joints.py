@@ -217,14 +217,26 @@ def cut_mortise_and_tenon_joint(
     marking_space: Space = Space(transform=tenon_base_transform)
 
     mortise_face_normal = shoulder_plane.normal
-    cos_angle = safe_dot_product(
+    # The tenon's angle is measured from the face's normal, so its cosine is the sine of the angle to
+    # the face itself: how steeply the tenon enters. A tenon of width w covers w / sin_from_face of the face.
+    cos_from_normal = safe_dot_product(
         safe_normalize_vector(mortise_face_normal), safe_normalize_vector(tenon_end_direction)
     )
+    sin_from_face = Abs(cos_from_normal)
+    arrangement_check(
+        None if not safe_zero_test(sin_from_face)
+        else "The tenon runs along the mortise face instead of into it"
+    )
 
-    sin_angle_sq = scalar(1) - cos_angle * cos_angle
-    is_square = safe_zero_test(sin_angle_sq)
-    sin_angle = sqrt(Abs(sin_angle_sq))
-    back_extension = scalar(0) if is_square else max(tenon_size[0], tenon_size[1]) / sin_angle
+    sin_from_normal_sq = scalar(1) - cos_from_normal * cos_from_normal
+    is_square = safe_zero_test(sin_from_normal_sq)
+    sin_from_normal = sqrt(Abs(sin_from_normal_sq))
+    # How far the slanted shoulder dips behind the tenon's base: (size / 2) * tan(angle from the
+    # normal), doubled for margin. The shoulder trims whatever reaches further.
+    back_extension = (
+        scalar(0) if is_square
+        else max(tenon_size[0], tenon_size[1]) * sin_from_normal / sin_from_face
+    )
 
     tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"
 
@@ -272,7 +284,7 @@ def cut_mortise_and_tenon_joint(
         joint_angle_axis_index = tenon_timber.get_size_index_in_long_face_normal_axis(joint_angle_axis_face)
 
         mortise_hole_length_oblique_direction = mortise_timber.get_face_direction_global(mortise_oblique_end)
-        end_crop_distance = tenon_size[joint_angle_axis_index] / sin_angle / scalar(2)
+        end_crop_distance = tenon_size[joint_angle_axis_index] / sin_from_face / scalar(2)
 
         mortise_hole_end_crop_global = HalfSpace(
             normal=mortise_hole_length_oblique_direction,
@@ -334,7 +346,7 @@ def cut_mortise_and_tenon_joint(
             opp_index = 1 if joint_angle_axis_index == 0 else 0
             mortise_hole_size = create_v2(
                 tenon_size[opp_index],
-                tenon_size[joint_angle_axis_index] / sin_angle,
+                tenon_size[joint_angle_axis_index] / sin_from_face,
             )
 
             mortise_hole_orientation = Orientation.from_z_and_y(
@@ -500,7 +512,7 @@ def cut_mortise_and_tenon_joint(
     )
 
     tenon_length_direction_global = tenon_timber.get_face_direction_global(tenon_end)
-    tip_position_global = marking_space.transform.position + tenon_length_direction_global * max(tenon_length, max(tenon_size[0], tenon_size[1])/cos_angle)
+    tip_position_global = marking_space.transform.position + tenon_length_direction_global * max(tenon_length, max(tenon_size[0], tenon_size[1])/cos_from_normal)
     tip_position_local = tenon_timber.transform.global_to_local(tip_position_global)
     tip_z_local = tip_position_local[2]
 
