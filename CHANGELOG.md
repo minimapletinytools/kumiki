@@ -8,6 +8,14 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-11
+
+### kumiki
+
+#### Changed
+
+- The dovetailed sawhorse pattern has router jig parts.
+
 ### kigumi
 
 #### Added
@@ -15,12 +23,15 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - **Delete File…** in the explorer's right-click menu, on files in All Files (the standalone app and the browser version) and on the project's frames: asked first, and views open on the file close.
 - The MCP server tells agents to read kumiki's usage instructions and API cheat sheet before writing frames, and gives them a `kumiki_docs` tool to read them, for agents that can't see the project's `.kigumi/docs/` (Claude desktop or claude.ai through the browser version).
 - Codex and Antigravity (`agy`) in the MCP server's copy-setup buttons: a `~/.codex/config.toml` block, and an `agy mcp add` command.
+- MCP in the browser version, for signed-in users: the tab connects out to Kigumi's relay, and agents get the tab's tools at an HTTPS URL, including the project's text files (`list_files`, `search_files`, `read_file`, `write_file`, `edit_file`, `new_file`, `delete_file`, `rename_file`). Sessions last 24 hours and need the tab open.
+- A `get_selection_history` tool for agents: the user's last 20 selections in the views, newest first, optionally for one file only.
+- The built-in agent's conversations are kept in the browser version too, across reloads, and can be reopened from history. A retention setting (7, 30 or 90 days, or just the last 50), the space they use, and a button to clear them, in the agent panel's settings.
 
 #### Changed
 
 - The browser version shows a loading card while Python and kumiki load: a progress bar through the start-up steps (with each package as it loads), the steps ticked off, and a parade of logs and beavers. The projects page appears once Kigumi is ready.
 - The sidebar notices a frame or pattern written into an existing file, such as one just made with New File, and one taken out or deleted. Each save only re-reads that file; the scan, which runs Python, happens only when its `@frame` / `@pattern` count changes, and skips the shipped patterns.
-- The MCP server has its own section in the explorer, **MCP server for agents**, above Kigumi options, saying what it is for.
+- The MCP server's settings and the built-in agent's settings are in one collapsible row at the top of the agent panel, **MCP and agent settings**, in place of the explorer's and viewer options' MCP controls and the panel's settings button. The agent panel always opens; with the built-in agent off it shows only that row.
 - The built-in agent asks for medium reasoning effort, and no longer reminds itself to write a first version after a few looks (it fired on questions too).
 - The agent's default output limit per step is now 16k tokens, since reasoning counts toward it.
 - The agent's `describe_frame` takes a frame file and answers in YAML: each timber's ends, the world direction each of its faces looks, its box as cut, what it touches and its joints.

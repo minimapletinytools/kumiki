@@ -2,7 +2,7 @@
   "name": "kigumi",
   "displayName": "Kigumi",
   "description": "Interactive 3D viewer and CAD environment for Kumiki timber framing and woodworking joinery in Python",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "publisher": "minimaple",
   "license": "Elastic-2.0",
   "homepage": "https://kumiki.build",
