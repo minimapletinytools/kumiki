@@ -640,8 +640,10 @@ function recentFoldersMenu() {
 function buildMenu() {
     const isMac = process.platform === 'darwin';
     const command = (label, id, accelerator) => ({ label, accelerator, click: () => runAppCommand(id) });
+    // On macOS the edit keys (⌘C, ⌘V, …) in text boxes need menu items; these are hidden but keep their keys.
+    const editKeys = isMac ? [{ type: 'separator', visible: false },
+        ...['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll'].map((role) => ({ role, visible: false }))] : [];
     const template = [
-        ...(isMac ? [{ role: 'appMenu' }] : []),
         {
             label: 'File',
             submenu: [
@@ -662,20 +664,15 @@ function buildMenu() {
                     },
                 },
                 ...(isMac ? [] : [{ type: 'separator' }, { role: 'quit' }]),
+                ...editKeys,
             ],
         },
-        { role: 'editMenu' },
         {
+            // On macOS this is the app menu too, so Kigumi shows once.
             label: 'Kigumi',
             submenu: [
+                ...(isMac ? [{ role: 'about' }, { type: 'separator' }] : []),
                 command('Refresh Active Viewer', 'kigumi.render', 'CmdOrCtrl+R'),
-                { label: 'Browse Patterns', enabled: Boolean(workspaceFolder), click: () => browsePatterns() },
-                { label: 'Browse Examples', enabled: Boolean(workspaceFolder), click: () => browseExamples() },
-                command('Close Pattern Viewer…', 'kigumi.unloadPattern'),
-                { type: 'separator' },
-                command('Initialize Project', 'kigumi.initializeProjectInWorkspace'),
-                command('Update Kumiki', 'kigumi.updateKumiki'),
-                { label: 'Check for Updates…', click: () => void checkForUpdatesNow() },
                 command('Refresh Explorer', 'kigumi.refreshSidebar'),
                 {
                     label: 'Auto Refresh on File Change',
@@ -683,6 +680,14 @@ function buildMenu() {
                     checked: settings.get('viewer.autoRefreshOnFileChange', false),
                     click: () => runAppCommand('kigumi.toggleAutoRefreshOnFileChange'),
                 },
+                { type: 'separator' },
+                { label: 'Browse Patterns', enabled: Boolean(workspaceFolder), click: () => browsePatterns() },
+                { label: 'Browse Examples', enabled: Boolean(workspaceFolder), click: () => browseExamples() },
+                command('Close Pattern Viewer…', 'kigumi.unloadPattern'),
+                { type: 'separator' },
+                command('Initialize Project', 'kigumi.initializeProjectInWorkspace'),
+                command('Update Kumiki', 'kigumi.updateKumiki'),
+                { label: 'Check for Updates…', click: () => void checkForUpdatesNow() },
                 { type: 'separator' },
                 {
                     label: 'Enable Built-in Agent',
@@ -695,31 +700,22 @@ function buildMenu() {
                 { type: 'separator' },
                 { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
                 { label: 'Show Log', accelerator: 'CmdOrCtrl+Shift+U', click: () => openLogTab() },
-            ],
-        },
-        {
-            label: 'View',
-            submenu: [
+                { label: 'Open Logs Folder', click: () => electronShell.openPath(path.dirname(logChannel.filePath)) },
                 {
                     label: 'Toggle Developer Tools',
                     accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
-                    click: () => {
-                        mainWindow.webContents.toggleDevTools();
-                    },
+                    click: () => mainWindow.webContents.toggleDevTools(),
                 },
-                { type: 'separator' },
                 { role: 'togglefullscreen' },
-            ],
-        },
-        {
-            role: 'help',
-            submenu: [
+                { type: 'separator' },
                 command('Kumiki Website', 'kigumi.openWebsite'),
-                { label: 'Open Logs Folder', click: () => electronShell.openPath(path.dirname(logChannel.filePath)) },
+                ...(isMac ? [{ type: 'separator' }, { role: 'services' }, { type: 'separator' },
+                    { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] : []),
             ],
         },
     ];
-    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    // macOS makes the first menu the app menu: Kigumi, then File.
+    Menu.setApplicationMenu(Menu.buildFromTemplate(isMac ? template.reverse() : template));
 }
 
 async function start() {

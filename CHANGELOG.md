@@ -8,6 +8,12 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kigumi
+
+#### Changed
+
+- The standalone app's menus are Kigumi and File. On macOS the Kigumi menu is also the app menu, so it no longer appears twice. View and Help are folded into Kigumi, and the Edit menu is gone; the edit keys still work in text boxes.
+
 ## [0.9.4] - 2026-11-11
 
 ### kumiki
