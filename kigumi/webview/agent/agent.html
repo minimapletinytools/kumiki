@@ -16,31 +16,61 @@
             <div class="agent-actions">
                 <select id="model-select" class="model-select" title="Model" data-i18n-title="agent.model"></select>
                 <button id="btn-history" class="icon-btn" title="Past conversations" data-i18n-title="agent.history"><span class="codicon codicon-history"></span></button>
-                <button id="btn-settings" class="icon-btn" title="Agent settings" data-i18n-title="agent.settings" aria-haspopup="true" aria-expanded="false"><span class="codicon codicon-settings-gear"></span></button>
                 <button id="btn-clear" class="icon-btn" title="New conversation" data-i18n-title="agent.new"><span class="codicon codicon-add"></span></button>
             </div>
         </header>
 
-        <div id="settings-menu" class="settings-menu" hidden>
-            <div class="settings-heading" data-i18n="agent.settings.heading">Before the agent changes something</div>
-            <label><input type="radio" name="permission-mode" value="ask"> <span data-i18n="agent.settings.ask">Ask before editing files</span></label>
-            <label><input type="radio" name="permission-mode" value="auto"> <span data-i18n="agent.settings.auto">Don't ask: edit files and run frames freely</span></label>
-            <div id="always-allowed" class="always-allowed"></div>
-            <label class="settings-select"><span data-i18n="agent.settings.outputLimit">Longest step</span>
-                <select id="setting-output-limit">
-                    <option value="8000" data-i18n="agent.settings.outputLimit.8000">8k tokens</option>
-                    <option value="16000" data-i18n="agent.settings.outputLimit.16000">16k tokens</option>
-                    <option value="32000" data-i18n="agent.settings.outputLimit.32000">32k tokens</option>
-                </select></label>
-            <label><input id="setting-startup" type="checkbox"> <span data-i18n="agent.settings.startup">Open the agent when Kigumi starts</span></label>
-            <label class="settings-key"><span data-i18n="agent.settings.openrouterKey">OpenRouter key</span>
-                <input id="setting-openrouter-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…"></label>
-            <div id="setting-openrouter-key-note" class="settings-key-note"></div>
-        </div>
+        <!-- MCP first, then the built-in agent's settings (menus.js). Always open while the agent is off. -->
+        <section id="settings-row" class="settings-row">
+            <button id="settings-toggle" class="settings-toggle" aria-expanded="false" aria-controls="settings-menu">
+                <span class="codicon codicon-chevron-right"></span>
+                <span data-i18n="agent.settings.row">MCP and agent settings</span>
+            </button>
+            <div id="settings-menu" class="settings-menu" hidden>
+                <div id="mcp-settings" class="settings-group" hidden>
+                    <div class="settings-heading" data-i18n="agent.mcp.heading">MCP server for your own agent</div>
+                    <div class="settings-hint-block" data-i18n="agent.mcp.intro">Let your own agent (Claude Code, Codex, Cursor…) see your frames, rebuild them and read their errors.</div>
+                    <label><input id="setting-mcp" type="checkbox"> <span data-i18n="agent.mcp.enable">Turn on the MCP server</span></label>
+                    <div id="mcp-details" class="mcp-details"></div>
+                </div>
+                <div class="settings-group">
+                    <div class="settings-heading" data-i18n="agent.settings.builtIn">Built-in agent</div>
+                    <label><input id="setting-agent-enabled" type="checkbox"> <span data-i18n="agent.settings.enabled">Use the built-in agent</span></label>
+                    <div id="agent-settings" class="agent-settings">
+                        <div class="settings-subheading" data-i18n="agent.settings.heading">Before the agent changes something</div>
+                        <label><input type="radio" name="permission-mode" value="ask"> <span data-i18n="agent.settings.ask">Ask before editing files</span></label>
+                        <label><input type="radio" name="permission-mode" value="auto"> <span data-i18n="agent.settings.auto">Don't ask: edit files and run frames freely</span></label>
+                        <div id="always-allowed" class="always-allowed"></div>
+                        <label class="settings-select"><span data-i18n="agent.settings.outputLimit">Longest step</span>
+                            <select id="setting-output-limit">
+                                <option value="8000" data-i18n="agent.settings.outputLimit.8000">8k tokens</option>
+                                <option value="16000" data-i18n="agent.settings.outputLimit.16000">16k tokens</option>
+                                <option value="32000" data-i18n="agent.settings.outputLimit.32000">32k tokens</option>
+                            </select></label>
+                        <label><input id="setting-startup" type="checkbox"> <span data-i18n="agent.settings.startup">Open the agent when Kigumi starts</span></label>
+                        <label class="settings-key"><span data-i18n="agent.settings.openrouterKey">OpenRouter key</span>
+                            <input id="setting-openrouter-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-…"></label>
+                        <div id="setting-openrouter-key-note" class="settings-key-note"></div>
+                        <label class="settings-select"><span data-i18n="agent.settings.retention">Keep past conversations</span>
+                            <select id="setting-retention">
+                                <option value="7" data-i18n="agent.settings.retention.7">7 days</option>
+                                <option value="30" data-i18n="agent.settings.retention.30">30 days</option>
+                                <option value="90" data-i18n="agent.settings.retention.90">90 days</option>
+                                <option value="0" data-i18n="agent.settings.retention.0">The last 50</option>
+                            </select></label>
+                        <div class="settings-storage">
+                            <span id="conversation-usage"></span>
+                            <button id="clear-conversations" class="link-btn" data-i18n="agent.settings.clearConversations">Delete all past conversations</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
         <div id="history-menu" class="history-menu" hidden>
             <div id="history-list"></div>
         </div>
         <div id="bypass-banner" class="bypass-banner" hidden>Not asking before changes</div>
+        <div class="agent-off-note" data-i18n="agent.off">The built-in agent is off. Turn it on in MCP and agent settings, above.</div>
         <div id="messages" class="agent-messages">
             <div class="agent-welcome" id="welcome">
                 <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
@@ -58,7 +88,7 @@
                                 <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
                                 <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
                             </span></li>
-                        <li data-i18n="agent.web.key">Add your own OpenRouter key in the agent's settings (the gear above)</li>
+                        <li data-i18n="agent.web.key">Add your own OpenRouter key in the agent's settings (MCP and agent settings, above)</li>
                         <li><a href="https://kumiki.build/install" target="_blank" rel="noopener noreferrer"
                             data-i18n="agent.web.app">Download the standalone app, which also connects your own agent (Claude Code and others) over MCP</a></li>
                     </ol>

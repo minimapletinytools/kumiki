@@ -71,6 +71,21 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve =
             },
         },
         {
+            name: 'get_selection_history',
+            description: 'What the user selected in the views lately, newest first (the last 20 at most): '
+                + 'when, in which view and file, and the timbers or feature selected, as describe_panel gives '
+                + 'them. Use it when the user refers to something they selected earlier. Give file_path to '
+                + 'get only that file\'s selections.',
+            shape: {
+                limit: z.number().int().min(1).max(20).optional().describe('How many, newest first. Defaults to 20.'),
+                file_path: z.string().optional().describe('Only selections in this frame file: relative to the project folder, or absolute inside it.'),
+            },
+            effect: 'read',
+            run: async ({ limit, file_path: filePath }) => text({
+                selections: panels.recentSelections(limit || 20, filePath ? resolve(filePath) : undefined),
+            }),
+        },
+        {
             name: 'open_in_viewer',
             description: 'Open a Python frame file in a Kigumi 3D view (or bring its view forward).',
             shape: { file_path: z.string().describe('A .py frame file: relative to the project folder, or absolute inside it.') },

@@ -1,6 +1,6 @@
 // The agent panel: it lists the models, offers signing in when there is no key, and a model picked
 // there is kept; with a key set, it says it is using it. Its settings set the longest step. And the
-// build an agent's edit runs. Turned off, the agent is gone: its panel, button and menu item.
+// build an agent's edit runs. Turned off, the panel shows only its settings; turned on from there, the chat is back.
 
 module.exports = {
     name: 'agent',
@@ -26,13 +26,13 @@ module.exports = {
         check('a model picked in the panel is kept, and the panel says which key it uses',
             settings.get('agent.model') === 'claude-haiku-4.5' && Boolean(using), `${settings.get('agent.model')}; ${using}`);
 
-        await read(`doc.getElementById('btn-settings').click()`);
+        await read(`doc.getElementById('settings-toggle').click()`);
         const shown = await read(`doc.getElementById('setting-output-limit').value`);
         await read(`(() => { const select = doc.getElementById('setting-output-limit'); select.value = '32000';
             select.dispatchEvent(new Event('change')); })()`);
         const limit = await waitFor(() => settings.get('agent.maxOutputTokens') === 32000, { timeoutMs: 5000 }).catch(() => false);
         await capture('agent-settings');
-        await read(`doc.getElementById('btn-settings').click()`);
+        await read(`doc.getElementById('settings-toggle').click()`);
         settings.set('agent.maxOutputTokens', 16000);
         check('the settings menu sets the longest step', shown === '16000' && limit, `shown ${shown}, now ${settings.get('agent.maxOutputTokens')}`);
 
@@ -49,27 +49,24 @@ module.exports = {
             report && report.ok === true && Array.isArray(report.entries) && report.entries.length === 0, JSON.stringify(report).slice(0, 200));
 
         const { Menu } = require('electron');
-        const menuHasAgent = () => Menu.getApplicationMenu().items.flatMap((item) => (item.submenu ? item.submenu.items : []))
-            .some((item) => item.label === 'Toggle Agent');
         const agentPanel = () => Boolean(connection().findPanel((panel) => panel.type === 'agent'));
         settings.set('agent.enabled', false);
-        const gone = await waitFor(async () => !agentPanel() && !menuHasAgent()
-            && await inShell(`document.querySelector('#toggle-right').hidden`), { timeoutMs: 5000 }).catch(() => false);
-        await onShellCommand('toggleAgent');
-        check('turned off, the agent panel closes and its button and menu item go, and it can\'t be opened',
-            gone && !agentPanel(), `panel ${agentPanel()}, menu ${menuHasAgent()}`);
-        settings.set('agent.enabled', true);
-        const back = await waitFor(async () => menuHasAgent()
-            && !(await inShell(`document.querySelector('#toggle-right').hidden`)), { timeoutMs: 5000 }).catch(() => false);
-        check('turned back on, the button and menu item return', back);
-        check('turned on, the agent panel opens by itself',
-            await waitFor(() => agentPanel(), { timeoutMs: 5000 }).then(() => true, () => false));
+        const onlySettings = await waitFor(() => read(`!doc.getElementById('settings-menu').hidden
+            && doc.getElementById('messages').offsetParent === null && doc.querySelector('.agent-off-note').offsetParent !== null`),
+        { timeoutMs: 5000 }).catch(() => false);
+        check('turned off, the agent panel stays, showing only its settings, and its button stays',
+            onlySettings && agentPanel() && !(await inShell(`document.querySelector('#toggle-right').hidden`)));
+        await read(`doc.getElementById('setting-agent-enabled').click()`);
+        const back = await waitFor(() => settings.get('agent.enabled') === true
+            && read(`doc.getElementById('messages').offsetParent !== null`), { timeoutMs: 5000 }).catch(() => false);
+        check('turned back on from its settings, the chat returns, the panel still shown', back && agentPanel()
+            && await inShell(`!document.querySelector('#slot-right').hidden`));
 
         const enableItem = () => Menu.getApplicationMenu().items.flatMap((item) => (item.submenu ? item.submenu.items : []))
-            .find((item) => item.label === 'Enable Agent Panel');
-        check('Kigumi > Enable Agent Panel is checked while it is on', enableItem() && enableItem().checked === true);
+            .find((item) => item.label === 'Enable Built-in Agent');
+        check('Kigumi > Enable Built-in Agent is checked while it is on', enableItem() && enableItem().checked === true);
         enableItem().click();
-        check('and unchecking it turns the agent off', await waitFor(() => settings.get('agent.enabled') === false && !agentPanel(),
+        check('and unchecking it turns the agent off', await waitFor(() => settings.get('agent.enabled') === false,
             { timeoutMs: 5000 }).then(() => true, () => false));
 
         check('a view\'s options offer the agent panel', await openFrame() && await waitFor(() => inShell(`(() => {

@@ -81,20 +81,18 @@ module.exports = {
             await inExplorer(`row('files-root')?.querySelector('.ks-twistie')?.click(); return true;`);
         }
 
-        // Above the tree: Project status, open; the MCP server and Kigumi options, closed until opened.
+        // Above the tree: Project status, open; Kigumi options, closed until opened. MCP is in the agent panel.
         const sections = await inExplorer(`return [...doc.querySelectorAll('.ks-section')].map((one) => ({
             id: one.dataset.section, open: one.querySelector('.ks-section-header').getAttribute('aria-expanded'),
             rows: one.querySelectorAll('.ks-status-row, .ks-option').length }));`);
-        check('the explorer has Project status open, then the MCP server and Kigumi options closed, above the tree',
+        check('the explorer has Project status open, then Kigumi options closed, above the tree',
             JSON.stringify(sections) === JSON.stringify([{ id: 'status', open: 'true', rows: sections[0].rows },
-                { id: 'mcp', open: 'false', rows: 0 }, { id: 'options', open: 'false', rows: 0 }])
+                { id: 'options', open: 'false', rows: 0 }])
                 && sections[0].rows > 0, JSON.stringify(sections));
-        await inExplorer(`doc.querySelector('.ks-section[data-section="mcp"] .ks-section-header').click(); return true;`);
-        const mcpSwitch = await waitFor(() => inExplorer(`return !!doc.querySelector('.ks-section[data-section="mcp"] input[data-option="mcp.enabled"]')
-            && !doc.querySelector('.ks-section[data-section="options"] input[data-option="mcp.enabled"]') || null;`), { timeoutMs: 5000 }).catch(() => false);
-        check('the MCP server switch is in its own section, not in Kigumi options', mcpSwitch === true);
-        await inExplorer(`doc.querySelector('.ks-section[data-section="mcp"] .ks-section-header').click(); return true;`);
         await inExplorer(`doc.querySelector('.ks-section[data-section="options"] .ks-section-header').click(); return true;`);
+        const noMcpSwitch = await waitFor(() => inExplorer(`return !!doc.querySelector('.ks-option')
+            && !doc.querySelector('input[data-option="mcp.enabled"]') || null;`), { timeoutMs: 5000 }).catch(() => false);
+        check('the explorer has no MCP switch: it is in the agent panel', noMcpSwitch === true);
         const drawingsBefore = settings.get('viewer.drawingBeta', false);
         const toggled = await waitFor(() => inExplorer(`const box = doc.querySelector('.ks-option input[data-option="viewer.drawingBeta"]');
             if (!box) return false; box.click(); return true;`), { timeoutMs: 5000 }).catch(() => false);

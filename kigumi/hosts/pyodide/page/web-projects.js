@@ -6,7 +6,9 @@
  * is stored here, so closing the tab loses nothing. Nothing is saved to disk or to the cloud.
  *
  * Kigumi's settings are kept here too (localStorage): sent to the server when the page connects,
- * and stored again each time they change (`web:settings`).
+ * and stored again each time they change (`web:settings`). So are the agent's saved conversations
+ * (IndexedDB, by their path under the server's conversations folder): sent at connect
+ * (`web:conversations`), and stored as the server writes or deletes them (`web:conversationFiles`).
  */
 (function () {
     'use strict';
@@ -16,6 +18,7 @@
     const STORE_KEY = 'kigumi.web.store';
     const DB_NAME = 'kigumi-web';
     const STORE = 'projects';
+    const CONVERSATIONS = 'conversations';
     const WARNING = 'Your files are saved to browser cache, NOT to disk and NOT to the cloud. '
         + "We aren't doing cloud files yet. Export a project to keep a copy.";
 
@@ -25,18 +28,22 @@
 
     function openDb() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, 1);
-            request.onupgradeneeded = () => request.result.createObjectStore(STORE, { keyPath: 'id' });
+            const request = indexedDB.open(DB_NAME, 2);
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
+                if (!db.objectStoreNames.contains(CONVERSATIONS)) db.createObjectStore(CONVERSATIONS);
+            };
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
     }
 
-    async function transact(mode, work) {
+    async function transact(mode, work, storeName = STORE) {
         const db = await openDb();
         return new Promise((resolve, reject) => {
-            const tx = db.transaction(STORE, mode);
-            const request = work(tx.objectStore(STORE));
+            const tx = db.transaction(storeName, mode);
+            const request = work(tx.objectStore(storeName));
             tx.oncomplete = () => {
                 db.close();
                 resolve(request ? request.result : undefined);
@@ -51,6 +58,41 @@
     const getProject = (id) => transact('readonly', (store) => store.get(id));
     const putProject = (record) => transact('readwrite', (store) => store.put(record));
     const deleteRecord = (id) => transact('readwrite', (store) => store.delete(id));
+
+    /** Every saved conversation file, { path: content }. */
+    async function storedConversations() {
+        const db = await openDb();
+        return new Promise((resolve, reject) => {
+            const files = {};
+            const tx = db.transaction(CONVERSATIONS, 'readonly');
+            const cursor = tx.objectStore(CONVERSATIONS).openCursor();
+            cursor.onsuccess = () => {
+                if (!cursor.result) return;
+                files[cursor.result.key] = cursor.result.value;
+                cursor.result.continue();
+            };
+            tx.oncomplete = () => {
+                db.close();
+                resolve(files);
+            };
+            tx.onerror = () => {
+                db.close();
+                reject(tx.error);
+            };
+        });
+    }
+
+    /** The server's writes and deletes of conversation files; a deleted path takes what is under it too. */
+    function receiveConversationFiles({ changed = {}, deleted = [] }) {
+        return transact('readwrite', (store) => {
+            for (const [relative, content] of Object.entries(changed)) store.put(content, relative);
+            for (const relative of deleted) {
+                store.delete(relative);
+                store.delete(IDBKeyRange.bound(`${relative}/`, `${relative}/\uffff`));
+            }
+            return null;
+        }, CONVERSATIONS);
+    }
 
     async function reload() {
         const all = await transact('readonly', (store) => store.getAll());
@@ -239,10 +281,15 @@
             // First, before the shell asks for anything: this browser's settings are the ones in force.
             command('web:settings', { values: storedSettings() });
             command('web:store', { values: readJson(STORE_KEY) });
+            storedConversations().catch((error) => {
+                warn(error);
+                return {};
+            }).then((files) => command('web:conversations', { files }));
             reload().catch(warn);
             if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
         },
         receiveFiles: (message) => receiveFiles(message).catch(warn),
+        receiveConversationFiles: (message) => receiveConversationFiles(message).catch(warn),
         storeSettings,
         storeValues,
         storedSettings,

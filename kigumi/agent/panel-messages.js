@@ -24,6 +24,8 @@ const PANEL_MESSAGES = {
     'agent:deleteConversation': z.object({ id }),
     'agent:signIn': z.object({ provider: z.enum(['github', 'google']).catch('github') }),
     'agent:signOut': z.object({}),
+    'agent:copyMcpSetup': z.object({ client: z.string() }),
+    'agent:clearConversations': z.object({}),
 };
 
 /** `message` as { type, ...fields } if it is one the panel may send in its shape; else null. */

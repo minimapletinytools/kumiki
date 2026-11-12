@@ -155,7 +155,6 @@ function shellStatus() {
         logBadge: status.logBadge,
         version: packageJson.version,
         autoRefresh: settings ? settings.get('viewer.autoRefreshOnFileChange', false) : false,
-        agent: agentEnabled(),
         update: updates && updates.available ? { version: updates.available.version } : null,
         recentFolders: recentFolders().map((one) => ({ ...one, shown: tildePath(one.path) })),
     };
@@ -487,9 +486,9 @@ function toggleAgentPanel() {
     if (agentPanel) agentPanel.toggle();
 }
 
-/** Closes the agent panel once `agent.enabled` is turned off. */
-function closeAgentIfDisabled() {
-    if (agentPanel) agentPanel.closeIfDisabled();
+/** Shows the agent panel's settings again after a setting changed elsewhere. */
+function refreshAgentPanel() {
+    if (agentPanel) agentPanel.refresh();
 }
 
 // Kigumi's MCP server (agent/mcp-service.js), made once the window is.
@@ -686,12 +685,12 @@ function buildMenu() {
                 },
                 { type: 'separator' },
                 {
-                    label: 'Enable Agent Panel',
+                    label: 'Enable Built-in Agent',
                     type: 'checkbox',
                     checked: agentEnabled(),
                     click: () => settings.set('agent.enabled', !agentEnabled()),
                 },
-                ...(agentEnabled() ? [{ label: 'Toggle Agent', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() }] : []),
+                { label: 'Toggle Agent Panel', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() },
                 { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcp && mcp.running), click: () => copyMcpSetup() },
                 { type: 'separator' },
                 { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
@@ -793,6 +792,7 @@ async function start() {
             return { account, models: modelList };
         },
         conversationsDir: path.join(userData, 'conversations'),
+        mcp: mcpControls,
         locale: app.getLocale(),
         log,
     });
@@ -848,9 +848,9 @@ async function start() {
             checkingForUpdates = settings.get('app.checkForUpdates', true);
             updates.start();
         }
-        closeAgentIfDisabled();
+        refreshAgentPanel();
         // Turned on just now: show it, rather than leave the user to find its button.
-        if (agentEnabled() && !agentWasEnabled) toggleAgentPanel();
+        if (agentEnabled() && !agentWasEnabled && agentPanel) agentPanel.show();
         agentWasEnabled = agentEnabled();
         buildMenu();
         pushShellState();

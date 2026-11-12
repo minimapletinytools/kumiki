@@ -1,5 +1,6 @@
-// The panel's two menus: settings (how freely the agent changes things, tools always allowed,
-// the longest step, opening at startup) and past conversations; and the banner saying when it isn't asking.
+// The panel's settings row (MCP and agent settings: the MCP server, the built-in agent on or off,
+// how freely it changes things, tools always allowed, the longest step, opening at startup, the key,
+// how long past conversations are kept) and past conversations; and the banner saying when it isn't asking.
 import { t } from './i18n.js';
 
 const MODE_BANNERS = { auto: 'agent.banner.auto' };
@@ -12,66 +13,101 @@ function ago(time) {
     return new Date(time).toLocaleDateString();
 }
 
+function size(bytes) {
+    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const el = (tag, className, textContent) => Object.assign(document.createElement(tag), className ? { className } : {},
+    textContent !== undefined ? { textContent } : {});
+
 export class Menus {
-    constructor({ settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, outputLimit, keyInput, keyNote, banner }, { post }) {
-        Object.assign(this, { settingsButton, settingsMenu, historyButton, historyMenu, historyList, alwaysAllowed, startupToggle, outputLimit, banner, post });
-        this.modeRadios = [...settingsMenu.querySelectorAll('input[name="permission-mode"]')];
+    /** `saved` and `save` keep whether the settings row is open, across reloads. */
+    constructor(elements, { post, saved = {}, save = () => {} }) {
+        Object.assign(this, elements, { post, save });
+        const { settingsToggle, historyButton, historyMenu, startupToggle, outputLimit, retention, keyInput,
+            mcpToggle, agentToggle, clearButton } = elements;
+        this.modeRadios = [...this.settingsMenu.querySelectorAll('input[name="permission-mode"]')];
         this.allowedTools = [];
-        settingsButton.addEventListener('click', () => {
-            historyMenu.hidden = true;
-            settingsMenu.hidden = !settingsMenu.hidden;
-            settingsButton.setAttribute('aria-expanded', String(!settingsMenu.hidden));
+        this.agentOn = true;
+        this.rowOpen = saved.settingsOpen === true;
+        settingsToggle.addEventListener('click', () => {
+            this.rowOpen = !this.rowOpen;
+            this.save({ settingsOpen: this.rowOpen });
+            this.showRow();
         });
         historyButton.addEventListener('click', () => {
             historyMenu.hidden = !historyMenu.hidden;
-            settingsMenu.hidden = true;
             if (!historyMenu.hidden) post({ type: 'agent:listConversations' });
         });
-        for (const radio of this.modeRadios) {
-            radio.addEventListener('change', () => post({ type: 'agent:setSetting', key: 'agent.permissionMode', value: radio.value }));
-        }
-        startupToggle.addEventListener('change', () => post({ type: 'agent:setSetting', key: 'agent.showOnStartup', value: startupToggle.checked }));
-        outputLimit.addEventListener('change', () => post({ type: 'agent:setSetting', key: 'agent.maxOutputTokens', value: Number(outputLimit.value) }));
+        const setSetting = (key, value) => post({ type: 'agent:setSetting', key, value });
+        for (const radio of this.modeRadios) radio.addEventListener('change', () => setSetting('agent.permissionMode', radio.value));
+        startupToggle.addEventListener('change', () => setSetting('agent.showOnStartup', startupToggle.checked));
+        outputLimit.addEventListener('change', () => setSetting('agent.maxOutputTokens', Number(outputLimit.value)));
+        retention.addEventListener('change', () => setSetting('agent.conversationRetentionDays', Number(retention.value)));
+        mcpToggle.addEventListener('change', () => setSetting('mcp.enabled', mcpToggle.checked));
+        agentToggle.addEventListener('change', () => setSetting('agent.enabled', agentToggle.checked));
+        clearButton.addEventListener('click', () => {
+            if (window.confirm(t('agent.settings.clearConfirm'))) post({ type: 'agent:clearConversations' });
+        });
         // A key typed here is sent once, on Enter or leaving the box, and the box empties again.
-        this.keyInput = keyInput;
-        this.keyNote = keyNote;
         const sendKey = () => {
             if (!keyInput.value.trim()) return;
-            post({ type: 'agent:setSetting', key: 'agent.openrouterApiKey', value: keyInput.value.trim() });
+            setSetting('agent.openrouterApiKey', keyInput.value.trim());
             keyInput.value = '';
         };
         keyInput.addEventListener('change', sendKey);
         keyInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') sendKey(); });
+        this.showRow();
+    }
+
+    /** Open or close the settings row; with the agent off it stays open, being all there is. */
+    showRow() {
+        const open = this.rowOpen || !this.agentOn;
+        this.settingsMenu.hidden = !open;
+        this.settingsToggle.setAttribute('aria-expanded', String(open));
+        const chevron = this.settingsToggle.querySelector('.codicon');
+        chevron.classList.toggle('codicon-chevron-down', open);
+        chevron.classList.toggle('codicon-chevron-right', !open);
     }
 
     closeHistory() {
         this.historyMenu.hidden = true;
     }
 
-    showSettings(settings) {
+    showSettings(settings, conversationBytes) {
+        this.agentOn = settings['agent.enabled'] === true;
+        document.body.classList.toggle('agent-off', !this.agentOn);
+        this.agentToggle.checked = this.agentOn;
+        this.mcpToggle.checked = settings['mcp.enabled'] === true;
+        this.agentSettings.hidden = !this.agentOn;
+        if (!this.agentOn) this.closeHistory();
+        this.showRow();
         const mode = settings['agent.permissionMode'] || 'ask';
         for (const radio of this.modeRadios) radio.checked = radio.value === mode;
         this.startupToggle.checked = settings['agent.showOnStartup'] !== false;
         this.outputLimit.value = String(settings['agent.maxOutputTokens'] || 16000);
+        this.retention.value = String(settings['agent.conversationRetentionDays'] ?? 30);
+        this.usage.textContent = typeof conversationBytes === 'number' && conversationBytes > 0
+            ? t('agent.settings.usage', { size: size(conversationBytes) }) : '';
+        this.clearButton.hidden = !(conversationBytes > 0);
         const hasKey = settings['agent.openrouterApiKey'] === true;
         this.keyNote.replaceChildren(document.createTextNode(hasKey ? t('agent.settings.openrouterKey.saved') : t('agent.settings.openrouterKey.none')));
         if (hasKey) {
-            const clear = Object.assign(document.createElement('button'), { className: 'link-btn', textContent: t('agent.settings.openrouterKey.clear') });
+            const clear = el('button', 'link-btn', t('agent.settings.openrouterKey.clear'));
             clear.addEventListener('click', () => this.post({ type: 'agent:setSetting', key: 'agent.openrouterApiKey', value: '' }));
             this.keyNote.append(' ', clear);
         }
         const planning = settings['agent.planMode'] === true;
-        this.banner.hidden = !planning && mode === 'ask';
+        this.banner.hidden = !this.agentOn || (!planning && mode === 'ask');
         this.banner.textContent = planning ? t('agent.banner.plan') : MODE_BANNERS[mode] ? t(MODE_BANNERS[mode]) : '';
         this.banner.classList.toggle('is-plan', planning);
         // Tools allowed for good from a permission card, each with a way to take it back.
         this.allowedTools = settings['agent.alwaysAllow'] || [];
-        const hint = this.allowedTools.length
-            ? [Object.assign(document.createElement('div'), { className: 'settings-hint', textContent: t('agent.settings.alwaysAllowed') })] : [];
+        const hint = this.allowedTools.length ? [el('div', 'settings-hint', t('agent.settings.alwaysAllowed'))] : [];
         this.alwaysAllowed.replaceChildren(...hint, ...this.allowedTools.map((name) => {
-            const chip = Object.assign(document.createElement('span'), { className: 'allowed-tool', textContent: name });
-            const remove = Object.assign(document.createElement('button'), { type: 'button', textContent: '×',
-                title: t('agent.settings.askAgain', { tool: name }) });
+            const chip = el('span', 'allowed-tool', name);
+            const remove = Object.assign(el('button', '', '×'), { type: 'button', title: t('agent.settings.askAgain', { tool: name }) });
             remove.addEventListener('click', () => this.post({ type: 'agent:setSetting', key: 'agent.alwaysAllow',
                 value: this.allowedTools.filter((tool) => tool !== name) }));
             chip.appendChild(remove);
@@ -79,22 +115,50 @@ export class Menus {
         }));
     }
 
+    /** The MCP server, where the host runs one: whether it serves, the setups to copy, who is connected. */
+    showMcp(state, { signedIn = true } = {}) {
+        this.mcpSettings.hidden = !state;
+        if (!state) return;
+        this.mcpDetails.hidden = !state.enabled;
+        if (!state.enabled) return this.mcpDetails.replaceChildren();
+        if (!signedIn && document.body.classList.contains('host-web')) {
+            return this.mcpDetails.replaceChildren(el('div', 'settings-hint-block', t('agent.mcp.signIn')));
+        }
+        if (!state.running) {
+            return this.mcpDetails.replaceChildren(el('div', 'settings-hint-block', state.error || t('agent.mcp.starting')));
+        }
+        const clients = state.clients || [];
+        const count = clients.length === 0 ? t('agent.mcp.agents.none')
+            : clients.length === 1 ? t('agent.mcp.agents.one') : t('agent.mcp.agents.many', { count: clients.length });
+        const setups = el('div', 'mcp-setups');
+        setups.append(...(state.setups || []).map((setup) => {
+            const button = Object.assign(el('button', 'mcp-setup', setup.label), { type: 'button' });
+            button.dataset.client = setup.id;
+            button.addEventListener('click', () => this.post({ type: 'agent:copyMcpSetup', client: setup.id }));
+            return button;
+        }));
+        const agents = el('div', 'settings-hint-block', count);
+        agents.title = clients.map((client) => client.name || client.id || '').join(', ');
+        this.mcpDetails.replaceChildren(
+            el('div', 'settings-hint-block mcp-url', t('agent.mcp.serving', { url: state.url })),
+            el('div', 'settings-hint-block', t('agent.mcp.copyFor')), setups, agents);
+    }
+
     showConversations({ items = [], current }) {
         if (!items.length) {
-            this.historyList.replaceChildren(Object.assign(document.createElement('div'), { className: 'history-empty', textContent: t('agent.history.empty') }));
+            this.historyList.replaceChildren(el('div', 'history-empty', t('agent.history.empty')));
             return;
         }
         this.historyList.replaceChildren(...items.map((item) => {
-            const row = Object.assign(document.createElement('div'), { className: 'history-item' + (item.id === current ? ' is-current' : '') });
-            const open = Object.assign(document.createElement('button'), { type: 'button', className: 'history-open' });
-            open.append(Object.assign(document.createElement('span'), { className: 'history-title', textContent: item.title || t('agent.history.untitled') }),
-                Object.assign(document.createElement('span'), { className: 'history-when', textContent: ago(item.updatedAt) }));
+            const row = el('div', 'history-item' + (item.id === current ? ' is-current' : ''));
+            const open = Object.assign(el('button', 'history-open'), { type: 'button' });
+            open.append(el('span', 'history-title', item.title || t('agent.history.untitled')), el('span', 'history-when', ago(item.updatedAt)));
             open.addEventListener('click', () => {
                 this.post({ type: 'agent:openConversation', id: item.id });
                 this.closeHistory();
             });
-            const remove = Object.assign(document.createElement('button'), { type: 'button', className: 'icon-btn history-delete', title: t('agent.history.delete') });
-            remove.appendChild(Object.assign(document.createElement('span'), { className: 'codicon codicon-trash' }));
+            const remove = Object.assign(el('button', 'icon-btn history-delete'), { type: 'button', title: t('agent.history.delete') });
+            remove.appendChild(el('span', 'codicon codicon-trash'));
             remove.addEventListener('click', () => this.post({ type: 'agent:deleteConversation', id: item.id }));
             row.append(open, remove);
             return row;

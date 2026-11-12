@@ -42,14 +42,14 @@ app.whenReady().then(async () => {
         await window.loadURL('http://127.0.0.1:8127/');
         await wait("document.body.classList.contains('kigumi-ready')");
         await js(`window.__kigumiWorker.addEventListener('message', ({data}) => { if(data.type==='browser:clipboard') window.mcpSetup=data.text; });`);
-        const explorer = `document.querySelector('#slot-left iframe')?.contentDocument`;
-        await wait(`${explorer}?.querySelector('[data-section="mcp"] .ks-section-header')`);
-        await js(`${explorer}.querySelector('[data-section="mcp"] .ks-section-header').click()`);
-        await wait(`${explorer}?.querySelector('input[data-option="mcp.enabled"]')`);
-        await js(`${explorer}.querySelector('input[data-option="mcp.enabled"]').click()`);
-        await wait(`${explorer}?.querySelector('button[data-copy="url"]')`, 30000);
-        assert.equal(await js(`!!${explorer}.querySelector('[data-copy="address"]')`), false);
-        await js(`${explorer}.querySelector('button[data-copy="url"]').click()`);
+        // MCP and agent settings, at the top of the agent panel.
+        await js(`document.querySelector('#toggle-right').click()`);
+        const agent = `document.querySelector('#slot-right iframe')?.contentDocument`;
+        await wait(`${agent} && !${agent}.getElementById('mcp-settings').hidden`);
+        await js(`${agent}.getElementById('settings-toggle').getAttribute('aria-expanded') === 'true' || ${agent}.getElementById('settings-toggle').click()`);
+        await js(`${agent}.getElementById('setting-mcp').click()`);
+        await wait(`${agent}?.querySelector('.mcp-setup[data-client="url"]')`, 30000);
+        await js(`${agent}.querySelector('.mcp-setup[data-client="url"]').click()`);
         const setup = await wait('window.mcpSetup', 10000);
         const url = setup.match(/URL: (.+)/)[1];
         const token = setup.match(/Bearer (.+)/)[1];
@@ -84,20 +84,14 @@ app.whenReady().then(async () => {
         assert.ok(!(await tool('rename_file', { file_path: 'notes/a.txt', new_path: 'notes/b.txt' })).isError);
         assert.ok((await tool('new_file', { file_path: '../outside.txt' })).isError);
         await wait(`(async () => {
-            const db = await new Promise(resolve => { const req = indexedDB.open('kigumi-web', 1); req.onsuccess = () => resolve(req.result); });
+            const db = await new Promise(resolve => { const req = indexedDB.open('kigumi-web'); req.onsuccess = () => resolve(req.result); });
             const project = await new Promise(resolve => { const req = db.transaction('projects').objectStore('projects').getAll(); req.onsuccess = () => resolve(req.result.find(one => one.name === 'MCP files')); });
             db.close();
             return project?.files['notes/b.txt'] === 'hello' && !('notes/a.txt' in project.files);
         })()`);
         assert.ok(!(await tool('delete_file', { file_path: 'notes/b.txt' })).isError);
         assert.ok((await tool('delete_file', { file_path: 'notes/b.txt' })).isError);
-        await wait(`${explorer}?.querySelector('[data-section="mcp"] .ks-section-header')`);
-        await js(`(() => {
-            const doc = ${explorer};
-            if (!doc.querySelector('input[data-option="mcp.enabled"]')) doc.querySelector('[data-section="mcp"] .ks-section-header').click();
-        })()`);
-        await wait(`${explorer}?.querySelector('input[data-option="mcp.enabled"]')`);
-        await js(`${explorer}.querySelector('input[data-option="mcp.enabled"]').click()`);
+        await js(`${agent}.getElementById('setting-mcp').click()`);
         let status;
         for (let i = 0; i < 50; i++) {
             status = (await fetch(url, { headers: { Authorization: `Bearer ${token}` } })).status;
@@ -105,7 +99,7 @@ app.whenReady().then(async () => {
             await sleep(100);
         }
         assert.equal(status, 410);
-        console.log('PASS: signed-in browser, sidebar enable/copy, public MCP initialize/list/call, project/file management, collision/path checks, disable/revoke');
+        console.log('PASS: signed-in browser, agent panel enable/copy, public MCP initialize/list/call, project/file management, collision/path checks, disable/revoke');
     } catch (error) {
         console.error(error);
         process.exitCode = 1;

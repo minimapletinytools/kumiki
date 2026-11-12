@@ -14,11 +14,14 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 protocol.registerSchemesAsPrivileged([{ scheme: 'kigumi', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 const STATE = {
-    type: 'agent:state', model: 'm1', via: 'openrouter', account: { configured: false }, strings: {},
+    type: 'agent:state', model: 'm1', via: 'openrouter', account: { configured: false }, strings: { 'agent.mcp.serving': 'Serving at {url}' }, conversationBytes: 2048,
     models: [{ id: 'm1', label: 'Model one' }, { id: 'm2', label: 'Model two' }],
-    settings: { 'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
+    settings: { 'agent.enabled': true, 'mcp.enabled': true, 'agent.conversationRetentionDays': 30,
+        'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
         'agent.maxOutputTokens': 8000 },
 };
+const MCP = { type: 'agent:mcp', state: { enabled: true, running: true, url: 'http://127.0.0.1:7345/mcp', error: null,
+    clients: [{ name: 'smoke-agent' }], setups: [{ id: 'claude-code', label: 'Claude Code' }] } };
 
 app.whenReady().then(async () => {
     protocol.handle('kigumi', (request) => {
@@ -61,7 +64,7 @@ app.whenReady().then(async () => {
 
         from = await count();
         await run(`(() => {
-            document.getElementById('btn-settings').click();
+            document.getElementById('settings-toggle').click();
             const auto = document.querySelector('input[name="permission-mode"][value="auto"]');
             auto.checked = true;
             auto.dispatchEvent(new Event('change', { bubbles: true }));
@@ -76,6 +79,16 @@ app.whenReady().then(async () => {
             select.dispatchEvent(new Event('change', { bubbles: true }));
         })()`);
         result.setModel = await posted('agent:setModel', from);
+
+        await send(MCP);
+        from = await count();
+        await run(`document.querySelector('.mcp-setup[data-client="claude-code"]').click()`);
+        result.mcpShown = await run('document.getElementById("mcp-details").textContent');
+        result.copyMcp = await posted('agent:copyMcpSetup', from);
+
+        from = await count();
+        await run(`(() => { window.confirm = () => true; document.getElementById('clear-conversations').click(); })()`);
+        result.clearConversations = await posted('agent:clearConversations', from);
 
         from = await count();
         await run('document.getElementById("btn-history").click()');
@@ -107,6 +120,15 @@ app.whenReady().then(async () => {
         from = await count();
         await run('document.getElementById("send-btn").click()');
         result.stop = await posted('agent:stop', from);
+
+        // Turned off, the settings stay open and the chat goes.
+        await run('document.getElementById("settings-toggle").click()');
+        await send({ ...STATE, settings: { ...STATE.settings, 'agent.enabled': false } });
+        result.off = await run(`({
+            settings: !document.getElementById('settings-menu').hidden,
+            chat: document.getElementById('messages').offsetParent !== null,
+            note: document.querySelector('.agent-off-note').offsetParent !== null,
+        })`);
     } catch (error) {
         result.failure = String((error && error.stack) || error);
     }

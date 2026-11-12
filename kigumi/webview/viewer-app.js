@@ -187,7 +187,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.toolsPanel = new ViewerToolsPanel(this);
         this.memberListPanel = new MemberListPanel(this, { t });
         // Kigumi's MCP server as the host last said it is (frame-view-session.js), or null.
-        this.mcpState = null;
         this.sidebar = new ViewSidebar({ requestUpdate: () => this.requestUpdate(), store: vscode });
 
         this.selectionPanel = new SelectionPanel(this, {
@@ -333,9 +332,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.setViewerOptions(INITIAL_PAYLOAD.viewerOptions);
         this.setViewPhase(ViewerPhase.WAITING_FOR_RUNNER, t('viewer.chrome.loading.raisingFrame'), { refreshToken: 0 });
         void this.beginPayloadApplication(INITIAL_PAYLOAD);
-        if (INITIAL_PAYLOAD.mcpAvailable && vscode) {
-            vscode.postMessage({ type: 'requestMcpState' });
-        }
         
         // Setup selection listener
         this.selectionManager.onSelectionChanged((event) => {
@@ -354,6 +350,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             }
             this.selectionPanel.updateInfo(this.currentFrameData);
             this.memberListPanel.syncSelection();
+            this.reportSelectionSoon();
         });
 
         // Attach Layers panel to selection store + extension messaging.
@@ -1407,12 +1404,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             return;
         }
 
-        if (message.type === 'mcpState') {
-            this.mcpState = message.state || null;
-            this.requestUpdate();
-            return;
-        }
-
         if (message.type === 'describePanelRequest') {
             this.respondToRequest(message, 'describePanelResult', () => this.describePanel(), 'Failed to describe the view');
             return;
@@ -1715,8 +1706,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             drawingBeta: DRAWING_BETA_ENABLED,
             // Whether the package lets assembly preview be turned on at all (feature-flags.js).
             assemblyPreviewAvailable: Boolean(FEATURE_FLAGS.assemblyPreview),
-            // Whether the host runs Kigumi's MCP server; its state is `mcpState`.
-            mcpAvailable: INITIAL_PAYLOAD.mcpAvailable === true,
             agentAvailable: INITIAL_PAYLOAD.agentAvailable === true,
             // Whether the host has the agent panel, and whether it is turned on (agent.enabled).
             agentEnabled: this.agentEnabledSetting === undefined
@@ -1729,13 +1718,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.agentEnabledSetting = Boolean(enabled);
         this.setBetaFeature('agent', enabled);
         this.requestUpdate();
-    }
-
-    /** Put what adds Kigumi's MCP server to an agent (a setup id of `mcpState`) on the clipboard. */
-    copyMcpSetup(clientId) {
-        if (vscode) {
-            vscode.postMessage({ type: 'copyMcpSetup', client: clientId });
-        }
     }
 
     /** Turn a beta feature ('assemblyPreview' or 'drawingBeta') on or off: a setting, so the host reloads the views. */
@@ -1788,6 +1770,17 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             if (additive) this.selectionManager.toggleTimber(key);
             else this.selectionManager.selectTimber(key, true);
         }
+    }
+
+    /** Send the selection to the host once it has settled, for the agent's selection history. */
+    reportSelectionSoon() {
+        clearTimeout(this._selectionReportTimer);
+        this._selectionReportTimer = setTimeout(() => {
+            if (vscode && this.selectionManager.hasSelection()) {
+                const { view, drawing, selection } = this.describePanel();
+                vscode.postMessage({ type: 'selectionChanged', view, drawing, selection });
+            }
+        }, 500);
     }
 
     /** What this view shows and what is selected in it, for an agent asking. See agent/panel-directory.js. */

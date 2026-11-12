@@ -401,38 +401,3 @@ button {
 .ks-menu-item:focus-visible .codicon {
     color: inherit;
 }
-
-/* With the MCP server on, under its switch: its address, the setups to copy, who is connected. */
-.ks-mcp {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 0 0 4px 20px;
-}
-
-.ks-mcp-setups {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-
-.ks-mcp-button {
-    padding: 1px 6px;
-    border: 1px solid var(--ks-input-border);
-    border-radius: 3px;
-    background: transparent;
-    color: var(--ks-fg);
-    font: inherit;
-    font-size: 11px;
-    cursor: pointer;
-}
-
-.ks-mcp-button:hover {
-    background: var(--ks-toolbar-hover);
-}
-
-.ks-mcp-note,
-.ks-mcp-agents {
-    color: var(--ks-muted);
-    font-size: 11px;
-}

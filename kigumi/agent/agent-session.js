@@ -5,7 +5,7 @@
  *
  * The panel and this talk in messages (webview/agent/protocol.js lists them):
  *   panel -> here:  agent/panel-messages.js, with each one's shape
- *   here -> panel:  agent:state {models, model, via, account, settings, strings}, agent:busy {busy},
+ *   here -> panel:  agent:state {models, model, via, account, settings, conversationBytes, strings}, agent:busy {busy},
  *                   agent:text {text}, agent:reasoning {text} (both streamed), agent:tool {id, name, input},
  *                   agent:toolResult {id, isError, text}, agent:toolImages {id, before, after},
  *                   agent:notice {text, key?, params?}, agent:context {tokens, window},
@@ -13,7 +13,7 @@
  *                   agent:error {message, key?, params?}, agent:conversations {items, current}, agent:replay {events},
  *                   agent:checkpoint {turn, files}, agent:restored {turn}, agent:restoreConflict {turn, files},
  *                   agent:queued {id, text}, agent:dequeued {id}, agent:userMessage {text, images},
- *                   agent:todos {items}, agent:files {files}
+ *                   agent:todos {items}, agent:files {files}, agent:mcp {state}
  *
  * Requests go where agent/models.js routeModel says: the OpenRouter key from settings, else
  * Kigumi's backend when signed in.
@@ -29,8 +29,14 @@ const { parsePanelMessage } = require('./panel-messages');
 const { runPanelTurn, describeFailure } = require('./turn');
 const { describeBuild } = require('./session-tools');
 
+/** How long saved conversations are kept, in days; 0 keeps them until there are too many. */
+const CONVERSATION_RETENTION = { fallback: 30, valid: (value) => [0, 7, 30, 90].includes(value) };
+
 /** The settings the panel's own menu sets: their defaults, and what a value must be. */
 const PANEL_SETTINGS = {
+    'agent.enabled': { fallback: false, valid: (value) => typeof value === 'boolean' },
+    'mcp.enabled': { fallback: false, valid: (value) => typeof value === 'boolean' },
+    'agent.conversationRetentionDays': CONVERSATION_RETENTION,
     'agent.permissionMode': { fallback: 'ask', valid: (value) => PERMISSION_MODES.includes(value) },
     'agent.alwaysAllow': { fallback: [], valid: (value) => Array.isArray(value) && value.every((name) => typeof name === 'string') },
     'agent.showOnStartup': { fallback: true, valid: (value) => typeof value === 'boolean' },
@@ -52,6 +58,7 @@ const titleOf = (text) => (text.length > 60 ? `${text.slice(0, 57)}…` : text);
 const HANDLERS = {
     'agent:ready'() {
         this.postState();
+        if (this.mcp) this.postMcp();
         // The panel (re)loaded: show what it had, or, the first time, the latest conversation.
         if (this.conversation.log.length) {
             this.postRaw({ type: 'agent:replay', events: this.conversation.render() });
@@ -92,6 +99,19 @@ const HANDLERS = {
     'agent:setSetting'({ key, value }) {
         if (!Object.hasOwn(PANEL_SETTINGS, key)) return;
         if (PANEL_SETTINGS[key].valid(value)) this.setSetting(key, typeof value === 'string' ? value.trim() : value);
+        if (key === 'agent.conversationRetentionDays' && this.conversations) this._tryStore(() => this.conversations.prune());
+        this.postState();
+    },
+    'agent:copyMcpSetup'({ client }) {
+        if (this.mcp) this.mcp.copySetup(client);
+    },
+    'agent:clearConversations'() {
+        if (!this.conversations) return;
+        this.stop();
+        this._tryStore(() => this.conversations.clear());
+        this.startConversation();
+        this.postRaw({ type: 'agent:replay', events: [] });
+        this.postConversations();
         this.postState();
     },
     'agent:listFiles'() {
@@ -134,8 +154,9 @@ class AgentSession {
      * @param {(route: object, options: {fetch?: typeof fetch}) => Promise<object>} [options.createModel]
      * @param {(line: string) => void} [options.log]
      * @param {object} [options.strings]   the panel's strings in the app's language (the agent.* keys of i18n/locales)
+     * @param {object|null} [options.mcp]  the host's MCP controls (host.js `mcp`), for the panel's settings
      */
-    constructor({ host, post, setting, setSetting = () => {}, account = null,
+    constructor({ host, post, setting, setSetting = () => {}, account = null, mcp = null,
         conversations = null, createModel = languageModelFor, log = () => {}, strings = {}, models = { list: () => MODELS } }) {
         this.strings = Object.fromEntries(Object.entries(strings).filter(([key]) => key.startsWith('agent.')));
         this.host = host;
@@ -175,7 +196,31 @@ class AgentSession {
         this.queue = [];
         this.nextQueued = 1;
         this.restored = false;
+        this.mcp = mcp;
+        this.mcpSubscription = mcp ? mcp.onChange(() => this.postMcp()) : null;
         this.startConversation();
+    }
+
+    /** Stop, and stop following the MCP server. */
+    dispose() {
+        this.stop();
+        if (this.mcpSubscription) this.mcpSubscription.dispose();
+        this.mcpSubscription = null;
+    }
+
+    /** The MCP server's state, for the panel's settings. */
+    postMcp() {
+        this.postRaw({ type: 'agent:mcp', state: this.mcp.state() });
+    }
+
+    /** Run `work` on the conversation store, logging a failure. */
+    _tryStore(work) {
+        try {
+            return work();
+        } catch (error) {
+            this.log(`[agent] saved conversations: ${error.message}`);
+            return undefined;
+        }
     }
 
     get busy() {
@@ -204,6 +249,7 @@ class AgentSession {
             account: this.account ? this.account.state() : { configured: false },
             settings: Object.fromEntries(Object.keys(PANEL_SETTINGS).map((key) => [key,
                 PANEL_SETTINGS[key].secret ? Boolean(this.panelSetting(key)) : this.panelSetting(key)])),
+            conversationBytes: this.conversations ? this._tryStore(() => this.conversations.usage()) || 0 : null,
             strings: this.strings,
         });
     }
@@ -377,4 +423,4 @@ class AgentSession {
     }
 }
 
-module.exports = { AgentSession, RETRY_PROMPT, describeFailure, describeBuild };
+module.exports = { AgentSession, RETRY_PROMPT, CONVERSATION_RETENTION, describeFailure, describeBuild };

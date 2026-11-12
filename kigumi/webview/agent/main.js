@@ -22,10 +22,19 @@ const composer = new Composer({
     input: $('prompt-input'), sendButton: $('send-btn'), attachments: $('attachments'), mentions: $('mentions'), planToggle: $('plan-toggle'),
 }, { post, isBusy: () => busy, onSent: (text, imageUrls) => conversation.userBubble(text, imageUrls) });
 const menus = new Menus({
-    settingsButton: $('btn-settings'), settingsMenu: $('settings-menu'), historyButton: $('btn-history'), historyMenu: $('history-menu'),
+    settingsToggle: $('settings-toggle'), settingsMenu: $('settings-menu'), historyButton: $('btn-history'), historyMenu: $('history-menu'),
     historyList: $('history-list'), alwaysAllowed: $('always-allowed'), startupToggle: $('setting-startup'), outputLimit: $('setting-output-limit'),
+    retention: $('setting-retention'), usage: $('conversation-usage'), clearButton: $('clear-conversations'),
+    mcpSettings: $('mcp-settings'), mcpToggle: $('setting-mcp'), mcpDetails: $('mcp-details'),
+    agentToggle: $('setting-agent-enabled'), agentSettings: $('agent-settings'),
     keyInput: $('setting-openrouter-key'), keyNote: $('setting-openrouter-key-note'), banner: $('bypass-banner'),
-}, { post });
+}, {
+    post,
+    saved: vscode.getState() || {},
+    save: (values) => vscode.setState({ ...(vscode.getState() || {}), ...values }),
+});
+let mcpState = null;
+let signedIn = false;
 
 function reset() {
     conversation.reset();
@@ -59,10 +68,16 @@ const HANDLERS = {
     'agent:state': (message) => {
         setStrings(message.strings);
         translatePage();
-        menus.showSettings(message.settings || {});
+        menus.showSettings(message.settings || {}, message.conversationBytes);
         composer.setPlanMode((message.settings || {})['agent.planMode'] === true);
         status.showModels(message.models || [], message.model);
         status.showRoute(message.via, message.account || { configured: false });
+        signedIn = Boolean(message.account && message.account.signedIn);
+        menus.showMcp(mcpState, { signedIn });
+    },
+    'agent:mcp': (message) => {
+        mcpState = message.state || null;
+        menus.showMcp(mcpState, { signedIn });
     },
     'agent:busy': (message) => {
         busy = Boolean(message.busy);

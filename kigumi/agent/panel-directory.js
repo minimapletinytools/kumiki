@@ -9,6 +9,8 @@
  *
  * A panel's description always says its `kind`; a viewer's carries `selection` (see
  * webview/selection-copy.js), an editor's the selected text.
+ *
+ * It also keeps the user's recent selections in the views (agent/selection-history.js).
  */
 
 const path = require('path');
@@ -17,8 +19,9 @@ const path = require('path');
  * @param {object} options
  * @param {() => Iterable<{id: string, session: object}>} options.views  open view sessions by panel id
  * @param {object} options.host
+ * @param {ReturnType<typeof import('./selection-history').createSelectionHistory>} [options.selectionHistory]
  */
-function createPanelDirectory({ views, host }) {
+function createPanelDirectory({ views, host, selectionHistory = null }) {
     function liveViews() {
         return [...views()].filter(({ session }) => session && !session.isDisposed);
     }
@@ -95,7 +98,17 @@ function createPanelDirectory({ views, host }) {
         return found ? found.session : null;
     }
 
-    return { list, active, describe, viewSession, sessionForSurface };
+    /** The last `count` selections made in the views, newest first, each with its file relative to the project. */
+    /** The last `count` selections, newest first; only those in `filePath` when given. */
+    function recentSelections(count, filePath) {
+        const all = selectionHistory ? selectionHistory.list() : [];
+        return all.filter((entry) => !filePath || entry.filePath === filePath).slice(0, count).map((entry) => {
+            const root = entry.filePath && typeof host.workspaceRootFor === 'function' ? host.workspaceRootFor(entry.filePath) : null;
+            return root ? { ...entry, relativePath: path.relative(root, entry.filePath) } : entry;
+        });
+    }
+
+    return { list, active, describe, viewSession, sessionForSurface, recentSelections };
 }
 
 module.exports = { createPanelDirectory };
