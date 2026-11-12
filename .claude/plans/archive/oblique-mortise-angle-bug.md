@@ -1,7 +1,9 @@
 # Oblique mortise-and-tenon: `1/sin` where `1/cos` was meant
 
-Status: **open**, not fixed. Found 2026-09-01 while chasing an unrelated
-drawing-mode anchor problem. Written down to be dealt with later.
+Status: **fixed** 2026-11-11 (branch `fix/oblique-mortise-angle`), with the tests from the test plan in
+`tests/joints/mixed/test_oblique_mortise_and_tenon.py`. `end_crop_distance` took the same correction: it
+crops the tenon at the hole's far wall, half the footprint from the origin. Found 2026-09-01 while
+chasing an unrelated drawing-mode anchor problem.
 
 ## Summary
 

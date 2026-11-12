@@ -110,10 +110,9 @@ start further out. The `back_extension` behind each tenon is trimmed by the shou
 
 What needs care:
 
-1. **Fix [oblique-mortise-angle-bug](oblique-mortise-angle-bug.md) first.** With
-   `bore_mortise_perpendicular_to_face`, the hole's elongation divides by `sin` where `cos` is meant, so
-   off-45 joints get holes too short or too long. A grid inherits it once per tenon. (That plan names
-   `joints/workshop/mortise_and_tenon_joints.py`; the file is now under `joints/workshop/mixed/`.)
+1. **[oblique-mortise-angle-bug](../archive/oblique-mortise-angle-bug.md): fixed.** With
+   `bore_mortise_perpendicular_to_face`, the hole's elongation divided by the wrong angle's sine, so
+   off-45 joints got holes too short or too long. Keep its off-45 tests passing for every tenon.
 2. **Overlap with the perpendicular bore** must be checked on the mortise footprints, which are
    elongated by `1/cos` along the slope, not on the tenon sizes. Tenons that clear each other can have
    holes that merge, leaving no wall between them.
@@ -125,7 +124,7 @@ that each tenon fits its hole and the holes don't touch.
 
 ## Order
 
-1. Fix the oblique bug, with its off-45 tests.
+1. ~~Fix the oblique bug, with its off-45 tests.~~ Done.
 2. Core `cut_multi_mortise_and_tenon_joint`; `cut_mortise_and_tenon_joint` calls it. The existing tests
    pass unchanged, and drawings of existing patterns don't change (same feature names).
 3. Plane- and face-aligned multi variants, then the grid variant.
