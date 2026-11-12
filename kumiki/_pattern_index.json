@@ -1304,7 +1304,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/dovetailed_sawhorse.py",
-      "sha256": "c9e936df6df6adb83542176bd66a5e9139600bd8b811a81ddfdb53b3072ad2f4",
+      "sha256": "d5074a44fe144cb0fb7c78a364f0e83f275094193fd81ad9c57a8fc6b2a76d13",
       "warnings": []
     },
     "patterns/structures/horsey_example.py": {
@@ -1434,7 +1434,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-12T04:26:05.343804+00:00",
+  "generated_at": "2026-11-12T04:35:57.598023+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

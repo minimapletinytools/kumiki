@@ -12,7 +12,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
-- The dovetailed sawhorse's router templates trace the dovetail's wide face, and the leg template sits on it, away from the leg. Its export writes one beam template and one leg template for each mirrored pair of legs, A and B, in place of a socket and tail for every leg. Its parameters: `offset` is now `beam_bushing_offset` (default 0) and `leg_bushing_offset` (default -3/8"), and `top`, `bottom` and `width` are `top_depth`, `bottom_depth` and `base_support_width`.
+- The dovetailed sawhorse's router templates trace the dovetail's wide face, and the leg template sits on it, away from the leg. Its export writes one beam template and one leg template for each mirrored pair of legs, A and B, in place of a socket and tail for every leg. Its parameters: `offset` is now `beam_bushing_offset` (default 0) and `leg_bushing_offset` (default 3/16"), and `top`, `bottom` and `width` are `top_depth`, `bottom_depth` and `base_support_width`.
 
 #### Fixed
 

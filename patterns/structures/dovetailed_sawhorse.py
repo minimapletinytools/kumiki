@@ -215,7 +215,7 @@ def tail_template(face: CrossSection, offset: Numeric, thickness: Numeric) -> Cu
 # the dovetail's wide face, where the bit is widest in the socket and narrowest round the tail.
 ROUTER_TEMPLATE = kiwari(
     beam_bushing_offset=kiwari.length(inches(0), about="The guide bushing's radius less the bit's at the widest point of the cut"),
-    leg_bushing_offset=kiwari.length(-inches(3, 8), about="The guide bushing's radius less the bit's at the narrowest point of the cut"),
+    leg_bushing_offset=kiwari.length(inches(3, 16), about="The guide bushing's radius less the bit's at the narrowest point of the cut"),
     top_depth=kiwari.length(inches(1, 2), minimum=0, about="The templates' thickness: the beam template's above the neck's plane, the leg template's behind the wide face"),
     bottom_depth=kiwari.length(inches(1), minimum=0, about="How far the beam template runs below the neck's plane, down onto the beam it sits on"),
     base_support_width=kiwari.length(inches(2), minimum=0, about="How wide the beam template is round its opening"),
