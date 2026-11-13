@@ -118,20 +118,33 @@ fs.writeFileSync(path.join(DIST, 'auth.html'), fs.readFileSync(path.join(HERE, '
 // policy, which names its scripts by nonce, still applies on top.
 const SHELL_POLICY = [
     "default-src 'none'",
-    "script-src 'self' 'unsafe-inline' blob:",
+    // Cloudflare Web Analytics' beacon, and where it reports (ANALYTICS below).
+    "script-src 'self' 'unsafe-inline' blob: https://static.cloudflareinsights.com",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     "img-src 'self' data: blob:",
     "frame-src 'self' blob:",
     "worker-src 'self' blob:",
-    "connect-src 'self'",
+    "connect-src 'self' https://cloudflareinsights.com",
 ].join('; ');
+
+// Cloudflare Web Analytics: cookieless page counts, at kumiki.build/try only (not local builds and tests).
+const ANALYTICS = `<script>
+    if (location.hostname === 'kumiki.build') {
+      const beacon = document.createElement('script');
+      beacon.type = 'module';
+      beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+      beacon.dataset.cfBeacon = '{"token": "7177885348334f15b71652a3e776a1ba"}';
+      document.head.append(beacon);
+    }
+    </script>`;
 
 // The shell page, with the page scripts first and room for blob panels and the worker.
 const shell = fs.readFileSync(path.join(KIGUMI, 'webview/shell/shell.html'), 'utf8');
 const index = shell
     .replace(/<meta http-equiv="Content-Security-Policy" content="[^"]*">/, `<meta http-equiv="Content-Security-Policy" content="${SHELL_POLICY}">`)
     .replace('<head>', '<head>\n    <base href="webview/shell/">')
+    .replace('</head>', `    ${ANALYTICS}\n</head>`)
     .replace('<link rel="stylesheet" href="shell.css">', '<link rel="stylesheet" href="shell.css">\n    <link rel="stylesheet" href="../../page/web.css">\n    <link rel="icon" type="image/png" href="../../page/favicon.png">')
     .replace('<script src="shell.js">', ['zip.js', 'web-projects.js', 'loading.js', 'transport.js']
         .map((name) => `<script src="../../page/${name}"></script>`).join('\n    ') + '\n    <script src="shell.js">');
