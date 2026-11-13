@@ -22,7 +22,8 @@ def test_basic_recipes_have_source_examples():
                 calls.add(node.func.id)
     for node in ast.parse((JOINTS / "basic_joints.py").read_text()).body:
         if isinstance(node, ast.FunctionDef) and node.name.startswith("cut_basic_"):
-            if node.name == "cut_basic_practice_board_in_dado_joint_on_plane_aligned_timbers":
+            if any(isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == "deprecated"
+                   for d in node.decorator_list):
                 continue
             if "Compatibility alias" not in (ast.get_docstring(node) or ""):
                 assert node.name in calls, node.name

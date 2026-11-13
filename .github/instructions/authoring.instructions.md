@@ -272,6 +272,15 @@ Patterns are simple examples demonstrating joints or other deconstruted concepts
 
   Use the variant and Kiwari rules below. See docs/patternbook.md.
 
+### Basic joint recipes
+
+Use a basic cutter to derive useful dimensions from the timbers, retaining only
+placement and joint-style choices that cannot be inferred. Do not add a basic
+for every alignment helper: add one only if it simplifies the general basic.
+Custom-shape cutters and cutters already fully sized from their inputs do not
+need naming-only wrappers. Validate defaults with unequal sizes and angled
+arrangements, not only the canonical equal-size example.
+
 ### Joint pattern organization
 
 Patterns serve as source references for agents and visual references for people.

@@ -88,18 +88,33 @@ Example usage of joints can be found in the `patterns` folder in source, you can
 | `cut_basic_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint` |Plain contact between members. |
 | `cut_basic_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint` | |
 | `cut_basic_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint` | |
-| `cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint` | |
-| `cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint` | |
 | `cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: DoubleButtJointTimberArrangement, slot_facing_end_on_receiving_timber: TimberEnd) -> Joint` | |
 | `cut_basic_plain_splice_lap_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint` |Lengthening a timber. |
 | `cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint` | |
 | `cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber: TimberLike, mortise_timber: TimberLike, tenon_end: TimberEnd, use_peg: bool=False) -> Joint` |A beam into a post, or a rail into a leg. |
 | `cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber: TimberLike, mortise_timber: TimberLike, tenon_end: TimberEnd) -> Joint` | |
 | `cut_basic_lapped_gooseneck_joint_on_aligned_timbers(gooseneck_timber: TimberLike, receiving_timber: TimberLike, receiving_timber_end: TimberEnd, gooseneck_timber_face: TimberLongFace) -> Joint` | |
-| `cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(dovetail_timber: TimberLike, receiving_timber: TimberLike, dovetail_timber_end: TimberEnd, dovetail_timber_face: TimberLongFace, receiving_timber_shoulder_inset: Numeric, dovetail_length: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric) -> Joint` | |
+| `cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArrangement, *, receiving_timber_shoulder_inset: Numeric=scalar(0)) -> Joint` | |
 | `cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(housed_timber: TimberLike, receiving_timber: TimberLike, housed_timber_end: TimberEnd, housed_timber_face: TimberLongFace, receiving_timber_shoulder_inset: Numeric=scalar(0)) -> Joint` | |
 | `cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
 | `cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint` | |
+| `cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` |Lapped sill or plate corners. |
+| `cut_basic_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement) -> Joint` | |
+| `cut_basic_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) -> Joint` | |
+| `cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers(timbers: List[TimberLike], starting_face_on_first_timber: TimberFace) -> Joint` | |
+| `cut_basic_mortise_and_tenon_joint(arrangement: ButtJointTimberArrangement, *, use_peg: bool=False) -> Joint` | |
+| `cut_basic_round_mortise_and_tenon_joint(arrangement: ButtJointTimberArrangement) -> Joint` | |
+| `cut_basic_tongue_and_groove_joint(tongue_board: Board, groove_board: Board) -> Joint` |Joining board edges. |
+| `cut_basic_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement) -> Joint` | |
+| `cut_basic_dovetail_corner_joint(arrangement: CornerJointTimberArrangement, *, half_blind: bool=False) -> Joint` |Box and drawer corners. |
+| `cut_basic_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]) -> Joint` | |
+| `cut_basic_practice_rounded_end_decoration(timber: BlockLike, rounded_face: TimberFace, rounded_end: TimberFace) -> Joint` | |
+| `cut_basic_practice_rafter_tail_scallop_corner_end_decoration(timber: BlockLike, short_edge: TimberShortEdge) -> Joint` | |
+| `cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, *, use_peg: bool=False) -> Joint` | |
+
+Basic rectangular and round tenons stop short of the receiving timber’s far side, reserving a quarter of the available insertion depth. The existing face-aligned rectangular basic uses the same recipe. Use the full cutters for through tenons or explicit dimensions. Tusked and wedged-half-dovetail basics retain their through-tenon recipes.
+
+The face-aligned basic cross-lap and housing names are deprecated; use the general basics above. Custom-shape cutters and the already-sized free housing and grooved-panel cutters do not need separate basic wrappers.
 
 This is not the complete list of joints. Search patterns to find joints not listed here. (TODO create a complete list of all joints)
 

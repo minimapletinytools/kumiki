@@ -118,14 +118,8 @@ class TestButtFamilyFreedoms:
     def test_dropin_dovetail_is_unidirectional(self):
         arrangement = create_canonical_example_butt_joint_timbers()
         joint = cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
-            dovetail_timber=arrangement.butt_timber,
-            receiving_timber=arrangement.receiving_timber,
-            dovetail_timber_end=arrangement.butt_timber_end,
-            dovetail_timber_face=TimberLongFace.RIGHT,
+            replace(arrangement, front_face_on_butt_timber=TimberLongFace.RIGHT),
             receiving_timber_shoulder_inset=scalar(0),
-            dovetail_length=inches(3),
-            dovetail_small_width=inches(1),
-            dovetail_angle=atan(scalar(1, 6)),
         )
 
         # The taper blocks axial pull: exactly one lift-out DOF along the
@@ -155,7 +149,7 @@ class TestButtFamilyFreedoms:
 
 class TestLapAndSpliceFreedoms:
     def test_plain_cross_lap(self):
-        joint = cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(create_canonical_example_cross_joint_timbers())
+        joint = cut_basic_plain_cross_lap_joint(create_canonical_example_cross_joint_timbers())
 
         assert_opposite_escape_pair(joint, "timberA", "timberB")
 
