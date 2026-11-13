@@ -23,6 +23,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Added
 
+- The website and Kigumi in the browser (kumiki.build/try) count visits with Cloudflare Web Analytics, which uses no cookies. The privacy policy says so.
 - The website is in Japanese too, at kumiki.build/ja/, with an English / 日本語 switch in the header. A first visit from a Japanese browser goes to the Japanese pages; the switch is remembered. The docs, privacy policy and terms stay English.
 - A Language setting in the standalone app (Kigumi > Language) and the browser version (the settings gear): Default, English or 日本語. Default, the default, follows the system's language, as the app already did; the browser version now follows the browser's, where it was always English. A new language shows after a restart (app) or a reload (browser), which Kigumi offers, and the browser version opens the same project again.
 

@@ -226,6 +226,16 @@ const structuredData = {
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+    <!-- Cloudflare Web Analytics: cookieless page counts, on kumiki.build only (not local previews). -->
+    <script is:inline>
+    if (location.hostname === 'kumiki.build') {
+      const beacon = document.createElement('script');
+      beacon.type = 'module';
+      beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+      beacon.dataset.cfBeacon = '{"token": "7177885348334f15b71652a3e776a1ba"}';
+      document.head.append(beacon);
+    }
+    </script>
   </head>
   <body>
     <header class="site-header">
