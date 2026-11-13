@@ -313,20 +313,41 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
--angled corner lap joint doesn't have end cuts
--do LLC research
--agent stuff
+DONE-agent stuff
   DONE-tool cleanup
   DONE-add drawings to cheat sheet
-  -do the pattern mega refactor
-  -do the example mega refactor
+  DONE-do the pattern mega refactor
+  DONE-do the example mega refactor
+
+
+-the TODO block doesn't go away if teh gaent moved on to something else, mabye add a manul x button?
+
+-update double spline joint to include mini tenons
+-angled corner lap joint doesn't have end cuts
+-add basic joint patterns
 
 
 
 -test agent created drawings
 -agent benchmarking examples
+-consider doing multiple agent sessions...
+-add to default context file/project currentyl in focus etc, so its more clear to bulit in agent if yous witched contexts and are prompting about something else
+-investigate adding to app store
+
+-add report crash feature?
+-add give feedback button?
+-create hotkey config page?
+-from source view tehre should be a button easily preview your source in the viewer, or a hotkeey!
+
+-application nav changes  
+  -add more info to about page, link to website, dsicord and discussion
+  -help should link discord/discussion as well
+  -get rid of edit tab in top application nav
+  -get rid of toggle developer tools
+  -does it make sense to move fullscrene options else where and get rid of the view tab?
 
 -agent account stuff
+  -do LLC research
   -setup LLC prob
   -figure out liability ad data retention risks
   -consider doing cloud files and sharing 
