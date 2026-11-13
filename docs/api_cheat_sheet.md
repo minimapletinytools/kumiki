@@ -121,6 +121,36 @@ def my_frame(k: Optional[Kiwari] = None) -> Frame:
     return Frame.from_joints(joints, additional_unjointed_timbers=None, name="my frame", kiwari=k)
 ```
 
+## Drawings
+
+drawings can be automatically generated but the results aren't so great.
+
+```python
+from kumiki.drawings.auto_drawings import with_auto_drawings
+...
+frame = Frame.from_joints(..)
+frame = with_auto_drawings(frame, fixed_path="beam")   # a plan measured from the timber "beam", and a shop drawing per distinct piece
+
+# or a shop drawing for just one timber, `post`, generated after the frame is shown
+from kumiki.drawings.auto_drawings import piece_drawing
+from kumiki.csg.symmetry import SymmetricTimberGroup
+from kumiki.finishing import Finishing
+def post_drawing(finishing: Finishing) -> None:
+    finishing.add_drawing(piece_drawing(SymmetricTimberGroup(frame.cut_timber_of(post), ())))
+frame = frame.with_finishing(post_drawing)
+
+return frame
+```
+
+To add measurements by manually, make a `Drawing` whose `measurements` are `Measure(feature_a, feature_b)`s between features found with `find_feature`, and add it from a finishing routine (`frame.with_finishing`, `Finishing.add_drawing`). Use the `kumiki_source` tool to see the following files:
+
+- `kumiki/drawings/auto_drawings.py`: `with_auto_drawings`, and `plan_drawing` / `piece_drawing` to start from a generated drawing
+- `kumiki/drawings/drawing.py`: `Drawing`, `shop_drawing_viewports()`, `SHOP_DRAWING_IDS`, `elevation_viewports()`
+- `kumiki/drawings/measure.py`: `Measure`
+- `kumiki/csg/feature_paths.py`: `find_feature`, which names the features to measure between
+- `kumiki/finishing.py`: `Finishing`
+- an example: `patterns/structures/dovetailed_sawhorse.py`; and "Generating drawings" in `agent_usage_instructions.md`
+
 
 ## Examples
 
