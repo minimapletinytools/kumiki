@@ -79,6 +79,7 @@ Example usage of joints can be found in the `patterns` folder in source, you can
 
 | Basic joint signature | When to use |
 |---|---|
+| `cut_basic_practice_board_in_dado_joint_on_plane_aligned_timbers(boards: PanelBoardArrangement, dado_timbers: ExtendedTimberArrangement) -> Joint` | Unimplemented; raises `AssertionError`. |
 | `cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint` |Mitered frame corners. |
 | `cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
 | `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, tongue_thickness: Optional[Numeric]=None, tongue_position: Numeric=scalar(0)) -> Joint` | |
