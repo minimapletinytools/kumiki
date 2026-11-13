@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.1
-"""The kanji 木 ("tree, wood") as a timber frame, standing in the XZ plane.
+"""Purpose
+-------
+Build the character 木 as a small timber sculpture.
+
+Concepts demonstrated — overview
+-------------------------------
+Small structure; angled members; decorative profiles; mixed joint types.
+
+Concepts demonstrated — details
+------------------------------
+A central post carries horizontal beams in a splined double-butt joint and diagonal strokes in
+pegged tenons. Profile cuts shape the strokes. Dimensions and angles are source constants; there
+are no Kiwari controls.
+Recipe notes
+------------
+The kanji 木 ("tree, wood") as a timber frame, standing in the XZ plane.
 
 A 4x4 post is the vertical stroke. Two 4x5 beams form the horizontal stroke, meeting at the
 post in a splined opposing double butt joint with square pegs. Two 4x6 side strokes fall away

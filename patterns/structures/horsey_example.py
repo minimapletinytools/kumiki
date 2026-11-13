@@ -1,5 +1,19 @@
 # Last checked on kumiki 0.9.0
-"""
+"""Purpose
+-------
+Build a straightforward workshop sawhorse from feet, posts, a stretcher, and a top beam.
+
+Concepts demonstrated — overview
+-------------------------------
+Furniture; sawhorse; simple example; face-aligned, axis-oriented construction.
+
+Concepts demonstrated — details
+------------------------------
+Pegged mortise-and-tenon joints connect the orthogonal members. A rectangular footprint
+establishes placement. Member sizes and joint proportions are source constants, not Kiwari
+parameters.
+Recipe notes
+------------
 Sawhorse Example - A simple sawhorse structure with mortise and tenon joints
 
 This example creates a sawhorse with:
@@ -261,7 +275,10 @@ def create_sawhorse() -> Frame:
     return Frame.from_joints(all_joints, name="Sawhorse")
 
 
-example = create_sawhorse
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
+    """Build the horsey example example."""
+    return create_sawhorse()
 
 
 def main():

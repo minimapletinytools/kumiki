@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Gordian's Knot puzzle structure with cutouts.
+"""Purpose
+-------
+Build a six-piece interlocking puzzle from cell-based cutout layouts.
+
+Concepts demonstrated — overview
+-------------------------------
+Development example; small puzzle; axis-oriented pieces; custom CSG.
+
+Concepts demonstrated — details
+------------------------------
+Piece names and grid layouts describe the occupied and removed cells. Members are arranged along
+the three world axes. The fixed recipe demonstrates translating a discrete puzzle layout into
+timber cuts, without Kiwari controls.
+Recipe notes
+------------
+Gordian's Knot puzzle structure with cutouts.
 
 Six interlocking 5×7×1 pieces arranged around the origin:
   - Z length axis: YELLOW (-x) and RED (+x)

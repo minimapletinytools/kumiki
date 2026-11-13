@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Assembly preview demo: an H-frame with a disassembly sequence.
+"""Purpose
+-------
+Exercise the assembly preview timeline and ordering warnings on a small frame.
+
+Concepts demonstrated — overview
+-------------------------------
+Development example; simple frame; disassembly sequencing; angled brace.
+
+Concepts demonstrated — details
+------------------------------
+Joint orders stage peg removal and member extraction. A brace deliberately demonstrates the
+warning for dragging a later-ordered member. Dimensions are source constants; this is a
+viewer-behaviour fixture rather than a construction template.
+Recipe notes
+------------
+Assembly preview demo: an H-frame with a disassembly sequence.
 
 Joint cut functions author their own assembly freedoms (escape directions and
 travel) and suborders (pegs pop before their joint slides), so the assembly

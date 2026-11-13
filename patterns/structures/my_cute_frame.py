@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Starter Kigumi frame: a simple H-shaped frame made of four 90x90mm timbers.
+"""Purpose
+-------
+Start with a small four-member frame to learn the arrange, cut, and assemble workflow.
+
+Concepts demonstrated — overview
+-------------------------------
+Simple example; small structure; face-aligned, axis-oriented construction.
+
+Concepts demonstrated — details
+------------------------------
+Two side members and two cross members use pegged mortise-and-tenon joints. Reference features
+identify the edges used for measurements. Dimensions are source constants; there are no Kiwari
+controls.
+Recipe notes
+------------
+Starter Kigumi frame: a simple H-shaped frame made of four 90x90mm timbers.
 
 Two side timbers run in the +Y direction. Two cross timbers join them with
 mortise-and-tenon joints (with 15mm draw-bore pegs), inset from the ends so

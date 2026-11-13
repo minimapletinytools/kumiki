@@ -294,6 +294,42 @@ removed when they add no useful reference configuration.
 
 Kumiki also ships with a few example Frames that demonstrate how to put everything together. In general, follow agent_usage_instructions.md for authoring patterns and example frames.
 
+### Authoring whole-frame examples
+
+Keep public examples in `patterns/structures/` and development fixtures in
+`hidden_structures/`. Use `hidden_structures/development/` for experiments that
+are not curated reference designs. Do not create a second hidden collection
+inside `patterns/`.
+
+Keep the version-check comment first. Follow it with a module docstring containing:
+
+- **Purpose**: what the example builds and what a reader should use it to learn.
+- **Concepts demonstrated — overview**: a short, plain-language list, such as
+  simple example, furniture, sawhorse, small/medium structure, standard timber
+  frame, non-square construction, axis-oriented and face-aligned construction,
+  angled braces, or multiple frames.
+- **Concepts demonstrated — details**: identify the actual construction methods
+  and useful APIs. Distinguish single-pitch rafters, rafters joined to each other
+  at the peak, and rafters supported by a ridge beam. State whether Kiwari controls
+  sizing, angles, structural counts/layout, or tool settings; if dimensions are
+  source constants, say so. Describe only concepts the file actually demonstrates.
+
+Preserve useful authored recipe notes after this preamble. Keep inline comments
+focused on non-obvious construction steps, reference spaces, and dimensions.
+Do not duplicate the code in comments or replace authored prose for style alone.
+
+Mark every public frame entry explicitly with `@frame` and use
+`(k: Optional[Kiwari] = None) -> Frame`. A file may contain several visible frames:
+give each a useful name and place them intentionally in world space. Resolve
+shared parameters from the same Kiwari declaration and return the resolved values
+on the corresponding Frame; give independent designs separate declarations.
+
+Add or update the Examples tables in `docs/api_cheat_sheet.md` when an example is
+added, moved, promoted, or changes what it demonstrates. Verify discovery and build
+all public entries affected by the change; render altered geometry and inspect it.
+Regenerate the packaged pattern index through `tools/build_pattern_index.py` when
+moving files into or out of the public catalog.
+
 ### How patterns and frames get discovered
 
 The librarian (`kumiki/librarian.py`) scans source files to find patterns and frame examples without importing them. In short: functions marked `@pattern("group/name")` are a file's patterns, and functions marked `@frame` are its frames (a module-level `example` or `build_frame` still works, with a deprecation warning). See the module docstring in `kumiki/librarian.py` for the exact detection rules and how the pattern-index cache works.

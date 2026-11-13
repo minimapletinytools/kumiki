@@ -1,5 +1,21 @@
 # Last checked on kumiki 0.9.0
-"""Cat Corner Cot - A timber frame cat cot designed against a corner supporting structure.
+"""Purpose
+-------
+Build a fitted cat enclosure together with the surrounding corner walls and sloping roof.
+
+Concepts demonstrated — overview
+-------------------------------
+Furniture and supporting models; multiple frames; non-rectangular context; sloping rafters.
+
+Concepts demonstrated — details
+------------------------------
+Separate frame entries show the enclosure and its supporting context. Stepped members, stacked
+tenons, infill boards, and roof housings accommodate the corner and roof slope. Piece matching
+and generated drawings support fabrication references. Geometry is defined by source constants,
+not Kiwari controls.
+Recipe notes
+------------
+Cat Corner Cot - A timber frame cat cot designed against a corner supporting structure.
 
 The file builds two frames, shown together where they stand:
 - `supporting_structure`: the corner walls and the sloped roof they carry.

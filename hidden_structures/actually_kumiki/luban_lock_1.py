@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Six-piece Luban lock (鲁班锁) / burr puzzle.
+"""Purpose
+-------
+Explore the geometry and housing cycle of a six-piece burr puzzle.
+
+Concepts demonstrated — overview
+-------------------------------
+Development example; small puzzle; rotated cross-sections; cyclic joinery.
+
+Concepts demonstrated — details
+------------------------------
+Pairs of members follow each world axis, with diamond cross-sections and a cyclic housing
+relationship. Dimensions are source constants. Use it to study interlocking geometry rather than
+ordinary frame construction.
+Recipe notes
+------------
+Six-piece Luban lock (鲁班锁) / burr puzzle.
 
 Six 1×1 wooden blocks (length = 2√2 × side), each rotated 45° around its
 length axis so the cross section is a diamond.  Two blocks run along each

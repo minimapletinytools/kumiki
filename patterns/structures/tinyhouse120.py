@@ -1,5 +1,19 @@
 # Last checked on kumiki 0.9.0
-"""
+"""Purpose
+-------
+Build a 120-square-foot timber-frame tiny house from floor beams through the roof.
+
+Concepts demonstrated — overview
+-------------------------------
+Standard timber-frame structure; medium building; gable roof; ridge-supported rafters.
+
+Concepts demonstrated — details
+------------------------------
+A 15-by-8-foot footprint organizes posts, beams, and wall members. King posts support a ridge
+beam; paired rafters run from the top plates to that ridge and extend at the eaves. Joint
+offsets accommodate members meeting the same post. Sizes and counts are source constants.
+Recipe notes
+------------
 Tiny House 120 sqft - A 15' x 8' timber frame tiny house
 Posts are on the INSIDE of the footprint. Front is the 15' side.
 """
@@ -1516,4 +1530,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     return frame
 
 
-example = create_tinyhouse120
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
+    """Build the tinyhouse120 example."""
+    return create_tinyhouse120()

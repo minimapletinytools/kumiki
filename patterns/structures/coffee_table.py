@@ -1,4 +1,18 @@
 # Last checked on kumiki 0.9.0
+"""Purpose
+-------
+Build a coffee-table frame with detailed furniture joinery.
+
+Concepts demonstrated — overview
+-------------------------------
+Furniture; small structure; orthogonal frame; decorative cuts.
+
+Concepts demonstrated — details
+------------------------------
+Upper stretchers use tusked tenons, while board and dovetail joints connect other members.
+Roundovers soften edges. The recipe demonstrates fitting several joints around shared legs.
+Sizes and offsets are source constants; it does not expose Kiwari controls.
+"""
 
 from kumiki import *
 from dataclasses import replace

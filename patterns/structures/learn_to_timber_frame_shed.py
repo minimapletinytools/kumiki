@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""
+"""Purpose
+-------
+Study a complete shed frame with floor framing, wall braces, and a paired-rafter roof.
+
+Concepts demonstrated — overview
+-------------------------------
+Standard timber-frame structure; medium building; angled braces; structural and sizing Kiwari.
+
+Concepts demonstrated — details
+------------------------------
+Kiwari controls footprint dimensions and counts of joists, rafter pairs, and intermediate posts.
+Rough stock is described relative to reference edges. Opposing rafters meet with tongue-and-fork
+joints at the peak, and collar members connect selected pairs; the roof differs from a
+ridge-beam-supported system.
+Recipe notes
+------------
 Timber Frame Shed - Base, Floor Joists, and Mudsill Joints
 """
 

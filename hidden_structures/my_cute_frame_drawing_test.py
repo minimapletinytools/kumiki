@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""my_cute_frame in rough stock, with generated drawings (kumiki.drawings.auto_drawings).
+"""Purpose
+-------
+Exercise automatic drawings and reference-feature measurement on a rough-stock starter frame.
+
+Concepts demonstrated — overview
+-------------------------------
+Development fixture; small orthogonal frame; rough stock; generated drawings.
+
+Concepts demonstrated — details
+------------------------------
+Loads the public starter frame and enlarges non-reference faces of its timbers. Piece matching
+groups repeated parts for shop drawings. Drawing and measurement tests use this file; dimensions
+come from the starter recipe.
+Recipe notes
+------------
+my_cute_frame in rough stock, with generated drawings (kumiki.drawings.auto_drawings).
 
 The Left Side timber is fixed: the plan is dimensioned from its reference faces and bottom end. Each
 distinct piece gets a shop drawing; matching pieces (match_timbers) share one, named with how many to
