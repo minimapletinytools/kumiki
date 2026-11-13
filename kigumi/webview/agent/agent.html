@@ -74,24 +74,18 @@
         <div id="messages" class="agent-messages">
             <div class="agent-welcome" id="welcome">
                 <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
-                <p data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
+                <p class="welcome-body" data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
                 <!-- The browser version's ways to run the agent, shown signed in or out (main.js, ?host=web). -->
                 <div class="web-agent-notice">
                     <div class="web-agent-warning" role="note">
                         <p class="web-agent-warning-title" data-i18n="agent.web.warningTitle">Important</p>
-                        <p data-i18n="agent.web.warning">You'll get much better results using your own agent with the standalone app. The agent panel in the web version is just for trying Kumiki out with minimal overhead. Sign in below to get $1 of "free" tokens to try it out. There is no way to buy more tokens! At some point I'll improve the agent and let you buy tokens, if you prefer working in the browser.</p>
+                        <p data-i18n="agent.web.warning" data-i18n-link="agent.web.appLink" data-href="https://kumiki.build/install">The web agent is just for trying out Kumiki with low overhead. You'll get much better results with your own agent and with the <a href="https://kumiki.build/install" target="_blank" rel="noopener noreferrer">standalone app</a>.</p>
                     </div>
-                    <p class="web-agent-notice-lead" data-i18n="agent.web.lead">Ways to run the agent here:</p>
-                    <ol>
-                        <li><span data-i18n="agent.web.signIn">Sign in and use your $1 of promo credit (it comes out of my pocket ;__;)</span>
-                            <span class="web-agent-sign-in">
-                                <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
-                                <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
-                            </span></li>
-                        <li data-i18n="agent.web.key">Add your own OpenRouter key in the agent's settings (MCP and agent settings, above)</li>
-                        <li><a href="https://kumiki.build/install" target="_blank" rel="noopener noreferrer"
-                            data-i18n="agent.web.app">Download the standalone app, which also connects your own agent (Claude Code and others) over MCP</a></li>
-                    </ol>
+                    <p class="web-agent-notice-lead" data-i18n="agent.web.signIn">Sign in to get $1 in promo tokens. You can also connect your own agent to the MCP (above).</p>
+                    <span class="web-agent-sign-in">
+                        <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
+                        <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
+                    </span>
                 </div>
                 <!-- Shown instead of the suggestions until the agent has a way to send requests (status.js). -->
                 <div class="welcome-sign-in">

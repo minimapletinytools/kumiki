@@ -226,23 +226,52 @@
      * Draw the projects page in the shell's welcome area when no project is open; return whether it
      * did (with one open, the shell's own welcome shows).
      */
+    /**
+     * Put the web version's parts in the welcome area, once: the logo in place of the heading, a pointer
+     * to the agent, the storage warning, and a pointer to the projects below.
+     */
+    function addWelcomeParts(tools) {
+        const $ = (id) => document.getElementById(id);
+        if ($('web-welcome-logo')) return;
+        const welcome = $('welcome');
+        const actions = $('welcome-actions');
+        const logo = tools.el('img', 'web-welcome-logo');
+        Object.assign(logo, { id: 'web-welcome-logo', src: '../../page/logo.png', alt: 'Kigumi' });
+        welcome.insertBefore(logo, welcome.firstChild);
+
+        const agent = tools.el('button', 'web-agent-hint');
+        agent.id = 'web-agent-hint';
+        agent.type = 'button';
+        agent.append(tools.el('span', '', 'Ask the agent to make you something or connect your own agent'),
+            tools.el('span', 'web-hint-arrow', '→'));
+        // The agent sits on the right: open it if it's closed.
+        agent.addEventListener('click', () => {
+            if ($('slot-right').hidden) tools.command('toggleAgent');
+        });
+        welcome.insertBefore(agent, actions);
+
+        const warning = tools.el('p', 'web-storage-warning', WARNING);
+        warning.id = 'web-storage-warning';
+        welcome.insertBefore(warning, actions);
+
+        const projectsHint = tools.el('p', 'web-projects-hint');
+        projectsHint.id = 'web-projects-hint';
+        projectsHint.append(tools.el('span', '', 'Open or create a project below first'), tools.el('span', 'web-hint-arrow', '↓'));
+        welcome.insertBefore(projectsHint, actions);
+    }
+
     function renderWelcome(state, tools) {
         lastRender = [state, tools];
         const $ = (id) => document.getElementById(id);
-        const welcome = $('welcome');
-        let warning = $('web-storage-warning');
-        if (!warning) {
-            warning = tools.el('p', 'web-storage-warning', WARNING);
-            warning.id = 'web-storage-warning';
-            welcome.insertBefore(warning, $('welcome-actions'));
-        }
+        addWelcomeParts(tools);
+        // With a project open (and no file), the shell's own welcome shows, with the pointer to the agent.
+        $('web-storage-warning').hidden = Boolean(state.workspace);
+        $('web-projects-hint').hidden = Boolean(state.workspace);
         if (state.workspace) {
-            warning.hidden = true;
             return false;
         }
-        warning.hidden = false;
         const openId = state.web && state.web.projectId;
-        $('welcome-lead').textContent = 'Your projects, kept in this browser.';
+        $('welcome-lead').textContent = '';
 
         const form = tools.el('form', 'web-new-project');
         const input = tools.el('input');

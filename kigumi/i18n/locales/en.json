@@ -455,11 +455,9 @@
   "agent.banner.auto": "Not asking: editing files and running frames freely",
   "agent.banner.plan": "Plan mode: looking and proposing, changing nothing",
   "agent.web.warningTitle": "Important",
-  "agent.web.warning": "You'll get much better results using your own agent with the standalone app. The agent panel in the web version is just for trying Kumiki out with minimal overhead. Sign in below to get $1 of \"free\" tokens to try it out. There is no way to buy more tokens! At some point I'll improve the agent and let you buy tokens, if you prefer working in the browser.",
-  "agent.web.lead": "Ways to run the agent here:",
-  "agent.web.signIn": "Sign in and use your $1 of promo credit (it comes out of my pocket ;__;)",
-  "agent.web.key": "Add your own OpenRouter key in the agent's settings (MCP and agent settings, above)",
-  "agent.web.app": "Download the standalone app, which also connects your own agent (Claude Code and others) over MCP",
+  "agent.web.warning": "The web agent is just for trying out Kumiki with low overhead. You'll get much better results with your own agent and with the {link}.",
+  "agent.web.appLink": "standalone app",
+  "agent.web.signIn": "Sign in to get $1 in promo tokens. You can also connect your own agent to the MCP (above).",
   "agent.welcome.title": "Kigumi Agent",
   "agent.welcome.body": "Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.",
   "agent.welcome.signIn": "Please sign in to use the agent.",
@@ -526,6 +524,8 @@
   "agent.notice.summarised": "The earlier conversation was summarised, to keep each step small.",
   "agent.notice.restored": "Put back as they were before that request: {files}. The agent is told so with your next message.",
   "agent.error.noCredit": "Out of credit.",
+  "agent.error.outOfTokens": "You are out of tokens. There is currently no way to buy more (maybe soon). Instead, you can connect your own agent to the MCP (above) or {link}.",
+  "agent.error.outOfTokensLink": "download the standalone app",
   "agent.error.refused": "Not signed in, or the API key was refused.",
   "agent.error.signIn": "Could not sign in: {error}"
 }
