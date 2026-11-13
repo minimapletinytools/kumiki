@@ -12,7 +12,8 @@ All of these come from `from kumiki import *`. Lengths are metres unless made wi
 mm(numerator, denominator=1)      # mm(90); mm(1, 2) is half a millimetre
 inches(numerator, denominator=1)  # inches(7, 2) is 3.5"
 feet(numerator, denominator=1)
-degrees(angle)
+degrees(numerator, denominator=1) # degrees(45, 2) is 22.5 degrees, in radians
+radians(numerator, denominator=1)
 create_v2(x, y)                   # a size (width, height), or a point on the footprint
 create_v3(x, y, z)                # a point in the world; Z is up
 ```
