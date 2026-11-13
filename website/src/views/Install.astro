@@ -1,0 +1,186 @@
+---
+// Get started, in each language (pages/install.astro, pages/ja/install.astro).
+import Layout from '../layouts/Layout.astro';
+import { appDownloads, kigumiVersion, marketplace, openVsx, releasePage } from '../kigumi-release';
+import { type Lang, fill, strings } from '../i18n';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const tryKigumi = import.meta.env.PUBLIC_KIGUMI_TRY === 'true';
+const s = strings(lang).install;
+const home = strings(lang).home;
+const instructions = 'https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md';
+const values = { version: kigumiVersion, releasePage, marketplace, openVsx, instructions, try: `${base}/try/` };
+---
+<Layout
+  title={s.title}
+  description={s.description}
+  canonicalPath="/install"
+  image="/photos/feature_code.png"
+  faqs={s.faqs}
+  lang={lang}
+  translated
+>
+  <article class="install">
+    <h1>{s.heading}</h1>
+    <p class="lead">{s.lead}</p>
+
+    <nav class="ways" aria-label={s.waysLabel}>
+      <a href="#app">
+        <strong>{s.ways.app}</strong>
+        <span>{s.ways.appBlurb}</span>
+      </a>
+      {tryKigumi && (
+        <a href="#browser">
+          <strong>{s.ways.browser}</strong>
+          <span>{s.ways.browserBlurb}</span>
+        </a>
+      )}
+      <a href="#vscode">
+        <strong>{s.ways.vscode}</strong>
+        <span>{s.ways.vscodeBlurb}</span>
+      </a>
+    </nav>
+
+    <section id="app" class="way">
+      <h2>{s.app.heading}</h2>
+      <ol class="steps">
+        <li>
+          <h3>{s.app.downloadTitle}</h3>
+          <div class="downloads">
+            <a class="btn btn-primary btn-sm" href={appDownloads.macArm}>{s.app.macArm}</a>
+            <a class="btn btn-secondary btn-sm" href={appDownloads.macIntel}>{s.app.macIntel}</a>
+            <a class="btn btn-secondary btn-sm" href={appDownloads.windows}>{s.app.windows}</a>
+          </div>
+          <p set:html={fill(s.app.downloadBody, values)} />
+        </li>
+        <li>
+          <h3>{s.app.projectTitle}</h3>
+          <p set:html={s.app.projectBody} />
+        </li>
+        <li>
+          <h3>{s.app.firstFrameTitle}</h3>
+          <p set:html={s.app.firstFrameBody} />
+        </li>
+        <li>
+          <h3>{s.app.ownTitle}</h3>
+          <p set:html={s.app.ownBody} />
+        </li>
+      </ol>
+    </section>
+
+    {tryKigumi && (
+      <section id="browser" class="way">
+        <h2>{s.browser.heading}</h2>
+        <p set:html={fill(s.browser.body, values)} />
+        <a class="btn btn-secondary btn-sm" href={`${base}/try/`}>{s.browser.button}</a>
+      </section>
+    )}
+
+    <section id="vscode" class="way">
+      <h2>{s.vscode.heading}</h2>
+      <ol class="steps">
+        <li>
+          <h3>{s.vscode.installTitle}</h3>
+          <p set:html={fill(s.vscode.installBody, values)} />
+        </li>
+        <li>
+          <h3>{s.vscode.folderTitle}</h3>
+          <p set:html={s.vscode.folderBody} />
+        </li>
+        <li>
+          <h3>{s.vscode.initTitle}</h3>
+          <p set:html={s.vscode.initBody} />
+        </li>
+        <li>
+          <h3>{s.vscode.firstFrameTitle}</h3>
+          <p set:html={s.vscode.firstFrameBody} />
+        </li>
+      </ol>
+    </section>
+
+    <section class="way ai">
+      <h2>{s.ai.heading}</h2>
+      <p set:html={fill(s.ai.body, values)} />
+      <figure class="prompt">
+        <figcaption>{s.ai.promptCaption}</figcaption>
+        <blockquote>{home.prompt}</blockquote>
+      </figure>
+    </section>
+  </article>
+</Layout>
+
+<style>
+  .install { max-width: 46rem; margin: 0 auto; padding: 2.5rem 0 1rem; }
+  .lead { margin-top: 1rem; font-size: 1.12rem; color: var(--ink-soft); }
+
+  .ways {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    margin-top: 2.5rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--sheet);
+  }
+  .ways a { padding: 1rem 1.2rem 1.1rem; color: var(--ink); }
+  .ways a + a { border-left: 1px solid var(--rule); }
+  .ways a:hover { text-decoration: none; background: var(--accent-tint); }
+  .ways strong { display: block; font-weight: 600; color: var(--accent); }
+  .ways span { display: block; margin-top: 0.25rem; font-size: 0.9rem; color: var(--ink-soft); }
+
+  .way { margin-top: 4rem; scroll-margin-top: 1.5rem; }
+  .way > p { margin-top: 1rem; color: var(--ink-soft); }
+  .way > .btn { margin-top: 1.25rem; }
+
+  /* A sequence, so numbered: a counter in the margin, on a rule. */
+  .steps { list-style: none; counter-reset: step; padding: 0; margin: 1.75rem 0 0; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 0 0 2rem 3rem;
+    border-left: 1px solid var(--rule-strong);
+    margin-left: 0.9rem;
+  }
+  .steps li:last-child { padding-bottom: 0; border-left-color: transparent; }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: -0.9rem;
+    top: -0.1rem;
+    width: 1.8rem;
+    height: 1.8rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .steps p { margin-top: 0.45rem; color: var(--ink-soft); }
+  .downloads { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+
+  code {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 0.05rem 0.3rem;
+  }
+
+  .prompt {
+    margin: 1.75rem 0 0;
+    padding: 1.3rem 1.5rem;
+    background: var(--sheet);
+    border: 1px solid var(--rule-strong);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+  }
+  .prompt figcaption { font-size: 0.85rem; color: var(--ink-faint); margin-bottom: 0.4rem; }
+  .prompt blockquote { margin: 0; font-family: var(--serif); font-size: 1.05rem; line-height: 1.65; }
+
+  @media (max-width: 640px) {
+    .ways a + a { border-left: 0; border-top: 1px solid var(--rule); }
+  }
+</style>

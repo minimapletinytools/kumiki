@@ -1,0 +1,361 @@
+{
+  "_comment": "The website's Japanese text, translated from en.json. Don't edit it on its own: when en.json changes, translate the changed entries again from the English (see AGENTS.md, Website translations).",
+  "layout": {
+    "description": "Kumiki は、木組み・伝統構法や木工の継手・仕口のために作られた、オープンソースの Python 向けプログラマブル CAD ライブラリです。パラメトリックな継手・仕口と、Kigumi によるリアルタイムの 3D プレビューを、Mac、Windows、VS Code、ブラウザで使えます。",
+    "imageAlt": "Kumiki で設計した木組みの CAD プレビュー",
+    "nav": {
+      "label": "サイト",
+      "download": "ダウンロード",
+      "try": "ブラウザで試す",
+      "joints": "継手・仕口",
+      "docs": "ドキュメント",
+      "videos": "動画",
+      "github": "GitHub",
+      "about": "概要"
+    },
+    "language": {
+      "label": "言語",
+      "switchTo": "English",
+      "switchToLabel": "View this page in English",
+      "switchToHomeLabel": "Go to the English home page"
+    },
+    "footer": {
+      "kigumi": "Kigumi",
+      "downloadApp": "アプリをダウンロード",
+      "tryInBrowser": "ブラウザで試す",
+      "vscode": "VS Code 拡張機能",
+      "openVsx": "Open VSX（Cursor）",
+      "releases": "リリース",
+      "documentation": "ドキュメント",
+      "overview": "概要",
+      "concepts": "基本概念",
+      "jointCatalog": "継手・仕口の一覧",
+      "apiReference": "API リファレンス",
+      "forAgents": "エージェント向け",
+      "authoringInstructions": "設計の手引き（英語）",
+      "cheatSheet": "API チートシート（英語）",
+      "project": "プロジェクト",
+      "github": "GitHub",
+      "videos": "動画",
+      "about": "概要",
+      "contact": "お問い合わせ",
+      "community": "コミュニティ",
+      "discussions": "GitHub Discussions",
+      "discord": "Discord",
+      "copyright": "&copy; 2026 minimaple. Kumiki と Kigumi は MPL-2.0 のもとで公開されているオープンソースソフトウェアです。",
+      "privacy": "プライバシー（英語）",
+      "terms": "利用規約（英語）"
+    }
+  },
+  "home": {
+    "title": "Kumiki — 木組み・木工の継手と仕口のためのプログラマブル CAD",
+    "description": "Kumiki は、木組みや木工の継手・仕口をコードで設計するためのオープンソース Python ライブラリです。パラメトリックな継手と、Mac、Windows、VS Code、ブラウザで動くリアルタイム 3D ビューア Kigumi を備えています。",
+    "heroTitle": "コードで設計する、木組みと木工のための CAD",
+    "tagline": "Kumiki は、木組みと木工のためのオープンソース Python ライブラリです。設計はただのプログラムで、どの継手も、つなぐ材に合わせてパラメトリックに寸法が決まります。すべてがコードでできているので、Kumiki の架構は AI エージェントの手を借りて設計できます。",
+    "downloadMac": "Mac 版をダウンロード",
+    "downloadWindows": "Windows 版をダウンロード",
+    "getKigumi": "Kigumi を入手",
+    "tryInBrowser": "ブラウザで試す",
+    "also": "Kigumi {version}：<a href=\"{macArm}\">Mac（Apple シリコン）</a>、<a href=\"{macIntel}\">Mac（Intel）</a>、<a href=\"{windows}\">Windows</a>、または <a href=\"{marketplace}\">VS Code 拡張機能</a>。無料のオープンソースです。",
+    "heroAlt": "Kumiki で設計したタイニーハウスの架構",
+    "titleBlock": {
+      "frame": "架構",
+      "frameValue": "タイニーハウス",
+      "source": "ソース",
+      "joints": "継手・仕口",
+      "jointsValue": "蟻、枘、相欠き"
+    },
+    "featuresTitle": "しくみ",
+    "featuresLabel": "Kumiki でできること",
+    "beta": "ベータ",
+    "features": {
+      "program": {
+        "label": "架構をプログラムする",
+        "kicker": "Python を書けば、架構ができる",
+        "heading": "架構の設計はパラメトリックなプログラム",
+        "body": "材と継手・仕口は、Kumiki が用意する Python の関数で定義します。コードはすべてパラメトリックです。寸法をひとつ変えれば、それに関わる継手がすべて更新されます。コードはエージェントと一緒に書いても、手で書いてもかまいません。",
+        "points": [
+          "継手は関数：正確で、カスタマイズでき、ドキュメントがある",
+          "パターンは組み合わせられる：同じ方杖を各梁の下に使える",
+          "どんな AI エージェントとでも一緒に設計できる"
+        ],
+        "imageAlt": "架構の隅に留め相欠きと込み栓の継手を定義する Python のソース",
+        "secondAlt": "そのコードが作る小屋を Kigumi で表示したもの"
+      },
+      "preview": {
+        "label": "Kigumi で見る",
+        "kicker": "ビューア",
+        "heading": "Kigumi は、書いたそばから架構を表示します",
+        "body": "Kigumi は架構を実行して描画します。Mac と Windows のデスクトップアプリ、VS Code 拡張機能、ブラウザのどれでも動きます。材を選んで寸法を読み、継手の形状ツリーをたどり、レイヤーを隠し、断面を切り、寸法を測れます。",
+        "points": [
+          "面・辺・継手の要素ひとつまで形状を調べられる",
+          "レイヤー、タグ、部材ごとの表示切り替えで架構を分解して見られる",
+          "X 線表示と断面表示で継手を内側から読める"
+        ],
+        "imageAlt": "二連の馬（作業台）の X 線表示。材の中の継手が見える",
+        "secondAlt": "ビューアで表示したコーヒーテーブルの架構"
+      },
+      "joinery": {
+        "label": "パラメトリックな継手・仕口",
+        "kicker": "ブーリアン演算ではなく、継手",
+        "heading": "材が変わっても正しく収まる、伝統的な継手・仕口",
+        "body": "枘、蟻、相欠き、継手、楔や込み栓を使ったものまで。どれもパラメトリックな継手で、つなぐ材が動いたり、寸法が変わったり、別の角度で取り合ったりすると、自動で刻み直されます。",
+        "points": [
+          "大入れ、胴付き、逃げ、込み栓は材から導かれる",
+          "複雑な設計向けの細かく設定できる継手と、直交する架構向けのシンプルな継手",
+          "数十種類の継手があり、今も増え続けている"
+        ],
+        "imageAlt": "込み栓付きの片側隠し相欠き（十字）の X 線表示",
+        "secondAlt": "斜めに取り合う、込み栓付きの方杖の枘差し"
+      },
+      "drawings": {
+        "label": "加工図",
+        "kicker": "図面",
+        "heading": "架構そのものから作る、平面図と加工図",
+        "body": "図面はモデルの投影なので、モデルとずれることがありません。Kumiki は材そのものから図面の配置を決めます。ビューポートや縮尺を自分で置く必要はありません。",
+        "points": [
+          "平面図と、部材の種類ごとの寸法入り図面",
+          "コードで生成・カスタマイズでき、図面も設計の一部になる",
+          "Kigumi で寸法を手で追加し、シートを PNG で書き出せる"
+        ],
+        "imageAlt": "生成されたシート：正面図、平面図、側面図、アイソメ図"
+      },
+      "assembly": {
+        "label": "組み立て順",
+        "kicker": "作業の順序",
+        "heading": "継手から割り出す、架構の組み立て順",
+        "body": "Kumiki は継手そのものから、どの材をどの順番で納められるかを割り出します。その順序を再生して、架構がばらばらになる様子を見られます。",
+        "points": [
+          "それぞれの継手の実際の組み方から導いた組み立て順",
+          "組み上がった状態からばらした状態までスライドして手順を読める",
+          "組み立てられない架構を、刻む前に見つけられる"
+        ],
+        "imageAlt": "途中までばらしたコーヒーテーブルと、組み立てのタイムラインのスライダー",
+        "secondAlt": "組み立て手順の別の時点での同じ架構"
+      }
+    },
+    "galleryTitle": "Kumiki で作ったもの",
+    "galleryLead": "架構、継手、そして完成した小屋。そのもとになったパターンは Kumiki に付属しています。",
+    "galleryOpen": "拡大して表示：{alt}",
+    "gallery": {
+      "oscarshed_built": "完成した Oscar's Shed（小屋）",
+      "tinyhouse120_front": "タイニーハウスの架構、正面",
+      "timber_frame_shed": "木組みの小屋の全体モデル",
+      "sawhorsey": "馬（作業台）のパターン",
+      "double_sawhorse": "込み栓で組んだ二連の馬（作業台）",
+      "round_crosslap_joint": "丸太の相欠き（十字）の詳細",
+      "wedged_half_dovetail": "楔付きの片蟻",
+      "dropin_dovetail_butt_joint": "蟻落し",
+      "dropin_dovetail_butt_joint_xray": "X 線表示：蟻落し",
+      "half_blind_cross_lap_joint": "込み栓付きの片側隠し相欠き（十字）",
+      "splined_opposing_joint": "雇い枘で向かい合う継手",
+      "splined_opposing_joint_xray": "X 線表示：雇い枘で向かい合う継手"
+    },
+    "agentsTitle": "エージェントと設計する",
+    "agentsLead": "架構は正確な寸法を持つただの Python なので、コーディングエージェントが説明から架構を書き、ビルドし、できたものを見て確かめられます。",
+    "kigumiAgentTitle": "Kigumi のエージェント",
+    "kigumiAgentBody": "Kigumi アプリとブラウザ版にあるエージェントパネルは、架構のファイルを編集し、ビルドできるか確かめ、ビューを見て確認します。Kigumi のアカウントでサインインするか、自分の OpenRouter キーを使います。",
+    "ownAgentTitle": "自分のエージェント",
+    "ownAgentBody": "Claude Code や Codex なども架構を書けます。<a href=\"{instructions}\">設計の手引き（英語）</a>を渡し、アプリで Kigumi の MCP サーバーを有効にすれば、架構をビルドして見られるようになります。",
+    "promptCaption": "たとえば",
+    "prompt": "かわいい馬（作業台）を作って。1′×2′ の範囲に水平な足が 2 本あって、その上に垂直な脚が 2 本立ち、2 本の脚の上に水平な梁が載っている。2 本の脚の真ん中を貫でつないでほしい。全部、角の込み栓を打った枘でつないでね！",
+    "faqTitle": "よくある質問",
+    "faqs": [
+      {
+        "question": "Kumiki とは何ですか？",
+        "answer": "Kumiki は、木組みの架構、軸組の建物、木工の継手・仕口をコードで設計するためのオープンソース Python ライブラリです。対になる Kigumi が、書いたそばから架構を 3D で表示し、継手の X 線表示、CSG ツリー、図面、ライブパラメータ（木割り）を備えています。"
+      },
+      {
+        "question": "Kigumi とは何で、どこで動きますか？",
+        "answer": "Kigumi は Kumiki のビューア兼エディタです。架構のスクリプトを実行して 3D で描画します。Mac と Windows のデスクトップアプリ、VS Code と Cursor の拡張機能、またはブラウザ（kumiki.build/try）で使えます。アプリとブラウザ版にはエージェントも組み込まれています。"
+      },
+      {
+        "question": "木工用途で、OpenSCAD、CadQuery、FreeCAD と比べてどうですか？",
+        "answer": "汎用 CAD は、あくまで汎用です。継手は描くのが難しく、使い回しもしにくい。Kumiki は分野に特化した CAD です。継手・仕口（枘、蟻、継手、相欠き、鎌継ぎ、大入れ、込み栓）は専用の関数で作られ、つなぐ部材がどんな形でも継手の形を合わせます。また FreeCAD と違い、設計はすべてコードで書くので、エージェントによる設計に最も向いています。"
+      },
+      {
+        "question": "AI エージェント（Claude、Codex、Cursor、Copilot）を使って Kumiki で架構を設計できますか？",
+        "answer": "はい。架構は正確な寸法を持つただの Python で、エージェントが得意とするものです。Kigumi のプロジェクトには設計の手引きと基本概念のドキュメントが含まれ、エージェントが自動で見つけます。Kigumi の MCP サーバーを使えば、いつものエージェントが架構をビルドし、アプリで見られます。"
+      },
+      {
+        "question": "どんな継手・仕口に対応していますか？",
+        "answer": "伝統的なものから現代的なものまで 30 種類以上の継手・仕口があり、それぞれにパラメトリックなバリエーションがあります。枘（角枘、大入れ、通し、楔、込み栓、引き寄せ）、相欠き（隅、十字、留め、片側隠し）、蟻（標準、楔付き片蟻、蟻落し）、継手（雇い枘、腰掛鎌継ぎ、金輪継ぎ）、垂木の組手、大入れの根太掛けなど。"
+      },
+      {
+        "question": "3D モデルや加工用のファイルを書き出せますか？",
+        "answer": "はい。架構や個々の材を、レンダリングや 3D プリント向けに STL、OBJ、3MF で、CNC やほかの CAD 向けに STEP で書き出せます。図面は PNG で書き出せ、SVG にも近く対応予定です。"
+      }
+    ],
+    "closingTitle": "枘ひとつから始めて、納屋まで",
+    "closingBody": "Kumiki はライブラリ、Kigumi は Kumiki の架構を作るための設計アプリと環境です。インストールは簡単で、セットアップは自動です。",
+    "getStarted": "はじめる",
+    "readDocs": "ドキュメントを読む（英語）",
+    "lightboxClose": "閉じる",
+    "lightboxPrev": "前の画像",
+    "lightboxNext": "次の画像"
+  },
+  "install": {
+    "title": "Kumiki と Kigumi をはじめる — Mac、Windows、VS Code、ブラウザで使える木組み CAD",
+    "description": "Mac または Windows 版の Kigumi をダウンロードするか、ブラウザで試すか、VS Code 拡張機能を入れて、Kumiki で最初の架構を設計しましょう。",
+    "faqs": [
+      {
+        "question": "Kigumi を使う前に Python をインストールする必要はありますか？",
+        "answer": "いいえ。Kigumi でプロジェクトを作成または初期化すると、プロジェクト専用の Python 環境を用意して Kumiki を自動でインストールします。コンピュータに Python がなければ uv のインストールを提案します。"
+      },
+      {
+        "question": "Claude Code、Codex、Antigravity を Kigumi につなぐには？",
+        "answer": "コーディングエージェントに Kumiki の設計の手引き（docs/agent_usage_instructions.md）を渡し、デスクトップアプリで Kigumi 組み込みの MCP サーバーを有効にします。エージェントが架構をビルドし、セッションのログを読み、スクリーンショットを確認できるようになります。"
+      },
+      {
+        "question": "pip や uv で Kumiki を直接インストールできますか？",
+        "answer": "はい。Python 3.10 以上の環境で pip install kumiki または uv add kumiki を実行すれば、架構のビルド、STEP/STL/3MF メッシュの書き出し、kumiki.kigumi_at_home による画面なしの PNG 描画ができます。"
+      }
+    ],
+    "heading": "はじめる",
+    "lead": "架構は Kumiki を使って Python で書き、Kigumi で見ます。Kigumi をどこで動かすか選んでください。どれも Python と Kumiki を自動で用意します。",
+    "waysLabel": "Kigumi の使い方",
+    "ways": {
+      "app": "デスクトップアプリ",
+      "appBlurb": "Mac と Windows。エディタ、ビューア、エージェントがひとつのウィンドウに。",
+      "browser": "ブラウザで",
+      "browserBlurb": "インストール不要。プロジェクトはブラウザに保存されます。",
+      "vscode": "VS Code 拡張機能",
+      "vscodeBlurb": "VS Code と Cursor で、いつもの道具と並べて。"
+    },
+    "app": {
+      "heading": "デスクトップアプリ",
+      "downloadTitle": "Kigumi をダウンロードしてインストール",
+      "macArm": "Mac（Apple シリコン）",
+      "macIntel": "Mac（Intel）",
+      "windows": "Windows",
+      "downloadBody": "バージョン {version}（<a href=\"{releasePage}\">リリースノート</a>）。新しいバージョンが出るとアプリが自動で更新します。Windows で「PC が保護されました」と表示されたら、<strong>詳細情報</strong>を選んでから<strong>実行</strong>を選んでください。",
+      "projectTitle": "プロジェクトを作る",
+      "projectBody": "<strong>New Project…</strong> を選び、フォルダを選ぶか作ります。Kigumi がそこに Kumiki をインストールします。コンピュータに Python がなければ、Python を同梱する <a href=\"https://docs.astral.sh/uv/\">uv</a> のインストールを提案します。",
+      "firstFrameTitle": "最初の架構を開く",
+      "firstFrameBody": "エクスプローラーで <strong>my_cute_frame</strong> をクリックすると表示されます。<code>my_cute_frame.py</code> を開いて数字をひとつ変えて保存すると、ビューが作り直されます。",
+      "ownTitle": "自分の設計を作る",
+      "ownBody": "<code>Frame</code> を作る Python ファイルを自分で書けば、ビューアに表示されます。AI コーディングエージェントでプロジェクトのフォルダを開けば、エージェントと一緒に設計できます。エージェントを Kigumi の MCP につなぐと、さらに多くの機能が使えます。"
+    },
+    "browser": {
+      "heading": "ブラウザで",
+      "body": "<a href=\"{try}\">kumiki.build/try</a> を開きます。Kigumi と Python はページの中で動き、サーバーには何も送られません。プロジェクトはディスクではなくブラウザのストレージに保存されるので、手元に残したいときは .zip で書き出してください。初回は Python をダウンロードするので少し時間がかかります。",
+      "button": "ブラウザで Kigumi を試す"
+    },
+    "vscode": {
+      "heading": "VS Code 拡張機能",
+      "installTitle": "Kigumi 拡張機能をインストール",
+      "installBody": "<a href=\"{marketplace}\">VS Code Marketplace</a> から、または Cursor などのエディタでは <a href=\"{openVsx}\">Open VSX</a> から。<a href=\"{releasePage}\">リリースページ</a>には <code>.vsix</code> もあります。",
+      "folderTitle": "フォルダを開く",
+      "folderBody": "プロジェクト用のフォルダを作り、<strong>File › Open Folder</strong> を選びます。",
+      "initTitle": "プロジェクトを初期化する",
+      "initBody": "アクティビティバーのアイコンから Kigumi のサイドバーを開くか、コマンドパレットで <strong>View: Show Kigumi</strong> を実行します。<strong>Initialize Project</strong> をクリックすると、Kigumi が Kumiki をインストールし、最初の架構を追加します。",
+      "firstFrameTitle": "最初の架構を開く",
+      "firstFrameBody": "<strong>my_cute_frame</strong> をクリックします。<code>my_cute_frame.py</code> を編集してビューアの更新ボタンを押すか、<strong>Kigumi の設定</strong>で自動更新を有効にします。"
+    },
+    "ai": {
+      "heading": "AI と設計する",
+      "body": "Kigumi アプリとブラウザ版にはエージェントパネルがあります。サインインするか OpenRouter キーを追加して、架構を頼んでみてください。ほかのコーディングエージェントも架構を書けます。おすすめは Claude、Codex、Antigravity です。Copilot と Cursor はおすすめしませんが、簡単な設計なら Copilot の無料クレジットで足りるかもしれません。エージェントには<a href=\"{instructions}\">設計の手引き（英語）</a>を渡し、アプリで MCP サーバーを有効にすれば、架構をビルドして見られるようになります。",
+      "promptCaption": "頼んでみよう"
+    }
+  },
+  "joints": {
+    "title": "Kumiki のパラメトリックな継手・仕口 — Python で扱う日本と西洋の木工の継手",
+    "description": "Kumiki の Python によるパラメトリックな木工・木組みの継手・仕口：枘、楔付き片蟻、蟻落し、腰掛鎌継ぎ、金輪継ぎ、相欠き。",
+    "kicker": "パラメトリックな継手・仕口",
+    "heading": "材が変われば自分で刻み直す、伝統的な継手・仕口",
+    "lead": "Kumiki では、継手はつなぐ材の関数です。手で描くブーリアンの箱ではありません。材の断面を変えても、柱を動かしても、屋根勾配をきつくしても、胴付き、大入れ、枘、楔、込み栓の穴はすべて形状から計算し直されます。",
+    "categoriesLabel": "継手・仕口の種類",
+    "categories": {
+      "mortise-and-tenon": {
+        "kicker": "柱、梁、方杖",
+        "heading": "枘差し",
+        "body": "木組みの主役です。一方の材の端に作った枘が、もう一方の材の面に掘った枘穴に入ります。大入れ、胴付き、引き寄せの丸込み栓や角込み栓、楔、割り楔を付けられます。柱や梁の寸法が変わると、枘の厚み、胴付きの面、込み栓の穴が合わせて刻み直されます。",
+        "imageAlt": "斜めに取り合う、込み栓付きの方杖の枘差し",
+        "secondAlt": "楔付き片蟻の通し枘",
+        "joints": [
+          "枘差し（込み栓、大入れ、止め枘）",
+          "楔付き片蟻の枘差し",
+          "割り楔の通し枘"
+        ]
+      },
+      "butt-and-dropin": {
+        "kicker": "根太、胴差し、向かい合う梁",
+        "heading": "落とし込みと両側からの仕口",
+        "body": "床の根太や胴差しは、主な軸組を建て起こしたあとに納められるよう、上から受け口に落とし込むことがよくあります。柱の両側から二本の梁が取り合うところでは、共通の雇い枘や向かい合う枘が、枘穴を割らずに柱を通して梁どうしを結びます。",
+        "imageAlt": "蟻落し",
+        "secondAlt": "蟻落しの X 線表示",
+        "joints": [
+          "蟻落し",
+          "大入れ仕口",
+          "雇い枘で向かい合う仕口"
+        ]
+      },
+      "splice-and-scarf": {
+        "kicker": "土台、桁、胴差しを継ぐ",
+        "heading": "継手",
+        "body": "土台や桁が一本の材より長くなるときは、継手（つぎて）で一直線上の二本の材を端と端でつなぎます。シンプルな相欠きから、かみ合う鎌継ぎや斜めに欠き込む継手まで、どの刻みも部材の断面から寸法が決まります。",
+        "imageAlt": "腰掛鎌継ぎ",
+        "secondAlt": "込み栓付きの雇い枘で向かい合う継手の X 線表示",
+        "joints": [
+          "腰掛鎌継ぎ",
+          "金輪継ぎ",
+          "相欠き継ぎ"
+        ]
+      },
+      "corner-and-cross": {
+        "kicker": "土台の隅、垂木の頂部、交差する部材",
+        "heading": "隅の仕口、組手、相欠き",
+        "body": "隅は、ただの留め、相欠き、蟻、垂木頂部の組手、または隅の外側に木口を見せない留めと車知栓の相欠きで納まります。交差する材は、等分に相欠きにするか、一方をもう一方の欠き込みに大入れにします。",
+        "imageAlt": "込み栓付きの片側隠し相欠き（十字）",
+        "secondAlt": "込み栓付きの片側隠し相欠き（十字）の X 線表示",
+        "joints": [
+          "箱相欠き車知栓仕口",
+          "組手（隅）",
+          "渡り腮と大入れ"
+        ]
+      }
+    },
+    "comparisonTitle": "汎用 CAD と比べて",
+    "comparisonLead": "機械系の CAD は任意の立体を扱います。Kumiki が扱うのは、材、木目の向き、基準となる稜線、そして継手・仕口の決まりです。",
+    "table": {
+      "head": ["機能", "Kumiki + Kigumi", "OpenSCAD / CadQuery", "SketchUp / FreeCAD"],
+      "rows": [
+        ["組み込みの継手・仕口", "30 種類以上のパラメトリックな継手（枘、蟻、継手、大入れ、込み栓）", "CSG のブーリアンで手作業で切り抜く", "手で描くか、固定のプラグイン"],
+        ["材の寸法を変える", "胴付き、枘、受け口、込み栓が自動で刻み直される", "座標の計算を書き直す必要がある", "隣の面が崩れることが多い"],
+        ["木目と材の面", "木目の軸（<code>BOTTOM</code> から <code>TOP</code>）と基準の稜線を標準で扱う", "なし（等方的なメッシュや BREP）", "なし"],
+        ["組み立て順の検証", "継手の差し込み方向から計算し、タイムラインで再生", "なし", "なし"],
+        ["AI エージェントによる設計", "組み込みのエージェント、MCP サーバー、厳密な記号計算、画面なしの PNG 描画", "浮動小数点による CSG のずれが起きやすい", "GUI 前提で、テキストや git で扱いにくい"]
+      ]
+    },
+    "faqTitle": "よくある質問",
+    "faqs": [
+      {
+        "question": "木工の継手に、OpenSCAD、CadQuery、FreeCAD、SketchUp ではなく Kumiki を使う理由は？",
+        "answer": "汎用 CAD では、継手は手で描くブーリアンの引き算です。柱を 4×4 から 6×6 に変えたり、垂木の角度を変えたりすると、枘穴、胴付き、込み栓の穴が崩れます。Kumiki では、どの継手もつなぐ材の関数なので、胴付き、大入れ、枘の厚み、クリアランスが自動で計算し直されます。"
+      },
+      {
+        "question": "日本の木組み（kigumi）と西洋の木組みの両方に対応していますか？",
+        "answer": "はい。腰掛鎌継ぎ、金輪継ぎ、蟻落し、大入れ仕口、渡り腮といった日本の伝統的な継手・仕口に加え、西洋の墨付けの流儀（スクエアルール、ミルルール）による木組みの継手（引き寄せ込み栓の枘、割り楔の枘、組手、相欠き、大入れ）も備えています。"
+      },
+      {
+        "question": "basic_joints と、より細かい継手の関数はどう使い分けますか？",
+        "answer": "まずは cut_basic_* 関数（たとえば cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers）から始めてください。幅 1/3 の枘のような標準的な大工の比率を、材から自動で導きます。胴付きの入り、枘のずれ、込み栓の位置を細かく決めたいときは、もとになる cut_* 関数に切り替えます。"
+      }
+    ],
+    "getKigumi": "Kigumi を入手",
+    "browseReference": "継手の API リファレンスを見る（英語）"
+  },
+  "about": {
+    "title": "Kumiki について — プログラマブル CAD と日本の木組み",
+    "description": "Kumiki が生まれた理由と、作っている人について。",
+    "heading": "Kumiki について",
+    "paragraphs": [
+      "多くの人と同じように、私もコロナ禍のあいだに日本の木工にのめり込みました。また、何十年ものあいだ、ゲームやソフトウェアの設計にもかなり打ち込んできました。Kumiki は、この二つの趣味から生まれたものです。",
+      "市販の CAD ソフトは値段が高く、木工に使うには物足りないところがたくさんあります。使いにくいインターフェースと限られたパラメトリック機能では、体系的な幾何学の決まりに従って繰り返される継手のパターンを表すのに向いていません。",
+      "Kumiki を作りはじめた頃は、Kumiki をできるだけシンプルで使いやすく作ったとしても、<strong>設計</strong>のために<strong>コード</strong>を書こうという人はあまりいないだろうと思っていました。ところが公開する頃には、エージェントによるコーディングがすっかり当たり前になっていました。そのことについて多くは語りませんが、実際のところ、それは CAD としての Kumiki を、使いにくくするどころか、ずっと使いやすくしてくれました。",
+      "私が作るのを楽しんでいるのと同じくらい、使うのを楽しんでもらえたらうれしいです。Kumiki は無料のオープンソースです！"
+    ],
+    "github": "GitHub で見る",
+    "home": "ホームに戻る"
+  }
+}

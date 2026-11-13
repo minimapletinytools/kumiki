@@ -1,0 +1,389 @@
+---
+// The joint catalog, in each language (pages/joints.astro, pages/ja/joints.astro).
+import Layout from '../layouts/Layout.astro';
+import { type Lang, localePath, strings } from '../i18n';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = strings(lang).joints;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const data = [
+  {
+    id: 'mortise-and-tenon',
+    image: `${base}/photos/mortise_tenon_brace_joint.png`,
+    second: `${base}/photos/wedged_half_dovetail.png`,
+    joints: [
+      {
+        jp: '枘差し / Hozo-sashi',
+        fn: 'cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/mixed/',
+      },
+      {
+        jp: '車知栓仕口 / Shachi-sen',
+        fn: 'cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/butt/',
+      },
+      {
+        jp: '割り楔枘 / Warikusabi-hozo',
+        fn: 'cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/mixed/',
+      },
+    ],
+  },
+  {
+    id: 'butt-and-dropin',
+    image: `${base}/photos/dropin_dovetail_butt_joint.png`,
+    second: `${base}/photos/dropin_dovetail_butt_joint_xray.png`,
+    joints: [
+      {
+        jp: '蟻落し仕口 / Ari-otoshi',
+        fn: 'cut_dropin_dovetail_butt_joint_on_face_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/butt/',
+      },
+      {
+        jp: '大入れ仕口 / Oire-shiguchi',
+        fn: 'cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/butt/',
+      },
+      {
+        jp: '雇い枘差し / Yatoi-hozo',
+        fn: 'cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/butt/',
+      },
+    ],
+  },
+  {
+    id: 'splice-and-scarf',
+    image: `${base}/photos/gooseneck_joint.png`,
+    second: `${base}/photos/splined_opposing_joint_xray.png`,
+    joints: [
+      {
+        jp: '腰掛鎌継ぎ / Koshikake Kama-tsugi',
+        fn: 'cut_basic_lapped_gooseneck_joint_on_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/splice/',
+      },
+      {
+        jp: '金輪継ぎ / Kanawa-tsugi',
+        fn: 'cut_basic_kanawa_tsugi_joint_on_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/splice/',
+      },
+      {
+        jp: '相欠き継ぎ / Aikaki-tsugi',
+        fn: 'cut_basic_plain_splice_lap_joint_on_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/splice/',
+      },
+    ],
+  },
+  {
+    id: 'corner-and-cross',
+    image: `${base}/photos/half_blind_cross_lap_joint.png`,
+    second: `${base}/photos/half_blind_cross_lap_joint_xray.png`,
+    joints: [
+      {
+        jp: '箱相欠き車知栓仕口 / Hako Aikaki Shachi-sen',
+        fn: 'cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/corner/',
+      },
+      {
+        jp: '組手 / Kumite',
+        fn: 'cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/corner/',
+      },
+      {
+        jp: '渡り腮 / Watari-ago',
+        fn: 'cut_basic_plain_cross_lap_joint_on_face_aligned_timbers',
+        href: 'https://kumiki.build/docs/reference/joints/workshop/cross/',
+      },
+    ],
+  },
+];
+
+// Each category's words, in this language, with its data.
+const categories = data.map((cat) => {
+  const words = s.categories[cat.id as keyof typeof s.categories];
+  return { ...cat, ...words, joints: cat.joints.map((joint, i) => ({ ...joint, name: words.joints[i] })) };
+});
+---
+<Layout
+  title={s.title}
+  description={s.description}
+  canonicalPath="/joints"
+  image="/photos/half_blind_cross_lap_joint_xray.png"
+  faqs={s.faqs}
+  lang={lang}
+  translated
+>
+  <article class="joints-page">
+    <p class="kicker">{s.kicker}</p>
+    <h1>{s.heading}</h1>
+    <p class="lead">{s.lead}</p>
+
+    <nav class="cat-nav" aria-label={s.categoriesLabel}>
+      {categories.map((cat) => (
+        <a href={`#${cat.id}`}>
+          <strong>{cat.heading}</strong>
+          <span>{cat.kicker}</span>
+        </a>
+      ))}
+    </nav>
+
+    {categories.map((cat) => (
+      <section id={cat.id} class="cat-section">
+        <div class="cat-grid">
+          <div class="cat-copy">
+            <p class="kicker">{cat.kicker}</p>
+            <h2>{cat.heading}</h2>
+            <p class="cat-body">{cat.body}</p>
+            <ul class="joint-list">
+              {cat.joints.map((j) => (
+                <li>
+                  <div class="joint-header">
+                    <a href={j.href}>{j.name}</a>
+                    <span class="jp">{j.jp}</span>
+                  </div>
+                  <code>{j.fn}</code>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div class="cat-media">
+            <img class="plate" src={cat.image} alt={cat.imageAlt} loading="lazy" decoding="async" />
+            {cat.second && (
+              <img class="plate plate-second" src={cat.second} alt={cat.secondAlt} loading="lazy" decoding="async" />
+            )}
+          </div>
+        </div>
+      </section>
+    ))}
+
+    <section class="comparison" id="comparison">
+      <h2>{s.comparisonTitle}</h2>
+      <p class="section-lead">{s.comparisonLead}</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              {s.table.head.map((cell) => <th>{cell}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {s.table.rows.map(([capability, ...cells]) => (
+              <tr>
+                <td><strong set:html={capability} /></td>
+                {cells.map((cell) => <td set:html={cell} />)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="faq-section" id="faq">
+      <h2>{s.faqTitle}</h2>
+      <div class="faq-list">
+        {s.faqs.map((faq) => (
+          <details class="faq-item">
+            <summary>
+              <span>{faq.question}</span>
+              <span class="faq-icon" aria-hidden="true"></span>
+            </summary>
+            <p>{faq.answer}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href={localePath(lang, '/install')}>{s.getKigumi}</a>
+      <a class="btn btn-secondary" href="https://kumiki.build/docs/reference/joints/workshop/basic_joints/">
+        {s.browseReference}
+      </a>
+    </div>
+  </article>
+</Layout>
+
+<style>
+  .joints-page {
+    padding: 2.5rem 0 2rem;
+  }
+  .lead {
+    margin-top: 1.2rem;
+    font-size: 1.12rem;
+    color: var(--ink-soft);
+    max-width: 44rem;
+  }
+  .cat-nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.75rem;
+    margin: 2.25rem 0 3.5rem;
+  }
+  .cat-nav a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--sheet);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    color: var(--ink);
+  }
+  .cat-nav a:hover {
+    border-color: var(--accent);
+    text-decoration: none;
+  }
+  .cat-nav span {
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+  }
+  .cat-section {
+    padding: 3.25rem 0;
+    border-top: 1px solid var(--rule-strong);
+  }
+  .cat-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 3rem;
+    align-items: start;
+  }
+  .cat-body {
+    margin-top: 0.9rem;
+    color: var(--ink-soft);
+  }
+  .joint-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0 0;
+  }
+  .joint-list li {
+    padding: 0.75rem 0;
+    border-top: 1px solid var(--rule);
+  }
+  .joint-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    font-weight: 500;
+  }
+  .jp {
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    font-weight: 400;
+  }
+  .joint-list code {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    word-break: break-all;
+  }
+  .cat-media {
+    display: grid;
+    gap: 1rem;
+  }
+  .plate-second {
+    width: 60%;
+    justify-self: end;
+  }
+  .comparison {
+    padding: 3.5rem 0 1rem;
+    border-top: 1px solid var(--rule-strong);
+  }
+  .section-lead {
+    margin-top: 0.6rem;
+    color: var(--ink-soft);
+    max-width: 40rem;
+  }
+  .table-wrap {
+    margin-top: 1.75rem;
+    overflow-x: auto;
+    background: var(--sheet);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.93rem;
+    text-align: left;
+  }
+  th, td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--paper);
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  tr:last-child td {
+    border-bottom: 0;
+  }
+  .faq-section {
+    padding: 3.5rem 0 2rem;
+    max-width: 52rem;
+  }
+  .faq-list {
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--rule-strong);
+  }
+  .faq-item {
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .faq-item summary {
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.05rem 0;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .faq-item summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq-icon {
+    position: relative;
+    width: 0.8rem;
+    height: 0.8rem;
+    flex: none;
+  }
+  .faq-icon::before, .faq-icon::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 1.5px;
+    background: var(--ink-soft);
+    transition: transform 0.2s ease;
+  }
+  .faq-icon::after {
+    transform: rotate(90deg);
+  }
+  .faq-item[open] .faq-icon::after {
+    transform: rotate(0deg);
+  }
+  .faq-item p {
+    padding: 0 2rem 1.2rem 0;
+    color: var(--ink-soft);
+  }
+  .cta-row {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-top: 2rem;
+  }
+  @media (max-width: 900px) {
+    .cat-grid {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+  }
+</style>

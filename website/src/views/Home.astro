@@ -1,0 +1,546 @@
+---
+// The home page, in each language (pages/index.astro, pages/ja/index.astro).
+import Layout from '../layouts/Layout.astro';
+import { appDownloads, kigumiVersion, marketplace } from '../kigumi-release';
+import { type Lang, fill, localePath, strings } from '../i18n';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const tryKigumi = import.meta.env.PUBLIC_KIGUMI_TRY === 'true';
+const s = strings(lang).home;
+
+// The tabs ARE the navigation: the strip selects, the panel slides. Each one says how the
+// program works rather than what it is like.
+const featureImages = [
+  { id: 'program', image: 'feature_code.png', second: 'oscarshed.png' },
+  { id: 'preview', image: 'double_sawhorse_xray.png', second: 'coffee_table.png' },
+  { id: 'joinery', image: 'half_blind_cross_lap_joint_xray.png', second: 'mortise_tenon_brace_joint.png' },
+  { id: 'drawings', image: 'feature_drawing.png', beta: true },
+  { id: 'assembly', image: 'feature_assembly.png', second: 'feature_assembly_2.png', beta: true },
+];
+const features = featureImages.map(({ id, image, second, beta }) => {
+  const words = s.features[id as keyof typeof s.features];
+  return {
+    id,
+    ...words,
+    status: beta ? s.beta : undefined,
+    image: `${base}/photos/${image}`,
+    second: second ? `${base}/photos/${second}` : undefined,
+    secondAlt: 'secondAlt' in words ? words.secondAlt : undefined,
+  };
+});
+
+const gallery = Object.entries(s.gallery).map(([name, alt]) => ({ src: `${base}/photos/${name}.png`, alt }));
+---
+<Layout
+  title={s.title}
+  description={s.description}
+  canonicalPath="/"
+  image="/photos/tinyhouse120_angle.png"
+  faqs={s.faqs}
+  lang={lang}
+  translated
+  wide
+>
+  <div class="column">
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>{s.heroTitle}</h1>
+        <p class="tagline">{s.tagline}</p>
+        <div class="cta">
+          <a class="btn btn-primary" id="download" href={appDownloads.macArm}
+             data-mac={appDownloads.macArm} data-windows={appDownloads.windows} data-other={localePath(lang, '/install')}
+             data-windows-label={s.downloadWindows} data-other-label={s.getKigumi}>
+            {s.downloadMac}
+          </a>
+          {tryKigumi && <a class="btn btn-secondary" href={`${base}/try/`}>{s.tryInBrowser}</a>}
+        </div>
+        <p class="also" set:html={fill(s.also, { version: kigumiVersion, ...appDownloads, marketplace })} />
+      </div>
+      <figure class="sheet">
+        <img src={`${base}/photos/tinyhouse120_angle.png`} alt={s.heroAlt} fetchpriority="high" decoding="async" />
+        <figcaption class="title-block">
+          <div><span>{s.titleBlock.frame}</span>{s.titleBlock.frameValue}</div>
+          <div><span>{s.titleBlock.source}</span><code>tinyhouse120.py</code></div>
+          <div><span>{s.titleBlock.joints}</span>{s.titleBlock.jointsValue}</div>
+        </figcaption>
+      </figure>
+    </section>
+  </div>
+
+  <section class="band" id="features">
+    <div class="band-inner">
+      <h2 class="features-title">{s.featuresTitle}</h2>
+      <div class="tabs" role="tablist" aria-label={s.featuresLabel}>
+        {features.map((feature, i) => (
+          <button
+            class="tab"
+            type="button"
+            role="tab"
+            id={`tab-${feature.id}`}
+            aria-controls={`panel-${feature.id}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+            data-index={i}
+          >
+            {feature.label}
+            {feature.status && <span class="status">{feature.status}</span>}
+          </button>
+        ))}
+      </div>
+      <div class="viewport" id="viewport">
+        <div class="track" id="track">
+          {features.map((feature, i) => (
+            <section
+              class="panel"
+              role="tabpanel"
+              id={`panel-${feature.id}`}
+              aria-labelledby={`tab-${feature.id}`}
+              inert={i !== 0}
+            >
+              <div class="panel-copy">
+                <p class="kicker">{feature.kicker}</p>
+                <h3 class="panel-heading">{feature.heading}</h3>
+                <p class="panel-body">{feature.body}</p>
+                <ul class="panel-points">
+                  {feature.points.map((point) => <li>{point}</li>)}
+                </ul>
+              </div>
+              <div class="panel-media">
+                <img class="plate" src={feature.image} alt={feature.imageAlt} loading="lazy" decoding="async" />
+                {feature.second && (
+                  <img class="plate plate-second" src={feature.second} alt={feature.secondAlt} loading="lazy" decoding="async" />
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="column">
+    <section class="gallery">
+      <h2>{s.galleryTitle}</h2>
+      <p class="section-lead">{s.galleryLead}</p>
+      <div class="grid">
+        {gallery.map((photo, i) => (
+          <figure>
+            <button class="thumb" type="button" data-index={i} aria-label={fill(s.galleryOpen, { alt: photo.alt })}>
+              <img src={photo.src} alt={photo.alt} loading="lazy" decoding="async" />
+            </button>
+          </figure>
+        ))}
+      </div>
+    </section>
+
+    <section class="agents" id="ai-agents">
+      <div class="agents-header">
+        <h2>{s.agentsTitle}</h2>
+        <p class="section-lead">{s.agentsLead}</p>
+      </div>
+      <div class="agents-ways">
+        <div>
+          <h3>{s.kigumiAgentTitle}</h3>
+          <p>{s.kigumiAgentBody}</p>
+        </div>
+        <div>
+          <h3>{s.ownAgentTitle}</h3>
+          <p set:html={fill(s.ownAgentBody, { instructions: 'https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md' })} />
+        </div>
+      </div>
+      <figure class="prompt">
+        <figcaption>{s.promptCaption}</figcaption>
+        <blockquote>{s.prompt}</blockquote>
+      </figure>
+    </section>
+
+    <section class="faq" id="faq">
+      <h2>{s.faqTitle}</h2>
+      <div class="faq-list">
+        {s.faqs.map((faq) => (
+          <details class="faq-item">
+            <summary>
+              <span>{faq.question}</span>
+              <span class="faq-icon" aria-hidden="true"></span>
+            </summary>
+            <p>{faq.answer}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+  </div>
+
+  <section class="band closing">
+    <div class="band-inner closing-inner">
+      <h2>{s.closingTitle}</h2>
+      <p>{s.closingBody}</p>
+      <div class="cta">
+        <a class="btn btn-primary" href={localePath(lang, '/install')}>{s.getStarted}</a>
+        <a class="btn btn-secondary" href="https://kumiki.build/docs/">{s.readDocs}</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="lightbox" id="lightbox" hidden>
+    <button class="lightbox-close" type="button" aria-label={s.lightboxClose}>&times;</button>
+    <button class="lightbox-nav lightbox-prev" type="button" aria-label={s.lightboxPrev}>&#8249;</button>
+    <img class="lightbox-image" id="lightbox-image" src="" alt="" />
+    <button class="lightbox-nav lightbox-next" type="button" aria-label={s.lightboxNext}>&#8250;</button>
+    <p class="lightbox-caption" id="lightbox-caption"></p>
+  </div>
+</Layout>
+
+<script>
+  // --- the sliding feature gallery -----------------------------------------
+  const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.tab'));
+  const panels = Array.from(document.querySelectorAll<HTMLElement>('.panel'));
+  const track = document.getElementById('track');
+
+  const viewport = document.getElementById('viewport');
+  let current = 0;
+
+  // All five panels stay laid out side by side -- that is what the track
+  // slides along -- so the viewport is told how tall the visible one is.
+  // Without this it would stand at the height of the tallest panel and the
+  // short ones would sit in a pool of whitespace.
+  function syncHeight() {
+    if (!viewport || !panels[current]) return;
+    viewport.style.height = `${panels[current].offsetHeight}px`;
+  }
+
+  // Measured rather than expressed as a percentage: the step is one panel plus
+  // the gutter between them, and Chrome rejects the calc() that would say so.
+  function slide() {
+    if (!track || panels.length === 0) return;
+    const step = panels.length > 1 ? panels[1].offsetLeft - panels[0].offsetLeft : 0;
+    track.style.transform = `translateX(${-current * step}px)`;
+  }
+
+  function select(index: number, focusTab = false) {
+    if (!track || tabs.length === 0) return;
+    const next = (index + tabs.length) % tabs.length;
+    current = next;
+    tabs.forEach((tab, i) => {
+      const on = i === next;
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.tabIndex = on ? 0 : -1;
+    });
+    // inert rather than hidden: the off-screen panels must keep their place in
+    // the track, but their links and images should stay out of the tab order
+    // and off a screen reader.
+    panels.forEach((panel, i) => {
+      if (i === next) panel.removeAttribute('inert');
+      else panel.setAttribute('inert', '');
+    });
+    slide();
+    syncHeight();
+    if (focusTab) tabs[next].focus();
+    history.replaceState(null, '', `#${panels[next].id.replace('panel-', '')}`);
+  }
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(i));
+    tab.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight') { event.preventDefault(); select(i + 1, true); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); select(i - 1, true); }
+      if (event.key === 'Home') { event.preventDefault(); select(0, true); }
+      if (event.key === 'End') { event.preventDefault(); select(tabs.length - 1, true); }
+    });
+  });
+
+  // Deep link: /#joinery opens that panel.
+  const wanted = window.location.hash.replace('#', '');
+  if (wanted) {
+    const found = panels.findIndex((panel) => panel.id === `panel-${wanted}`);
+    if (found >= 0) select(found);
+  }
+
+  // The panel grows when its images arrive and when the column reflows, and
+  // both happen after the height above was measured.
+  function reflow() { slide(); syncHeight(); }
+  reflow();
+  window.addEventListener('resize', reflow);
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(reflow);
+    panels.forEach((panel) => observer.observe(panel));
+  }
+
+  // --- gallery lightbox -----------------------------------------------------
+  const gallery = Array.from(document.querySelectorAll<HTMLButtonElement>('.thumb'));
+  const lightbox = document.getElementById('lightbox') as HTMLDivElement | null;
+  const lightboxImage = document.getElementById('lightbox-image') as HTMLImageElement | null;
+  const lightboxCaption = document.getElementById('lightbox-caption');
+  const closeBtn = lightbox?.querySelector<HTMLButtonElement>('.lightbox-close');
+  const prevBtn = lightbox?.querySelector<HTMLButtonElement>('.lightbox-prev');
+  const nextBtn = lightbox?.querySelector<HTMLButtonElement>('.lightbox-next');
+
+  let currentIndex = 0;
+
+  function show(index: number) {
+    if (!lightbox || !lightboxImage || gallery.length === 0) return;
+    currentIndex = (index + gallery.length) % gallery.length;
+    const img = gallery[currentIndex].querySelector('img');
+    if (!img) return;
+    lightboxImage.src = img.src;
+    lightboxImage.alt = img.alt;
+    if (lightboxCaption) lightboxCaption.textContent = img.alt;
+    lightbox.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    if (!lightbox) return;
+    lightbox.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  gallery.forEach((btn, i) => btn.addEventListener('click', () => show(i)));
+  closeBtn?.addEventListener('click', close);
+  prevBtn?.addEventListener('click', () => show(currentIndex - 1));
+  nextBtn?.addEventListener('click', () => show(currentIndex + 1));
+  lightbox?.addEventListener('click', (e) => { if (e.target === lightbox) close(); });
+
+  document.addEventListener('keydown', (e) => {
+    if (!lightbox || lightbox.hidden) return;
+    if (e.key === 'Escape') close();
+    if (e.key === 'ArrowLeft') show(currentIndex - 1);
+    if (e.key === 'ArrowRight') show(currentIndex + 1);
+  });
+</script>
+
+<script>
+  // The download button offers this computer's installer: Windows, a Mac, or the install page.
+  const download = document.getElementById('download') as HTMLAnchorElement | null;
+  if (download) {
+    const agent = navigator.userAgent;
+    if (/Windows/.test(agent)) {
+      download.href = download.dataset.windows ?? download.href;
+      download.textContent = download.dataset.windowsLabel ?? download.textContent;
+    } else if (!/Macintosh|Mac OS X/.test(agent) || /iPhone|iPad/.test(agent)) {
+      download.href = download.dataset.other ?? download.href;
+      download.textContent = download.dataset.otherLabel ?? download.textContent;
+    }
+  }
+</script>
+
+<style>
+  /* ── Hero ── */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 7fr);
+    gap: 3.5rem;
+    align-items: center;
+    padding: 3rem 0 5rem;
+  }
+  .hero h1 { font-size: clamp(2.3rem, 4.2vw, 3.3rem); max-width: 16ch; }
+  .hero h1:lang(ja) { max-width: 11em; }
+  .tagline { margin-top: 1.4rem; font-size: 1.12rem; color: var(--ink-soft); max-width: 34rem; }
+  .cta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+  .also { margin-top: 1.1rem; font-size: 0.9rem; color: var(--ink-faint); max-width: 32rem; }
+
+  /* The hero render as a drawing sheet, with a title block along the bottom. */
+  .sheet {
+    margin: 0;
+    background: var(--sheet);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .sheet img { display: block; width: 100%; height: auto; }
+  .title-block {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.4fr;
+    border-top: 1px solid var(--rule-strong);
+    font-size: 0.9rem;
+  }
+  .title-block div { padding: 0.6rem 0.9rem 0.7rem; }
+  .title-block div + div { border-left: 1px solid var(--rule); }
+  .title-block span { display: block; font-size: 0.75rem; color: var(--ink-faint); }
+  .title-block code { font-size: 0.85rem; }
+
+  /* ── How it works ── */
+  .features-title { margin-bottom: 1.75rem; }
+  .tabs {
+    display: flex;
+    gap: 0.25rem 2rem;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+  .tab {
+    appearance: none;
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.6rem 0 0.8rem;
+    font: inherit;
+    font-size: 1rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab[aria-selected='true'] { color: var(--ink); font-weight: 500; border-bottom-color: var(--accent); }
+
+  .viewport { overflow: hidden; transition: height 0.3s ease; }
+  .track { display: flex; align-items: flex-start; gap: 4rem; transition: transform 0.45s cubic-bezier(0.3, 0.7, 0.2, 1); }
+  .panel {
+    flex: 0 0 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 3.5rem;
+    padding-top: 2.75rem;
+    align-items: start;
+  }
+  .panel-heading { font-family: var(--serif); font-size: clamp(1.45rem, 2.4vw, 1.9rem); font-weight: 700; line-height: 1.2; }
+  .panel-body { margin-top: 1rem; color: var(--ink-soft); }
+  .panel-points { list-style: none; padding: 0; margin: 1.5rem 0 0; }
+  .panel-points li {
+    padding: 0.6rem 0 0.6rem 1.4rem;
+    border-top: 1px solid var(--rule-strong);
+    position: relative;
+    font-size: 0.95rem;
+  }
+  .panel-points li::before {
+    content: '';
+    position: absolute;
+    left: 0.15rem;
+    top: 1.2rem;
+    width: 0.55rem;
+    height: 1px;
+    background: var(--accent);
+  }
+  .panel-media { display: grid; gap: 1rem; }
+  .plate-second { width: 55%; justify-self: end; }
+
+  /* ── Gallery ── */
+  .gallery { padding: 5.5rem 0 1rem; }
+  .section-lead { margin-top: 0.75rem; color: var(--ink-soft); max-width: 40rem; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
+  }
+  .grid figure { margin: 0; }
+  .thumb {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--sheet);
+    overflow: hidden;
+    cursor: zoom-in;
+    aspect-ratio: 4 / 3;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s ease; }
+  .thumb:hover img { transform: scale(1.03); }
+
+  /* ── Agents ── */
+  .agents { padding: 5.5rem 0 1rem; }
+  .agents-ways {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 2.25rem;
+    border-top: 1px solid var(--rule-strong);
+  }
+  .agents-ways > div { padding: 1.5rem 2.5rem 0 0; }
+  .agents-ways > div + div { padding: 1.5rem 0 0 2.5rem; border-left: 1px solid var(--rule); }
+  .agents-ways p { margin-top: 0.6rem; color: var(--ink-soft); }
+  .prompt {
+    margin: 2.5rem 0 0;
+    padding: 1.4rem 1.6rem;
+    background: var(--sheet);
+    border: 1px solid var(--rule-strong);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    max-width: 52rem;
+  }
+  .prompt figcaption { font-size: 0.85rem; color: var(--ink-faint); margin-bottom: 0.4rem; }
+  .prompt blockquote { margin: 0; font-family: var(--serif); font-size: 1.1rem; line-height: 1.65; }
+
+  /* ── FAQ ── */
+  .faq { padding: 5.5rem 0 5rem; max-width: 52rem; }
+  .faq-list { margin-top: 1.75rem; border-top: 1px solid var(--rule-strong); }
+  .faq-item { border-bottom: 1px solid var(--rule-strong); }
+  .faq-item summary {
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.1rem 0;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-icon { position: relative; width: 0.8rem; height: 0.8rem; flex: none; }
+  .faq-icon::before, .faq-icon::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 1.5px;
+    background: var(--ink-soft);
+    transition: transform 0.2s ease;
+  }
+  .faq-icon::after { transform: rotate(90deg); }
+  .faq-item[open] .faq-icon::after { transform: rotate(0deg); }
+  .faq-item p { padding: 0 2.5rem 1.3rem 0; color: var(--ink-soft); }
+
+  /* ── Closing ── */
+  .closing-inner { text-align: center; }
+  .closing-inner p { margin: 1rem auto 0; color: var(--ink-soft); max-width: 34rem; }
+  .closing-inner .cta { justify-content: center; }
+
+  /* ── Lightbox ── */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(20, 21, 24, 0.92);
+    display: grid;
+    place-items: center;
+    padding: 3rem 4rem;
+  }
+  .lightbox[hidden] { display: none; }
+  .lightbox-image { max-width: 100%; max-height: calc(100vh - 8rem); border-radius: var(--radius); background: var(--sheet); }
+  .lightbox-caption { position: absolute; bottom: 1.25rem; left: 0; right: 0; text-align: center; color: #d9dad6; font-size: 0.9rem; }
+  .lightbox button {
+    position: absolute;
+    background: none;
+    border: 0;
+    color: #fff;
+    font-size: 2.4rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.5rem 0.8rem;
+  }
+  .lightbox-close { top: 0.75rem; right: 1rem; }
+  .lightbox-prev { left: 0.75rem; top: 50%; transform: translateY(-50%); }
+  .lightbox-next { right: 0.75rem; top: 50%; transform: translateY(-50%); }
+
+  /* ── Narrow screens ── */
+  @media (max-width: 900px) {
+    .hero, .panel { grid-template-columns: 1fr; gap: 2rem; }
+    .hero { padding: 1.5rem 0 3.5rem; }
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .agents-ways { grid-template-columns: 1fr; }
+    .agents-ways > div, .agents-ways > div + div { padding: 1.5rem 0 0; border-left: 0; }
+    .agents-ways > div + div { margin-top: 1.5rem; border-top: 1px solid var(--rule); }
+    .band-inner { padding: 3.5rem 1.5rem; }
+    .gallery, .agents, .faq { padding-top: 3.5rem; }
+  }
+  @media (max-width: 560px) {
+    .title-block { grid-template-columns: 1fr 1fr; }
+    .title-block div:last-child { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--rule); }
+    .tabs { gap: 0 1.25rem; }
+    .column, .band-inner { padding-left: 1rem; padding-right: 1rem; }
+  }
+</style>

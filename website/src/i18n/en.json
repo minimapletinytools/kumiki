@@ -1,0 +1,361 @@
+{
+  "_comment": "The website's English text: the source the other languages are translated from (see AGENTS.md, Website translations). {name} is filled in by the page; some strings hold HTML.",
+  "layout": {
+    "description": "Kumiki is an open-source programmatic CAD library for Python designed for timber framing and woodworking joinery, with parametric joinery and live 3D preview in Kigumi, on Mac, Windows, VS Code or the web.",
+    "imageAlt": "Kumiki timber frame CAD preview",
+    "nav": {
+      "label": "Site",
+      "download": "Download",
+      "try": "Try it",
+      "joints": "Joints",
+      "docs": "Docs",
+      "videos": "Videos",
+      "github": "GitHub",
+      "about": "About"
+    },
+    "language": {
+      "label": "Language",
+      "switchTo": "日本語",
+      "switchToLabel": "このページを日本語で表示",
+      "switchToHomeLabel": "日本語のトップページへ"
+    },
+    "footer": {
+      "kigumi": "Kigumi",
+      "downloadApp": "Download the app",
+      "tryInBrowser": "Try it in your browser",
+      "vscode": "VS Code extension",
+      "openVsx": "Open VSX (Cursor)",
+      "releases": "Releases",
+      "documentation": "Documentation",
+      "overview": "Overview",
+      "concepts": "Concepts",
+      "jointCatalog": "Joint catalog",
+      "apiReference": "API reference",
+      "forAgents": "For agents",
+      "authoringInstructions": "Authoring instructions",
+      "cheatSheet": "API cheat sheet",
+      "project": "Project",
+      "github": "GitHub",
+      "videos": "Videos",
+      "about": "About",
+      "contact": "Contact",
+      "community": "Community",
+      "discussions": "GitHub Discussions",
+      "discord": "Discord",
+      "copyright": "&copy; 2026 minimaple. Kumiki and Kigumi are open source under the MPL-2.0.",
+      "privacy": "Privacy",
+      "terms": "Terms"
+    }
+  },
+  "home": {
+    "title": "Kumiki — Programmatic CAD for Timber Framing & Woodworking Joinery",
+    "description": "Kumiki is an open-source Python library for designing timber frames and woodworking joinery in code, with parametric joints and a live 3D viewer, Kigumi, for Mac, Windows, VS Code and the web.",
+    "heroTitle": "Programmatic Timber Framing and Woodworking CAD",
+    "tagline": "Kumiki is an open-source Python library for timber framing and woodworking. Designs are just programs and every joint is parametrically sized to the timbers it joins. Since everything is built from code, kumiki frames can be authored with support from AI agents.",
+    "downloadMac": "Download for Mac",
+    "downloadWindows": "Download for Windows",
+    "getKigumi": "Get Kigumi",
+    "tryInBrowser": "Try it in your browser",
+    "also": "Kigumi {version} for <a href=\"{macArm}\">Mac (Apple silicon)</a>, <a href=\"{macIntel}\">Mac (Intel)</a> and <a href=\"{windows}\">Windows</a>, or as a <a href=\"{marketplace}\">VS Code extension</a>. Free and open source.",
+    "heroAlt": "A tiny house frame designed in Kumiki",
+    "titleBlock": {
+      "frame": "Frame",
+      "frameValue": "Tiny house",
+      "source": "Source",
+      "joints": "Joints",
+      "jointsValue": "Dovetails, mortise and tenon, laps"
+    },
+    "featuresTitle": "How it works",
+    "featuresLabel": "What Kumiki does",
+    "beta": "Beta",
+    "features": {
+      "program": {
+        "label": "Program your frames",
+        "kicker": "Python in, frame out",
+        "heading": "Frame designs are parametric programs",
+        "body": "Timbers and joints are defined through python functions provided by kumiki. All code is parametric: Change a dimension and every joint that depends on it updates. Author your code agentically or by hand.",
+        "points": [
+          "Joints are functions: precise, customizable and documented",
+          "Patterns compose: the same brace can be used under each beam",
+          "Author your design together with any AI agent"
+        ],
+        "imageAlt": "Python source declaring mitered and keyed lap joints at a frame corner",
+        "secondAlt": "The shed that code builds, rendered in Kigumi"
+      },
+      "preview": {
+        "label": "See it in Kigumi",
+        "kicker": "The viewer",
+        "heading": "Kigumi shows the frame as you write it",
+        "body": "Kigumi runs your frame and draws it: as a desktop app for Mac and Windows, as a VS Code extension, or in your browser. Select a timber and read its dimensions, walk into a joint's geometry tree, hide layers, cut sections and measure.",
+        "points": [
+          "Inspect geometry down to a single face, edge or joint feature",
+          "Layers, tags and per-member visibility for picking a frame apart",
+          "X-ray and section views for reading a joint from the inside"
+        ],
+        "imageAlt": "X-ray view of a double sawhorse, showing the joinery inside the timbers",
+        "secondAlt": "A coffee table frame rendered in the viewer"
+      },
+      "joinery": {
+        "label": "Parametric joinery",
+        "kicker": "Joints, not boolean cuts",
+        "heading": "Traditional joints that stay correct when the timbers change",
+        "body": "Mortise and tenon, dovetails, half-laps, scarfs, wedged and pegged variants. Each one is a parametric joint that recuts itself when the timbers it joins move, change size, or meet at a different angle.",
+        "points": [
+          "Housings, shoulders, reliefs and pegs derived from the timbers,",
+          "Highly configurable joints for complex designs and simple plain versions for square frames",
+          "Dozens of joints, with more being added regularly"
+        ],
+        "imageAlt": "X-ray of a half-blind cross lap joint with keys",
+        "secondAlt": "A pegged mortise-and-tenon brace joint at an angle"
+      },
+      "drawings": {
+        "label": "Shop drawings",
+        "kicker": "Drawings",
+        "heading": "Plans and shop drawings made from the frame itself",
+        "body": "A drawing is a projection of the model, so it cannot drift from it. Kumiki lays out the views from the timbers themselves: you never place a viewport or a scale.",
+        "points": [
+          "A plan, and a dimensioned drawing for each distinct piece",
+          "Generated and customized in code, where the drawing is part of the design",
+          "Add a dimension by hand in Kigumi, and export sheets as PNG"
+        ],
+        "imageAlt": "A generated sheet: front elevation, plan, side elevation and isometric"
+      },
+      "assembly": {
+        "label": "Assembly order",
+        "kicker": "Order of operations",
+        "heading": "The order the frame goes together, worked out from the joinery",
+        "body": "Kumiki works out which timbers can be moved into place, and in what order, from the joints themselves. Then it plays it back so you can watch the frame come apart.",
+        "points": [
+          "Assembly order derived from how each joint actually goes together",
+          "Scrub from assembled to disassembled to read a sequence",
+          "Catches a frame that cannot be assembled before you cut it"
+        ],
+        "imageAlt": "A coffee table part-way disassembled, with the assembly timeline slider",
+        "secondAlt": "The same frame at another point in the assembly sequence"
+      }
+    },
+    "galleryTitle": "Built with Kumiki",
+    "galleryLead": "Frames, joints and a finished shed. The patterns behind them ship with Kumiki.",
+    "galleryOpen": "Open larger view: {alt}",
+    "gallery": {
+      "oscarshed_built": "Oscar's Shed, built: the finished structure",
+      "tinyhouse120_front": "Tiny house frame, front view",
+      "timber_frame_shed": "Full timber-framed shed model",
+      "sawhorsey": "Sawhorse pattern",
+      "double_sawhorse": "Double sawhorse with pegged joinery",
+      "round_crosslap_joint": "Round crosslap joint detail",
+      "wedged_half_dovetail": "Wedged half dovetail joint",
+      "dropin_dovetail_butt_joint": "Drop-in dovetail butt joint",
+      "dropin_dovetail_butt_joint_xray": "X-ray: drop-in dovetail butt joint",
+      "half_blind_cross_lap_joint": "Half-blind cross lap joint with keys",
+      "splined_opposing_joint": "Splined opposing scarf joint",
+      "splined_opposing_joint_xray": "X-ray: splined opposing scarf joint"
+    },
+    "agentsTitle": "Design with an agent",
+    "agentsLead": "Frames are plain Python with exact dimensions, so a coding agent can write one from a description, build it, and look at what it made.",
+    "kigumiAgentTitle": "Kigumi’s agent",
+    "kigumiAgentBody": "The agent panel in the Kigumi app and the browser version edits your frame files, checks that they build, and looks at the view. Sign in to a Kigumi account, or use your own OpenRouter key.",
+    "ownAgentTitle": "Your own agent",
+    "ownAgentBody": "Claude Code, Codex and others can write frames too. Give them the <a href=\"{instructions}\">authoring instructions</a>, and turn on Kigumi’s MCP server in the app so they can build frames and see them.",
+    "promptCaption": "For example",
+    "prompt": "Make me a cute saw horse. It has 2 horizontal feet on a 1′×2′ footprint, with two vertical legs on top of the feet, and a horizontal beam resting on top of the 2 legs. There should also be a stretcher connecting the 2 legs in the middle. Join everything with mortise and tenon joinery with square pegs please!",
+    "faqTitle": "Questions",
+    "faqs": [
+      {
+        "question": "What is Kumiki?",
+        "answer": "Kumiki is an open-source Python library for designing timber frames, post-and-beam buildings and woodworking joinery in code. Its companion, Kigumi, shows the frame in 3D as you write it, with X-ray joint inspection, the CSG tree, drawings and live parameters (kiwari)."
+      },
+      {
+        "question": "What is Kigumi, and where does it run?",
+        "answer": "Kigumi is Kumiki’s viewer and editor. It runs your frame script and renders it in 3D. Get it as a desktop app for Mac and Windows, as an extension for VS Code and Cursor, or use it in your browser at kumiki.build/try. The app and the browser version also have a built-in agent."
+      },
+      {
+        "question": "How does Kumiki compare to OpenSCAD, CadQuery or FreeCAD for woodworking?",
+        "answer": "General-purpose CAD is.. general purpose. Joints are difficult to draw and aren’t easily reused. Kumiki is a domain specific CAD application. Joinery (mortise and tenon, dovetails, scarfs, half-laps, gooseneck splices, housings, pegs) is created from purpose built functions that will fit the shape of the joint to whatever member it joints. And unlike FreeCAD, all designs are written with code which is best suited for agentic authoring."
+      },
+      {
+        "question": "Can I use AI agents (Claude, Codex, Cursor, Copilot) to design frames with Kumiki?",
+        "answer": "Yes. Frames are plain Python with exact dimensions, which agents write well. Kigumi projects ship with authoring instructions and the concepts documentation, that the agent will find automatically. Kigumi’s MCP server lets the agents you already use build frames and look at them in the app."
+      },
+      {
+        "question": "What joints does Kumiki support?",
+        "answer": "More than 30 traditional and modern timber joints, each with parametric variations: mortise and tenon (square, housed, through, wedged, pegged, drawbored), lap joints (corner, cross, mitered, half-blind), dovetails (standard, wedged half-dovetail, drop-in), scarf and splice joints (splined opposing scarf, lapped gooseneck or kanawa-tsugi), tongue-and-fork rafter joints, and drop-in housed joist pockets."
+      },
+      {
+        "question": "Can Kumiki export 3D models and files for fabrication?",
+        "answer": "Yes. Kumiki exports frames and individual timbers to STL, OBJ and 3MF for rendering and 3D printing, and to STEP for CNC and other CAD software. Drawings export as PNG and SVG will be supported soon."
+      }
+    ],
+    "closingTitle": "Start with a mortise and tenon joint, end with a barn",
+    "closingBody": "kumiki is the library and kigumi is design application and environment for building kumiki frames. Installion is easy and setup is automatic.",
+    "getStarted": "Get started",
+    "readDocs": "Read the docs",
+    "lightboxClose": "Close",
+    "lightboxPrev": "Previous image",
+    "lightboxNext": "Next image"
+  },
+  "install": {
+    "title": "Get Started with Kumiki & Kigumi — Timber Framing CAD for Mac, Windows, VS Code and the Web",
+    "description": "Download Kigumi for Mac or Windows, try it in your browser, or install the VS Code extension, and design your first timber frame with Kumiki.",
+    "faqs": [
+      {
+        "question": "Do I need to install Python before using Kigumi?",
+        "answer": "No. When you create or initialize a project in Kigumi, it sets up a project-local Python environment and installs Kumiki automatically, offering to install uv if no Python is present on your computer."
+      },
+      {
+        "question": "How do I connect Claude Code, Codex, or Antigravity to Kigumi?",
+        "answer": "Point your coding agent at the Kumiki authoring instructions (docs/agent_usage_instructions.md) and enable Kigumi’s built-in MCP server in the desktop app so the agent can build frames, read session logs, and inspect screenshots."
+      },
+      {
+        "question": "Can I install Kumiki directly with pip or uv?",
+        "answer": "Yes. Run pip install kumiki or uv add kumiki in any Python >=3.10 environment to build frames, export STEP/STL/3MF meshes, or render headless PNG views with kumiki.kigumi_at_home."
+      }
+    ],
+    "heading": "Get started",
+    "lead": "You write frames in Python with Kumiki, and see them in Kigumi. Pick where you want Kigumi to run. Each one sets up Python and Kumiki for you.",
+    "waysLabel": "Ways to run Kigumi",
+    "ways": {
+      "app": "Desktop app",
+      "appBlurb": "Mac and Windows. Editor, viewer and agent in one window.",
+      "browser": "In your browser",
+      "browserBlurb": "Nothing to install. Projects stay in the browser.",
+      "vscode": "VS Code extension",
+      "vscodeBlurb": "For VS Code and Cursor, next to your own tools."
+    },
+    "app": {
+      "heading": "Desktop app",
+      "downloadTitle": "Download and install Kigumi",
+      "macArm": "Mac, Apple silicon",
+      "macIntel": "Mac, Intel",
+      "windows": "Windows",
+      "downloadBody": "Version {version} (<a href=\"{releasePage}\">release notes</a>). The app updates itself when a new version comes out. If Windows says it protected your PC, choose <strong>More info</strong>, then <strong>Run anyway</strong>.",
+      "projectTitle": "Make a project",
+      "projectBody": "Choose <strong>New Project…</strong> and pick or make a folder. Kigumi installs Kumiki into it. If your computer has no Python, it offers to install <a href=\"https://docs.astral.sh/uv/\">uv</a>, which brings its own.",
+      "firstFrameTitle": "Open your first frame",
+      "firstFrameBody": "Click <strong>my_cute_frame</strong> in the explorer to see it. Open <code>my_cute_frame.py</code>, change a number and save: the view rebuilds.",
+      "ownTitle": "Create your own designs",
+      "ownBody": "Author your own Python file that produces a <code>Frame</code> and it will show up in the viewer. Open the project folder with your AI coding agent to author agentically. Connect your agent to the Kigumi MCP for more features."
+    },
+    "browser": {
+      "heading": "In your browser",
+      "body": "Open <a href=\"{try}\">kumiki.build/try</a>. Kigumi and Python run in the page, and nothing goes to a server. Your projects live in the browser’s storage, not on disk: export a project as a .zip to keep a copy. The first visit downloads Python, so it takes a moment.",
+      "button": "Try Kigumi in your browser"
+    },
+    "vscode": {
+      "heading": "VS Code extension",
+      "installTitle": "Install the Kigumi extension",
+      "installBody": "From the <a href=\"{marketplace}\">VS Code Marketplace</a>, or from <a href=\"{openVsx}\">Open VSX</a> for Cursor and other editors. There’s also a <code>.vsix</code> on the <a href=\"{releasePage}\">release page</a>.",
+      "folderTitle": "Open a folder",
+      "folderBody": "Make a folder for your project, then choose <strong>File › Open Folder</strong>.",
+      "initTitle": "Initialize the project",
+      "initBody": "Open the Kigumi sidebar from its icon in the activity bar, or run <strong>View: Show Kigumi</strong> from the command palette. Click <strong>Initialize Project</strong>: Kigumi installs Kumiki and adds a first frame.",
+      "firstFrameTitle": "Open your first frame",
+      "firstFrameBody": "Click <strong>my_cute_frame</strong>. Edit <code>my_cute_frame.py</code> and click refresh in the viewer, or turn on auto refresh under <strong>Kigumi options</strong>."
+    },
+    "ai": {
+      "heading": "Designing with AI",
+      "body": "The Kigumi app and browser version have an agent panel: sign in, or add an OpenRouter key, and ask for a frame. Other coding agents can write frames too. We recommend Claude, Codex or Antigravity. Copilot and Cursor are not recommended, though Copilot’s free credits may be enough for a simple design. Point them at the <a href=\"{instructions}\">authoring instructions</a>, and in the app, turn on the MCP server so they can build frames and see them.",
+      "promptCaption": "Try asking"
+    }
+  },
+  "joints": {
+    "title": "Parametric Timber Joinery in Kumiki — Japanese & Western Woodworking Joints in Python",
+    "description": "Explore Kumiki's parametric woodworking and timber framing joints in Python: mortise and tenon, wedged half-dovetails, drop-in dovetails (ari-tsugi), gooseneck splices (koshikake kama-tsugi), kanawa-tsugi scarfs, and cross-laps.",
+    "kicker": "Parametric joinery",
+    "heading": "Traditional joints that recut themselves when the timbers change",
+    "lead": "In Kumiki, a joint is a function of the timbers it connects—not a boolean box you draw by hand. Change a timber’s cross-section, move a post, or steepen a roof pitch, and every shoulder, housing, tenon, wedge and peg hole is recomputed from the geometry.",
+    "categoriesLabel": "Joint categories",
+    "categories": {
+      "mortise-and-tenon": {
+        "kicker": "Posts, beams and braces",
+        "heading": "Mortise and tenon",
+        "body": "The workhorse of a timber frame. A tenon on the end of one timber enters a mortise in the face of another, with optional housings, shoulders, draw-bored round or square pegs, wedges, or tusks. When a post or beam changes size, the tenon thickness, shoulder plane and peg holes recut to match.",
+        "imageAlt": "Pegged mortise and tenon brace joint at an angle",
+        "secondAlt": "Wedged half-dovetail through mortise and tenon joint",
+        "joints": [
+          "Mortise and tenon (pegged, housed, or blind)",
+          "Wedged half-dovetail mortise and tenon",
+          "Tusked through mortise and tenon"
+        ]
+      },
+      "butt-and-dropin": {
+        "kicker": "Joists, girts and opposing beams",
+        "heading": "Drop-in and double butt joints",
+        "body": "Floor joists and girts often drop into pockets from above so they can be set after the main bents are raised. Where two beams meet from opposite sides of a post, a shared spline or opposing tenon ties them through the post without blowing out the mortise.",
+        "imageAlt": "Drop-in dovetail butt joint (ari-tsugi)",
+        "secondAlt": "X-ray view of a drop-in dovetail butt joint",
+        "joints": [
+          "Drop-in dovetail butt joint",
+          "Drop-in housed butt joint",
+          "Splined opposing double butt joint"
+        ]
+      },
+      "splice-and-scarf": {
+        "kicker": "Extending sills, plates and girts",
+        "heading": "Splice and scarf joints",
+        "body": "When a mudsill or top plate runs longer than a single stick of lumber, a lengthening joint (tsugite) joins two collinear timbers end to end. From simple half-laps to interlocking gooseneck and rabbeted oblique scarfs, each cut is sized from the member's cross-section.",
+        "imageAlt": "Lapped gooseneck splice joint (koshikake kama-tsugi)",
+        "secondAlt": "X-ray view of a splined opposing joint with pegs",
+        "joints": [
+          "Lapped gooseneck splice",
+          "Half-blind tenoned dadoed rabbeted scarf",
+          "Splice half-lap joint"
+        ]
+      },
+      "corner-and-cross": {
+        "kicker": "Sill corners, rafter peaks and crossing members",
+        "heading": "Corner, bridle and cross-lap joints",
+        "body": "Corners meet as plain miters, half-laps, dovetails, tongue-and-fork (bridle) rafter peaks, or mitered-and-keyed laps that hide the end grain on the outside of the corner. Crossing timbers half-lap equally or house one member into a dado in the other.",
+        "imageAlt": "Half-blind cross-lap joint with keys",
+        "secondAlt": "X-ray view of a half-blind cross-lap joint with keys",
+        "joints": [
+          "Mitered and keyed corner lap",
+          "Tongue and fork corner (bridle joint)",
+          "Cross-lap and housing (dado) joints"
+        ]
+      }
+    },
+    "comparisonTitle": "How Kumiki compares to general-purpose CAD",
+    "comparisonLead": "Mechanical CAD tools model arbitrary solids; Kumiki models timbers, grain direction, reference arrises and joinery rules.",
+    "table": {
+      "head": ["Capability", "Kumiki + Kigumi", "OpenSCAD / CadQuery", "SketchUp / FreeCAD"],
+      "rows": [
+        ["Built-in wood joinery", "30+ parametric joints (M&amp;T, dovetails, scarfs, housings, pegs)", "Manual CSG boolean cutouts", "Manual drawing or static plugins"],
+        ["Resizing a timber", "Shoulders, tenons, pockets and pegs recut automatically", "Requires rewriting coordinate math", "Often breaks adjacent faces"],
+        ["Wood grain &amp; local faces", "First-class grain axis (<code>BOTTOM</code> to <code>TOP</code>) and reference edges", "None (isotropic meshes/BREPs)", "None"],
+        ["Assembly order verification", "Computed from joint insertion directions with timeline playback", "None", "None"],
+        ["AI agent authoring", "Built-in agent, MCP server, exact symbolic rules, headless PNG render", "Prone to floating-point CSG misalignment", "GUI-bound, not text/git native"]
+      ]
+    },
+    "faqTitle": "Questions",
+    "faqs": [
+      {
+        "question": "Why use Kumiki instead of OpenSCAD, CadQuery, FreeCAD or SketchUp for wood joinery?",
+        "answer": "In general-purpose CAD, a joint is a boolean subtraction you draw by hand: if you change a post from 4x4 to 6x6 or change a rafter angle, the mortise, shoulder and peg holes break. In Kumiki, every joint is a function of the timbers it connects, so shoulders, housings, tenon thicknesses and clearances recalculate automatically."
+      },
+      {
+        "question": "Does Kumiki support both Japanese joinery (kigumi) and Western timber framing?",
+        "answer": "Yes. Kumiki includes traditional Japanese splicing and connecting joints (koshikake kama-tsugi, kanawa-tsugi, ari-otoshi, oire-shiguchi, watari-ago) alongside classic Western square-rule and mill-rule timber framing joints (draw-bored mortise and tenon, tusked tenons, bridle joints, cross-laps and housings)."
+      },
+      {
+        "question": "How do I choose between basic_joints and full joint functions?",
+        "answer": "Start with cut_basic_* functions (such as cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers). They derive standard carpentry proportions—like a 1/3-width tenon—from the timbers automatically. When you need exact control over shoulder insets, tenon offsets or peg placement, switch to the underlying cut_* function."
+      }
+    ],
+    "getKigumi": "Get Kigumi",
+    "browseReference": "Browse the Joint API Reference"
+  },
+  "about": {
+    "title": "About Kumiki — Programmatic CAD & Japanese Timber Framing",
+    "description": "Why Kumiki exists, and who's behind it.",
+    "heading": "About",
+    "paragraphs": [
+      "Like many others, I went headfirst into Japanese carpentry during COVID. I've also been designing games and software with some intensity for decades. Kumiki is the combined inspiration of my hobbies.",
+      "Commercial CAD software carries a hefty price tag and leaves plenty to be desired for woodworking. Clunky interfaces with limited parametric features aren't ideal for representing repeating patterns of joints that follow systematic geometric rules.",
+      "When I originally created Kumiki, I figured few people would be willing to write <strong>CODE</strong> to make their <strong>DESIGNS</strong>, even with Kumiki designed to be as simple and accessible as it is. By the time I released it, though, the agentic coding ship had sailed. I won't say much about that, except that it has, as a matter of fact, made Kumiki more &mdash; not less &mdash; accessible as a CAD program.",
+      "I hope you enjoy using it as much as I enjoy making it. Kumiki is free and open source!"
+    ],
+    "github": "View on GitHub",
+    "home": "Back to home"
+  }
+}
