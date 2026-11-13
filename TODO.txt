@@ -13,9 +13,9 @@ how to do therad CSG hehe?? probably just smiluate it?or add spiral but don't al
 
 :: 11/09/2026 agent eval prompt collection
 
-
-
 build me a monitor stand, it should have a 6x10 inch base that's 1.75 inches thick, it should have a vertical post in the middle back of the base to hold the mointor up. dovetailed to the top of the post should be a wooden block that matches VESA mounting dimensions.
+
+
 
 :: 11/09/2026 new video script
 
@@ -270,6 +270,23 @@ IGONRE-test the install cadquery stuff
 IGNORE-create test runner for examples so the exmaples are also tests :O
 DONE-new kigumi icon
   DONE-make suer to update the sidebar icon as well
+DONE-app changes
+  -remove "Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them."
+  -You'll get much better results using your own agent with the standalone app. The agent panel in the web version is just for trying Kumiki out with minimal overhead. Sign in below to get $1 of "free" tokens to try it out. There is no way to buy more tokens! At some point I'll improve the agent and let you buy tokens, if you prefer working in the browser.
+    -change to: The web agent is just for trying out kumiki with low overhead. You'll get much better results with your own agent and with the standalone app (link to website)
+  -"Ways to run the agent here..." should jsut say "sign in to use get $1 in promo tokens.  You can also connect our own agent to the MCP (above).
+  -if you prompt and you are out of tokens it sholud siplay a message "you are out of tokens, there is currently no way to buy more (maybe soon), instead you can connect your own agent to the MCP (above) or download the standalone app (link to website)
+  -In the center where it says Kigumi Your projects, kept in this browser., delete this text
+    -add kigumi app logo here 
+    -then add a box with a right arrow that says "ask the agent to make you something or connect your own agent" -> 
+      -this message should also show up when you have a projec topen but no file open
+    -and then a down arrow that says "open or create a project below first" v
+  -use kumiki app logo as the website favicon
+
+DONE-do localization on web app, standalone app
+DONE-add localization change setting somewhere
+DONE-add numerator/denominator to angle/radians
+DONE-is there an easy awy to add site statistics to the website and app?
 
 -agent stuff
   -do benchmarking examples
@@ -298,7 +315,7 @@ DONE-new kigumi icon
 -allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
 -decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md
--improve board  functions, think bout the simplest way to do this...
+-improve board  functions, think bout the s4implest way to do this...
 -update shed example to include board
   -make a video about this maybe after you do some more edge joints
 -add srcibe notching ot more joints...
