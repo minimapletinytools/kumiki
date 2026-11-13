@@ -22,6 +22,7 @@ const MCP_INSTRUCTIONS = [
     'Kigumi shows timber frames written in Python with the kumiki library.',
     'Before writing or changing a frame, read kumiki_docs "agent_usage_instructions" (the rules) and "api_cheat_sheet".',
     'Check a function\'s exact signature with kumiki_api rather than guessing.',
+    'To read kumiki\'s source or its example frames, or search them, use kumiki_source.',
     'After an edit, build the frame with check_frame and see where its timbers ended up with describe_frame.',
 ].join(' ');
 

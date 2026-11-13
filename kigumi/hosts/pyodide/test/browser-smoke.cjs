@@ -251,6 +251,10 @@ app.whenReady().then(async () => {
         check("the agent's search finds a line in the project", found.includes('my_cute_frame.py:'), found.slice(0, 120));
         const api = await tool('kumiki_api', { name: 'create_axis_aligned_timber' });
         check("the agent's kumiki_api looks a name up in kumiki", api.includes('create_axis_aligned_timber') && !api.startsWith('ERROR'), api.slice(0, 120));
+        const sourceFound = await tool('kumiki_source', { search: 'def create_axis_aligned_timber' });
+        const page = await tool('kumiki_source', { path: 'kumiki.construction', offset: 1, limit: 3 });
+        check("kumiki_source searches and reads the browser's kumiki", sourceFound.startsWith('kumiki/construction.py:')
+            && page.startsWith('kumiki/construction.py\n1\t'), `${sourceFound.slice(0, 80)} | ${page.slice(0, 60)}`);
         const sheet = await tool('kumiki_docs', { name: 'api_cheat_sheet' });
         check('kumiki_docs reads the cheat sheet from the browser\'s kumiki', sheet.startsWith('# API cheat sheet'), sheet.slice(0, 120));
         // The tab signing in opens: noted, not opened.

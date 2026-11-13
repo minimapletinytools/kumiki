@@ -2,7 +2,7 @@
 
 The signatures of what a frame most often uses, and one complete small frame. The usage instructions
 and concepts say when to use each and why; this is what to type. For anything not here, look the name
-up (Kigumi's agent: `kumiki_api`) rather than guessing.
+up (Kigumi's agent: `kumiki_api`, or `kumiki_source` to read and search kumiki's files) rather than guessing.
 
 All of these come from `from kumiki import *`. Lengths are metres unless made with a unit.
 

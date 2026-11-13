@@ -75,12 +75,12 @@ describe('the panel directory', () => {
 describe('the tools', () => {
     const textOf = (content) => JSON.parse(content[0].text);
 
-    test('every agent gets the view tools, check_frame and kumiki_api; the built-in one also files and a to-do list', () => {
+    test('every agent gets the view tools, check_frame, kumiki_api and kumiki_source; the built-in one also files and a to-do list', () => {
         const host = viewHost({ panels: directory(), run: async () => ({}), files: { root: () => '/p' }, kumikiApi: async () => '{}' });
         const shared = sharedTools(host).map((tool) => tool.name);
         const own = agentTools(host, { checkpoints: () => null }).map((tool) => tool.name);
 
-        expect(shared).toEqual(expect.arrayContaining(['list_panels', 'screenshot', 'check_frame', 'kumiki_api']));
+        expect(shared).toEqual(expect.arrayContaining(['list_panels', 'screenshot', 'check_frame', 'kumiki_api', 'kumiki_source']));
         expect(shared).not.toContain('edit_file');
         expect(own).toEqual([...shared, 'list_files', 'search_files', 'read_file', 'write_file', 'edit_file', 'update_todos']);
         // Headless: no views, so no view tools; a host whose frames can be described still has describe_frame.

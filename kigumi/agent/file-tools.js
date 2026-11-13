@@ -13,6 +13,24 @@ const MAX_READ_LINES = 2000;
 /** A read's most characters: every read stays in the conversation, which goes with every step. */
 const MAX_READ_CHARS = 40000;
 
+/**
+ * Lines of `content` from `offset` (1-based), numbered, at most `limit` lines or MAX_READ_CHARS
+ * characters, saying where to read on from when there is more.
+ */
+function numberedLines(content, offset = 1, limit = MAX_READ_LINES) {
+    const lines = content.split('\n');
+    const shown = [];
+    let size = 0;
+    for (const line of lines.slice(offset - 1, offset - 1 + Math.min(limit, MAX_READ_LINES))) {
+        size += line.length + 8;
+        if (size > MAX_READ_CHARS && shown.length) break;
+        shown.push(line);
+    }
+    const next = offset + shown.length;
+    return shown.map((line, i) => `${offset + i}\t${line}`).join('\n')
+        + (next - 1 < lines.length ? `\n(${lines.length} lines in all; read on from line ${next})` : '');
+}
+
 /** @param {{files: object}} options  the project's files (agent/project-files.js) */
 function createFileTools({ files }) {
     const filePath = z.string().describe('A path relative to the project folder (or absolute, inside it).');
@@ -66,17 +84,7 @@ function createFileTools({ files }) {
             run: async ({ file_path: file, offset = 1, limit = MAX_READ_LINES }) => {
                 const content = await files.read(file);
                 if (content === null) throw new Error(`${file} doesn't exist.`);
-                const lines = content.split('\n');
-                const shown = [];
-                let size = 0;
-                for (const line of lines.slice(offset - 1, offset - 1 + Math.min(limit, MAX_READ_LINES))) {
-                    size += line.length + 8;
-                    if (size > MAX_READ_CHARS && shown.length) break;
-                    shown.push(line);
-                }
-                const next = offset + shown.length;
-                return text(shown.map((line, i) => `${offset + i}\t${line}`).join('\n')
-                    + (next - 1 < lines.length ? `\n(${lines.length} lines in all; read on from line ${next})` : ''));
+                return text(numberedLines(content, offset, limit));
             },
         },
         {
@@ -117,4 +125,4 @@ function createFileTools({ files }) {
     ];
 }
 
-module.exports = { createFileTools };
+module.exports = { createFileTools, numberedLines, MAX_READ_LINES, MAX_READ_CHARS };

@@ -23,6 +23,12 @@ const ask = async (args) => JSON.parse((await tool.run(args))[0].text);
         expect((await ask({ name: 'Frame.from_joints' })).signature).toMatch(/^\(joints/);
     }, 60000);
 
+    test('source longer than it gives says where it stops and how to read on', async () => {
+        const module = await ask({ name: 'kumiki.construction', source: true });
+        expect(module.source_cut).toMatch(/^Only the first \d+ of \d+ lines are shown: read on with kumiki_source, path kumiki\/construction\.py, offset \d+\.$/);
+        expect((await ask({ name: 'inches', source: true })).source_cut).toBeUndefined();
+    }, 60000);
+
     test('no such name: close ones instead', async () => {
         const missing = await ask({ name: 'create_axis_timber' });
         expect(missing.found).toBe(false);

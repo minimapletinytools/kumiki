@@ -15,6 +15,7 @@ import importlib
 import inspect
 import io
 import json
+import os
 import re
 import sys
 
@@ -78,6 +79,20 @@ def members(value):
     return [{"name": key, "kind": type(member).__name__, "summary": first_line(member)} for key, member in named][:MAX_MEMBERS]
 
 
+def source_cut(value, source):
+    """Where the source shown stops, and how to read on with the kumiki_source tool."""
+    shown = source[:MAX_SOURCE].count("\n")
+    try:
+        start = 1 if inspect.ismodule(value) else inspect.getsourcelines(value)[1]
+        file = inspect.getsourcefile(value)
+        package = os.path.dirname(os.path.dirname(os.path.abspath(sys.modules["kumiki"].__file__)))
+        file = os.path.relpath(file, package).replace(os.sep, "/")
+    except (TypeError, OSError, KeyError):
+        return f"Only the first {shown} lines are shown."
+    return (f"Only the first {shown} of {source.count(chr(10)) + 1} lines are shown: read on with "
+            f"kumiki_source, path {file}, offset {start + shown}.")
+
+
 def describe(name, with_members, with_source):
     value, suggestions = resolve(name)
     if value is None:
@@ -99,9 +114,12 @@ def describe(name, with_members, with_source):
         found["members"] = members(value)
     if with_source:
         try:
-            found["source"] = inspect.getsource(value)[:MAX_SOURCE]
+            source = inspect.getsource(value)
         except (TypeError, OSError):
-            found["source"] = None
+            source = None
+        found["source"] = source and source[:MAX_SOURCE]
+        if source and len(source) > MAX_SOURCE:
+            found["source_cut"] = source_cut(value, source)
     return {key: item for key, item in found.items() if item is not None}
 
 
