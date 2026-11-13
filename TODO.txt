@@ -313,48 +313,15 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
-IGNORE-maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
-IGNORE-test frame scanning fixes
-IGONRE-test the install cadquery stuff 
-IGNORE-create test runner for examples so the exmaples are also tests :O
-DONE-new kigumi icon
-  DONE-make suer to update the sidebar icon as well
-DONE-app changes
-  -remove "Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them."
-  -You'll get much better results using your own agent with the standalone app. The agent panel in the web version is just for trying Kumiki out with minimal overhead. Sign in below to get $1 of "free" tokens to try it out. There is no way to buy more tokens! At some point I'll improve the agent and let you buy tokens, if you prefer working in the browser.
-    -change to: The web agent is just for trying out kumiki with low overhead. You'll get much better results with your own agent and with the standalone app (link to website)
-  -"Ways to run the agent here..." should jsut say "sign in to use get $1 in promo tokens.  You can also connect our own agent to the MCP (above).
-  -if you prompt and you are out of tokens it sholud siplay a message "you are out of tokens, there is currently no way to buy more (maybe soon), instead you can connect your own agent to the MCP (above) or download the standalone app (link to website)
-  -In the center where it says Kigumi Your projects, kept in this browser., delete this text
-    -add kigumi app logo here 
-    -then add a box with a right arrow that says "ask the agent to make you something or connect your own agent" -> 
-      -this message should also show up when you have a projec topen but no file open
-    -and then a down arrow that says "open or create a project below first" v
-  -use kumiki app logo as the website favicon
-DONE-do localization on web app, standalone app
-DONE-add localization change setting somewhere
-DONE-add numerator/denominator to angle/radians
-DONE-is there an easy awy to add site statistics to the website and app?
-DONE-add joints/arrangement stuff to cheat sheet
-IGNORE-rename/reo rg all mortise and tenon joints
-  DONE-mortise_and_tenon_join/...
-  DONE-delete 45 degree relative tenon size, basic, 
-  -face_aligned
-  -plane_aligned
-  -through_tenon
-  -face_aligned_inset_shoulder
-  -plane_aligned_notch_relief
-  -plane_aligned_scribe_relief
-  -double_angled_notch_relief
-  -double_angled_scribe_relief
 
 -agent stuff
   DONE-tool cleanup
-  -add drawings to cheat sheet
+  DONE-add drawings to cheat sheet
   -do the pattern mega refactor
   -do the example mega refactor
 
--example kumiki frames need toh duplicate source button
+
+
 -test agent created drawings
 -agent benchmarking examples
 
@@ -383,42 +350,28 @@ IGNORE-rename/reo rg all mortise and tenon joints
       -in the panel it should have a "update configuration", this will scan the code for the matching call that created the stl timber and update it in the source code with the new transform configuration. If it can't be found or its ambiguous, it should pop up an error saying it couldn't do it fory ou, either do it manually or ask the agent to do it, it should offer to copy the configuration to clipboard so you can do it yourself manually or copy a prewritten prompt for the agent to do it for you.
       -be careful abotu these new modes. we don't want to create some combinatorial nightmare with all our other stuff. in this isolation mode ALl you can do is reposition the stl, so please architecture kigumi accordings to reduce tech debt)
 
--check that edges are being highlighted correctly in 2d drawing mesaurements
--make a new video 
--do some more testing
--msg modes on r/woodworking if they will allow promo
--then you can see if all features are visible through the views and warn if not
--allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
--decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
--maybe do a measuring.py doc though that's kinda laready covered by concepts.md
--improve board  functions, think bout the s4implest way to do this...
+-promote stuff
+  -make a new video 
+  -msg mods on r/woodworking if they will allow promo
+
+
 -update shed example to include board
-  -make a video about this maybe after you do some more edge joints
 -add srcibe notching ot more joints...
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
--add support for multilpe frames in jigumi (returns list of frames but you'll need to figure out how to do kiwari...)
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
-  
-
+-maybe do a measuring.py doc though that's kinda laready covered by concepts.md  
 -add shouder to cross lap joint
   -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
   -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
 -patern book changes
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
-
 -enable potato (scribe) notching on the remaining joints?
 -update wedged half dovtail to support shoulder shapes and peg
  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
 -add relief imple for DropinButtJointSweepScribeReliefConfig D:
-
--do reorg on patterns and eaxmples again
-  -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
-  -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
-  -"Example Frames" -> "Examples"
 -selecting cylinders, their surfaces render over the ends, I guess atht's probably intentional TBH...
-
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
@@ -429,10 +382,8 @@ IGNORE-rename/reo rg all mortise and tenon joints
     - joint type tags should be prioritized, or instead sort by tags that show up most often
     - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
     Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
--you broke notching on mortise and tenon joint again
--look into promoting some plain joints
 -rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future 
--add more tests using the right way
+
 -assembly
   -rename dissamebly to tatamae LOL`
   -make assembiles work in patterns
@@ -442,6 +393,10 @@ IGNORE-rename/reo rg all mortise and tenon joints
 
 
 -MEASURING/DRAWING BACKLOG
+  -refine centerline, refreence edge and PTW highlighting in drawings view
+  -add option to color refreences arris/face differently maybe
+  -add legend to drawings view
+  -add viweport support, I think yo uneed it now
   -maybe do drawing prettifier pass
   -add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
 
@@ -521,6 +476,53 @@ IGNORE-rename/reo rg all mortise and tenon joints
 
 :: TODONE 
 
+IGNORE-maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
+IGNORE-test frame scanning fixes
+IGONRE-test the install cadquery stuff 
+IGNORE-create test runner for examples so the exmaples are also tests :O
+DONE-new kigumi icon
+  DONE-make suer to update the sidebar icon as well
+DONE-app changes
+  -remove "Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them."
+  -You'll get much better results using your own agent with the standalone app. The agent panel in the web version is just for trying Kumiki out with minimal overhead. Sign in below to get $1 of "free" tokens to try it out. There is no way to buy more tokens! At some point I'll improve the agent and let you buy tokens, if you prefer working in the browser.
+    -change to: The web agent is just for trying out kumiki with low overhead. You'll get much better results with your own agent and with the standalone app (link to website)
+  -"Ways to run the agent here..." should jsut say "sign in to use get $1 in promo tokens.  You can also connect our own agent to the MCP (above).
+  -if you prompt and you are out of tokens it sholud siplay a message "you are out of tokens, there is currently no way to buy more (maybe soon), instead you can connect your own agent to the MCP (above) or download the standalone app (link to website)
+  -In the center where it says Kigumi Your projects, kept in this browser., delete this text
+    -add kigumi app logo here 
+    -then add a box with a right arrow that says "ask the agent to make you something or connect your own agent" -> 
+      -this message should also show up when you have a projec topen but no file open
+    -and then a down arrow that says "open or create a project below first" v
+  -use kumiki app logo as the website favicon
+DONE-do localization on web app, standalone app
+DONE-add localization change setting somewhere
+DONE-add numerator/denominator to angle/radians
+DONE-is there an easy awy to add site statistics to the website and app?
+DONE-add joints/arrangement stuff to cheat sheet
+IGNORE-rename/reo rg all mortise and tenon joints
+  DONE-mortise_and_tenon_join/...
+  DONE-delete 45 degree relative tenon size, basic, 
+  -face_aligned
+  -plane_aligned
+  -through_tenon
+  -face_aligned_inset_shoulder
+  -plane_aligned_notch_relief
+  -plane_aligned_scribe_relief
+  -double_angled_notch_relief
+  -double_angled_scribe_relief
+
+IGNORE-check that edges are being highlighted correctly in 2d drawing mesaurements
+DONE-allow adding suplemental features for stuff like PTW faces and centerplanes to be rendered for measuring (similar to cylinder axis but not tied to any CSg I guess)
+DONE/IGNORE-decide how you wantto fix: if I select the inner shoulder of the lap cut on the rafter in oscar shed and measure, I can't select the opposite shoulderhit)
+DONE-add support for multilpe frames in jigumi (returns list of frames but you'll need to figure out how to do kiwari...)
+
+DONE/IGNORE-do reorg on patterns and eaxmples again
+  -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
+  -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
+  -"Example Frames" -> "Examples"
+DONE-example kumiki frames need toh duplicate source button  
+DONE-you broke notching on mortise and tenon joint again
+IGNORE-add more tests using the right way
 
 DONE-btw, when I do web based deploy of kigumi, i'm going to want browser cache based filesystem and cloud DB filesystem, and then the standalone app shoulda lso have
   access to cloud DB filesystem in addition to working with local filesystem. What changesa re needed to support the cloud DB filesystem on the backend
