@@ -34,6 +34,21 @@ Applies to all new and edited code.
 - Module docstrings: a few lines on what the module contains.
 - Less is more: no docstring at all beats one that repeats the name.
 
+## Website translations
+
+The website's text is in `website/src/i18n/`: `en.json` (English) and `ja.json` (Japanese). The
+pages in `website/src/views/` read from them; `website/src/pages/` and `website/src/pages/ja/`
+render each view in its language.
+
+- `en.json` is the source. The user edits the English there, and their wording is kept as written.
+- `ja.json` is always translated from `en.json`. When `en.json` changes (check
+  `git log -p website/src/i18n/en.json`), translate every changed entry again from the English
+  into `ja.json`. Don't change the Japanese on its own, and don't change the English to match it.
+- Text added to a page goes into both files: the English in `en.json`, its translation in `ja.json`.
+- Keep `{placeholders}` and HTML tags as they are. `npm run build` warns where the two files
+  differ; a missing Japanese entry shows in English.
+- The privacy policy and terms, and the docs, stay English only.
+
 # Concepts
 
 please see docs/concepts.md

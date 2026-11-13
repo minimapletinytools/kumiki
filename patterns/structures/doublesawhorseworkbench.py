@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Double sawhorse workbench.
+"""Purpose
+-------
+Build a compact workbench with paired posts and a recessed tool tray.
+
+Concepts demonstrated — overview
+-------------------------------
+Furniture; sawhorse workbench; small structure; face-aligned, axis-oriented construction.
+
+Concepts demonstrated — details
+------------------------------
+Through mortises join posts to feet; stopped mortises keep the work surface unbroken. A
+cross-lapped stretcher ties the posts together, and a custom recess forms the tray. Dimensions
+are source constants.
+Recipe notes
+------------
+Double sawhorse workbench.
 
 Footprint is 2' (Y) x 4' (X). Two 4x6 feet (tall dimension in Z) run along the
 inside of the 2' sides. Each foot carries a pair of vertical 4x6 posts (thin
@@ -254,7 +269,10 @@ def build_double_sawhorse_workbench() -> Frame:
     )
 
 
-example = build_double_sawhorse_workbench
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
+    """Build the doublesawhorseworkbench example."""
+    return build_double_sawhorse_workbench()
 
 
 if __name__ == "__main__":

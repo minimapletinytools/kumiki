@@ -13,9 +13,24 @@ export function t(key, params) {
     return params ? template.replace(/\{(\w+)\}/g, (match, name) => (name in params ? String(params[name]) : match)) : template;
 }
 
-/** Every element with data-i18n="key" (and data-i18n-title, data-i18n-placeholder) in its language. */
+/** `key`'s string with its {link} a link to `href`, reading `linkKey`'s string. */
+export function withLink(key, linkKey, href) {
+    const [before, after = ''] = t(key).split('{link}');
+    const link = Object.assign(document.createElement('a'), { href, target: '_blank', rel: 'noopener noreferrer', textContent: t(linkKey) });
+    const fragment = document.createDocumentFragment();
+    fragment.append(before, link, after);
+    return fragment;
+}
+
+/**
+ * Every element with data-i18n="key" (and data-i18n-title, data-i18n-placeholder) in its language. One
+ * with data-i18n-link="linkKey" and data-href gets its {link} as a link (withLink).
+ */
 export function translatePage(root = document) {
-    for (const element of root.querySelectorAll('[data-i18n]')) element.textContent = t(element.dataset.i18n);
+    for (const element of root.querySelectorAll('[data-i18n]')) {
+        if (element.dataset.i18nLink) element.replaceChildren(withLink(element.dataset.i18n, element.dataset.i18nLink, element.dataset.href));
+        else element.textContent = t(element.dataset.i18n);
+    }
     for (const element of root.querySelectorAll('[data-i18n-title]')) element.title = t(element.dataset.i18nTitle);
     for (const element of root.querySelectorAll('[data-i18n-placeholder]')) element.placeholder = t(element.dataset.i18nPlaceholder);
 }

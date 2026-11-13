@@ -1,4 +1,4 @@
-const { SUPPORTED_LOCALES, DEFAULT_LOCALE, resolveLocale, loadCatalog, createTranslator } = require('../i18n');
+const { SUPPORTED_LOCALES, DEFAULT_LOCALE, resolveLocale, loadCatalog, createTranslator, LANGUAGE_CHOICES, chooseLanguage } = require('../i18n');
 const en = require('../i18n/locales/en.json');
 const ja = require('../i18n/locales/ja.json');
 
@@ -17,6 +17,23 @@ describe('resolveLocale', () => {
     expect(resolveLocale(undefined)).toBe(DEFAULT_LOCALE);
     expect(resolveLocale(null)).toBe(DEFAULT_LOCALE);
   });
+});
+
+describe('chooseLanguage', () => {
+    test('default follows the system language', () => {
+        expect(chooseLanguage('default', 'ja-JP')).toBe('ja-JP');
+        expect(chooseLanguage(undefined, 'en-US')).toBe('en-US');
+    });
+
+    test('a chosen language wins over the system one', () => {
+        expect(chooseLanguage('ja', 'en-US')).toBe('ja');
+        expect(chooseLanguage('en', 'ja-JP')).toBe('en');
+    });
+
+    test('every choice but default is a supported locale', () => {
+        expect(LANGUAGE_CHOICES[0].id).toBe('default');
+        for (const { id } of LANGUAGE_CHOICES.slice(1)) expect(SUPPORTED_LOCALES).toContain(id);
+    });
 });
 
 describe('catalogs', () => {

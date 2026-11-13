@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""my_cute_frame in rough stock, with generated drawings (kumiki.drawings.auto_drawings).
+"""Purpose
+-------
+Exercise automatic drawings and reference-feature measurement on a rough-stock starter frame.
+
+Concepts demonstrated — overview
+-------------------------------
+Development fixture; small orthogonal frame; rough stock; generated drawings.
+
+Concepts demonstrated — details
+------------------------------
+Loads the public starter frame and enlarges non-reference faces of its timbers. Piece matching
+groups repeated parts for shop drawings. Drawing and measurement tests use this file; dimensions
+come from the starter recipe.
+Recipe notes
+------------
+my_cute_frame in rough stock, with generated drawings (kumiki.drawings.auto_drawings).
 
 The Left Side timber is fixed: the plan is dimensioned from its reference faces and bottom end. Each
 distinct piece gets a shop drawing; matching pieces (match_timbers) share one, named with how many to
@@ -10,6 +25,7 @@ Run directly to print what each drawing picked; load in Kigumi to see the drawin
 
 import importlib.util as importlib_util
 from pathlib import Path as FilePath
+from typing import Optional
 
 from kumiki import *
 from kumiki.csg.feature_paths import FeatureHandle
@@ -53,7 +69,10 @@ def build_frame_with_drawing() -> Frame:
     return with_auto_drawings(_load_cute_frame()(), FIXED_TIMBER).finish()
 
 
-example = build_frame_with_drawing
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
+    """Build the rough-stock frame with generated drawings."""
+    return build_frame_with_drawing()
 
 
 def _name(handle: FeatureHandle) -> str:

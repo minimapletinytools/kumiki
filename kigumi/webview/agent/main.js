@@ -35,6 +35,7 @@ const menus = new Menus({
 });
 let mcpState = null;
 let signedIn = false;
+let via = null; // how requests go: through the backend on the signed-in account, or to OpenRouter on a key
 
 function reset() {
     conversation.reset();
@@ -73,6 +74,7 @@ const HANDLERS = {
         status.showModels(message.models || [], message.model);
         status.showRoute(message.via, message.account || { configured: false });
         signedIn = Boolean(message.account && message.account.signedIn);
+        via = message.via;
         menus.showMcp(mcpState, { signedIn });
     },
     'agent:mcp': (message) => {
@@ -95,7 +97,8 @@ const HANDLERS = {
     'agent:toolResult': (message) => conversation.finishTool(message.id, message.isError, message.text),
     'agent:toolImages': (message) => conversation.showToolImages(message.id, message.before, message.after),
     'agent:permission': (message) => conversation.askPermission(message.requestId, message.toolName || 'tool', message.input || {}),
-    'agent:done': (message) => conversation.done({ ...message, error: textOf(message.errorKey, null, message.error) }),
+    'agent:done': (message) => conversation.done({ ...message, error: textOf(message.errorKey, null, message.error),
+        outOfTokens: message.errorKey === 'agent.error.noCredit' && via === 'backend' && document.body.classList.contains('host-web') }),
     'agent:error': (message) => conversation.error(textOf(message.key, message.params, message.message || t('agent.failed'))),
     'agent:userMessage': (message) => conversation.userBubble(message.text || '', [], message.images || 0),
     'agent:todos': (message) => status.showTodos(message.items || []),

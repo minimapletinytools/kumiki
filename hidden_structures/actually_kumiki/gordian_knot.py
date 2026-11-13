@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Gordian's Knot puzzle structure with cutouts.
+"""Purpose
+-------
+Build a six-piece interlocking puzzle from cell-based cutout layouts.
+
+Concepts demonstrated — overview
+-------------------------------
+Development example; small puzzle; axis-oriented pieces; custom CSG.
+
+Concepts demonstrated — details
+------------------------------
+Piece names and grid layouts describe the occupied and removed cells. Members are arranged along
+the three world axes. The fixed recipe demonstrates translating a discrete puzzle layout into
+timber cuts, without Kiwari controls.
+Recipe notes
+------------
+Gordian's Knot puzzle structure with cutouts.
 
 Six interlocking 5×7×1 pieces arranged around the origin:
   - Z length axis: YELLOW (-x) and RED (+x)
@@ -67,6 +82,8 @@ BLUE:
   X X X
   XXXXX
 """
+
+from typing import Optional
 
 from kumiki import *
 from kumiki.csg.cutcsg import RectangularPrism, SolidUnion
@@ -173,7 +190,8 @@ def _make_cuts_for_grid(grid: list[str]) -> SolidUnion | None:
     return SolidUnion(prisms) if prisms else None
 
 
-def example() -> Frame:
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
     # Six timbers in right-handed arrangement:
     # 1. YELLOW (-x) & RED (+x): length along +Z, width along +Y, thickness along X
     # 2. PURPLE (-y) & GREEN (+y): length along +X, width along +Z, thickness along Y

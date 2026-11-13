@@ -12,6 +12,11 @@ npm run dev
 
 Then open the URL printed in the terminal (usually <http://localhost:4321/kumiki/>).
 
+## Languages
+
+English at `/`, Japanese at `/ja/`. The text is in `src/i18n/en.json` (the source) and
+`src/i18n/ja.json` (translated from it); see Website translations in `AGENTS.md`.
+
 ## Build
 
 ```bash

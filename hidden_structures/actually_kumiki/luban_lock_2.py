@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Three-piece Luban lock (鲁班锁三通) / burr puzzle cross.
+"""Purpose
+-------
+Exercise a three-piece puzzle that requires rotation before translation to disassemble.
+
+Concepts demonstrated — overview
+-------------------------------
+Development fixture; small puzzle; axis-oriented members; rotational assembly freedoms.
+
+Concepts demonstrated — details
+------------------------------
+Custom prism and cylinder cuts define the lock. The assembly sequence rotates one piece and then
+extracts the others along different axes. Dimensions are source constants; assembly tests use
+this fixture.
+Recipe notes
+------------
+Three-piece Luban lock (鲁班锁三通) / burr puzzle cross.
 
 Three 1×1×3 timbers form a cross around the origin:
   - Timber 'x' runs along the X axis, centered at the origin
@@ -19,6 +34,8 @@ Disassembly: 'x' turns 90° about the cylinder axis, 'y' slides out along +X,
 then 'z' slides out along +Y.
 """
 
+from typing import Optional
+
 from kumiki import *
 from kumiki.csg.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion
 from kumiki.assembly import RotationDof, TranslationDof
@@ -32,7 +49,8 @@ length = inches(3)
 block_size = create_v2(side, side)
 
 
-def example() -> Frame:
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
     # Half-length offset so bottom_position puts the timber centroid at (0, 0, 0)
     half_len = length / scalar(2)
 

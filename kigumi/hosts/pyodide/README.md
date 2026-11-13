@@ -118,9 +118,9 @@ Sign in through the agent panel, enable MCP in the sidebar, and copy the setup f
 an external agent. The browser opens an outbound WebSocket to `kigumi-backend` on
 Cloudflare; the copied HTTPS URL and bearer token grant access to this tab's shared
 Kigumi tools. Keep the tab open and awake while using it. Project tools and the full text-file workflow are available through this connection:
-`list_files`, `search_files`, `read_file`, `write_file`, `edit_file`, `new_file`, `delete_file`, and
-`rename_file`. Writes stay inside the open project and protect internal folders. `new_file` and
-`rename_file` refuse collisions; `write_file` can replace existing content. Writing a file creates
+`list_files`, `search_files`, `read_file`, `write_file`, `edit_file`, `delete_file`, and
+`rename_file`. Writes stay inside the open project and protect internal folders. `rename_file`
+refuses collisions; `write_file` makes a file or replaces one. Writing a file creates
 its parent folders, and renaming can move a file into another folder. Changes use the same browser
 storage as the editor. Standalone MCP leaves file access to the client's local filesystem tools;
 the built-in agent has these tools on both hosts.

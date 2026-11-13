@@ -117,6 +117,8 @@ mortises, and through/half-blind dovetails. The pattern source is the reference
 for the exact geometry and API call.
 
 
-Frames rather than patterns live under `patterns/structures/`, one `example` callable per
-file: whole frames (a sawhorse, a shed, the tiny house) rather than single joints.
+Whole-frame examples live under `patterns/structures/`. Each public entry uses `@frame`;
+a file may contain several named frames shown together. Purpose and concept sections at
+the top explain what to learn from the recipe. Development fixtures live under
+`hidden_structures/`. See the Examples tables in `api_cheat_sheet.md`.
 

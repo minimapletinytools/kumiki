@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""
+"""Purpose
+-------
+Study a complete shed frame with floor framing, wall braces, and a paired-rafter roof.
+
+Concepts demonstrated — overview
+-------------------------------
+Standard timber-frame structure; medium building; angled braces; structural and sizing Kiwari.
+
+Concepts demonstrated — details
+------------------------------
+Kiwari controls footprint dimensions and counts of joists, rafter pairs, and intermediate posts.
+Rough stock is described relative to reference edges. Opposing rafters meet with tongue-and-fork
+joints at the peak, and collar members connect selected pairs; the roof differs from a
+ridge-beam-supported system.
+Recipe notes
+------------
 Timber Frame Shed - Base, Floor Joists, and Mudsill Joints
 """
 
@@ -1308,7 +1323,7 @@ def build_shed_frame(k: Optional[Kiwari] = None) -> Frame:
             attached_timber_angle=pi / 4,
             # TODO update this to use target timber
             attached_timber_length_or_target=b_length,
-            attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
+            attached_timber_stickout=Stickout(stickoutReference1=StickoutReference.INSIDE),
             original_timber_end_to_measure_from_for_length_position=TimberEnd.TOP,
             attached_timber_long_face_to_measure_to_for_length_position=TimberCenterline.CENTERLINE,
             length_position_measurement=length_pos,
@@ -1465,7 +1480,7 @@ def build_shed_frame(k: Optional[Kiwari] = None) -> Frame:
         original_timber=rw2, size=collar_size,
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
         attached_timber_angle=pi / 4, attached_timber_length_or_target=collar_length,
-        attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
+        attached_timber_stickout=Stickout(stickoutReference1=StickoutReference.INSIDE),
         original_timber_end_to_measure_from_for_length_position=TimberEnd.TOP,
         attached_timber_long_face_to_measure_to_for_length_position=TimberCenterline.CENTERLINE,
         length_position_measurement=feet(3),
@@ -1479,7 +1494,7 @@ def build_shed_frame(k: Optional[Kiwari] = None) -> Frame:
         original_timber=rw8, size=collar_size,
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
         attached_timber_angle=pi / 4, attached_timber_length_or_target=collar_length,
-        attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
+        attached_timber_stickout=Stickout(stickoutReference1=StickoutReference.INSIDE),
         original_timber_end_to_measure_from_for_length_position=TimberEnd.TOP,
         attached_timber_long_face_to_measure_to_for_length_position=TimberCenterline.CENTERLINE,
         length_position_measurement=feet(3),

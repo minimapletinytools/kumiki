@@ -1,17 +1,19 @@
 # API cheat sheet
 
-A cheat sheet of actual methods to use when authoring kumiki frames. Use the `kumiki_api` tool to learn more about the methods. Use the `kumiki_source` tool to see the full source code. Please also see `agent_usage_instructions.md` and `concepts.md`.
+The signatures of what a frame most often uses, and one complete small frame. The usage instructions
+and concepts say when to use each and why; this is what to type. For anything not here, look the name
+up (Kigumi's agent: `kumiki_api`, or `kumiki_source` to read and search kumiki's files) rather than guessing.
+
+All of these come from `from kumiki import *`. Lengths are metres unless made with a unit.
 
 ## Units and vectors
 
 ```python
-mm(numerator, denominator=1)      # mm(90) is 90mm; mm(1, 2) is half a millimetre
-cm(..)
-m(..)
-inches(..)  # inches(7, 2) is 3.5"
-feet(..)
-degrees(..)
-radians(..)
+mm(numerator, denominator=1)      # mm(90); mm(1, 2) is half a millimetre
+inches(numerator, denominator=1)  # inches(7, 2) is 3.5"
+feet(numerator, denominator=1)
+degrees(numerator, denominator=1) # degrees(45, 2) is 22.5 degrees, in radians
+radians(numerator, denominator=1)
 create_v2(x, y)                   # a size (width, height), or a point on the footprint
 create_v3(x, y, z)                # a point in the world; Z is up
 ```
@@ -140,8 +142,70 @@ def my_frame(k: Optional[Kiwari] = None) -> Frame:
     return Frame.from_joints(joints, additional_unjointed_timbers=None, name="my frame", kiwari=k)
 ```
 
+## Drawings
+
+drawings can be automatically generated but the results aren't so great.
+
+```python
+from kumiki.drawings.auto_drawings import with_auto_drawings
+...
+frame = Frame.from_joints(..)
+frame = with_auto_drawings(frame, fixed_path="beam")   # a plan measured from the timber "beam", and a shop drawing per distinct piece
+
+# or a shop drawing for just one timber, `post`, generated after the frame is shown
+from kumiki.drawings.auto_drawings import piece_drawing
+from kumiki.csg.symmetry import SymmetricTimberGroup
+from kumiki.finishing import Finishing
+def post_drawing(finishing: Finishing) -> None:
+    finishing.add_drawing(piece_drawing(SymmetricTimberGroup(frame.cut_timber_of(post), ())))
+frame = frame.with_finishing(post_drawing)
+
+return frame
+```
+
+To add measurements by manually, make a `Drawing` whose `measurements` are `Measure(feature_a, feature_b)`s between features found with `find_feature`, and add it from a finishing routine (`frame.with_finishing`, `Finishing.add_drawing`). Use the `kumiki_source` tool to see the following files:
+
+- `kumiki/drawings/auto_drawings.py`: `with_auto_drawings`, and `plan_drawing` / `piece_drawing` to start from a generated drawing
+- `kumiki/drawings/drawing.py`: `Drawing`, `shop_drawing_viewports()`, `SHOP_DRAWING_IDS`, `elevation_viewports()`
+- `kumiki/drawings/measure.py`: `Measure`
+- `kumiki/csg/feature_paths.py`: `find_feature`, which names the features to measure between
+- `kumiki/finishing.py`: `Finishing`
+- an example: `patterns/structures/dovetailed_sawhorse.py`; and "Generating drawings" in `agent_usage_instructions.md`
+
 
 ## Examples
 
-See all examples in the `patterns/structures` folder and using the `kumiki_source` tool.
-These examples are the best API reference. Unless the user asks for just like the example, it may be better to build from the ground up rather than adapt an example.
+Use these files as source references for the concepts you need. Each starts with its
+purpose, a short concept list, and implementation details. Public examples live in
+`patterns/structures/`; open a file in Kigumi or find it with `kumiki_source`.
+
+| Example | Good reference for | Kiwari controls |
+|---|---|---|
+| [Starter frame](../patterns/structures/my_cute_frame.py) | Simple four-member frame; face-aligned and axis-oriented construction; pegged tenons | None; source dimensions |
+| [Simple sawhorse](../patterns/structures/horsey_example.py) | Small furniture; orthogonal feet, posts, stretcher, and top beam | None; source dimensions |
+| [Double-sawhorse workbench](../patterns/structures/doublesawhorseworkbench.py) | Furniture; through/stopped tenons; cross-lapped stretcher and tool tray | None; source dimensions |
+| [Coffee table](../patterns/structures/coffee_table.py) | Furniture; several joints meeting shared legs; tusked stretchers and decorative cuts | None; source dimensions |
+| [Dovetailed sawhorse](../patterns/structures/dovetailed_sawhorse.py) | Non-square construction; splayed legs; tapered dovetails; drawings and router templates | Sizing and angles: height, timber dimensions, leg spacing and splay; separate template-tool controls |
+| [Wood character](../patterns/structures/ki_kanji.py) | Small sculpture; diagonal members; splined and pegged joints; curved profiles | None; source dimensions |
+| [Cross-lapped post](../patterns/structures/multi_cross_lap_post.py) | Three boards at 60-degree plan intervals; round stock; multi-member joinery | None; source dimensions and count |
+| [Oscar's shed](../patterns/structures/oscarshed.py) | Small standard timber-frame building; **single-pitch rafters** housed in unequal-height plates | None; source dimensions and counts |
+| [Timber-frame shed](../patterns/structures/learn_to_timber_frame_shed.py) | Medium standard frame; floor joists; angled braces; **paired rafters joined at the peak** with collars | Structural counts: joists, rafter pairs, intermediate posts; sizing: footprint |
+| [120-square-foot tiny house](../patterns/structures/tinyhouse120.py) | Medium standard frame; king posts and ridge beam; **ridge-supported rafters** with eave extensions | None; source dimensions and counts |
+| [Multiple frames: pavilion yard](../patterns/structures/multiple_frames.py) | Multiple frames in one file; roofed timber pavilion; simple building models as context | Shared model spacing/height; independent pavilion member sizes, roof rise and rafter count |
+
+Development fixtures live together in `hidden_structures/`, outside the published
+pattern catalog. They are useful for specific mechanisms rather than as starting designs:
+
+| Development example | Concepts |
+|---|---|
+| [Assembly preview](../hidden_structures/assembly_preview_demo.py) | Joint ordering, peg removal, extraction, and deliberate warning cases |
+| [Drawing fixture](../hidden_structures/my_cute_frame_drawing_test.py) | Rough stock, reference features, matching pieces, generated drawings |
+| [Cat corner cot](../hidden_structures/cat_corner_cot.py) | Multiple frames; non-rectangular supporting context; stepped members and sloping roof |
+| [N-legged stool](../hidden_structures/development/n_legged_stool.py) | Radial furniture; splayed round legs; Kiwari leg count, dimensions and angles |
+| [Simultaneous assembly](../hidden_structures/development/simple_simultaneous_assembly.py) | Reciprocal polygon; Kiwari member count, cross-section and radius |
+| [Six-piece Luban lock](../hidden_structures/actually_kumiki/luban_lock_1.py) | Diamond cross-sections and cyclic housings |
+| [Three-piece Luban lock](../hidden_structures/actually_kumiki/luban_lock_2.py) | Custom cuts; rotation followed by translation during disassembly |
+| [Gordian knot](../hidden_structures/actually_kumiki/gordian_knot.py) | Cell-based CSG cutouts and interlocking pieces |
+
+The hidden collection also contains relief-algorithm patterns in
+`hidden_structures/development/relief_example_patterns.py`.

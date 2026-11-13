@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Six-way cross lap arrangement: a round post capped by three crossing 2x8 boards.
+"""Purpose
+-------
+Build a round post topped by three intersecting boards.
+
+Concepts demonstrated — overview
+-------------------------------
+Small structure; non-square plan; round stock; multi-member joinery.
+
+Concepts demonstrated — details
+------------------------------
+Three boards rotate by 60 degrees in plan and are woven together with multi-cross laps. Free
+housing fits the assembly into the round post. Board count and dimensions are source constants,
+not viewer controls.
+Recipe notes
+------------
+Six-way cross lap arrangement: a round post capped by three crossing 2x8 boards.
 
 A single round post (10" diameter, 4' tall) stands at the origin. Three 2x8
 boards, each 4' long, pass over the top of the post so their centerlines all
@@ -30,7 +45,8 @@ num_boards = 3
 angle_step = degrees(180) / num_boards  # 60 degrees between each board's axis
 
 
-def example() -> Frame:
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
     # Round post, standing at the origin.
     post = RoundTimber(
         length=post_height,

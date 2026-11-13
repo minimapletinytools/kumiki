@@ -1063,14 +1063,9 @@ body.host-web .welcome-sign-in {
 }
 .web-agent-notice-lead {
     margin: 0 0 6px;
-    font-weight: 600;
 }
-.web-agent-notice ol {
-    margin: 0;
-    padding-left: 18px;
-}
-.web-agent-notice li {
-    margin: 0 0 6px;
+body.host-web .welcome-body {
+    display: none;
 }
 .web-agent-sign-in {
     display: block;
@@ -1084,6 +1079,7 @@ body.host-web .welcome-sign-in {
 body.signed-in .web-agent-sign-in {
     display: none;
 }
-.web-agent-notice a {
+.web-agent-notice a,
+.agent-error a {
     color: var(--ka-accent);
 }

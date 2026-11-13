@@ -1,11 +1,10 @@
 /**
- * The kumiki_docs tool, and the instructions Kigumi's MCP servers send: how to write frames, for
- * agents that can't read the project's .kigumi/docs/ themselves.
+ * kumiki's docs, which kumiki_source lists first (agent/kumiki-source-tool.js), and the instructions
+ * Kigumi's MCP servers send: how to write frames.
  */
 
 const fs = require('fs');
 const path = require('path');
-const { z } = require('zod');
 
 // What each doc is for, in the order to read them. Any other doc is listed by its first heading.
 const ABOUT = {
@@ -20,8 +19,9 @@ const SKIP = new Set(['index']);
 
 const MCP_INSTRUCTIONS = [
     'Kigumi shows timber frames written in Python with the kumiki library.',
-    'Before writing or changing a frame, read kumiki_docs "agent_usage_instructions" (the rules) and "api_cheat_sheet".',
+    'Before writing or changing a frame, read kumiki_source "docs/agent_usage_instructions.md" (the rules) and "docs/api_cheat_sheet.md".',
     'Check a function\'s exact signature with kumiki_api rather than guessing.',
+    'kumiki_source also reads and searches kumiki\'s source and its example frames.',
     'After an edit, build the frame with check_frame and see where its timbers ended up with describe_frame.',
 ].join(' ');
 
@@ -41,30 +41,6 @@ function firstHeading(file) {
     return line ? line.replace(/^#+\s*/, '') : '';
 }
 
-/** The kumiki_docs tool over `folder()`, the docs folder or null. */
-function kumikiDocsTool(folder) {
-    return {
-        name: 'kumiki_docs',
-        description: 'Read kumiki\'s docs for writing frames. With no name, lists them. Read "agent_usage_instructions" '
-            + 'and "api_cheat_sheet" before writing or changing a frame.',
-        shape: {
-            name: z.string().optional().describe('The doc to read, e.g. "api_cheat_sheet". Leave out to list them.'),
-        },
-        effect: 'read',
-        run: async ({ name }) => {
-            const dir = folder();
-            if (!dir) throw new Error('kumiki\'s docs aren\'t found yet: open a project whose .venv has kumiki.');
-            const docs = listDocs(dir);
-            const wanted = name && name.replace(/\.md$/, '');
-            if (!wanted) return [{ type: 'text', text: docs.map((doc) => `${doc.name}: ${doc.about}`).join('\n') }];
-            if (!docs.some((doc) => doc.name === wanted)) {
-                throw new Error(`No doc "${name}". The docs: ${docs.map((doc) => doc.name).join(', ')}.`);
-            }
-            return [{ type: 'text', text: fs.readFileSync(path.join(dir, `${wanted}.md`), 'utf8') }];
-        },
-    };
-}
-
 /**
  * The docs folder for kumiki at `source`: the wheel's kumiki/docs, a checkout's docs/, or else the
  * project's .kigumi/docs/. Null if none has them.
@@ -77,4 +53,4 @@ function kumikiDocsFolder(source, projectRoot) {
         .find((folder) => fs.existsSync(path.join(folder, 'agent_usage_instructions.md'))) || null;
 }
 
-module.exports = { kumikiDocsTool, kumikiDocsFolder, MCP_INSTRUCTIONS };
+module.exports = { listDocs, kumikiDocsFolder, MCP_INSTRUCTIONS };

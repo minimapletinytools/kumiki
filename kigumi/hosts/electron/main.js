@@ -33,6 +33,7 @@ const { mcpTools } = require('../../agent/agent');
 const { createMcpService } = require('../../agent/mcp-service');
 const { RELEASES_URL, createUpdateChecker, downloadUrl } = require('./update-check');
 const { createAutoInstaller } = require('./auto-update');
+const { LANGUAGE_SETTING, LANGUAGE_CHOICES, chooseLanguage } = require('../../i18n');
 
 const KIGUMI_DIR = path.join(__dirname, '..', '..');
 const ORIGIN = 'kigumi://app';
@@ -61,6 +62,8 @@ const APP_DEFAULTS = {
     // Look for a newer Kigumi release on start and once a day; prereleases only when asked.
     'app.checkForUpdates': true,
     'app.updatePrereleases': false,
+    // Kigumi's language: default (the system's), en or ja.
+    [LANGUAGE_SETTING]: 'default',
 };
 
 const CONTENT_TYPES = {
@@ -85,6 +88,11 @@ let connection = null;
 let pages = null;
 let kigumiApp = null;
 let settings = null;
+
+/** The language Kigumi's views are in: app.language's, else the system's. */
+function appLocale() {
+    return chooseLanguage(settings.get(LANGUAGE_SETTING, 'default'), app.getLocale());
+}
 let logChannel = null;
 let workspaceFolder = null;
 const status = { message: null, level: 'info', progress: null, logBadge: false };
@@ -321,7 +329,7 @@ function openProject() {
         connection,
         settings,
         workspaceFolder,
-        locale: app.getLocale(),
+        locale: appLocale(),
         log: (line) => logChannel.appendLine(line),
         runCommand: runAppCommand,
         setStatus,
@@ -698,6 +706,15 @@ function buildMenu() {
                 { label: 'Toggle Agent Panel', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() },
                 { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcp && mcp.running), click: () => copyMcpSetup() },
                 { type: 'separator' },
+                {
+                    label: 'Language',
+                    submenu: LANGUAGE_CHOICES.map(({ id, label }) => ({
+                        label,
+                        type: 'radio',
+                        checked: settings.get(LANGUAGE_SETTING, 'default') === id,
+                        click: () => settings.set(LANGUAGE_SETTING, id),
+                    })),
+                },
                 { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
                 { label: 'Show Log', accelerator: 'CmdOrCtrl+Shift+U', click: () => openLogTab() },
                 { label: 'Open Logs Folder', click: () => electronShell.openPath(path.dirname(logChannel.filePath)) },
@@ -789,7 +806,7 @@ async function start() {
         },
         conversationsDir: path.join(userData, 'conversations'),
         mcp: mcpControls,
-        locale: app.getLocale(),
+        locale: appLocale(),
         log,
     });
     mcp = createMcpService({
@@ -823,6 +840,30 @@ async function start() {
         })();
     });
 
+    // A new language shows once Kigumi restarts: the open views already have their strings.
+    let locale = appLocale();
+    async function offerRestartForLanguage() {
+        if (appLocale() === locale) return;
+        locale = appLocale();
+        const { response } = await dialog.showMessageBox(mainWindow, {
+            type: 'info',
+            message: 'Restart Kigumi to change its language?',
+            detail: 'Your projects and settings are kept.',
+            buttons: ['Restart', 'Later'],
+            defaultId: 0,
+            cancelId: 1,
+        });
+        if (response !== 0) return;
+        for (const id of editors.dirtyIds()) {
+            const panel = connection.panels.get(id);
+            if (panel) panel.reveal();
+            if (!(await confirmCloseEditor(id))) return;
+        }
+        closeConfirmed = true;
+        app.relaunch();
+        mainWindow.close();
+    }
+
     openProject();
     if (agentEnabled() && settings.get('agent.showOnStartup', true)) {
         toggleAgentPanel();
@@ -851,6 +892,7 @@ async function start() {
         buildMenu();
         pushShellState();
         void syncMcpServer();
+        void offerRestartForLanguage();
     });
     buildMenu();
     void syncMcpServer();

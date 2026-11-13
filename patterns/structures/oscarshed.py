@@ -1,12 +1,24 @@
 # Last checked on kumiki 0.9.0
-"""
+"""Purpose
+-------
+Build a small rectangular shed with a single-pitch roof.
+
+Concepts demonstrated — overview
+-------------------------------
+Standard timber-frame structure; small building; orthogonal walls; sloping rafters.
+
+Concepts demonstrated — details
+------------------------------
+An 8-by-4-foot footprint supports mudsills, posts, beams, and infill members. Five parallel
+rafters span unequal-height top plates to form a single-pitch roof; housing cuts seat them in
+the plates. Dimensions and counts are source constants.
+Recipe notes
+------------
 Oscar's Shed - A simple timber frame shed structure
 Built using the Kumiki API
 """
 
 from typing import Optional
-import sys
-sys.path.append('..')
 
 from kumiki import *
 from kumiki.timber import Frame
@@ -1084,7 +1096,10 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     return Frame.from_joints(all_joints, additional_unjointed_timbers=unjointed_timbers, name="Oscar's Shed")
 
 
-example = create_oscarshed
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
+    """Build the oscarshed example."""
+    return create_oscarshed()
 
 
 # ============================================================================

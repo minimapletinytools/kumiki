@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Dovetailed sawhorse: a beam on edge and four splayed legs.
+"""Purpose
+-------
+Build a splayed-leg sawhorse and generate drawings and router-template tools for its joinery.
+
+Concepts demonstrated — overview
+-------------------------------
+Furniture; sawhorse; non-square construction; compound leg angles; sizing Kiwari.
+
+Concepts demonstrated — details
+------------------------------
+Four splayed legs meet an edge-standing beam through tapered sliding dovetails. Kiwari controls
+leg spacing, splay, timber dimensions, and height. Generated drawings show the beam and legs; a
+separate tool exports router templates with its own parameters.
+Recipe notes
+------------
+Dovetailed sawhorse: a beam on edge and four splayed legs.
 
 Each leg is let into an arris of the beam by its whole thickness, as a sliding dovetail tapered
 point up, so the load wedges it tighter. Seen along the beam, a leg's outer face runs through the

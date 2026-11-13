@@ -1,15 +1,30 @@
 # Last checked on kumiki 0.9.0
-"""
+"""Purpose
+-------
+Build a 120-square-foot timber-frame tiny house from floor beams through the roof.
+
+Concepts demonstrated — overview
+-------------------------------
+Standard timber-frame structure; medium building; gable roof; ridge-supported rafters.
+
+Concepts demonstrated — details
+------------------------------
+A 15-by-8-foot footprint organizes posts, beams, and wall members. King posts support a ridge
+beam; paired rafters run from the top plates to that ridge and extend at the eaves. Joint
+offsets accommodate members meeting the same post. Sizes and counts are source constants.
+Recipe notes
+------------
 Tiny House 120 sqft - A 15' x 8' timber frame tiny house
 Posts are on the INSIDE of the footprint. Front is the 15' side.
 """
 
 import sys
+from dataclasses import replace
 
 from typing import Optional
 
 from kumiki import *
-from kumiki.timber import Frame, add_milestone
+from kumiki.timber import Frame, add_milestone, compute_timber_orientation
 
 # ============================================================================
 # PARAMETERS
@@ -44,6 +59,14 @@ stud_tenon_size = create_v2(inches(1), inches(scalar(5, 2)))
 stud_tenon_depth = inches(scalar(5, 2))
 stud_tenon_outside_offset = inches(1)
 
+
+
+def _reverse_cross_section(timber: Timber) -> Timber:
+    """Turn the cross-section 180 degrees, preserving the centerline and ends."""
+    orientation = compute_timber_orientation(
+        timber.get_length_direction_global(), -timber.get_width_direction_global()
+    )
+    return replace(timber, transform=replace(timber.transform, orientation=orientation))
 
 
 def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
@@ -186,101 +209,101 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     beam_centerline_height = bottom_beam_height + beam_size[0] / scalar(2)
 
     # Front perimeter: FL -> FM1 -> FM2 -> FR
-    beam_front_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FL, timber2=post_FM1,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_front_1 = attach_face_aligned_timber(
+        original_timber=post_FL,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Front Bottom Beam 1"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FM1,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Front Bottom Beam 1",
     )
-    beam_front_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FM1, timber2=post_FM2,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_front_2 = attach_face_aligned_timber(
+        original_timber=post_FM1,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Front Bottom Beam 2"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FM2,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Front Bottom Beam 2",
     )
-    beam_front_3 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FM2, timber2=post_FR,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_front_3 = attach_face_aligned_timber(
+        original_timber=post_FM2,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Front Bottom Beam 3"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FR,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Front Bottom Beam 3",
     )
 
     # Right perimeter: FR -> MR -> BR
-    beam_right_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FR, timber2=post_MR,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_right_1 = attach_face_aligned_timber(
+        original_timber=post_FR,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Right Bottom Beam 1"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_MR,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Right Bottom Beam 1",
     )
-    beam_right_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_MR, timber2=post_BR,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_right_2 = attach_face_aligned_timber(
+        original_timber=post_MR,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Right Bottom Beam 2"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_BR,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Right Bottom Beam 2",
     )
 
     # Back perimeter: BR -> BM1 -> BM2 -> BL
-    beam_back_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_BR, timber2=post_BM1,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_back_1 = attach_face_aligned_timber(
+        original_timber=post_BR,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Back Bottom Beam 1"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_BM1,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Back Bottom Beam 1",
     )
-    beam_back_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_BM1, timber2=post_BM2,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_back_2 = attach_face_aligned_timber(
+        original_timber=post_BM1,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Back Bottom Beam 2"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_BM2,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Back Bottom Beam 2",
     )
-    beam_back_3 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_BM2, timber2=post_BL,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_back_3 = attach_face_aligned_timber(
+        original_timber=post_BM2,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Back Bottom Beam 3"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_BL,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Back Bottom Beam 3",
     )
 
     # Left perimeter: BL -> ML -> FL
-    beam_left_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_BL, timber2=post_ML,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_left_1 = attach_face_aligned_timber(
+        original_timber=post_BL,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Left Bottom Beam 1"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_ML,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Left Bottom Beam 1",
     )
-    beam_left_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_ML, timber2=post_FL,
-        location_on_timber1=beam_centerline_height,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    beam_left_2 = attach_face_aligned_timber(
+        original_timber=post_ML,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Left Bottom Beam 2"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FL,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_centerline_height,
+        ticket="Left Bottom Beam 2",
     )
 
     # ========================================================================
@@ -289,56 +312,61 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # - Also connect midpoints of beam_front_1/2/3 to corresponding back beams
     #   (back segments are reversed in X: 1<->3, 2<->2, 3<->1).
     # ========================================================================
-    floor_joist_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_front_1,
-        timber2=beam_back_3,
-        location_on_timber1=beam_front_1.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    floor_joist_1 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_front_1,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
+        attached_timber_length_or_target=beam_back_3,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_front_1.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=beam_size[0] / scalar(2),
         ticket="Floor Joist 1",
-    )
-    floor_joist_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_front_2,
-        timber2=beam_back_2,
-        location_on_timber1=beam_front_2.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    ))
+    floor_joist_2 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_front_2,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
+        attached_timber_length_or_target=beam_back_2,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_front_2.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=beam_size[0] / scalar(2),
         ticket="Floor Joist 2",
-    )
-    floor_joist_3 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_front_3,
-        timber2=beam_back_1,
-        location_on_timber1=beam_front_3.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    ))
+    floor_joist_3 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_front_3,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
+        attached_timber_length_or_target=beam_back_1,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_front_3.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=beam_size[0] / scalar(2),
         ticket="Floor Joist 3",
-    )
-    floor_joist_4 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_front_2,
-        timber2=beam_back_2,
-        location_on_timber1=scalar(0),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    ))
+    floor_joist_4 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_front_2,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
+        attached_timber_length_or_target=beam_back_2,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=scalar(0),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=beam_size[0] / scalar(2),
         ticket="Floor Joist FM1-BM",
-    )
-    floor_joist_5 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_front_2,
-        timber2=beam_back_2,
-        location_on_timber1=beam_front_2.length,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    ))
+    floor_joist_5 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_front_2,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
+        attached_timber_length_or_target=beam_back_2,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_front_2.length,
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=beam_size[0] / scalar(2),
         ticket="Floor Joist FM2-BM",
-    )
+    ))
 
     floor_joists = [floor_joist_1, floor_joist_2, floor_joist_3, floor_joist_4, floor_joist_5]
     add_milestone('floor joists')
@@ -348,41 +376,41 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # ========================================================================
     mid_beam_centerline = mid_beam_height + beam_size[0] / scalar(2)
 
-    mid_beam_front = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FL, timber2=post_FR,
-        location_on_timber1=mid_beam_centerline,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    mid_beam_front = attach_face_aligned_timber(
+        original_timber=post_FL,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Mid-Height Front Beam"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FR,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=mid_beam_centerline,
+        ticket="Mid-Height Front Beam",
     )
-    mid_beam_right = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FR, timber2=post_BR,
-        location_on_timber1=mid_beam_centerline,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    mid_beam_right = attach_face_aligned_timber(
+        original_timber=post_FR,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Mid-Height Right Beam"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_BR,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=mid_beam_centerline,
+        ticket="Mid-Height Right Beam",
     )
-    mid_beam_back = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_BR, timber2=post_BL,
-        location_on_timber1=mid_beam_centerline,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    mid_beam_back = attach_face_aligned_timber(
+        original_timber=post_BR,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Mid-Height Back Beam"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_BL,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=mid_beam_centerline,
+        ticket="Mid-Height Back Beam",
     )
-    mid_beam_left = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_BL, timber2=post_FL,
-        location_on_timber1=mid_beam_centerline,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    mid_beam_left = attach_face_aligned_timber(
+        original_timber=post_BL,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Mid-Height Left Beam"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FL,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=mid_beam_centerline,
+        ticket="Mid-Height Left Beam",
     )
 
     # ========================================================================
@@ -396,26 +424,28 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     loft_beam_back_pos_1 = mid_beam_back.length - loft_beam_front_pos_1
     loft_beam_back_pos_2 = mid_beam_back.length - loft_beam_front_pos_2
 
-    loft_beam_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=mid_beam_front,
-        timber2=mid_beam_back,
-        location_on_timber1=loft_beam_front_pos_1,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    loft_beam_1 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=mid_beam_front,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Loft Beam FM1-BM"
-    )
-    loft_beam_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=mid_beam_front,
-        timber2=mid_beam_back,
-        location_on_timber1=loft_beam_front_pos_2,
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
+        attached_timber_length_or_target=mid_beam_back,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=loft_beam_front_pos_1,
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=beam_size[0] / scalar(2),
+        ticket="Loft Beam FM1-BM",
+    ))
+    loft_beam_2 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=mid_beam_front,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Loft Beam FM2-BM"
-    )
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
+        attached_timber_length_or_target=mid_beam_back,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=loft_beam_front_pos_2,
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=beam_size[0] / scalar(2),
+        ticket="Loft Beam FM2-BM",
+    ))
 
     
 
@@ -436,23 +466,23 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # First layer: front-to-back (along Y axis), 6" stickout on both ends
     top_plate_stickout = Stickout.symmetric(inches(6))
 
-    top_plate_left = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FL, timber2=post_BL,
-        location_on_timber1=top_plate_height,
-        stickout=top_plate_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    top_plate_left = attach_face_aligned_timber(
+        original_timber=post_FL,
         size=top_plate_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Top Plate Left (Front-to-Back)"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.FRONT,
+        attached_timber_length_or_target=post_BL,
+        attached_timber_stickout=top_plate_stickout,
+        length_position_measurement=top_plate_height,
+        ticket="Top Plate Left (Front-to-Back)",
     )
-    top_plate_right = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FR, timber2=post_BR,
-        location_on_timber1=top_plate_height,
-        stickout=top_plate_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    top_plate_right = attach_face_aligned_timber(
+        original_timber=post_FR,
         size=top_plate_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Top Plate Right (Front-to-Back)"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_BR,
+        attached_timber_stickout=top_plate_stickout,
+        length_position_measurement=top_plate_height,
+        ticket="Top Plate Right (Front-to-Back)",
     )
 
     # Second layer: left-to-right (along X axis)
@@ -462,23 +492,23 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # L/R plate centerline = L/R plate bottom + 5.5"/2
     second_plate_centerline = (top_plate_height + top_plate_size[0] / scalar(2)) - inches(3) + top_plate_size[0] / scalar(2)
 
-    top_plate_front = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FL, timber2=post_FR,
-        location_on_timber1=second_plate_centerline,
-        stickout=top_plate_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    top_plate_front = attach_face_aligned_timber(
+        original_timber=post_FL,
         size=top_plate_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Top Plate Front (Left-to-Right)"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FR,
+        attached_timber_stickout=top_plate_stickout,
+        length_position_measurement=second_plate_centerline,
+        ticket="Top Plate Front (Left-to-Right)",
     )
-    top_plate_back = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_BL, timber2=post_BR,
-        location_on_timber1=second_plate_centerline,
-        stickout=top_plate_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    top_plate_back = attach_face_aligned_timber(
+        original_timber=post_BL,
         size=top_plate_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Top Plate Back (Left-to-Right)"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.FRONT,
+        attached_timber_length_or_target=post_BR,
+        attached_timber_stickout=top_plate_stickout,
+        length_position_measurement=second_plate_centerline,
+        ticket="Top Plate Back (Left-to-Right)",
     )
     add_milestone('beams and plates')
 
@@ -487,109 +517,127 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # LOWER WALL STUDS — vertical 4x4 posts via join_timbers
     # from bottom beam spans up to the mid-height perimeter beams.
     # ========================================================================
-    lower_stud_front_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_front_1, timber2=mid_beam_front,
-        location_on_timber1=beam_front_1.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    lower_stud_front_1 = attach_face_aligned_timber(
+        original_timber=beam_front_1,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.FRONT,
-        ticket="Front Lower Stud 1"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_front,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_front_1.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Front Lower Stud 1",
     )
-    lower_stud_front_3 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_front_3, timber2=mid_beam_front,
-        location_on_timber1=beam_front_3.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    lower_stud_front_3 = attach_face_aligned_timber(
+        original_timber=beam_front_3,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.FRONT,
-        ticket="Front Lower Stud 3"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_front,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_front_3.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Front Lower Stud 3",
     )
 
     # Window members in FM1-FM2 bay (replace middle lower stud)
-    window_member_upper = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FM1, timber2=post_FM2,
-        location_on_timber1=non_corner_post_height * scalar(4, 5),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    window_member_upper = attach_face_aligned_timber(
+        original_timber=post_FM1,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Front Window Member Upper"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FM2,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=non_corner_post_height * scalar(4, 5),
+        ticket="Front Window Member Upper",
     )
-    window_member_lower = join_face_aligned_on_face_aligned_timbers(
-        timber1=post_FM1, timber2=post_FM2,
-        location_on_timber1=non_corner_post_height * scalar(2, 5),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    window_member_lower = attach_face_aligned_timber(
+        original_timber=post_FM1,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Front Window Member Lower"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=post_FM2,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=non_corner_post_height * scalar(2, 5),
+        ticket="Front Window Member Lower",
     )
 
-    lower_stud_right_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_right_1, timber2=mid_beam_right,
-        location_on_timber1=beam_right_1.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    lower_stud_right_1 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_right_1,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.RIGHT,
-        ticket="Right Lower Stud 1"
-    )
-    lower_stud_right_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_right_2, timber2=mid_beam_right,
-        location_on_timber1=beam_right_2.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_right,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_right_1.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Right Lower Stud 1",
+    ))
+    lower_stud_right_2 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_right_2,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.RIGHT,
-        ticket="Right Lower Stud 2"
-    )
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_right,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_right_2.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Right Lower Stud 2",
+    ))
 
-    lower_stud_back_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_back_1, timber2=mid_beam_back,
-        location_on_timber1=beam_back_1.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    lower_stud_back_1 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_back_1,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.FRONT,
-        ticket="Back Lower Stud 1"
-    )
-    lower_stud_back_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_back_2, timber2=mid_beam_back,
-        location_on_timber1=beam_back_2.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_back,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_back_1.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Back Lower Stud 1",
+    ))
+    lower_stud_back_2 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_back_2,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.FRONT,
-        ticket="Back Lower Stud 2"
-    )
-    lower_stud_back_3 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_back_3, timber2=mid_beam_back,
-        location_on_timber1=beam_back_3.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_back,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_back_2.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Back Lower Stud 2",
+    ))
+    lower_stud_back_3 = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=beam_back_3,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.FRONT,
-        ticket="Back Lower Stud 3"
-    )
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_back,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_back_3.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Back Lower Stud 3",
+    ))
 
-    lower_stud_left_1 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_left_1, timber2=mid_beam_left,
-        location_on_timber1=beam_left_1.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    lower_stud_left_1 = attach_face_aligned_timber(
+        original_timber=beam_left_1,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.RIGHT,
-        ticket="Left Lower Stud 1"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_left,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_left_1.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Left Lower Stud 1",
     )
-    lower_stud_left_2 = join_face_aligned_on_face_aligned_timbers(
-        timber1=beam_left_2, timber2=mid_beam_left,
-        location_on_timber1=beam_left_2.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    lower_stud_left_2 = attach_face_aligned_timber(
+        original_timber=beam_left_2,
         size=post_size,
-        orientation_face_on_timber1=TimberFace.RIGHT,
-        ticket="Left Lower Stud 2"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=mid_beam_left,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=beam_left_2.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=post_size[0] / scalar(2),
+        ticket="Left Lower Stud 2",
     )
 
     # ========================================================================
@@ -610,65 +658,69 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             z,
         )
 
-    # Upper studs via join_timbers.
+    # Upper studs attached between the mid-height beams and top plates.
 
     upper_studs_front = []
     for i in range(1, 5):
         frac = scalar(i, 5)
-        stud = join_face_aligned_on_face_aligned_timbers(
-            timber1=mid_beam_front,
-            timber2=top_plate_front,
-            location_on_timber1=mid_beam_front.length * frac,
-            stickout=no_stickout,
-            lateral_offset_from_timber1=scalar(0),
+        stud = attach_face_aligned_timber(
+            original_timber=mid_beam_front,
             size=post_size,
-            orientation_face_on_timber1=TimberFace.FRONT,
-            ticket=f"Front Upper Stud {i}"
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length_or_target=top_plate_front,
+            attached_timber_stickout=no_stickout,
+            length_position_measurement=mid_beam_front.length * frac,
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+            lateral_position_measurement=post_size[0] / scalar(2),
+            ticket=f"Front Upper Stud {i}",
         )
         upper_studs_front.append(stud)
 
     upper_studs_back = []
     for i in range(1, 5):
         frac = scalar(i, 5)
-        stud = join_face_aligned_on_face_aligned_timbers(
-            timber1=mid_beam_back,
-            timber2=top_plate_back,
-            location_on_timber1=mid_beam_back.length * frac,
-            stickout=no_stickout,
-            lateral_offset_from_timber1=scalar(0),
+        stud = _reverse_cross_section(attach_face_aligned_timber(
+            original_timber=mid_beam_back,
             size=post_size,
-            orientation_face_on_timber1=TimberFace.FRONT,
-            ticket=f"Back Upper Stud {i}"
-        )
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length_or_target=top_plate_back,
+            attached_timber_stickout=no_stickout,
+            length_position_measurement=mid_beam_back.length * frac,
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+            lateral_position_measurement=post_size[0] / scalar(2),
+            ticket=f"Back Upper Stud {i}",
+        ))
         upper_studs_back.append(stud)
 
     upper_studs_right = []
     for i in range(1, 3):
         frac = scalar(i, 3)
-        stud = join_face_aligned_on_face_aligned_timbers(
-            timber1=mid_beam_right,
-            timber2=top_plate_right,
-            location_on_timber1=mid_beam_right.length * frac,
-            stickout=no_stickout,
-            lateral_offset_from_timber1=scalar(0),
+        stud = _reverse_cross_section(attach_face_aligned_timber(
+            original_timber=mid_beam_right,
             size=post_size,
-            orientation_face_on_timber1=TimberFace.RIGHT,
-            ticket=f"Right Upper Stud {i}"
-        )
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length_or_target=top_plate_right,
+            attached_timber_stickout=no_stickout,
+            length_position_measurement=mid_beam_right.length * frac,
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+            lateral_position_measurement=post_size[0] / scalar(2),
+            ticket=f"Right Upper Stud {i}",
+        ))
         upper_studs_right.append(stud)
 
     upper_studs_left = []
     for i in range(1, 3):
         frac = scalar(i, 3)
-        stud = join_face_aligned_on_face_aligned_timbers(
-            timber1=mid_beam_left,
-            timber2=top_plate_left,
-            location_on_timber1=mid_beam_left.length * frac,
-            stickout=no_stickout,
-            lateral_offset_from_timber1=scalar(0),
+        stud = attach_face_aligned_timber(
+            original_timber=mid_beam_left,
             size=post_size,
-            orientation_face_on_timber1=TimberFace.RIGHT,
-            ticket=f"Left Upper Stud {i}"
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length_or_target=top_plate_left,
+            attached_timber_stickout=no_stickout,
+            length_position_measurement=mid_beam_left.length * frac,
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+            lateral_position_measurement=post_size[0] / scalar(2),
+            ticket=f"Left Upper Stud {i}",
         )
         upper_studs_left.append(stud)
 
@@ -713,25 +765,26 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # - One vertical king post from that beam up to the ridge beam
     # ========================================================================
     top_plate_mid_x = top_plate_front.get_bottom_position_global()[0] + top_plate_front.length / scalar(2)
-    center_support_beam = join_face_aligned_on_face_aligned_timbers(
-        timber1=top_plate_front,
-        timber2=top_plate_back,
-        location_on_timber1=top_plate_front.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    center_support_beam = _reverse_cross_section(attach_face_aligned_timber(
+        original_timber=top_plate_front,
         size=beam_size,
-        orientation_face_on_timber1=TimberFace.TOP,
-        ticket="Center Ridge Support Beam"
-    )
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.BACK,
+        attached_timber_length_or_target=top_plate_back,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=top_plate_front.length / scalar(2),
+        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        lateral_position_measurement=beam_size[0] / scalar(2),
+        ticket="Center Ridge Support Beam",
+    ))
 
-    center_king_post = join_face_aligned_on_face_aligned_timbers(
-        timber1=center_support_beam,
-        timber2=ridge_beam,
-        location_on_timber1=center_support_beam.length / scalar(2),
-        stickout=no_stickout,
-        lateral_offset_from_timber1=scalar(0),
+    center_king_post = attach_face_aligned_timber(
+        original_timber=center_support_beam,
         size=post_size,
-        ticket="Center King Post"
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=ridge_beam,
+        attached_timber_stickout=no_stickout,
+        length_position_measurement=center_support_beam.length / scalar(2),
+        ticket="Center King Post",
     )
 
     # ========================================================================
@@ -1516,4 +1569,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     return frame
 
 
-example = create_tinyhouse120
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
+    """Build the tinyhouse120 example."""
+    return create_tinyhouse120()

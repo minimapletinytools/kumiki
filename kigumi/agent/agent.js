@@ -10,7 +10,7 @@
  *   kumikiApi       (name, {members, source}) => Promise<string> (agent/kumiki-api.js); null without one
  *   kumikiSource()  the kumiki library's folder, which the agent may read; or null
  *   kumikiExamples() kumiki's example frames' folder; or null
- *   kumikiDocs()    kumiki's docs folder, for MCP clients (agent/kumiki-docs.js); or null
+ *   kumikiDocs()    kumiki's docs folder (agent/kumiki-docs.js), which kumiki_source reads; or null
  *   systemPrompt    (kumikiSource, kumikiExamples) => string (agent/system-prompt.js)
  */
 
@@ -20,7 +20,7 @@ const { createFileManagementTools } = require('./file-management-tools');
 const { createFileTools } = require('./file-tools');
 const { viewFrames, checkFrameTool, describeFrameTool } = require('./frames');
 const { kumikiApiTool } = require('./kumiki-api');
-const { kumikiDocsTool } = require('./kumiki-docs');
+const { kumikiSourceTool } = require('./kumiki-source-tool');
 const { todoTool, withBuildCheck, withCheckpoints } = require('./session-tools');
 const { PLAN_MODE_NOTE } = require('./permissions');
 
@@ -34,11 +34,14 @@ function viewHost({ panels, run, files, workspaceFolders = () => [files.root()].
 /** The tools any agent gets: the built-in one, and others over MCP. */
 function sharedTools(host) {
     return [
-        ...(host.view ? createKigumiTools(host.view) : []),
+        // Where list_projects names the open project, get_workspace_folder would only repeat it.
+        ...(host.view ? createKigumiTools({ ...host.view, workspaceTool: !host.projects }) : []),
         ...(host.projects ? createProjectTools(host.projects) : []),
         checkFrameTool(host.frames),
         ...(host.frames.describe ? [describeFrameTool(host.frames)] : []),
-        ...(host.kumikiApi ? [kumikiApiTool(host.kumikiApi)] : []),
+        // Both read the project's kumiki: its names, and its docs and files.
+        ...(host.kumikiApi ? [kumikiApiTool(host.kumikiApi), kumikiSourceTool({ docs: host.kumikiDocs || (() => null),
+            source: host.kumikiSource || (() => null), examples: host.kumikiExamples || (() => null) })] : []),
     ];
 }
 
@@ -47,18 +50,14 @@ function filesystemTools(host) {
     if (!host.files) return [];
     return [
         ...createFileTools({ files: host.files }),
-        ...(host.files.create && host.files.deleteFile && host.files.rename
+        ...(host.files.deleteFile && host.files.rename
             ? createFileManagementTools({ files: host.files }) : []),
     ];
 }
 
-/**
- * Return MCP tools: the shared ones, kumiki's docs (the built-in agent reads .kigumi/docs/ instead),
- * and file access when the client cannot access the project directly.
- */
+/** Return MCP tools: the shared ones, and file access when the client cannot access the project directly. */
 function mcpTools(host, { fileAccess = false } = {}) {
-    return [...sharedTools(host), ...(host.kumikiDocs ? [kumikiDocsTool(host.kumikiDocs)] : []),
-        ...(fileAccess ? filesystemTools(host) : [])];
+    return [...sharedTools(host), ...(fileAccess ? filesystemTools(host) : [])];
 }
 
 /**

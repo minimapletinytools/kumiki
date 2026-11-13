@@ -10,11 +10,21 @@ from kumiki import *
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 
 
-@pattern('butt/cut_dropin_housed_butt_joint_on_face_aligned_timbers')
-def create_dropin_housed_butt_joint_example(position: Optional[V3]=None) -> Frame:
+OPTIONS = kiwari(
+    receiving_timber_shoulder_inset=kiwari.length(inches(scalar(1, 2))),
+    housing_length=kiwari.length(inches(4)),
+    housing_width=kiwari.length(inches(3)),
+    housing_lateral_offset=kiwari.length(scalar(0)),
+    housing_depth=kiwari.length(inches(scalar(5, 2))),
+)
+
+
+@pattern('butt/cut_dropin_housed_butt_joint_on_face_aligned_timbers', kiwari=OPTIONS)
+def create_dropin_housed_butt_joint_example(k: Optional[Kiwari] = None, *, position: Optional[V3]=None) -> Frame:
     """
     Create a drop-in housed butt joint using canonical 4"x5"x4' timbers.
     """
+    k = OPTIONS.resolve(k)
     arrangement = create_canonical_example_butt_joint_timbers(position=position)
     housed_timber = replace(arrangement.butt_timber, ticket=TimberTicket("housed_timber"))
     arrangement = replace(
@@ -25,18 +35,16 @@ def create_dropin_housed_butt_joint_example(position: Optional[V3]=None) -> Fram
 
     joint = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        receiving_timber_shoulder_inset=inches(scalar(1, 2)),  # 0.5" shoulder inset
-        housing_length=inches(4),                               # 4" long housing tenon
-        housing_width=inches(3),                                # 3" wide housing pocket
-        housing_lateral_offset=scalar(0),                       # Centered
-        housing_depth=inches(scalar(5, 2))                      # 2.5" deep cut
+        receiving_timber_shoulder_inset=k.length("receiving_timber_shoulder_inset"),
+        housing_length=k.length("housing_length"),
+        housing_width=k.length("housing_width"),
+        housing_lateral_offset=k.length("housing_lateral_offset"),
+        housing_depth=k.length("housing_depth")
     )
-    
+
     frame = Frame.from_joints(
         [joint],
         name="Drop-in Housed Butt Joint Example (大入れ仕口 / Oire Shiguchi)"
     )
-    
+
     return frame
-
-

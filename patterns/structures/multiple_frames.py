@@ -1,5 +1,22 @@
 # Last checked on kumiki 0.9.0
-"""Multiple frames in one file: a little yard of four structures.
+"""Purpose
+-------
+Show several named frames together as a small yard, with a timber pavilion and three supporting
+building models.
+
+Concepts demonstrated — overview
+-------------------------------
+Multiple frames per file; medium scene; gable-roof pavilion; shared and independent Kiwari.
+
+Concepts demonstrated — details
+------------------------------
+Cottage, tower, and shed share spacing and height controls. The pavilion has independent
+member-size, roof-rise, and rafter-count controls. Its posts and beams support a ridge on king
+posts and paired rafters. The neighbouring buildings use solid bodies and roof boards as visual
+context, not detailed structural joinery.
+Recipe notes
+------------
+Multiple frames in one file: a little yard of four structures.
 
 Each `@frame` below builds one structure, and Kigumi shows them all together,
 each where it was built. Each returns its kiwari on its Frame. The three models
@@ -12,8 +29,8 @@ massive vertical timber filling the footprint, slanted boards for a roof, a
 plain butt joint trimming the body to each board, and doors and windows recessed
 into the walls.
 
-The fourth is an actual timber frame: four posts and a ring of beams, joined
-with pegged mortise and tenons.
+The fourth is a timber pavilion: pegged posts and beams, king posts carrying
+a ridge, and paired rafters housed into the side beams.
 
     cottage (0, +y)      tower (+x, +y)
 
@@ -34,6 +51,8 @@ MODELS = kiwari(
 PAVILION = kiwari(
     post_size=kiwari.point2(create_v2(mm(150), mm(150)), about="The posts' cross section"),
     beam_size=kiwari.point2(create_v2(mm(100), mm(150)), about="The beams' cross section, width by height"),
+    roof_rise=kiwari.length(mm(900), minimum=mm(500), maximum=m(1.5), about="Ridge above the side-beam centreline"),
+    rafter_pairs=kiwari.count(5, minimum=3, maximum=9, about="Pairs along the ridge"),
 )
 
 # The height every model is drawn at when MODELS's height is left alone.
@@ -215,7 +234,7 @@ def shed(k: Optional[Kiwari] = None) -> Frame:
 
 @frame
 def pavilion(k: Optional[Kiwari] = None) -> Frame:
-    """The one real timber frame: four posts and a ring of pegged beams."""
+    """Build a pegged pavilion with king posts, a ridge, and housed rafters."""
     k = PAVILION.resolve(k)
     post_size = k.v2("post_size")
     beam_size = k.v2("beam_size")
@@ -250,5 +269,45 @@ def pavilion(k: Optional[Kiwari] = None) -> Frame:
             spanning, bottom_post, TimberEnd.BOTTOM, use_peg=True))
         joints.append(cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
             spanning, top_post, TimberEnd.TOP, use_peg=True))
+
+    # King posts carry the ridge above the two end cross beams.
+    ridge_height = side_beam_height + k.length("roof_rise")
+    ridge_size = create_v2(mm(180), mm(100))
+    ridge = create_timber(
+        length=m(3.6), size=ridge_size,
+        bottom_position=create_v3(0, m(-1.8), ridge_height),
+        length_direction=create_v3(0, 1, 0), width_direction=create_v3(0, 0, 1),
+        ticket="roof/ridge")
+    for end_name, (cross_beam, _, _) in zip(("back", "front"), beams[2:]):
+        y = cross_beam.get_bottom_position_global()[1]
+        king = join_timbers(
+            cross_beam, ridge, location_on_timber1=cross_beam.length / 2,
+            location_on_timber2=y + m(1.8), size=create_v2(mm(100), mm(100)),
+            orientation_width_vector=create_v3(1, 0, 0), ticket=f"roof/{end_name}_king_post")
+        joints.append(cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
+            king, cross_beam, TimberEnd.BOTTOM))
+        joints.append(cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
+            king, ridge, TimberEnd.TOP))
+
+    rafter_size = create_v2(mm(75), mm(120))
+    overhang = mm(300)
+    count = k.count("rafter_pairs")
+    for side, (plate, _, _) in zip(("left", "right"), beams[:2]):
+        rafters = []
+        for i in range(count):
+            y = m(-1.3) + m(2.6) * scalar(i, count - 1)
+            eave = create_v3(plate.get_bottom_position_global()[0], y,
+                             side_beam_height + beam_size[0] / 2 + mm(30))
+            peak = create_v3(0, y, ridge_height)
+            direction = safe_normalize_vector(peak - eave)
+            rafter = create_timber(
+                length=(peak - eave).norm() + overhang, size=rafter_size,
+                bottom_position=eave - direction * overhang,
+                length_direction=direction, width_direction=create_v3(0, 1, 0),
+                ticket=f"roof/{side}_rafter_{i + 1}")
+            rafters.append(rafter)
+            joints.append(cut_basic_plain_butt_joint(
+                ButtJointTimberArrangement(rafter, ridge, TimberEnd.TOP)))
+        joints.append(cut_free_house_joint(plate, rafters))
 
     return replace(Frame.from_joints(joints, name="Pavilion", kiwari=k), footprints=[footprint])
