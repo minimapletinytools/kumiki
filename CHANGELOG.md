@@ -26,6 +26,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - The standalone app's menus are Kigumi and File. On macOS the Kigumi menu is also the app menu, so it no longer appears twice. View and Help are folded into Kigumi, and the Edit menu is gone; the edit keys still work in text boxes.
 - In the browser version, deleting a project shows a clear warning: the project exists only in this browser and can't be recovered. The project's name must be typed in before Delete is enabled, and the warning offers to export a .zip first.
 - The projects page (browser version) and Recent projects (app) scroll when the list is long, rather than running off the top of the window.
+- The browser version's welcome page shows the logo, and points to the agent and to the projects below. The agent panel there says what the web agent is for, and when the promo tokens run out it says so and points to the MCP and the standalone app.
+- The website's icon is the Kigumi logo.
 
 ## [0.9.4] - 2026-11-11
 

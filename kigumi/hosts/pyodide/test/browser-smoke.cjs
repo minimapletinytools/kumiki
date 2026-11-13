@@ -79,6 +79,25 @@ app.whenReady().then(async () => {
         check('with no project open, Project status offers Open Project, not Initialize Project',
             Boolean(startStatus && !startStatus.includes('Initialize Project')));
         check('the agent panel is open from the start', await wait(`!!document.querySelector('#slot-right iframe') && !document.querySelector('#slot-right').hidden`, 30000) === true);
+        const welcomeParts = await js(`(() => {
+            const shown = (id) => { const e = document.getElementById(id); return !!e && !e.hidden && e.offsetParent !== null; };
+            const logo = document.getElementById('web-welcome-logo');
+            return { logo: !!logo && logo.complete && logo.naturalWidth > 0, agent: shown('web-agent-hint'), projects: shown('web-projects-hint'),
+                heading: getComputedStyle(document.querySelector('#welcome h1')).display, lead: document.getElementById('welcome-lead').textContent };
+        })()`);
+        check('with no project open, the welcome shows the logo, points to the agent and down to the projects',
+            welcomeParts.logo && welcomeParts.agent && welcomeParts.projects && welcomeParts.heading === 'none' && welcomeParts.lead === '',
+            JSON.stringify(welcomeParts));
+        const agentNotice = await wait(`(() => {
+            const doc = document.querySelector('#slot-right iframe')?.contentDocument;
+            const warning = doc?.querySelector('[data-i18n="agent.web.warning"]');
+            const link = warning?.querySelector('a');
+            return warning && link && !warning.textContent.includes('{link}') ? { text: warning.textContent, href: link.href,
+                body: getComputedStyle(doc.querySelector('.welcome-body')).display } : null;
+        })()`, 30000);
+        check('the agent panel says the web agent is for trying Kumiki out, linking the standalone app, without its welcome blurb',
+            Boolean(agentNotice && agentNotice.text.startsWith('The web agent is just for trying out Kumiki')
+                && agentNotice.href === 'https://kumiki.build/install' && agentNotice.body === 'none'), JSON.stringify(agentNotice));
 
         await js(`(() => {
             document.querySelector('.web-new-project input').value = 'Shed';
