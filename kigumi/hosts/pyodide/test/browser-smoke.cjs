@@ -317,6 +317,27 @@ app.whenReady().then(async () => {
 
         await js("document.querySelector('.web-project .welcome-recent-folder').click()");
         check('opening it again works from the browser\'s copy', await wait(`document.querySelector('#status-workspace')?.textContent === 'Shed'`, 30000) === true);
+
+        // The settings gear's Language: a new one reloads the page, which opens the project again in it.
+        async function pickRow(label) {
+            const row = await wait(`!document.querySelector('#quickpick').hidden && [...document.querySelectorAll('#quickpick-list .item-label')].some((one) => one.textContent.startsWith(${JSON.stringify(label)})) || null`, 15000);
+            if (row) await js(`[...document.querySelectorAll('#quickpick-list .item-label')].find((one) => one.textContent.startsWith(${JSON.stringify(label)})).click()`);
+            return row === true;
+        }
+        async function setLanguage(label) {
+            await js("document.querySelector('#status-settings').click()");
+            const picked = await pickRow('Language:') && await pickRow(label) && await pickRow('Reload');
+            await sleep(1500);
+            await wait("document.body.classList.contains('kigumi-ready')", 240000);
+            const reopened = await wait(`document.querySelector('#status-workspace')?.textContent === 'Shed'`, 60000) === true;
+            const options = await wait(`[...(${explorer}?.querySelectorAll('*') || [])].map((one) => one.textContent).find((text) => /^Kigumi(の設定| options)$/.test(text.trim())) || null`, 60000);
+            return { picked, reopened, options: options && options.trim() };
+        }
+        const japanese = await setLanguage('日本語');
+        check('Language in the settings: 日本語 reloads the page, opens the project again, and the explorer is in Japanese',
+            japanese.picked && japanese.reopened && japanese.options === 'Kigumiの設定', JSON.stringify(japanese));
+        const restored = await setLanguage('Default');
+        check('and Default goes back to the browser\'s language', restored.picked && restored.reopened && restored.options === 'Kigumi options', JSON.stringify(restored));
         await js("document.querySelector('#status-workspace').click()");
         await wait("!!document.querySelector('.web-project')", 30000);
         const scrolls = await js(`['welcome', 'welcome-recent-list'].every((id) => getComputedStyle(document.getElementById(id)).overflowY === 'auto')`);

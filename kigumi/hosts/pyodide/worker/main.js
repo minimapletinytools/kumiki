@@ -25,6 +25,7 @@ const { getInlineExampleFrameContent } = require('../../../project-initializer')
 const { SettingsStore, defaultsFromPackageJson } = require('../../../app-shell/settings-store');
 const { LogChannel } = require('../../../app-shell/log-channel');
 const { createBrowserHost } = require('../browser-host');
+const { LANGUAGE_SETTING, LANGUAGE_CHOICES, chooseLanguage } = require('../../../i18n');
 const { writeProjectFiles, readProjectFiles, watchProjectFiles } = require('../project-files');
 const { createAgentPanel } = require('../../../agent/agent-panel');
 const { createAccount } = require('../../../agent/account');
@@ -128,7 +129,19 @@ async function start() {
         ...defaultsFromPackageJson(packageJson), 'viewer.autoRefreshOnFileChange': true,
         // On here, unlike the standalone app: the browser has no other agent to reach Kigumi with.
         'agent.enabled': true,
+        // Kigumi's language: default (the browser's), en or ja.
+        [LANGUAGE_SETTING]: 'default',
     });
+    // This browser's settings, which the page sent while Python loaded: in force before anything
+    // starts, so Kigumi starts in its language.
+    for (const message of queued) {
+        if (message && message.type === 'shell:command' && message.command === 'web:settings') {
+            settings.replace((message.args[0] || {}).values);
+        }
+    }
+    /** The language Kigumi's views are in: app.language's, else the browser's. */
+    const locale = () => chooseLanguage(settings.get(LANGUAGE_SETTING, 'default'),
+        (self.navigator && self.navigator.language) || 'en');
     const channel = new LogChannel(`${DATA}/logs/kigumi.log`);
     const log = (line) => channel.appendLine(line);
 
@@ -219,7 +232,7 @@ async function start() {
 
     function startKigumi() {
         setHost(createBrowserHost({
-            connection, workspaceFolder: project ? project.dir : null, settings, runCommand, setStatus, setProgress,
+            connection, workspaceFolder: project ? project.dir : null, settings, locale: locale(), runCommand, setStatus, setProgress,
             editors, showLog: openLog, log, mcp: mcp.controls, closeProject: () => switchProject(null), agentPanel: true,
             projects: {
                 open: () => pickProject(),
@@ -292,13 +305,33 @@ async function start() {
     /** The settings quick pick, the status bar's gear. */
     async function chooseSetting() {
         const onOff = (key, fallback = false) => (settings.get(key, fallback) === true ? 'on' : 'off');
+        const language = settings.get(LANGUAGE_SETTING, 'default');
+        const languageLabel = (LANGUAGE_CHOICES.find((one) => one.id === language) || LANGUAGE_CHOICES[0]).label;
         const picked = await connection.pick([
             { label: `Auto refresh on file change: ${onOff('viewer.autoRefreshOnFileChange', true)}`, value: 'viewer.autoRefreshOnFileChange' },
             { label: `Drawings (beta): ${onOff('viewer.drawingBeta')}`, value: 'viewer.drawingBeta' },
-        ], 'Turn a setting on or off (kept in this browser)');
-        if (picked && picked.value) {
+            { label: `Language: ${languageLabel}`, value: LANGUAGE_SETTING },
+        ], 'Change a setting (kept in this browser)');
+        if (picked && picked.value === LANGUAGE_SETTING) {
+            await chooseLanguageSetting();
+        } else if (picked && picked.value) {
             settings.set(picked.value, settings.get(picked.value, picked.value === 'viewer.autoRefreshOnFileChange') !== true);
         }
+    }
+
+    /** Pick Kigumi's language; a new one shows once the page reloads, as the open views have their strings. */
+    async function chooseLanguageSetting() {
+        const before = locale();
+        const picked = await connection.pick(LANGUAGE_CHOICES.map(({ id, label }) => ({ label, value: id })), 'Kigumi\'s language');
+        if (!picked) return;
+        settings.set(LANGUAGE_SETTING, picked.value);
+        if (locale() === before) return;
+        const reload = await connection.pick([{ label: 'Reload' }, { label: 'Later' }], 'Reload the page to change Kigumi\'s language?');
+        if (!reload || reload.label !== 'Reload') return;
+        for (const id of editors.dirtyIds()) {
+            if (!(await editors.confirmClose(id))) return;
+        }
+        post({ type: 'web:reload', projectId: project ? project.id : null });
     }
 
     // The agent: as the standalone app's (hosts/electron/main.js), its requests sent from here.
@@ -432,7 +465,7 @@ async function start() {
         onConversationFiles: (update) => post({ type: 'web:conversationFiles', ...update }),
         mcp: { state: () => mcp.controls.state(), onChange: (listener) => mcp.controls.onChange(listener),
             copySetup: (clientId) => mcp.controls.copySetup(clientId) },
-        locale: (self.navigator && self.navigator.language) || 'en',
+        locale: locale(),
         log,
     });
 

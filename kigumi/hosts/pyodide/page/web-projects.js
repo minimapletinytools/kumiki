@@ -309,6 +309,30 @@
         return true;
     }
 
+    // The project to open again after a reload for a new language (reloadInto).
+    const REOPEN_KEY = 'kigumi.web.reopen';
+
+    /** Reload the page (the worker too), opening `projectId` again once it's back. */
+    function reloadInto(projectId) {
+        try {
+            if (projectId) sessionStorage.setItem(REOPEN_KEY, projectId);
+        } catch (error) {
+            warn(error);
+        }
+        window.location.reload();
+    }
+
+    function reopenAfterReload() {
+        let id = null;
+        try {
+            id = sessionStorage.getItem(REOPEN_KEY);
+            sessionStorage.removeItem(REOPEN_KEY);
+        } catch (_error) {
+            return;
+        }
+        if (id) openProject(id).catch(warn);
+    }
+
     function storedSettings() {
         try {
             const values = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
@@ -355,6 +379,7 @@
                 return {};
             }).then((files) => command('web:conversations', { files }));
             reload().catch(warn);
+            reopenAfterReload();
             if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
         },
         receiveFiles: (message) => receiveFiles(message).catch(warn),
@@ -362,6 +387,7 @@
         storeSettings,
         storeValues,
         storedSettings,
+        reloadInto,
         downloadBase64,
         renderWelcome,
         // For tests and the console.

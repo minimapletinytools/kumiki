@@ -10,6 +10,7 @@ const { createShellHostServices } = require('../../app-shell/host-services');
  * @param {import('../../app-shell/shell-connection').ShellConnection} options.connection
  * @param {string|null} options.workspaceFolder  the open project's working folder
  * @param {import('../../app-shell/settings-store').SettingsStore} options.settings
+ * @param {string} [options.locale]  the language Kigumi's views are in
  * @param {(command: string, ...args: any[]) => Promise<any>} options.runCommand
  * @param {(level: string, text: string) => void} options.setStatus
  * @param {(title: string|null) => void} options.setProgress
@@ -20,10 +21,10 @@ const { createShellHostServices } = require('../../app-shell/host-services');
  * @param {object} [options.mcp]  Kigumi's MCP server's controls (agent/mcp-service.js)
  * @param {object} [options.projects]  opening a project (host.js `projects`)
  */
-function createBrowserHost({ connection, workspaceFolder, settings, runCommand, setStatus, setProgress, editors,
+function createBrowserHost({ connection, workspaceFolder, settings, locale = 'en', runCommand, setStatus, setProgress, editors,
     showLog = null, log = () => {}, agentPanel = false, mcp = null, closeProject = null, projects = null }) {
     return {
-        locale: 'en',
+        locale,
         ...createShellHostServices({ connection, settings, workspaceFolder, documents: editors, setProgress, log }),
         showsFileBrowser: true,
         agentPanel,

@@ -21,6 +21,10 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kigumi
 
+#### Added
+
+- A Language setting in the standalone app (Kigumi > Language) and the browser version (the settings gear): Default, English or 日本語. Default, the default, follows the system's language, as the app already did; the browser version now follows the browser's, where it was always English. A new language shows after a restart (app) or a reload (browser), which Kigumi offers, and the browser version opens the same project again.
+
 #### Changed
 
 - The standalone app's menus are Kigumi and File. On macOS the Kigumi menu is also the app menu, so it no longer appears twice. View and Help are folded into Kigumi, and the Edit menu is gone; the edit keys still work in text boxes.
