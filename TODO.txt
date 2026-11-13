@@ -1,3 +1,52 @@
+
+:: 11/12/2026
+
+Lets do a big refactor on all the patterns and joints
+
+1. go through all the joints and review their doc strings. Look for missing information and places to make them more consistent.
+DO NOT modify anything that was clearyl written by my and not by an agent without discussing with me first and only if what I wrote is INCORRECT
+we are willing to tolerate some missing information since the source is always avalible.
+
+2. make sure every joint has a cut_basic variation
+
+3. update the joint list in api_cheat_sheet. reformat the joint table so that it has the full signature of the cut basic variation as its first collumn, and then the second column should have a BRIEf description of when to use the joint. Keep it simple or omit it. You can ask me for my opinion too
+
+4. do the mega pattern update. Patterns are intended for 2 purposes, as a source reference for the agent, and as a visual reference for humans who want to see what a joint looks like and how it can be configured.
+
+- do not use combined folder / example + variants, only do plain folders and variants
+- the folder structure should match the joint folder structure, except joints with many variants get their own folders.
+- basic joints get their own exmaples organized under basic joints (we already have this, but not every basic joint has a pattern)
+- when do decide to create multiple variants vs using kiwari
+  - prefere kiwari for: size, position, notching, peg shape, 
+  - use multilpe variants for different timber configuration angles, face/plane aligned and other variants, configuration that would be considered different joint, ege half blidn vs plain dovetail, through mortise vs stopped mortise, angled mortise and tenon vs 90 degree morntise and tenon, configuration that would be confusing to describe with kiwari, ask me if you are uncertain.
+- not seevral patterns I created were for development purposes only so don't be afraid to delete them
+- if there was a face/plan aligned variant of the method, then make the pattern angled, otherwise just keep everything axis aligend and face aligned.
+-udpate agent authoring instructions on the format for pattern
+
+
+
+----
+example mega refactor
+
+    -list examples in cheatsheet
+    -move onlypoop into hidden structures or move hidden structers into only poop
+    -multiple frames can be non-hidden, but make the structure in there nicer.
+    -do a comment pass on the frames, add preamble to each one explaining what its for 
+    -add section on each frame file explaining what concepts it demonstrates well, both in simple and broad detail, some examples:
+      -standard "timber frame structure" shape
+      -non-square construction
+      -simple example
+      -face aligned and axis aligned construction
+      -angled braces
+      -rafters (differentiate by style)
+      -small structure
+      -medium structure
+      -kiwari parameters (and what sort of stuff gets parameterized, e.g. structural, or sizing)
+      -furniture
+      -saw horse
+    -udpate agent authoring instructions on the format for examples
+
+:: 11/11/2026
 screw joints
 
 arrangement: ButtJointArrangement
@@ -282,16 +331,32 @@ DONE-app changes
       -this message should also show up when you have a projec topen but no file open
     -and then a down arrow that says "open or create a project below first" v
   -use kumiki app logo as the website favicon
-
 DONE-do localization on web app, standalone app
 DONE-add localization change setting somewhere
 DONE-add numerator/denominator to angle/radians
 DONE-is there an easy awy to add site statistics to the website and app?
+DONE-add joints/arrangement stuff to cheat sheet
+IGNORE-rename/reo rg all mortise and tenon joints
+  DONE-mortise_and_tenon_join/...
+  DONE-delete 45 degree relative tenon size, basic, 
+  -face_aligned
+  -plane_aligned
+  -through_tenon
+  -face_aligned_inset_shoulder
+  -plane_aligned_notch_relief
+  -plane_aligned_scribe_relief
+  -double_angled_notch_relief
+  -double_angled_scribe_relief
 
 -agent stuff
-  -do benchmarking examples
-  -do mega agent  docs and example refactor
-  -test agent created drawings
+  DONE-tool cleanup
+  -add drawings to cheat sheet
+  -do the pattern mega refactor
+  -do the example mega refactor
+
+-example kumiki frames need toh duplicate source button
+-test agent created drawings
+-agent benchmarking examples
 
 -agent account stuff
   -setup LLC prob
@@ -302,12 +367,23 @@ DONE-is there an easy awy to add site statistics to the website and app?
 -dio mega update wesite
   DONE-rewrite content to be not slop ugh
   -add animation header image/video
-  -add discussion and discord links 
-  -see if agent can generate all joints.... 
+  -add discussion and discord links  (maybe make them a little mor eprominent, perhaps as a section on the site just below the main row)
 
+
+-add STL mesh support shouldn't be hard :O
+  -make a cabriole leg table example 
+    -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
+  -STL timber should have "placeholder mode" which does the following
+    -renders as a regular rectangular prism timber but with a different color or texture to indicate it needs work
+    -in tree view, shows up with a "(needs stl placement)" suffix
+    -when you click on the timber, you enter a new mode that allows you to resize and reposition the STL
+      -typically the stl is already roughly aligned so there should be snap 90 degree options, but there is fallback gizmo and text entry boxes for fine alignment
+      -also a gizmo for translation add scale
+      -the panel for transform shows up under the selection box and above the tree view box I guess?
+      -in the panel it should have a "update configuration", this will scan the code for the matching call that created the stl timber and update it in the source code with the new transform configuration. If it can't be found or its ambiguous, it should pop up an error saying it couldn't do it fory ou, either do it manually or ask the agent to do it, it should offer to copy the configuration to clipboard so you can do it yourself manually or copy a prewritten prompt for the agent to do it for you.
+      -be careful abotu these new modes. we don't want to create some combinatorial nightmare with all our other stuff. in this isolation mode ALl you can do is reposition the stl, so please architecture kigumi accordings to reduce tech debt)
 
 -check that edges are being highlighted correctly in 2d drawing mesaurements
--add joints/arrangement stuff to cheat sheet
 -make a new video 
 -do some more testing
 -msg modes on r/woodworking if they will allow promo
@@ -324,21 +400,6 @@ DONE-is there an easy awy to add site statistics to the website and app?
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
   
--rename/reo rg all mortise and tenon joints
-  DONE-mortise_and_tenon_join/...
-  DONE-delete 45 degree relative tenon size, basic, 
-  -face_aligned
-  -plane_aligned
-  -through_tenon
-  -face_aligned_inset_shoulder
-  -plane_aligned_notch_relief
-  -plane_aligned_scribe_relief
-  -double_angled_notch_relief
-  -double_angled_scribe_relief
-
--add STL mesh support shouldn't be hard :O
-  -make a cabriole leg table example 
-    -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
 
 -add shouder to cross lap joint
   -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
