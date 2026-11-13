@@ -1,7 +1,8 @@
-"""Check public example discovery and the multi-frame scene's parameter groups."""
+"""Check public and hidden example discovery and the multi-frame scene's parameter groups."""
 
 import importlib.util
 import json
+import warnings
 from dataclasses import replace
 from pathlib import Path
 
@@ -12,10 +13,15 @@ from kumiki.frame_decorators import module_entries
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "patterns" / "structures"
+HIDDEN = ROOT / "hidden_structures"
+FRAME_FILES = sorted([
+    *EXAMPLES.glob("*.py"),
+    *(path for path in HIDDEN.rglob("*.py") if path.name != "relief_example_patterns.py"),
+])
 
 
-@pytest.mark.parametrize("path", sorted(EXAMPLES.glob("*.py")), ids=lambda p: p.stem)
-def test_public_examples_have_explicit_buildable_entries(path):
+@pytest.mark.parametrize("path", FRAME_FILES, ids=lambda p: p.stem)
+def test_examples_have_explicit_buildable_entries_without_warnings(path):
     spec = importlib.util.spec_from_file_location("example_catalog_" + path.stem, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -24,7 +30,9 @@ def test_public_examples_have_explicit_buildable_entries(path):
     assert not entries.rejected
     assert entries.frames
     for entry in entries.frames:
-        frame = entry.function()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            frame = entry.function()
         assert isinstance(frame, Frame)
         assert frame.cut_timbers
 

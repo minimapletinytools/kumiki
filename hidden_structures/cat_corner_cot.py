@@ -421,7 +421,7 @@ def cut_roof_slope_trim_joint(wall_timbers: list[Timber], roof_plane_point: V3, 
 
     return Joint(
         cuttings=cuttings,
-        ticket=JointTicket(path="roof_slope_wall_trim", joint_type="custom_halfspace_trim", tags=("roof", "wall_trim")),
+        ticket=JointTicket(path="roof_slope_wall_trim", joint_type="custom_halfspace_trim"),
     )
 
 

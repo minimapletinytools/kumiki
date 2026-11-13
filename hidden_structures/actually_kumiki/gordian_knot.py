@@ -83,6 +83,8 @@ BLUE:
   XXXXX
 """
 
+from typing import Optional
+
 from kumiki import *
 from kumiki.csg.cutcsg import RectangularPrism, SolidUnion
 
@@ -188,7 +190,8 @@ def _make_cuts_for_grid(grid: list[str]) -> SolidUnion | None:
     return SolidUnion(prisms) if prisms else None
 
 
-def example() -> Frame:
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
     # Six timbers in right-handed arrangement:
     # 1. YELLOW (-x) & RED (+x): length along +Z, width along +Y, thickness along X
     # 2. PURPLE (-y) & GREEN (+y): length along +X, width along +Z, thickness along Y

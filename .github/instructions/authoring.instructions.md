@@ -318,7 +318,7 @@ Preserve useful authored recipe notes after this preamble. Keep inline comments
 focused on non-obvious construction steps, reference spaces, and dimensions.
 Do not duplicate the code in comments or replace authored prose for style alone.
 
-Mark every public frame entry explicitly with `@frame` and use
+Mark every public or hidden frame entry explicitly with `@frame` and use
 `(k: Optional[Kiwari] = None) -> Frame`. A file may contain several visible frames:
 give each a useful name and place them intentionally in world space. Resolve
 shared parameters from the same Kiwari declaration and return the resolved values
@@ -326,7 +326,9 @@ on the corresponding Frame; give independent designs separate declarations.
 
 Add or update the Examples tables in `docs/api_cheat_sheet.md` when an example is
 added, moved, promoted, or changes what it demonstrates. Verify discovery and build
-all public entries affected by the change; render altered geometry and inspect it.
+all entries affected by the change without deprecation or ignored-argument warnings;
+render altered geometry and inspect it. For API-only cleanup, compare member placement,
+sizes, and cut geometry before and after the change.
 Regenerate the packaged pattern index through `tools/build_pattern_index.py` when
 moving files into or out of the public catalog.
 

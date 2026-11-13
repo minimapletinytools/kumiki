@@ -19,8 +19,6 @@ Built using the Kumiki API
 """
 
 from typing import Optional
-import sys
-sys.path.append('..')
 
 from kumiki import *
 from kumiki.timber import Frame

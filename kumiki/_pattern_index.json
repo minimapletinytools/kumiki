@@ -1257,7 +1257,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/learn_to_timber_frame_shed.py",
-      "sha256": "e95beab39f9b84e5e5e0e5c0d1e2213fd88e71a693c06e482527cd7dc5d2eb6c",
+      "sha256": "b98590efcf2531f3713629ca864d51de7b3b27aec9a2a8e62c7319d2315425d9",
       "warnings": []
     },
     "patterns/structures/multi_cross_lap_post.py": {
@@ -1335,7 +1335,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 1102,
+          "lineno": 1100,
           "name": "example"
         }
       ],
@@ -1344,7 +1344,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/oscarshed.py",
-      "sha256": "8bc660439830ffb30b4a6bad2c95499fee90bbf71543cd219650782f2e75c3db",
+      "sha256": "c63dff256df0a3a3fdb7f7945cee3ccc17f926dbc8dd0459618ec8172320cc8f",
       "warnings": []
     },
     "patterns/structures/tinyhouse120.py": {
@@ -1353,7 +1353,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 1534,
+          "lineno": 1541,
           "name": "example"
         }
       ],
@@ -1362,11 +1362,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/tinyhouse120.py",
-      "sha256": "140d521ce6f98eaa8a230eb6941a8e3ef1d662ce1c1eca620f0ed1efdb689b1d",
+      "sha256": "51b2e3b424b3cf612e025e2633bccc56e15463461266242ac618ce94153eecd9",
       "warnings": []
     }
   },
-  "generated_at": "2026-11-13T04:47:42.203854+00:00",
+  "generated_at": "2026-11-13T04:57:25.292142+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

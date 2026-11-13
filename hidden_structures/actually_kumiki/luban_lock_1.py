@@ -82,6 +82,8 @@ Housing timber freedoms (relative to housed timbers):
 """
 
 from dataclasses import replace
+from typing import Optional
+
 from kumiki import *
 from kumiki.assembly import AssemblyFreedom
 
@@ -100,7 +102,8 @@ block_size = create_v2(block_width, block_height)
 half_diag = block_width * sqrt(scalar(2)) / scalar(2)
 
 
-def example() -> Frame:
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
 
     # -- X-axis pair --------------------------------------------------------
     # Length runs along +X, cross section in YZ rotated 45° around X.

@@ -25,6 +25,7 @@ Run directly to print what each drawing picked; load in Kigumi to see the drawin
 
 import importlib.util as importlib_util
 from pathlib import Path as FilePath
+from typing import Optional
 
 from kumiki import *
 from kumiki.csg.feature_paths import FeatureHandle
@@ -68,7 +69,10 @@ def build_frame_with_drawing() -> Frame:
     return with_auto_drawings(_load_cute_frame()(), FIXED_TIMBER).finish()
 
 
-example = build_frame_with_drawing
+@frame
+def example(k: Optional[Kiwari] = None) -> Frame:
+    """Build the rough-stock frame with generated drawings."""
+    return build_frame_with_drawing()
 
 
 def _name(handle: FeatureHandle) -> str:
