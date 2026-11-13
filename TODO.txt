@@ -313,7 +313,8 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
-
+-angled corner lap joint doesn't have end cuts
+-do LLC research
 -agent stuff
   DONE-tool cleanup
   DONE-add drawings to cheat sheet
@@ -465,7 +466,7 @@ DONE-sliding dovetail (maybe you want tapered variants)
   -allow decorative extrusions (polygon on a face that extrudes into the face) so you can cut the \____/ shape out of the sawhores feet
   -allow corner lap joint to take non plane aligned timber, you choose one of the timber sto take the "normal" lap and the other one takes the angled lap
     -# TODO rename to _on_PAT or add support for non plane aligned cases, in which case, provide another parmeter to decide to what extent the lap cut is in each timber's orientation (default to 0 or 0.5)
-  -lincoln log joints?
+  -lincoln log joints? (both the rounded with groov evariant and the dovetail square variant)
   -double butt spline joint should allow timbers to be placed on either side of the spline (top/bottom)
   -drop in house joint + notching only on one side
     -update drop in dovetail joint to notch only on one side
