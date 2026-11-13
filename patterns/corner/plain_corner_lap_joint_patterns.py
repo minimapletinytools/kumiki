@@ -1,45 +1,23 @@
 # Last checked on kumiki 0.9.0
-"""
-Plain Corner Lap Joint Patterns
-"""
+"""Orthogonal and angled corner laps with adjustable cut proportions."""
 
+from typing import Optional
 from kumiki import *
-from kumiki.example_shavings import (
-    RoundTimberConfig,
-    create_canonical_example_right_angle_corner_joint_timbers,
-    _CANONICAL_EXAMPLE_TIMBER_SIZE,
-)
+from kumiki.example_shavings import create_canonical_example_corner_joint_timbers
+
+LAP = kiwari(cut_ratio=kiwari.number(scalar(1, 2), minimum=0.1, maximum=0.9))
 
 
-def _maybe_round_timber_config(use_round_timbers: bool):
-    if not use_round_timbers:
-        return None
-    return RoundTimberConfig(
-        diameter=max(_CANONICAL_EXAMPLE_TIMBER_SIZE[0], _CANONICAL_EXAMPLE_TIMBER_SIZE[1]) * sqrt(2)
-    )
+def _corner_lap(k: Kiwari, angle: Numeric) -> Joint:
+    arrangement = create_canonical_example_corner_joint_timbers(corner_angle=angle)
+    return cut_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement, cut_ratio=k.number("cut_ratio"))
 
 
-def make_corner_lap_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
-    """
-    Create a corner lap joint where each corner timber gets a lap plus an end cut.
-    """
-    arrangement = create_canonical_example_right_angle_corner_joint_timbers(
-        position=position,
-        timber_config=_maybe_round_timber_config(use_round_timbers),
-    )
-    joint = cut_plain_corner_lap_joint_on_plane_aligned_timbers(
-        CornerJointTimberArrangement(
-            timber1=arrangement.timber1,
-            timber2=arrangement.timber2,
-            timber1_end=arrangement.timber1_end,
-            timber2_end=arrangement.timber2_end,
-            front_face_on_timber1=None,
-        ),
-        cut_ratio=scalar(1, 2),
-    )
-    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
+@pattern("corner/plain_corner_lap_joint/orthogonal", kiwari=LAP)
+def orthogonal(k: Optional[Kiwari] = None) -> Joint:
+    return _corner_lap(LAP.resolve(k), degrees(90))
 
 
-@pattern('corner/cut_plain_corner_lap_joint_on_plane_aligned_timbers')
-def cut_plain_corner_lap_joint_on_plane_aligned_timbers_pattern() -> Frame:
-    return Frame(cut_timbers=make_corner_lap_joint_example(create_v3(0, 0, 0)), name='Plain Corner Lap Joint')
+@pattern("corner/plain_corner_lap_joint/angled", kiwari=LAP)
+def angled(k: Optional[Kiwari] = None) -> Joint:
+    return _corner_lap(LAP.resolve(k), degrees(120))

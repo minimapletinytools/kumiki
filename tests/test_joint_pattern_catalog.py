@@ -46,3 +46,59 @@ def test_joint_pattern_file_builds_leaf_variants(source):
         assert not any(path.startswith(pattern.path + "/") for path in paths)
         frame = pattern.raise_at()
         assert frame.cut_timbers
+
+
+def test_multi_cross_lap_controls_move_material_between_three_members():
+    from dataclasses import replace
+    from kumiki import CutTimber, create_v3, inches
+    from patterns.cross.multi_cross_lap_joint_patterns import CHAIN, multi_cross_lap
+
+    for values, expected in [({}, ["first", "middle", "last"]),
+                             ({"first_boundary": 0.2, "second_boundary": 0.8},
+                              ["middle", "middle", "middle"])]:
+        joint = multi_cross_lap(replace(CHAIN, values=values))
+        timbers = {cut.timber.ticket.path: cut.timber for cut in joint.cuttings.values()}
+        assert len(timbers) == 3
+        bodies = {
+            name: CutTimber(timber, cuts=[cut for cut in joint.cuttings.values()
+                                         if cut.timber is timber]).render_timber_with_cuts_csg_local()
+            for name, timber in timbers.items()
+        }
+        for height, owner in zip([1.5, 3, 4.5], expected):
+            point = create_v3(0, inches(1.5), inches(height))
+            occupants = [name for name, timber in timbers.items()
+                         if bodies[name].contains_point(timber.transform.global_to_local(point))]
+            assert occupants == [owner]
+
+
+@pytest.mark.parametrize("notched,round_stock,pegged", [
+    (False, False, True), (True, False, False), (True, True, True),
+])
+def test_compound_pattern_relief_and_peg_controls(notched, round_stock, pegged):
+    from dataclasses import replace
+    from kumiki import PegShape
+    from patterns.mixed.mortise_and_tenon_joints_patterns import (
+        ANGLED_TENON, example_double_angled_mortise_and_tenon,
+    )
+
+    joint = example_double_angled_mortise_and_tenon(replace(ANGLED_TENON, values={
+        "notched": notched, "round_timbers": round_stock,
+        "pegged": pegged, "peg_shape": PegShape.ROUND,
+    }))
+    assert len(joint.cuttings) == 2
+    assert bool(joint.jointAccessories) == pegged
+
+
+@pytest.mark.parametrize("top_entry", [False, True])
+def test_tusked_pattern_accepts_rough_reference_and_inset(top_entry):
+    from dataclasses import replace
+    from kumiki import MeasureOppositeShoulderFrom, inches
+    from patterns.mixed.mortise_and_tenon_joints_patterns import TUSKED, tusked_front, tusked_top
+
+    build = tusked_top if top_entry else tusked_front
+    joint = build(replace(TUSKED, values={
+        "rough_stock": True, "measure_from": MeasureOppositeShoulderFrom.Rough,
+        "opposite_inset": inches(1),
+    }))
+    assert len(joint.cuttings) == 2
+    assert joint.jointAccessories

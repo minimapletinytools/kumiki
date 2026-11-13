@@ -7,9 +7,15 @@ from kumiki import *
 from kumiki.csg.pathcsg import StraightSegment, ArcSegment
 
 
-@pattern('decorative/roundover', tags=["main"])
-def example_roundover_decoration() -> Joint:
+EXAMPLE_ROUNDOVER_DECORATION_OPTIONS = kiwari(
+    radius=kiwari.length(inches(1, 2), minimum=inches(1, 8)),
+)
+
+
+@pattern('decorative/roundover', tags=["main"], kiwari=EXAMPLE_ROUNDOVER_DECORATION_OPTIONS)
+def example_roundover_decoration(k: Optional[Kiwari] = None) -> Joint:
     """A single timber with all 12 edges rounded over."""
+    k = EXAMPLE_ROUNDOVER_DECORATION_OPTIONS.resolve(k)
     timber = Timber(
         length=feet(4),
         size=Matrix([inches(4), inches(6)]),
@@ -19,13 +25,19 @@ def example_roundover_decoration() -> Joint:
     return cut_practice_roundover_decoration(
         timber=timber,
         edges=list(TimberEdge),
-        radius=inches(1, 2),
+        radius=k.length("radius"),
     )
 
 
-@pattern('decorative/roundover_imperfect', tags=["main"])
-def example_roundover_imperfect() -> Joint:
+EXAMPLE_ROUNDOVER_IMPERFECT_OPTIONS = kiwari(
+    radius=kiwari.length(inches(1, 2), minimum=inches(1, 8)),
+)
+
+
+@pattern('decorative/roundover_imperfect', tags=["main"], kiwari=EXAMPLE_ROUNDOVER_IMPERFECT_OPTIONS)
+def example_roundover_imperfect(k: Optional[Kiwari] = None) -> Joint:
     """A single edge rounded over on an imperfect timber."""
+    k = EXAMPLE_ROUNDOVER_IMPERFECT_OPTIONS.resolve(k)
     timber = Timber(
         length=feet(3),
         size=Matrix([inches(4), inches(4)]),
@@ -39,13 +51,20 @@ def example_roundover_imperfect() -> Joint:
     return cut_practice_roundover_decoration(
         timber=timber,
         edges=[TimberEdge.RIGHT_FRONT],
-        radius=inches(1, 2),
+        radius=k.length("radius"),
     )
 
 
-@pattern('decorative/rafter_tail_scallop', tags=["main"])
-def example_rafter_tail_scallop_decoration() -> Joint:
+EXAMPLE_RAFTER_TAIL_SCALLOP_DECORATION_OPTIONS = kiwari(
+    height=kiwari.length(inches(2)),
+    length=kiwari.length(inches(4)),
+)
+
+
+@pattern('decorative/rafter_tail_scallop', tags=["main"], kiwari=EXAMPLE_RAFTER_TAIL_SCALLOP_DECORATION_OPTIONS)
+def example_rafter_tail_scallop_decoration(k: Optional[Kiwari] = None) -> Joint:
     """A rafter tail with a scalloped decorative cut on its underside near the tail end."""
+    k = EXAMPLE_RAFTER_TAIL_SCALLOP_DECORATION_OPTIONS.resolve(k)
     timber = Timber(
         length=feet(4),
         size=Matrix([inches(4), inches(6)]),
@@ -55,8 +74,8 @@ def example_rafter_tail_scallop_decoration() -> Joint:
     return cut_practice_rafter_tail_scallop_corner_end_decoration(
         timber=timber,
         short_edge=TimberShortEdge.TOP_BACK,
-        scallop_height=inches(2),
-        scallop_length=inches(4),
+        scallop_height=k.length("height"),
+        scallop_length=k.length("length"),
     )
 
 
@@ -88,9 +107,16 @@ def example_path_extrusion_corner_end_decoration() -> Joint:
     )
 
 
-@pattern('decorative/straight_angled_end_cut', tags=["main"])
-def example_straight_angled_end_cut_decoration() -> Joint:
+EXAMPLE_STRAIGHT_ANGLED_END_CUT_DECORATION_OPTIONS = kiwari(
+    distance=kiwari.length(inches(3)),
+    angle=kiwari.angle(degrees(30)),
+)
+
+
+@pattern('decorative/straight_angled_end_cut', tags=["main"], kiwari=EXAMPLE_STRAIGHT_ANGLED_END_CUT_DECORATION_OPTIONS)
+def example_straight_angled_end_cut_decoration(k: Optional[Kiwari] = None) -> Joint:
     """A single timber with an angled cut decoration on its top end."""
+    k = EXAMPLE_STRAIGHT_ANGLED_END_CUT_DECORATION_OPTIONS.resolve(k)
     timber = Timber(
         length=feet(4),
         size=Matrix([inches(4), inches(6)]),
@@ -100,8 +126,8 @@ def example_straight_angled_end_cut_decoration() -> Joint:
     return cut_practice_straight_angled_end_cut_decoration(
         timber=timber,
         front_face=TimberFace.FRONT,
-        position_from_end=inches(3),
-        angle=degrees(30),
+        position_from_end=k.length("distance"),
+        angle=k.angle("angle"),
         angle_towards_face=TimberFace.RIGHT,
         timber_end=TimberEnd.TOP,
     )
