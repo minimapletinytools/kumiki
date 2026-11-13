@@ -386,11 +386,6 @@ def example_basic_tusked_mortise_and_tenon_joint(position=None) -> Joint:
 from kumiki.joints.workshop.basic_joints import (
     cut_basic_plain_butt_joint,
     cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers,
-    cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers,
-    cut_basic_plain_cross_lap_joint,
-    cut_basic_plain_cross_lap_house_joint,
-    cut_basic_free_house_joint,
-    cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers,
 )
 
 
@@ -409,38 +404,3 @@ def basic_tongue_and_fork_butt() -> Joint:
     """Cut a tongue-and-fork butt joint with default proportions."""
     return cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         create_canonical_example_butt_joint_timbers())
-
-
-@pattern("basic_joints/plain_corner_lap_joint")
-def basic_corner_lap() -> Joint:
-    """Cut a half-depth corner lap."""
-    return cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers(
-        create_canonical_example_corner_joint_timbers(corner_angle=degrees(120)))
-
-
-@pattern("basic_joints/plain_cross_lap_joint")
-def basic_cross_lap() -> Joint:
-    """Cut a cross lap with default relief."""
-    return cut_basic_plain_cross_lap_joint(create_canonical_example_cross_joint_timbers())
-
-
-@pattern("basic_joints/plain_cross_lap_house_joint")
-def basic_cross_lap_house() -> Joint:
-    """Cut a housing for a crossing timber."""
-    return cut_basic_plain_cross_lap_house_joint(
-        create_canonical_example_cross_joint_timbers(lateral_offset=inches(2)))
-
-
-@pattern("basic_joints/free_house_joint")
-def basic_free_house() -> Joint:
-    """Cut a housing following a crossing timber's body."""
-    arrangement = create_canonical_example_cross_joint_timbers(lateral_offset=inches(2))
-    return cut_basic_free_house_joint(arrangement.timber1, [arrangement.timber2])
-
-
-@pattern("basic_joints/multi_cross_lap_joint")
-def basic_multi_cross_lap() -> Joint:
-    """Cut uniformly spaced laps in a two-member chain."""
-    arrangement = create_canonical_example_cross_joint_timbers()
-    return cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers(
-        [arrangement.timber1, arrangement.timber2], TimberFace.RIGHT)
