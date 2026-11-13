@@ -27,6 +27,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Added
 
+- Example frames in the explorer have Duplicate To Workspace, as library patterns do: it copies the frame into the project's top folder, beside its own frames, and opens it.
 - A `kumiki_source` tool for the agent and for agents over MCP: it lists, reads and searches the kumiki library the project uses (in its .venv) and kumiki's example frames, read-only and a page at a time. `kumiki_api` now says when it cut a long source short, and where to read on.
 - The website and Kigumi in the browser (kumiki.build/try) count visits with Cloudflare Web Analytics, which uses no cookies. The privacy policy says so.
 - The website is in Japanese too, at kumiki.build/ja/, with an English / 日本語 switch in the header. A first visit from a Japanese browser goes to the Japanese pages; the switch is remembered. The docs, privacy policy and terms stay English.

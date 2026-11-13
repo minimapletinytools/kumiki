@@ -682,7 +682,8 @@ class SidebarModel {
             label,
             icon,
             expanded: false,
-            children: items.map((item) => this._frameNode(`frame-file:library:${item.sourceFile}`, item.name, item.sourceFile, item)),
+            children: items.map((item) => this._frameNode(`frame-file:library:${item.sourceFile}`, item.name, item.sourceFile, item,
+                ['viewSource', 'duplicate', 'openInViewer'])),
             data: { items },
         });
 

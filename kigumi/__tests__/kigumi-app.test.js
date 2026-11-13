@@ -104,6 +104,35 @@ test('duplicating is refused for a workspace pattern', async () => {
   await app.dispose();
 });
 
+test('duplicating an example frame copies it beside the project\'s frames; a project frame is refused', async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-app-test-'));
+  const library = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-app-lib-'));
+  const example = path.join(library, 'shed.py');
+  fs.writeFileSync(example, 'from kumiki import *\n');
+  const host = fakeHost({ workspaceRoots: () => [workspace] });
+  const app = newApp(host);
+
+  await app.commands['kigumi.duplicatePatternToWorkspace']({
+    type: 'frameFile', key: `frame-file:library:${example}`, data: { sourceFile: example, name: 'shed' },
+  });
+  expect(fs.readFileSync(path.join(workspace, 'shed.py'), 'utf8')).toBe('from kumiki import *\n');
+  expect(host.showFile).toHaveBeenCalledWith(path.join(workspace, 'shed.py'));
+  expect(host.messages.at(-1)).toEqual(['info', 'Frame duplicated to: shed.py']);
+
+  await app.commands['kigumi.duplicatePatternToWorkspace']({
+    type: 'frameFile', key: `frame-file:library:${example}`, data: { sourceFile: example, name: 'shed' },
+  });
+  expect(fs.existsSync(path.join(workspace, 'shed_1.py'))).toBe(true);
+
+  await app.commands['kigumi.duplicatePatternToWorkspace']({
+    type: 'frameFile', key: `frame-file:workspace:${path.join(workspace, 'shed.py')}`, data: { filePath: path.join(workspace, 'shed.py') },
+  });
+  expect(host.messages.at(-1)[0]).toBe('error');
+  await app.dispose();
+  fs.rmSync(workspace, { recursive: true, force: true });
+  fs.rmSync(library, { recursive: true, force: true });
+});
+
 test('with no pattern viewers open, unload says so without asking', async () => {
   const host = fakeHost();
   const app = newApp(host);

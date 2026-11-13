@@ -57,7 +57,15 @@ function _extractSourcePathFromSidebarElement(element) {
     return null;
 }
 
+/** Whether `element` is a library's example frame (not one of the workspace's own). */
+function _isLibraryFrameElement(element) {
+    return Boolean(element && element.type === 'frameFile' && String(element.key || '').startsWith('frame-file:library:'));
+}
+
 function _isDuplicableLibraryElement(element) {
+    if (_isLibraryFrameElement(element)) {
+        return true;
+    }
     if (!element || !element.data || (element.type !== 'patternItem' && element.type !== 'patternbookGroup')) {
         return false;
     }
@@ -538,10 +546,12 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                 return;
             }
             try {
-                const { duplicatePatternToWorkspace } = require('./pattern-source-utils');
-                const newPath = await duplicatePatternToWorkspace(sourcePath, workspaceRoot);
+                const { duplicatePatternToWorkspace, duplicateFrameToWorkspace } = require('./pattern-source-utils');
+                const frame = _isLibraryFrameElement(selectedElement);
+                const newPath = await (frame ? duplicateFrameToWorkspace : duplicatePatternToWorkspace)(sourcePath, workspaceRoot);
                 await host.showFile(newPath);
-                host.showMessage('info', t('message.patternDuplicatedTo', { path: path.relative(workspaceRoot, newPath) }));
+                host.showMessage('info', t(frame ? 'message.frameDuplicatedTo' : 'message.patternDuplicatedTo',
+                    { path: path.relative(workspaceRoot, newPath) }));
                 await sidebarModel.refresh(true);
             } catch (error) {
                 outputChannel.appendLine(`Duplicate pattern error: ${error.message}\n${error.stack}`);

@@ -12,14 +12,15 @@ function getPatternbookName(sourceFile) {
 }
 
 /**
- * Copies a file from dependency to workspace patterns folder.
+ * Copies a file from dependency to workspace patterns folder (or `folder` in the workspace).
  * @param {string} sourceFile - The source file path
  * @param {string} workspaceRoot - The workspace root directory
  * @param {boolean} isReadOnly - Whether to mark as read-only
+ * @param {string} [folder] - The folder in the workspace to copy into; patterns/ by default
  * @returns {Promise<string>} - The new file path
  */
-async function copyPatternToWorkspace(sourceFile, workspaceRoot, isReadOnly = false) {
-    const patternsDir = path.join(workspaceRoot, 'patterns');
+async function copyPatternToWorkspace(sourceFile, workspaceRoot, isReadOnly = false, folder = 'patterns') {
+    const patternsDir = path.join(workspaceRoot, folder);
     
     // Ensure patterns directory exists
     if (!fs.existsSync(patternsDir)) {
@@ -65,6 +66,16 @@ async function duplicatePatternToWorkspace(sourceFile, workspaceRoot) {
 }
 
 /**
+ * Copies a library's example frame into the workspace's top folder, beside its own frames.
+ * @param {string} sourceFile - The example frame's file
+ * @param {string} workspaceRoot - The workspace root directory
+ * @returns {Promise<string>} - The new file path
+ */
+async function duplicateFrameToWorkspace(sourceFile, workspaceRoot) {
+    return copyPatternToWorkspace(sourceFile, workspaceRoot, false, '.');
+}
+
+/**
  * Opens a shipped pattern as a read-only copy in the workspace.
  * @param {string} sourceFile - The source file path (from dependencies)
  * @param {string} workspaceRoot - The workspace root directory
@@ -99,6 +110,7 @@ function groupPatternsByPatternbook(patterns) {
 
 module.exports = {
     duplicatePatternToWorkspace,
+    duplicateFrameToWorkspace,
     viewShippedPatternSource,
     groupPatternsByPatternbook,
 };

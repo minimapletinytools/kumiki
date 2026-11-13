@@ -294,14 +294,14 @@ describe('row actions', () => {
     expect(group.rowActions).toEqual(['viewSource', 'duplicate']);
   });
 
-  test('a project frame can be deleted; a library frame can not', () => {
+  test('a project frame can be deleted; a library frame can be duplicated instead', () => {
     const model = new SidebarModel();
     model._state.frames = [{ filePath: '/ws/frame.py', relativePath: 'frame.py' }];
     model._state.shippedExamples = [{ sourceFile: '/deps/example.py', name: 'example' }];
     const tree = model.getTree();
 
-    expect(findNode(tree, (node) => node.label === 'frame.py').rowActions).toContain('deleteFile');
-    expect(findNode(tree, (node) => node.label === 'example').rowActions).not.toContain('deleteFile');
+    expect(findNode(tree, (node) => node.label === 'frame.py').rowActions).toEqual(['viewSource', 'openInViewer', 'deleteFile']);
+    expect(findNode(tree, (node) => node.label === 'example').rowActions).toEqual(['viewSource', 'duplicate', 'openInViewer']);
   });
 
   test('every row action names a known action', () => {

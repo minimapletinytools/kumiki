@@ -285,6 +285,19 @@ app.whenReady().then(async () => {
             && new Set(examples.map((key) => key.split('/').pop())).size === examples.length, `${examples.length} rows`);
         const shipped = await js(`[...${explorer}.querySelectorAll('.ks-row')].find((one) => one.dataset.key === 'pattern-section:shipped-patterns')?.textContent || ''`);
         check('kumiki\'s own patterns are listed', /\((\d+)\)/.test(shipped) && Number(shipped.match(/\((\d+)\)/)[1]) > 0, shipped.trim());
+        // An example frame can be duplicated into the project, where it is listed with the project's frames.
+        const rowButtons = (key) => js(`[...(${explorer}.querySelector('.ks-row[data-key="' + CSS.escape(${JSON.stringify(key)}) + '"]')
+            ?.querySelectorAll('.ks-row-actions button') || [])].map((one) => one.title)`);
+        const exampleButtons = houseRow ? await rowButtons(houseRow) : [];
+        if (exampleButtons.includes('Duplicate To Workspace')) {
+            await js(`[...${explorer}.querySelector('.ks-row[data-key="' + CSS.escape(${JSON.stringify(houseRow)}) + '"]').querySelectorAll('.ks-row-actions button')]
+                .find((one) => one.title === 'Duplicate To Workspace').click()`);
+        }
+        const copied = await wait(`[...(${explorer}?.querySelectorAll('.ks-row') || [])].map((one) => one.dataset.key || '')
+            .find((key) => key.startsWith('frame-file:workspace:') && key.endsWith('/tinyhouse120.py')) || null`, 30000);
+        const copiedButtons = copied ? await rowButtons(copied) : [];
+        check('an example frame\'s Duplicate To Workspace copies it into the project, whose own frames have no such button',
+            Boolean(copied) && !copiedButtons.includes('Duplicate To Workspace'), JSON.stringify({ exampleButtons, copied, copiedButtons }));
         const houseStart = Date.now();
         if (houseRow) await js(`[...${explorer}.querySelectorAll('.ks-row')].find((one) => one.dataset.key === ${JSON.stringify(houseRow)}).click()`);
         const houseTimbers = houseRow ? await wait(`(() => {
