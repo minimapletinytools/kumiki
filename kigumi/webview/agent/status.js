@@ -66,8 +66,12 @@ export class Status {
         this.contextMeter.textContent = '';
     }
 
-    /** The agent's to-do list, pinned above the box. */
+    /**
+     * The agent's to-do list, pinned above the box. Each update shows it again, even after the user
+     * hid it with its ×.
+     */
     showTodos(items) {
+        this.todoItems = items;
         this.todos.hidden = !items.length;
         if (!items.length) return this.todos.replaceChildren();
         const left = items.filter((item) => !item.done).length;
@@ -79,6 +83,17 @@ export class Status {
         const list = document.createElement('ul');
         for (const item of items) list.appendChild(Object.assign(document.createElement('li'), { className: item.done ? 'is-done' : '', textContent: item.text }));
         details.appendChild(list);
-        this.todos.replaceChildren(details);
+        const close = Object.assign(document.createElement('button'), {
+            className: 'todos-close', type: 'button', textContent: '×', title: t('agent.todos.hide'),
+        });
+        close.setAttribute('aria-label', t('agent.todos.hide'));
+        close.addEventListener('click', () => { this.todos.hidden = true; });
+        this.todos.replaceChildren(close, details);
+    }
+
+    /** A new request: a list with everything ticked off belonged to the last task, so it goes. */
+    hideFinishedTodos() {
+        const items = this.todoItems || [];
+        if (items.length && items.every((item) => item.done)) this.todos.hidden = true;
     }
 }

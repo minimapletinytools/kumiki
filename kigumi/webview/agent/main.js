@@ -20,7 +20,10 @@ const status = new Status({
 const conversation = new Conversation($('messages'), { post, setActivity: (label) => status.setActivity(label) });
 const composer = new Composer({
     input: $('prompt-input'), sendButton: $('send-btn'), attachments: $('attachments'), mentions: $('mentions'), planToggle: $('plan-toggle'),
-}, { post, isBusy: () => busy, onSent: (text, imageUrls) => conversation.userBubble(text, imageUrls) });
+}, { post, isBusy: () => busy, onSent: (text, imageUrls) => {
+    status.hideFinishedTodos();
+    conversation.userBubble(text, imageUrls);
+} });
 const menus = new Menus({
     settingsToggle: $('settings-toggle'), settingsMenu: $('settings-menu'), historyButton: $('btn-history'), historyMenu: $('history-menu'),
     historyList: $('history-list'), alwaysAllowed: $('always-allowed'), startupToggle: $('setting-startup'), outputLimit: $('setting-output-limit'),
@@ -100,7 +103,10 @@ const HANDLERS = {
     'agent:done': (message) => conversation.done({ ...message, error: textOf(message.errorKey, null, message.error),
         outOfTokens: message.errorKey === 'agent.error.noCredit' && via === 'backend' && document.body.classList.contains('host-web') }),
     'agent:error': (message) => conversation.error(textOf(message.key, message.params, message.message || t('agent.failed'))),
-    'agent:userMessage': (message) => conversation.userBubble(message.text || '', [], message.images || 0),
+    'agent:userMessage': (message) => {
+        status.hideFinishedTodos();
+        conversation.userBubble(message.text || '', [], message.images || 0);
+    },
     'agent:todos': (message) => status.showTodos(message.items || []),
     'agent:files': (message) => composer.setFiles(message.files || []),
     'agent:queued': (message) => conversation.showQueued(message.id, message.text || ''),

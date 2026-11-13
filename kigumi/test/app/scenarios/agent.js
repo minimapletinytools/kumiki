@@ -36,6 +36,21 @@ module.exports = {
         settings.set('agent.maxOutputTokens', 16000);
         check('the settings menu sets the longest step', shown === '16000' && limit, `shown ${shown}, now ${settings.get('agent.maxOutputTokens')}`);
 
+        // The agent's to-do list: its × hides it, and the agent's next change to it shows it again.
+        const agentSurface = connection().findPanel((panel) => panel.type === 'agent');
+        const todos = (items) => agentSurface.postMessage({ type: 'agent:todos', items });
+        todos([{ text: 'Write the sills', done: true }, { text: 'Join the posts' }]);
+        const listed = await waitFor(() => read(`!doc.getElementById('todos').hidden && doc.querySelectorAll('#todos li').length === 2`),
+            { timeoutMs: 5000 }).catch(() => false);
+        await capture('agent-todos');
+        await read(`doc.querySelector('#todos .todos-close').click()`);
+        const hid = await read(`doc.getElementById('todos').hidden`);
+        todos([{ text: 'Write the sills', done: true }, { text: 'Join the posts', done: true }]);
+        const shownAgain = await waitFor(() => read(`!doc.getElementById('todos').hidden`), { timeoutMs: 5000 }).catch(() => false);
+        todos([]);
+        check('the to-do list\'s × hides it until the agent changes it', listed && hid === true && shownAgain,
+            JSON.stringify({ listed, hid, shownAgain }));
+
         // What an edit by the agent runs: the view's file built as it is, and that build's problems.
         await openFrame(FRAME);
         const report = await runAppCommand('kigumi.automationBuildReport', { filePath: FRAME, graceMs: 0 });

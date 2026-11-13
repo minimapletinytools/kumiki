@@ -517,6 +517,7 @@
   "agent.context.title": "Tokens the last step sent: the whole conversation goes with every step.",
   "agent.todos.left": "To do: {left} of {total} left",
   "agent.todos.done": "Done: all {total}",
+  "agent.todos.hide": "Hide the to-do list until the agent changes it",
   "agent.notice.maxSteps": "Stopped after {steps} steps. Say \"continue\" to carry on.",
   "agent.notice.outputLimit": "Stopped at the output limit for one step. Say \"continue\" to carry on, or raise the limit in settings.",
   "agent.notice.unexpected": "The model stopped unexpectedly ({reason}). Say \"continue\" to carry on.",

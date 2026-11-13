@@ -7,7 +7,7 @@
 const { harnessOf } = require('./models');
 const { runTurn } = require('./agent-loop');
 const { instructions } = require('./agent');
-const { promptEntries } = require('./prompt-content');
+const { promptEntries, lastFocus } = require('./prompt-content');
 
 /** What to tell the user for a failed request: {key, text}, the key for the panel to show it in its language. */
 function describeFailure(error) {
@@ -58,7 +58,8 @@ async function runPanelTurn({ conversation, text, images, host, tools, profile, 
             files: host.files.root() ? host.files : null,
             system: instructions(host, { planMode: settings.planMode }),
             log: conversation.log,
-            prompt: await promptEntries({ text, images, files: host.files, describe, modelSeesImages: profile.images }),
+            prompt: await promptEntries({ text, images, files: host.files, describe, modelSeesImages: profile.images,
+                previous: lastFocus(conversation.log) }),
             abortSignal,
             askPermission,
             onEvent: post,

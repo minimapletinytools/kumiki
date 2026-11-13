@@ -10,7 +10,7 @@ const { MODELS, HARNESS, findModel, harnessOf, createModelList, routeModel } = r
 const SUMMARISE_AT_TOKENS = HARNESS.summariseAt;
 const { createFileTools } = require('../agent/file-tools');
 const { createProjectFiles } = require('../agent/project-files');
-const { contextNote, withMentions, promptEntries } = require('../agent/prompt-content');
+const { contextNote, lastFocus, withMentions, promptEntries } = require('../agent/prompt-content');
 const { AgentSession, RETRY_PROMPT, describeFailure, describeBuild } = require('../agent/agent-session');
 const { viewHost } = require('../agent/agent');
 const { z } = require('zod');
@@ -768,14 +768,32 @@ describe('the agent session', () => {
         expect(account.refreshBalance).toHaveBeenCalled();
     });
 
-    test('a request goes with a note of what the user is looking at', async () => {
-        expect(contextNote({ kind: 'viewer', fileName: 'a.py' }))
-            .toEqual({ note: 'context', text: 'What the user is looking at in Kigumi: {"kind":"viewer","fileName":"a.py"}' });
+    test('a request goes with a note of the project, the file and what the user is looking at', async () => {
+        const panel = { kind: 'viewer', filePath: '/w/shed/frames/a.py' };
+        expect(contextNote(panel, { root: '/w/shed' })).toEqual({
+            note: 'context', focus: { project: 'shed', file: 'frames/a.py' },
+            text: 'What the user is looking at in Kigumi: {"project":"shed","file":"frames/a.py","panel":{"kind":"viewer","filePath":"/w/shed/frames/a.py"}}',
+        });
+        expect(contextNote(null, { root: '/w/shed' }).focus).toEqual({ project: 'shed', file: null });
         expect(contextNote(null)).toBeNull();
         expect(contextNote({ text: 'x'.repeat(5000) }).text.length).toBeLessThan(2100);
         const entries = await promptEntries({ text: 'fix this', files: { root: () => null }, describe: async () => ({ kind: 'viewer' }) });
-        expect(entries).toEqual([{ note: 'context', text: expect.stringContaining('viewer') },
+        expect(entries).toEqual([{ note: 'context', focus: { project: null, file: null }, text: expect.stringContaining('viewer') },
             { role: 'user', content: 'fix this', shown: { text: 'fix this', images: 0 } }]);
+    });
+
+    test('the note says when the user has switched file or project since their last message', async () => {
+        const at = (file, root = '/w/shed') => contextNote({ kind: 'viewer', filePath: `${root}/${file}` }, { root });
+        const first = at('a.py');
+        expect(first.text).not.toContain('switched');
+        expect(at('a.py', '/w/shed').text).not.toContain('switched');
+        expect(contextNote({ kind: 'viewer', filePath: '/w/shed/a.py' }, { root: '/w/shed', previous: first.focus }).text).not.toContain('switched');
+        expect(contextNote({ kind: 'viewer', filePath: '/w/shed/b.py' }, { root: '/w/shed', previous: first.focus }).text)
+            .toContain('Since their last message the user has switched from a.py in the project shed to b.py in the project shed');
+        expect(contextNote({ kind: 'viewer', filePath: '/w/barn/a.py' }, { root: '/w/barn', previous: first.focus }).text)
+            .toContain('switched from a.py in the project shed to a.py in the project barn');
+        expect(lastFocus([first, { role: 'user', content: 'hi' }, { note: 'undo', text: 'x' }])).toEqual(first.focus);
+        expect(lastFocus([])).toBeNull();
     });
 
     test('editing a file a view shows rebuilds it, and the edit says whether it built', async () => {
