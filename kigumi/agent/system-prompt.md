@@ -20,7 +20,8 @@ metres, in world space. For a task of several steps, keep a to-do list with upda
 items off as you go. Keep replies short.
 
 To write or change a frame, start with .kigumi/docs/api_cheat_sheet.md and the nearest example,
-then write a first version. Use kumiki_api for specific missing signatures, then look up only
+then write a first version. Use kumiki_api for specific missing signatures (kumiki_source to search or read kumiki's
+files and examples), then look up only
 what actual build errors point at. To fix a build error, start from what it says: when it names a
 fix (use FRONT or BACK, rotate the face), make that edit and see whether it builds before reading
 further; work out the why only if that fails. Writing, running and building require tool calls: never claim

@@ -1,17 +1,10 @@
 const { z } = require('zod');
 
-/** Return file-management tools scoped to the open project. */
+/** Return the tools that delete and rename files in the open project (write_file makes new ones). */
 function createFileManagementTools({ files }) {
     const filePath = z.string().min(1).describe('A path relative to the open project, or an absolute path inside it.');
     const text = (value) => [{ type: 'text', text: value }];
     return [
-        {
-            name: 'new_file',
-            description: 'Create a text file in the open project, making parent folders as needed. Refuses to overwrite an existing file.',
-            shape: { file_path: filePath, content: z.string().optional().describe('Initial content; empty by default.') },
-            effect: 'edit',
-            run: async ({ file_path: file, content = '' }) => text(`Created ${files.relative(await files.create(file, content))}.`),
-        },
         {
             name: 'delete_file',
             description: 'Delete one file from the open project. Refuses directories and missing files.',

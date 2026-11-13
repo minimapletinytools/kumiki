@@ -5,12 +5,15 @@
   extension-icon.png    VS Code's extension icon (256 px)
   app-icon.png          the standalone app's icon (1024 px, inset as macOS draws app icons)
   hosts/pyodide/page/favicon.png   the browser version's favicon (64 px)
+  hosts/pyodide/page/logo.png      the browser version's welcome page logo (256 px)
+  ../website/public/favicon.png, apple-touch-icon.png   the website's icons (64 and 180 px)
 """
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter
 
 KIGUMI = Path(__file__).resolve().parents[1]
+WEBSITE = KIGUMI.parent / 'website' / 'public'
 SOURCE = KIGUMI / 'logo-source.png'
 
 # The square of the render the logo shows (pixels): the frame, with a margin around it.
@@ -64,7 +67,11 @@ def main():
     render(1024, inset=100 / 1024).save(KIGUMI / 'app-icon.png', optimize=True)
     # A browser tab shows it at 16 px: more contrast still.
     render(64, contrast=1.15).save(KIGUMI / 'hosts/pyodide/page/favicon.png', optimize=True)
-    print('Wrote extension-icon.png, app-icon.png and hosts/pyodide/page/favicon.png')
+    render(256).save(KIGUMI / 'hosts/pyodide/page/logo.png', optimize=True)
+    render(64, contrast=1.15).save(WEBSITE / 'favicon.png', optimize=True)
+    render(180).save(WEBSITE / 'apple-touch-icon.png', optimize=True)
+    print('Wrote extension-icon.png, app-icon.png, hosts/pyodide/page/favicon.png and logo.png, '
+          'and the website\'s favicon.png and apple-touch-icon.png')
 
 
 if __name__ == '__main__':

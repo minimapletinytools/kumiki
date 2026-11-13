@@ -1,8 +1,7 @@
-// Node-side i18n: resolves the extension's active locale from VS Code's own
-// display language (vscode.env.language) and loads the matching flat, dotted
-// key -> string catalog from ./locales. No user-facing override yet — this
-// purely auto-follows VS Code's language, same as vscode.l10n does for
-// package.json contributions.
+// Node-side i18n: resolves the active locale and loads the matching flat, dotted
+// key -> string catalog from ./locales. The extension follows VS Code's display
+// language (vscode.env.language); the app and the browser version follow the
+// system's, unless their app.language setting names one.
 const fs = require('fs');
 const path = require('path');
 
@@ -45,6 +44,19 @@ function resolveLocale(vscodeLanguage) {
     return normalizeLocale(vscodeLanguage) || DEFAULT_LOCALE;
 }
 
+// The app.language setting's choices (the standalone app and the browser version).
+const LANGUAGE_SETTING = 'app.language';
+const LANGUAGE_CHOICES = [
+    { id: 'default', label: 'Default (system language)' },
+    { id: 'en', label: 'English' },
+    { id: 'ja', label: '日本語' },
+];
+
+// The language to use: the setting's, else (at 'default') the system's.
+function chooseLanguage(setting, systemLanguage) {
+    return normalizeLocale(setting) || systemLanguage;
+}
+
 function interpolate(template, params) {
     if (!params) {
         return template;
@@ -79,4 +91,7 @@ module.exports = {
     resolveLocale,
     loadCatalog,
     createTranslator,
+    LANGUAGE_SETTING,
+    LANGUAGE_CHOICES,
+    chooseLanguage,
 };

@@ -21,7 +21,7 @@ function kumikiApiTool(lookup) {
         shape: {
             name: z.string().describe('The name to look up.'),
             members: z.boolean().optional().describe('Also list its members, with a line on each.'),
-            source: z.boolean().optional().describe('Also give its source code.'),
+            source: z.boolean().optional().describe('Also give its source code (a function\'s or class\'s; a module\'s file is read with kumiki_source).'),
         },
         effect: 'read',
         run: async ({ name, members, source }) => [{ type: 'text', text: await lookup(name, { members, source }) }],

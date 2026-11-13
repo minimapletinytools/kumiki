@@ -1,5 +1,66 @@
 /* The web version's projects page (web-projects.js), in the shell's welcome area. */
 
+/* Its logo stands in for the shell's heading. */
+.welcome h1 {
+    display: none;
+}
+
+.web-welcome-logo {
+    width: 96px;
+    height: 96px;
+}
+
+.welcome-lead:empty {
+    display: none;
+}
+
+/* Points right, to the agent panel; opens it when it's closed. */
+.web-agent-hint {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 480px;
+    padding: 10px 14px;
+    border: 1px solid var(--ka-border);
+    border-radius: 6px;
+    background: var(--ka-chrome-bg);
+    color: var(--ka-fg);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.web-agent-hint:hover {
+    border-color: var(--ka-accent);
+}
+
+.web-agent-hint:focus-visible {
+    outline: 2px solid var(--ka-focus);
+    outline-offset: 1px;
+}
+
+.web-hint-arrow {
+    color: var(--ka-accent);
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* Points down, to the new project form and the projects. */
+.web-projects-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin: 0;
+    color: var(--ka-fg);
+    font-size: 13px;
+}
+
+.web-projects-hint[hidden] {
+    display: none;
+}
+
 .web-storage-warning {
     max-width: 520px;
     margin: 0;
@@ -99,7 +160,7 @@ body:not(.kigumi-ready) .slot-left::before {
 }
 
 /* The loading card (loading.js): in place of the welcome contents until Kigumi is ready. */
-body.kw-is-loading .welcome > :not(h1):not(.kw-loading) {
+body.kw-is-loading .welcome > :not(.web-welcome-logo):not(.kw-loading) {
     display: none;
 }
 

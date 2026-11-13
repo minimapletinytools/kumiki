@@ -18,8 +18,9 @@ const text = (value) => [{ type: 'text', text: typeof value === 'string' ? value
  * @param {() => string[]} [options.workspaceFolders]  the folders open, the project first
  * @param {(file: string) => string} [options.resolve]  a file the agent names as an absolute path,
  *     throwing for one it may not use (agent/project-files.js resolve)
+ * @param {boolean} [options.workspaceTool]  offer get_workspace_folder (not where list_projects says it)
  */
-function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve = (file) => file }) {
+function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve = (file) => file, workspaceTool = true }) {
     const panelId = z.string().optional()
         .describe('A panel id from list_panels. Defaults to the active panel, or the active view.');
 
@@ -27,7 +28,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve =
     function viewOptions(id) {
         const session = panels.viewSession(id);
         if (!session) {
-            throw new Error(id ? `No open view with id ${id}` : 'No view is open. Open a frame file with open_in_viewer.');
+            throw new Error(id ? `No open view with id ${id}` : 'No view is open. Open a frame file with check_frame.');
         }
         return session.patternName
             ? { slotName: session.slotName, filePath: session.filePath }
@@ -35,7 +36,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve =
     }
 
     return [
-        {
+        ...(workspaceTool ? [{
             name: 'get_workspace_folder',
             description: 'The project folder open in Kigumi: where its frame files and patterns are, and '
                 + 'what the file paths the other tools give are relative to.',
@@ -45,7 +46,7 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve =
                 const folders = workspaceFolders();
                 return text({ workspaceFolder: folders[0] || null, workspaceFolders: folders });
             },
-        },
+        }] : []),
         {
             name: 'list_panels',
             description: 'Every open Kigumi panel (3D views, code editors, the log), which one is active, '
@@ -86,22 +87,6 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve =
             }),
         },
         {
-            name: 'open_in_viewer',
-            description: 'Open a Python frame file in a Kigumi 3D view (or bring its view forward).',
-            shape: { file_path: z.string().describe('A .py frame file: relative to the project folder, or absolute inside it.') },
-            effect: 'run',
-            run: async ({ file_path: filePath }) => text(await run('kigumi.automationOpenFileInViewer', { filePath: resolve(filePath) })),
-        },
-        {
-            name: 'refresh_view',
-            description: 'Rebuild a view from its source file, after the file has been edited.',
-            shape: { panel_id: panelId },
-            effect: 'run',
-            run: async ({ panel_id: id }) => text(await run('kigumi.automationRefreshSession', {
-                ...viewOptions(id), reason: 'agent refresh',
-            })),
-        },
-        {
             name: 'read_view_log',
             description: "A view's log: what the Python runner printed building the frame, including errors "
                 + 'and tracebacks.',
@@ -116,23 +101,19 @@ function createKigumiTools({ panels, run, workspaceFolders = () => [], resolve =
             )),
         },
         {
-            name: 'get_camera',
-            description: "A view's camera: where it looks from and at.",
-            shape: { panel_id: panelId },
-            effect: 'read',
-            run: async ({ panel_id: id }) => text(await run('kigumi.automationGetCameraState', viewOptions(id))),
-        },
-        {
-            name: 'set_camera',
-            description: "Move a view's camera. Pass the state get_camera returns, changed as wanted.",
+            name: 'camera',
+            description: "A view's camera: where it looks from and at. Give a state (as this returns it, changed "
+                + 'as wanted) to move the camera there.',
             shape: {
                 panel_id: panelId,
-                camera: z.record(z.string(), z.unknown()).describe('A camera state, as get_camera returns it.'),
+                set: z.record(z.string(), z.unknown()).optional().describe('A camera state to move to, as this tool returns it.'),
             },
             effect: 'ui',
-            run: async ({ panel_id: id, camera }) => text(await run('kigumi.automationSetCameraState', {
-                ...viewOptions(id), cameraState: camera,
-            })),
+            run: async ({ panel_id: id, set }) => {
+                const options = viewOptions(id);
+                if (set) await run('kigumi.automationSetCameraState', { ...options, cameraState: set });
+                return text(await run('kigumi.automationGetCameraState', options));
+            },
         },
         {
             name: 'screenshot',

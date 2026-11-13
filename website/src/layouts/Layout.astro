@@ -1,5 +1,6 @@
 ---
 import { kigumiVersion, releasePage } from '../kigumi-release';
+import { type Lang, localePath, strings } from '../i18n';
 
 export interface Props {
   title: string;
@@ -12,11 +13,16 @@ export interface Props {
   /** Let the page run full width and manage its own columns, so full-bleed
       section bands are actually full width rather than faked with 100vw. */
   wide?: boolean;
+  lang?: Lang;
+  /** The page is in every language: at canonicalPath and at /ja + canonicalPath. */
+  translated?: boolean;
 }
 
 const {
   title,
-  description = 'Kumiki is an open-source programmatic CAD library for Python designed for timber framing and woodworking joinery, with parametric joinery and live 3D preview in Kigumi, on Mac, Windows, VS Code or the web.',
+  lang = 'en',
+  translated = false,
+  description = strings(lang).layout.description,
   image = '/photos/tinyhouse120_angle.png',
   canonicalPath,
   type = 'website',
@@ -26,11 +32,17 @@ const {
 } = Astro.props;
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const s = strings(lang).layout;
+const other: Lang = lang === 'en' ? 'ja' : 'en';
+// The other language's version of this page; an untranslated page offers the other's home page.
+const otherHref = translated && canonicalPath ? localePath(other, canonicalPath) : localePath(other, '/');
+const link = (path: string) => localePath(lang, path);
 // Kigumi in the browser, at /try: built only when the KIGUMI_TRY repo variable is on (deploy-website.yml).
 const tryKigumi = import.meta.env.PUBLIC_KIGUMI_TRY === 'true';
 const siteUrl = 'https://kumiki.build';
 const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
-const canonicalUrl = canonicalPath ? `${siteUrl}${canonicalPath}` : `${siteUrl}${pathname === '/' ? '' : pathname}`;
+const urlFor = (one: Lang, path: string) => `${siteUrl}${localePath(one, path).slice(base.length)}`;
+const canonicalUrl = canonicalPath ? urlFor(lang, canonicalPath) : `${siteUrl}${pathname === '/' ? '' : pathname}`;
 const imageUrl = image.startsWith('http') ? image : `${siteUrl}${image.startsWith('/') ? '' : '/'}${image}`;
 
 const graphNodes: any[] = [
@@ -157,33 +169,49 @@ const structuredData = {
 };
 ---
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
-    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+    <link rel="icon" type="image/png" href={`${base}/favicon.png`} />
+    <link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png`} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Shippori+Mincho+B1:wght@600;700&display=swap" />
 
     <!-- Canonical & Agent Discovery Links -->
     <link rel="canonical" href={canonicalUrl} />
+    {translated && canonicalPath && (['en', 'ja'] as Lang[]).map((one) => (
+      <link rel="alternate" hreflang={one} href={urlFor(one, canonicalPath)} />
+    ))}
+    {translated && canonicalPath && <link rel="alternate" hreflang="x-default" href={urlFor('en', canonicalPath)} />}
+    <!-- A first visit from a Japanese browser goes to the Japanese page; the header's switch is remembered. -->
+    {translated && lang === 'en' && (
+      <script is:inline define:vars={{ target: otherHref }}>
+        try {
+          const chosen = localStorage.getItem('kumiki.lang');
+          const browser = ((navigator.languages && navigator.languages[0]) || navigator.language || '').toLowerCase();
+          if (chosen === 'ja' || (!chosen && browser.startsWith('ja'))) location.replace(target + location.hash);
+        } catch (_error) {}
+      </script>
+    )}
     <link rel="alternate" type="text/markdown" title="LLM Context Summary" href={`${siteUrl}/llms.txt`} />
     <link rel="help" title="Comprehensive LLM Guide" href={`${siteUrl}/llms-full.txt`} />
     <link rel="sitemap" type="application/xml" title="Sitemap" href={`${siteUrl}/sitemap.xml`} />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:site_name" content="Kumiki" />
-    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale" content={lang === 'ja' ? 'ja_JP' : 'en_US'} />
+    {translated && <meta property="og:locale:alternate" content={lang === 'ja' ? 'en_US' : 'ja_JP'} />}
     <meta property="og:type" content={type} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={imageUrl} />
-    <meta property="og:image:alt" content="Kumiki timber frame CAD preview" />
+    <meta property="og:image:alt" content={s.imageAlt} />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -198,21 +226,33 @@ const structuredData = {
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+    <!-- Cloudflare Web Analytics: cookieless page counts, on kumiki.build only (not local previews). -->
+    <script is:inline>
+    if (location.hostname === 'kumiki.build') {
+      const beacon = document.createElement('script');
+      beacon.type = 'module';
+      beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+      beacon.dataset.cfBeacon = '{"token": "7177885348334f15b71652a3e776a1ba"}';
+      document.head.append(beacon);
+    }
+    </script>
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href={`${base}/`}>
+      <a class="brand" href={link('/')}>
         <span class="brand-mark" aria-hidden="true">組</span>
         <span class="brand-text">Kumiki</span>
       </a>
-      <nav class="site-nav" aria-label="Site">
-        <a href={`${base}/install`}>Download</a>
-        {tryKigumi && <a href={`${base}/try/`}>Try it</a>}
-        <a href={`${base}/joints`}>Joints</a>
-        <a href="https://kumiki.build/docs/">Docs</a>
-        <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">Videos</a>
-        <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">GitHub</a>
-        <a href={`${base}/about`}>About</a>
+      <nav class="site-nav" aria-label={s.nav.label}>
+        <a href={link('/install')}>{s.nav.download}</a>
+        {tryKigumi && <a href={`${base}/try/`}>{s.nav.try}</a>}
+        <a href={link('/joints')}>{s.nav.joints}</a>
+        <a href="https://kumiki.build/docs/">{s.nav.docs}</a>
+        <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">{s.nav.videos}</a>
+        <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">{s.nav.github}</a>
+        <a href={link('/about')}>{s.nav.about}</a>
+        <a class="language-switch" href={otherHref} hreflang={other} lang={other} data-lang={other}
+           aria-label={translated ? s.language.switchToLabel : s.language.switchToHomeLabel}>{s.language.switchTo}</a>
       </nav>
     </header>
     <main class={wide ? 'wide' : undefined}>
@@ -221,45 +261,53 @@ const structuredData = {
     <footer class="site-footer">
       <div class="footer-nav">
         <div class="footer-col">
-          <h2 class="footer-heading">Kigumi</h2>
-          <a href={`${base}/install`}>Download the app</a>
-          {tryKigumi && <a href={`${base}/try/`}>Try it in your browser</a>}
-          <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi" target="_blank" rel="noreferrer">VS Code extension</a>
-          <a href="https://open-vsx.org/extension/minimaple/kigumi" target="_blank" rel="noreferrer">Open VSX (Cursor)</a>
-          <a href="https://github.com/minimapletinytools/kumiki/releases" target="_blank" rel="noreferrer">Releases</a>
+          <h2 class="footer-heading">{s.footer.kigumi}</h2>
+          <a href={link('/install')}>{s.footer.downloadApp}</a>
+          {tryKigumi && <a href={`${base}/try/`}>{s.footer.tryInBrowser}</a>}
+          <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi" target="_blank" rel="noreferrer">{s.footer.vscode}</a>
+          <a href="https://open-vsx.org/extension/minimaple/kigumi" target="_blank" rel="noreferrer">{s.footer.openVsx}</a>
+          <a href="https://github.com/minimapletinytools/kumiki/releases" target="_blank" rel="noreferrer">{s.footer.releases}</a>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">Documentation</h2>
-          <a href="https://kumiki.build/docs/">Overview</a>
-          <a href="https://kumiki.build/docs/concepts/">Concepts</a>
-          <a href={`${base}/joints`}>Joint catalog</a>
-          <a href="https://kumiki.build/docs/reference/">API reference</a>
+          <h2 class="footer-heading">{s.footer.documentation}</h2>
+          <a href="https://kumiki.build/docs/">{s.footer.overview}</a>
+          <a href="https://kumiki.build/docs/concepts/">{s.footer.concepts}</a>
+          <a href={link('/joints')}>{s.footer.jointCatalog}</a>
+          <a href="https://kumiki.build/docs/reference/">{s.footer.apiReference}</a>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">For agents</h2>
+          <h2 class="footer-heading">{s.footer.forAgents}</h2>
           <a href={`${base}/llms.txt`}>llms.txt</a>
           <a href={`${base}/llms-full.txt`}>llms-full.txt</a>
-          <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md" target="_blank" rel="noreferrer">Authoring instructions</a>
-          <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/api_cheat_sheet.md" target="_blank" rel="noreferrer">API cheat sheet</a>
+          <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md" target="_blank" rel="noreferrer">{s.footer.authoringInstructions}</a>
+          <a href="https://github.com/minimapletinytools/kumiki/blob/main/docs/api_cheat_sheet.md" target="_blank" rel="noreferrer">{s.footer.cheatSheet}</a>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">Project</h2>
-          <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">GitHub</a>
-          <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">Videos</a>
-          <a href={`${base}/about`}>About</a>
-          <a href="mailto:minimapletinytools@gmail.com">Contact</a>
+          <h2 class="footer-heading">{s.footer.project}</h2>
+          <a href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">{s.footer.github}</a>
+          <a href="https://www.youtube.com/playlist?list=PLWKU1B561fyM" target="_blank" rel="noreferrer">{s.footer.videos}</a>
+          <a href={link('/about')}>{s.footer.about}</a>
+          <a href="mailto:minimapletinytools@gmail.com">{s.footer.contact}</a>
         </div>
         <div class="footer-col">
-          <h2 class="footer-heading">Community</h2>
-          <a href="https://github.com/minimapletinytools/kumiki/discussions" target="_blank" rel="noreferrer">GitHub Discussions</a>
-          <a href="https://discord.gg/cQhUG7WJ8" target="_blank" rel="noreferrer">Discord</a>
+          <h2 class="footer-heading">{s.footer.community}</h2>
+          <a href="https://github.com/minimapletinytools/kumiki/discussions" target="_blank" rel="noreferrer">{s.footer.discussions}</a>
+          <a href="https://discord.gg/cQhUG7WJ8" target="_blank" rel="noreferrer">{s.footer.discord}</a>
         </div>
       </div>
       <div class="footer-bottom">
-        <span>&copy; 2026 minimaple. Kumiki and Kigumi are open source under the MPL-2.0.</span>
-        <span class="footer-legal"><a href={`${base}/privacy`}>Privacy</a> <a href={`${base}/terms`}>Terms</a></span>
+        <span set:html={s.footer.copyright} />
+        <span class="footer-legal"><a href={`${base}/privacy`}>{s.footer.privacy}</a> <a href={`${base}/terms`}>{s.footer.terms}</a></span>
       </div>
     </footer>
+    <script>
+      // The language switch is remembered, so a Japanese browser that picks English stays there.
+      document.querySelector<HTMLAnchorElement>('.language-switch')?.addEventListener('click', (event) => {
+        try {
+          localStorage.setItem('kumiki.lang', (event.currentTarget as HTMLAnchorElement).dataset.lang ?? 'en');
+        } catch (_error) {}
+      });
+    </script>
     <style is:global>
       :root {
         /* Paper, sumi ink and indigo: a carpenter's drawing, not a craft shop. The timber colour
@@ -276,7 +324,7 @@ const structuredData = {
         --accent-deep: #213c63;
         --accent-tint: #e4eaf3;
         --serif: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", Georgia, serif;
-        --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
         --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         --max: 1200px;
         --radius: 4px;
@@ -338,6 +386,7 @@ const structuredData = {
       .site-nav { display: flex; flex-wrap: wrap; gap: 0.4rem 1.6rem; font-size: 0.95rem; }
       .site-nav a { color: var(--ink-soft); }
       .site-nav a:hover { color: var(--ink); text-decoration: none; }
+      .site-nav .language-switch { color: var(--accent); }
 
       main { max-width: var(--max); margin: 0 auto; padding: 1rem 1.5rem 5rem; }
       main.wide { max-width: none; padding: 0 0 5rem; }
@@ -387,6 +436,8 @@ const structuredData = {
       h2 { font-size: clamp(1.7rem, 3vw, 2.35rem); }
       h3 { font-size: 1.08rem; font-weight: 600; line-height: 1.35; margin: 0; }
       p { margin: 0; }
+      /* Japanese headings break between phrases, not inside a word. */
+      :lang(ja) :is(h1, h2, h3) { word-break: auto-phrase; letter-spacing: 0; }
 
       /* What a section is about, when its heading doesn't say: sentence case, in the accent. */
       .kicker { color: var(--accent); font-weight: 500; font-size: 0.95rem; margin: 0 0 0.6rem; }

@@ -104,7 +104,7 @@ The first line of every frame or pattern file names the last kumiki version it r
   scalar(3.5)           # also OK
   ```
 - Use `mm()`, `cm()` and `m()` for metric
-- Use `degrees()` and `radians()` for angles
+- Use `degrees()` and `radians()` for angles: `degrees(45, 2)` is 22.5 degrees
 - Use `Matrix([...])` for vectors, always with `scalar` values
 
 ## Creating Timbers

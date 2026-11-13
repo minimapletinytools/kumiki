@@ -7,7 +7,7 @@
 const { z } = require('zod');
 
 const EDIT_TOOLS = new Set(['write_file', 'edit_file']);
-const CHECKPOINT_TOOLS = new Set([...EDIT_TOOLS, 'new_file', 'delete_file', 'rename_file']);
+const CHECKPOINT_TOOLS = new Set([...EDIT_TOOLS, 'delete_file', 'rename_file']);
 
 /** The build report's result as text for the agent, appended to an edit's own. */
 function describeBuild(report) {

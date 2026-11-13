@@ -64,6 +64,8 @@
             window.kigumiWeb.receiveConversationFiles(message);
         } else if (message.type === 'web:settings') {
             window.kigumiWeb.storeSettings(message.values);
+        } else if (message.type === 'web:reload') {
+            window.kigumiWeb.reloadInto(message.projectId);
         } else if (message.type === 'web:store') {
             window.kigumiWeb.storeValues(message.values);
         } else if (message.type === 'browser:signIn') {

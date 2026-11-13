@@ -79,6 +79,25 @@ app.whenReady().then(async () => {
         check('with no project open, Project status offers Open Project, not Initialize Project',
             Boolean(startStatus && !startStatus.includes('Initialize Project')));
         check('the agent panel is open from the start', await wait(`!!document.querySelector('#slot-right iframe') && !document.querySelector('#slot-right').hidden`, 30000) === true);
+        const welcomeParts = await js(`(() => {
+            const shown = (id) => { const e = document.getElementById(id); return !!e && !e.hidden && e.offsetParent !== null; };
+            const logo = document.getElementById('web-welcome-logo');
+            return { logo: !!logo && logo.complete && logo.naturalWidth > 0, agent: shown('web-agent-hint'), projects: shown('web-projects-hint'),
+                heading: getComputedStyle(document.querySelector('#welcome h1')).display, lead: document.getElementById('welcome-lead').textContent };
+        })()`);
+        check('with no project open, the welcome shows the logo, points to the agent and down to the projects',
+            welcomeParts.logo && welcomeParts.agent && welcomeParts.projects && welcomeParts.heading === 'none' && welcomeParts.lead === '',
+            JSON.stringify(welcomeParts));
+        const agentNotice = await wait(`(() => {
+            const doc = document.querySelector('#slot-right iframe')?.contentDocument;
+            const warning = doc?.querySelector('[data-i18n="agent.web.warning"]');
+            const link = warning?.querySelector('a');
+            return warning && link && !warning.textContent.includes('{link}') ? { text: warning.textContent, href: link.href,
+                body: getComputedStyle(doc.querySelector('.welcome-body')).display } : null;
+        })()`, 30000);
+        check('the agent panel says the web agent is for trying Kumiki out, linking the standalone app, without its welcome blurb',
+            Boolean(agentNotice && agentNotice.text.startsWith('The web agent is just for trying out Kumiki')
+                && agentNotice.href === 'https://kumiki.build/install' && agentNotice.body === 'none'), JSON.stringify(agentNotice));
 
         await js(`(() => {
             document.querySelector('.web-new-project input').value = 'Shed';
@@ -232,8 +251,12 @@ app.whenReady().then(async () => {
         check("the agent's search finds a line in the project", found.includes('my_cute_frame.py:'), found.slice(0, 120));
         const api = await tool('kumiki_api', { name: 'create_axis_aligned_timber' });
         check("the agent's kumiki_api looks a name up in kumiki", api.includes('create_axis_aligned_timber') && !api.startsWith('ERROR'), api.slice(0, 120));
-        const sheet = await tool('kumiki_docs', { name: 'api_cheat_sheet' });
-        check('kumiki_docs reads the cheat sheet from the browser\'s kumiki', sheet.startsWith('# API cheat sheet'), sheet.slice(0, 120));
+        const sourceFound = await tool('kumiki_source', { search: 'def create_axis_aligned_timber' });
+        const page = await tool('kumiki_source', { path: 'kumiki.construction', offset: 1, limit: 3 });
+        check("kumiki_source searches and reads the browser's kumiki", sourceFound.startsWith('kumiki/construction.py:')
+            && page.startsWith('kumiki/construction.py\n1\t'), `${sourceFound.slice(0, 80)} | ${page.slice(0, 60)}`);
+        const sheet = await tool('kumiki_source', { path: 'docs/api_cheat_sheet.md', limit: 1 });
+        check('kumiki_source reads the cheat sheet from the browser\'s kumiki', sheet.startsWith('docs/api_cheat_sheet.md\n1\t# API cheat sheet'), sheet.slice(0, 120));
         // The tab signing in opens: noted, not opened.
         await js(`window.open = (url) => { window.__signInUrl = url; return {}; }; true`);
         await js(`${agent}.querySelector('.web-agent-sign-in .sign-in-chip[data-provider="github"]').click()`);
@@ -298,6 +321,27 @@ app.whenReady().then(async () => {
 
         await js("document.querySelector('.web-project .welcome-recent-folder').click()");
         check('opening it again works from the browser\'s copy', await wait(`document.querySelector('#status-workspace')?.textContent === 'Shed'`, 30000) === true);
+
+        // The settings gear's Language: a new one reloads the page, which opens the project again in it.
+        async function pickRow(label) {
+            const row = await wait(`!document.querySelector('#quickpick').hidden && [...document.querySelectorAll('#quickpick-list .item-label')].some((one) => one.textContent.startsWith(${JSON.stringify(label)})) || null`, 15000);
+            if (row) await js(`[...document.querySelectorAll('#quickpick-list .item-label')].find((one) => one.textContent.startsWith(${JSON.stringify(label)})).click()`);
+            return row === true;
+        }
+        async function setLanguage(label) {
+            await js("document.querySelector('#status-settings').click()");
+            const picked = await pickRow('Language:') && await pickRow(label) && await pickRow('Reload');
+            await sleep(1500);
+            await wait("document.body.classList.contains('kigumi-ready')", 240000);
+            const reopened = await wait(`document.querySelector('#status-workspace')?.textContent === 'Shed'`, 60000) === true;
+            const options = await wait(`[...(${explorer}?.querySelectorAll('*') || [])].map((one) => one.textContent).find((text) => /^Kigumi(の設定| options)$/.test(text.trim())) || null`, 60000);
+            return { picked, reopened, options: options && options.trim() };
+        }
+        const japanese = await setLanguage('日本語');
+        check('Language in the settings: 日本語 reloads the page, opens the project again, and the explorer is in Japanese',
+            japanese.picked && japanese.reopened && japanese.options === 'Kigumiの設定', JSON.stringify(japanese));
+        const restored = await setLanguage('Default');
+        check('and Default goes back to the browser\'s language', restored.picked && restored.reopened && restored.options === 'Kigumi options', JSON.stringify(restored));
         await js("document.querySelector('#status-workspace').click()");
         await wait("!!document.querySelector('.web-project')", 30000);
         const scrolls = await js(`['welcome', 'welcome-recent-list'].every((id) => getComputedStyle(document.getElementById(id)).overflowY === 'auto')`);

@@ -1,0 +1,60 @@
+---
+// The About page, in each language (pages/about.astro, pages/ja/about.astro).
+import Layout from '../layouts/Layout.astro';
+import { type Lang, localePath, strings } from '../i18n';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const s = strings(lang).about;
+---
+<Layout
+  title={s.title}
+  description={s.description}
+  canonicalPath="/about"
+  image="/photos/oscarshed_built.png"
+  lang={lang}
+  translated
+>
+  <section class="about">
+    <h1>{s.heading}</h1>
+
+    <div class="prose">
+      {s.paragraphs.map((paragraph) => <p set:html={paragraph} />)}
+    </div>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">
+        {s.github}
+      </a>
+      <a class="btn btn-secondary" href={localePath(lang, '/')}>
+        {s.home}
+      </a>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .about {
+    max-width: 660px;
+    margin: 0 auto;
+    padding: 3rem 0 2rem;
+  }
+  .about h1 {
+    font-size: clamp(2.1rem, 4vw, 2.9rem);
+    margin: 0 0 1.8rem;
+  }
+  .prose p {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    margin: 0 0 1.2rem;
+  }
+  .prose strong {
+    color: var(--ink);
+  }
+  .cta-row {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-top: 2rem;
+  }
+</style>

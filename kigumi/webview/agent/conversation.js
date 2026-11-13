@@ -1,7 +1,7 @@
 // The conversation as the panel draws it: requests, streamed replies (Markdown) and reasoning, tool
 // chips that open to what went in and came out, permission cards, undo notes, and requests waiting
 // their turn.
-import { t, translatePage } from './i18n.js';
+import { t, translatePage, withLink } from './i18n.js';
 import { render } from './markdown.js';
 import { pre, toolInputView } from './diff.js';
 
@@ -184,7 +184,8 @@ export class Conversation {
         this.setActivity(t('agent.activity.waiting'));
     }
 
-    done({ stopped, isError, error, costUsd }) {
+    /** `outOfTokens`: the browser version's promo credit is spent, which can't be topped up. */
+    done({ stopped, isError, error, outOfTokens, costUsd }) {
         // A question the turn ended without an answer to can no longer be answered.
         for (const buttons of this.element.querySelectorAll('.permission-card .permission-buttons')) {
             buttons.closest('.permission-card').classList.add('is-denied');
@@ -192,6 +193,8 @@ export class Conversation {
         }
         if (stopped) {
             this.note(t('agent.stopped'));
+        } else if (isError && outOfTokens) {
+            this.add('agent-error').append(withLink('agent.error.outOfTokens', 'agent.error.outOfTokensLink', 'https://kumiki.build/install'));
         } else if (isError) {
             const failed = this.error(error || t('agent.failed'));
             const again = this.linkButton(t('agent.retry'), () => {

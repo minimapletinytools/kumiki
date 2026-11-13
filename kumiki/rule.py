@@ -701,39 +701,41 @@ def cross_product(v1: V3, v2: V3) -> V3:
 # Angle Conversion Functions
 # ============================================================================
 
-def radians(angle: Numeric) -> Numeric:
+def radians(numerator, denominator=1) -> float:
     """
-    Identity function for angles already in radians.
-    Use this to make it explicit that an angle is in radians.
+    Create an angle in radians, making explicit that it is in radians.
 
     Args:
-        angle: Angle value in radians
+        numerator: The numerator (can be int, float, or str)
+        denominator: The denominator (default=1)
 
     Returns:
-        The same angle value (unchanged)
+        float value in radians
 
     Examples:
         radians(pi / 2)      # 90 degrees in radians
-        radians(pi / 4)       # 45 degrees in radians
+        radians(pi, 4)       # pi/4: 45 degrees in radians
+        radians("1/2")       # half a radian, from a fraction string
     """
-    return angle
+    return scalar(numerator, denominator)
 
-def degrees(angle: Numeric) -> Numeric:
+def degrees(numerator, denominator=1) -> float:
     """
-    Convert an angle from degrees to radians.
+    Create an angle in radians from degrees.
 
     Args:
-        angle: Angle value in degrees
+        numerator: The numerator (can be int, float, or str)
+        denominator: The denominator (default=1)
 
     Returns:
-        Angle value in radians
+        float value in radians
 
     Examples:
         degrees(90)           # 90 degrees = pi/2 radians
-        degrees(45)           # 45 degrees = pi/4 radians
-        degrees(180)          # 180 degrees = pi radians
+        degrees(45, 2)        # 22.5 degrees
+        degrees("45/2")       # 22.5 degrees, from a fraction string
     """
-    return angle * pi / scalar(180)
+    return scalar(numerator, denominator) * pi / scalar(180)
 
 
 # ============================================================================

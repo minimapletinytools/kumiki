@@ -1,17 +1,19 @@
 # API cheat sheet
 
-A cheat sheet of actual methods to use when authoring kumiki frames. Use the `kumiki_api` tool to learn more about the methods. Use the `kumiki_source` tool to see the full source code. Please also see `agent_usage_instructions.md` and `concepts.md`.
+The signatures of what a frame most often uses, and one complete small frame. The usage instructions
+and concepts say when to use each and why; this is what to type. For anything not here, look the name
+up (Kigumi's agent: `kumiki_api`, or `kumiki_source` to read and search kumiki's files) rather than guessing.
+
+All of these come from `from kumiki import *`. Lengths are metres unless made with a unit.
 
 ## Units and vectors
 
 ```python
-mm(numerator, denominator=1)      # mm(90) is 90mm; mm(1, 2) is half a millimetre
-cm(..)
-m(..)
-inches(..)  # inches(7, 2) is 3.5"
-feet(..)
-degrees(..)
-radians(..)
+mm(numerator, denominator=1)      # mm(90); mm(1, 2) is half a millimetre
+inches(numerator, denominator=1)  # inches(7, 2) is 3.5"
+feet(numerator, denominator=1)
+degrees(numerator, denominator=1) # degrees(45, 2) is 22.5 degrees, in radians
+radians(numerator, denominator=1)
 create_v2(x, y)                   # a size (width, height), or a point on the footprint
 create_v3(x, y, z)                # a point in the world; Z is up
 ```

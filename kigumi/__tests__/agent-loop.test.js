@@ -946,7 +946,7 @@ describe('the agent session', () => {
     test('in plan mode, no file is edited, and the model is told why; the camera still moves', async () => {
         const { agent, posted } = session({ settings: { 'agent.planMode': true, 'agent.permissionMode': 'auto' } });
         await expect(agent.permissions.ask('edit_file', {})).rejects.toThrow('Plan mode is on');
-        await expect(agent.permissions.ask('set_camera', {})).resolves.toBe(true);
+        await expect(agent.permissions.ask('camera', {})).resolves.toBe(true);
         expect(posted.some((message) => message.type === 'agent:permission')).toBe(false);
     });
 
@@ -1039,7 +1039,7 @@ describe('the agent session', () => {
         void agent.permissions.ask('edit_file', {});
         expect(asked()).toBe(1);
         // Moving the camera only changes what the user sees.
-        await expect(agent.permissions.ask('set_camera', {})).resolves.toBe(true);
+        await expect(agent.permissions.ask('camera', {})).resolves.toBe(true);
 
         agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'auto' });
         await expect(agent.permissions.ask('edit_file', {})).resolves.toBe(true);
@@ -1068,7 +1068,6 @@ describe('the agent session', () => {
 
         await expect(agent.permissions.ask('check_frame', { file_path: 'shown.py' })).resolves.toBe(true);
         await expect(agent.permissions.ask('check_frame', { file_path: 'written.py' })).resolves.toBe(true);
-        await expect(agent.permissions.ask('refresh_view', {})).resolves.toBe(true);
         void agent.permissions.ask('check_frame', { file_path: 'cleanup.py' });
         expect(agent.permissions.pending.size).toBe(1);
     });

@@ -10,6 +10,10 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kumiki
 
+#### Added
+
+- `degrees()` and `radians()` take a numerator and a denominator, like `inches()`: `degrees(45, 2)` is 22.5 degrees. A fraction string works too, `degrees("45/2")`.
+
 #### Changed
 
 - The dovetailed sawhorse's router templates trace the dovetail's wide face, and the leg template sits on it, away from the leg. Its export writes one beam template and one leg template for each mirrored pair of legs, A and B, in place of a socket and tail for every leg. Its parameters: `offset` is now `beam_bushing_offset` (default 0) and `leg_bushing_offset` (default 3/16"), and `top`, `bottom` and `width` are `top_depth`, `bottom_depth` and `base_support_width`.
@@ -21,11 +25,21 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ### kigumi
 
+#### Added
+
+- A `kumiki_source` tool for the agent and for agents over MCP: it lists, reads and searches the kumiki library the project uses (in its .venv) and kumiki's example frames, read-only and a page at a time. `kumiki_api` now says when it cut a long source short, and where to read on.
+- The website and Kigumi in the browser (kumiki.build/try) count visits with Cloudflare Web Analytics, which uses no cookies. The privacy policy says so.
+- The website is in Japanese too, at kumiki.build/ja/, with an English / 日本語 switch in the header. A first visit from a Japanese browser goes to the Japanese pages; the switch is remembered. The docs, privacy policy and terms stay English.
+- A Language setting in the standalone app (Kigumi > Language) and the browser version (the settings gear): Default, English or 日本語. Default, the default, follows the system's language, as the app already did; the browser version now follows the browser's, where it was always English. A new language shows after a restart (app) or a reload (browser), which Kigumi offers, and the browser version opens the same project again.
+
 #### Changed
 
+- Fewer agent tools, each doing something the others don't: `kumiki_docs` is folded into `kumiki_source`, which lists the docs first; `new_file` is gone, as `write_file` makes new files; `open_in_viewer` and `refresh_view` are gone, as `check_frame` opens and builds a frame and says whether it built; `get_camera` and `set_camera` are one `camera` tool; and `get_workspace_folder` is left out where `list_projects` names the open project. `kumiki_api` points to `kumiki_source` for a whole module's source.
 - The standalone app's menus are Kigumi and File. On macOS the Kigumi menu is also the app menu, so it no longer appears twice. View and Help are folded into Kigumi, and the Edit menu is gone; the edit keys still work in text boxes.
 - In the browser version, deleting a project shows a clear warning: the project exists only in this browser and can't be recovered. The project's name must be typed in before Delete is enabled, and the warning offers to export a .zip first.
 - The projects page (browser version) and Recent projects (app) scroll when the list is long, rather than running off the top of the window.
+- The browser version's welcome page shows the logo, and points to the agent and to the projects below. The agent panel there says what the web agent is for, and when the promo tokens run out it says so and points to the MCP and the standalone app.
+- The website's icon is the Kigumi logo.
 
 ## [0.9.4] - 2026-11-11
 
