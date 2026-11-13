@@ -10,7 +10,7 @@ from kumiki import *
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 
 
-@pattern("butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers")
+@pattern('butt/cut_dropin_housed_butt_joint_on_face_aligned_timbers')
 def create_dropin_housed_butt_joint_example(position: Optional[V3]=None) -> Frame:
     """
     Create a drop-in housed butt joint using canonical 4"x5"x4' timbers.

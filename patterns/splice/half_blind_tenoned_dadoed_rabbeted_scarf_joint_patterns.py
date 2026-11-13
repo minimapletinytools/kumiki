@@ -13,7 +13,7 @@ TIMBER_LENGTH = inches(48)
 TIMBER_SIZE_2D = create_v2(TIMBER_WIDTH, TIMBER_HEIGHT)
 
 
-@pattern("splice_joints/rebated_oblique_and_dadoed_scarf_joint")
+@pattern('splice/rebated_oblique_and_dadoed_scarf_joint')
 def create_rebated_oblique_and_dadoed_scarf_example(position: Optional[V3]=None) -> Frame:
     """
     Create a rebated oblique and dadoed scarf joint (Kanawa Tsugi
@@ -68,6 +68,6 @@ def create_rebated_oblique_and_dadoed_scarf_example(position: Optional[V3]=None)
 create_half_blind_tenoned_dadoed_rabbeted_scarf_example = create_rebated_oblique_and_dadoed_scarf_example
 
 
-@pattern("splice_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint")
+@pattern('splice/half_blind_tenoned_dadoed_rabbeted_scarf_joint')
 def half_blind_tenoned_dadoed_rabbeted_scarf_joint_pattern() -> Frame:
     return create_half_blind_tenoned_dadoed_rabbeted_scarf_example()

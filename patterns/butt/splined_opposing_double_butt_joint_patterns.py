@@ -41,6 +41,6 @@ def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:
     return Frame.from_joints([joint], name="Splined Opposing Double Butt Joint")
 
 
-@pattern("multi_butt_joints/splined_opposing_double_butt_joint", tags=["main"])
+@pattern('butt/splined_opposing_double_butt_joint', tags=["main"])
 def splined_opposing_double_butt_joint_pattern() -> Frame:
     return make_splined_opposing_double_butt_joint_example(create_v3(0, 0, 0))

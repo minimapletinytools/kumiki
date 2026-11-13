@@ -37,11 +37,11 @@ def make_half_blind_dovetail_corner_joint_example(position: V3) -> list[CutTimbe
     return _make_dovetail_corner_joint_example(position, depth=inches(scalar(5, 2)))
 
 
-@pattern("corner_joints/dovetail_corner_joint/cut_dovetail_corner_joint")
+@pattern('corner/dovetail_corner_joint/cut_dovetail_corner_joint')
 def cut_dovetail_corner_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_through_dovetail_corner_joint_example(create_v3(0, 0, 0)), name='Through Dovetail Corner Joint')
 
 
-@pattern("corner_joints/dovetail_corner_joint/cut_dovetail_corner_joint_half_blind")
+@pattern('corner/dovetail_corner_joint/cut_dovetail_corner_joint_half_blind')
 def cut_dovetail_corner_joint_half_blind_pattern() -> Frame:
     return Frame(cut_timbers=make_half_blind_dovetail_corner_joint_example(create_v3(0, 0, 0)), name='Half Blind Dovetail Corner Joint')

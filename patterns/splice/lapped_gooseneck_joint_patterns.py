@@ -10,7 +10,7 @@ from kumiki import *
 from kumiki.example_shavings import create_canonical_example_splice_joint_timbers
 
 
-@pattern("splice_joints/lapped_gooseneck_splice_joint")
+@pattern('splice/lapped_gooseneck_splice_joint')
 def create_simple_gooseneck_example(position: Optional[V3]=None) -> Frame:
     """
     Create a gooseneck splice joint example using canonical 4"x5"x4' timbers.

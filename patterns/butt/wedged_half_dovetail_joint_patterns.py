@@ -26,7 +26,7 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-@pattern("butt_joints/wedged_half_dovetail_mortise_and_tenon", kiwari=ROUND_STOCK)
+@pattern('butt/wedged_half_dovetail_mortise_and_tenon', kiwari=ROUND_STOCK)
 def example_wedged_half_dovetail_mortise_and_tenon(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Wedged half-dovetail mortise and tenon joint on the canonical 4"x5"x4'

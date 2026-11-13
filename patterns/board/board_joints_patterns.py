@@ -16,7 +16,7 @@ from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.timber import Board, Frame, Orientation, Timber, TimberEnd, Transform, create_v3
 
 
-@pattern("board_joints/tongue_and_groove", tags=["main"])
+@pattern('board/tongue_and_groove', tags=["main"])
 def example_tongue_and_groove(position=None) -> Joint:
     """Single tongue-and-groove pattern with one tongue board and one groove board."""
     if position is None:
@@ -70,7 +70,7 @@ GROOVED_FRAME = kiwari(
 )
 
 
-@pattern("board_joints/board_in_grooved_frame", tags=["main"], kiwari=GROOVED_FRAME)
+@pattern('board/board_in_grooved_frame', tags=["main"], kiwari=GROOVED_FRAME)
 def example_board_in_grooved_frame(k: Optional[Kiwari]=None) -> Frame:
     """Boards fitted into a grooved rectangular frame."""
     k = GROOVED_FRAME.resolve(k)
@@ -217,7 +217,6 @@ def _joint_with_ticket_prefix(joint, prefix: str):
     return replace(joint, cuttings=new_cuttings)
 
 
-@pattern("board_joints/sliding_dovetail", tags=["main"])
 def example_sliding_dovetail_boards() -> Frame:
     dovetail_depth = inches(1, 4)
     dovetail_small_width = inches(1, 2)
@@ -255,3 +254,26 @@ def example_sliding_dovetail_boards() -> Frame:
     )
 
 
+
+
+SLIDING_DOVETAIL = kiwari(
+    depth=kiwari.length(inches(1, 4)),
+    width=kiwari.length(inches(1, 2)),
+    angle=kiwari.angle(degrees(80)),
+)
+
+
+@pattern("board/sliding_dovetail/side_to_face", kiwari=SLIDING_DOVETAIL)
+def sliding_dovetail_side_to_face(k: Optional[Kiwari] = None) -> Joint:
+    k = SLIDING_DOVETAIL.resolve(k)
+    return cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
+        create_canonical_example_board_butt_joint_boards_side_to_face(),
+        k.length("depth"), k.length("width"), k.angle("angle"))
+
+
+@pattern("board/sliding_dovetail/end_to_face", kiwari=SLIDING_DOVETAIL)
+def sliding_dovetail_end_to_face(k: Optional[Kiwari] = None) -> Joint:
+    k = SLIDING_DOVETAIL.resolve(k)
+    return cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
+        create_canonical_example_board_butt_joint_boards_end_to_face(),
+        k.length("depth"), k.length("width"), k.angle("angle"))

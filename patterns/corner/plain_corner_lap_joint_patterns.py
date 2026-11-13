@@ -40,6 +40,6 @@ def make_corner_lap_joint_example(position: V3, use_round_timbers=False) -> list
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern("corner_joints/cut_plain_corner_lap_joint_on_plane_aligned_timbers")
+@pattern('corner/cut_plain_corner_lap_joint_on_plane_aligned_timbers')
 def cut_plain_corner_lap_joint_on_plane_aligned_timbers_pattern() -> Frame:
     return Frame(cut_timbers=make_corner_lap_joint_example(create_v3(0, 0, 0)), name='Plain Corner Lap Joint')

@@ -57,6 +57,6 @@ def make_splice_lap_joint_example(position: V3, use_round_timbers=False) -> list
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern("splice_joints/plain_splice_lap_joint")
+@pattern('splice/plain_splice_lap_joint')
 def plain_splice_lap_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_splice_lap_joint_example(create_v3(0, 0, 0)), name='Plain Splice Lap Joint')

@@ -54,7 +54,6 @@ def _maybe_round_timber_config(use_round_timbers: bool):
 
 
 # TODO make a main patterns and all the _mortise_and_tenon_on_face_aligned ones below should become its childre
-@pattern("butt_joints/mortise_and_tenon/basic_face_aligned")
 def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_round_timbers=False) -> Joint:
     """
     Basic blind mortise and tenon using cut_mortise_and_tenon_joint_on_face_aligned_timbers.
@@ -76,7 +75,6 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
         mortise_depth=inches(7, 2),
     )
 
-@pattern("butt_joints/mortise_and_tenon/round_peg")
 def example_mortise_and_tenon_with_round_peg(position=None, use_round_timbers=False) -> Joint:
     """
     The basic blind mortise and tenon, pegged with one round peg.
@@ -117,7 +115,7 @@ def example_mortise_and_tenon_with_round_peg(position=None, use_round_timbers=Fa
 
 
 # TODO rename to example_mortise_and_tenon_with_round_tenon_on_face_aligned_timbers
-@pattern("butt_joints/mortise_and_tenon/round_face_aligned")
+@pattern('mixed/mortise_and_tenon/round_face_aligned')
 def example_round_mortise_and_tenon_on_face_aligned_timbers(position=None, use_round_timbers=False) -> Joint:
     """
     Round (cylindrical) mortise and tenon using cut_round_mortise_and_tenon_joint.
@@ -153,7 +151,6 @@ def example_round_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
     )
 
 # TODO  rename example_mortise_and_tenon_with_round_timbers
-@pattern("butt_joints/mortise_and_tenon/basic_face_aligned_round_timbers")
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_two_round_timbers(position=None, use_round_timbers=True) -> Joint:
     """
     Basic blind mortise and tenon on the canonical butt-joint layout,
@@ -183,7 +180,7 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_wedge(position=
     pass
 
 
-@pattern("butt_joints/mortise_and_tenon/through_tenon")
+@pattern('mixed/mortise_and_tenon/through_tenon')
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(position=None, use_round_timbers=False) -> Joint:
     """
     Through tenon with 3" stickout past the mortise timber, and the tenon offset
@@ -215,7 +212,6 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(p
         tenon_position=Matrix([inches(0), inches(1)]),
     )
 
-@pattern("butt_joints/mortise_and_tenon/face_aligned_inset_shoulder")
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_shoulder(position=None, use_round_timbers=False) -> Joint:
     """
     Mortise and tenon with a 0.5" shoulder inset from the mortise entry face.
@@ -238,7 +234,7 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_s
         mortise_shoulder_inset=inches(1, 2),
     )
 
-@pattern("butt_joints/mortise_and_tenon/double_angled")
+@pattern('mixed/mortise_and_tenon/double_angled')
 def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=False) -> Joint:
     """
     Mortise and tenon with timbers meeting at two non-orthogonal angles.
@@ -293,7 +289,7 @@ def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=Fal
     )
 
 
-@pattern("butt_joints/mortise_and_tenon/double_angled_with_notch_relief")
+@pattern('mixed/mortise_and_tenon/double_angled_with_notch_relief')
 def example_double_angled_mortise_and_tenon_with_notch_relief(position=None, use_round_timbers=False) -> Joint:
     """
     Same compound-angle arrangement as example_double_angled_mortise_and_tenon (brace
@@ -364,7 +360,7 @@ NOTCH_STYLE = kiwari(
 )
 
 
-@pattern("butt_joints/mortise_and_tenon/irrational_angle_37_degrees")
+@pattern('mixed/mortise_and_tenon/irrational_angle_37_degrees')
 def example_mortise_and_tenon_at_irrational_angle(position=None) -> Joint:
     """
     A mortise and tenon between a 6"x6" vertical post and a 4"x6" beam raking at 37 degrees.
@@ -418,7 +414,7 @@ def example_mortise_and_tenon_at_irrational_angle(position=None) -> Joint:
     )
 
 
-@pattern("butt_joints/mortise_and_tenon/joint_plane_aligned_notched_2sided", kiwari=NOTCH_STYLE)
+@pattern('mixed/mortise_and_tenon/joint_plane_aligned_notched_2sided', kiwari=NOTCH_STYLE)
 def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(k: Optional[Kiwari]=None) -> Joint:
     """
     Mortise and tenon on plane-aligned timbers, tenon approaching at 45 degrees (in the
@@ -499,7 +495,7 @@ def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(k: Optional[Kiw
     )
 
 
-@pattern("butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon")
+@pattern('mixed/mortise_and_tenon/brace_joint_mortise_and_tenon')
 def example_brace_joint(position=None, use_round_timbers=False) -> Frame:
     """
     Create a brace joint with mortise and tenon connections.
@@ -517,7 +513,7 @@ def example_brace_joint(position=None, use_round_timbers=False) -> Frame:
                                  name="Brace Joint with Mortise and Tenon")
 
 
-@pattern("butt_joints/mortise_and_tenon/steep_brace_joint_mortise_and_tenon")
+@pattern('mixed/mortise_and_tenon/steep_brace_joint_mortise_and_tenon')
 def example_steep_brace_joint(position=None, use_round_timbers=False) -> Frame:
     """
     The brace joint with an uneven brace: it meets timber1 at its middle and timber2 a quarter
@@ -629,7 +625,7 @@ def _mortised_brace_frame(position, use_round_timbers, share_of_timber1, share_o
     return Frame.from_joints([miter_joint, joint1, joint2], name=name)
 
 
-@pattern("corner_joints/mortise_and_tenon/mortise_and_tenon_corner_joint")
+@pattern('mixed/mortise_and_tenon/mortise_and_tenon_corner_joint')
 def example_mortise_and_tenon_corner_joint(position=None, use_round_timbers=False) -> Joint:
     """
     Corner mortise and tenon joint via cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers.
@@ -694,7 +690,7 @@ def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timb
     )
 
 
-@pattern("butt_joints/tusked_mortise_and_tenon")
+@pattern('mixed/tusked_mortise_and_tenon/standard')
 def example_tusked_mortise_and_tenon(position=None, use_round_timbers=False) -> Joint:
     """
     Through mortise-and-tenon joint on the canonical 4"x5"x4' butt joint
@@ -730,7 +726,7 @@ def example_tusked_mortise_and_tenon(position=None, use_round_timbers=False) -> 
     )
 
 
-@pattern("butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_entry_from_top")
+@pattern('mixed/tusked_mortise_and_tenon/tusked_mortise_and_tenon_entry_from_top')
 def example_tusked_mortise_and_tenon_entry_from_top(position=None, use_round_timbers=False) -> Joint:
     """
     Tusked through mortise-and-tenon joint with the tusk driven in from the TOP face
@@ -763,7 +759,7 @@ def example_tusked_mortise_and_tenon_entry_from_top(position=None, use_round_tim
     )
 
 
-@pattern("butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_inset_from_top")
+@pattern('mixed/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_inset_from_top')
 def example_tusked_mortise_and_tenon_opposite_shoulder_inset_from_top(position=None, use_round_timbers=False) -> Joint:
     """
     Tusked through mortise-and-tenon joint with a 1" opposite-shoulder inset: the tusk hole
@@ -817,7 +813,7 @@ def _make_rough_receiving_timber_arrangement(position=None):
     return replace(arrangement, receiving_timber=receiving_timber)
 
 
-@pattern("butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_from_perfect")
+@pattern('mixed/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_from_perfect')
 def example_tusked_mortise_and_tenon_opposite_shoulder_from_perfect(position=None) -> Joint:
     """
     Tusked through mortise-and-tenon joint against a receiving timber with oversized rough
@@ -846,7 +842,7 @@ def example_tusked_mortise_and_tenon_opposite_shoulder_from_perfect(position=Non
     )
 
 
-@pattern("butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_from_rough")
+@pattern('mixed/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_from_rough')
 def example_tusked_mortise_and_tenon_opposite_shoulder_from_rough(position=None) -> Joint:
     """
     Same oversized receiving timber as example_tusked_mortise_and_tenon_opposite_shoulder_from_perfect,
@@ -871,7 +867,7 @@ def example_tusked_mortise_and_tenon_opposite_shoulder_from_rough(position=None)
         ),
     )
 
-@pattern("butt_joints/mortise_and_tenon/compound_offset_parallel_shoulder")
+@pattern('mixed/mortise_and_tenon/compound_offset_parallel_shoulder')
 def example_compound_angle_offset_parallel_shoulder(position=None, use_round_timbers=False) -> Joint:
     """
     Mortise and tenon joint with compound angle (45 degrees in both axes),
@@ -936,7 +932,7 @@ def example_compound_angle_offset_parallel_shoulder(position=None, use_round_tim
 
 
 # TODO rename to example_inset_shoulder_angled
-@pattern("butt_joints/mortise_and_tenon/inset_shoulder_notch_angled")
+@pattern('mixed/mortise_and_tenon/inset_shoulder_notch_angled')
 def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False) -> Joint:
     """
     Mortise and tenon with an inset shoulder, angled.
@@ -1006,7 +1002,7 @@ def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False) 
     )
 
 # TODO rename to example_inset_shoulder_double_angled
-@pattern("butt_joints/mortise_and_tenon/inset_shoulder_scribe_angled")
+@pattern('mixed/mortise_and_tenon/inset_shoulder_scribe_angled')
 def example_inset_shoulder_scribe_angled(position=None, use_round_timbers=False) -> Joint:
     """
     Mortise and tenon with an inset shoulder using the SCRIBE style.
@@ -1116,3 +1112,35 @@ if __name__ == "__main__":
     print('='*60)
 
 
+
+
+STOPPED_MORTISE = kiwari(
+    tenon_width=kiwari.length(inches(3), minimum=inches(1, 4)),
+    tenon_height=kiwari.length(inches(1), minimum=inches(1, 4)),
+    tenon_length=kiwari.length(inches(3), minimum=inches(1, 4)),
+    mortise_depth=kiwari.length(inches(7, 2), minimum=inches(1, 4)),
+    shoulder_inset=kiwari.length(scalar(0), minimum=scalar(0)),
+    pegged=kiwari.flag(False),
+    peg_shape=kiwari.choice(PegShape, PegShape.ROUND),
+    round_timbers=kiwari.flag(False),
+)
+
+
+@pattern("mixed/mortise_and_tenon/stopped_face_aligned", kiwari=STOPPED_MORTISE)
+def stopped_face_aligned(k: Optional[Kiwari] = None) -> Joint:
+    """Cut a stopped mortise with adjustable tenon, shoulder inset, and peg."""
+    k = STOPPED_MORTISE.resolve(k)
+    arrangement = create_canonical_example_butt_joint_timbers(
+        timber_config=_maybe_round_timber_config(k.flag("round_timbers")))
+    peg = SimplePegParameters(
+        shape=k.choice("peg_shape"), peg_positions=[(inches(1), scalar(0))],
+        size=inches(1, 2)) if k.flag("pegged") else None
+    return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        arrangement,
+        tenon_width_relative_to_joint=k.length("tenon_width"),
+        tenon_height_relative_to_joint=k.length("tenon_height"),
+        tenon_length=k.length("tenon_length"),
+        mortise_depth=k.length("mortise_depth"),
+        mortise_shoulder_inset=k.length("shoulder_inset"),
+        peg_parameters=peg,
+    )

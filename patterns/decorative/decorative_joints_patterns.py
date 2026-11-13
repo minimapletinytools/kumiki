@@ -7,7 +7,7 @@ from kumiki import *
 from kumiki.csg.pathcsg import StraightSegment, ArcSegment
 
 
-@pattern("decorative_joints/roundover", tags=["main"])
+@pattern('decorative/roundover', tags=["main"])
 def example_roundover_decoration() -> Joint:
     """A single timber with all 12 edges rounded over."""
     timber = Timber(
@@ -23,7 +23,7 @@ def example_roundover_decoration() -> Joint:
     )
 
 
-@pattern("decorative_joints/roundover_imperfect", tags=["main"])
+@pattern('decorative/roundover_imperfect', tags=["main"])
 def example_roundover_imperfect() -> Joint:
     """A single edge rounded over on an imperfect timber."""
     timber = Timber(
@@ -43,7 +43,7 @@ def example_roundover_imperfect() -> Joint:
     )
 
 
-@pattern("decorative_joints/rafter_tail_scallop", tags=["main"])
+@pattern('decorative/rafter_tail_scallop', tags=["main"])
 def example_rafter_tail_scallop_decoration() -> Joint:
     """A rafter tail with a scalloped decorative cut on its underside near the tail end."""
     timber = Timber(
@@ -60,7 +60,7 @@ def example_rafter_tail_scallop_decoration() -> Joint:
     )
 
 
-@pattern("decorative_joints/path_extrusion_corner_end", tags=["main"])
+@pattern('decorative/path_extrusion_corner_end', tags=["main"])
 def example_path_extrusion_corner_end_decoration() -> Joint:
     """
     A carved corner scoop at the bottom-right end of a timber.
@@ -88,7 +88,7 @@ def example_path_extrusion_corner_end_decoration() -> Joint:
     )
 
 
-@pattern("decorative_joints/straight_angled_end_cut", tags=["main"])
+@pattern('decorative/straight_angled_end_cut', tags=["main"])
 def example_straight_angled_end_cut_decoration() -> Joint:
     """A single timber with an angled cut decoration on its top end."""
     timber = Timber(
@@ -107,3 +107,15 @@ def example_straight_angled_end_cut_decoration() -> Joint:
     )
 
 
+
+
+ROUNDED_END = kiwari(radius=kiwari.length(inches(5)), distance=kiwari.length(inches(5)))
+
+
+@pattern("decorative/rounded_end", kiwari=ROUNDED_END)
+def rounded_end(k: Optional[Kiwari] = None) -> Joint:
+    k = ROUNDED_END.resolve(k)
+    timber = Timber(length=feet(4), size=create_v2(inches(4), inches(6)),
+                    transform=Transform.identity(), ticket=TimberTicket(path="timber"))
+    return cut_practice_rounded_end_decoration(
+        timber, TimberFace.RIGHT, TimberFace.TOP, k.length("radius"), k.length("distance"))

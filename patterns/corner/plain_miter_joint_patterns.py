@@ -124,16 +124,16 @@ def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) ->
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern("corner_joints/plain_miter_joint/cut_plain_miter_joint", tags=["main"])
+@pattern('corner/plain_miter_joint/cut_plain_miter_joint', tags=["main"])
 def cut_plain_miter_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_miter_joint_example(create_v3(0, 0, 0)), name='Plain Miter Joint')
 
 
-@pattern("corner_joints/plain_miter_joint/cut_plain_miter_joint_face_aligned")
+@pattern('corner/plain_miter_joint/cut_plain_miter_joint_face_aligned')
 def cut_plain_miter_joint_face_aligned_pattern() -> Frame:
     return Frame(cut_timbers=make_miter_joint_face_aligned_example(create_v3(0, 0, 0)), name='Plain Miter Joint (Face Aligned)')
 
 
-@pattern("corner_joints/plain_miter_joint/cut_plain_miter_joint_3d")
+@pattern('corner/plain_miter_joint/cut_plain_miter_joint_3d')
 def cut_plain_miter_joint_3d_pattern() -> Frame:
     return Frame(cut_timbers=make_miter_joint_3d_angles_example(create_v3(0, 0, 0)), name='Plain Miter Joint (3D)')

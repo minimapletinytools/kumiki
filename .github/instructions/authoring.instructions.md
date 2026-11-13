@@ -270,9 +270,27 @@ Patterns are simple examples demonstrating joints or other deconstruted concepts
       ...
   ```
 
-  Prefer a second pattern over a parameter where the variants are worth seeing
-  side by side in the sidebar -- a round-timber version of a joint is a
-  pattern, not a toggle. See docs/patternbook.md.
+  Use the variant and Kiwari rules below. See docs/patternbook.md.
+
+### Joint pattern organization
+
+Patterns serve as source references for agents and visual references for people.
+Match category folders to `kumiki/joints/workshop/` (`butt`, `corner`, `mixed`,
+`splice`, `cross`, `board`, `free`, and `decorative`). Keep basic-wrapper examples
+under `basic_joints`, with an example for every basic joint. Give a joint with
+multiple variants its own folder. Folders contain variants only: no pattern may
+also be the parent path of another pattern.
+
+Use Kiwari for size, position, notching, and peg shape. Use separate variants for
+timber angles, alignment requirements, and distinct joint configurations such as
+through versus stopped mortises or through versus half-blind dovetails. Ask the
+user when a configuration is difficult to express clearly with Kiwari.
+
+When an API has a face- or plane-aligned specialization, show the general method
+on angled timbers. Otherwise use axis-oriented, face-aligned arrangements where
+the joint permits them. Prefer canonical arrangements from `example_shavings.py`.
+Keep builders short enough to read as examples. Development-only patterns may be
+removed when they add no useful reference configuration.
 
 Kumiki also ships with a few example Frames that demonstrate how to put everything together. In general, follow agent_usage_instructions.md for authoring patterns and example frames.
 

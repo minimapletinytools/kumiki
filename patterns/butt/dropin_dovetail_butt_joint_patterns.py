@@ -23,7 +23,7 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-@pattern("butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", kiwari=ROUND_STOCK)
+@pattern('butt/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers', kiwari=ROUND_STOCK)
 def create_dovetail_butt_joint_example(k: Optional[Kiwari]=None, *, position: Optional[V3]=None) -> Frame:
     """
     Create a dovetail butt joint (蟻仕口 / Ari Shiguchi) using canonical 4"x5"x4' timbers.

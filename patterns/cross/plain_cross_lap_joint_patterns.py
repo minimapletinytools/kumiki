@@ -104,11 +104,11 @@ def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern("cross_joints/cut_plain_cross_lap_house_joint", tags=["main"])
+@pattern('cross/cut_plain_cross_lap_house_joint', tags=["main"])
 def cut_plain_cross_lap_house_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_house_joint_example(create_v3(0, 0, 0)), name='Plain Cross Lap House Joint')
 
 
-@pattern("cross_joints/cut_plain_cross_lap_joint")
+@pattern('cross/cut_plain_cross_lap_joint')
 def cut_plain_cross_lap_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_cross_lap_joint_example(create_v3(0, 0, 0)), name='Plain Cross Lap Joint')

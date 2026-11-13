@@ -45,11 +45,11 @@ def make_tongue_and_fork_corner_joint_135_example(position: V3, use_round_timber
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern("corner_joints/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_90")
+@pattern('corner/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_90')
 def cut_tongue_and_fork_corner_joint_90_pattern() -> Frame:
     return Frame(cut_timbers=make_tongue_and_fork_corner_joint_90_example(create_v3(0, 0, 0)), name='Tongue and Fork Corner Joint 90°')
 
 
-@pattern("corner_joints/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_135")
+@pattern('corner/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_135')
 def cut_tongue_and_fork_corner_joint_135_pattern() -> Frame:
     return Frame(cut_timbers=make_tongue_and_fork_corner_joint_135_example(create_v3(0, 0, 0)), name='Tongue and Fork Corner Joint 135°')
