@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""Simple Assembly Test Structure
+"""Purpose
+-------
+Explore a reciprocal polygon whose joints form a simultaneous-disassembly cycle.
+
+Concepts demonstrated — overview
+-------------------------------
+Development example; non-square construction; assembly constraints; structural Kiwari.
+
+Concepts demonstrated — details
+------------------------------
+Kiwari changes member count, timber cross-section, and polygon radius. Each member joins the
+next with a mortise and tenon. The cyclic relationship is the focus, rather than a standalone
+building or furniture design.
+Recipe notes
+------------
+Simple Assembly Test Structure
 
 A regular n-gon of timbers where each timber is joined to the next timber in sequence
 with a basic mortise and tenon joint. This creates a reciprocal frame cycle such that

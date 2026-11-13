@@ -154,5 +154,37 @@ To add measurements by manually, make a `Drawing` whose `measurements` are `Meas
 
 ## Examples
 
-See all examples in the `patterns/structures` folder and using the `kumiki_source` tool.
-These examples are the best API reference. Unless the user asks for just like the example, it may be better to build from the ground up rather than adapt an example.
+Use these files as source references for the concepts you need. Each starts with its
+purpose, a short concept list, and implementation details. Public examples live in
+`patterns/structures/`; open a file in Kigumi or find it with `kumiki_source`.
+
+| Example | Good reference for | Kiwari controls |
+|---|---|---|
+| [Starter frame](../patterns/structures/my_cute_frame.py) | Simple four-member frame; face-aligned and axis-oriented construction; pegged tenons | None; source dimensions |
+| [Simple sawhorse](../patterns/structures/horsey_example.py) | Small furniture; orthogonal feet, posts, stretcher, and top beam | None; source dimensions |
+| [Double-sawhorse workbench](../patterns/structures/doublesawhorseworkbench.py) | Furniture; through/stopped tenons; cross-lapped stretcher and tool tray | None; source dimensions |
+| [Coffee table](../patterns/structures/coffee_table.py) | Furniture; several joints meeting shared legs; tusked stretchers and decorative cuts | None; source dimensions |
+| [Dovetailed sawhorse](../patterns/structures/dovetailed_sawhorse.py) | Non-square construction; splayed legs; tapered dovetails; drawings and router templates | Sizing and angles: height, timber dimensions, leg spacing and splay; separate template-tool controls |
+| [Wood character](../patterns/structures/ki_kanji.py) | Small sculpture; diagonal members; splined and pegged joints; curved profiles | None; source dimensions |
+| [Cross-lapped post](../patterns/structures/multi_cross_lap_post.py) | Three boards at 60-degree plan intervals; round stock; multi-member joinery | None; source dimensions and count |
+| [Oscar's shed](../patterns/structures/oscarshed.py) | Small standard timber-frame building; **single-pitch rafters** housed in unequal-height plates | None; source dimensions and counts |
+| [Timber-frame shed](../patterns/structures/learn_to_timber_frame_shed.py) | Medium standard frame; floor joists; angled braces; **paired rafters joined at the peak** with collars | Structural counts: joists, rafter pairs, intermediate posts; sizing: footprint |
+| [120-square-foot tiny house](../patterns/structures/tinyhouse120.py) | Medium standard frame; king posts and ridge beam; **ridge-supported rafters** with eave extensions | None; source dimensions and counts |
+| [Multiple frames: pavilion yard](../patterns/structures/multiple_frames.py) | Multiple frames in one file; roofed timber pavilion; simple building models as context | Shared model spacing/height; independent pavilion member sizes, roof rise and rafter count |
+
+Development fixtures live together in `hidden_structures/`, outside the published
+pattern catalog. They are useful for specific mechanisms rather than as starting designs:
+
+| Development example | Concepts |
+|---|---|
+| [Assembly preview](../hidden_structures/assembly_preview_demo.py) | Joint ordering, peg removal, extraction, and deliberate warning cases |
+| [Drawing fixture](../hidden_structures/my_cute_frame_drawing_test.py) | Rough stock, reference features, matching pieces, generated drawings |
+| [Cat corner cot](../hidden_structures/cat_corner_cot.py) | Multiple frames; non-rectangular supporting context; stepped members and sloping roof |
+| [N-legged stool](../hidden_structures/development/n_legged_stool.py) | Radial furniture; splayed round legs; Kiwari leg count, dimensions and angles |
+| [Simultaneous assembly](../hidden_structures/development/simple_simultaneous_assembly.py) | Reciprocal polygon; Kiwari member count, cross-section and radius |
+| [Six-piece Luban lock](../hidden_structures/actually_kumiki/luban_lock_1.py) | Diamond cross-sections and cyclic housings |
+| [Three-piece Luban lock](../hidden_structures/actually_kumiki/luban_lock_2.py) | Custom cuts; rotation followed by translation during disassembly |
+| [Gordian knot](../hidden_structures/actually_kumiki/gordian_knot.py) | Cell-based CSG cutouts and interlocking pieces |
+
+The hidden collection also contains relief-algorithm patterns in
+`hidden_structures/development/relief_example_patterns.py`.

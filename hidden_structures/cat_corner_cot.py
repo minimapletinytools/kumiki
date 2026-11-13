@@ -1,5 +1,21 @@
 # Last checked on kumiki 0.9.0
-"""Cat Corner Cot - A timber frame cat cot designed against a corner supporting structure.
+"""Purpose
+-------
+Build a fitted cat enclosure together with the surrounding corner walls and sloping roof.
+
+Concepts demonstrated — overview
+-------------------------------
+Furniture and supporting models; multiple frames; non-rectangular context; sloping rafters.
+
+Concepts demonstrated — details
+------------------------------
+Separate frame entries show the enclosure and its supporting context. Stepped members, stacked
+tenons, infill boards, and roof housings accommodate the corner and roof slope. Piece matching
+and generated drawings support fabrication references. Geometry is defined by source constants,
+not Kiwari controls.
+Recipe notes
+------------
+Cat Corner Cot - A timber frame cat cot designed against a corner supporting structure.
 
 The file builds two frames, shown together where they stand:
 - `supporting_structure`: the corner walls and the sloped roof they carry.
@@ -405,7 +421,7 @@ def cut_roof_slope_trim_joint(wall_timbers: list[Timber], roof_plane_point: V3, 
 
     return Joint(
         cuttings=cuttings,
-        ticket=JointTicket(path="roof_slope_wall_trim", joint_type="custom_halfspace_trim", tags=("roof", "wall_trim")),
+        ticket=JointTicket(path="roof_slope_wall_trim", joint_type="custom_halfspace_trim"),
     )
 
 

@@ -1,5 +1,20 @@
 # Last checked on kumiki 0.9.0
-"""N-Legged Stool Structure
+"""Purpose
+-------
+Explore a round-seat stool with a variable number of splayed legs.
+
+Concepts demonstrated — overview
+-------------------------------
+Development example; furniture; non-square construction; structural and sizing Kiwari.
+
+Concepts demonstrated — details
+------------------------------
+Kiwari changes the leg count, seat and member dimensions, stretcher height, and splay angle.
+Circular placement and round timbers demonstrate radial layouts and a stretcher ring. This
+remains outside the public example catalog.
+Recipe notes
+------------
+N-Legged Stool Structure
 
 An n-legged stool consisting of a round flat seat, n legs arranged with circular
 symmetry splaying out by 10 degrees, and a ring of stretchers.
