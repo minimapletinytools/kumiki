@@ -421,9 +421,14 @@ def mortise_and_tenon_handles():
     from kumiki.csg.feature_paths import FeatureHandle, find_feature
     from kumiki.identity import ResolvedTimberPath
     from kumiki.timber import Frame
-    from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
+    from kumiki import cut_mortise_and_tenon_joint_on_face_aligned_timbers, inches
+    from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 
-    frame = Frame.from_joints(joints=[example_basic_mortise_and_tenon_joint()])
+    joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+        create_canonical_example_butt_joint_timbers(),
+        tenon_width_relative_to_joint=inches(4, 3), tenon_height_relative_to_joint=inches(15, 4),
+        tenon_length=inches(5))
+    frame = Frame.from_joints(joints=[joint])
     butt = present(frame.cut_timber_at(ResolvedTimberPath("butt_timber")), "butt_timber")
     receiving = present(frame.cut_timber_at(ResolvedTimberPath("receiving_timber")), "receiving_timber")
     body = ("timber (rough, extended)",)

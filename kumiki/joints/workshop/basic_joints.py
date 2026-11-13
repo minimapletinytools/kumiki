@@ -54,10 +54,7 @@ from kumiki.construction import (
 )
 from .shavings.build_a_butt import SimplePegParameters, DovetailTenonWedgeAccessoryParameters
 
-from kumiki.construction import ExtendedTimberArrangement, PanelBoardArrangement, ButtJointBoardArrangement
-from .corner.dovetail_corner_joint import SingleDovetailSizeParameter
-from kumiki.csg.pathcsg import PathSegment
-from .free.free_dovetail_joint import FreeDovetailShape
+from kumiki.construction import ButtJointBoardArrangement
 
 # ============================================================================
 # Plain Joint Wrappers
@@ -223,41 +220,16 @@ def cut_basic_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJoin
     return cut_plain_butt_splice_joint_on_aligned_timbers(arrangement)
 
 
+@deprecated("Use cut_basic_plain_cross_lap_joint instead")
 def cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint:
-    """
-    Creates a cross-lap joint between two intersecting timbers with equal material removal.
-
-    Material is split equally (half from each timber). Convenience wrapper; see
-    `cut_plain_cross_lap_joint` for full control over cut faces and split ratio.
-
-    Args:
-        arrangement: Cross joint arrangement. Timbers must be face-aligned and orthogonal.
-
-    Returns:
-        Joint object containing the two CutTimbers.
-    """
-    error = arrangement.check_face_aligned_and_orthogonal()
-    assert error is None, error
-    return cut_plain_cross_lap_joint(arrangement)
+    """Forward to the general basic cross lap."""
+    return cut_basic_plain_cross_lap_joint(arrangement)
 
 
+@deprecated("Use cut_basic_plain_cross_lap_house_joint instead")
 def cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint:
-    """
-    Creates a house (dado/housing) joint where the housing timber is relieved to receive the housed timber.
-
-    Only the housing timber is cut; the housed timber is unaffected. Convenience wrapper; see
-    `cut_plain_cross_lap_house_joint` for details.
-
-    Args:
-        arrangement: Cross joint arrangement where timber1 is the housing timber and timber2
-                     is the housed timber. Timbers must be face-aligned and orthogonal.
-
-    Returns:
-        Joint object containing both timbers.
-    """
-    error = arrangement.check_face_aligned_and_orthogonal()
-    assert error is None, error
-    return cut_plain_cross_lap_house_joint(arrangement)
+    """Forward to the general basic housing."""
+    return cut_basic_plain_cross_lap_house_joint(arrangement)
 
 
 def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
@@ -428,77 +400,14 @@ cut_basic_かなわつぎ = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_j
 # ============================================================================
 
 def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
-    tenon_timber: TimberLike,
-    mortise_timber: TimberLike,
-    tenon_end: TimberEnd,
+    tenon_timber: TimberLike, mortise_timber: TimberLike, tenon_end: TimberEnd,
     use_peg: bool = False,
 ) -> Joint:
-    """
-    Creates a mortise and tenon joint between two face-aligned orthogonal timbers, with automatic sizing.
-
-    Tenon dimensions are derived automatically: 3/4 of the mortise timber's relevant depth for
-    the height and 1/3 of its face width for the width. Tenon length equals the full width of the
-    mortise timber. For full control over sizing, use `cut_mortise_and_tenon_joint_on_face_aligned_timbers` directly.
-
-    Args:
-        tenon_timber: The timber that will receive the tenon cut.
-        mortise_timber: The timber that will receive the mortise hole.
-        tenon_end: Which end of the tenon timber gets the tenon (TOP or BOTTOM).
-        use_peg: If True, adds a square peg through the joint for draw-bore tightening.
-
-    Returns:
-        Joint object containing the two CutTimbers and, if use_peg=True, a Peg accessory.
-    """
-    assert isinstance(tenon_end, TimberEnd), f"expected TimberEnd, got {type(tenon_end).__name__}"
-    # this is the "side" of the joint
-    joint_side_mortise_timber_face = mortise_timber.get_closest_oriented_face_from_global_direction(cross_product(mortise_timber.get_length_direction_global(), tenon_timber.get_face_direction_global(tenon_end.to.face())))
-    joint_side_tenon_timber_face = tenon_timber.get_closest_oriented_face_from_global_direction(mortise_timber.get_face_direction_global(joint_side_mortise_timber_face))
-
-    # the sizing XY depends on the orientation of the tenon timber relative to the mortise timber
-    mortise_length_on_tenon_timber_face = tenon_timber.get_closest_oriented_face_from_global_direction(mortise_timber.get_length_direction_global())
-
-    mortise_timber_entry_face = joint_side_mortise_timber_face.to.long_face().rotate_right().to.face()
-
-    tenon_mortise_length_size = tenon_timber.get_size_in_face_normal_axis(mortise_length_on_tenon_timber_face)*scalar(3,4)
-    tenon_mortise_width_size = mortise_timber.get_size_in_face_normal_axis(joint_side_mortise_timber_face)*scalar(1,3)
-
-    if mortise_length_on_tenon_timber_face == TimberLongFace.FRONT or mortise_length_on_tenon_timber_face == TimberLongFace.BACK:
-        tenon_size = Matrix([tenon_mortise_length_size, tenon_mortise_width_size])
-    else:
-        tenon_size = Matrix([tenon_mortise_width_size, tenon_mortise_length_size])
-        
-
-    tenon_length = mortise_timber.get_size_in_face_normal_axis(mortise_timber_entry_face)
-    mortise_depth = tenon_length
-
-    tenon_position = create_v2(scalar(0), scalar(0))
-    peg_parameters = None
-    front_face_on_butt_timber = None
-    if use_peg:
-        front_face_on_butt_timber = joint_side_tenon_timber_face.to.long_face()
-        peg_parameters = SimplePegParameters(
-            shape=PegShape.SQUARE,
-            peg_positions=[cast(Tuple[Numeric, Numeric], (tenon_length / 3, 0))],
-            size=inches(1, 2),
-            depth=None,
-            tenon_hole_offset=inches(scalar(1, 16))
-        )
-
-    arrangement = ButtJointTimberArrangement(
-        receiving_timber=cast(Timber, mortise_timber),
-        butt_timber=cast(Timber, tenon_timber),
-        butt_timber_end=tenon_end,
-        front_face_on_butt_timber=front_face_on_butt_timber,
-    )
-    return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=arrangement,
-        tenon_width_relative_to_joint=tenon_mortise_width_size,
-        tenon_height_relative_to_joint=tenon_mortise_length_size,
-        tenon_length=tenon_length,
-        mortise_depth=mortise_depth,
-        tenon_position=tenon_position,
-        peg_parameters=peg_parameters,
-    )
+    """Cut the basic stopped tenon using individual face-aligned timbers."""
+    arrangement = ButtJointTimberArrangement(tenon_timber, mortise_timber, tenon_end)
+    error = arrangement.check_face_aligned_and_orthogonal()
+    assert error is None, error
+    return cut_basic_mortise_and_tenon_joint(arrangement, use_peg=use_peg)
 
 
 def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -630,57 +539,15 @@ def cut_basic_lapped_gooseneck_joint_on_aligned_timbers(
 
 
 def cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
-    dovetail_timber: TimberLike,
-    receiving_timber: TimberLike,
-    dovetail_timber_end: TimberEnd,
-    dovetail_timber_face: TimberLongFace,
-    receiving_timber_shoulder_inset: Numeric,
-    dovetail_length: Numeric,
-    dovetail_small_width: Numeric,
-    dovetail_angle: Numeric,
+    arrangement: ButtJointTimberArrangement, *, receiving_timber_shoulder_inset: Numeric = scalar(0),
 ) -> Joint:
-    """
-    Creates a housed dovetail butt joint (蟻継ぎ / Ari Tsugi) with default proportions.
-
-    Dovetail dimensions scale with the timber width regardless of the values passed for
-    dovetail_length, dovetail_small_width, and dovetail_angle — those parameters are
-    overridden internally (present for API compatibility). For full control, use
-    `cut_dropin_dovetail_butt_joint_on_face_aligned_timbers` directly.
-
-    Args:
-        dovetail_timber: The timber with the dovetail tenon.
-        receiving_timber: The timber that receives the dovetail socket.
-        dovetail_timber_end: Which end of the dovetail timber is cut.
-        dovetail_timber_face: The face on the dovetail timber where the profile is visible.
-        receiving_timber_shoulder_inset: Distance to inset the shoulder notch on the receiving timber.
-        dovetail_length: Overridden internally by default proportions.
-        dovetail_small_width: Overridden internally by default proportions.
-        dovetail_angle: Overridden internally by default proportions.
-
-    Returns:
-        Joint object containing the two CutTimbers with dovetail cuts.
-    """
-    assert isinstance(dovetail_timber_end, TimberEnd), f"expected TimberEnd, got {type(dovetail_timber_end).__name__}"
-    assert isinstance(dovetail_timber_face, TimberLongFace), f"expected TimberLongFace, got {type(dovetail_timber_face).__name__}"
-    assert isinstance(dovetail_timber, TimberLike), f"expected TimberLike, got {type(dovetail_timber).__name__}"
-    assert isinstance(receiving_timber, TimberLike), f"expected TimberLike, got {type(receiving_timber).__name__}"
-    width = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face.rotate_right())
-    dovetail_length = width/scalar(2)
-    dovetail_small_width = width*scalar(1, 2)
-    dovetail_angle = atan(scalar(1, 6))
-
+    """Cut a housed dovetail with length and neck width each half the butt timber's profile width."""
+    face = arrangement.front_face_on_butt_timber
+    assert face is not None, "Set front_face_on_butt_timber to select the drop-in direction"
+    width = arrangement.butt_timber.get_size_in_face_normal_axis(face.rotate_right())
     return cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            butt_timber=dovetail_timber,
-            receiving_timber=receiving_timber,
-            butt_timber_end=dovetail_timber_end,
-            front_face_on_butt_timber=dovetail_timber_face,
-        ),
-        receiving_timber_shoulder_inset=receiving_timber_shoulder_inset,
-        dovetail_length=dovetail_length,
-        dovetail_small_width=dovetail_small_width,
-        dovetail_angle=dovetail_angle,
-    )
+        arrangement, receiving_timber_shoulder_inset=receiving_timber_shoulder_inset,
+        dovetail_length=width / 2, dovetail_small_width=width / 2, dovetail_angle=atan(scalar(1, 6)))
 
 
 def cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(
@@ -817,181 +684,271 @@ def cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
 def cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint:
     """Cut a half-depth corner lap on plane-aligned timbers."""
     from .corner.plain_corner_lap_joint import cut_plain_corner_lap_joint_on_plane_aligned_timbers
-
     return cut_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement)
 
 
 def cut_basic_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """Cut an equal cross lap with the default scribe relief."""
-    from .cross.plain_cross_lap_joint import cut_plain_cross_lap_joint
-
     return cut_plain_cross_lap_joint(arrangement)
 
 
 def cut_basic_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """Cut a housing in the first timber for the second timber."""
-    from .cross.plain_cross_lap_joint import cut_plain_cross_lap_house_joint
-
     return cut_plain_cross_lap_house_joint(arrangement)
 
 
-def cut_basic_free_house_joint(housing_timber: TimberLike, housed_timbers: List[Union[TimberLike, CutTimber]]) -> Joint:
-    """Cut housings following the supplied timber bodies."""
-    from .free.free_house_joint import cut_free_house_joint
-
-    return cut_free_house_joint(housing_timber, housed_timbers)
-
-
-def cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers(timbers: List[TimberLike], starting_face_on_first_timber: TimberFace) -> Joint:
+def cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers(
+    timbers: List[TimberLike], starting_face_on_first_timber: TimberFace,
+) -> Joint:
     """Cut a chain of cross laps with uniformly spaced cut boundaries."""
     from .cross.multi_cross_lap_joint import cut_multi_cross_lap_joint_on_plane_aligned_timbers
-
     return cut_multi_cross_lap_joint_on_plane_aligned_timbers(timbers, starting_face_on_first_timber)
 
 
-def cut_basic_mortise_and_tenon_joint_on_plane_aligned_timbers(
-    arrangement: ButtJointTimberArrangement,
+def _basic_tenon_dimensions(arrangement: ButtJointTimberArrangement, round_tenon: bool = False, receiving_end: Optional[TimberEnd] = None):
+    """Return local tenon size, insertion length, and receiving entry face.
+
+    Reserve a quarter of the available insertion depth beyond the tenon's tip.
+    The butt centerline must enter a long face. Corner joints extend the receiving
+    end to meet the butt's outside face; other joints stay within its declared ends.
+    """
+    butt, receiving = arrangement.butt_timber, arrangement.receiving_timber
+    direction = butt.get_face_direction_global(arrangement.butt_timber_end)
+    origin = receiving.transform.global_to_local(butt.get_bottom_position_global())
+    rotation = receiving.orientation.matrix.T
+    direction_local = rotation * direction
+    bounds = [(-receiving.size[0] / 2, receiving.size[0] / 2),
+              (-receiving.size[1] / 2, receiving.size[1] / 2), (scalar(0), receiving.length)]
+    intervals = []
+    for axis, (low, high) in enumerate(bounds):
+        if axis == 2 and receiving_end is not None:
+            continue
+        velocity = direction_local[axis]
+        if safe_zero_test(velocity):
+            assert low < origin[axis] < high, "Tenon centerline must intersect the receiving timber"
+            continue
+        ends = sorted(((low - origin[axis]) / velocity, (high - origin[axis]) / velocity))
+        intervals.append((ends[0], ends[1], axis))
+    entry, _, entry_axis = max(intervals, key=lambda interval: interval[0])
+    exit_distance = min(interval[1] for interval in intervals)
+    assert entry < exit_distance and entry_axis != 2, "Tenon must enter a receiving long face"
+    entry_face = ((TimberLongFace.LEFT, TimberLongFace.RIGHT),
+                  (TimberLongFace.BACK, TimberLongFace.FRONT))[entry_axis][direction_local[entry_axis] < 0]
+    center = origin + direction_local * entry
+    axes = [rotation * butt.get_width_direction_global(), rotation * butt.get_height_direction_global()]
+    normal = arrangement.compute_normalized_timber_cross_product()
+    thickness_axis = max(range(2), key=lambda i: Abs(safe_dot_product(
+        normal, butt.get_width_direction_global() if i == 0 else butt.get_height_direction_global())))
+    sizes = [butt.size[i] * (scalar(1, 3) if i == thickness_axis else scalar(3, 4)) for i in range(2)]
+    sizes[thickness_axis] = min(butt.size[thickness_axis], receiving.get_size_in_direction_3d(normal)) / 3
+    if round_tenon:
+        sizes = [min(min(butt.size), min(receiving.size)) / 3] * 2
+    # Project the tenon outline onto the entry face and fit it inside that face.
+    projected = [axis - direction_local * axis[entry_axis] / direction_local[entry_axis] for axis in axes]
+    scale = scalar(1)
+    for i, (low, high) in enumerate(bounds):
+        if i == entry_axis or (i == 2 and receiving_end is not None):
+            continue
+        half_span = sum(Abs(axis[i]) * size / 2 for axis, size in zip(projected, sizes))
+        if not safe_zero_test(half_span):
+            scale = min(scale, scalar(3, 4) * min(center[i] - low, high - center[i]) / half_span)
+    assert scale > 0, "Tenon centerline must lie inside the receiving face"
+    sizes = [size * scale for size in sizes]
+    earliest_exit = exit_distance - entry
+    latest_entry = scalar(0)
+    for sign_x in (-1, 1):
+        for sign_y in (-1, 1):
+            offset = axes[0] * sizes[0] * sign_x / 2 + axes[1] * sizes[1] * sign_y / 2
+            for i, (low, high) in enumerate(bounds):
+                if i == 2 and receiving_end is not None:
+                    continue
+                velocity = direction_local[i]
+                if safe_zero_test(velocity):
+                    continue
+                near, far = sorted(((low - center[i] - offset[i]) / velocity,
+                                    (high - center[i] - offset[i]) / velocity))
+                latest_entry = max(latest_entry, near)
+                earliest_exit = min(earliest_exit, far)
+    assert earliest_exit > latest_entry, "No depth remains for a stopped tenon"
+    length = latest_entry + (earliest_exit - latest_entry) * scalar(3, 4)
+    return create_v2(*sizes), length, entry_face
+
+
+def _basic_peg(arrangement: ButtJointTimberArrangement, size: V2, length: Numeric):
+    """Return the arrangement with a peg face and one proportionally sized square peg."""
+    if arrangement.front_face_on_butt_timber is None:
+        face = arrangement.butt_timber.get_closest_oriented_long_face_from_global_direction(
+            arrangement.compute_normalized_timber_cross_product())
+        arrangement = replace(arrangement, front_face_on_butt_timber=face)
+    from .shavings.build_a_butt import locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face, locate_tenon_origin_on_shoulder
+    direction = arrangement.butt_timber.get_face_direction_global(arrangement.butt_timber_end)
+    receiving = arrangement.receiving_timber
+    face = receiving.get_closest_oriented_long_face_from_global_direction(-direction)
+    plane = locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face(
+        arrangement, receiving.get_size_in_face_normal_axis(face) / 2, face)
+    origin = locate_tenon_origin_on_shoulder(plane, arrangement.butt_timber,
+                                           arrangement.butt_timber_end, create_v2(0, 0))
+    peg_size = min(min(size), length) / 6
+    low, high = peg_size, length - peg_size
+    # Keep the peg inside the declared receiving ends, including at a corner.
+    along = receiving.get_length_direction_global()
+    velocity = safe_dot_product(direction, along)
+    station = safe_dot_product(origin - receiving.get_bottom_position_global(), along)
+    if not safe_zero_test(velocity):
+        start, stop = sorted(((peg_size - station) / velocity,
+                              (receiving.length - peg_size - station) / velocity))
+        low, high = max(low, start), min(high, stop)
+    assert low <= high, "No room for a peg inside the receiving timber's declared ends"
+    distance = max(low, min(length / 3, high))
+    peg = SimplePegParameters(shape=PegShape.SQUARE, peg_positions=[(distance, scalar(0))],
+                              size=peg_size, tenon_hole_offset=scalar(0))
+    return arrangement, peg
+
+
+def cut_basic_mortise_and_tenon_joint(
+    arrangement: ButtJointTimberArrangement, *, use_peg: bool = False,
 ) -> Joint:
-    """Cut a centered tenon one third as long as the receiving timber's narrow dimension."""
-    from .mixed import cut_mortise_and_tenon_joint_on_plane_aligned_timbers
+    """Cut a centered rectangular tenon with a quarter-depth reserve in the receiver.
 
-    return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
-        arrangement,
-        tenon_width_relative_to_joint=min(arrangement.butt_timber.size) / scalar(3),
-        tenon_height_relative_to_joint=min(arrangement.butt_timber.size) / scalar(3),
-        tenon_length=min(arrangement.receiving_timber.size) / scalar(3))
-
-
-def cut_basic_mortise_and_tenon_joint(arrangement: ButtJointTimberArrangement) -> Joint:
-    """Cut a centered rectangular tenon with one-third cross-section dimensions."""
+    Start with 3/4 of the butt's in-plane size and 1/3 of the smaller transverse
+    timber dimension; reduce both to fit the receiving face. The shoulder follows that entry face.
+    """
     from .mixed import cut_mortise_and_tenon_joint
-
+    size, length, face = _basic_tenon_dimensions(arrangement)
+    peg = None
+    if use_peg:
+        arrangement, peg = _basic_peg(arrangement, size, length)
     return cut_mortise_and_tenon_joint(
-        arrangement, tenon_size=arrangement.butt_timber.size / scalar(3),
-        tenon_length=min(arrangement.receiving_timber.size) / scalar(3))
+        arrangement, tenon_size=size, tenon_length=length, mortise_depth=length,
+        set_mortise_shoulder_parallel_to_face=face,
+        mortise_shoulder_distance_from_centerline_or_centerplane=arrangement.receiving_timber.get_size_in_face_normal_axis(face) / 2,
+        peg_parameters=peg)
 
 
 def cut_basic_round_mortise_and_tenon_joint(arrangement: ButtJointTimberArrangement) -> Joint:
-    """Cut a centered round tenon sized from the narrower timber dimensions."""
+    """Cut a centered round tenon with a quarter-depth reserve in the receiver.
+
+    Start with a third of the smallest cross-section dimension of either timber
+    and reduce it to fit the entry face.
+    """
     from .mixed import cut_round_mortise_and_tenon_joint
-
+    size, length, face = _basic_tenon_dimensions(arrangement, round_tenon=True)
     return cut_round_mortise_and_tenon_joint(
-        arrangement, diameter=min(arrangement.butt_timber.size) / scalar(3),
-        tenon_length=min(arrangement.receiving_timber.size) / scalar(3))
+        arrangement, diameter=size[0], tenon_length=length, mortise_depth=length,
+        set_mortise_shoulder_parallel_to_face=face,
+        mortise_shoulder_distance_from_centerline_or_centerplane=arrangement.receiving_timber.get_size_in_face_normal_axis(face) / 2)
 
 
-def cut_basic_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
-    arrangement: ButtJointTimberArrangement,
+def cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
+    arrangement: CornerJointTimberArrangement, *, use_peg: bool = False,
 ) -> Joint:
-    """Cut a centered round tenon on plane-aligned timbers."""
-    from .mixed import cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers
-
-    return cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
-        arrangement, diameter=min(arrangement.butt_timber.size) / scalar(3),
-        tenon_length=min(arrangement.receiving_timber.size) / scalar(3))
+    """Cut a centered stopped corner tenon with shoulders on both sides."""
+    from .mixed import cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers
+    butt = ButtJointTimberArrangement(arrangement.timber1, arrangement.timber2,
+                                     arrangement.timber1_end, front_face_on_butt_timber=arrangement.front_face_on_timber1)
+    size, length, _ = _basic_tenon_dimensions(butt, receiving_end=arrangement.timber2_end)
+    normal = arrangement.compute_normalized_timber_cross_product()
+    height_face = arrangement.timber1.get_closest_oriented_long_face_from_global_direction(normal)
+    height_index = arrangement.timber1.get_size_index_in_long_face_normal_axis(height_face)
+    width_index = 1 - height_index
+    peg = None
+    if use_peg:
+        butt, peg = _basic_peg(butt, size, length)
+        arrangement = replace(arrangement, front_face_on_timber1=butt.front_face_on_butt_timber)
+    return cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
+        arrangement, tenon_width_relative_to_joint=size[width_index],
+        tenon_height_relative_to_joint=size[height_index], tenon_length=length, mortise_depth=length,
+        tenon_distance_from_end=(arrangement.timber1.size[width_index] - size[width_index]) / 2,
+        peg_parameters=peg)
 
 
 def cut_basic_tongue_and_groove_joint(tongue_board: Board, groove_board: Board) -> Joint:
-    """Cut a centered tongue one third of the thinner board's thickness."""
+    """Cut a tongue within the shared thickness and overlap of two boards."""
     from .board import cut_tongue_and_groove_joint
-
-    thickness = min(tongue_board.size[1], groove_board.size[1])
+    other = tongue_board.transform.global_to_local(groove_board.transform.position)
+    low = max(-tongue_board.size[1] / 2, other[1] - groove_board.size[1] / 2)
+    high = min(tongue_board.size[1] / 2, other[1] + groove_board.size[1] / 2)
+    overlap = (tongue_board.size[0] + groove_board.size[0]) / 2 - Abs(other[0])
+    assert high > low and overlap > 0, "Boards must overlap in width and thickness"
     return cut_tongue_and_groove_joint(
-        tongue_board, groove_board, tongue_depth=thickness / scalar(3),
-        tongue_width=thickness / scalar(3))
+        tongue_board, groove_board, tongue_depth=min(min(tongue_board.size[1], groove_board.size[1]) / 3, overlap),
+        tongue_width=(high - low) / 3, tongue_center_offset=(low + high) / 2)
 
 
+def cut_basic_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement) -> Joint:
+    """Cut a centered, untapered sliding dovetail with a 1:6 flare."""
+    from .board.board_joints import cut_practice_sliding_dovetail_joint_on_orthogonal_boards, _lateral_positive_dovetail_face
+    from kumiki.measuring import locate_face
+    butt, receiving = arrangement.butt_timber, arrangement.receiving_timber
+    front = arrangement.front_face_on_butt_timber
+    assert front is not None, "The sliding direction requires front_face_on_butt_timber"
+    direction = butt.get_face_direction_global(arrangement.butt_timber_face)
+    entry = receiving.get_closest_oriented_face_from_global_direction(-direction)
+    lateral = _lateral_positive_dovetail_face(arrangement.butt_timber_face, front)
+    width = butt.get_size_in_face_normal_axis(lateral)
+    overlap = safe_dot_product(locate_face(butt, arrangement.butt_timber_face).point - locate_face(receiving, entry).point, direction)
+    depth = min(receiving.get_size_in_face_normal_axis(entry) / 3, overlap, width / 2)
+    assert depth > 0, "Butt board must overlap the receiving board"
+    # The underlying cutter measures flare with cosine rather than tangent.
+    return cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
+        arrangement, dovetail_depth=depth, dovetail_small_width=width / 2,
+        dovetail_angle=acos(scalar(1, 6)))
 
 
-def cut_basic_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards: PanelBoardArrangement, frame_timbers: ExtendedTimberArrangement) -> Joint:
-    """Cut board in grooved rectangular frame joint on face aligned timbers with default optional settings."""
-    from .board.board_joints import cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers
-
-    return cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards, frame_timbers)
-
-
-
-
-
-
-
-def cut_basic_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement, dovetail_depth: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric) -> Joint:
-    """Cut sliding dovetail joint on orthogonal boards with default optional settings."""
-    from .board.board_joints import cut_practice_sliding_dovetail_joint_on_orthogonal_boards
-
-    return cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement, dovetail_depth, dovetail_small_width, dovetail_angle)
-
-
-
-def cut_basic_dovetail_corner_joint(arrangement: CornerJointTimberArrangement, distances: List[Numeric], dovetails: List[SingleDovetailSizeParameter]) -> Joint:
-    """Cut dovetail corner joint with default optional settings."""
-    from .corner.dovetail_corner_joint import cut_dovetail_corner_joint
-
-    return cut_dovetail_corner_joint(arrangement, distances, dovetails)
-
-
-cut_basic_plain_tongue_and_fork_joint_on_plane_aligned_timbers = cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers
-
-
-
-def cut_basic_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge], radius: Numeric) -> Joint:
-    """Cut roundover decoration with default optional settings."""
-    from .decorative.decorative_joints import cut_practice_roundover_decoration
-
-    return cut_practice_roundover_decoration(timber, edges, radius)
-
-
-def cut_basic_practice_rounded_end_decoration(timber: BlockLike, rounded_face: TimberFace, rounded_end: TimberFace, radius: Numeric, distance_from_end: Numeric) -> Joint:
-    """Cut rounded end decoration with default optional settings."""
-    from .decorative.decorative_joints import cut_practice_rounded_end_decoration
-
-    return cut_practice_rounded_end_decoration(timber, rounded_face, rounded_end, radius, distance_from_end)
-
-
-
-def cut_basic_practice_rafter_tail_scallop_corner_end_decoration(timber: BlockLike, short_edge: Union[TimberShortEdge], scallop_height: Numeric, scallop_length: Numeric) -> Joint:
-    """Cut rafter tail scallop corner end decoration with default optional settings."""
-    from .decorative.decorative_joints import cut_practice_rafter_tail_scallop_corner_end_decoration
-
-    return cut_practice_rafter_tail_scallop_corner_end_decoration(timber, short_edge, scallop_height, scallop_length)
-
-
-
-
-def cut_basic_practice_path_extrusion_corner_end_decoration(timber: BlockLike, cut_corner: TimberShortEdge, cut_path: List[PathSegment]) -> Joint:
-    """Cut path extrusion corner end decoration with default optional settings."""
-    from .decorative.decorative_joints import cut_practice_path_extrusion_corner_end_decoration
-
-    return cut_practice_path_extrusion_corner_end_decoration(timber, cut_corner, cut_path)
-
-
-def cut_basic_practice_straight_angled_end_cut_decoration(timber: BlockLike, front_face: TimberFace, position_from_end: Numeric) -> Joint:
-    """Cut straight angled end cut decoration with default optional settings."""
-    from .decorative.decorative_joints import cut_practice_straight_angled_end_cut_decoration
-
-    return cut_practice_straight_angled_end_cut_decoration(timber, front_face, position_from_end)
-
-
-
-def cut_basic_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: TimberLike, dovetail: FreeDovetailShape) -> Joint:
-    """Cut free dovetail joint with default optional settings."""
-    from .free.free_dovetail_joint import cut_free_dovetail_joint
-
-    return cut_free_dovetail_joint(dovetail_timber, receiving_timber, dovetail)
-
-
-def cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, tenon_width_relative_to_joint: Numeric, tenon_height_relative_to_joint: Numeric, tenon_length: Numeric) -> Joint:
-    """Cut mortise and tenon corner joint on plane aligned timbers with default optional settings."""
-    from .mixed.mortise_and_tenon_joints import cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers
-
-    return cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(arrangement, tenon_width_relative_to_joint, tenon_height_relative_to_joint, tenon_length)
-
-
-def cut_basic_practice_board_in_dado_joint_on_plane_aligned_timbers(
-    boards: PanelBoardArrangement,
-    dado_timbers: ExtendedTimberArrangement,
+def cut_basic_dovetail_corner_joint(
+    arrangement: CornerJointTimberArrangement, *, half_blind: bool = False,
 ) -> Joint:
-    """Raise AssertionError because board-in-dado cutting is not implemented."""
-    from .board.board_joints import cut_practice_board_in_dado_joint_on_plane_aligned_timbers
+    """Cut evenly spaced dovetails, deriving their count and sizes from the timbers.
 
-    return cut_practice_board_in_dado_joint_on_plane_aligned_timbers(boards, dado_timbers)
+    Use a 1:6 flare, reduced when a narrow layout cannot accommodate that slope.
+    """
+    from .corner.dovetail_corner_joint import cut_dovetail_corner_joint, SingleDovetailSizeParameter
+    if arrangement.front_face_on_timber1 is None:
+        face = arrangement.timber1.get_closest_oriented_long_face_from_global_direction(
+            arrangement.compute_normalized_timber_cross_product())
+        arrangement = replace(arrangement, front_face_on_timber1=face)
+    face = arrangement.front_face_on_timber1
+    assert face is not None
+    span = arrangement.timber1.get_size_in_face_normal_axis(face)
+    entry = arrangement.timber2.get_closest_oriented_long_face_from_global_direction(
+        -arrangement.timber1.get_face_direction_global(arrangement.timber1_end))
+    thickness = arrangement.timber2.get_size_in_face_normal_axis(entry)
+    depth = thickness * (scalar(2, 3) if half_blind else scalar(1))
+    slope = min(scalar(1, 6), span / (8 * depth))
+    flare = 2 * depth * slope
+    count = max(1, int(span / max(thickness * 2, flare * 2) + scalar(1, 2)))
+    pitch = span / count
+    small_width = (pitch - flare) / 2
+    return cut_dovetail_corner_joint(arrangement,
+        distances=[pitch / 2] + [pitch] * (count - 1),
+        dovetails=[SingleDovetailSizeParameter(angle=atan(slope), small_width=small_width,
+                                             depth=depth if half_blind else None)] * count)
+
+
+def cut_basic_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]) -> Joint:
+    """Round selected edges with a radius one quarter of their smallest adjacent dimension."""
+    from .decorative.decorative_joints import cut_practice_roundover_decoration, _EDGE_ADJACENT_FACES
+    assert edges, "Select at least one edge"
+    dimensions = [timber.get_size_in_face_normal_axis(face) for edge in edges for face in _EDGE_ADJACENT_FACES[edge]]
+    return cut_practice_roundover_decoration(timber, edges, min(dimensions) / 4)
+
+
+def cut_basic_practice_rounded_end_decoration(
+    timber: BlockLike, rounded_face: TimberFace, rounded_end: TimberFace,
+) -> Joint:
+    """Cut a centered semicircular end spanning the selected profile."""
+    from .decorative.decorative_joints import cut_practice_rounded_end_decoration
+    span_face = rounded_end.rotate_about(rounded_face)
+    radius = max(timber.get_half_rough_size_in_face_normal_axis(span_face),
+                 timber.get_half_rough_size_in_face_normal_axis(span_face.get_opposite_face()))
+    return cut_practice_rounded_end_decoration(timber, rounded_face, rounded_end, radius, radius)
+
+
+def cut_basic_practice_rafter_tail_scallop_corner_end_decoration(
+    timber: BlockLike, short_edge: TimberShortEdge,
+) -> Joint:
+    """Cut a quarter-depth scallop extending one profile depth along the timber."""
+    from .decorative.decorative_joints import cut_practice_rafter_tail_scallop_corner_end_decoration
+    depth = timber.get_size_in_face_normal_axis(short_edge.long_face)
+    return cut_practice_rafter_tail_scallop_corner_end_decoration(
+        timber, short_edge, scallop_height=depth / 4, scallop_length=min(depth, timber.length))

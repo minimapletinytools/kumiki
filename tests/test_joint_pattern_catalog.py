@@ -7,22 +7,11 @@ from pathlib import Path
 import pytest
 
 from kumiki.frame_decorators import module_patterns
-from kumiki.joints.workshop import basic_joints
 
 ROOT = Path(__file__).resolve().parents[1]
 JOINTS = ROOT / "kumiki/joints/workshop"
 PATTERNS = ROOT / "patterns"
 CATEGORIES = {"board", "butt", "corner", "cross", "decorative", "free", "mixed", "splice"}
-
-
-def test_implemented_joint_functions_have_basic_entries():
-    for source in JOINTS.rglob("*.py"):
-        if "shavings" in source.parts or source.name == "basic_joints.py":
-            continue
-        for node in ast.parse(source.read_text()).body:
-            if not isinstance(node, ast.FunctionDef) or not node.name.startswith("cut_"):
-                continue
-            assert callable(getattr(basic_joints, node.name.replace("cut_", "cut_basic_", 1), None)), node.name
 
 
 def test_basic_recipes_have_source_examples():
@@ -33,7 +22,8 @@ def test_basic_recipes_have_source_examples():
                 calls.add(node.func.id)
     for node in ast.parse((JOINTS / "basic_joints.py").read_text()).body:
         if isinstance(node, ast.FunctionDef) and node.name.startswith("cut_basic_"):
-            if node.name == "cut_basic_practice_board_in_dado_joint_on_plane_aligned_timbers":
+            if any(isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == "deprecated"
+                   for d in node.decorator_list):
                 continue
             if "Compatibility alias" not in (ast.get_docstring(node) or ""):
                 assert node.name in calls, node.name

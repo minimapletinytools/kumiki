@@ -4,6 +4,7 @@ Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py
 """
 
+from dataclasses import replace
 from typing import Optional
 from kumiki import Frame, Joint, Kiwari, create_v3, pattern
 from kumiki.kiwari import kiwari
@@ -20,8 +21,8 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers,
     cut_basic_plain_butt_joint_on_face_aligned_timbers,
     cut_basic_plain_butt_splice_joint_on_aligned_timbers,
-    cut_basic_plain_cross_lap_joint_on_face_aligned_timbers,
-    cut_basic_plain_house_joint_on_face_aligned_timbers,
+    cut_basic_plain_cross_lap_joint,
+    cut_basic_plain_cross_lap_house_joint,
     cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers,
     cut_basic_plain_splice_lap_joint_on_aligned_timbers,
     cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers,
@@ -152,7 +153,7 @@ def example_basic_cross_lap_joint(position=None) -> Joint:
         position = create_v3(0, 0, 0)
 
     arrangement = create_canonical_example_cross_joint_timbers(position=position)
-    joint = cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement)
+    joint = cut_basic_plain_cross_lap_joint(arrangement)
 
     return joint
 
@@ -167,7 +168,7 @@ def example_basic_house_joint(position=None) -> Joint:
 
     # TODO offset
     arrangement = create_canonical_example_cross_joint_timbers(position=position, lateral_offset=inches(2))
-    joint = cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement)
+    joint = cut_basic_plain_cross_lap_house_joint(arrangement)
 
     return joint
 
@@ -286,21 +287,11 @@ def example_basic_dropin_dovetail_butt_joint(position=None) -> Joint:
     arrangement = create_canonical_example_butt_joint_timbers(position)
     # Face perpendicular to receiving timber length (X): use RIGHT (normal +Z) on butt timber
     dovetail_timber_face = TimberLongFace.RIGHT
-    width = arrangement.butt_timber.get_size_in_face_normal_axis(dovetail_timber_face.rotate_right())
-    dovetail_length = width / scalar(2)
-    dovetail_small_width = width * scalar(1, 2)
-    dovetail_angle = atan(scalar(1, 6))
     receiving_timber_shoulder_inset = inches(1)  # 1 inch inset
 
     joint = cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
-        dovetail_timber=arrangement.butt_timber,
-        receiving_timber=arrangement.receiving_timber,
-        dovetail_timber_end=arrangement.butt_timber_end,
-        dovetail_timber_face=dovetail_timber_face,
+        replace(arrangement, front_face_on_butt_timber=dovetail_timber_face),
         receiving_timber_shoulder_inset=receiving_timber_shoulder_inset,
-        dovetail_length=dovetail_length,
-        dovetail_small_width=dovetail_small_width,
-        dovetail_angle=dovetail_angle,
     )
     return joint
 
@@ -382,14 +373,10 @@ def example_basic_tusked_mortise_and_tenon_joint(position=None) -> Joint:
     return joint
 
 
-
 from kumiki.joints.workshop.basic_joints import (
     cut_basic_plain_butt_joint,
     cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers,
     cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers,
-    cut_basic_plain_cross_lap_joint,
-    cut_basic_plain_cross_lap_house_joint,
-    cut_basic_free_house_joint,
     cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers,
 )
 
@@ -416,26 +403,6 @@ def basic_corner_lap() -> Joint:
     """Cut a half-depth corner lap."""
     return cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers(
         create_canonical_example_corner_joint_timbers(corner_angle=degrees(120)))
-
-
-@pattern("basic_joints/plain_cross_lap_joint")
-def basic_cross_lap() -> Joint:
-    """Cut a cross lap with default relief."""
-    return cut_basic_plain_cross_lap_joint(create_canonical_example_cross_joint_timbers())
-
-
-@pattern("basic_joints/plain_cross_lap_house_joint")
-def basic_cross_lap_house() -> Joint:
-    """Cut a housing for a crossing timber."""
-    return cut_basic_plain_cross_lap_house_joint(
-        create_canonical_example_cross_joint_timbers(lateral_offset=inches(2)))
-
-
-@pattern("basic_joints/free_house_joint")
-def basic_free_house() -> Joint:
-    """Cut a housing following a crossing timber's body."""
-    arrangement = create_canonical_example_cross_joint_timbers(lateral_offset=inches(2))
-    return cut_basic_free_house_joint(arrangement.timber1, [arrangement.timber2])
 
 
 @pattern("basic_joints/multi_cross_lap_joint")

@@ -106,6 +106,83 @@
       "sha256": "3c68e0972c402fada0a7ef131481f02b6c161d3a9d5186a508dd61e84aeb3314",
       "warnings": []
     },
+    "patterns/basic_additional_patterns.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_basic_additional_patterns",
+      "multiple_frames": false,
+      "patternbook": {
+        "pattern_names": [
+          "angled",
+          "angled",
+          "through",
+          "mortise_and_tenon_corner_joint",
+          "roundover",
+          "rounded_end",
+          "rafter_tail_scallop",
+          "tongue_and_groove",
+          "side_to_face",
+          "half_blind"
+        ],
+        "patterns": [
+          {
+            "path": "basic_joints/mortise_and_tenon/angled",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/round_mortise_and_tenon/angled",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/dovetail_corner_joint/through",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/mortise_and_tenon_corner_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/roundover",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/rounded_end",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/rafter_tail_scallop",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/tongue_and_groove",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/sliding_dovetail/side_to_face",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/dovetail_corner_joint/half_blind",
+            "pattern_type": "frame",
+            "tags": []
+          }
+        ]
+      },
+      "relative_path": "basic_additional_patterns.py",
+      "sha256": "7fbe1cfcb4574acaab508df2b4f65b04a38e52692228b760bbea02d3868cbd6c",
+      "warnings": []
+    },
     "patterns/basic_joints_patterns.py": {
       "chosen_frame_kind": null,
       "chosen_frame_name": null,
@@ -133,7 +210,9 @@
           "basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint",
           "basic_tusked_mortise_and_tenon",
           "angled",
-          "tongue_and_fork_butt_joint"
+          "tongue_and_fork_butt_joint",
+          "plain_corner_lap_joint",
+          "multi_cross_lap_joint"
         ],
         "patterns": [
           {
@@ -236,11 +315,21 @@
             "path": "basic_joints/tongue_and_fork_butt_joint",
             "pattern_type": "frame",
             "tags": []
+          },
+          {
+            "path": "basic_joints/plain_corner_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/multi_cross_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "1a0951f9a77b2e704ea9943fb5a898da7473ef1c590ae5d0971398f34d379c90",
+      "sha256": "67459b247cfe47b4cc6eb6bbe764cadd053cbc0b7cd4dfa1d608d1af267d95eb",
       "warnings": []
     },
     "patterns/board/board_joints_patterns.py": {
@@ -1185,7 +1274,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/doublesawhorseworkbench.py",
-      "sha256": "7f1e543ac75828b2ff6870f63b232c737b01dd93b9547cf6ff4d039b668d5c4b",
+      "sha256": "491a7ccf2b3c27b38f5eafb839ee0f7e6237a24b182735bb5c49d8f3e01724e7",
       "warnings": []
     },
     "patterns/structures/dovetailed_sawhorse.py": {
@@ -1366,7 +1455,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-13T05:19:52.720005+00:00",
+  "generated_at": "2026-11-13T18:32:35.958124+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }
