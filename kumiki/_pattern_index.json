@@ -1353,7 +1353,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 1541,
+          "lineno": 1573,
           "name": "example"
         }
       ],
@@ -1362,11 +1362,11 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/tinyhouse120.py",
-      "sha256": "51b2e3b424b3cf612e025e2633bccc56e15463461266242ac618ce94153eecd9",
+      "sha256": "12d8ab13f445bad65a1df7dba22f2508256a7ee9a7d87527f6af52c1b8d20241",
       "warnings": []
     }
   },
-  "generated_at": "2026-11-13T04:57:25.292142+00:00",
+  "generated_at": "2026-11-13T05:19:52.720005+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }
