@@ -34,6 +34,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
+- Fewer agent tools, each doing something the others don't: `kumiki_docs` is folded into `kumiki_source`, which lists the docs first; `new_file` is gone, as `write_file` makes new files; `open_in_viewer` and `refresh_view` are gone, as `check_frame` opens and builds a frame and says whether it built; `get_camera` and `set_camera` are one `camera` tool; and `get_workspace_folder` is left out where `list_projects` names the open project. `kumiki_api` points to `kumiki_source` for a whole module's source.
 - The standalone app's menus are Kigumi and File. On macOS the Kigumi menu is also the app menu, so it no longer appears twice. View and Help are folded into Kigumi, and the Edit menu is gone; the edit keys still work in text boxes.
 - In the browser version, deleting a project shows a clear warning: the project exists only in this browser and can't be recovered. The project's name must be typed in before Delete is enabled, and the warning offers to export a .zip first.
 - The projects page (browser version) and Recent projects (app) scroll when the list is long, rather than running off the top of the window.

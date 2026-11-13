@@ -255,8 +255,8 @@ app.whenReady().then(async () => {
         const page = await tool('kumiki_source', { path: 'kumiki.construction', offset: 1, limit: 3 });
         check("kumiki_source searches and reads the browser's kumiki", sourceFound.startsWith('kumiki/construction.py:')
             && page.startsWith('kumiki/construction.py\n1\t'), `${sourceFound.slice(0, 80)} | ${page.slice(0, 60)}`);
-        const sheet = await tool('kumiki_docs', { name: 'api_cheat_sheet' });
-        check('kumiki_docs reads the cheat sheet from the browser\'s kumiki', sheet.startsWith('# API cheat sheet'), sheet.slice(0, 120));
+        const sheet = await tool('kumiki_source', { path: 'docs/api_cheat_sheet.md', limit: 1 });
+        check('kumiki_source reads the cheat sheet from the browser\'s kumiki', sheet.startsWith('docs/api_cheat_sheet.md\n1\t# API cheat sheet'), sheet.slice(0, 120));
         // The tab signing in opens: noted, not opened.
         await js(`window.open = (url) => { window.__signInUrl = url; return {}; }; true`);
         await js(`${agent}.querySelector('.web-agent-sign-in .sign-in-chip[data-provider="github"]').click()`);

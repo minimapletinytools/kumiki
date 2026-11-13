@@ -12,6 +12,7 @@ function installedKumiki() {
         'kumiki/csg/__init__.py': '',
         'kumiki/csg/cutcsg.py': 'def cut_scarf():\n    pass\n',
         'kumiki/patterns/structures/shed.py': 'from kumiki import *\n# a scarf in a shed\n',
+        'kumiki/docs/agent_usage_instructions.md': '# How to write frames\nUse a scarf.\n',
         'kumiki/__pycache__/rule.cpython-313.pyc': 'x',
         'secret.txt': 'not kumiki',
     };
@@ -19,16 +20,18 @@ function installedKumiki() {
         fs.mkdirSync(path.dirname(path.join(site, file)), { recursive: true });
         fs.writeFileSync(path.join(site, file), content);
     }
-    return { source: path.join(site, 'kumiki'), examples: path.join(site, 'kumiki', 'patterns') };
+    return { source: path.join(site, 'kumiki'), examples: path.join(site, 'kumiki', 'patterns'), docs: path.join(site, 'kumiki', 'docs') };
 }
 
 const folders = installedKumiki();
-const tool = kumikiSourceTool({ source: () => folders.source, examples: () => folders.examples });
+const tool = kumikiSourceTool({ docs: () => folders.docs, source: () => folders.source, examples: () => folders.examples });
 const run = async (args) => (await tool.run(args))[0].text;
 
 describe('kumiki_source', () => {
-    test('with nothing asked, lists the library and the examples, each file once, with its length', async () => {
+    test('with nothing asked, lists the docs first, then the library and the examples, each file once', async () => {
         const listed = (await run({})).split('\n');
+        expect(listed[0]).toBe('docs/agent_usage_instructions.md: How to write kumiki frames: the rules to follow. Read it first.');
+        expect(listed.some((line) => line.startsWith('kumiki/docs'))).toBe(false);
         expect(listed).toEqual(expect.arrayContaining(['kumiki/rule.py (30 lines)', 'kumiki/csg/cutcsg.py (3 lines)',
             'examples/structures/shed.py (3 lines)']));
         expect(listed.some((line) => line.startsWith('kumiki/patterns'))).toBe(false);
@@ -49,6 +52,7 @@ describe('kumiki_source', () => {
 
     test('searches the library and the examples, or one folder', async () => {
         expect((await run({ search: 'scarf' })).split('\n')).toEqual([
+            'docs/agent_usage_instructions.md:2: Use a scarf.',
             'kumiki/csg/cutcsg.py:1: def cut_scarf():',
             'examples/structures/shed.py:2: # a scarf in a shed',
         ]);
@@ -57,10 +61,10 @@ describe('kumiki_source', () => {
     });
 
     test('reads nothing outside kumiki, and says when kumiki is not found', async () => {
-        await expect(run({ path: 'kumiki/../secret.txt' })).rejects.toThrow("outside kumiki's source and examples");
-        await expect(run({ search: 'kumiki', path: '../' })).rejects.toThrow("outside kumiki's source and examples");
-        await expect(run({ path: 'kumiki/nope.py' })).rejects.toThrow("isn't in kumiki's source or examples");
+        await expect(run({ path: 'kumiki/../secret.txt' })).rejects.toThrow("outside kumiki's docs, source and examples");
+        await expect(run({ search: 'kumiki', path: '../' })).rejects.toThrow("outside kumiki's docs, source and examples");
+        await expect(run({ path: 'kumiki/nope.py' })).rejects.toThrow("isn't in kumiki's docs, source or examples");
         const none = kumikiSourceTool({ source: () => null, examples: () => null });
-        await expect(none.run({})).rejects.toThrow("kumiki's source isn't found yet");
+        await expect(none.run({})).rejects.toThrow("kumiki isn't found yet");
     });
 });

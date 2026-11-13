@@ -24,8 +24,10 @@ const ask = async (args) => JSON.parse((await tool.run(args))[0].text);
     }, 60000);
 
     test('source longer than it gives says where it stops and how to read on', async () => {
-        const module = await ask({ name: 'kumiki.construction', source: true });
-        expect(module.source_cut).toMatch(/^Only the first \d+ of \d+ lines are shown: read on with kumiki_source, path kumiki\/construction\.py, offset \d+\.$/);
+        const long = await ask({ name: 'PerfectTimberWithin', source: true });
+        expect(long.source_cut).toMatch(/^Only the first \d+ of \d+ lines are shown: read on with kumiki_source, path kumiki\/[\w/]+\.py, offset \d+\.$/);
+        expect((await ask({ name: 'kumiki.construction', source: true })).source)
+            .toBe('Read the module\'s file with kumiki_source, path kumiki/construction.py.');
         expect((await ask({ name: 'inches', source: true })).source_cut).toBeUndefined();
     }, 60000);
 

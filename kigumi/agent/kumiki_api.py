@@ -79,15 +79,25 @@ def members(value):
     return [{"name": key, "kind": type(member).__name__, "summary": first_line(member)} for key, member in named][:MAX_MEMBERS]
 
 
+def kumiki_path(value):
+    """`value`'s file as kumiki_source names it (kumiki/construction.py), or None."""
+    try:
+        file = inspect.getsourcefile(value)
+        package = os.path.dirname(os.path.dirname(os.path.abspath(sys.modules["kumiki"].__file__)))
+        return os.path.relpath(file, package).replace(os.sep, "/")
+    except (TypeError, KeyError):
+        return None
+
+
 def source_cut(value, source):
     """Where the source shown stops, and how to read on with the kumiki_source tool."""
     shown = source[:MAX_SOURCE].count("\n")
     try:
-        start = 1 if inspect.ismodule(value) else inspect.getsourcelines(value)[1]
-        file = inspect.getsourcefile(value)
-        package = os.path.dirname(os.path.dirname(os.path.abspath(sys.modules["kumiki"].__file__)))
-        file = os.path.relpath(file, package).replace(os.sep, "/")
-    except (TypeError, OSError, KeyError):
+        start = inspect.getsourcelines(value)[1]
+    except (TypeError, OSError):
+        start = None
+    file = kumiki_path(value)
+    if start is None or file is None:
         return f"Only the first {shown} lines are shown."
     return (f"Only the first {shown} of {source.count(chr(10)) + 1} lines are shown: read on with "
             f"kumiki_source, path {file}, offset {start + shown}.")
@@ -112,7 +122,10 @@ def describe(name, with_members, with_source):
         found["members_of"] = [m["name"] for m in members(value) if m["kind"] not in ("function", "method")][:50] or None
     if with_members or inspect.ismodule(value):
         found["members"] = members(value)
-    if with_source:
+    if with_source and inspect.ismodule(value):
+        # A module's source is its whole file: kumiki_source reads it a page at a time.
+        found["source"] = f"Read the module's file with kumiki_source, path {kumiki_path(value) or value.__name__}."
+    elif with_source:
         try:
             source = inspect.getsource(value)
         except (TypeError, OSError):

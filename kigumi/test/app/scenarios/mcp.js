@@ -26,7 +26,7 @@ module.exports = {
                 requestInit: { headers: { Authorization: `Bearer ${settings.get('mcp.token')}` } },
             }));
             try {
-                await client.callTool({ name: 'get_workspace_folder', arguments: {} });
+                await client.callTool({ name: 'list_projects', arguments: {} });
                 clientListed = await waitFor(() => details().then((text) => text.includes('1 agent connected')),
                     { timeoutMs: 5000 }).catch(() => false);
             } finally {
