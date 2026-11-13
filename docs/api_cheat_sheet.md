@@ -79,6 +79,7 @@ Example usage of joints can be found in the `patterns` folder in source, you can
 
 | Basic joint signature | When to use |
 |---|---|
+| `cut_basic_practice_board_in_dado_joint_on_plane_aligned_timbers(boards: PanelBoardArrangement, dado_timbers: ExtendedTimberArrangement) -> Joint` | Unimplemented; raises `AssertionError`. |
 | `cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint` |Mitered frame corners. |
 | `cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
 | `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, tongue_thickness: Optional[Numeric]=None, tongue_position: Numeric=scalar(0)) -> Joint` | |
@@ -98,6 +99,26 @@ Example usage of joints can be found in the `patterns` folder in source, you can
 | `cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(housed_timber: TimberLike, receiving_timber: TimberLike, housed_timber_end: TimberEnd, housed_timber_face: TimberLongFace, receiving_timber_shoulder_inset: Numeric=scalar(0)) -> Joint` | |
 | `cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
 | `cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint` | |
+| `cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` |Lapped sill or plate corners. |
+| `cut_basic_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement) -> Joint` | |
+| `cut_basic_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) -> Joint` | |
+| `cut_basic_free_house_joint(housing_timber: TimberLike, housed_timbers: List[Union[TimberLike, CutTimber]]) -> Joint` |Housing shaped around existing members. |
+| `cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers(timbers: List[TimberLike], starting_face_on_first_timber: TimberFace) -> Joint` | |
+| `cut_basic_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint` | |
+| `cut_basic_mortise_and_tenon_joint(arrangement: ButtJointTimberArrangement) -> Joint` | |
+| `cut_basic_round_mortise_and_tenon_joint(arrangement: ButtJointTimberArrangement) -> Joint` | |
+| `cut_basic_round_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint` | |
+| `cut_basic_tongue_and_groove_joint(tongue_board: Board, groove_board: Board) -> Joint` |Joining board edges. |
+| `cut_basic_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards: PanelBoardArrangement, frame_timbers: ExtendedTimberArrangement) -> Joint` | |
+| `cut_basic_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement, dovetail_depth: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric) -> Joint` | |
+| `cut_basic_dovetail_corner_joint(arrangement: CornerJointTimberArrangement, distances: List[Numeric], dovetails: List[SingleDovetailSizeParameter]) -> Joint` |Box and drawer corners. |
+| `cut_basic_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge], radius: Numeric) -> Joint` | |
+| `cut_basic_practice_rounded_end_decoration(timber: BlockLike, rounded_face: TimberFace, rounded_end: TimberFace, radius: Numeric, distance_from_end: Numeric) -> Joint` | |
+| `cut_basic_practice_rafter_tail_scallop_corner_end_decoration(timber: BlockLike, short_edge: Union[TimberShortEdge], scallop_height: Numeric, scallop_length: Numeric) -> Joint` | |
+| `cut_basic_practice_path_extrusion_corner_end_decoration(timber: BlockLike, cut_corner: TimberShortEdge, cut_path: List[PathSegment]) -> Joint` | |
+| `cut_basic_practice_straight_angled_end_cut_decoration(timber: BlockLike, front_face: TimberFace, position_from_end: Numeric) -> Joint` | |
+| `cut_basic_free_dovetail_joint(dovetail_timber: TimberLike, receiving_timber: TimberLike, dovetail: FreeDovetailShape) -> Joint` | |
+| `cut_basic_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, tenon_width_relative_to_joint: Numeric, tenon_height_relative_to_joint: Numeric, tenon_length: Numeric) -> Joint` | |
 
 This is not the complete list of joints. Search patterns to find joints not listed here. (TODO create a complete list of all joints)
 

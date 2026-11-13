@@ -7,11 +7,22 @@ from pathlib import Path
 import pytest
 
 from kumiki.frame_decorators import module_patterns
+from kumiki.joints.workshop import basic_joints
 
 ROOT = Path(__file__).resolve().parents[1]
 JOINTS = ROOT / "kumiki/joints/workshop"
 PATTERNS = ROOT / "patterns"
 CATEGORIES = {"board", "butt", "corner", "cross", "decorative", "free", "mixed", "splice"}
+
+
+def test_implemented_joint_functions_have_basic_entries():
+    for source in JOINTS.rglob("*.py"):
+        if "shavings" in source.parts or source.name == "basic_joints.py":
+            continue
+        for node in ast.parse(source.read_text()).body:
+            if not isinstance(node, ast.FunctionDef) or not node.name.startswith("cut_"):
+                continue
+            assert callable(getattr(basic_joints, node.name.replace("cut_", "cut_basic_", 1), None)), node.name
 
 
 def test_basic_recipes_have_source_examples():
