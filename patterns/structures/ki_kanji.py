@@ -22,28 +22,38 @@ from the post at 45 degrees below the beam, each in a mortise and tenon with one
 The beams' tops arch down to their tips; the side strokes' tops are scooped so they sweep up.
 """
 
+from dataclasses import replace
 from typing import Optional
 
 from kumiki import *
 from kumiki.csg.pathcsg import Path as ProfilePath
 
 
-POST_SIZE = create_v2(inches(4), inches(4))
+POST_SIZE = create_v2(inches(4.5), inches(4))
 BEAM_SIZE = create_v2(inches(4), inches(5))   # 4" through the frame (Y), 5" tall (Z)
 SIDE_STROKE_SIZE = create_v2(inches(4), inches(6))   # 4" through the frame (Y), 6" in its plane
 
-POST_HEIGHT = inches(48)
-BEAM_CENTER_HEIGHT = inches(33)
-BEAM_LENGTH = inches(22)                       # post centerline to beam tip
-SIDE_STROKE_LENGTH = inches(24)                # post centerline to stroke tip
+POST_HEIGHT = inches(29.988)                   # 5% longer than 28.56"
+POST_BASE_HEIGHT = inches(1)                   # the whole frame stands this far off the ground
+BEAM_CENTER_HEIGHT = inches(19.635) + POST_BASE_HEIGHT   # falls with the post it is carried on
+BEAM_LENGTH = inches(13.695)                   # post centerline to beam tip (62.25% of 22")
+SIDE_STROKE_LENGTH = inches(14.94)             # post centerline to stroke tip (62.25% of 24")
 SIDE_STROKE_ANGLE = degrees(45)                # below horizontal
-# Where each side stroke's centerline meets the post's centerline: low enough that its top
-# edge clears the beam's underside.
-SIDE_STROKE_ROOT_HEIGHT = BEAM_CENTER_HEIGHT - BEAM_SIZE[1] / 2 - inches(3, 2)
+SPLINE_EXTRA_DEPTH = inches(3, 4)              # how far the spline stands proud below the beams
+# The scooped top and the crop at the post face leave each stroke's highest point, where it
+# meets the post, this far below its centerline root.
+SIDE_STROKE_TOP_DROP_BELOW_ROOT = inches(1.39)
+# Where each side stroke's centerline meets the post's centerline: high enough that its highest
+# point lands 1 1/2" below the spline's underside, clear of the beams above it.
+SIDE_STROKE_ROOT_HEIGHT = (
+    BEAM_CENTER_HEIGHT - BEAM_SIZE[1] / 2 - SPLINE_EXTRA_DEPTH - inches(3, 2)
+    + SIDE_STROKE_TOP_DROP_BELOW_ROOT
+)
 
 BEAM_CROWN_DROP = inches(3, 2)                 # how far the beam top falls from post to tip
+PEG_STICKOUT = inches(3, 4)                    # how far every peg stands proud of each face
 SIDE_STROKE_TENON_WIDTH = inches(7, 2)         # in the frame's plane, flush with the stroke's underside
-SIDE_STROKE_PEG_FROM_SHOULDER = inches(1)
+SIDE_STROKE_PEG_FROM_SHOULDER = inches(3, 2)   # deeper into the mortise, clear of the outer face
 # Deepest at the peg, measured from the post centerline along the stroke.
 SIDE_STROKE_SCOOP_DEEPEST_AT = POST_SIZE[0] / 2 / cos(SIDE_STROKE_ANGLE) + SIDE_STROKE_PEG_FROM_SHOULDER
 # As deep as it can go there without cutting into the tenon.
@@ -57,6 +67,25 @@ def _top_long_face(timber: Timber) -> TimberLongFace:
 
 def _short_edge(end: TimberEnd, face: TimberLongFace) -> TimberShortEdge:
     return TimberShortEdge[f"{end.name}_{face.name}"]
+
+
+def _pegs_proud_of_both_faces(joint: Joint, through: Numeric, stickout: Numeric) -> Joint:
+    """Return `joint` with each of its pegs reaching `through` and standing `stickout` proud at
+    both ends.
+
+    The splined double butt joint gives its pegs a stick-out of half their depth and no say in
+    it, so the peg accessories it made are rebuilt here with the two lengths we want. The peg
+    holes it cut already pass right through the butt timbers, so the extra reach is clear.
+    """
+    accessories = dict(joint.jointAccessories)
+    for name, accessory in accessories.items():
+        if isinstance(accessory, Peg):
+            accessories[name] = replace(
+                accessory,
+                forward_length=through,
+                stickout_length=stickout,
+            )
+    return Joint(cuttings=joint.cuttings, ticket=joint.ticket, jointAccessories=accessories)
 
 
 def _crown_cut(timber: Timber, end: TimberEnd, run: Numeric, drop: Numeric) -> Joint:
@@ -121,7 +150,7 @@ def _scoop_cut(timber: Timber, deepest_at: Numeric, depth: Numeric) -> Joint:
 @frame
 def ki_kanji(k: Optional[Kiwari] = None) -> Frame:
     post = create_axis_aligned_timber(
-        bottom_position=create_v3(0, 0, 0),
+        bottom_position=create_v3(0, 0, POST_BASE_HEIGHT),
         length=POST_HEIGHT,
         size=POST_SIZE,
         length_direction=TimberFace.TOP,
@@ -171,19 +200,27 @@ def ki_kanji(k: Optional[Kiwari] = None) -> Frame:
         slot_thickness=inches(1),
         slot_depth=inches(2),
         spline_length=inches(14),
-        spline_extra_depth=inches(1, 2),
+        spline_extra_depth=SPLINE_EXTRA_DEPTH,
         slot_symmetric_extra_length=inches(1, 8),
         peg_parameters=SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(inches(3), scalar(0))],
-            size=inches(5, 8),
+            peg_positions=[(inches(3, 2), scalar(0))],
+            size=inches(15, 16),
         ),
+    )
+    # That joint fixes its pegs at half their depth proud; give them 3/4" at each face instead.
+    beam_joint = _pegs_proud_of_both_faces(
+        beam_joint,
+        through=BEAM_SIZE[0] + PEG_STICKOUT,
+        stickout=PEG_STICKOUT,
     )
 
     # Mortises are bored square to the post face and the tenons cropped to them; each stops
     # short of the post's centerline so the two from opposite faces never meet.
     tenon_length = inches(4)
-    mortise_depth = inches(7, 4)
+    # Each mortise is 2" deep, so the two from opposite faces leave a 1/2" gap at the post's
+    # centreline (the post is 4 1/2" wide across X).
+    mortise_depth = inches(2)
 
     def side_stroke_joint(stroke: Timber) -> Joint:
         # Shift the tenon along the stroke's local Y so it is flush with the underside.
@@ -206,8 +243,10 @@ def ki_kanji(k: Optional[Kiwari] = None) -> Frame:
             peg_parameters=SimplePegParameters(
                 shape=PegShape.ROUND,
                 peg_positions=[(SIDE_STROKE_PEG_FROM_SHOULDER, scalar(0))],
-                size=inches(5, 8),
+                size=inches(15, 16),
                 tenon_hole_offset=mm(2),
+                depth=POST_SIZE[1] + PEG_STICKOUT,   # through the post and out the far face
+                stickout_length=PEG_STICKOUT,
             ),
         )
 
