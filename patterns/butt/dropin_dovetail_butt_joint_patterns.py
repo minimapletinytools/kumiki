@@ -23,12 +23,24 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-@pattern("butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", kiwari=ROUND_STOCK)
+OPTIONS = kiwari(
+    round_timbers=kiwari.flag(False),
+    receiving_timber_shoulder_inset=kiwari.length(inches(scalar(1, 2))),
+    dovetail_length=kiwari.length(inches(4)),
+    dovetail_small_width=kiwari.length(inches(scalar(3, 2))),
+    dovetail_angle=kiwari.angle(atan(scalar(3, 16))),
+    dovetail_lateral_offset=kiwari.length(scalar(0)),
+    dovetail_depth=kiwari.length(inches(scalar(5, 2))),
+)
+
+
+@pattern('butt/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers', kiwari=OPTIONS)
 def create_dovetail_butt_joint_example(k: Optional[Kiwari]=None, *, position: Optional[V3]=None) -> Frame:
     """
     Create a dovetail butt joint (蟻仕口 / Ari Shiguchi) using canonical 4"x5"x4' timbers.
     """
-    use_round_timbers = ROUND_STOCK.resolve(k).flag("round_timbers")
+    k = OPTIONS.resolve(k)
+    use_round_timbers = k.flag("round_timbers")
     arrangement = create_canonical_example_butt_joint_timbers(
         position=position,
         timber_config=_maybe_round_timber_config(use_round_timbers),
@@ -42,19 +54,17 @@ def create_dovetail_butt_joint_example(k: Optional[Kiwari]=None, *, position: Op
 
     joint = cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        receiving_timber_shoulder_inset=inches(scalar(1, 2)),  # 0.5" shoulder inset
-        dovetail_length=inches(4),                                # 4" long dovetail tenon
-        dovetail_small_width=inches(scalar(3, 2)),             # 1.5" narrow end
-        dovetail_angle=atan(scalar(3, 16)),                    # Flares from 1.5" to 3" over 4" length
-        dovetail_lateral_offset=scalar(0),                     # Centered
-        dovetail_depth=inches(scalar(5, 2))                    # 2.5" deep cut
+        receiving_timber_shoulder_inset=k.length("receiving_timber_shoulder_inset"),
+        dovetail_length=k.length("dovetail_length"),
+        dovetail_small_width=k.length("dovetail_small_width"),
+        dovetail_angle=k.angle("dovetail_angle"),
+        dovetail_lateral_offset=k.length("dovetail_lateral_offset"),
+        dovetail_depth=k.length("dovetail_depth")
     )
-    
+
     frame = Frame.from_joints(
         [joint],
         name="Dovetail Butt Joint Example (蟻仕口 / Ari Shiguchi)"
     )
-    
+
     return frame
-
-

@@ -371,10 +371,10 @@ def cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     Creates a half-blind tenoned, dadoed, rabbeted scarf joint (金輪継ぎ / Kanawa Tsugi)
     with default proportions.
 
-    Stepped shoulder depth is 1/5 of timber 1's dimension in front_face_on_timber1 normal axis.
-    Scarf length is 4× stepped shoulder depth.
-    Dado depth and height are 1/5 of stepped shoulder depth.
-    Stub tenon width is 1/5 of stepped shoulder depth.
+    Timber width is timber1's dimension normal to front_face_on_timber1.rotate_right().
+    Rebated shoulder depth, dado depth and height, and stub tenon width are 1/5 of
+    that width. Scarf length is 4 times that width. An unset front face defaults
+    to FRONT.
 
     Args:
         arrangement: Splice joint timber arrangement. Timbers must be face-aligned with parallel axes.

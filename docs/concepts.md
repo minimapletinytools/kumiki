@@ -35,13 +35,11 @@ All timbers and boards are oriented, with the grain running from the `BOTTOM` to
 
 Timbers are referenced in their own local coordinate system, which is also referred to as a `Transform` or `MarkingSpace`.
 
-The *bottom point* of a timber is on the bottom face of the timber and in the center of its cross section. The bottom point is located at the origin of the timber's local coordinate system.
+The *bottom point* of a timber is on the bottom (-z) face of the timber and in the center of its cross section. The bottom point is located at the origin of the timber's local coordinate system.
 
-The *centerline* of the timber is the line that runs from bottom to top.
+The *centerline* of the timber is the line that runs from bottom to top (+z). 
 
-`bottom_position` (in `create_timber`, `create_axis_aligned_timber` and the like) is this bottom point, in world space: the center of the timber's bottom end, not a corner. For a timber lying flat, its Z is the height of the centerline, so a timber 200 mm tall resting on the ground has a `bottom_position` Z of 100 mm (at Z = 0 it would sit half below the ground), and its X and Y are the middle of its end. `size` is `(width, height)`: the width runs along `width_direction`, the height along the third axis.
-
-By default, a timber is oriented with its bottom cross section centered on the XY plane and running up in the Z direction. We use the following names for each axis
+By default, a timber is oriented with its bottom cross section centered on the XY plane and running up in the z direction. We use the following names for each local axis
 
 - Z axis: *length axis* of the timber, and the *length* of the timber is its dimension in this axis
 - X axis: *width axis* of the timber, and the *width* of the timber is its dimension in this axis
@@ -59,12 +57,12 @@ When we do care about referencing a specific face, we may do so relative to its 
 
 ```
 class TimberFace(Enum):
-    TOP = 1 # the face vector with normal vector in the +Z axis direction
-    BOTTOM = 2 # the face vector with normal vector in the -Z axis direction
-    RIGHT = 3 # the face vector with normal vector in the +X axis direction
-    FRONT = 4 # the face vector with normal vector in the +Y axis direction
-    LEFT = 5 # the face vector with normal vector in the -X axis direction
-    BACK = 6 # the face vector with normal vector in the -Y axis direction
+    TOP = 1 # the face pointing in the local +Z axis direction
+    BOTTOM = 2 # -Z 
+    RIGHT = 3 # +X
+    FRONT = 4 # +Y
+    LEFT = 5 # -X
+    BACK = 6 # -Y
 ```
 
 ## perfect timber within and imperfect timbers

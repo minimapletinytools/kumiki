@@ -13,12 +13,22 @@ TIMBER_LENGTH = inches(48)
 TIMBER_SIZE_2D = create_v2(TIMBER_WIDTH, TIMBER_HEIGHT)
 
 
-@pattern("splice_joints/rebated_oblique_and_dadoed_scarf_joint")
-def create_rebated_oblique_and_dadoed_scarf_example(position: Optional[V3]=None) -> Frame:
+SCARF = kiwari(
+    length=kiwari.length(inches(10), minimum=inches(4)),
+    shoulder_depth=kiwari.length(inches(1), minimum=inches(1, 4)),
+    dado_depth=kiwari.length(inches(1), minimum=inches(1, 4)),
+    dado_height=kiwari.length(inches(3, 2), minimum=inches(1, 4)),
+    tenon_width=kiwari.length(inches(3, 2), minimum=inches(1, 4)),
+)
+
+
+@pattern('splice/rebated_oblique_and_dadoed_scarf_joint', kiwari=SCARF)
+def create_rebated_oblique_and_dadoed_scarf_example(k: Optional[Kiwari] = None, *, position: Optional[V3] = None) -> Frame:
     """
     Create a rebated oblique and dadoed scarf joint (Kanawa Tsugi
     style) example using two 4"x5"x4' timbers.
     """
+    k = SCARF.resolve(k)
     if position is None:
         position = create_v3(scalar(0), scalar(0), scalar(0))
 
@@ -51,11 +61,11 @@ def create_rebated_oblique_and_dadoed_scarf_example(position: Optional[V3]=None)
 
     joint = cut_rebated_oblique_and_dadoed_scarf_joint_on_aligned_timbers(
         arrangement=arrangement,
-        rebated_shoulder_depth=inches(1),
-        scarf_length=inches(10),
-        dado_depth=inches(1),
-        dado_height=inches(1.5),
-        stub_tenon_width=inches(1.5),
+        rebated_shoulder_depth=k.length("shoulder_depth"),
+        scarf_length=k.length("length"),
+        dado_depth=k.length("dado_depth"),
+        dado_height=k.length("dado_height"),
+        stub_tenon_width=k.length("tenon_width"),
         joint_center_relative_to_timber1_end=overlap,
     )
 
@@ -63,11 +73,3 @@ def create_rebated_oblique_and_dadoed_scarf_example(position: Optional[V3]=None)
         [joint],
         name="Rebated Oblique and Dadoed Scarf Joint",
     )
-
-
-create_half_blind_tenoned_dadoed_rabbeted_scarf_example = create_rebated_oblique_and_dadoed_scarf_example
-
-
-@pattern("splice_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint")
-def half_blind_tenoned_dadoed_rabbeted_scarf_joint_pattern() -> Frame:
-    return create_half_blind_tenoned_dadoed_rabbeted_scarf_example()

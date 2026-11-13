@@ -29,13 +29,13 @@ def _post_on_beam_with_dovetail(position, taper_angle):
     return cut_free_dovetail_joint(post, beam, dovetail)
 
 
-@pattern("free_joints/free_dovetail_joint/sliding", tags=["main"])
+@pattern('free/free_dovetail_joint/sliding', tags=["main"])
 def example_free_sliding_dovetail(position=None) -> Joint:
     """A straight sliding dovetail."""
     return _post_on_beam_with_dovetail(position, scalar(0))
 
 
-@pattern("free_joints/free_dovetail_joint/tapered")
+@pattern('free/free_dovetail_joint/tapered')
 def example_free_tapered_dovetail(position=None) -> Joint:
     """The same, tapering toward its forward end, so it tightens as it slides home."""
     return _post_on_beam_with_dovetail(position, degrees(5))

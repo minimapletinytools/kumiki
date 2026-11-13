@@ -54,6 +54,6 @@ def make_splice_joint_example(position: V3, use_round_timbers=False) -> list[Cut
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern("splice_joints/plain_butt_splice_joint", tags=["main"])
+@pattern('splice/plain_butt_splice_joint', tags=["main"])
 def plain_butt_splice_joint_pattern() -> Frame:
     return Frame(cut_timbers=make_splice_joint_example(create_v3(0, 0, 0)), name='Plain Butt Splice Joint')

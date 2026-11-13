@@ -18,39 +18,9 @@ create_v2(x, y)                   # a size (width, height), or a point on the fo
 create_v3(x, y, z)                # a point in the world; Z is up
 ```
 
-## Timbers
+## Creating Timbers
 
-```python
-create_axis_aligned_timber(bottom_position, length, size, length_direction, width_direction=None, ticket=None) -> Timber
-```
-
-- `bottom_position` is the center of the timber's bottom end, not a corner: a timber lying flat at Z = 0 is half below the ground.
-- `size` is `(width, height)`: the width runs along `width_direction`, the height along the third axis.
-- `length_direction` and `width_direction` are `TimberFace`s naming world directions: `TOP` is +Z, `RIGHT` +X, `FRONT` +Y.
-- `ticket` is the timber's name (a string), or a `TimberTicket(path, material=None, reference_features=(), tags=())`.
-
-### Which way each face looks
-
-A timber's `TOP` face looks along its `length_direction`, `RIGHT` along its `width_direction`, and
-`FRONT` along the third axis (length × width); `BOTTOM`, `LEFT` and `BACK` are their opposites. The
-four long faces (`TimberLongFace`: `RIGHT`, `LEFT`, `FRONT`, `BACK`) are the ones a joint's
-`front_face_on_*` names. For the usual placements:
-
-| Timber | `length_direction` | `width_direction` | TOP | RIGHT | FRONT | BOTTOM | LEFT | BACK |
-|---|---|---|---|---|---|---|---|---|
-| Post standing up | `TOP` | `RIGHT` | +Z | +X | +Y | -Z | -X | -Y |
-| Post standing up | `TOP` | `FRONT` | +Z | +Y | -X | -Z | -Y | +X |
-| Beam along X | `RIGHT` | `FRONT` | +X | +Y | +Z | -X | -Y | -Z |
-| Beam along X | `RIGHT` | `TOP` | +X | +Z | -Y | -X | -Z | +Y |
-| Beam along Y | `FRONT` | `RIGHT` | +Y | +X | -Z | -Y | -X | +Z |
-| Beam along Y | `FRONT` | `TOP` | +Y | +Z | +X | -Y | -Z | -X |
-
-A board lying flat is a beam whose `size` is (its width, its thickness), with `width_direction`
-along the floor: its `FRONT` and `BACK` are the broad faces. For a timber made any other way (a
-`join_*` timber, one at an angle), build the frame and read its faces off Kigumi's `describe_frame`
-rather than working them out.
-
-On a footprint, which keeps timbers on the ground:
+make a footprint first and add timbers to it:
 
 ```python
 Footprint(corners=(create_v2(...), ...))   # the corners, in order around it
@@ -60,7 +30,7 @@ create_horizontal_timber_on_footprint(footprint, corner_index, location_type, si
 # location_type: FootprintLocation.INSIDE (the usual), OUTSIDE or CENTER
 ```
 
-Between two timbers:
+join timbers together:
 
 ```python
 join_face_aligned_on_face_aligned_timbers(timber1, timber2, location_on_timber1, stickout, size, lateral_offset_from_timber1=0,
@@ -70,14 +40,25 @@ join_timbers(timber1, timber2, location_on_timber1, location_on_timber2=None, la
 # stickout: Stickout.nostickout() to end at the two timbers' centerlines
 ```
 
-The new timber's `BOTTOM` end is at `timber1`, its `TOP` end at `timber2`.
+creating timbers with no relations
 
+```python
+create_axis_aligned_timber(bottom_position, length, size, length_direction, width_direction=None, ticket=None) -> Timber
+create_timber(length: Numeric, size: V2, bottom_position: V3,
+                          length_direction: Direction3D, width_direction: Direction3D,
+                          ticket: Optional[Union[TimberTicket, str]] = None) -> 'Timber'
+```
+
+- `bottom_position` is the center of the timber's bottom end, not a corner: a timber lying flat at Z = 0 is half below the ground.
+- `size` is `(width, height)`: the width runs along `width_direction`, the height along the third axis.
+- `length_direction` and `width_direction` are `TimberFace`s naming world directions: `TOP` is +Z, `RIGHT` +X, `FRONT` +Y.
+- `ticket` is the timber's name (a string), or a `TimberTicket(path, material=None, reference_features=(), tags=())`.
 
 ## Joints
 
 ### Arrangements
 
-Most joint functions take an arrangement naming the timbers, which ends meet, and (when needed) a reference long face (`TimberLongFace.FRONT`, `BACK`, `LEFT` or `RIGHT`):
+Most joint functions take an arrangement naming the timbers in the joint and the "orientation" of the joint.
 
 ```python
 ButtJointTimberArrangement(butt_timber, receiving_timber, butt_timber_end,
@@ -87,74 +68,51 @@ DoubleButtJointTimberArrangement(butt_timber_1, butt_timber_2, receiving_timber,
 CornerJointTimberArrangement(timber1, timber2, timber1_end, timber2_end, front_face_on_timber1=None)
 CrossJointTimberArrangement(timber1, timber2, front_face_on_timber1=None)
 SpliceJointTimberArrangement(timber1, timber2, timber1_end, timber2_end, front_face_on_timber1=None)
-# ends: TimberEnd.BOTTOM or TimberEnd.TOP
+# ends: TimberEnd.BOTTOM/TOP
+# faces: TimberLongFace.LEFT/RIGHT/FRONT/BACK
 ```
 
 ### Common Joints
 
-The ones to use when the user names no joint (the agent usage instructions, "default joints"):
+A list of joints to use dependening on the application. Always use for the `cut_basic_*` variants first (they size the cut from the timbers); call the underlying `cut_*` function when you need more control over its parameters.
 
-- butt joint (a beam, rail or leg ending on the side of another timber): `cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers`
-- corner joint (two timbers ending at a corner): `cut_basic_plain_miter_joint` or `cut_plain_corner_lap_joint_on_plane_aligned_timbers`
-- splice joint (two timbers end to end): `cut_basic_plain_splice_lap_joint_on_aligned_timbers`
-- cross joint (two timbers crossing): `cut_basic_plain_cross_lap_joint_on_face_aligned_timbers`
+Example usage of joints can be found in the `patterns` folder in source, you can search for them using `kumiki_source(search="pattern")` tool.
 
-Reach for the `cut_basic_*` variants first (they size the cut from the timbers); call the underlying `cut_*` function when you need explicit dimensions.
 
-```python
-# Butt joints (beam into post, joist into beam)
-cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber, mortise_timber, tenon_end, use_peg=False) -> Joint
-cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber, mortise_timber, tenon_end) -> Joint
-cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(housed_timber, receiving_timber, housed_timber_end,
-                                                           housed_timber_face, receiving_timber_shoulder_inset=0) -> Joint
-cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(dovetail_timber, receiving_timber, dovetail_timber_end,
-                                                             dovetail_timber_face, receiving_timber_shoulder_inset, ...) -> Joint
-cut_basic_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint
-cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: DoubleButtJointTimberArrangement,
-                                                                     slot_facing_end_on_receiving_timber: TimberEnd) -> Joint
+| Basic joint signature | When to use |
+|---|---|
+| `cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint` |Mitered frame corners. |
+| `cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
+| `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, tongue_thickness: Optional[Numeric]=None, tongue_position: Numeric=scalar(0)) -> Joint` | |
+| `cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement: ButtJointTimberArrangement, tongue_thickness: Optional[Numeric]=None, tongue_position: Numeric=scalar(0), shoulder_inset: Numeric=scalar(0)) -> Joint` | |
+| `cut_basic_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint` |Plain contact between members. |
+| `cut_basic_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint` | |
+| `cut_basic_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint` | |
+| `cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint` | |
+| `cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint` | |
+| `cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: DoubleButtJointTimberArrangement, slot_facing_end_on_receiving_timber: TimberEnd) -> Joint` | |
+| `cut_basic_plain_splice_lap_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint` |Lengthening a timber. |
+| `cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint` | |
+| `cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber: TimberLike, mortise_timber: TimberLike, tenon_end: TimberEnd, use_peg: bool=False) -> Joint` |A beam into a post, or a rail into a leg. |
+| `cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(tenon_timber: TimberLike, mortise_timber: TimberLike, tenon_end: TimberEnd) -> Joint` | |
+| `cut_basic_lapped_gooseneck_joint_on_aligned_timbers(gooseneck_timber: TimberLike, receiving_timber: TimberLike, receiving_timber_end: TimberEnd, gooseneck_timber_face: TimberLongFace) -> Joint` | |
+| `cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(dovetail_timber: TimberLike, receiving_timber: TimberLike, dovetail_timber_end: TimberEnd, dovetail_timber_face: TimberLongFace, receiving_timber_shoulder_inset: Numeric, dovetail_length: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric) -> Joint` | |
+| `cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(housed_timber: TimberLike, receiving_timber: TimberLike, housed_timber_end: TimberEnd, housed_timber_face: TimberLongFace, receiving_timber_shoulder_inset: Numeric=scalar(0)) -> Joint` | |
+| `cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint` | |
+| `cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint` | |
 
-# Corner joints (mudsills, plates, rafters at a peak)
-cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint
-cut_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint
-cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint
-cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement,
-                                                                tongue_thickness=None, tongue_position=0) -> Joint
+This is not the complete list of joints. Search patterns to find joints not listed here. (TODO create a complete list of all joints)
 
-# Cross joints (crossing beams or boards)
-cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint
-cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint
+## Creating the frame
 
-# Splice joints (extending sills, girts or plates end-to-end)
-cut_basic_plain_splice_lap_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint
-cut_basic_lapped_gooseneck_joint_on_aligned_timbers(gooseneck_timber, receiving_timber,
-                                                    receiving_timber_end, gooseneck_timber_face) -> Joint
-cut_basic_kanawa_tsugi_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint
+Your kumiki project is not done until there is a `@frame` decorated function that returns a Frame. Always use Frame.from_joints and pass in the list of joint objects returned by the joint functions above. If Only use `additional_unjointed_timbers` if there are timbers that have no joints.
+
 ```
-
-### Which joint for the job
-
-Each with a pattern file that uses it (in `patterns/`, read-only); start from that file's call.
-
-| The job | Joint | Pattern |
-|---|---|---|
-| Beam or girt into the side of a post, pegged | `cut_mortise_and_tenon_joint_on_face_aligned_timbers` (basic variant first, `use_peg=True`) | `mixed/mortise_and_tenon_joints_patterns.py` |
-| Leg into a seat or top; apron or rail into a leg | `cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers` | `basic_joints_patterns.py` |
-| Tie beam, or a beam under heavy load, into a post | `cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` | `butt/wedged_half_dovetail_joint_patterns.py` |
-| Joist into a beam or sill | `cut_dropin_housed_butt_joint_on_face_aligned_timbers`; the dovetail version below if it must not pull out | `butt/dropin_housed_butt_joint_patterns.py` |
-| Shelf into the side of a case, dovetailed | `cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers` | `butt/dropin_dovetail_butt_joint_patterns.py` |
-| Shelf into the side of a case, plain (a dado) | `cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers` | `butt/dropin_housed_butt_joint_patterns.py` |
-| Two butt timbers into one timber from opposite sides | `cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers` | `butt/splined_opposing_double_butt_joint_patterns.py` |
-| Sills or plates meeting at a corner | `cut_plain_corner_lap_joint_on_plane_aligned_timbers` (simplest); `cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers` (no end grain shows) | `corner/plain_corner_lap_joint_patterns.py` |
-| A frame or box corner, mitered | `cut_basic_plain_miter_joint` | `corner/plain_miter_joint_patterns.py` |
-| Box or drawer corner, dovetailed | `cut_dovetail_corner_joint` | `corner/dovetail_corner_joint_patterns.py` |
-| Two rafters meeting at the ridge | `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers` | `corner/tongue_and_fork_corner_joint_patterns.py` |
-| Two timbers crossing, both notched | `cut_basic_plain_cross_lap_joint_on_face_aligned_timbers` | `basic_joints_patterns.py` |
-| One timber crossing in a housing in the other | `cut_basic_plain_house_joint_on_face_aligned_timbers` | `basic_joints_patterns.py` |
-| Lengthening a timber, simply | `cut_basic_plain_splice_lap_joint_on_aligned_timbers` | `splice/plain_splice_lap_joint_patterns.py` |
-| Lengthening a sill (gooseneck facing up) | `cut_lapped_gooseneck_joint_on_aligned_timbers` | `splice/lapped_gooseneck_joint_patterns.py` |
-| A placeholder only: it holds against nothing | `cut_basic_plain_butt_joint_on_face_aligned_timbers` | `butt/plain_butt_joint_patterns.py` |
-
-## The frame
+def from_joints(cls, joints: List[Joint],
+                    additional_unjointed_timbers: Optional[List[PerfectTimberWithin]] = None,
+                    name: Optional[str] = None,
+                    kiwari: Optional['Kiwari'] = None) -> 'Frame': 
+```
 
 ```python
 @frame
@@ -163,39 +121,8 @@ def my_frame(k: Optional[Kiwari] = None) -> Frame:
     return Frame.from_joints(joints, additional_unjointed_timbers=None, name="my frame", kiwari=k)
 ```
 
-## Example: A complete small frame
 
-Four posts on a footprint, a beam along the top of each long side, and a rail across each end, all
-in basic mortise and tenons. It builds, and every timber meets the rest.
+## Examples
 
-```python
-# Last checked on kumiki 0.9.0
-from typing import Optional
-from kumiki import *
-
-POST = create_v2(inches(4), inches(4))
-BEAM = create_v2(inches(4), inches(6))
-POST_HEIGHT = feet(3)
-
-
-@frame
-def bench(k: Optional[Kiwari] = None) -> Frame:
-    # A 4' x 2' rectangle on the ground, its corners in order around it.
-    footprint = Footprint(corners=(create_v2(0, 0), create_v2(feet(4), 0), create_v2(feet(4), feet(2)), create_v2(0, feet(2))))
-    posts = [create_vertical_timber_on_footprint_corner(footprint, i, POST_HEIGHT, FootprintLocation.INSIDE, POST,
-                                                        ticket=f"post {i}") for i in range(4)]
-    # A beam between the tops of each long side's posts.
-    beams = [join_face_aligned_on_face_aligned_timbers(posts[a], posts[b], location_on_timber1=POST_HEIGHT - BEAM[1] / 2,
-                                                       stickout=Stickout.nostickout(), size=BEAM, ticket=name)
-             for a, b, name in [(0, 1, "front beam"), (3, 2, "back beam")]]
-    # A rail at each end, a foot up, tying the two sides together.
-    rails = [join_face_aligned_on_face_aligned_timbers(posts[a], posts[b], location_on_timber1=feet(1),
-                                                       stickout=Stickout.nostickout(), size=POST, ticket=name)
-             for a, b, name in [(1, 2, "right rail"), (0, 3, "left rail")]]
-    # Each beam or rail is tenoned into the posts at its ends: its BOTTOM end into the first, TOP into the second.
-    spans = [(beams[0], posts[0], posts[1]), (beams[1], posts[3], posts[2]), (rails[0], posts[1], posts[2]), (rails[1], posts[0], posts[3])]
-    joints = [cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(span, post, end)
-              for span, first, second in spans
-              for post, end in [(first, TimberEnd.BOTTOM), (second, TimberEnd.TOP)]]
-    return Frame.from_joints(joints, name="bench", kiwari=k)
-```
+See all examples in the `patterns/structures` folder and using the `kumiki_source` tool.
+These examples are the best API reference. Unless the user asks for just like the example, it may be better to build from the ground up rather than adapt an example.

@@ -89,7 +89,7 @@ def make_tongue_and_fork_butt_joint_angled_inset_example(position: V3, use_round
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
+def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbers=False, shoulder_inset=scalar(0)) -> list[CutTimber]:
     """
     Create a tongue-and-fork butt joint at 138 degrees, shoulder flush with the receiving
     (fork) timber's entry face (no inset).
@@ -123,23 +123,28 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
         receiving_timber=receiving_timber,
         butt_timber_end=TimberEnd.BOTTOM,
     )
-    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
+    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement, shoulder_inset=shoulder_inset)
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern("butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_90", tags=["main"], kiwari=ROUND_STOCK)
+@pattern('butt/tongue_and_fork/tongue_and_fork_butt_joint_90', tags=["main"], kiwari=ROUND_STOCK)
 def tongue_and_fork_butt_joint_90_pattern(k: Optional[Kiwari] = None) -> Frame:
     on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
     return Frame(cut_timbers=make_tongue_and_fork_butt_joint_90_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Tongue and Fork Butt Joint 90°")
 
 
-@pattern("butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled", kiwari=ROUND_STOCK)
+ANGLED_OPTIONS = kiwari(
+    round_timbers=kiwari.flag(False),
+    shoulder_inset=kiwari.length(scalar(0), minimum=scalar(0)),
+)
+
+
+@pattern('butt/tongue_and_fork/tongue_and_fork_butt_joint_angled', kiwari=ANGLED_OPTIONS)
 def tongue_and_fork_butt_joint_angled_pattern(k: Optional[Kiwari] = None) -> Frame:
-    on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
-    return Frame(cut_timbers=make_tongue_and_fork_butt_joint_angled_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Tongue and Fork Butt Joint (Angled)")
+    on_round = ANGLED_OPTIONS.resolve(k).flag("round_timbers")
+    return Frame(cut_timbers=make_tongue_and_fork_butt_joint_angled_example(create_v3(0, 0, 0), use_round_timbers=on_round, shoulder_inset=ANGLED_OPTIONS.resolve(k).length("shoulder_inset")), name="Tongue and Fork Butt Joint (Angled)")
 
 
-@pattern("butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled_inset", kiwari=ROUND_STOCK)
 def tongue_and_fork_butt_joint_angled_inset_pattern(k: Optional[Kiwari] = None) -> Frame:
     on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
     return Frame(cut_timbers=make_tongue_and_fork_butt_joint_angled_inset_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Tongue and Fork Butt Joint (Angled + Inset)")

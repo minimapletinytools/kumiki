@@ -382,3 +382,25 @@ def example_basic_tusked_mortise_and_tenon_joint(position=None) -> Joint:
     return joint
 
 
+
+from kumiki.joints.workshop.basic_joints import (
+    cut_basic_plain_butt_joint,
+    cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers,
+)
+
+
+@pattern("basic_joints/plain_butt_joint/angled")
+def basic_plain_butt_angled() -> Joint:
+    """Cut a plain butt joint on a brace arrangement."""
+    from kumiki.example_shavings import create_canonical_example_brace_joint_timbers
+    from kumiki.construction import ButtJointTimberArrangement
+    brace = create_canonical_example_brace_joint_timbers()
+    return cut_basic_plain_butt_joint(ButtJointTimberArrangement(
+        brace.brace_timber, brace.timber1, TimberEnd.BOTTOM))
+
+
+@pattern("basic_joints/tongue_and_fork_butt_joint")
+def basic_tongue_and_fork_butt() -> Joint:
+    """Cut a tongue-and-fork butt joint with default proportions."""
+    return cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
+        create_canonical_example_butt_joint_timbers())

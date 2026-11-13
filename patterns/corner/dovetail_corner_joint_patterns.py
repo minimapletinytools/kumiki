@@ -1,47 +1,34 @@
 # Last checked on kumiki 0.9.0
-"""
-Dovetail Corner Joint Patterns
-"""
+"""Through and half-blind dovetail corners."""
 
+from typing import Optional
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_right_angle_corner_joint_timbers
 
-
-def _make_dovetail_corner_joint_example(position: V3, depth=None) -> list[CutTimber]:
-    """
-    Create a dovetail corner joint on the canonical right-angle corner timbers.
-
-    The canonical timbers are 4x5, laid out across the 4" axis and reaching 5" into
-    timber2, so a 1:8 flare opens each dovetail by 0.625 a side over a through cut.
-    Two dovetails centered 1" and 3" in from the front face fit that with room to spare.
-    """
-    arrangement = create_canonical_example_right_angle_corner_joint_timbers(position=position)
-    joint = cut_dovetail_corner_joint(
-        arrangement,
-        distances=[inches(1), inches(2)],
-        dovetails=[
-            SingleDovetailSizeParameter(angle=atan(scalar(1, 8)), small_width=inches(scalar(1, 2)), depth=depth)
-            for _ in range(2)
-        ],
-    )
-    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
+DOVETAIL = kiwari(
+    small_width=kiwari.length(inches(1, 2), minimum=inches(1, 8)),
+    angle=kiwari.angle(atan(scalar(1, 8))),
+    first_distance=kiwari.length(inches(1)),
+    spacing=kiwari.length(inches(2)),
+)
+HALF_BLIND = kiwari(**dict(DOVETAIL.declarations), depth=kiwari.length(inches(5, 2)))
 
 
-def make_through_dovetail_corner_joint_example(position: V3) -> list[CutTimber]:
-    """Through dovetails: they run the full thickness of timber2 and show on its far face."""
-    return _make_dovetail_corner_joint_example(position)
+def _dovetail(k: Kiwari, depth: Optional[Numeric]) -> Joint:
+    return cut_dovetail_corner_joint(
+        create_canonical_example_right_angle_corner_joint_timbers(),
+        distances=[k.length("first_distance"), k.length("spacing")],
+        dovetails=[SingleDovetailSizeParameter(
+            angle=k.angle("angle"), small_width=k.length("small_width"), depth=depth)
+            for _ in range(2)])
 
 
-def make_half_blind_dovetail_corner_joint_example(position: V3) -> list[CutTimber]:
-    """Half blind dovetails: they stop short, so timber2's far face stays unbroken."""
-    return _make_dovetail_corner_joint_example(position, depth=inches(scalar(5, 2)))
+@pattern("corner/dovetail_corner_joint/through", kiwari=DOVETAIL)
+def through(k: Optional[Kiwari] = None) -> Joint:
+    return _dovetail(DOVETAIL.resolve(k), None)
 
 
-@pattern("corner_joints/dovetail_corner_joint/cut_dovetail_corner_joint")
-def cut_dovetail_corner_joint_pattern() -> Frame:
-    return Frame(cut_timbers=make_through_dovetail_corner_joint_example(create_v3(0, 0, 0)), name='Through Dovetail Corner Joint')
-
-
-@pattern("corner_joints/dovetail_corner_joint/cut_dovetail_corner_joint_half_blind")
-def cut_dovetail_corner_joint_half_blind_pattern() -> Frame:
-    return Frame(cut_timbers=make_half_blind_dovetail_corner_joint_example(create_v3(0, 0, 0)), name='Half Blind Dovetail Corner Joint')
+@pattern("corner/dovetail_corner_joint/half_blind", kiwari=HALF_BLIND)
+def half_blind(k: Optional[Kiwari] = None) -> Joint:
+    k = HALF_BLIND.resolve(k)
+    return _dovetail(k, k.length("depth"))

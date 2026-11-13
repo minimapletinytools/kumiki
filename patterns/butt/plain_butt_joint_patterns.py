@@ -114,13 +114,13 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-@pattern("butt_joints/plain_butt_joint/plain_butt_joint", kiwari=ROUND_STOCK)
+@pattern('butt/plain_butt_joint/plain_butt_joint', kiwari=ROUND_STOCK)
 def plain_butt_joint_pattern(k: Optional[Kiwari] = None) -> Frame:
     on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
     return Frame(cut_timbers=make_butt_joint_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Plain Butt Joint")
 
 
-@pattern("butt_joints/plain_butt_joint/plain_butt_joint_3d", kiwari=ROUND_STOCK)
+@pattern('butt/plain_butt_joint/plain_butt_joint_3d', kiwari=ROUND_STOCK)
 def plain_butt_joint_3d_pattern(k: Optional[Kiwari] = None) -> Frame:
     on_round = ROUND_STOCK.resolve(k).flag("round_timbers")
     return Frame(cut_timbers=make_butt_joint_3d_angles_example(create_v3(0, 0, 0), use_round_timbers=on_round), name="Plain Butt Joint (3D)")

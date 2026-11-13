@@ -482,10 +482,3 @@ Then a roof is modeled with boards slanted boards, and the previous vertical tim
 Windows:
 
 You can model windows by using free_difference_joint to cut recesses or holes the wall  (todo make this joint, just free house joint except the housed timber isn't included in the final joint (or alternatively, include it but cut it away entirely))
-
-
-
-
-# Creating new Patterns
-
-TODO

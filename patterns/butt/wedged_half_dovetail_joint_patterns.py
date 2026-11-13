@@ -26,7 +26,17 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-@pattern("butt_joints/wedged_half_dovetail_mortise_and_tenon", kiwari=ROUND_STOCK)
+OPTIONS = kiwari(
+    round_timbers=kiwari.flag(False),
+    tenon_depth=kiwari.length(inches(4)),
+    dovetail_depth=kiwari.length(inches(1, 2)),
+    mortise_shoulder_inset=kiwari.length(inches(1, 2)),
+    receiving_timber_mortise_extra_depth=kiwari.length(inches(1, 2)),
+    wedge_angle=kiwari.angle(degrees(8)),
+)
+
+
+@pattern('butt/wedged_half_dovetail_mortise_and_tenon', kiwari=OPTIONS)
 def example_wedged_half_dovetail_mortise_and_tenon(k: Optional[Kiwari]=None, *, position=None) -> Joint:
     """
     Wedged half-dovetail mortise and tenon joint on the canonical 4"x5"x4'
@@ -34,7 +44,8 @@ def example_wedged_half_dovetail_mortise_and_tenon(k: Optional[Kiwari]=None, *, 
     of the butt timber, which aligns with the receiving timber's length axis.
     A wedge accessory is included to lock the tenon.
     """
-    use_round_timbers = ROUND_STOCK.resolve(k).flag("round_timbers")
+    k = OPTIONS.resolve(k)
+    use_round_timbers = k.flag("round_timbers")
     if position is None:
         position = create_v3(0, 0, 0)
 
@@ -48,15 +59,13 @@ def example_wedged_half_dovetail_mortise_and_tenon(k: Optional[Kiwari]=None, *, 
     return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
         tenon_size=Matrix([inches(2), inches(4)]),
-        tenon_depth=inches(4),
-        dovetail_depth=inches(1, 2),
-        mortise_shoulder_inset=inches(1, 2),
-        receiving_timber_mortise_extra_depth=inches(1, 2),
+        tenon_depth=k.length("tenon_depth"),
+        dovetail_depth=k.length("dovetail_depth"),
+        mortise_shoulder_inset=k.length("mortise_shoulder_inset"),
+        receiving_timber_mortise_extra_depth=k.length("receiving_timber_mortise_extra_depth"),
         wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
-            wedge_angle=degrees(8),
+            wedge_angle=k.angle("wedge_angle"),
             wedge_tip_stickout=inches(1),
             wedge_back_extra_length=inches(1),
         ),
     )
-
-
