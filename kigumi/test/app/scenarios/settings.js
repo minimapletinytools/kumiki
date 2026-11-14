@@ -17,6 +17,16 @@ module.exports = {
         const items = (menu) => (menu ? menu.items.flatMap((item) => [item, ...items(item.submenu)]) : []);
         const language = items(Menu.getApplicationMenu()).find((item) => item.label === 'Language');
         const choices = language ? language.submenu.items.map((item) => `${item.label}${item.checked ? ' *' : ''}`) : [];
+        const top = Menu.getApplicationMenu().items.map((item) => item.label);
+        const helpMenu = Menu.getApplicationMenu().items.find((item) => item.label === 'Help');
+        const helpItems = helpMenu ? helpMenu.submenu.items.filter((item) => item.type !== 'separator').map((item) => item.label) : [];
+        const all = items(Menu.getApplicationMenu()).map((item) => item.label);
+        check('the menus are Kigumi, File and Help; Help links the website, the docs, Discord and GitHub Discussions; '
+            + 'About Kigumi is in the Kigumi menu, and there is no Toggle Developer Tools',
+            JSON.stringify(top) === JSON.stringify(process.platform === 'darwin' ? ['Kigumi', 'File', 'Help'] : ['File', 'Kigumi', 'Help'])
+                && JSON.stringify(helpItems) === JSON.stringify(['Kumiki Website', 'Documentation', 'Discord', 'GitHub Discussions'])
+                && all.includes('About Kigumi') && !all.includes('Toggle Developer Tools'),
+            JSON.stringify({ top, helpItems }));
         check('the Language menu offers Default (checked), English and 日本語', settings.get('app.language') === 'default'
             && choices.join(', ') === 'Default (system language) *, English, 日本語', choices.join(', '));
     },

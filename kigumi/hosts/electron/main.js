@@ -782,15 +782,25 @@ function buildMenu() {
                 { label: 'Show Log', ...keyed('app.showLog'), click: () => openLogTab() },
                 { label: 'Open Logs Folder', click: () => electronShell.openPath(path.dirname(logChannel.filePath)) },
                 { role: 'togglefullscreen' },
-                { type: 'separator' },
-                command('Kumiki Website', 'kigumi.openWebsite'),
                 ...(isMac ? [{ type: 'separator' }, { role: 'services' }, { type: 'separator' },
                     { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] : []),
             ],
         },
     ];
+    const help = {
+        // On macOS the role adds the menu search box.
+        label: 'Help',
+        role: 'help',
+        submenu: [
+            { label: 'Kumiki Website', click: () => electronShell.openExternal(LINKS.website) },
+            { label: 'Documentation', click: () => electronShell.openExternal(LINKS.docs) },
+            { type: 'separator' },
+            { label: 'Discord', click: () => electronShell.openExternal(LINKS.discord) },
+            { label: 'GitHub Discussions', click: () => electronShell.openExternal(LINKS.discussions) },
+        ],
+    };
     // macOS makes the first menu the app menu: Kigumi, then File.
-    Menu.setApplicationMenu(Menu.buildFromTemplate(isMac ? template.reverse() : template));
+    Menu.setApplicationMenu(Menu.buildFromTemplate([...(isMac ? template.reverse() : template), help]));
 }
 
 async function start() {

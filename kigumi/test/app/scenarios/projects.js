@@ -50,8 +50,8 @@ module.exports = {
 
         const menus = Menu.getApplicationMenu().items.map((item) => item.label);
         const copy = Menu.getApplicationMenu().items.flatMap((item) => item.submenu.items).find((item) => item.role === 'copy');
-        check('the menus are Kigumi and File, with copy kept (hidden) for the edit keys on macOS',
-            menus.length === 2 && menus.includes('Kigumi') && menus.includes('File')
+        check('the menus are Kigumi, File and Help, with copy kept (hidden) for the edit keys on macOS',
+            menus.length === 3 && menus.includes('Kigumi') && menus.includes('File') && menus.includes('Help')
                 && (process.platform !== 'darwin' || (Boolean(copy) && copy.visible === false)), JSON.stringify(menus));
     },
 };
