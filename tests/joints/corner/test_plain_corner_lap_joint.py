@@ -75,3 +75,62 @@ class TestCornerLapJoint:
 
 
 
+@pytest.mark.parametrize("angle", [30, 60, 90, 120, 150])
+@pytest.mark.parametrize("ends", [
+    (TimberEnd.BOTTOM, TimberEnd.BOTTOM),
+    (TimberEnd.TOP, TimberEnd.BOTTOM),
+    (TimberEnd.BOTTOM, TimberEnd.TOP),
+    (TimberEnd.TOP, TimberEnd.TOP),
+])
+@pytest.mark.parametrize("cut_ratio", [scalar(1, 4), scalar(1, 2), scalar(3, 4)])
+def test_angled_corner_lap_trims_to_opposing_faces(angle, ends, cut_ratio):
+    corner_global = create_v3(2, -3, 4)
+    away_directions_global = [create_v3(0, 1, 0), create_v3(sin(degrees(angle)), cos(degrees(angle)), 0)]
+    sizes = [create_v2(.12, .18), create_v2(.12, .24)]
+    lengths = [scalar(2), scalar(3)]
+    timbers = []
+    for index, end in enumerate(ends):
+        away_global = away_directions_global[index]
+        timbers.append(create_timber(
+            length=lengths[index], size=sizes[index],
+            bottom_position=corner_global if end == TimberEnd.BOTTOM else corner_global + lengths[index] * away_global,
+            length_direction=away_global if end == TimberEnd.BOTTOM else -away_global,
+            width_direction=create_v3(0, 0, 1),
+            ticket=TimberTicket(f"member{index}"),
+        ))
+    joint = cut_plain_corner_lap_joint_on_plane_aligned_timbers(CornerJointTimberArrangement(
+        timber1=timbers[0], timber2=timbers[1], timber1_end=ends[0], timber2_end=ends[1],
+        front_face_on_timber1=TimberLongFace.RIGHT,
+    ), cut_ratio=cut_ratio)
+
+    for index, key in enumerate(("timberA", "timberB")):
+        timber, other = timbers[index], timbers[1 - index]
+        cutting = joint.cuttings[key]
+        solid = _render_cutting(cutting)
+        # The far side is perpendicular to the other member, pointing out of this corner.
+        other_away_global = away_directions_global[1 - index]
+        outward_global = cross_product(create_v3(0, 0, 1), other_away_global)
+        if safe_dot_product(outward_global, away_directions_global[index]) > 0:
+            outward_global = -outward_global
+        plane_point_global = corner_global + outward_global * other.size[1] / 2
+        direction_global = timber.get_length_direction_global()
+        # Sample the half of each lap that remains, at three positions across its width.
+        split_x = timber.size[0] * (scalar(1, 2) - cut_ratio)
+        retained_x = (-timber.size[0] / 2 + split_x) / 2 if index == 0 else (split_x + timber.size[0] / 2) / 2
+        for y in (-timber.size[1] * .4, scalar(0), timber.size[1] * .4):
+            edge_point_global = timber.transform.local_to_global(create_v3(retained_x, y, 0))
+            station = safe_dot_product(outward_global, plane_point_global - edge_point_global) / safe_dot_product(outward_global, direction_global)
+            boundary_local = create_v3(retained_x, y, station)
+            inward_local = create_v3(0, 0, .001 if ends[index] == TimberEnd.BOTTOM else -.001)
+            assert solid.is_point_on_boundary(boundary_local)
+            assert solid.contains_point(boundary_local + inward_local)
+            assert not solid.contains_point(boundary_local - inward_local)
+
+        extension = (other.size[1] + abs(cos(degrees(angle))) * timber.size[1]) / (2 * sin(degrees(angle)))
+        if ends[index] == TimberEnd.BOTTOM:
+            assert cutting.maybe_bottom_end_cut_distance_from_bottom == pytest.approx(-extension)
+            assert cutting.maybe_top_end_cut_distance_from_bottom is None
+        else:
+            assert cutting.maybe_top_end_cut_distance_from_bottom == pytest.approx(timber.length + extension)
+            assert cutting.maybe_bottom_end_cut_distance_from_bottom is None
+        assert cutting.assembly_freedom is not None
