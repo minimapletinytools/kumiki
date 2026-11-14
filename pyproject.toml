@@ -1,6 +1,6 @@
 [project]
 name = "kumiki"
-version = "0.9.4"
+version = "0.9.5"
 description = "Programmatic CAD library for timber framing, woodworking joinery, and architectural framing in Python"
 requires-python = ">=3.10"
 license = "MPL-2.0"

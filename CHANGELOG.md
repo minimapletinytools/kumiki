@@ -8,19 +8,27 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-11-13
+
 ### kumiki
 
 #### Added
 
+- Basic joint recipes sized from the timbers: `cut_basic_mortise_and_tenon_joint`, `cut_basic_round_mortise_and_tenon_joint`, `cut_basic_plain_cross_lap_joint`, `cut_basic_plain_cross_lap_house_joint`, `cut_basic_multi_cross_lap_joint_on_plane_aligned_timbers`, `cut_basic_plain_corner_lap_joint_on_plane_aligned_timbers`, `cut_basic_dovetail_corner_joint` and `cut_basic_tongue_and_groove_joint`, and practice ones: a mortise and tenon corner, a sliding dovetail on orthogonal boards, and rounded-end, roundover and rafter-tail scallop decorations. All the basic joint examples are in one pattern file.
+- Each joint's examples are one pattern, its variants chosen with kiwari parameters, and the pattern catalog is reorganised to match.
+- The example frames are curated, with the construction concepts they show documented, and a multi-frame pavilion joins them.
 - `degrees()` and `radians()` take a numerator and a denominator, like `inches()`: `degrees(45, 2)` is 22.5 degrees. A fraction string works too, `degrees("45/2")`.
 
 #### Changed
 
+- `cut_basic_plain_cross_lap_joint_on_face_aligned_timbers` is now `cut_basic_plain_cross_lap_joint`, and `cut_basic_plain_house_joint_on_face_aligned_timbers` is `cut_basic_plain_cross_lap_house_joint`. The old names still work, and warn that they are deprecated.
 - The dovetailed sawhorse's router templates trace the dovetail's wide face, and the leg template sits on it, away from the leg. Its export writes one beam template and one leg template for each mirrored pair of legs, A and B, in place of a socket and tail for every leg. Its parameters: `offset` is now `beam_bushing_offset` (default 0) and `leg_bushing_offset` (default 3/16"), and `top`, `bottom` and `width` are `top_depth`, `bottom_depth` and `base_support_width`.
 - The dovetailed sawhorse's `leg_y_splay_angle` defaults to atan of the leg's thickness over the beam's height, in place of 12 degrees.
 
 #### Fixed
 
+- Angled corner laps are trimmed flush with the opposing faces.
+- A box cut by planes meshes with every cutting plane kept, so basic joints mesh watertight, in one piece, with no folded sheets where cuts meet.
 - A mortise and tenon joint with `bore_mortise_perpendicular_to_face` at an angle other than 45 degrees cut its mortise the wrong length: too short for the tenon when the brace leans close to the post, too long when it stands steep. A tenon running along the mortise face, rather than into it, is now refused instead of divided by zero.
 
 ### kigumi
@@ -38,6 +46,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Changed
 
+- The agent panel's suggestions ask it to make mudsills on a footprint, resize the posts, and generate drawings.
 - The agent's to-do list has a × to hide it until the agent next changes it, and a list with everything done goes when you send a new message.
 - Each message to the built-in agent names the open project and the file in focus, and says when you have switched file or project since your last message.
 - Fewer agent tools, each doing something the others don't: `kumiki_docs` is folded into `kumiki_source`, which lists the docs first; `new_file` is gone, as `write_file` makes new files; `open_in_viewer` and `refresh_view` are gone, as `check_frame` opens and builds a frame and says whether it built; `get_camera` and `set_camera` are one `camera` tool; and `get_workspace_folder` is left out where `list_projects` names the open project. `kumiki_api` points to `kumiki_source` for a whole module's source.
