@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 from .identity_memo import memo_by_identity
 from .carriers import (Carrier, CarrierBarrel, CarrierLine, CarrierMap, CarrierPlane, CarrierRef, Midplane, Recipe,
                        merge_coincident_planes)
+from kumiki.user_warnings import warn_user
 
 
 # ============================================================================
@@ -561,7 +562,7 @@ def derive_edge_hits(
             owner = shared_ancestor(some_common_ancestor, face_hits[i].owner, face_hits[j].owner)
             if owner is None:
                 # Can't happen: both parents came from one gather.
-                warnings.warn(
+                warn_user(
                     f"Skipping the derived edge {edge.name}: its parents are not "
                     f"both under the node being searched, so there is no node to "
                     f"own it.")
@@ -587,7 +588,7 @@ def derive_point_hits(
                 continue
             owner = shared_ancestor(some_common_ancestor, edge_hit.owner, face_hit.owner)
             if owner is None:
-                warnings.warn(
+                warn_user(
                     f"Skipping the derived point {point.name}: its parents are not "
                     f"both under the node being searched, so there is no node to "
                     f"own it.")
@@ -1425,7 +1426,7 @@ class CylinderAxisFeature(EdgeFeature):
         """Return the owner as a Cylinder, or None (with a warning) if it isn't one."""
         if isinstance(owner, Cylinder):
             return owner
-        warnings.warn(
+        warn_user(
             f"{self.name!r} is a cylinder axis, but its owner is a "
             f"{type(owner).__name__}, which has no axis")
         return None

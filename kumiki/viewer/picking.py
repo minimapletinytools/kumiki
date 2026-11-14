@@ -16,6 +16,7 @@ from ..geometry import Line
 from ..rule import Transform, V3, scalar
 from ..timber import PerfectTimberWithin
 from .rule_at_home import Float3, LocalFrame
+from kumiki.user_warnings import warn_user
 
 #: A pointer's ray in timber-local space: origin, direction.
 LocalRay = Tuple[Float3, Float3]
@@ -113,7 +114,7 @@ def describe_leaf_csg(csg: 'CutCSG', local_pt: Float3, eps: float = 1e-4) -> str
         return feature.name
 
     # Fallbacks for a shape with no default features (PathExtrusion); they warn.
-    warnings.warn(
+    warn_user(
         f"No feature named the point on {type(csg).__name__}, so its label is "
         "being guessed. Every primitive should name its own boundary through "
         "default_features(); this one does not."

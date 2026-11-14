@@ -3,7 +3,6 @@
 TODO rename this file to "FeatureHandle"
 """
 
-import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Sequence, Tuple, Union
 
@@ -11,6 +10,7 @@ from .cutcsg import (CSGFeature, CutCSG, CutCSGLabel, DerivedEdgeFeature, Derive
                      OwnedFeatureHit, SolidUnion, csg_children, shared_ancestor)
 from ..identity import (DerivedFeaturePath, FeaturePath, FeatureRef, ResolvedJointPath,
                        ResolvedTimberPath, SingleFeaturePath)
+from kumiki.user_warnings import warn_user
 
 if TYPE_CHECKING:
     from ..timber import CutTimber, Cutting, Frame, PerfectTimberWithin
@@ -59,7 +59,7 @@ def label_name(labeled: Union[CutCSG, 'Cutting']) -> Optional[str]:
         return label.name
     timber = getattr(labeled, "timber", None)
     on = f" on timber {timber.ticket.path!r}" if timber is not None else ""
-    warnings.warn(
+    warn_user(
         f"A {type(labeled).__name__}{on} has label {label!r}, a {type(label).__name__}, not a CutCSGLabel. "
         f"Write label=CutCSGLabel({label!r}) instead."
     )

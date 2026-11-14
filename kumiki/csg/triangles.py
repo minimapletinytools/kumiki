@@ -7,7 +7,6 @@ model and trimesh. All SymPy-to-float conversion happens here.
 
 from __future__ import annotations
 
-import sys
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Iterable, Optional, Sequence, Tuple, Union
@@ -31,6 +30,7 @@ from .cutcsg import (
 from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
 from .meshcsg import TriangleSolid
 from ..rule import Matrix, Numeric, Transform, V2, V3
+from ..user_warnings import warn_user
 
 
 TRIANGLES_FLOAT_DIGITS = 8
@@ -311,11 +311,7 @@ def _run_boolean(operation: str, meshes: Sequence[trimesh.Trimesh]) -> trimesh.T
 
     if len(non_empty_meshes) == 0:
         # All meshes are empty, return an empty mesh
-        print(
-            f"Warning: All meshes in boolean {operation} operation are empty, returning empty mesh",
-            file=sys.stderr,
-            flush=True,
-        )
+        warn_user(f"Every mesh in a boolean {operation} is empty, so the result is empty")
         return trimesh.Trimesh(vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64))
     
     if len(non_empty_meshes) == 1:
@@ -365,12 +361,8 @@ def _mesh_rectangular_prism(prism: RectangularPrism) -> trimesh.Trimesh:
     if length <= 0:
         size_x = _numeric_to_float(prism.size[0])
         size_y = _numeric_to_float(prism.size[1])
-        print(
-            f"Warning: skipping zero/negative-length RectangularPrism: "
-            f"size=[{size_x}, {size_y}], start_distance={start_distance}, end_distance={end_distance}, length={length}",
-            file=sys.stderr,
-            flush=True,
-        )
+        warn_user(f"Skipping a RectangularPrism of length {length * 1000:.1f} mm "
+                  f"(size {size_x * 1000:.1f} x {size_y * 1000:.1f} mm, from {start_distance} to {end_distance})")
         # Return an empty mesh instead of raising an exception
         # This allows the rest of the CSG tree to be processed correctly
         return trimesh.Trimesh(vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64))
@@ -394,12 +386,8 @@ def _mesh_cylinder(cylinder: Cylinder) -> trimesh.Trimesh:
     height = end_distance - start_distance
     if height <= 0:
         radius = _numeric_to_float(cylinder.radius)
-        print(
-            f"Warning: skipping zero/negative-height Cylinder: "
-            f"radius={radius}, start_distance={start_distance}, end_distance={end_distance}, height={height}",
-            file=sys.stderr,
-            flush=True,
-        )
+        warn_user(f"Skipping a Cylinder of height {height * 1000:.1f} mm "
+                  f"(radius {radius * 1000:.1f} mm, from {start_distance} to {end_distance})")
         # Return an empty mesh instead of raising an exception
         # This allows the rest of the CSG tree to be processed correctly
         return trimesh.Trimesh(vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64))

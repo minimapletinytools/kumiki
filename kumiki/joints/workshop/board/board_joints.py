@@ -4,11 +4,10 @@ Contains functions for creating joints between boards.
 """
 
 from kumiki.construction import arrangement_check, arrangement_error
-import warnings
 from dataclasses import replace
 from typing import Dict, List, Tuple, Union, Optional
 
-from kumiki.timber import AssemblyFreedom, Board, TimberFace, Cutting, Joint, JointTicket
+from kumiki.timber import AssemblyFreedom, Board, FrameWarning, TimberFace, Cutting, Joint, JointTicket
 from kumiki.rule import (
     Numeric,
     V3,
@@ -41,6 +40,7 @@ from kumiki.construction import (
     ExtendedTimberArrangement,
 )
 from kumiki.measuring import locate_face
+from kumiki.user_warnings import warn_user
 
 
 def cut_tongue_and_groove_joint(
@@ -89,9 +89,9 @@ def cut_tongue_and_groove_joint(
             ), "tongue board and groove board must have the same orientation"
 
     if not safe_compare(tongue_board.size[0] - tongue_board.size[1], 0, Comparison.GT):
-        warnings.warn(
-            "board orientation appears to be thicker than it is wide, "
-            "are you sure you oriented your board correctly"
+        warn_user(
+            f"{tongue_board.ticket.path} is thicker than it is wide: is the board "
+            "oriented the way you meant?"
         )
 
     groove_pos_in_tongue_local = tongue_board.transform.global_to_local(
@@ -113,8 +113,10 @@ def cut_tongue_and_groove_joint(
         x_overlap = tongue_half_width - (groove_x_in_tongue_local - groove_half_width)
 
     if not safe_compare(x_overlap - tongue_depth, 0, Comparison.GE):
-        warnings.warn(
-            "groove board does not overlap tongue board enough to cut the groove"
+        warn_user(
+            f"{groove_board.ticket.path} doesn't overlap {tongue_board.ticket.path} by the "
+            "tongue's depth, so the groove is not cut to its full depth",
+            FrameWarning,
         )
 
     tongue_y_low = tongue_center_offset - tongue_width / scalar(2)
@@ -137,8 +139,10 @@ def cut_tongue_and_groove_joint(
     if safe_compare(groove_y_low - tongue_y_low, 0, Comparison.GT) or safe_compare(
         tongue_y_high - groove_y_high, 0, Comparison.GT
     ):
-        warnings.warn(
-            "groove board does not overlap tongue, groove may be incomplete"
+        warn_user(
+            f"{groove_board.ticket.path} doesn't cover the whole tongue of "
+            f"{tongue_board.ticket.path}, so the groove may be incomplete",
+            FrameWarning,
         )
 
     face_x = side_sign * tongue_half_width

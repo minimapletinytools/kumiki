@@ -28,6 +28,7 @@ from .csg.cutcsg import (
 )
 from .rule import Transform
 from .timber import CutTimber, Frame, Accessory
+from .user_warnings import warn_user
 
 import numpy as np
 import trimesh
@@ -416,9 +417,17 @@ def _to_mm(val) -> float:
     return sympy_to_float(val) * _M_TO_MM
 
 
+def _where(csg: CutCSG) -> str:
+    """Where a primitive sits, for a message: " at (x, y, z) mm", or nothing if it has no position."""
+    transform = getattr(csg, "transform", None)
+    position = transform.position if transform is not None else getattr(csg, "position", None)
+    if position is None:
+        return ""
+    return " at (" + ", ".join(f"{float(axis) * 1000:.1f}" for axis in position) + ") mm"
+
+
 def _csg_to_ocp(csg: CutCSG) -> "TopoDS_Shape":
     """Recursively convert a CutCSG tree (in global coords) to an OCP shape."""
-    import sys
     try:
         if isinstance(csg, EmptyCSG):
             return _empty_to_ocp()
@@ -438,33 +447,10 @@ def _csg_to_ocp(csg: CutCSG) -> "TopoDS_Shape":
             return _difference_to_ocp(csg)
         raise TypeError(f"Unsupported CutCSG type for STEP export: {type(csg).__name__}")
     except Exception as exc:
-        print(
-            f"[blueprint] STEP error in {type(csg).__name__}: {exc}",
-            file=sys.stderr, flush=True,
-        )
-        if isinstance(csg, (RectangularPrism, ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)):
-            m = csg.transform.orientation.matrix
-            p = csg.transform.position
-            print(
-                f"[blueprint]   transform matrix:\n"
-                f"    [{float(m[0,0]):.15f}, {float(m[0,1]):.15f}, {float(m[0,2]):.15f}]\n"
-                f"    [{float(m[1,0]):.15f}, {float(m[1,1]):.15f}, {float(m[1,2]):.15f}]\n"
-                f"    [{float(m[2,0]):.15f}, {float(m[2,1]):.15f}, {float(m[2,2]):.15f}]\n"
-                f"    position: [{float(p[0])}, {float(p[1])}, {float(p[2])}]",
-                file=sys.stderr, flush=True,
-            )
-        if isinstance(csg, Cylinder):
-            print(
-                f"[blueprint]   axis: [{float(csg.axis_direction[0])}, {float(csg.axis_direction[1])}, {float(csg.axis_direction[2])}]"
-                f"  pos: [{float(csg.position[0])}, {float(csg.position[1])}, {float(csg.position[2])}]",
-                file=sys.stderr, flush=True,
-            )
-        if isinstance(csg, HalfSpace):
-            print(
-                f"[blueprint]   normal: [{float(csg.normal[0])}, {float(csg.normal[1])}, {float(csg.normal[2])}]"
-                f"  offset: {float(csg.offset)}",
-                file=sys.stderr, flush=True,
-            )
+        # Said once, by the primitive that failed, not again by each node above it.
+        if not getattr(exc, "_kumiki_step_reported", False):
+            warn_user(f"STEP export failed on a {type(csg).__name__}{_where(csg)}: {exc}")
+            setattr(exc, "_kumiki_step_reported", True)
         raise
 
 
