@@ -23,9 +23,11 @@ test('a key is written one way: lower case, modifiers in order', () => {
   expect(normalizeKey('')).toBe('');
 });
 
-test('the defaults: Open Current File in Viewer is cmd+shift+o on macOS and ctrl+shift+o elsewhere', () => {
-  expect(keysOf(resolveKeybindings({ platform: 'darwin' }), 'kigumi.openCurrentFileInViewer')).toEqual(['shift+cmd+o']);
-  expect(keysOf(resolveKeybindings({ platform: 'linux' }), 'kigumi.openCurrentFileInViewer')).toEqual(['ctrl+shift+o']);
+test('the defaults: Open Current File in Viewer is cmd+o (ctrl+o), and Open in Viewer… cmd+shift+o (ctrl+shift+o)', () => {
+  expect(keysOf(resolveKeybindings({ platform: 'darwin' }), 'kigumi.openCurrentFileInViewer')).toEqual(['cmd+o']);
+  expect(keysOf(resolveKeybindings({ platform: 'linux' }), 'kigumi.openCurrentFileInViewer')).toEqual(['ctrl+o']);
+  expect(keysOf(resolveKeybindings({ platform: 'darwin' }), 'kigumi.quickOpenInViewer')).toEqual(['shift+cmd+o']);
+  expect(keysOf(resolveKeybindings({ platform: 'linux' }), 'kigumi.quickOpenInViewer')).toEqual(['ctrl+shift+o']);
   expect(keysOf(resolveKeybindings({ platform: 'darwin' }), 'viewer.measure')).toEqual(['m']);
   expect(keysOf(resolveKeybindings({ platform: 'win32' }), 'viewer.redo')).toEqual(['ctrl+shift+z', 'ctrl+y']);
 });
@@ -52,7 +54,7 @@ test('menus take Electron accelerators; keys show as the platform writes them', 
   expect(toAccelerator('cmd+shift+p')).toBe('Shift+Cmd+P');
   expect(toAccelerator('ctrl+alt+f12')).toBe('Ctrl+Alt+F12');
   expect(acceleratorFor('kigumi.quickOpenFile', resolveKeybindings({ platform: 'darwin' }))).toBe('Cmd+P');
-  expect(acceleratorFor('kigumi.quickOpenInViewer', resolveKeybindings({ platform: 'win32' }))).toBe('Ctrl+O');
+  expect(acceleratorFor('kigumi.quickOpenInViewer', resolveKeybindings({ platform: 'win32' }))).toBe('Ctrl+Shift+O');
   expect(acceleratorFor('app.keyboardShortcuts', resolveKeybindings({ platform: 'darwin' }))).toBeUndefined();
   expect(keyLabel('shift+cmd+o', 'darwin')).toBe('⇧⌘O');
   expect(keyLabel('ctrl+shift+o', 'linux')).toBe('Ctrl+Shift+O');
@@ -72,7 +74,7 @@ test('the shell is told the app keys to run (none the browser keeps), and each k
   expect(web.bindings).toContainEqual({ command: 'kigumi.render', keys: ['f5'] });
   expect(web.bindings.some((one) => one.command === 'app.closeTab')).toBe(false);
   expect(web.bindings.some((one) => one.command.startsWith('viewer.'))).toBe(false);
-  expect(web.labels['kigumi.openCurrentFileInViewer']).toBe('⇧⌘O');
+  expect(web.labels['kigumi.openCurrentFileInViewer']).toBe('⌘O');
   expect(shellKeys(settings, { platform: 'darwin', desktop: true, dispatch: false }).labels['app.closeTab']).toBe('⌘W');
 });
 
@@ -104,7 +106,7 @@ test('the Keyboard Shortcuts tab changes, removes and resets keys in the setting
   onMessage({ type: 'keysReady' });
   const first = posted.at(-1);
   expect(first.entries.some((one) => one.command === 'app.closeTab')).toBe(false);
-  expect(first.entries.find((one) => one.command === 'kigumi.openCurrentFileInViewer').labels).toEqual(['⇧⌘O']);
+  expect(first.entries.find((one) => one.command === 'kigumi.openCurrentFileInViewer').labels).toEqual(['⌘O']);
 
   onMessage({ type: 'setKeys', command: 'viewer.measure', keys: ['shift+m'] });
   expect(settings.get('app.keybindings')).toEqual({ 'viewer.measure': 'shift+m' });

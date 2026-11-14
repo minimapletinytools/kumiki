@@ -16,8 +16,8 @@ const KEYBINDINGS_SETTING = 'app.keybindings';
  */
 const COMMANDS = Object.freeze([
     { command: 'kigumi.quickOpenFile', title: 'Go to File…', scope: 'app', key: 'ctrl+p', mac: 'cmd+p' },
-    { command: 'kigumi.quickOpenInViewer', title: 'Open in Viewer…', scope: 'app', key: 'ctrl+o', mac: 'cmd+o' },
-    { command: 'kigumi.openCurrentFileInViewer', title: 'Open Current File in Viewer', scope: 'app', key: 'ctrl+shift+o', mac: 'cmd+shift+o' },
+    { command: 'kigumi.quickOpenInViewer', title: 'Open in Viewer…', scope: 'app', key: 'ctrl+shift+o', mac: 'cmd+shift+o' },
+    { command: 'kigumi.openCurrentFileInViewer', title: 'Open Current File in Viewer', scope: 'app', key: 'ctrl+o', mac: 'cmd+o' },
     { command: 'kigumi.render', title: 'Refresh Active Viewer', scope: 'app', key: 'ctrl+r', mac: 'cmd+r' },
     { command: 'app.closeTab', title: 'Close Tab', scope: 'app', key: 'ctrl+w', mac: 'cmd+w', desktopOnly: true },
     { command: 'app.toggleAgent', title: 'Toggle Agent Panel', scope: 'app', key: 'ctrl+shift+a', mac: 'cmd+shift+a' },
