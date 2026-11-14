@@ -253,92 +253,27 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
-DONE-agent stuff
-  DONE-tool cleanup
-  DONE-add drawings to cheat sheet
-  DONE-do the pattern mega refactor
-  DONE-do the example mega refactor
-DONE-agent instructions
-DONE-the TODO block in teh agent panle doesn't go away if teh gaent moved on to something else, mabye add a manul x button to close it? and it will reopen the next time the agent actually updates it or changes it? idkwh at do you think?
-DONE-add to default context file/project currentyl in focus etc, so its more clear to bulit in agent if yous witched contexts and are prompting about something else waht do you think?
-DONE-add basic joint patterns
-DONE-please folder the basic butt joint stuffp roperyl if there are multiple variants, ege mortise_and_tenon/... cuzi t's conufisg that there is both a folder and a pattern named basic_morties_and_tenon
-DONE-remove the basic_ prefix from all teh basic pattern,s for decorative cuts, add the decorative_ prefix to it so we know it's ad ecorative cut
-DONE-update double spline joint to include mini tenons
-DONE-angled corner lap joint doesn't have end cuts
-DONE/IGNORE-investigate adding to app store
-DONE-application nav changes  
-  -add more info to about page, link to website, dsicord and discussion
-  -help should link discord/discussion as well
-  -get rid of edit tab in top application nav
-  -get rid of toggle developer tools
-  -does it make sense to move fullscrene options else where and get rid of the view tab?
-DONE-create hotkey config page?
-DOEN-from source view tehre should be a button easily preview your source in the viewer, or a hotkeey!
-DONE-triangulation is producing edge artifacts on basic_splice_lap_joint pattern and basic_dropin_dovetali_butt_joint_pattern. there's al ine across the shoulder line smh
-DONE-add STL mesh support shouldn't be hard :O
-  -make a cabriole leg table example 
-    -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
-  -STL timber should have "placeholder mode" which does the following
-    -renders as a regular rectangular prism timber but with a different color or texture to indicate it needs work
-    -in tree view, shows up with a "(needs stl placement)" suffix
-    -when you click on the timber, you enter a new mode that allows you to resize and reposition the STL
-      -typically the stl is already roughly aligned so there should be snap 90 degree options, but there is fallback gizmo and text entry boxes for fine alignment
-      -also a gizmo for translation add scale
-      -the panel for transform shows up under the selection box and above the tree view box I guess?
-      -in the panel it should have a "update configuration", this will scan the code for the matching call that created the stl timber and update it in the source code with the new transform configuration. If it can't be found or its ambiguous, it should pop up an error saying it couldn't do it fory ou, either do it manually or ask the agent to do it, it should offer to copy the configuration to clipboard so you can do it yourself manually or copy a prewritten prompt for the agent to do it for you.
-      -be careful abotu these new modes. we don't want to create some combinatorial nightmare with all our other stuff. in this isolation mode ALl you can do is reposition the stl, so please architecture kigumi accordings to reduce tech debt)
-
-DONE-do a logging pass. flag logs that are too spammy or wordy, see where logging is inconsistent or could be improved
-DONE-view source button for patterns should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
-DONE-change supabase app title
-DONE-make sure upload image funcitonality works (drag+drop and a + button)
-
-DONE-when right clicking on a timebr the menu should look as such
-  1. "focus camera on <timber name>"
-  2. if there are features highlighted: "features here (tab to cycle): \n ..." (tab to cycle only shows if there is more than 1 feature)
-  DIVIDER
-  3. "export <TIMBER NAME> \n stl, \nstep"
-
-DONE-mcp/agent options should be more cler
-  -title should be Agent Settings and MCP 
-  -"Enable MCP Server" -> "now serving..." (no url needed)
-    -one bigger button that says "copy setup prompt for ALL agents" and then smaller buttons as they are now
-    -after copying some text should pop up indicating what to do next, if copy for all agents was chosen instruct "paste instructions into you ragen,t you may need to RESTART your agent afterwards"
-  -add a "collaspe ^ button at the bottom cuz it' seasy to open the settings and not collapse it...
-  -options are saved right?
-
-DONE-mcp msg window
-  -should have a down arrow button when you scroll away from the bottom, the button should be slight different color so it's more prominent.
-  -instead of tool names lets givet hme human readable stuff e.g.
-    -screenshot -> "screenshotting <frame name> to validate"
-    -edit -> "working on <frame name>"
-    -search api -> "researching <filename>" 
-    -etc
-
-DONE-mcp chat windown
-  -should be visually a little more distainct so ppl know to click there to start prompting
-  -TODO list should have an x button to close it
-  -chat window should be resiazable and fdefault to 2 collumns and say "prompt here..." (drag+drop images, paste content, or @ to reference a file)
-  -permission mode should be bottom left of the chat and default to don't ask, it can stay as an option in the settings tab too
-  -maybe plan/edit mode can be adrop down and moved below the chat as well.
-  
-DONE-mke sure MCP provides instructions for what it does for external agents
 
 
+-assembly timeline should just combine with assembly preview beta option so there is just the beta option
+-selected panel should show timber type (e.g. Select: Cabriole Leg (mesh)) the regular rectangular dtimebrs don't eed it, just the other types, it shoul dsay (mesh, round, polygon)
+
+
+
+-improve default prompts to not be clickable or whatever
 
 
 -improve agent panel visual clarity
   -maybe do highligh tutorial tips thingy
   -add buttno that says "prompt below"
-  -improve default prompts to not be clickable or whatever
+  
   -summary should be highlighted
 -make sure trackpad scrolling in agent panel is working
 -remove undo prompt or allow undo for the undo
 -add some jokes into the ouptut
 
 
--assembly timeline should just combine with assembly preview beta option
+
 
 
 -create 3d measurement tool (guess itneeds to save to file), code measurement sstillp refrered
@@ -351,10 +286,6 @@ DONE-mke sure MCP provides instructions for what it does for external agents
 
 
 
-
-
--selected panel should show timber type (mesh, round, etc)
--add an optional scale ruler to the 3d view and have it default off, can be enabled in options tab
 
 -see if you can make use of ButtJointCSGParts
 
@@ -436,8 +367,6 @@ DONE-mke sure MCP provides instructions for what it does for external agents
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
 
-IGNORE-timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
-  
 -enable potato (scribe) notching on the remaining joints?
 
 -add relief imple for DropinButtJointSweepScribeReliefConfig D:
@@ -527,7 +456,82 @@ IGNORE-timber ticket names sholud get praented in a new folder matching their pa
 
 
 :: TODONE 
+DONE-agent stuff
+  DONE-tool cleanup
+  DONE-add drawings to cheat sheet
+  DONE-do the pattern mega refactor
+  DONE-do the example mega refactor
+DONE-agent instructions
+DONE-the TODO block in teh agent panle doesn't go away if teh gaent moved on to something else, mabye add a manul x button to close it? and it will reopen the next time the agent actually updates it or changes it? idkwh at do you think?
+DONE-add to default context file/project currentyl in focus etc, so its more clear to bulit in agent if yous witched contexts and are prompting about something else waht do you think?
+DONE-add basic joint patterns
+DONE-please folder the basic butt joint stuffp roperyl if there are multiple variants, ege mortise_and_tenon/... cuzi t's conufisg that there is both a folder and a pattern named basic_morties_and_tenon
+DONE-remove the basic_ prefix from all teh basic pattern,s for decorative cuts, add the decorative_ prefix to it so we know it's ad ecorative cut
+DONE-update double spline joint to include mini tenons
+DONE-angled corner lap joint doesn't have end cuts
+DONE/IGNORE-investigate adding to app store
+DONE-application nav changes  
+  -add more info to about page, link to website, dsicord and discussion
+  -help should link discord/discussion as well
+  -get rid of edit tab in top application nav
+  -get rid of toggle developer tools
+  -does it make sense to move fullscrene options else where and get rid of the view tab?
+DONE-create hotkey config page?
+DOEN-from source view tehre should be a button easily preview your source in the viewer, or a hotkeey!
+DONE-triangulation is producing edge artifacts on basic_splice_lap_joint pattern and basic_dropin_dovetali_butt_joint_pattern. there's al ine across the shoulder line smh
+DONE-add STL mesh support shouldn't be hard :O
+  -make a cabriole leg table example 
+    -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
+  -STL timber should have "placeholder mode" which does the following
+    -renders as a regular rectangular prism timber but with a different color or texture to indicate it needs work
+    -in tree view, shows up with a "(needs stl placement)" suffix
+    -when you click on the timber, you enter a new mode that allows you to resize and reposition the STL
+      -typically the stl is already roughly aligned so there should be snap 90 degree options, but there is fallback gizmo and text entry boxes for fine alignment
+      -also a gizmo for translation add scale
+      -the panel for transform shows up under the selection box and above the tree view box I guess?
+      -in the panel it should have a "update configuration", this will scan the code for the matching call that created the stl timber and update it in the source code with the new transform configuration. If it can't be found or its ambiguous, it should pop up an error saying it couldn't do it fory ou, either do it manually or ask the agent to do it, it should offer to copy the configuration to clipboard so you can do it yourself manually or copy a prewritten prompt for the agent to do it for you.
+      -be careful abotu these new modes. we don't want to create some combinatorial nightmare with all our other stuff. in this isolation mode ALl you can do is reposition the stl, so please architecture kigumi accordings to reduce tech debt)
 
+DONE-do a logging pass. flag logs that are too spammy or wordy, see where logging is inconsistent or could be improved
+DONE-view source button for patterns should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
+DONE-change supabase app title
+DONE-make sure upload image funcitonality works (drag+drop and a + button)
+
+DONE-when right clicking on a timebr the menu should look as such
+  1. "focus camera on <timber name>"
+  2. if there are features highlighted: "features here (tab to cycle): \n ..." (tab to cycle only shows if there is more than 1 feature)
+  DIVIDER
+  3. "export <TIMBER NAME> \n stl, \nstep"
+
+DONE-mcp/agent options should be more cler
+  -title should be Agent Settings and MCP 
+  -"Enable MCP Server" -> "now serving..." (no url needed)
+    -one bigger button that says "copy setup prompt for ALL agents" and then smaller buttons as they are now
+    -after copying some text should pop up indicating what to do next, if copy for all agents was chosen instruct "paste instructions into you ragen,t you may need to RESTART your agent afterwards"
+  -add a "collaspe ^ button at the bottom cuz it' seasy to open the settings and not collapse it...
+  -options are saved right?
+
+DONE-mcp msg window
+  -should have a down arrow button when you scroll away from the bottom, the button should be slight different color so it's more prominent.
+  -instead of tool names lets givet hme human readable stuff e.g.
+    -screenshot -> "screenshotting <frame name> to validate"
+    -edit -> "working on <frame name>"
+    -search api -> "researching <filename>" 
+    -etc
+
+DONE-mcp chat windown
+  -should be visually a little more distainct so ppl know to click there to start prompting
+  -TODO list should have an x button to close it
+  -chat window should be resiazable and fdefault to 2 collumns and say "prompt here..." (drag+drop images, paste content, or @ to reference a file)
+  -permission mode should be bottom left of the chat and default to don't ask, it can stay as an option in the settings tab too
+  -maybe plan/edit mode can be adrop down and moved below the chat as well.
+  
+DONE-mke sure MCP provides instructions for what it does for external agents
+DONE-add an optional scale ruler to the 3d view and have it default off, can be enabled in options tab
+
+
+IGNORE-timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
+  
 IGNORE-maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
 IGNORE-test frame scanning fixes
 IGONRE-test the install cadquery stuff 
