@@ -327,44 +327,15 @@ DONE-remove the basic_ prefix from all teh basic pattern,s for decorative cuts, 
 DONE-update double spline joint to include mini tenons
 DONE-angled corner lap joint doesn't have end cuts
 DONE/IGNORE-investigate adding to app store
-
--triangulation is producing edge artifacts on basic_splice_lap_joint pattern and basic_dropin_dovetali_butt_joint_pattern. there's al ine across the shoulder line smh
-
--create hotkey config page?
--from source view tehre should be a button easily preview your source in the viewer, or a hotkeey!
-
-
--see if you can make use of ButtJointCSGParts
--test agent created drawings
--agent benchmarking examples
--consider doing multiple agent sessions...
-
-
-
-
--add report crash feature?
--add give feedbac/report issue button?
-
-
-
--application nav changes  
+DONE-application nav changes  
   -add more info to about page, link to website, dsicord and discussion
   -help should link discord/discussion as well
   -get rid of edit tab in top application nav
   -get rid of toggle developer tools
   -does it make sense to move fullscrene options else where and get rid of the view tab?
-
--agent account stuff
-  -do LLC research
-  -setup LLC prob
-  -figure out liability ad data retention risks
-  -consider doing cloud files and sharing 
-  -draft out dream spec for cloud suite and see if we should do any refactors now.
-
--dio mega update wesite
-  DONE-rewrite content to be not slop ugh
-  -add animation header image/video
-  -add discussion and discord links  (maybe make them a little mor eprominent, perhaps as a section on the site just below the main row)
+DONE-create hotkey config page?
+DOEN-from source view tehre should be a button easily preview your source in the viewer, or a hotkeey!
+DONE-triangulation is producing edge artifacts on basic_splice_lap_joint pattern and basic_dropin_dovetali_butt_joint_pattern. there's al ine across the shoulder line smh
 
 
 -add STL mesh support shouldn't be hard :O
@@ -379,6 +350,26 @@ DONE/IGNORE-investigate adding to app store
       -the panel for transform shows up under the selection box and above the tree view box I guess?
       -in the panel it should have a "update configuration", this will scan the code for the matching call that created the stl timber and update it in the source code with the new transform configuration. If it can't be found or its ambiguous, it should pop up an error saying it couldn't do it fory ou, either do it manually or ask the agent to do it, it should offer to copy the configuration to clipboard so you can do it yourself manually or copy a prewritten prompt for the agent to do it for you.
       -be careful abotu these new modes. we don't want to create some combinatorial nightmare with all our other stuff. in this isolation mode ALl you can do is reposition the stl, so please architecture kigumi accordings to reduce tech debt)
+
+
+-see if you can make use of ButtJointCSGParts
+-test agent created drawings
+-agent benchmarking examples
+-consider doing multiple agent sessions...
+-add report crash feature?
+-add give feedbac/report issue button?
+-agent account stuff
+  -do LLC research
+  -setup LLC prob
+  -figure out liability ad data retention risks
+  -consider doing cloud files and sharing 
+  -draft out dream spec for cloud suite and see if we should do any refactors now.
+
+-dio mega update wesite
+  DONE-rewrite content to be not slop ugh
+  -add animation header image/video
+  -add discussion and discord links  (maybe make them a little mor eprominent, perhaps as a section on the site just below the main row)
+
 
 -promote stuff
   -make a new video 
