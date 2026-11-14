@@ -66,5 +66,25 @@ module.exports = {
         } finally {
             fs.rmSync(scratch, { force: true });
         }
+
+        // A pattern's source opens at the pattern, not at the top of its pattern book.
+        const book = path.join(REPO, 'patterns', 'basic_joints_patterns.py');
+        const declared = fs.readFileSync(book, 'utf8').split('\n')
+            .findIndex((line) => line.includes('"basic_joints/basic_tongue_and_fork_corner_joint"')) + 1;
+        await runAppCommand('kigumi.viewPatternSource', {
+            type: 'patternItem', data: { sourceFile: book, patternName: 'basic_joints/basic_tongue_and_fork_corner_joint' },
+        });
+        const cursorLine = await waitFor(() => inShell(`(() => {
+            const frame = document.querySelector('#slot-center iframe:not([hidden])');
+            const win = frame && frame.contentWindow;
+            const editor = win && win.monaco && win.monaco.editor.getEditors()[0];
+            // The model has no file uri, so the text says it is the book.
+            const model = editor && editor.getModel();
+            return model && model.getValue().includes('basic_tongue_and_fork_corner_joint') && editor.getPosition().lineNumber > 1
+                ? editor.getPosition().lineNumber : null;
+        })()`), { timeoutMs: 15000 }).catch(() => null);
+        await capture('07-pattern-source');
+        check("View Source opens a pattern's book at the pattern", declared > 1 && cursorLine === declared,
+            `line ${cursorLine}, declared on ${declared}`);
     },
 };

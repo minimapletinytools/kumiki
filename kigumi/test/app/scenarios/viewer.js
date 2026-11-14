@@ -57,6 +57,18 @@ module.exports = {
                 && cubeWidth > 50,
             `${JSON.stringify(before)} -> ${JSON.stringify(toggled)}, cube ${cubeWidth}px`);
 
+        // A selected timber's panel says what kind of timber it is.
+        const kind = await inShell(`(async () => {
+            const app = ${viewDoc}.querySelector('kigumi-app');
+            app.selectMembers([Array.from(app.sceneManager.keys())[0]], false);
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            const line = ${viewDoc}.querySelector('#info-panel .ip-timber-kind');
+            return line ? line.textContent : null;
+        })()`);
+        await capture('02d-timber-kind');
+        await inShell(`${viewDoc}.querySelector('kigumi-app').selectMembers([], false)`);
+        check('a selected timber shows its type in the selection panel', kind === 'type rectangular', JSON.stringify(kind));
+
         // A right click on a row of the layers tree offers to copy it for an assistant, not the
         // browser's cut/copy/paste.
         clipboard.writeText('');

@@ -17,14 +17,17 @@ WEBSITE = KIGUMI.parent / 'website' / 'public'
 SOURCE = KIGUMI / 'logo-source.png'
 
 # The square of the render the logo shows (pixels): the frame, with a margin around it.
-CROP = (38, 100, 1638, 1700)
-# The viewer's floor reflection under the post (x from, x to, from y): painted over with the background beside it.
-REFLECTION = (770, 906, 1563)
+CROP = (42, 116, 1134, 1208)
 CORNER = 0.22  # the rounded square's corner radius, as a share of its side
 CONTRAST = 1.0  # walnut on cream holds up when small without more
-# Walnut timber on cream, in place of the render's pale timber on mint green.
-WOOD = (140, 92, 54)
+# Muted walnut timber on cream, in place of the render's pale timber on mint green.
+WOOD = (133, 96, 66)
+# The pegs and spline in honey, so they show against the walnut and the cream.
+PEG = (218, 168, 92)
 BACKGROUND = (240, 233, 220)
+# The render's lightness of the timber and of the pegs: each is tinted relative to its own.
+TIMBER_LIGHTNESS = 220
+PEG_LIGHTNESS = 188
 
 
 def timber_mask(image):
@@ -35,11 +38,23 @@ def timber_mask(image):
     return ImageChops.lighter(warm, dark).filter(ImageFilter.GaussianBlur(0.6))
 
 
+def peg_mask(image):
+    """255 on the pegs and spline: yellower than the timber (red less blue about 60 to its 20)."""
+    red, _green, blue = image.split()
+    return ImageChops.subtract(red, blue).point(lambda d: max(0, min(255, (d - 38) * 18))).filter(ImageFilter.GaussianBlur(0.6))
+
+
+def tinted(lightness, colour, base):
+    """`colour` where `lightness` is `base`, lighter and darker with it: the render's shading and outlines."""
+    return Image.merge('RGB', [lightness.point(lambda v, c=c: min(255, int(v * c / base))) for c in colour])
+
+
 def wood_coloured(image):
-    """`image` with its timber tinted WOOD, keeping the render's shading, outlines and pegs, on BACKGROUND."""
-    lightness = image.convert('L').point(lambda v: min(255, int(v * 1.04)))
-    tinted = Image.merge('RGB', [lightness.point(lambda v, c=c: int(v * c / 255)) for c in WOOD])
-    return Image.composite(tinted, Image.new('RGB', image.size, BACKGROUND), timber_mask(image))
+    """`image` with its timber in WOOD and its pegs and spline in PEG, on BACKGROUND."""
+    lightness = image.convert('L')
+    out = Image.composite(tinted(lightness, WOOD, TIMBER_LIGHTNESS), Image.new('RGB', image.size, BACKGROUND),
+                          timber_mask(image))
+    return Image.composite(tinted(lightness, PEG, PEG_LIGHTNESS), out, peg_mask(image))
 
 
 def render(size, inset=0.0, contrast=CONTRAST):
@@ -47,9 +62,6 @@ def render(size, inset=0.0, contrast=CONTRAST):
     margin = round(size * inset)
     side = size - 2 * margin
     source = Image.open(SOURCE).convert('RGB')
-    left, right, top = REFLECTION
-    beside = source.crop((left - (right - left), top, left, source.height))
-    source.paste(beside, (left, top))
     square = wood_coloured(source.crop(CROP))
     square = ImageEnhance.Contrast(square).enhance(contrast).resize((side, side), Image.LANCZOS)
     scale_up = 4  # the corners drawn large, then shrunk: smooth edges
