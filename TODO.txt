@@ -215,66 +215,6 @@ Optionally, come through with a plane to finish the top of the sawhorse.
 
 
 
-
-
-
-:: 11/1/2026 kumiki 0.10.0 release
-
-Kumiki is a programmatic CAD application for timber framing and woodwork. 
-
-Here's what's new for kumiki 0.10.0
-
-You can now ask the agent to generate blueprints and plans for you and if you don't like them you can go in and modify things yourself.
-
-There's a much easier to install standalone app that will set up all your project dependencies for you.
-
-With the ne wapp, the UI has also been overhauled to be more compact and intuitive
-
-the agent interaciton experience has been improved, it can self validate your work and you can also press this handy "copy for ai" to tell the AI what you're looking at
-
-And of course many more joints, patterns and examples have been added
-
-There's plenty more to come. kumiki is free and open source Please like and subscribe and stay tuned!
-
-:: 10/17/2026 PTW rough measuring notes
-
-Every timber has a "Perfect Timber Within" which may differ from its actual "rough" shape.
-
-This introduces a challenge in the fetaure/measurement system. We must render the "rough" shape, however all measurements must be taken from "reference features" which coincide with the PTW.
-
-To address this, we use the `Timber.get_extended_rough_csg_with_perfect_features_local` method which returns the timber's rough CSG with the following changes:
-
-- face features that coincide with PTW faces relabeled from rough.* to rptw.*
-- non-coinciding PTW face features added as non-real features labeled ptw.*
-- PTW centerplanes added as non-real features labeled ptw.*
-
-
-
-  
-
-:: 9/12/2026 do kumiki vid 
-
-There's a hidden assembly solver in kumiki that allows you to dissamble your designs and make your own ikea assembly explosion animations
-
-Why is this feature disabled by default?
-
-well kumiki is a term for interlocking wooden puzzles in japan
-
-The current dissamebly easily handles simple puzzles with single step solutions
-
-But puzzles requiring multiple steps are much harder for it to handle
-
-And these can get quite complicated
-
-So until the kumki's assembly feature can really live up to its own name
-
-- 6 sliding piece puzzle
-- 3 pcs burr puzzle https://www.youtube.com/watch?v=8ffj5BrKnfs
-- 6 pcs chinese cross puzzle https://www.youtube.com/watch?v=Vxw2LPQ8c4c
-- gordian knot puzzle lol https://sketchfab.com/3d-models/gordian-knot-assembly-cf579718b14649839d5f04beef1c6e2b
- 
-
-
 ::: 7/29 board notes
 
 board related joints
@@ -349,16 +289,82 @@ DONE-add STL mesh support shouldn't be hard :O
       -in the panel it should have a "update configuration", this will scan the code for the matching call that created the stl timber and update it in the source code with the new transform configuration. If it can't be found or its ambiguous, it should pop up an error saying it couldn't do it fory ou, either do it manually or ask the agent to do it, it should offer to copy the configuration to clipboard so you can do it yourself manually or copy a prewritten prompt for the agent to do it for you.
       -be careful abotu these new modes. we don't want to create some combinatorial nightmare with all our other stuff. in this isolation mode ALl you can do is reposition the stl, so please architecture kigumi accordings to reduce tech debt)
 
+DONE-do a logging pass. flag logs that are too spammy or wordy, see where logging is inconsistent or could be improved
+DONE-view source button for patterns should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
+DONE-change supabase app title
+DONE-make sure upload image funcitonality works (drag+drop and a + button)
+
+DONE-when right clicking on a timebr the menu should look as such
+  1. "focus camera on <timber name>"
+  2. if there are features highlighted: "features here (tab to cycle): \n ..." (tab to cycle only shows if there is more than 1 feature)
+  DIVIDER
+  3. "export <TIMBER NAME> \n stl, \nstep"
+
+DONE-mcp/agent options should be more cler
+  -title should be Agent Settings and MCP 
+  -"Enable MCP Server" -> "now serving..." (no url needed)
+    -one bigger button that says "copy setup prompt for ALL agents" and then smaller buttons as they are now
+    -after copying some text should pop up indicating what to do next, if copy for all agents was chosen instruct "paste instructions into you ragen,t you may need to RESTART your agent afterwards"
+  -add a "collaspe ^ button at the bottom cuz it' seasy to open the settings and not collapse it...
+  -options are saved right?
+
+DONE-mcp msg window
+  -should have a down arrow button when you scroll away from the bottom, the button should be slight different color so it's more prominent.
+  -instead of tool names lets givet hme human readable stuff e.g.
+    -screenshot -> "screenshotting <frame name> to validate"
+    -edit -> "working on <frame name>"
+    -search api -> "researching <filename>" 
+    -etc
+
+DONE-mcp chat windown
+  -should be visually a little more distainct so ppl know to click there to start prompting
+  -TODO list should have an x button to close it
+  -chat window should be resiazable and fdefault to 2 collumns and say "prompt here..." (drag+drop images, paste content, or @ to reference a file)
+  -permission mode should be bottom left of the chat and default to don't ask, it can stay as an option in the settings tab too
+  -maybe plan/edit mode can be adrop down and moved below the chat as well.
+  
+DONE-mke sure MCP provides instructions for what it does for external agents
+
+
+
+
+-improve agent panel visual clarity
+  -maybe do highligh tutorial tips thingy
+  -add buttno that says "prompt below"
+  -improve default prompts to not be clickable or whatever
+  -summary should be highlighted
+-make sure trackpad scrolling in agent panel is working
+-remove undo prompt or allow undo for the undo
+-add some jokes into the ouptut
+
+
+-assembly timeline should just combine with assembly preview beta option
+
+
+-create 3d measurement tool (guess itneeds to save to file), code measurement sstillp refrered
+-add skill to explain to users how things are working ,maybe add an option to toggle "explain how it works"
+-refresh seems slow again, check perf on web?
+-drawing beta nedes to be on by default and or explaini n prompts
+-ad options for MCP to read and write options
+-back to 3d. vie button needs to be bigger
+-the measurement viewport list view is maybe a little useless, make it less prnompnent
+
+
+
+
+
+-selected panel should show timber type (mesh, round, etc)
+-add an optional scale ruler to the 3d view and have it default off, can be enabled in options tab
 
 -see if you can make use of ButtJointCSGParts
 
--selected panel should show timber type (mesh, round, etc)
+
 -add shouder to cross lap joint
   -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
   -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
 
--add an optional scale ruler to the 3d view and have it default off, can be enabled in options tab
--do a logging pass. flag logs that are too spammy or wordy, see where logging is inconsistent or could be improved
+
+
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
 
@@ -396,7 +402,7 @@ DONE-add STL mesh support shouldn't be hard :O
   -check coverage, decide which featuersa are final enough to need more extensive coverage
 
 -maybe do a measuring.py doc though that's kinda laready covered by concepts.md  
--view source button for patterns should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
+
 -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
     - joint type tags should be prioritized, or instead sort by tags that show up most often
     - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
@@ -2255,6 +2261,66 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: ARCHIVE
+
+
+
+
+
+:: 11/1/2026 kumiki 0.10.0 release
+
+Kumiki is a programmatic CAD application for timber framing and woodwork. 
+
+Here's what's new for kumiki 0.10.0
+
+You can now ask the agent to generate blueprints and plans for you and if you don't like them you can go in and modify things yourself.
+
+There's a much easier to install standalone app that will set up all your project dependencies for you.
+
+With the ne wapp, the UI has also been overhauled to be more compact and intuitive
+
+the agent interaciton experience has been improved, it can self validate your work and you can also press this handy "copy for ai" to tell the AI what you're looking at
+
+And of course many more joints, patterns and examples have been added
+
+There's plenty more to come. kumiki is free and open source Please like and subscribe and stay tuned!
+
+:: 10/17/2026 PTW rough measuring notes
+
+Every timber has a "Perfect Timber Within" which may differ from its actual "rough" shape.
+
+This introduces a challenge in the fetaure/measurement system. We must render the "rough" shape, however all measurements must be taken from "reference features" which coincide with the PTW.
+
+To address this, we use the `Timber.get_extended_rough_csg_with_perfect_features_local` method which returns the timber's rough CSG with the following changes:
+
+- face features that coincide with PTW faces relabeled from rough.* to rptw.*
+- non-coinciding PTW face features added as non-real features labeled ptw.*
+- PTW centerplanes added as non-real features labeled ptw.*
+
+
+
+  
+
+:: 9/12/2026 do kumiki vid 
+
+There's a hidden assembly solver in kumiki that allows you to dissamble your designs and make your own ikea assembly explosion animations
+
+Why is this feature disabled by default?
+
+well kumiki is a term for interlocking wooden puzzles in japan
+
+The current dissamebly easily handles simple puzzles with single step solutions
+
+But puzzles requiring multiple steps are much harder for it to handle
+
+And these can get quite complicated
+
+So until the kumki's assembly feature can really live up to its own name
+
+- 6 sliding piece puzzle
+- 3 pcs burr puzzle https://www.youtube.com/watch?v=8ffj5BrKnfs
+- 6 pcs chinese cross puzzle https://www.youtube.com/watch?v=Vxw2LPQ8c4c
+- gordian knot puzzle lol https://sketchfab.com/3d-models/gordian-knot-assembly-cf579718b14649839d5f04beef1c6e2b
+ 
 
 
 
