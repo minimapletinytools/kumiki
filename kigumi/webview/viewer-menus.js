@@ -38,6 +38,8 @@ export const MenusMixin = (Base) => class extends Base {
             kind: 'member',
             items: [
                 { id: 'focus', label: t('viewer.contextMenu.focusOn', { name }), keepCase: true },
+                // Set apart from what follows it, when anything comes before the export rows' own divider.
+                ...(featureRows.length > 0 || copy ? [{ id: 'divider-focus', divider: true }] : []),
                 ...(featureRows.length > 0 ? [{
                     id: 'features',
                     heading: true,

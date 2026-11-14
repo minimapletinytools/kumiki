@@ -106,7 +106,7 @@ module.exports = {
         const exportAt = rows.findIndex((row) => row.startsWith('# export '));
         await inShell(`${viewDoc}.querySelector('kigumi-app').selectMembers([], false)`);
         check('a right click on a timber offers to focus on it, the features under the pointer, then export',
-            /^focus camera on \S/.test(rows[0] || '') && rows[1] && rows[1].startsWith('# features here')
+            /^focus camera on \S/.test(rows[0] || '') && rows[1] === '---' && rows[2] && rows[2].startsWith('# features here')
                 && rows[exportAt - 1] === '---' && rows[exportAt + 1] === 'stl' && rows[exportAt + 2] === 'step'
                 && !rows.includes('copy for ai'),
             JSON.stringify(rightClick));
