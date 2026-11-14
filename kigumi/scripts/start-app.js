@@ -51,7 +51,9 @@ function replaceIcon(resources) {
 /** Returns the executable of the Kigumi-named copy of Electron's bundle, making it if needed. */
 function macBundle() {
     const source = path.resolve(electron, '..', '..', '..');
-    const version = `${require('electron/package.json').version} (bundle ${BUNDLE_FORMAT})`;
+    // Made again for a new Electron, or a new icon: the copy's icon is the one it was made with.
+    const icon = require('crypto').createHash('sha1').update(fs.readFileSync(ICON)).digest('hex').slice(0, 12);
+    const version = `${require('electron/package.json').version} (bundle ${BUNDLE_FORMAT}, icon ${icon})`;
     const bundle = path.join(DEV_DIR, 'Kigumi.app');
     const stamp = path.join(DEV_DIR, 'electron-version');
     const executable = path.join(bundle, 'Contents', 'MacOS', 'Kigumi');
