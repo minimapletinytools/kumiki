@@ -3,6 +3,7 @@ const { app, BrowserWindow, session } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const assert = require('assert/strict');
+const { MCP_INSTRUCTIONS } = require('../../../agent/mcp-instructions');
 const HERE = path.resolve(__dirname, '..');
 const backend = process.env.KIGUMI_BACKEND_DIR || path.resolve(HERE, '../../../../kigumi-backend');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -62,7 +63,8 @@ app.whenReady().then(async () => {
             assert.equal(body.error, undefined, JSON.stringify(body));
             return body.result;
         };
-        await call('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } });
+        const initialized = await call('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'smoke', version: '1' } });
+        assert.equal(initialized.instructions, MCP_INSTRUCTIONS);
         assert.ok((await call('tools/list')).tools.some(tool => tool.name === 'list_panels'));
         const result = await call('tools/call', { name: 'list_panels', arguments: {} });
         assert.ok(Array.isArray(JSON.parse(result.content[0].text).panels));

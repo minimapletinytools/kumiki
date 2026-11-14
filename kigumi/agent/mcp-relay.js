@@ -1,5 +1,6 @@
 /** Connect browser tools to the Cloudflare MCP relay. */
 const { z } = require('zod');
+const { MCP_INSTRUCTIONS } = require('./mcp-instructions');
 const { MCP_CLIENTS, mcpSetupText } = require('./mcp-setup');
 
 function createMcpRelay({ settings, account, backendUrl, tools, copyText, setStatus, WebSocketClass = WebSocket, fetch: fetcher = (...args) => fetch(...args), storage = null }) {
@@ -20,9 +21,10 @@ function createMcpRelay({ settings, account, backendUrl, tools, copyText, setSta
     const state = () => ({ enabled: settings.get('mcp.enabled', false) === true, running: socket?.readyState === 1,
         url: session?.url || null, error, clients: [], setups: MCP_CLIENTS });
     const notify = () => { for (const listener of listeners) listener(state()); };
-    async function request(path, signal) {
+    async function request(path, signal, body) {
         const response = await account().fetchWithToken(`${backendUrl}${path}`, {
-            method: 'POST', signal: AbortSignal.any([AbortSignal.timeout(10000), ...(signal ? [signal] : [])]),
+            method: 'POST', ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+            signal: AbortSignal.any([AbortSignal.timeout(10000), ...(signal ? [signal] : [])]),
         });
         if (!response.ok) throw new Error(`MCP relay: HTTP ${response.status}. Sign in to Kigumi to connect.`);
         return response.json();
@@ -80,7 +82,7 @@ function createMcpRelay({ settings, account, backendUrl, tools, copyText, setSta
             }
             session = created;
         }
-        const { ticket } = await request(`/mcp-sessions/${session.id}/ticket`, signal);
+        const { ticket } = await request(`/mcp-sessions/${session.id}/ticket`, signal, { instructions: MCP_INSTRUCTIONS });
         if (epoch !== generation) return;
         const url = new URL(`${session.url}/connect`);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';

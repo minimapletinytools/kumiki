@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { MCP_INSTRUCTIONS } = require('../agent/mcp-instructions');
 const { createMcpRelay } = require('../agent/mcp-relay');
 
 test('validates calls and revokes access when disabled', async () => {
@@ -9,11 +10,13 @@ test('validates calls and revokes access when disabled', async () => {
         close() { this.readyState = 3; this.onclose?.(); }
     }
     const requests = [];
+    const connectionMetadata = [];
     const run = jest.fn(async ({ count }) => [{ type: 'text', text: String(count) }]);
     const relay = createMcpRelay({
         settings: { get: () => enabled },
-        account: () => ({ userId: () => 'alice', fetchWithToken: async (url) => {
+        account: () => ({ userId: () => 'alice', fetchWithToken: async (url, init) => {
             requests.push(url);
+            if (url.endsWith('/ticket')) connectionMetadata.push(JSON.parse(init.body));
             return { ok: true, json: async () => url.endsWith('/mcp-sessions')
                 ? { id: 'one', token: 'secret', revokeToken: 'delete-only', url: 'https://relay.test/mcp/one' } : { ticket: 'ticket' } };
         } }),
@@ -22,6 +25,7 @@ test('validates calls and revokes access when disabled', async () => {
         copyText: jest.fn(), setStatus: jest.fn(), WebSocketClass: Socket,
     });
     await relay.sync();
+    expect(connectionMetadata).toEqual([{ instructions: MCP_INSTRUCTIONS }]);
     const message = (id, method, params) => ws.onmessage({ data: JSON.stringify({ v: 1, id, method, params, deadline: Date.now() + 10000 }) });
     message('list', 'tools/list', {});
     message('bad', 'tools/call', { name: 'count', arguments: { count: 'wrong' } });

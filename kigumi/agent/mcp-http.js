@@ -9,7 +9,7 @@
 
 const http = require('http');
 const crypto = require('crypto');
-const { MCP_INSTRUCTIONS } = require('./kumiki-docs');
+const { MCP_INSTRUCTIONS } = require('./mcp-instructions');
 
 const PATH = '/mcp';
 
