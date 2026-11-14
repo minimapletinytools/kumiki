@@ -202,7 +202,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
 
     const sidebarController = new SidebarController(sidebarModel, {
         runCommand: (command, ...args) => host.runCommand(command, ...args),
-        log: (message) => outputChannel.appendLine(`[kigumi] ${message}`),
+        log: (message, level) => outputChannel.appendLine(`[kigumi] ${message}`, level),
     });
     disposables.push(sidebarController, sidebarModel);
 
@@ -497,7 +497,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                 const runner = await _getOrCreateBackgroundRunner(firstPattern.sourceFile);
                 await _openBookFromWebview(runner, firstPattern.sourceFile);
             } catch (error) {
-                outputChannel.appendLine(`Open patternbook error: ${error.message}\n${error.stack}`);
+                outputChannel.appendLine(`Open patternbook error: ${error.message}\n${error.stack}`, 'error');
                 host.showMessage('error', t('message.failedToOpenPatternbook', { error: error.message }));
             }
         },
@@ -524,7 +524,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                     host.showMessage('info', t('message.openedReadOnlyPatternCopy'));
                 }
             } catch (error) {
-                outputChannel.appendLine(`View source error: ${error.message}\n${error.stack}`);
+                outputChannel.appendLine(`View source error: ${error.message}\n${error.stack}`, 'error');
                 host.showMessage('error', t('message.failedToViewPatternSource', { error: error.message }));
             }
         },
@@ -554,7 +554,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                     { path: path.relative(workspaceRoot, newPath) }));
                 await sidebarModel.refresh(true);
             } catch (error) {
-                outputChannel.appendLine(`Duplicate pattern error: ${error.message}\n${error.stack}`);
+                outputChannel.appendLine(`Duplicate pattern error: ${error.message}\n${error.stack}`, 'error');
                 host.showMessage('error', t('message.failedToDuplicatePattern', { error: error.message }));
             }
         },
@@ -878,7 +878,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             }
         }
         for (const warning of (result.instructionWarnings || [])) {
-            outputChannel.appendLine(`[kigumi] Warning: ${warning}`);
+            outputChannel.appendLine(`[kigumi] ${warning}`, 'warn');
         }
     }
 
@@ -970,7 +970,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         try {
             runner = await _getOrCreateBackgroundRunner(sourceFile);
         } catch (error) {
-            outputChannel.appendLine(`Open pattern error: ${error.message}\n${error.stack}`);
+            outputChannel.appendLine(`Open pattern error: ${error.message}\n${error.stack}`, 'error');
             host.showMessage('error', t('message.failedToStartRunner', { error: error.message }));
             return;
         }
@@ -1068,7 +1068,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                         await runner.request('unload_slot', { slot: oldSlotName });
                     }
                 } catch (err) {
-                    outputChannel.appendLine(`Failed to unload old slot '${oldSlotName}': ${err.message || err}`);
+                    outputChannel.appendLine(`Failed to unload old slot '${oldSlotName}': ${err.message || err}`, 'warn');
                 }
                 existingSession.reassignPattern({ slotName, patternName, filePath: sourceFile });
                 existingSession.reveal();
@@ -1192,7 +1192,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                     outputChannel.appendLine(`[kigumi] Removed ${result.removedFiles.length} old log file(s) from ${result.logsDir}`);
                 }
             } catch (error) {
-                outputChannel.appendLine(`[kigumi] Failed to prune old logs in ${root}: ${error.message || error}`);
+                outputChannel.appendLine(`[kigumi] Failed to prune old logs in ${root}: ${error.message || error}`, 'warn');
             }
         }
     }

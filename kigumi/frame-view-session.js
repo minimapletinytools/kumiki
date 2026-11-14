@@ -39,6 +39,17 @@ function assemblyPreviewSettingEnabled() {
     return getHost().getConfig('viewer.assemblyPreview', false) === true;
 }
 
+/**
+ * The level of a line the runner or the frame printed: runner.py tags its own (log_stderr's
+ * "[warn] "), and a Python warning ("file.py:12: FrameWarning: ...") counts as one, so an
+ * agent's edit reports it.
+ */
+function pythonLineLevel(line) {
+    const tag = /^\[(debug|warn|error)\] /.exec(line);
+    if (tag) return tag[1];
+    return /\b[A-Z]\w*Warning: /.test(line) ? 'warn' : 'info';
+}
+
 function normalizeViewerLogLevel(level) {
     if (typeof level !== 'string') {
         return 'info';
@@ -89,7 +100,7 @@ class FrameViewSession {
         // watcher -- rebuilds with the values on screen rather than reverting
         // to the defaults behind the user's back.
         this.kiwariValues = null;
-        this.profiler = new RefreshProfiler({ log: (msg) => this.log(msg) });
+        this.profiler = new RefreshProfiler({ log: (msg, level) => this.log(msg, level) });
         this.slotName = options.slotName || 'main';
         this.sessionType = options.sessionType || 'main';
         this.patternName = options.patternName || null;
@@ -131,7 +142,7 @@ class FrameViewSession {
                 type: 'layersTree',
                 payload: this._lastLayersData,
             }).catch((err) => {
-                this.log(`[layers] Failed to post layers tree: ${err.message || err}`);
+                this.log(`[layers] Failed to post layers tree: ${err.message || err}`, 'warn');
             });
             this._fetchAssemblyInBackground(this._lastLayersData);
         }
@@ -171,7 +182,7 @@ class FrameViewSession {
             }
             return parsed;
         } catch (error) {
-            this.log(`[settings] Failed to read ${settingsPath}: ${error.message || error}`);
+            this.log(`[settings] Failed to read ${settingsPath}: ${error.message || error}`, 'error');
             return null;
         }
     }
@@ -213,7 +224,7 @@ class FrameViewSession {
                 error: null,
             },
         }).catch((error) => {
-            this.log(`[webview] Failed to post loading status '${stage}': ${error.message || error}`);
+            this.log(`[webview] Failed to post loading status '${stage}': ${error.message || error}`, 'warn');
         });
     }
 
@@ -344,7 +355,7 @@ class FrameViewSession {
                     this.kiwariValues = { ...message.kiwari };
                 }
                 this.refresh('manual refresh button').catch((error) => {
-                    this.log(`[refresh] Manual refresh failed: ${error.message || error}`);
+                    this.log(`[refresh] Manual refresh failed: ${error.message || error}`, 'error');
                 });
                 return;
             }
@@ -353,7 +364,7 @@ class FrameViewSession {
                     this.kiwariValues = { ...message.kiwari };
                 }
                 this.saveParameters().catch((error) => {
-                    this.log(`[parameters] Save failed: ${error.message || error}`);
+                    this.log(`[parameters] Save failed: ${error.message || error}`, 'error');
                     getHost().showMessage('error', t('message.saveParametersFailed', { error: error.message || error }));
                 });
                 return;
@@ -383,14 +394,14 @@ class FrameViewSession {
                 const key = BETA_FEATURE_SETTINGS[message.feature];
                 if (key) {
                     Promise.resolve(getHost().updateConfig(key, message.enabled === true)).catch((error) => {
-                        this.log(`[settings] setBetaFeature error: ${error.message || error}`);
+                        this.log(`[settings] setBetaFeature error: ${error.message || error}`, 'error');
                     });
                 }
                 return;
             }
             if (message.type === 'requestSaveViewerSettings') {
                 this._handleSaveViewerSettingsRequest(message).catch((error) => {
-                    this.log(`[settings] requestSaveViewerSettings error: ${error.message || error}`);
+                    this.log(`[settings] requestSaveViewerSettings error: ${error.message || error}`, 'error');
                 });
                 return;
             }
@@ -412,13 +423,13 @@ class FrameViewSession {
                 // an assistant working in it would name it.
                 const sourceFile = path.relative(this.projectRoot, this.filePath) || path.basename(this.filePath);
                 getHost().copyText(describeSelection({ ...(message.selection || {}), sourceFile })).catch((err) => {
-                    this.log(`[selection] copy for AI failed: ${err.message || err}`);
+                    this.log(`[selection] copy for AI failed: ${err.message || err}`, 'error');
                 });
                 return;
             }
             if (message.type === 'findCSGAtPoint') {
                 this._handleFindCSGAtPoint(message).catch((err) => {
-                    this.log(`[csg-nav] findCSGAtPoint error: ${err.message || err}`);
+                    this.log(`[csg-nav] findCSGAtPoint error: ${err.message || err}`, 'error');
                 });
                 return;
             }
@@ -430,14 +441,14 @@ class FrameViewSession {
                 this._handleHoverFeatureAtPoint(message).catch((err) => {
                     if (!this._hoverErrorReported) {
                         this._hoverErrorReported = true;
-                        this.log(`[hover] ${err.message || err} (further hover errors are not logged)`);
+                        this.log(`[hover] ${err.message || err} (further hover errors are not logged)`, 'warn');
                     }
                 });
                 return;
             }
             if (message.type === 'requestDrawings') {
                 this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
-                    this.log(`[drawing] requestDrawings error: ${err.message || err}`);
+                    this.log(`[drawing] requestDrawings error: ${err.message || err}`, 'error');
                 });
                 return;
             }
@@ -447,7 +458,7 @@ class FrameViewSession {
             }
             if (message.type === 'requestSaveDrawings') {
                 this._handleDrawingsCommand('save_drawings', {}, { enter: false }).catch((err) => {
-                    this.log(`[drawing] requestSaveDrawings error: ${err.message || err}`);
+                    this.log(`[drawing] requestSaveDrawings error: ${err.message || err}`, 'error');
                 });
                 return;
             }
@@ -488,49 +499,49 @@ class FrameViewSession {
             }
             if (message.type === 'requestDrawingFromSelection') {
                 this._handleRequestDrawingFromSelection(message).catch((err) => {
-                    this.log(`[drawing] requestDrawingFromSelection error: ${err.message || err}`);
+                    this.log(`[drawing] requestDrawingFromSelection error: ${err.message || err}`, 'error');
                 });
                 return;
             }
             if (message.type === 'requestDebugDrawing') {
                 this._handleRequestDebugDrawing().catch((err) => {
-                    this.log(`[drawing] requestDebugDrawing error: ${err.message || err}`);
+                    this.log(`[drawing] requestDebugDrawing error: ${err.message || err}`, 'error');
                 });
                 return;
             }
             if (message.type === 'requestCSGTree') {
                 this._handleRequestCSGTree(message).catch((err) => {
-                    this.log(`[layers] requestCSGTree error: ${err.message || err}`);
+                    this.log(`[layers] requestCSGTree error: ${err.message || err}`, 'error');
                 });
                 return;
             }
             if (message.type === 'requestFeatureHighlights') {
                 this._handleRequestFeatureHighlights(message).catch((err) => {
-                    this.log(`[highlight] requestFeatureHighlights error: ${err.message || err}`);
+                    this.log(`[highlight] requestFeatureHighlights error: ${err.message || err}`, 'error');
                 });
                 return;
             }
             if (message.type === 'requestCSGByPath') {
                 this._handleRequestCSGByPath(message).catch((err) => {
-                    this.log(`[layers] requestCSGByPath error: ${err.message || err}`);
+                    this.log(`[layers] requestCSGByPath error: ${err.message || err}`, 'error');
                 });
                 return;
             }
             if (message.type === 'requestExportFiles') {
                 exportFormats(this, message).catch((err) => {
-                    this.log(`[export] requestExportFiles error: ${err.message || err}`);
+                    this.log(`[export] requestExportFiles error: ${err.message || err}`, 'error');
                 });
                 return;
             }
             if (message.type === 'requestExportMember') {
                 exportMember(this, message).catch((err) => {
-                    this.log(`[export] requestExportMember error: ${err.message || err}`);
+                    this.log(`[export] requestExportMember error: ${err.message || err}`, 'error');
                 });
                 return;
             }
             if (message.type === 'requestInstallCadqueryOcp') {
                 installCadqueryOcp(this).catch((err) => {
-                    this.log(`[export] requestInstallCadqueryOcp error: ${err.message || err}`);
+                    this.log(`[export] requestInstallCadqueryOcp error: ${err.message || err}`, 'error');
                 });
                 return;
             }
@@ -558,7 +569,7 @@ class FrameViewSession {
             const details = message.details && typeof message.details === 'object'
                 ? JSON.stringify(message.details)
                 : '{}';
-            this.log(`[webview:${source}:${level}] ${eventName} v${version} ${details}`);
+            this.log(`[webview:${source}] ${eventName} v${version} ${details}`, level);
         });
     }
 
@@ -824,7 +835,7 @@ class FrameViewSession {
             try {
                 await this.runnerSession.dispose();
             } catch (error) {
-                this.log(`[runner] dispose after failure: ${error.message || error}`);
+                this.log(`[runner] dispose after failure: ${error.message || error}`, 'warn');
             }
         }
 
@@ -977,7 +988,7 @@ class FrameViewSession {
                     type: 'layersTree',
                     payload: layersData,
                 }).catch((err) => {
-                    this.log(`[layers] Failed to post layers tree: ${err.message || err}`);
+                    this.log(`[layers] Failed to post layers tree: ${err.message || err}`, 'warn');
                 });
                 this._fetchAssemblyInBackground(layersData);
             }
@@ -985,7 +996,7 @@ class FrameViewSession {
             // The drawings again, measured on the frame just built.
             if (getHost().getConfig(BETA_FEATURE_SETTINGS.drawingBeta, false) === true) {
                 this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
-                    if (!this.isDisposed) this.log(`[drawing] get_drawings after refresh failed: ${err.message || err}`);
+                    if (!this.isDisposed) this.log(`[drawing] get_drawings after refresh failed: ${err.message || err}`, 'error');
                 });
             }
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
@@ -1008,7 +1019,7 @@ class FrameViewSession {
             this.log(`[refresh] Draining pending refresh (${pendingReason})`);
             // Fire-and-forget so it doesn't block error reporting
             this.refresh(pendingReason).catch((err) => {
-                this.log(`[refresh] Pending refresh failed: ${err.message || err}`);
+                this.log(`[refresh] Pending refresh failed: ${err.message || err}`, 'error');
             });
         }
 
@@ -1251,7 +1262,7 @@ class FrameViewSession {
             const result = await this.runnerSession.slotRequest('find_csg_by_path', this.slotName, payload);
             this._postToWebview({ type: 'csgSelectionResult', ...result });
         } catch (err) {
-            this.log(`[layers] find_csg_by_path failed: ${err.message || err}`);
+            this.log(`[layers] find_csg_by_path failed: ${err.message || err}`, 'error');
         }
     }
 
@@ -1301,7 +1312,7 @@ class FrameViewSession {
         const match = message && typeof message.dataUrl === 'string' && /^data:image\/png;base64,(.+)$/u.exec(message.dataUrl);
         if (!fileName.endsWith('.png') || !match) {
             const error = (message && typeof message.error === 'string' && message.error) || 'the view sent no PNG';
-            this.log(`[drawing] PNG export failed: ${error}`);
+            this.log(`[drawing] PNG export failed: ${error}`, 'error');
             void getHost().showMessage('error', t('message.drawingExportFailed', { error }));
             return;
         }
@@ -1353,7 +1364,7 @@ class FrameViewSession {
             reply = { type: 'toolResult', name, output: (result && result.output) || '' };
         } catch (error) {
             const message = error.message || String(error);
-            this.log(`[tools] "${name}" failed: ${message}`);
+            this.log(`[tools] "${name}" failed: ${message}`, 'error');
             reply = { type: 'toolResult', name, error: message };
         }
         if (this.panel && !this.isDisposed) {
@@ -1373,7 +1384,7 @@ class FrameViewSession {
                 }
             })
             .catch((err) => {
-                if (!this.isDisposed) this.log(`[finishing] run_finishing failed: ${err.message || err}`);
+                if (!this.isDisposed) this.log(`[finishing] run_finishing failed: ${err.message || err}`, 'error');
             });
     }
 
@@ -1388,7 +1399,7 @@ class FrameViewSession {
                 return;
             }
             this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
-                if (!this.isDisposed) this.log(`[drawing] get_drawings after a finishing drawing failed: ${err.message || err}`);
+                if (!this.isDisposed) this.log(`[drawing] get_drawings after a finishing drawing failed: ${err.message || err}`, 'error');
             });
         }, 200);
     }
@@ -1436,7 +1447,7 @@ class FrameViewSession {
             })
             .catch((err) => {
                 const elapsedMs = Date.now() - startMs;
-                this.log(`[assembly] get_assembly failed after ${elapsedMs}ms: ${err.message || err}`);
+                this.log(`[assembly] get_assembly failed after ${elapsedMs}ms: ${err.message || err}`, 'error');
                 if (generation !== this._assemblyFetchGeneration || this.isDisposed) {
                     return;
                 }
@@ -1476,7 +1487,7 @@ class FrameViewSession {
                 path: settingsPath,
                 savedAt: settings.savedAt,
             }).catch((error) => {
-                this.log(`[settings] Failed to post viewerSettingsSaved: ${error.message || error}`);
+                this.log(`[settings] Failed to post viewerSettingsSaved: ${error.message || error}`, 'warn');
             });
         }
     }
@@ -1496,7 +1507,7 @@ class FrameViewSession {
         try {
             await this.refresh(`${source} change`);
         } catch (error) {
-            this.log(`[watcher] Auto-reload failed for ${path.basename(this.filePath)}: ${error.message || error}`);
+            this.log(`[watcher] Auto-reload failed for ${path.basename(this.filePath)}: ${error.message || error}`, 'error');
         }
     }
 
@@ -1520,7 +1531,7 @@ class FrameViewSession {
                 sourceHasPendingChanges: this.sourceHasPendingChanges,
             },
         }).catch((error) => {
-            this.log(`[webview] Failed to post source change state: ${error.message || error}`);
+            this.log(`[webview] Failed to post source change state: ${error.message || error}`, 'warn');
         });
     }
 
@@ -1543,7 +1554,7 @@ class FrameViewSession {
                 errorLocation: parseTracebackLocation(details && details.traceback, { prefer: this.filePath }),
             },
         }).catch((postError) => {
-            this.log(`[webview] Failed to post error state: ${postError.message || postError}`);
+            this.log(`[webview] Failed to post error state: ${postError.message || postError}`, 'warn');
         });
     }
 
@@ -1564,7 +1575,7 @@ class FrameViewSession {
                 errorLocation: parseTracebackLocation(traceback, { prefer: this.filePath }),
             },
         }).catch((postError) => {
-            this.log(`[webview] Failed to post error state with link: ${postError.message || postError}`);
+            this.log(`[webview] Failed to post error state with link: ${postError.message || postError}`, 'warn');
         });
     }
 
@@ -1575,7 +1586,7 @@ class FrameViewSession {
         try {
             await getHost().openFileAt(location.filePath, location.lineNumber);
         } catch (openError) {
-            this.log(`[error] Failed to open traceback location: ${openError.message || openError}`);
+            this.log(`[error] Failed to open traceback location: ${openError.message || openError}`, 'warn');
         }
     }
 
@@ -1622,7 +1633,7 @@ class FrameViewSession {
                         await this.runnerSession.request('unload_slot', { slot: this.slotName });
                     }
                 } catch (error) {
-                    this.log(`[slot] Failed to unload slot '${this.slotName}': ${error.message || error}`);
+                    this.log(`[slot] Failed to unload slot '${this.slotName}': ${error.message || error}`, 'warn');
                 }
             }
             this.runnerSession = null;
@@ -1661,11 +1672,15 @@ class FrameViewSession {
         }
     }
 
-    log(message) {
+    /** One line of this view's log, at `level`; without one, a `[warn]`-style tag in it decides. */
+    log(message, level) {
         const formatted = `[${path.basename(this.filePath)}] ${message}`;
-        const match = /\[(debug|info|warn|error)\]/i.exec(String(message));
-        // Timings are for looking into speed, not for reading: debug unless they say otherwise.
-        const level = normalizeViewerLogLevel(match ? match[1] : /\[timing\]/.test(message) ? 'debug' : 'info');
+        if (!level) {
+            const match = /\[(debug|info|warn|error)\]/i.exec(String(message));
+            // Timings are for looking into speed, not for reading: debug unless they say otherwise.
+            level = match ? match[1] : /\[timing\]/.test(message) ? 'debug' : 'info';
+        }
+        level = normalizeViewerLogLevel(level);
         const entry = {
             timestamp: new Date().toISOString(),
             level,
@@ -1675,7 +1690,7 @@ class FrameViewSession {
             sessionType: this.sessionType,
         };
         this.appendSessionLog(entry);
-        this.channel.appendLine(formatted);
+        this.channel.appendLine(formatted, level);
     }
 
     /** Several lines (a traceback) as one entry of the log channel and the session log, at `level`. */
@@ -1702,8 +1717,7 @@ class FrameViewSession {
             const lines = (partial + text).split('\n');
             partial = lines.pop();
             for (const line of lines) {
-                // A Python warning ("file.py:12: FrameWarning: ...") counts as one, so an agent's edit reports it.
-                if (line.trim()) this.log(`${/\b[A-Z]\w*Warning: /.test(line) ? '[warn] ' : ''}[python] ${line}`);
+                if (line.trim()) this.log(`[python] ${line}`, pythonLineLevel(line));
             }
         };
         this.runnerSession.onMilestone = (milestone) => {
@@ -1728,11 +1742,11 @@ class FrameViewSession {
                 this.log(`[assembly] Received background assembly result (${seconds}s)`);
                 this._postToWebview({ type: 'assemblyData', payload: message.result ? message.result.assembly : null });
             } else if (message.type === 'job_failed') {
-                this.log(`[assembly] Background assembly solve failed: ${message.error && message.error.message}`);
+                this.log(`[assembly] Background assembly solve failed: ${message.error && message.error.message}`, 'error');
                 this._postToWebview({ type: 'assemblyData', payload: null });
             }
         };
     }
 }
 
-module.exports = { FrameViewSession };
+module.exports = { FrameViewSession, pythonLineLevel };

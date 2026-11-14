@@ -222,7 +222,7 @@ async function runAppCommand(id, ...args) {
     try {
         return await handler(...args);
     } catch (error) {
-        logChannel.appendLine(`[app] ${id} failed: ${error.stack || error}`);
+        logChannel.appendLine(`[app] ${id} failed: ${error.stack || error}`, 'error');
         setStatus('error', `${id} failed: ${error.message || error}`);
         return undefined;
     }
@@ -447,7 +447,7 @@ function handleAuthLink(url) {
         mainWindow.focus();
     }
     account.completeSignIn(url).then(() => logChannel.appendLine('[account] signed in')).catch((error) => {
-        logChannel.appendLine(`[account] sign-in failed: ${error.message}`);
+        logChannel.appendLine(`[account] sign-in failed: ${error.message}`, 'error');
         setStatus('error', `Could not sign in: ${error.message}`);
     });
 }

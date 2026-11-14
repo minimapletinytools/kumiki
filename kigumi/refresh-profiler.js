@@ -133,7 +133,7 @@ class RefreshProfiler {
             fs.writeFileSync(outputPath, `${JSON.stringify(statsPayload, null, 2)}\n`, 'utf8');
             return outputPath;
         } catch (error) {
-            this.log(`[refresh] Failed to write stats JSON: ${error.message || error}`);
+            this.log(`[refresh] Failed to write stats JSON: ${error.message || error}`, 'warn');
             return null;
         }
     }

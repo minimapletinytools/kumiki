@@ -84,7 +84,7 @@ class PythonRunnerSession {
                 return pythonPath;
             }
         } catch (error) {
-            this.channel.appendLine(`[env] Failed reading .kigumi/kigumi.yaml: ${error.message}`);
+            this.channel.appendLine(`[env] Failed reading .kigumi/kigumi.yaml: ${error.message}`, 'warn');
         }
         return null;
     }
@@ -244,7 +244,7 @@ class PythonRunnerSession {
                 this.channel.appendLine(`[env] Updated ${PROJECT_DOCS_DIR} for kumiki ${kumikiVersion} from ${synced.source}`);
             }
         } catch (error) {
-            this.channel.appendLine(`[env] Could not update ${PROJECT_DOCS_DIR}: ${error.message}`);
+            this.channel.appendLine(`[env] Could not update ${PROJECT_DOCS_DIR}: ${error.message}`, 'warn');
         }
     }
 
@@ -263,7 +263,7 @@ class PythonRunnerSession {
             ]);
             kumikiVersion = stdout.trim();
         } catch (error) {
-            this.channel.appendLine(`[env] Could not read kumiki version: ${error.message}`);
+            this.channel.appendLine(`[env] Could not read kumiki version: ${error.message}`, 'warn');
             return;
         }
 
@@ -377,8 +377,8 @@ class PythonRunnerSession {
         try {
             message = JSON.parse(line);
         } catch (error) {
-            this.channel.appendLine(`Protocol parse error: ${error.message}`);
-            this.channel.appendLine(`Raw stdout: ${line}`);
+            this.channel.appendLine(`Protocol parse error: ${error.message}`, 'error');
+            this.channel.appendLine(`Raw stdout: ${line}`, 'error');
             return;
         }
 
@@ -391,7 +391,7 @@ class PythonRunnerSession {
 
         if (message.type === 'fatal_error') {
             const error = this.createRunnerError(message.error, 'Runner fatal error');
-            this.channel.appendLine(`Runner fatal error: ${this.extractErrorMessage(message.error)}`);
+            this.channel.appendLine(`Runner fatal error: ${this.extractErrorMessage(message.error)}`, 'error');
             this.startResolved = true;
             rejectStart(error);
             return;
@@ -414,7 +414,7 @@ class PythonRunnerSession {
         if (Object.prototype.hasOwnProperty.call(message, 'id')) {
             const pending = this.pending.get(message.id);
             if (!pending) {
-                this.channel.appendLine(`No pending request for response id ${message.id}`);
+                this.channel.appendLine(`No pending request for response id ${message.id}`, 'warn');
                 return;
             }
 
@@ -427,7 +427,7 @@ class PythonRunnerSession {
             return;
         }
 
-        this.channel.appendLine(`Unhandled protocol message: ${line}`);
+        this.channel.appendLine(`Unhandled protocol message: ${line}`, 'warn');
     }
 
     extractErrorMessage(errorPayload) {
@@ -494,7 +494,7 @@ class PythonRunnerSession {
                 await this.request('shutdown');
             }
         } catch (error) {
-            this.channel.appendLine(`Runner shutdown request failed: ${error.message}`);
+            this.channel.appendLine(`Runner shutdown request failed: ${error.message}`, 'warn');
         }
 
         if (this.process && this.isAlive()) {
