@@ -313,32 +313,30 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
--angled corner lap joint doesn't have end cuts
--do LLC research
--agent stuff
+DONE-agent stuff
   DONE-tool cleanup
   DONE-add drawings to cheat sheet
-  -do the pattern mega refactor
-  -do the example mega refactor
-
-
-
--test agent created drawings
--agent benchmarking examples
-
--agent account stuff
-  -setup LLC prob
-  -figure out liability ad data retention risks
-  -consider doing cloud files and sharing 
-  -draft out dream spec for cloud suite and see if we should do any refactors now.
-
--dio mega update wesite
-  DONE-rewrite content to be not slop ugh
-  -add animation header image/video
-  -add discussion and discord links  (maybe make them a little mor eprominent, perhaps as a section on the site just below the main row)
-
-
--add STL mesh support shouldn't be hard :O
+  DONE-do the pattern mega refactor
+  DONE-do the example mega refactor
+DONE-agent instructions
+DONE-the TODO block in teh agent panle doesn't go away if teh gaent moved on to something else, mabye add a manul x button to close it? and it will reopen the next time the agent actually updates it or changes it? idkwh at do you think?
+DONE-add to default context file/project currentyl in focus etc, so its more clear to bulit in agent if yous witched contexts and are prompting about something else waht do you think?
+DONE-add basic joint patterns
+DONE-please folder the basic butt joint stuffp roperyl if there are multiple variants, ege mortise_and_tenon/... cuzi t's conufisg that there is both a folder and a pattern named basic_morties_and_tenon
+DONE-remove the basic_ prefix from all teh basic pattern,s for decorative cuts, add the decorative_ prefix to it so we know it's ad ecorative cut
+DONE-update double spline joint to include mini tenons
+DONE-angled corner lap joint doesn't have end cuts
+DONE/IGNORE-investigate adding to app store
+DONE-application nav changes  
+  -add more info to about page, link to website, dsicord and discussion
+  -help should link discord/discussion as well
+  -get rid of edit tab in top application nav
+  -get rid of toggle developer tools
+  -does it make sense to move fullscrene options else where and get rid of the view tab?
+DONE-create hotkey config page?
+DOEN-from source view tehre should be a button easily preview your source in the viewer, or a hotkeey!
+DONE-triangulation is producing edge artifacts on basic_splice_lap_joint pattern and basic_dropin_dovetali_butt_joint_pattern. there's al ine across the shoulder line smh
+DONE-add STL mesh support shouldn't be hard :O
   -make a cabriole leg table example 
     -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
   -STL timber should have "placeholder mode" which does the following
@@ -351,38 +349,94 @@ DONE-sliding dovetail (maybe you want tapered variants)
       -in the panel it should have a "update configuration", this will scan the code for the matching call that created the stl timber and update it in the source code with the new transform configuration. If it can't be found or its ambiguous, it should pop up an error saying it couldn't do it fory ou, either do it manually or ask the agent to do it, it should offer to copy the configuration to clipboard so you can do it yourself manually or copy a prewritten prompt for the agent to do it for you.
       -be careful abotu these new modes. we don't want to create some combinatorial nightmare with all our other stuff. in this isolation mode ALl you can do is reposition the stl, so please architecture kigumi accordings to reduce tech debt)
 
+
+
+-selected panel should show timber type (mesh, round, etc)
+-add shouder to cross lap joint
+  -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
+  -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
+
+-add an optional scale ruler to the 3d view and have it default off, can be enabled in options tab
+-do a logging pass. flag logs that are too spammy or wordy, see where logging is inconsistent or could be improved
+-add sensibility checks to arrangement (so basically they intersect at least a little bit)
+  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
+
+
+
+-update wedged half dovtail to support shoulder shapes and peg
+  -see if you can make use of ButtJointCSGParts
+  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
+-test agent created drawings
+-agent benchmarking examples
+-consider doing multiple agent sessions...
+-add report crash feature?
+-add give feedbac/report issue button?
+-agent account stuff
+  -do LLC research
+  -setup LLC prob
+  -figure out liability ad data retention risks
+  -consider doing cloud files and sharing 
+  -draft out dream spec for cloud suite and see if we should do any refactors now.
+-you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
+  -maybe a singel pattern that shows the main members of a buliding
+  -different king post queen post etc styles
+  -bracing 
+  -nuki
+  -mudsill corners 
+  -etc
+
+-dio mega update wesite
+  DONE-rewrite content to be not slop ugh
+  -add animation header image/video
+  -add discussion and discord links  (maybe make them a little mor eprominent, perhaps as a section on the site just below the main row)
+
+-do mega testing pass
+  -decide which ones to run alawys which ones to runo nyl on CI
+  -check coverage, decide which featuersa are final enough to need more extensive coverage
+
+-maybe do a measuring.py doc though that's kinda laready covered by concepts.md  
+-view source button for patterns should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
+-add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
+    - joint type tags should be prioritized, or instead sort by tags that show up most often
+    - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
+    Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
 -promote stuff
   -make a new video 
   -msg mods on r/woodworking if they will allow promo
 
 
+  DONE-simple function for creating the default drawing and solving it (full frame, 3 views, only measure what's visible)
+  -refine centerline, refreence edge and PTW highlighting in drawings view
+  -add option to color refreences arris/face differently maybe
+  -add legend to drawings view
+  
+  -maybe do drawing prettifier pass
+  -add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
+  -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
+    -either add it as a separate menu after a divider
+    -get rid of it in 2d drawing view
+    -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
+    
 -update shed example to include board
+
+
+
+
+
+
 -add srcibe notching ot more joints...
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
--maybe do a measuring.py doc though that's kinda laready covered by concepts.md  
--add shouder to cross lap joint
-  -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
-  -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
--patern book changes
-  -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
-  -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
+
+IGNORE-timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
+  
 -enable potato (scribe) notching on the remaining joints?
--update wedged half dovtail to support shoulder shapes and peg
- -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
+
 -add relief imple for DropinButtJointSweepScribeReliefConfig D:
 -selecting cylinders, their surfaces render over the ends, I guess atht's probably intentional TBH...
--add an optional scale ruler to the view and havei t default off
--maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
--add sensibility checks to arrangement (so basically they intersect at least a little bit)
-  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
 -consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
--you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
--add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
-    - joint type tags should be prioritized, or instead sort by tags that show up most often
-    - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
-    Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
+
 -rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future 
 
 -assembly
@@ -394,21 +448,12 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 -MEASURING/DRAWING BACKLOG
-  -refine centerline, refreence edge and PTW highlighting in drawings view
-  -add option to color refreences arris/face differently maybe
-  -add legend to drawings view
-  -add viweport support, I think yo uneed it now
-  -maybe do drawing prettifier pass
-  -add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
 
-  -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
-    -either add it as a separate menu after a divider
-    -get rid of it in 2d drawing view
-    -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
-  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
+  -add viweport support, I think yo uneed it now
   -do the drawing border and meta info stuff
     -add background border for drawing...
     -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
+  -you should be able to define non timebr features in python to create measurement to, these don't need to show up in the viewer necessarily.
   -XRAY feature
     -timber goes into x-ray view when a feature is selected in drawing mode 
     -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
@@ -416,7 +461,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
     -figure out xray joints tagging (could be a per joint/direction property)
       -XRAY_FROM_AXIS (enum face aligned timber directions) 
       -we can add more sophistitacted filter sin the future
-  -simple function for creating the default drawing and solving it (full frame, 3 views, only measure what's visible)
   -solver optimization, the expensive part is face_reaches_surface
     -cache solid_bounds
     -add broadphase
