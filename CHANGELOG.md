@@ -12,6 +12,7 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Added
 
+- Stubby mini tenons for `cut_splined_opposing_double_butt_joint_on_face_aligned_timbers`: `timber1_stubby_mini_tenons` takes `StubbyMiniTenon`s (position and size as a mortise and tenon's, a length, and an optional extra mortise depth), each left standing past the shoulder in a mortise in the receiving timber; butt timber 2's default to timber 1's, lined up across the receiving timber. `cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers_with_stubby_tenons` adds three: one in line with the spline on its far side from the slot's opening, and one on each side of it, each as long as it is wide; `basic_stubby_mini_tenons` returns them.
 - `degrees()` and `radians()` take a numerator and a denominator, like `inches()`: `degrees(45, 2)` is 22.5 degrees. A fraction string works too, `degrees("45/2")`.
 
 #### Changed

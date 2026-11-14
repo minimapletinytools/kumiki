@@ -3,8 +3,8 @@ Kumiki - Splined opposing double butt joint construction function
 """
 
 from kumiki.construction import arrangement_error
-from dataclasses import replace
-from typing import Dict, List, Optional
+from dataclasses import dataclass, replace
+from typing import Dict, List, Optional, Tuple
 
 from kumiki.timber import *
 from kumiki.construction import *
@@ -18,19 +18,45 @@ from ..shavings import *
 from ..shavings.build_a_butt import (
     SimplePegParameters,
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+    locate_tenon_origin_on_shoulder,
 )
 from ..shavings.relief import (
     chop_shoulder_notch_aligned_with_timber,
     warn_if_arrangement_timbers_imperfect,
 )
 
-# stubby mini tenons
+@dataclass(frozen=True)
 class StubbyMiniTenon:
-    #position, size, matching same semantics as the regular mortise and tenon joint on the butt_timber_1 side
-    # TODO
-    # the position/size semantics are reversed on the other side if you want them to be aligned
-    #def reflect_for_other_side() -> StubbyMiniTenon:
-    pass
+    """A short tenon left on a butt timber's end, beside the spline, in a mortise in the receiving timber.
+
+    `position` and `size` are as cut_mortise_and_tenon_joint's `tenon_position` and `tenon_size`: the
+    tenon's centre, offset from the butt timber's centerline, and its size, both in that timber's
+    local X and Y. `length` is how far it reaches past the shoulder. `mortise_extra_depth` is how much
+    deeper than `length` its mortise goes; None for a quarter of `length`.
+    """
+    position: V2
+    size: V2
+    length: Numeric
+    mortise_extra_depth: Optional[Numeric] = None
+
+    def reflect_for_other_side(self, from_timber: TimberLike, to_timber: TimberLike) -> 'StubbyMiniTenon':
+        """Return this tenon of `from_timber` as one on `to_timber`, the opposing butt timber, lined up with
+        it across the receiving timber: the same place in the world, in `to_timber`'s local X and Y."""
+        length_direction = from_timber.get_length_direction_global()
+        between = from_timber.get_bottom_position_global() - to_timber.get_bottom_position_global()
+        between = between - length_direction * safe_dot_product(between, length_direction)
+        offset = (between
+                  + from_timber.get_face_direction_global(TimberFace.RIGHT) * self.position[0]
+                  + from_timber.get_face_direction_global(TimberFace.FRONT) * self.position[1])
+        to_right = to_timber.get_face_direction_global(TimberFace.RIGHT)
+        to_front = to_timber.get_face_direction_global(TimberFace.FRONT)
+        # The timbers' X and Y may be turned a quarter from each other; the size turns with them.
+        same_axes = are_vectors_parallel(to_right, from_timber.get_face_direction_global(TimberFace.RIGHT))
+        return replace(
+            self,
+            position=create_v2(safe_dot_product(offset, to_right), safe_dot_product(offset, to_front)),
+            size=self.size if same_axes else create_v2(self.size[1], self.size[0]),
+        )
 
 def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     arrangement: DoubleButtJointTimberArrangement,
@@ -53,8 +79,10 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     # optional peg setup; pegs will be drilled through each butt timber and the spline
     peg_parameters: Optional[SimplePegParameters] = None,
 
-    timber1_stubby_mini_tenons: List[StubbyMiniTenon] = [],
-    timber2_stubby_mini_tenons: Optional[List[StubbyMiniTenon]] = None, #reflected from timber1_stubby_mini_tenons if None
+    # stubby mini tenons on butt_timber_1, each in a mortise in the receiving timber
+    timber1_stubby_mini_tenons: Optional[List[StubbyMiniTenon]] = None,
+    # those on butt_timber_2; None for timber1's, reflected across to line up with them
+    timber2_stubby_mini_tenons: Optional[List[StubbyMiniTenon]] = None,
 
 ) -> Joint:
     """
@@ -220,6 +248,78 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
 
     receiving_negative_csg_parts = [receiving_slot_negative_csg_local]
 
+    stubby_tenons_1 = list(timber1_stubby_mini_tenons or [])
+    stubby_tenons_2 = (
+        list(timber2_stubby_mini_tenons) if timber2_stubby_mini_tenons is not None
+        else [tenon.reflect_for_other_side(butt_timber_1, butt_timber_2) for tenon in stubby_tenons_1]
+    )
+
+    def _stubby_tenon_cuts(
+        butt_timber: TimberLike, butt_end: TimberEnd, tenons: List[StubbyMiniTenon], name: str,
+    ) -> Tuple[List[CutCSG], List[CutCSG], Numeric]:
+        """Return the butt timber's waste past its shoulder around its stubby tenons, local to it; their
+        mortises, local to the receiving timber; and the longest tenon's length."""
+        if not tenons:
+            return [], [], scalar(0)
+        for tenon in tenons:
+            for axis in (0, 1):
+                half = butt_timber.size[axis] / scalar(2)
+                assert safe_compare(tenon.position[axis] - tenon.size[axis] / scalar(2), -half, Comparison.GE) and \
+                    safe_compare(tenon.position[axis] + tenon.size[axis] / scalar(2), half, Comparison.LE), (
+                        f"a stubby tenon on {name} reaches outside the timber in its local {'XY'[axis]}"
+                    )
+            assert safe_compare(tenon.length, 0, Comparison.GT), "a stubby tenon's length must be > 0"
+        receiving_face_towards_butt = receiving_timber.get_closest_oriented_long_face_from_global_direction(
+            butt_timber.get_face_direction_global(butt_end)
+        )
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+            ButtJointTimberArrangement(butt_timber=butt_timber, receiving_timber=receiving_timber, butt_timber_end=butt_end),
+            receiving_timber.get_size_in_face_normal_axis(receiving_face_towards_butt) / scalar(2) - shoulder_symmetric_inset,
+        )
+        tenon_orientation = compute_timber_orientation(
+            safe_normalize_vector(butt_timber.get_face_direction_global(butt_end)), butt_timber.get_width_direction_global()
+        )
+        tenons_local: List[CutCSG] = []
+        mortises_local: List[CutCSG] = []
+        for index, tenon in enumerate(tenons):
+            transform = Transform(
+                position=locate_tenon_origin_on_shoulder(shoulder_plane, butt_timber, butt_end, tenon.position),
+                orientation=tenon_orientation,
+            )
+            extra = tenon.mortise_extra_depth if tenon.mortise_extra_depth is not None else tenon.length / scalar(4)
+            assert safe_compare(extra, 0, Comparison.GE), "a stubby tenon's mortise_extra_depth must be >= 0"
+            tenons_local.append(adopt_csg(None, butt_timber.transform, RectangularPrism(
+                size=tenon.size, transform=transform, start_distance=scalar(0), end_distance=tenon.length,
+                label=CutCSGLabel(f"stubby_tenon_{index}"),
+            )))
+            mortises_local.append(adopt_csg(None, receiving_timber.transform, RectangularPrism(
+                size=tenon.size, transform=transform, start_distance=scalar(0), end_distance=tenon.length + extra,
+                label=CutCSGLabel(f"stubby_mortise_{name}_{index}"),
+            )))
+        # Everything past the shoulder goes, but the tenons.
+        shoulder_waste_global = HalfSpace(
+            normal=-shoulder_plane.normal,
+            offset=safe_dot_product(-shoulder_plane.normal, shoulder_plane.point),
+            label=CutCSGLabel("stubby_tenon_shoulder"),
+        )
+        waste_local = Difference(
+            base=adopt_csg(None, butt_timber.transform, shoulder_waste_global),
+            subtract=tenons_local,
+            label=CutCSGLabel("stubby_tenon_waste"),
+        )
+        return [waste_local], mortises_local, max(tenon.length for tenon in tenons)
+
+    butt_1_stubby_waste, stubby_mortises_1, longest_stubby_1 = _stubby_tenon_cuts(
+        butt_timber_1, arrangement.butt_timber_1_end, stubby_tenons_1, "butt_timber_1")
+    butt_2_stubby_waste, stubby_mortises_2, longest_stubby_2 = _stubby_tenon_cuts(
+        butt_timber_2, arrangement.butt_timber_2_end, stubby_tenons_2, "butt_timber_2")
+    receiving_negative_csg_parts.extend(stubby_mortises_1 + stubby_mortises_2)
+    # A butt timber with stubby tenons ends at their tips; the waste around them is cut back to the shoulder.
+    butt_1_end_cut_from_bottom = butt_1_shoulder_distance_from_bottom + (
+        longest_stubby_1 if arrangement.butt_timber_1_end == TimberEnd.TOP else -longest_stubby_1)
+    butt_2_end_cut_from_bottom = butt_2_shoulder_distance_from_bottom + (
+        longest_stubby_2 if arrangement.butt_timber_2_end == TimberEnd.TOP else -longest_stubby_2)
+
     if safe_compare(shoulder_symmetric_inset, 0, Comparison.GT):
         def _make_receiving_shoulder_notch_local(
             butting_timber: TimberLike,
@@ -261,21 +361,6 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
         negative_csg=receiving_negative_csg_local,
         label=CutCSGLabel("spline_socket_cut"),
     )
-    butt_1_cut = Cutting(
-        timber=butt_timber_1,
-        maybe_top_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.BOTTOM else None,
-        negative_csg=butt_1_slot_negative_csg_local,
-        label=CutCSGLabel("spline_slot_cut"),
-    )
-    butt_2_cut = Cutting(
-        timber=butt_timber_2,
-        maybe_top_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.BOTTOM else None,
-        negative_csg=butt_2_slot_negative_csg_local,
-        label=CutCSGLabel("spline_slot_cut"),
-    )
-
     spline_transform = Transform(
         position=slot_marking_transform_global.position + slot_direction_global * (effective_slot_depth-slot_depth)/2,
         orientation=slot_marking_orientation_global,
@@ -283,12 +368,12 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
 
     peg_holes_in_spline_local: List[CutCSG] = []
     joint_accessories: Dict[str, Accessory] = {}
+    butt_1_negative_parts: List[CutCSG] = [butt_1_slot_negative_csg_local, *butt_1_stubby_waste]
+    butt_2_negative_parts: List[CutCSG] = [butt_2_slot_negative_csg_local, *butt_2_stubby_waste]
 
     # peg logic slightly different so we don't use compute_peg_positions
     if peg_parameters is not None:
         peg_size = peg_parameters.size
-        butt_1_negative_parts = [butt_1_slot_negative_csg_local]
-        butt_2_negative_parts = [butt_2_slot_negative_csg_local]
 
         if arrangement.front_face_on_butt_timber_1 is None:
 
@@ -459,18 +544,18 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             "peg_butt_2",
         )
 
-        butt_1_cut = Cutting(
-            timber=butt_timber_1,
-            maybe_top_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.TOP else None,
-            maybe_bottom_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.BOTTOM else None,
-            negative_csg=butt_1_negative_parts[0] if len(butt_1_negative_parts) == 1 else CSGUnion(children=butt_1_negative_parts),
+    def _butt_cut(timber: TimberLike, end: TimberEnd, end_cut_from_bottom: Numeric, parts: List[CutCSG]) -> Cutting:
+        return Cutting(
+            timber=timber,
+            maybe_top_end_cut_distance_from_bottom=end_cut_from_bottom if end == TimberEnd.TOP else None,
+            maybe_bottom_end_cut_distance_from_bottom=end_cut_from_bottom if end == TimberEnd.BOTTOM else None,
+            negative_csg=parts[0] if len(parts) == 1 else CSGUnion(children=parts),
+            # Without pegs or stubby tenons the cut is the slot alone, named as such.
+            **({"label": CutCSGLabel("spline_slot_cut")} if len(parts) == 1 else {}),
         )
-        butt_2_cut = Cutting(
-            timber=butt_timber_2,
-            maybe_top_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.TOP else None,
-            maybe_bottom_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.BOTTOM else None,
-            negative_csg=butt_2_negative_parts[0] if len(butt_2_negative_parts) == 1 else CSGUnion(children=butt_2_negative_parts),
-        )
+
+    butt_1_cut = _butt_cut(butt_timber_1, arrangement.butt_timber_1_end, butt_1_end_cut_from_bottom, butt_1_negative_parts)
+    butt_2_cut = _butt_cut(butt_timber_2, arrangement.butt_timber_2_end, butt_2_end_cut_from_bottom, butt_2_negative_parts)
 
     # Accessory geometry is local-space and centered at origin; transform places it globally.
     spline_positive_csg = RectangularPrism(
@@ -497,12 +582,12 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     butt_2_escape_direction = -butt_timber_2.get_face_direction_global(arrangement.butt_timber_2_end)
     butt_1_cut = replace(
         butt_1_cut,
-        assembly_freedom=AssemblyFreedom.translation(butt_1_escape_direction, freed_after=spline_length / scalar(2)),
+        assembly_freedom=AssemblyFreedom.translation(butt_1_escape_direction, freed_after=max(spline_length / scalar(2), longest_stubby_1)),
         assembly_ordering=Ordering(0, 0),
     )
     butt_2_cut = replace(
         butt_2_cut,
-        assembly_freedom=AssemblyFreedom.translation(butt_2_escape_direction, freed_after=spline_length / scalar(2)),
+        assembly_freedom=AssemblyFreedom.translation(butt_2_escape_direction, freed_after=max(spline_length / scalar(2), longest_stubby_2)),
         assembly_ordering=Ordering(0, 0),
     )
 

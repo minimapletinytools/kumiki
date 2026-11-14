@@ -115,23 +115,24 @@
       "multiple_frames": false,
       "patternbook": {
         "pattern_names": [
-          "basic_miter_joint",
-          "basic_miter_joint_face_aligned",
-          "basic_tongue_and_fork_corner_joint",
-          "basic_butt_joint",
-          "basic_butt_splice_joint",
-          "basic_cross_lap_joint",
-          "basic_house_joint",
-          "basic_splined_opposing_double_butt_joint",
-          "basic_splice_lap_joint",
-          "basic_mortise_and_tenon",
-          "basic_wedged_half_dovetail_mortise_and_tenon",
-          "basic_lapped_gooseneck_joint",
-          "basic_dropin_dovetail_butt_joint",
-          "basic_dropin_housed_butt_joint",
-          "basic_mitered_and_keyed_lap_joint",
-          "basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint",
-          "basic_tusked_mortise_and_tenon",
+          "angled",
+          "face_aligned",
+          "tongue_and_fork_corner_joint",
+          "face_aligned",
+          "butt_splice_joint",
+          "cross_lap_joint",
+          "house_joint",
+          "plain",
+          "with_stubby_tenons",
+          "splice_lap_joint",
+          "face_aligned",
+          "wedged_half_dovetail_mortise_and_tenon",
+          "lapped_gooseneck_joint",
+          "dropin_dovetail_butt_joint",
+          "dropin_housed_butt_joint",
+          "mitered_and_keyed_lap_joint",
+          "half_blind_tenoned_dadoed_rabbeted_scarf_joint",
+          "tusked_mortise_and_tenon",
           "angled",
           "tongue_and_fork_butt_joint",
           "plain_corner_lap_joint",
@@ -140,102 +141,107 @@
           "angled",
           "through",
           "mortise_and_tenon_corner_joint",
-          "roundover",
-          "rounded_end",
-          "rafter_tail_scallop",
+          "decorative_roundover",
+          "decorative_rounded_end",
+          "decorative_rafter_tail_scallop",
           "tongue_and_groove",
           "side_to_face",
           "half_blind"
         ],
         "patterns": [
           {
-            "path": "basic_joints/basic_miter_joint",
+            "path": "basic_joints/miter_joint/angled",
             "pattern_type": "frame",
             "tags": [
               "main"
             ]
           },
           {
-            "path": "basic_joints/basic_miter_joint_face_aligned",
+            "path": "basic_joints/miter_joint/face_aligned",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_tongue_and_fork_corner_joint",
+            "path": "basic_joints/tongue_and_fork_corner_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_butt_joint",
+            "path": "basic_joints/plain_butt_joint/face_aligned",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_butt_splice_joint",
+            "path": "basic_joints/butt_splice_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_cross_lap_joint",
+            "path": "basic_joints/cross_lap_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_house_joint",
+            "path": "basic_joints/house_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_splined_opposing_double_butt_joint",
+            "path": "basic_joints/splined_opposing_double_butt_joint/plain",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_splice_lap_joint",
+            "path": "basic_joints/splined_opposing_double_butt_joint/with_stubby_tenons",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_mortise_and_tenon",
+            "path": "basic_joints/splice_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/mortise_and_tenon/face_aligned",
             "pattern_type": "frame",
             "tags": [
               "main"
             ]
           },
           {
-            "path": "basic_joints/basic_wedged_half_dovetail_mortise_and_tenon",
+            "path": "basic_joints/wedged_half_dovetail_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": [
               "main"
             ]
           },
           {
-            "path": "basic_joints/basic_lapped_gooseneck_joint",
+            "path": "basic_joints/lapped_gooseneck_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_dropin_dovetail_butt_joint",
+            "path": "basic_joints/dropin_dovetail_butt_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_dropin_housed_butt_joint",
+            "path": "basic_joints/dropin_housed_butt_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_mitered_and_keyed_lap_joint",
+            "path": "basic_joints/mitered_and_keyed_lap_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint",
+            "path": "basic_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/basic_tusked_mortise_and_tenon",
+            "path": "basic_joints/tusked_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": []
           },
@@ -280,17 +286,17 @@
             "tags": []
           },
           {
-            "path": "basic_joints/roundover",
+            "path": "basic_joints/decorative_roundover",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/rounded_end",
+            "path": "basic_joints/decorative_rounded_end",
             "pattern_type": "frame",
             "tags": []
           },
           {
-            "path": "basic_joints/rafter_tail_scallop",
+            "path": "basic_joints/decorative_rafter_tail_scallop",
             "pattern_type": "frame",
             "tags": []
           },
@@ -312,7 +318,7 @@
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "3ce1e51439fe20604718a24ed1d67fdf00ebceab5c4eadc400f250dfbf2df399",
+      "sha256": "386af0bad6dde1ee925b835e6f6b8dadca99b646441c77c4e4e52d714374c3bf",
       "warnings": []
     },
     "patterns/board/board_joints_patterns.py": {
@@ -1302,7 +1308,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 122,
+          "lineno": 151,
           "name": "ki_kanji"
         }
       ],
@@ -1311,7 +1317,7 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/ki_kanji.py",
-      "sha256": "6873f6d1dd2740e096a3a7d0e13ee9c64d1f36db430cb78329b7846d752140e7",
+      "sha256": "ca66eed4d8a7edd0e5ad19fc06726c36b05734fbf8449d8c5d2e610737e13d21",
       "warnings": []
     },
     "patterns/structures/learn_to_timber_frame_shed.py": {
@@ -1438,7 +1444,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-13T18:40:18.378388+00:00",
+  "generated_at": "2026-11-14T00:44:17.811368+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

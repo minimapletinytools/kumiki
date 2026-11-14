@@ -306,3 +306,67 @@ class TestSplinedOpposingDoubleButtJoint:
 
         assert safe_zero_test(peg_lateral_position - spline_lateral_position)
         assert safe_zero_test(Abs(actual_spline_lateral_position - spline_lateral_position) - spline_extra_depth / scalar(2))
+
+
+def _stubby_tenon_middle_global(butt: TimberLike, end: TimberEnd, receiving: TimberLike, tenon: StubbyMiniTenon) -> V3:
+    """Return the middle of `tenon` on `butt`: halfway along it past the shoulder, at its position."""
+    end_direction = butt.get_face_direction_global(end)
+    receiving_middle = receiving.get_bottom_position_global() + receiving.get_length_direction_global() * receiving.length / scalar(2)
+    length_direction = butt.get_length_direction_global()
+    bottom = butt.get_bottom_position_global()
+    on_centerline = bottom + length_direction * safe_dot_product(receiving_middle - bottom, length_direction)
+    shoulder = on_centerline - end_direction * (receiving.get_size_in_direction_3d(end_direction) / scalar(2))
+    return (shoulder + end_direction * (tenon.length / scalar(2))
+            + butt.get_face_direction_global(TimberFace.RIGHT) * tenon.position[0]
+            + butt.get_face_direction_global(TimberFace.FRONT) * tenon.position[1])
+
+
+class TestStubbyMiniTenons:
+    """Stubby mini tenons beside the spline, each in a mortise in the receiving timber."""
+
+    def _joint(self):
+        arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
+        joint = cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers_with_stubby_tenons(arrangement, TimberEnd.TOP)
+        return arrangement, joint
+
+    def test_each_tenon_stands_past_the_shoulder_and_its_mortise_is_cut(self):
+        arrangement, joint = self._joint()
+        receiving = arrangement.receiving_timber
+        receiving_csg = _render_cutting(joint.cuttings["receiving_timber"])
+        tenons_1 = basic_stubby_mini_tenons(arrangement, TimberEnd.TOP)
+        assert len(tenons_1) == 3
+        for butt, end, key, tenons in (
+            (arrangement.butt_timber_1, arrangement.butt_timber_1_end, "butt_timber_1", tenons_1),
+            (arrangement.butt_timber_2, arrangement.butt_timber_2_end, "butt_timber_2",
+             [one.reflect_for_other_side(arrangement.butt_timber_1, arrangement.butt_timber_2) for one in tenons_1]),
+        ):
+            butt_csg = _render_cutting(joint.cuttings[key])
+            for tenon in tenons:
+                middle = _stubby_tenon_middle_global(butt, end, receiving, tenon)
+                assert butt_csg.contains_point(butt.transform.global_to_local(middle)), f"a tenon is missing from {key}"
+                assert not receiving_csg.contains_point(receiving.transform.global_to_local(middle)), (
+                    f"the mortise for a tenon on {key} is not cut")
+
+    def test_the_other_butts_tenons_line_up_across_the_receiving_timber(self):
+        arrangement, _ = self._joint()
+        receiving = arrangement.receiving_timber
+        length_direction = arrangement.butt_timber_1.get_length_direction_global()
+        for tenon in basic_stubby_mini_tenons(arrangement, TimberEnd.TOP):
+            other = tenon.reflect_for_other_side(arrangement.butt_timber_1, arrangement.butt_timber_2)
+            here = _stubby_tenon_middle_global(arrangement.butt_timber_1, arrangement.butt_timber_1_end, receiving, tenon)
+            there = _stubby_tenon_middle_global(arrangement.butt_timber_2, arrangement.butt_timber_2_end, receiving, other)
+            across = there - here
+            lateral = across - length_direction * safe_dot_product(across, length_direction)
+            assert safe_compare(safe_dot_product(lateral, lateral), 0, Comparison.EQ)
+
+    def test_the_end_past_the_shoulder_is_cut_away_around_the_tenons(self):
+        arrangement, joint = self._joint()
+        butt = arrangement.butt_timber_1
+        end = arrangement.butt_timber_1_end
+        receiving = arrangement.receiving_timber
+        # A corner of the end, past the shoulder: no tenon there.
+        corner = StubbyMiniTenon(position=create_v2(butt.size[0] / 2 - mm(2), -butt.size[1] / 2 + mm(2)),
+                                 size=create_v2(mm(1), mm(1)), length=mm(10))
+        point = _stubby_tenon_middle_global(butt, end, receiving, corner)
+        assert not _render_cutting(joint.cuttings["butt_timber_1"]).contains_point(butt.transform.global_to_local(point))
+

@@ -28,6 +28,7 @@ from .butt import (
     cut_dropin_housed_butt_joint_on_face_aligned_timbers,
     cut_wedged_half_dovetail_joint_on_face_aligned_timbers as cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_splined_opposing_double_butt_joint_on_face_aligned_timbers,
+    StubbyMiniTenon,
 )
 from .mixed import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
@@ -253,6 +254,86 @@ def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     Returns:
         Joint containing all three cut timbers and spline/peg accessories.
     """
+    return cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
+        **_basic_splined_opposing_double_butt_sizes(arrangement, slot_facing_end_on_receiving_timber),
+    )
+
+
+def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers_with_stubby_tenons(
+    arrangement: DoubleButtJointTimberArrangement,
+    slot_facing_end_on_receiving_timber: TimberEnd,
+    stubby_tenon_length: Optional[Numeric] = None,
+) -> Joint:
+    """
+    Creates a splined opposing double butt joint as the basic one does, with three stubby tenons on each
+    butt timber, each in a mortise in the receiving timber:
+
+    - one in line with the spline, on its far side from the slot's opening, as wide as the spline and
+      half as deep as the timber left there, centred in it;
+    - one on each side of the spline, centred between it and the timber's edge, half that gap wide
+      and half the slot's depth deep, centred on the spline's depth.
+
+    Args:
+        arrangement: Double butt joint arrangement, as for the basic joint.
+        slot_facing_end_on_receiving_timber: Receiving-timber end that the slot faces.
+        stubby_tenon_length: How far the tenons reach past the shoulder; None for each as long as it is wide
+            (the smaller side of its cross-section).
+
+    Returns:
+        Joint containing all three cut timbers and spline/peg accessories.
+    """
+    sizes = _basic_splined_opposing_double_butt_sizes(arrangement, slot_facing_end_on_receiving_timber)
+    tenons = basic_stubby_mini_tenons(arrangement, slot_facing_end_on_receiving_timber, stubby_tenon_length)
+    return cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(**sizes, timber1_stubby_mini_tenons=tenons)
+
+
+def basic_stubby_mini_tenons(
+    arrangement: DoubleButtJointTimberArrangement,
+    slot_facing_end_on_receiving_timber: TimberEnd,
+    stubby_tenon_length: Optional[Numeric] = None,
+) -> List[StubbyMiniTenon]:
+    """Return the three stubby tenons on butt_timber_1 that
+    cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers_with_stubby_tenons cuts, beside
+    the basic joint's spline; `stubby_tenon_length` None for each as long as it is wide."""
+    sizes = _basic_splined_opposing_double_butt_sizes(arrangement, slot_facing_end_on_receiving_timber)
+    butt_timber_1 = sizes["arrangement"].butt_timber_1
+    receiving_timber = sizes["arrangement"].receiving_timber
+    slot_thickness, slot_depth = sizes["slot_thickness"], sizes["slot_depth"]
+
+    # Across the butt timber's end: t along the joint plane's normal, d along the slot's depth, from the
+    # timber's centerline toward the slot's open face.
+    slot_direction = receiving_timber.get_face_direction_global(slot_facing_end_on_receiving_timber)
+    across = safe_normalize_vector(cross_product(butt_timber_1.get_length_direction_global(),
+                                                 receiving_timber.get_length_direction_global()))
+    width_t = butt_timber_1.get_size_in_direction_3d(across)
+    depth_d = butt_timber_1.get_size_in_direction_3d(slot_direction)
+    right = butt_timber_1.get_face_direction_global(TimberFace.RIGHT)
+    front = butt_timber_1.get_face_direction_global(TimberFace.FRONT)
+    t_is_x = are_vectors_parallel(across, right)
+
+    def tenon(t: Numeric, d: Numeric, size_t: Numeric, size_d: Numeric) -> StubbyMiniTenon:
+        offset = across * t + slot_direction * d
+        return StubbyMiniTenon(
+            position=create_v2(safe_dot_product(offset, right), safe_dot_product(offset, front)),
+            size=create_v2(size_t, size_d) if t_is_x else create_v2(size_d, size_t),
+            length=stubby_tenon_length if stubby_tenon_length is not None else min(size_t, size_d),
+        )
+
+    beyond_spline = depth_d - slot_depth            # the timber past the slot's bottom
+    gap = (width_t - slot_thickness) / scalar(2)    # between the spline and each edge
+    spline_middle_d = depth_d / scalar(2) - slot_depth / scalar(2)
+    return [
+        tenon(scalar(0), -depth_d / scalar(2) + beyond_spline / scalar(2), slot_thickness, beyond_spline / scalar(2)),
+        tenon(slot_thickness / scalar(2) + gap / scalar(2), spline_middle_d, gap / scalar(2), slot_depth / scalar(2)),
+        tenon(-(slot_thickness / scalar(2) + gap / scalar(2)), spline_middle_d, gap / scalar(2), slot_depth / scalar(2)),
+    ]
+
+
+def _basic_splined_opposing_double_butt_sizes(
+    arrangement: DoubleButtJointTimberArrangement,
+    slot_facing_end_on_receiving_timber: TimberEnd,
+) -> dict:
+    """Return the basic splined opposing double butt joint's arguments: its spline sized from the timbers, and one peg."""
     # Ensure peg entry direction is defined. If unset, choose the butt-1 long face whose
     # normal is closest to the joint-plane normal so drilling is perpendicular to the joint plane.
     arrangement_with_peg_face = arrangement
@@ -298,7 +379,7 @@ def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
         butt_length_direction_global
     ) * scalar(4)
 
-    return cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
+    return dict(
         arrangement=arrangement_with_peg_face,
         slot_thickness=slot_thickness,
         slot_depth=slot_depth,

@@ -21,6 +21,7 @@ from .wedged_half_dovetail_joint import (
 )
 from .splined_opposing_double_butt_joint import (
     cut_splined_opposing_double_butt_joint_on_face_aligned_timbers,
+    StubbyMiniTenon,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers",
     "cut_wedged_half_dovetail_joint_on_face_aligned_timbers",
     "cut_splined_opposing_double_butt_joint_on_face_aligned_timbers",
+    "StubbyMiniTenon",
 ]
