@@ -14,6 +14,9 @@
 /** Webview to extension. Handled in frame-view-session's message chain. */
 const TO_EXTENSION = Object.freeze([
     'addMeasurement',
+    'requestSTLPlacement',
+    'updateSTLPlacement',
+    'copySTLPlacement',
     'assemblyFailureLog',
     'copySelectionForAI',
     'deleteMeasurement',

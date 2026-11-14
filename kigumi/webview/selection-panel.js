@@ -549,5 +549,12 @@ export class SelectionPanel {
             }
         }
 
+        const stlSelected = this.app.selectionManager.getSelectedTimbers();
+        if (stlSelected.length === 1 && this.app.memberMetadataByKey.get(stlSelected[0])?.mesh?.stlPlacement) {
+            const edit = document.createElement('button');
+            edit.textContent = 'Edit STL placement';
+            edit.addEventListener('click', () => this.app.startSTLPlacement(stlSelected[0]));
+            body.appendChild(edit);
+        }
         panel.appendChild(body);
     }}

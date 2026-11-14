@@ -742,3 +742,9 @@ export function edgeSegmentPositions(segments) {
 }
 
 export { KigumiMeasurements, CsgTreeView, KigumiKiwariValues, choosePickAction, SelectionStore, CameraController, GeometryMode, KigumiTags, KigumiUnits, AssemblyTimeline };
+
+// Shared placement appearance for the main viewer and isolated editor.
+export const STL_PLACEMENT_STYLE = Object.freeze({
+    placeholder: 0xdca638, reference: 0xdca638, mesh: 0xcdaa7d, background: 0xf1f4ef,
+    axes: [0xd24a43, 0x439f66, 0x487bd5],
+});
