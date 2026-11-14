@@ -4146,6 +4146,9 @@ def translate_csg(csg: CutCSG, translation: V3) -> CutCSG:
         return replace(csg, transform=new_transform)
     if isinstance(csg, Cylinder):
         return replace(csg, position=csg.position + translation)
+    if hasattr(csg, "transform"):
+        transform = cast(Transform, csg.transform)
+        return replace(csg, transform=replace(transform, position=transform.position + translation))
     # Unknown CSG type: return as-is
     return csg
 

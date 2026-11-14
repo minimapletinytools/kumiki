@@ -71,6 +71,10 @@ export class ViewerSettingsPanel {
                     </select>
                 </label>
                 <label>
+                    <input id="scale-ruler-toggle" type="checkbox" .checked=${Boolean(this.app.showScaleRuler)}>
+                    ${t('viewer.options.scaleRuler')}
+                </label>
+                <label>
                     <input id="feature-parent-toggle" type="checkbox" .checked=${Boolean(this.app.showFeatureParent)}>
                     ${t('viewer.options.featureParent')}
                 </label>
@@ -296,6 +300,11 @@ export class ViewerSettingsPanel {
         const app = this.app;
         return [
             { id: 'center-gizmo-toggle', on: 'change', apply: (el) => app.setCenterGizmoEnabled(el.checked) },
+            {
+                id: 'scale-ruler-toggle', on: 'change',
+                apply: (el) => app.setScaleRulerEnabled(el.checked),
+                sync: (el) => { el.checked = Boolean(app.showScaleRuler); },
+            },
             {
                 id: 'units-select', on: 'change',
                 apply: (el) => app.setUnits(el.value),

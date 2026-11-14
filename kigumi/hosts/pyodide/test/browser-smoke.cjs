@@ -143,7 +143,7 @@ app.whenReady().then(async () => {
             const win = ${view}.defaultView;
             const target = win.document.querySelector('.monaco-editor textarea') || win.document.body;
             // dispatchEvent is false when a listener took the key (panel-bridge.js).
-            return !target.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'O', code: 'KeyO', shiftKey: true,
+            return !target.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'o', code: 'KeyO',
                 metaKey: ${mac}, ctrlKey: ${!mac}, bubbles: true, cancelable: true }));
         })()`);
         const viewBrought = await wait(`${viewShown} || null`, 30000);
@@ -153,7 +153,7 @@ app.whenReady().then(async () => {
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'run', args: ['kigumi.openFileSource', ${JSON.stringify(filePath)}] })`);
         await wait(`(() => { const doc = ${view}; return doc && doc.querySelector('.monaco-editor .view-lines') ? true : null; })()`, 30000);
         const welcomeKey = await js(`document.getElementById('key-open-current-in-viewer')?.textContent`);
-        check('the welcome page shows the shortcut as this system writes it', welcomeKey === (mac ? '⇧⌘O' : 'Ctrl+Shift+O'), welcomeKey);
+        check('the welcome page shows the shortcut as this system writes it', welcomeKey === (mac ? '⌘O' : 'Ctrl+O'), welcomeKey);
         await js(`(() => {
             const model = ${view}.defaultView.monaco.editor.getModels()[0];
             model.setValue(model.getValue() + '\\n# unsaved buffer rendered\\n');

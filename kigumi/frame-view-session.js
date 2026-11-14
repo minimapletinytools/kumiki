@@ -330,6 +330,14 @@ class FrameViewSession {
             if (!message) {
                 return;
             }
+            if (message.type === 'requestSTLPlacement' || message.type === 'updateSTLPlacement') {
+                this.handleSTLPlacement(message);
+                return;
+            }
+            if (message.type === 'copySTLPlacement') {
+                getHost().copyText(String(message.text || ''));
+                return;
+            }
             if (message.type === 'requestRefresh') {
                 this.log('[webview] Manual refresh requested from viewer');
                 if (message.kiwari && typeof message.kiwari === 'object') {
@@ -647,6 +655,38 @@ class FrameViewSession {
             return this.autoRefreshOnFileChange;
         }
         return this.fileWatcher.isEnabled;
+    }
+
+    /** Load a placement preview or apply a verified source edit. */
+    async handleSTLPlacement(message) {
+        try {
+            await this.ensureRunnerSession();
+            const updating = message.type === 'updateSTLPlacement';
+            const result = await this.runnerSession.slotRequest(
+                updating ? 'prepare_stl_placement' : 'get_stl_placement', this.slotName,
+                { memberKey: message.memberKey, placement: message.placement });
+            if (this.isDisposed) return;
+            if (updating) {
+                const { applyPlacementEdit } = require('./stl-placement-source');
+                await applyPlacementEdit(getHost(), result);
+            }
+            this.panel.postMessage({ type: 'stlPlacementResult', requestId: message.requestId,
+                memberKey: message.memberKey, updated: updating, result });
+            if (updating) await this.refresh('STL placement saved');
+        } catch (error) {
+            if (message.type === 'requestSTLPlacement') getHost().showMessage('error', String(error.message || error));
+            else {
+                const configuration = `placement=${JSON.stringify(message.placement)}`;
+                getHost().showMessage('error', `Could not update STL placement: ${error.message || error} Edit it manually or ask the agent.`,
+                    'Copy configuration', 'Copy prompt for agent').then(action => {
+                    if (action === 'Copy configuration') getHost().copyText(configuration);
+                    if (action === 'Copy prompt for agent') getHost().copyText(
+                        `Update the create_stl_timber call for ${message.memberKey} with ${configuration}. Translation is in metres; rotation is intrinsic XYZ degrees. If the call is shared, separate this member first. Preserve other source edits.`);
+                });
+            }
+            this.panel?.postMessage({ type: 'stlPlacementResult', requestId: message.requestId,
+                memberKey: message.memberKey, error: String(error.message || error) });
+        }
     }
 
     /** Ask the runner to write this frame's parameters beside its source. */

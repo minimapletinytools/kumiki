@@ -394,6 +394,7 @@ class MemberMeshWire(TypedDict, total=False):
     csg_nodes: int
     csg_features: int
     timberClass: str
+    stlPlacement: Dict[str, bool]
     isPerfectTimber: bool
     cut_length: Optional[float]
     meshSource: str
@@ -1113,7 +1114,7 @@ def _cut_timber_to_triangle_mesh_payload(
     timber_class = type(timber).__name__
     is_perfect = bool(timber.is_perfect_timber())
     # By class, since is_perfect_timber() is true for a RoundTimber whose diameter equals its size.
-    non_rectangular_classes = ('RoundTimber', 'MeshTimber', 'RegularPolygonTimber')
+    non_rectangular_classes = ('RoundTimber', 'MeshTimber', 'STLTimber', 'RegularPolygonTimber')
     has_non_rectangular_actual = timber_class in non_rectangular_classes
 
     # Top-level vertices/indices remain the actual-geometry mesh for
@@ -1141,6 +1142,9 @@ def _cut_timber_to_triangle_mesh_payload(
         isPerfectTimber=is_perfect,
         cut_length=_cut_length(cut_timber),
     )
+
+    if hasattr(timber, "needs_stl_placement"):
+        payload["stlPlacement"] = {"needed": bool(timber.needs_stl_placement)}
 
     # For non-rectangular-actual timbers, also triangulate the perfect-AABB CSG
     # so the viewer can swap meshes locally without round-tripping to Python.
@@ -3149,7 +3153,7 @@ def serialize_layers(frame: 'Frame', frame_parts: Sequence[Tuple[str, Any]] = ()
         timbers_payload.append({
             "kumikiEphemeralId": entry["kumikiEphemeralId"],
             "memberKey": entry["memberKey"],
-            "name": entry["displayName"],
+            "name": entry["displayName"] + (" (needs stl placement)" if getattr(entry["timber"], "needs_stl_placement", False) else ""),
             "tags": list(timber_tags_by_kumiki_id.get(entry["kumikiEphemeralId"], [])),
             "cuts": cuts_meta,
             "referenceFeatures": _reference_features_payload(
@@ -5490,6 +5494,28 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
     if command == "find_csg_by_path":
         ss = _resolve_slot(state, payload)
         result = _handle_find_csg_by_path(state, cast(PathPickRequest, payload), ss)
+        return state, make_success_response(request_id, command, result), False
+
+    if command in ("get_stl_placement", "prepare_stl_placement"):
+        from kumiki.stl import STLTimber, STLPlacement
+        ss = _resolve_slot(state, payload)
+        entries, _ = _assign_member_keys(ss.frame)
+        entry = next((entry for entry in entries if entry["memberKey"] == payload.get("memberKey")), None)
+        if entry is None or not isinstance(entry["timber"], STLTimber):
+            raise ValueError("The selected STL timber is no longer in this frame")
+        timber = entry["timber"]
+        if command == "get_stl_placement":
+            result = {
+                "memberKey": entry["memberKey"], "name": entry["displayName"],
+                "vertices": timber.mesh.vertices, "faces": timber.mesh.faces,
+                "size": [float(timber.size[0]), float(timber.size[1]), float(timber.length)],
+                "placement": (timber.placement or STLPlacement()).to_dict(),
+                "source": timber.source.path if timber.source else None,
+            }
+        else:
+            from stl_placement import prepare_edit
+            count = sum(getattr(e["timber"], "source", None) == timber.source for e in entries)
+            result = prepare_edit(timber, payload.get("placement", {}), _project_root or ss.file_path.parent, count)
         return state, make_success_response(request_id, command, result), False
 
     # --- Slot management ---

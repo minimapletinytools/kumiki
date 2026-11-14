@@ -1,9 +1,11 @@
+import { STL_PLACEMENT_STYLE } from './viewer-shared.js';
 /**
  * How the scene looks: theme and geometry mode, the center gizmo, edges, shadows, reflections, footprints, materials, the light and cylinder silhouettes.
  *
  * A mixin of the viewer (viewer-app.js): its methods run as the viewer's.
  */
 
+import { rulerLength } from './scale-ruler.js';
 import { CameraCubeGizmo, DEFAULT_FOOTPRINT_COLOR, DEFAULT_THEME_UI, FOOTPRINT_COLOR_SWATCHES, GeometryMode, OrbitCenterGizmo, THEMES, radialFadeColor, t, vscode } from './viewer-shared.js';
 import * as KigumiPickTolerances from './pick-tolerances.js';
 
@@ -217,6 +219,46 @@ export const RenderingMixin = (Base) => class extends Base {
     setCenterGizmoEnabled(enabled) {
         this.showCenterGizmo = enabled;
         this.updateOrbitCenterGizmo();
+    }
+
+    /** Show or hide the scale ruler; drawn each frame by updateScaleRuler. */
+    setScaleRulerEnabled(enabled) {
+        this.displayOptions.set('showScaleRuler', Boolean(enabled));
+    }
+
+    /**
+     * The scale ruler, at the bottom right of the view, for the active viewport: a round length that
+     * fits, at the scale the viewport shows at its orbit centre -- the same height either projection
+     * frames there (updateViewportOrthographicFrustum). Changes the page only when the ruler changes.
+     */
+    updateScaleRuler(pageRect, canvasHeight) {
+        const element = this.renderRoot && this.renderRoot.querySelector('#scale-ruler');
+        if (!element) {
+            return;
+        }
+        const viewport = this.showScaleRuler ? this.activeViewport : null;
+        let ruler = null;
+        if (viewport) {
+            const rect = viewport.pixelRect(pageRect, canvasHeight);
+            const fovRad = viewport.perspectiveCamera.fov * Math.PI / 180;
+            const shownHeight = 2 * Math.max(0.001, viewport.cameraController.orbitDist) * Math.tan(fovRad / 2);
+            ruler = rect.height > 0 ? rulerLength(shownHeight / rect.height, this.unitSystem()) : null;
+        }
+        // Above the debug readout when that is showing, which shares the corner.
+        const debug = this.renderRoot.querySelector('#debug');
+        const lift = debug && debug.offsetParent !== null ? debug.offsetHeight + 8 : 0;
+        const key = ruler ? `${ruler.label}|${Math.round(ruler.px)}|${lift}` : 'off';
+        if (key === this._scaleRulerKey) {
+            return;
+        }
+        this._scaleRulerKey = key;
+        element.hidden = !ruler;
+        if (!ruler) {
+            return;
+        }
+        element.style.bottom = `${12 + lift}px`;
+        element.querySelector('.scale-ruler-bar').style.width = `${Math.round(ruler.px)}px`;
+        element.querySelector('.scale-ruler-label').textContent = ruler.label;
     }
 
     /**
@@ -572,12 +614,15 @@ export const RenderingMixin = (Base) => class extends Base {
         return this.renderer ? this.renderer.getSize(new THREE.Vector2()) : new THREE.Vector2(1, 1);
     }
 
-    createMaterialSetForMemberType(memberType) {
+    createMaterialSetForMemberType(memberType, stlPlaceholder = false) {
         const profileId = this.resolveRenderProfileIdForMemberType(memberType);
         const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
+        if (stlPlaceholder) specs.solid.color = STL_PLACEMENT_STYLE.placeholder;
+        const solid = new THREE.MeshStandardMaterial(specs.solid);
+        solid.userData.stlPlaceholder = stlPlaceholder;
         return {
             profileId,
-            solid: new THREE.MeshStandardMaterial(specs.solid),
+            solid,
             edge: new THREE.LineMaterial(specs.edge),
             reflection: new THREE.MeshStandardMaterial(specs.reflection),
         };
@@ -588,6 +633,7 @@ export const RenderingMixin = (Base) => class extends Base {
             return;
         }
         const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
+        if (bundle.mesh.material.userData.stlPlaceholder) specs.solid.color = STL_PLACEMENT_STYLE.placeholder;
         bundle.profileId = profileId;
         this.applyMaterialSpec(bundle.mesh.material, specs.solid);
         this.applyMaterialSpec(bundle.edges.material, specs.edge);

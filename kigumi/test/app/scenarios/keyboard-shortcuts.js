@@ -11,9 +11,11 @@ module.exports = {
         const isMac = process.platform === 'darwin';
 
         const openCurrent = menuItem('Open Current File in Viewer');
-        check('the File menu has Open Current File in Viewer, on cmd/ctrl+shift+o',
-            Boolean(openCurrent) && openCurrent.accelerator === (isMac ? 'Shift+Cmd+O' : 'Ctrl+Shift+O'),
-            openCurrent && openCurrent.accelerator);
+        const openPicked = menuItem('Open in Viewer…');
+        check('the File menu has Open Current File in Viewer on cmd/ctrl+o, and Open in Viewer… on cmd/ctrl+shift+o',
+            Boolean(openCurrent) && openCurrent.accelerator === (isMac ? 'Cmd+O' : 'Ctrl+O')
+                && openPicked.accelerator === (isMac ? 'Shift+Cmd+O' : 'Ctrl+Shift+O'),
+            `${openCurrent && openCurrent.accelerator}, ${openPicked && openPicked.accelerator}`);
 
         // The file in focus, in an editor, opens in a view.
         await runAppCommand('kigumi.viewPatternSource', { data: { sourceFile: FRAME } });
@@ -63,7 +65,7 @@ module.exports = {
             JSON.stringify({ pressedChange, recordingFreesMenu, saved, followed, accelerator: menuItem('Open Current File in Viewer').accelerator }));
 
         settings.set('app.keybindings', {});
-        const reset = await waitFor(() => menuItem('Open Current File in Viewer').accelerator === (isMac ? 'Shift+Cmd+O' : 'Ctrl+Shift+O') || null,
+        const reset = await waitFor(() => menuItem('Open Current File in Viewer').accelerator === (isMac ? 'Cmd+O' : 'Ctrl+O') || null,
             { timeoutMs: 5000 }).catch(() => false);
         check('reset, the key is the default again', reset === true);
         const keysTab = connection().findPanel((panel) => panel.type === 'keyboardShortcuts');

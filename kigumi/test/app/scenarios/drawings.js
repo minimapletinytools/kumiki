@@ -19,6 +19,25 @@ module.exports = {
         })()`), { timeoutMs: 20000 }).catch(() => false);
         check('turning drawings on in the beta section saves it, and the open view reloads with them', betaSaved && betaShown);
 
+        // The scale ruler: off until the options turn it on, then at the bottom right with a round length.
+        const ruler = () => inShell(`(() => {
+            const el = ${viewDoc}.getElementById('scale-ruler');
+            if (!el || el.hidden) return null;
+            const box = el.getBoundingClientRect();
+            const view = ${viewDoc}.getElementById('viewport').getBoundingClientRect();
+            return { label: el.querySelector('.scale-ruler-label').textContent,
+                width: el.querySelector('.scale-ruler-bar').getBoundingClientRect().width,
+                corner: view.right - box.right < 20 && view.bottom - box.bottom < 40 };
+        })()`);
+        const rulerOff = await ruler();
+        await showTab('options');
+        await inShell(`${viewDoc}.getElementById('scale-ruler-toggle').click()`);
+        const ruler3d = await waitFor(() => ruler(), { timeoutMs: 5000 }).catch(() => null);
+        check('the scale ruler is off until the options turn it on; then it is at the 3D view\'s bottom right, a round length',
+            rulerOff === null && ruler3d && ruler3d.corner && /^\d+ (mm|m)$/.test(ruler3d.label) && ruler3d.width > 20 && ruler3d.width <= 121,
+            JSON.stringify({ rulerOff, ruler3d }));
+        await capture('03a-scale-ruler-3d');
+
         await runAppCommand('kigumi.openFrameFromSidebar', DRAWING_FRAME);
         const viewerApp = `${viewDoc}.querySelector("kigumi-app")`;
         const drawingId = await waitFor(() => inShell(`(() => {
@@ -52,6 +71,14 @@ module.exports = {
                 : `drawing ${drawingId}; ${state}`);
         await capture('03c-drawing-dotted-lines');
         if (!drawn) return;
+
+        // This drawing is in another frame's view, whose options are its own.
+        await inShell(`${viewerApp}.setScaleRulerEnabled(true)`);
+        const rulerDrawing = await waitFor(() => ruler(), { timeoutMs: 5000 }).catch(() => null);
+        check('in a drawing, the scale ruler is at the bottom right too', rulerDrawing && rulerDrawing.corner && rulerDrawing.width > 20,
+            JSON.stringify(rulerDrawing));
+        await capture('03d-scale-ruler-drawing');
+        await inShell(`${viewerApp}.setScaleRulerEnabled(false)`);
 
         // Export as PNG: the page fitted whole at about 3000 px, with its dimensions, written to the
         // frame's exports; the view the user had (zoomed and panned here) comes back as it was.

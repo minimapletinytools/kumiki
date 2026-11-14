@@ -462,7 +462,8 @@
     function init() {
         if (!isMac) {
             $('key-go-to-file').textContent = 'Ctrl+P';
-            $('key-open-in-viewer').textContent = 'Ctrl+O';
+            $('key-open-in-viewer').textContent = 'Ctrl+Shift+O';
+            $('key-open-current-in-viewer').textContent = 'Ctrl+O';
         }
         $('status-workspace').addEventListener('click', () => command('openFolder'));
         $('status-log').addEventListener('click', () => command('openLog'));
