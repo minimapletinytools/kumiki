@@ -34,7 +34,7 @@ BEAM_SIZE = create_v2(inches(4), inches(5))   # 4" through the frame (Y), 5" tal
 SIDE_STROKE_SIZE = create_v2(inches(4), inches(6))   # 4" through the frame (Y), 6" in its plane
 
 POST_HEIGHT = inches(29.988)                   # 5% longer than 28.56"
-POST_BASE_HEIGHT = inches(1)                   # the whole frame stands this far off the ground
+POST_BASE_HEIGHT = inches(0)                   # the whole frame stands this far off the ground
 BEAM_CENTER_HEIGHT = inches(19.635) + POST_BASE_HEIGHT   # falls with the post it is carried on
 BEAM_LENGTH = inches(13.695)                   # post centerline to beam tip (62.25% of 22")
 SIDE_STROKE_LENGTH = inches(14.94)             # post centerline to stroke tip (62.25% of 24")

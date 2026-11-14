@@ -24,6 +24,13 @@ from ..shavings.relief import (
     warn_if_arrangement_timbers_imperfect,
 )
 
+# stubby mini tenons
+class StubbyMiniTenon:
+    #position, size, matching same semantics as the regular mortise and tenon joint on the butt_timber_1 side
+    # TODO
+    # the position/size semantics are reversed on the other side if you want them to be aligned
+    #def reflect_for_other_side() -> StubbyMiniTenon:
+    pass
 
 def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     arrangement: DoubleButtJointTimberArrangement,
@@ -45,6 +52,10 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     slot_lateral_offset=scalar(0),
     # optional peg setup; pegs will be drilled through each butt timber and the spline
     peg_parameters: Optional[SimplePegParameters] = None,
+
+    timber1_stubby_mini_tenons: List[StubbyMiniTenon] = [],
+    timber2_stubby_mini_tenons: Optional[List[StubbyMiniTenon]] = None, #reflected from timber1_stubby_mini_tenons if None
+
 ) -> Joint:
     """
     Creates a splined opposing double butt joint.

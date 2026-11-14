@@ -318,20 +318,18 @@ DONE-agent stuff
   DONE-add drawings to cheat sheet
   DONE-do the pattern mega refactor
   DONE-do the example mega refactor
+DONE-agent instructions
+DONE-the TODO block in teh agent panle doesn't go away if teh gaent moved on to something else, mabye add a manul x button to close it? and it will reopen the next time the agent actually updates it or changes it? idkwh at do you think?
+DONE-add to default context file/project currentyl in focus etc, so its more clear to bulit in agent if yous witched contexts and are prompting about something else waht do you think?
 
-
--the TODO block doesn't go away if teh gaent moved on to something else, mabye add a manul x button?
 
 -update double spline joint to include mini tenons
 -angled corner lap joint doesn't have end cuts
 -add basic joint patterns
-
-
-
 -test agent created drawings
 -agent benchmarking examples
 -consider doing multiple agent sessions...
--add to default context file/project currentyl in focus etc, so its more clear to bulit in agent if yous witched contexts and are prompting about something else
+
 -investigate adding to app store
 
 -add report crash feature?
