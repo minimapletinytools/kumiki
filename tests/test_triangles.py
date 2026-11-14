@@ -358,3 +358,29 @@ class TestTriangles:
         # With roundovers and a miter end cut, volume should be around ~0.0006 m^3 (not dropped to 0 or sliver).
         assert mesh.volume > 0.0005
         assert len(mesh.faces) > 0
+
+@pytest.mark.parametrize("builder_name", [
+    "example_basic_splice_lap_joint",
+    "example_basic_dropin_dovetail_butt_joint",
+])
+@pytest.mark.parametrize("world_space", [False, True])
+def test_basic_joint_meshes_have_no_shoulder_seams(builder_name, world_space):
+    from kumiki import Frame
+    from kumiki.csg.cutcsg import adopt_csg
+    from patterns import basic_joints_patterns
+
+    frame = Frame.from_joints([getattr(basic_joints_patterns, builder_name)()])
+    for cut_timber in frame.cut_timbers:
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+        if world_space:
+            csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), csg)
+        mesh = triangulate_cutcsg(csg).mesh
+        assert mesh.is_watertight
+        assert len(mesh.split()) == 1, "The tail must remain connected to its timber"
+        assert all(angle < math.pi - 1e-6 for angle in mesh.face_adjacency_angles), "No folded sheets at coincident cut planes"
+        # Every triangle must separate retained material from removed material.
+        for center, normal in zip(mesh.triangles_center, mesh.face_normals):
+            inside = create_v3(*(center - normal * 1e-6))
+            outside = create_v3(*(center + normal * 1e-6))
+            assert csg.contains_point(inside)
+            assert not csg.contains_point(outside)
