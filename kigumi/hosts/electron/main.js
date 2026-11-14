@@ -748,11 +748,6 @@ function buildMenu() {
                 { label: 'Keyboard Shortcuts…', ...keyed('app.keyboardShortcuts'), click: () => openKeyboardShortcuts() },
                 { label: 'Show Log', ...keyed('app.showLog'), click: () => openLogTab() },
                 { label: 'Open Logs Folder', click: () => electronShell.openPath(path.dirname(logChannel.filePath)) },
-                {
-                    label: 'Toggle Developer Tools',
-                    accelerator: isMac ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
-                    click: () => mainWindow.webContents.toggleDevTools(),
-                },
                 { role: 'togglefullscreen' },
                 { type: 'separator' },
                 command('Kumiki Website', 'kigumi.openWebsite'),
