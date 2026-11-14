@@ -365,9 +365,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             this.selectionPanel.updateInfo(this.currentFrameData);
             this.memberListPanel.syncSelection();
             this.reportSelectionSoon();
-            const selected = this.selectionManager.getSelectedTimbers();
-            const mesh = selected.length === 1 ? this.memberMetadataByKey.get(selected[0])?.mesh : null;
-            if (mesh?.stlPlacement?.needed && !this.stlEditor && !this.stlRequestId) this.startSTLPlacement(selected[0]);
         });
 
         // Attach Layers panel to selection store + extension messaging.
@@ -1405,7 +1402,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             this._endAllPointerGestures();
             this._setShiftHeld(false);
             this.stlEditor = new STLPlacementEditor({ parent: this.renderRoot, data: message.result,
-                style: STL_PLACEMENT_STYLE, send: request => this.sendSTLPlacement(request),
+                style: STL_PLACEMENT_STYLE, background: this.style.background, material: this.renderProfileMaterialSpecs(this.resolveRenderProfile(this.resolveRenderProfileIdForMemberType('timber'))).solid, send: request => this.sendSTLPlacement(request),
                 close: () => this.closeSTLPlacement() });
             return;
         }

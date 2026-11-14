@@ -2,25 +2,26 @@ import { placement, configuration, agentPrompt } from './stl-placement-model.js'
 
 /** Own an isolated placement canvas, transform panel, and their entire event/resource lifetime. */
 export class STLPlacementEditor {
-    constructor({ parent, data, style, send, close }) {
+    constructor({ parent, data, style, material, background, send, close }) {
         this.data = data;
         this.value = placement(data.placement);
         this.style = style;
         this.send = send;
         this.onClose = close;
         this.mode = 'translation';
-        this.uniform = true;
+        this.material = material;
         this.inputs = [];
         this.abort = new window.AbortController();
         this.root = document.createElement('div');
         this.root.dataset.stlPlacementEditor = '';
         this.root.setAttribute('role', 'dialog');
         this.root.setAttribute('aria-label', 'Place STL');
-        this.root.style.cssText = 'position:absolute;inset:0;z-index:10000;display:grid;grid-template-columns:300px minmax(180px,1fr);background:var(--vscode-editor-background,#fff);color:var(--vscode-editor-foreground,#222);font:13px system-ui;';
+        this.root.className = 'stl-placement';
+        this.root.style.background = background;
         this.stage = document.createElement('div');
-        this.stage.style.cssText = 'position:relative;min-width:0;overflow:hidden';
+        this.stage.className = 'stl-placement-stage';
         this.sidebar = document.createElement('div');
-        this.sidebar.style.cssText = 'overflow:auto;padding:16px;border-right:1px solid #8886';
+        this.sidebar.className = 'stl-placement-sidebar';
         this.root.append(this.sidebar, this.stage);
         this.suspended = [...parent.children].map(element => [element, element.inert]);
         for (const [element] of this.suspended) element.inert = true;
@@ -48,7 +49,7 @@ export class STLPlacementEditor {
     button(text, action, parent = this.sidebar) {
         const b = this.text('button', text, parent);
         b.type = 'button';
-        b.style.cssText = 'margin:3px;padding:5px 8px;cursor:pointer';
+        b.className = 'ip-action ip-measure';
         b.addEventListener('click', action, { signal: this.abort.signal });
         return b;
     }
@@ -60,20 +61,20 @@ export class STLPlacementEditor {
         this.text('p', 'Only this STL can be edited. Right-drag to orbit; scroll to zoom. Escape cancels.');
         this.text('h3', 'Transform');
         const modes = this.text('div', 'Gizmo: ');
+        this.modeButtons = [];
         for (const [name, label] of [['translation', 'Move'], ['rotation', 'Rotate'], ['scale', 'Scale']]) {
-            this.button(label, () => { this.mode = name; this.rebuildGizmo(); this.update(); }, modes);
+            const button = this.button(label, () => { this.mode = name; this.rebuildGizmo(); this.update(); }, modes);
+            this.modeButtons.push({ name, button });
         }
-        const uniform = this.text('label', ' Uniform scale ');
-        const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = true;
-        checkbox.onchange = () => { this.uniform = checkbox.checked; }; uniform.prepend(checkbox);
+        this.text('p', 'Scale: drag an axis box for one axis, or the center box for all three.');
         for (const [key, label, step] of [['translation', 'Translation (m)', .001], ['rotation', 'Rotation (degrees)', 1], ['scale', 'Scale', .01]]) {
             this.text('h4', label);
-            const row = this.text('div', ''); row.style.display = 'flex';
+            const row = this.text('div', ''); row.className = 'stl-placement-fields';
             for (let axis = 0; axis < 3; axis++) {
                 const labelNode = this.text('label', 'XYZ'[axis], row);
                 const input = document.createElement('input'); input.type = 'number'; input.step = String(step);
                 input.setAttribute('aria-label', `${label} ${'XYZ'[axis]}`);
-                input.style.cssText = 'width:70px;display:block';
+                input.className = 'stl-placement-input';
                 input.onchange = () => {
                     const next = placement(this.value); next[key][axis] = Number(input.value);
                     try { this.value = placement(next); this.update(); this.status.textContent = ''; }
@@ -109,9 +110,9 @@ export class STLPlacementEditor {
     }
 
     buildScene() {
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.setClearColor(this.style.background);
+        this.renderer.setClearColor(0, 0);
         this.renderer.domElement.style.cssText = 'display:block;width:100%;height:100%;touch-action:none';
         this.stage.append(this.renderer.domElement);
         this.scene = new THREE.Scene();
@@ -123,7 +124,7 @@ export class STLPlacementEditor {
         this.geometry = new THREE.BufferGeometry();
         this.geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.data.vertices.flat(), 3));
         this.geometry.setIndex(this.data.faces.flat()); this.geometry.computeVertexNormals();
-        this.mesh = new THREE.Mesh(this.geometry, new THREE.MeshStandardMaterial({ color: this.style.mesh, roughness: .8 }));
+        this.mesh = new THREE.Mesh(this.geometry, new THREE.MeshStandardMaterial(this.material));
         this.scene.add(this.mesh);
         const reference = new THREE.BoxGeometry(...this.data.size);
         this.reference = new THREE.LineSegments(new THREE.EdgesGeometry(reference), new THREE.LineBasicMaterial({ color: this.style.reference }));
@@ -147,6 +148,12 @@ export class STLPlacementEditor {
     rebuildGizmo() {
         this.disposeObjects(this.gizmo); this.gizmo.clear();
         const length = this.gizmoSize;
+        if (this.mode === 'scale') {
+            const center = new THREE.Mesh(new THREE.BoxGeometry(length * .16, length * .16, length * .16),
+                new THREE.MeshBasicMaterial({ color: this.style.uniformScale, depthTest: false }));
+            center.userData.uniformScale = true; center.renderOrder = 102;
+            this.gizmo.add(center);
+        }
         for (let axis = 0; axis < 3; axis++) {
             const direction = new THREE.Vector3().setComponent(axis, 1);
             const material = new THREE.MeshBasicMaterial({ color: this.style.axes[axis], depthTest: false, transparent: true, opacity: .9 });
@@ -175,8 +182,13 @@ export class STLPlacementEditor {
     pointerDown(event) {
         if (event.button === 2) this.drag = { orbit: true, x: event.clientX, y: event.clientY, yaw: this.yaw, pitch: this.pitch };
         else if (event.button === 0) {
-            const hit = this.ray(event).intersectObjects(this.gizmo.children).find(h => Number.isInteger(h.object.userData.axis));
+            const hit = this.ray(event).intersectObjects(this.gizmo.children).find(h => Number.isInteger(h.object.userData.axis) || h.object.userData.uniformScale);
             if (!hit) return;
+            if (hit.object.userData.uniformScale) {
+                this.drag = { uniformScale: true, x: event.clientX, y: event.clientY, value: placement(this.value) };
+                this.renderer.domElement.setPointerCapture(event.pointerId);
+                return;
+            }
             const axis = hit.object.userData.axis;
             const origin = this.gizmo.position.clone();
             const direction = new THREE.Vector3().setComponent(axis, 1).applyQuaternion(this.gizmo.quaternion);
@@ -195,11 +207,16 @@ export class STLPlacementEditor {
         const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
         if (drag.orbit) { this.yaw = drag.yaw - dx * .01; this.pitch = Math.max(-1.5, Math.min(1.5, drag.pitch + dy * .01)); this.render(); return; }
         this.value = placement(drag.value);
+        if (drag.uniformScale) {
+            const factor = Math.exp((dx - dy) * .01);
+            this.value.scale = drag.value.scale.map(v => v * factor);
+            this.update(); return;
+        }
         const amount = (dx * drag.screen.x + dy * drag.screen.y) / Math.max(1, drag.screen.lengthSq());
         if (this.mode === 'translation') this.value.translation[drag.axis] += amount;
         if (this.mode === 'scale') {
             const factor = Math.max(.001, 1 + amount / this.gizmoSize);
-            for (let axis = 0; axis < 3; axis++) if (this.uniform || axis === drag.axis) this.value.scale[axis] *= factor;
+            this.value.scale[drag.axis] *= factor;
         }
         if (this.mode === 'rotation' && drag.start) {
             const point = this.ray(event).ray.intersectPlane(drag.plane, new THREE.Vector3());
@@ -219,6 +236,7 @@ export class STLPlacementEditor {
     }
 
     update() {
+        for (const { name, button } of this.modeButtons) button.setAttribute('aria-pressed', String(this.mode === name));
         for (const { key, axis, input } of this.inputs) input.value = String(Number(this.value[key][axis].toFixed(6)));
         this.mesh.position.fromArray(this.value.translation);
         this.mesh.rotation.set(...this.value.rotation.map(v => v * Math.PI / 180), 'XYZ');

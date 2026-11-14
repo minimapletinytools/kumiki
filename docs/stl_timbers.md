@@ -18,14 +18,14 @@ The importer rejects open, inconsistently wound, and non-finite meshes.
 ## Placement
 
 Omitting `placement` creates a placeholder: a rectangular reference timber in amber,
-with `(needs stl placement)` after its tree label. Select it to enter STL placement.
-An already configured STL has an **Edit STL placement** button in the selection panel.
+with `(needs stl placement)` after its tree label. Select it, then click **Edit STL placement** in the selection panel. The same button
+opens placement for already configured STL timbers. Selection alone stays in the viewer.
 
 The editor isolates one timber. Other viewer actions are disabled until **Cancel**,
 Escape, or a successful **Update configuration**. A frame refresh cancels the preview.
 Move, Rotate, and Scale select a gizmo; numeric fields allow precise placement. Quarter
 turn buttons rotate around the reference timber's axes. Scale handles follow the mesh's
-rotated axes; uniform scaling is enabled initially. Right-drag orbits and the wheel zooms.
+rotated axes and resize only that axis. Drag the center box to scale all three axes together. Right-drag orbits and the wheel zooms.
 **Fit to reference** resets rotation and uniformly fits and centers the mesh in the
 reference prism. **Reset** restores the placement present when the editor opened.
 
@@ -55,12 +55,13 @@ not modify the model or file until the source update succeeds.
 
 Open `patterns/structures/cabriole_table.py` in Kigumi. It contains a four-leg table
 with accepted placements and a separate placeholder beside it for practicing alignment.
-It demonstrates stock shape and placement, without modeled fasteners.
+Four 30 × 30 mm tenons enter 25 mm-deep stopped mortises in the 35 mm tabletop.
+The STL tips already contain that material; the mesh is never extended for joinery.
 
 Regenerate the included procedural mesh from the repository root:
 
 ```sh
-uv run python tools/generate_cabriole_leg.py
+uv run --extra render python tools/generate_cabriole_leg.py
 ```
 
 An optional output path writes another copy. The generator creates a closed

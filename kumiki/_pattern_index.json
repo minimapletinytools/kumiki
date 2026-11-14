@@ -1230,12 +1230,12 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 25,
+          "lineno": 26,
           "name": "cabriole_table"
         },
         {
           "kind": "function",
-          "lineno": 36,
+          "lineno": 43,
           "name": "cabriole_placement"
         }
       ],
@@ -1244,7 +1244,7 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/cabriole_table.py",
-      "sha256": "565d7f3738c690e7cfc5a52abf31939e2469fca215433f4a5d8a09ce232485af",
+      "sha256": "4d546835dc9a5c7d3caffe3aa5e77947ab029d187f935d07fd6bd4bc25235203",
       "warnings": []
     },
     "patterns/structures/coffee_table.py": {
@@ -1461,7 +1461,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-14T01:30:32.382331+00:00",
+  "generated_at": "2026-11-14T04:21:34.645437+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

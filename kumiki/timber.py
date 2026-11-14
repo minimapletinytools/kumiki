@@ -1749,9 +1749,9 @@ def _ends_extended_by_cuts(timber: PerfectTimberWithin, cuts: list) -> Tuple[boo
         for cut in cuts
     )
     
-    # Check if timber can be extended for joints
-    if (has_bottom_cut or has_top_cut) and not timber.can_be_extended_for_joints():
-        assert False, f"Cannot extend {type(timber).__name__} for joints - timber does not support extension"
+    # Fixed stock retains its bounds while end cuts remove existing material.
+    if not timber.can_be_extended_for_joints():
+        return False, False
     
     # Note: did_end_cuts_extend_timber() can be called separately to check if cuts extend beyond bounds
     # For splice joints and similar, cuts extending beyond is expected and valid behavior

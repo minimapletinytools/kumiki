@@ -745,6 +745,6 @@ export { KigumiMeasurements, CsgTreeView, KigumiKiwariValues, choosePickAction, 
 
 // Shared placement appearance for the main viewer and isolated editor.
 export const STL_PLACEMENT_STYLE = Object.freeze({
-    placeholder: 0xdca638, reference: 0xdca638, mesh: 0xcdaa7d, background: 0xf1f4ef,
+    placeholder: 0xdca638, reference: 0xdca638, uniformScale: 0xe8c957,
     axes: [0xd24a43, 0x439f66, 0x487bd5],
 });

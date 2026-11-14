@@ -3,20 +3,22 @@ from pathlib import Path
 import argparse
 import numpy as np
 import trimesh
+from scipy.interpolate import PchipInterpolator
 
 
 def generate(output: Path) -> None:
     # Height, diagonal sweep, radius, and superellipse exponent, from foot to square joinery block.
     stations = np.array([
-        [0, 25, 25, 2], [12, 30, 35, 2], [35, 24, 29, 2], [80, 6, 17, 2],
-        [150, -10, 15, 2], [260, -18, 18, 2], [380, -10, 25, 2],
-        [480, 10, 37, 2.5], [550, 16, 40, 3], [610, 0, 35, 8],
-        [650, 0, 35, 16], [720, 0, 35, 16],
+        [0, 25, 30, 2], [12, 30, 42, 2], [35, 24, 36, 2], [80, 6, 24, 2],
+        [150, -10, 22, 2], [260, -18, 26, 2], [380, -10, 34, 2],
+        [480, 10, 45, 2.5], [550, 16, 48, 3], [630, 8, 40, 4],
+        [680, 0, 35, 16], [720, 0, 35, 16],
     ])
-    rings, sides = 73, 32
+    profile = PchipInterpolator(stations[:, 0], stations[:, 1:], axis=0)
+    rings, sides = 145, 64
     vertices = []
     for z in np.linspace(0, 720, rings):
-        sweep, radius, exponent = [np.interp(z, stations[:, 0], stations[:, i]) for i in (1, 2, 3)]
+        sweep, radius, exponent = profile(z)
         for angle in np.linspace(0, 2 * np.pi, sides, endpoint=False):
             x, y = np.cos(angle), np.sin(angle)
             vertices.append([sweep + radius * np.sign(x) * abs(x) ** (2 / exponent),

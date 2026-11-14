@@ -107,13 +107,24 @@ def test_generated_cabriole_examples_build():
     from patterns.structures.cabriole_table import cabriole_table, cabriole_placement
     table = cabriole_table()
     assert len(table.cut_timbers) == 5
-    legs = table.cut_timbers[:4]
+    assert table.source_joints is not None and len(table.source_joints) == 4
+    legs = [cut for cut in table.cut_timbers if isinstance(cut.timber, STLTimber)]
     timbers = [leg.timber for leg in legs]
     assert all(isinstance(timber, STLTimber) for timber in timbers)
     sources = [getattr(timber, "source") for timber in timbers]
     assert all(source is not None for source in sources)
     assert len({source.line for source in sources}) == 4
     assert all(triangulate_cutcsg(leg.timber.get_actual_csg_local()).mesh.is_volume for leg in legs)
+    for leg in legs:
+        solid = leg.render_timber_with_cuts_csg_local()
+        assert solid.contains_point(create_v3(0, 0, .71))
+        assert not solid.contains_point(create_v3(.025, 0, .71))
+        assert triangulate_cutcsg(solid).mesh.is_volume
+    top = next(cut for cut in table.cut_timbers if not isinstance(cut.timber, STLTimber))
+    solid = top.render_timber_with_cuts_csg_local()
+    # Top local X is world Y, local Y is world Z, local Z is world X.
+    assert not solid.contains_point(create_v3(-.25, -.0075, .1))
+    assert solid.contains_point(create_v3(-.25, .0125, .1))
     placeholder = cabriole_placement().cut_timbers[0].timber
     assert isinstance(placeholder, STLTimber) and placeholder.needs_stl_placement
 
@@ -157,3 +168,14 @@ def test_source_edit_preserves_windows_line_endings_and_refuses_indirect_calls(t
         prepare_edit(timber, {}, tmp_path)
     with pytest.raises(ValueError, match='missing'):
         prepare_edit(replace(timber, source=None), {}, tmp_path)
+
+
+def test_mesh_end_cuts_trim_stock_without_extending_it(stl):
+    timber = create_stl_timber(reference(), stl, placement={'translation': [0, 0, .15]})
+    trimmed = CutTimber(timber, cuts=[Cutting(timber, maybe_top_end_cut_distance_from_bottom=.2)])
+    mesh = triangulate_cutcsg(trimmed.render_timber_with_cuts_csg_local()).mesh
+    assert mesh.volume == pytest.approx(.004)
+    beyond = CutTimber(timber, cuts=[Cutting(timber, maybe_top_end_cut_distance_from_bottom=2)])
+    mesh = triangulate_cutcsg(beyond.render_timber_with_cuts_csg_local()).mesh
+    assert mesh.volume == pytest.approx(.006)
+    assert mesh.bounds[1, 2] == pytest.approx(.3)
