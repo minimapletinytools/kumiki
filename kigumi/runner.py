@@ -858,6 +858,11 @@ def log_stderr(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
+def log_debug(message: str) -> None:
+    """A line for looking into the runner, hidden in the Log tab unless it shows debug."""
+    log_stderr(f"[debug] {message}")
+
+
 def log_warning(message: str) -> None:
     """A warning in the view's log: the "[warn] " tag gives the line its level there."""
     log_stderr(f"[warn] {message}")
@@ -1321,6 +1326,8 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
     remesh_metrics: List[RemeshMetricWire] = []
     seen_keys = set()
     key_counts: Dict[str, int] = {}
+    # The timbers left out, by why: one line for many timbers that fail the same way.
+    skipped: Dict[str, List[str]] = {}
 
     for cut_timber in frame.cut_timbers:
         try:
@@ -1393,7 +1400,12 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
                         f"fallback geometry failed for {get_timber_display_name(cut_timber.timber)}: {fallback_exc}"
                     )
 
-            log_error(f"skipping geometry for {get_timber_display_name(cut_timber.timber)}: {exc}")
+            skipped.setdefault(str(exc), []).append(get_timber_display_name(cut_timber.timber))
+
+    for why, names in skipped.items():
+        shown = ", ".join(names[:5]) + (f" and {len(names) - 5} more" if len(names) > 5 else "")
+        log_error(f"skipping geometry for {shown}: {why}" if len(names) == 1
+                  else f"skipping geometry for {len(names)} timbers ({shown}): {why}")
 
     accessories = list(frame.accessories) if hasattr(frame, "accessories") and frame.accessories else []
     for accessory in accessories:
@@ -3503,11 +3515,8 @@ def _purge_project_modules(project_root: Path, keep_paths: set[Path], verbose: b
         _project_module_loaded_at.pop(module_name, None)
         removed_count += 1
 
-    if verbose:
-        if removed_count > 0:
-            log_stderr(f"[reload] Purged {removed_count} project module(s): {', '.join(sorted(removable))}")
-        else:
-            log_stderr("[reload] No project modules to purge (first load or all already clean)")
+    if verbose and removed_count > 0:
+        log_stderr(f"[reload] Re-importing {removed_count} changed project module(s): {', '.join(sorted(removable))}")
 
 
 def _looks_like_frame(value: Any) -> bool:
@@ -3569,8 +3578,6 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> ModuleType:
         if _project_modules_changed(_project_root, keep_paths):
             _purge_project_modules(_project_root, keep_paths, verbose=verbose)
             _project_generation += 1
-        elif verbose:
-            log_stderr("[reload] No project module changed since it was imported; keeping them")
     else:
         if verbose:
             log_warning(f"[reload] no project root (sys.argv={sys.argv}), so changed project "
@@ -3599,10 +3606,6 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> ModuleType:
         for name, _path in _project_modules(_project_root, keep_paths):
             _project_module_loaded_at.setdefault(name, started)
     _last_project_load_at = started
-    
-    if verbose:
-        log_stderr(f"[reload] Loaded module: {module_name} from {file_path}")
-    
     return module
 
 
@@ -3886,7 +3889,7 @@ def resolve_frame_from_module(
         entry = getattr(module, legacy)
         if legacy == "build_frame" and not callable(entry):
             continue
-        _warn_legacy_entry(legacy)
+        _warn_legacy_entry(legacy, getattr(module, "__file__", None))
         if callable(entry):
             entry = _call_frame_entry(entry, incoming.get(legacy))
         if not _looks_like_frame(entry):
@@ -3904,7 +3907,14 @@ def resolve_frame_from_module(
     )
 
 
-def _warn_legacy_entry(name: str) -> None:
+# The files already told their frame's name is deprecated: once a runner is enough.
+_legacy_entries_warned: set = set()
+
+
+def _warn_legacy_entry(name: str, module_file: Optional[str]) -> None:
+    if (module_file, name) in _legacy_entries_warned:
+        return
+    _legacy_entries_warned.add((module_file, name))
     log_warning(f"picking up the frame by the name '{name}' is deprecated and will be removed. "
                 f"Mark it with @frame instead: @frame def {name}(k: Kiwari) -> Frame")
 
@@ -5227,7 +5237,7 @@ class Jobs:
             log_stderr(f"[job] {job.job_id} [{job.slot}] cancelled after {job.elapsed_s:.3f}s")
             emit_message(job.event("job_cancelled"))
         else:
-            log_stderr(f"[job] {job.job_id} [{job.slot}] {job.state} in {job.elapsed_s:.3f}s")
+            log_debug(f"[job] {job.job_id} [{job.slot}] {job.state} in {job.elapsed_s:.3f}s")
             emit_message(job.event(outcome[0], **outcome[1]))
 
     @staticmethod
@@ -5295,8 +5305,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
 
         reload_s = time.monotonic() - t0
         state.slots[slot_name] = next_slot
-        frame_name = next_slot.frame.name if hasattr(next_slot.frame, "name") else "?"
-        log_stderr(f"[reload] [{slot_name}] Frame loaded: '{frame_name}', {len(next_slot.frame.cut_timbers)} timbers")
         result = {
             "examplePath": str(next_slot.file_path),
             "frame": {
@@ -5433,8 +5441,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
             return {"assembly": _build_assembly_payload(
                 ss.frame, timber_entries, accessory_entries, should_cancel=context.should_cancel)}
 
-        log_stderr(f"[assembly] [{slot_name}] Solving the assembly of '{getattr(ss.frame, 'name', '?')}' "
-                   f"({len(ss.frame.cut_timbers)} timbers) in the background")
         job = _jobs.start("assembly", slot_name, _solve_assembly)
         return state, make_success_response(request_id, command, {"assembly": {"pending": True}, "jobId": job.job_id}), False
 
@@ -5511,7 +5517,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         new_slot = load_slot_state(file_path, kiwari_values=_opt_mapping(payload, "kiwari"))
         reload_s = time.monotonic() - t0
         state.slots[slot_name] = new_slot
-        log_stderr(f"[slot] Loaded slot '{slot_name}' from {file_path}")
+        log_debug(f"[slot] Loaded slot '{slot_name}' from {file_path}")
         result = {
             "slot": slot_name,
             "examplePath": str(new_slot.file_path),
@@ -5533,7 +5539,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
         removed = slot_name in state.slots
         if removed:
             del state.slots[slot_name]
-            log_stderr(f"[slot] Unloaded slot '{slot_name}'")
+            log_debug(f"[slot] Unloaded slot '{slot_name}'")
         return state, make_success_response(request_id, command, {"slot": slot_name, "removed": removed}), False
 
     if command == "list_slots":
@@ -5710,9 +5716,7 @@ def main() -> None:
 
     target_path = sys.argv[1]
 
-    log_stderr(f"[startup] runner.py ready. executable={sys.executable}")
-    log_stderr(f"[startup] _project_root={_project_root}")
-    log_stderr(f"[startup] target={target_path}")
+    log_debug(f"[startup] runner ready: python={sys.executable} project={_project_root} file={target_path}")
 
     try:
         initial_slot = load_slot_state(target_path)

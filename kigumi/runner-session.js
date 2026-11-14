@@ -274,7 +274,7 @@ class PythonRunnerSession {
                 await this.upgradeKumikiTo(pythonCmd, kigummiVersion, minimum, kumikiVersion);
                 return;
             }
-            this.channel.appendLine(`[env] kumiki ${kumikiVersion} is compatible with kigumi ${kigummiVersion}`);
+            this.channel.appendLine(`[env] kumiki ${kumikiVersion} is compatible with kigumi ${kigummiVersion}`, 'debug');
             return;
         }
 

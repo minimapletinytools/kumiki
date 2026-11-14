@@ -3,7 +3,7 @@ import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
 import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPanel, ViewerToolsPanel, usePanelRuntime } from './viewer-panels.js';
-import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DRAWING_BETA_ENABLED, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, VIEWER_APP_VERSION, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
+import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DRAWING_BETA_ENABLED, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
 import { PickingMixin } from './viewer-picking.js';
 import { isKey } from './key-match.js';
 
@@ -702,7 +702,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             } catch (error) {
                 if (!this._hoverBroken) {
                     this._hoverBroken = true;
-                    this.emitViewerLog('hover-error', { message: String(error && error.message || error) });
+                    this.emitViewerLog('hover-error', { message: String(error && error.message || error) }, 'warn');
                 }
             }
             // Pulled, not pushed: what is drawn follows the state because the
@@ -1046,13 +1046,13 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     // The log
     // ------------------------------------------------------------------
 
-    emitViewerLog(eventName, details = {}) {
+    /** An event for the view's log: a trace of what was clicked or measured, so debug by default. */
+    emitViewerLog(eventName, details = {}, level = 'debug') {
         const payload = {
             type: 'viewerLog',
             event: eventName,
             source: 'viewer',
-            level: 'info',
-            version: VIEWER_APP_VERSION,
+            level,
             details,
             timestamp: new Date().toISOString(),
         };

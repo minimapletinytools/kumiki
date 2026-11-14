@@ -40,6 +40,22 @@ function assemblyPreviewSettingEnabled() {
 }
 
 /**
+ * The line a finished build leaves in the log, e.g.
+ * "Built frame.py: 48 timbers in 595ms (loading 351ms, meshes 242ms; file change)".
+ */
+function refreshSummary(name, { reason, totalS, timbers, reloadResult, geometryData }) {
+    const ms = (seconds) => `${Math.round(seconds * 1000)}ms`;
+    const reloadS = reloadResult && reloadResult.profiling && reloadResult.profiling.reload_s;
+    const geometryS = geometryData && geometryData.profiling && geometryData.profiling.geometry_s;
+    const steps = [];
+    if (typeof reloadS === 'number' && reloadS > 0) steps.push(`loading ${ms(reloadS)}`);
+    if (typeof geometryS === 'number') steps.push(`meshes ${ms(geometryS)}`);
+    const why = [steps.join(', '), reason].filter(Boolean).join('; ');
+    const count = typeof timbers === 'number' ? `${timbers} timber${timbers === 1 ? '' : 's'} ` : '';
+    return `Built ${name}: ${count}in ${ms(totalS)}${why ? ` (${why})` : ''}`;
+}
+
+/**
  * The level of a line the runner or the frame printed: runner.py tags its own (log_stderr's
  * "[warn] "), and a Python warning ("file.py:12: FrameWarning: ...") counts as one, so an
  * agent's edit reports it.
@@ -279,11 +295,10 @@ class FrameViewSession {
         this.profiler.markTiming(initTiming, 'initialize.webviewHtml.end');
         this.panel.onDispose(() => {
             this.panel = null;
-            this.log(`[panel] Panel closed, disposing session for slot '${this.slotName}'`);
+            this.log(`[panel] Panel closed, disposing session for slot '${this.slotName}'`, 'debug');
             void this.dispose();
         });
         this._setupWebviewMessageHandler();
-        this.log('[webview] viewer log bridge active');
         this.setSourceHasPendingChanges(false, { force: true });
         this.postLoadingStatus('raising frame', { reason: 'session initialize', refreshToken: this.refreshSequence });
 
@@ -323,14 +338,14 @@ class FrameViewSession {
             this.filePath,
             this.runnerSession.projectRoot,
             (source) => this.onFileChanged(source),
-            (message) => this.log(`[watcher] ${message}`)
+            (message) => this.log(`[watcher] ${message}`, 'debug')
         );
         this.fileWatcher.start({ enabled: this.autoRefreshOnFileChange });
         this.profiler.markTiming(initTiming, 'initialize.watcher.end');
 
         this.profiler.markTiming(initTiming, 'initialize.end');
 
-        this.log(`Session initialized for ${this.filePath} (slot=${this.slotName}, type=${this.sessionType})`);
+        this.log(`Session initialized for ${this.filePath} (slot=${this.slotName}, type=${this.sessionType})`, 'debug');
     }
 
     _setupWebviewMessageHandler() {
@@ -557,11 +572,10 @@ class FrameViewSession {
             const eventName = typeof message.event === 'string' ? message.event : 'unknown';
             const source = typeof message.source === 'string' ? message.source : 'webview';
             const level = normalizeViewerLogLevel(message.level);
-            const version = typeof message.version === 'string' ? message.version : 'unknown';
             const details = message.details && typeof message.details === 'object'
                 ? JSON.stringify(message.details)
                 : '{}';
-            this.log(`[webview:${source}] ${eventName} v${version} ${details}`, level);
+            this.log(`[webview:${source}] ${eventName} ${details}`, level);
         });
     }
 
@@ -723,7 +737,7 @@ class FrameViewSession {
         this.panel = createFrameViewer(this.filePath, this.patternName, isLocalDev, this.openInSplitView);
         this.panel.onDispose(() => {
             this.panel = null;
-            this.log(`[panel] Panel closed, disposing session for slot '${this.slotName}'`);
+            this.log(`[panel] Panel closed, disposing session for slot '${this.slotName}'`, 'debug');
             void this.dispose();
         });
         this._setupWebviewMessageHandler();
@@ -770,7 +784,7 @@ class FrameViewSession {
                     this.filePath,
                     this.runnerSession && this.runnerSession.projectRoot,
                     (source) => this.onFileChanged(source),
-                    (message) => this.log(`[watcher] ${message}`)
+                    (message) => this.log(`[watcher] ${message}`, 'debug')
                 );
                 this.fileWatcher.start({ enabled: this.autoRefreshOnFileChange });
             }
@@ -812,7 +826,7 @@ class FrameViewSession {
         }
         if (this.isRefreshing) {
             this.pendingRefreshReason = reason;
-            this.log(`[refresh] Queuing pending refresh for ${this.filePath} (${reason})`);
+            this.log(`[refresh] Queuing pending refresh for ${this.filePath} (${reason})`, 'debug');
             return;
         }
 
@@ -822,7 +836,7 @@ class FrameViewSession {
         const refreshToken = this.refreshSequence;
         this.lastRefreshReason = reason;
         this.lastRefreshAt = new Date().toISOString();
-        this.log(`[refresh] Reloading ${path.basename(this.filePath)} (${reason})`);
+        this.log(`[refresh] Reloading ${path.basename(this.filePath)} (${reason})`, 'debug');
         this.postLoadingStatus('raising frame', { reason, refreshToken });
         let refreshError = null;
         const timing = this.profiler.createTimingTracker({ reason, refreshToken });
@@ -837,7 +851,7 @@ class FrameViewSession {
 
             let reloadResult = null;
             if (this._slotIsFresh) {
-                this.log(`[refresh] Skipping reload_example for ${path.basename(this.filePath)} (slot freshly loaded during runner launch)`);
+                this.log(`[refresh] Skipping reload_example for ${path.basename(this.filePath)} (slot freshly loaded during runner launch)`, 'debug');
                 this._slotIsFresh = false;
                 reloadResult = { profiling: { reload_s: 0 } };
             } else {
@@ -962,7 +976,8 @@ class FrameViewSession {
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
             this.profiler.markTiming(timing, 'refresh.end', { refresh_total_ms: Math.round(refresh_total_s * 1000) });
             await pushCadqueryStatus(this);
-            this.log(`[refresh] Reload complete for ${path.basename(this.filePath)}`);
+            this.log(`[refresh] ${refreshSummary(path.basename(this.filePath), {
+                reason, totalS: refresh_total_s, timbers: totalTimbers, reloadResult, geometryData })}`);
         } catch (error) {
             refreshError = error;
             this.profiler.markTiming(timing, 'refresh.error', {
@@ -1019,7 +1034,7 @@ class FrameViewSession {
         if (options.outputPath) {
             fs.mkdirSync(path.dirname(options.outputPath), { recursive: true });
             fs.writeFileSync(options.outputPath, imageBuffer);
-            this.log(`[screenshot] Wrote ${options.outputPath}`);
+            this.log(`[screenshot] Wrote ${options.outputPath}`, 'debug');
         }
 
         return {
@@ -1390,7 +1405,7 @@ class FrameViewSession {
         }
         this._assemblyFetchGeneration = (this._assemblyFetchGeneration || 0) + 1;
         const generation = this._assemblyFetchGeneration;
-        this.log(`[assembly] Requesting background assembly solve for ${path.basename(this.filePath)}...`);
+        this.log(`[assembly] Requesting background assembly solve for ${path.basename(this.filePath)}...`, 'debug');
         const startMs = Date.now();
         this.runnerSession.slotRequest('get_assembly', this.slotName)
             .then(() => {
@@ -1403,7 +1418,7 @@ class FrameViewSession {
                 // would wipe out the "still solving" UI state almost
                 // instantly, well before the actual solve finishes.
                 const elapsedMs = Date.now() - startMs;
-                this.log(`[assembly] Background assembly solve request acknowledged in ${elapsedMs}ms (solving in background)`);
+                this.log(`[assembly] Background assembly solve request acknowledged in ${elapsedMs}ms (solving in background)`, 'debug');
             })
             .catch((err) => {
                 const elapsedMs = Date.now() - startMs;
@@ -1463,7 +1478,6 @@ class FrameViewSession {
             return;
         }
 
-        this.log(`[watcher] Auto-reloading due to ${source} change...`);
         try {
             await this.refresh(`${source} change`);
         } catch (error) {
@@ -1699,7 +1713,7 @@ class FrameViewSession {
             }
             const seconds = message.timing && message.timing.elapsedS;
             if (message.type === 'job_result') {
-                this.log(`[assembly] Received background assembly result (${seconds}s)`);
+                this.log(`[assembly] Solved the assembly in ${seconds}s`);
                 this._postToWebview({ type: 'assemblyData', payload: message.result ? message.result.assembly : null });
             } else if (message.type === 'job_failed') {
                 this.log(`[assembly] Background assembly solve failed: ${message.error && message.error.message}`, 'error');
@@ -1709,4 +1723,4 @@ class FrameViewSession {
     }
 }
 
-module.exports = { FrameViewSession, pythonLineLevel };
+module.exports = { FrameViewSession, pythonLineLevel, refreshSummary };

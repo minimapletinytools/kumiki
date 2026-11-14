@@ -195,9 +195,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             return mainSession.runnerSession.getPythonCommand();
         },
         getKumikiVersionInfo: async (workspaceRoot) => getWorkspaceKumikiVersionInfo(workspaceRoot, getActivePythonFilePath()),
-        logLine: (message) => {
-            outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
-        },
+        logLine: (message, level) => outputChannel.appendLine(message, level),
     });
 
     const sidebarController = new SidebarController(sidebarModel, {
