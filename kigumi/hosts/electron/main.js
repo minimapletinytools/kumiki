@@ -7,7 +7,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { app, net, protocol, Menu, dialog, safeStorage, shell: electronShell } = require('electron');
+const { app, net, protocol, Menu, dialog, nativeImage, safeStorage, shell: electronShell } = require('electron');
 const { setHost } = require('../../host');
 const { createKigumiApp } = require('../../kigumi-app');
 const { DEFAULT_FILES_EXCLUDE } = require('../../sidebar-files');
@@ -652,6 +652,38 @@ function recentFoldersMenu() {
     ];
 }
 
+// Where the About window and the Help menu point.
+const LINKS = Object.freeze({
+    website: 'https://kumiki.build',
+    docs: 'https://kumiki.build/docs/',
+    discord: 'https://discord.gg/cQhUG7WJ8',
+    discussions: 'https://github.com/minimapletinytools/kumiki/discussions',
+});
+
+/** About Kigumi: its version, what it runs on, its licence, and links to the website and the community. */
+async function showAbout() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const links = [['Website', LINKS.website], ['Discord', LINKS.discord], ['GitHub Discussions', LINKS.discussions]];
+    const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'none',
+        icon: nativeImage.createFromPath(path.join(KIGUMI_DIR, 'app-icon.png')),
+        title: 'About Kigumi',
+        message: `Kigumi ${packageJson.version}`,
+        detail: [
+            'The viewer and editor for kumiki, the Python library for timber framing and joinery.',
+            '',
+            `Electron ${process.versions.electron}, Chromium ${process.versions.chrome}, Node ${process.versions.node}`,
+            `${os.type()} ${os.release()} (${process.arch})`,
+            '',
+            '© 2026 minimaple. Kumiki and Kigumi are open source under the MPL-2.0.',
+        ].join('\n'),
+        buttons: ['OK', ...links.map(([label]) => label)],
+        defaultId: 0,
+        cancelId: 0,
+    });
+    if (response > 0) void electronShell.openExternal(links[response - 1][1]);
+}
+
 // The Keyboard Shortcuts tab (app-shell/keyboard-shortcuts.js), made once the window is; and whether
 // it is waiting for a new key, when the menus let keys through to it.
 let openKeyboardShortcuts = () => {};
@@ -708,7 +740,8 @@ function buildMenu() {
             // On macOS this is the app menu too, so Kigumi shows once.
             label: 'Kigumi',
             submenu: [
-                ...(isMac ? [{ role: 'about' }, { type: 'separator' }] : []),
+                { label: 'About Kigumi', click: () => void showAbout() },
+                { type: 'separator' },
                 command('Refresh Active Viewer', 'kigumi.render'),
                 command('Refresh Explorer', 'kigumi.refreshSidebar'),
                 {
