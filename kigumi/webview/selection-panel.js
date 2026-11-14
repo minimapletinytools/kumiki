@@ -232,6 +232,9 @@ export class SelectionPanel {
         const selectedSize = selectedKnownCount === 1
             ? this._describeMemberSize(this.app.memberMetadataByKey.get(selectedMembers[0]))
             : null;
+        const selectedKind = selectedKnownCount === 1
+            ? this._describeTimberKind(this.app.memberMetadataByKey.get(selectedMembers[0]))
+            : null;
 
         const focus = this.app.selectionManager.csgFocus;
         const detail = this.app.lastPickDetail;
@@ -277,6 +280,7 @@ export class SelectionPanel {
             canCopy: KigumiSelectionCopy.canCopy(selectedKnownCount, Boolean(focus && focus.featureLabel)),
             tags: selectedTags,
             size: selectedSize,
+            kind: selectedKind,
         });
     }
 
@@ -359,6 +363,18 @@ export class SelectionPanel {
             return null;
         }
         return `${width} x ${height} - ${lengthValue}`;
+    }
+
+    /** What kind of timber a member is ("round", "board", ...), or its class name for a kind
+     *  kumiki doesn't ship. Nothing for an accessory, or a runner too old to say. */
+    _describeTimberKind(metadata) {
+        const timberClass = metadata && metadata.type !== 'accessory' && metadata.mesh && metadata.mesh.timberClass;
+        if (!timberClass) {
+            return null;
+        }
+        const key = `viewer.selection.timberKind.${timberClass}`;
+        const said = this.t(key);
+        return said && said !== key ? said : timberClass;
     }
 
     _selectedTags(selectedMembers) {
@@ -475,6 +491,16 @@ export class SelectionPanel {
             size.textContent = summary.size;
             size.title = summary.size;
             body.appendChild(size);
+        }
+
+        if (summary.kind) {
+            const line = document.createElement('div');
+            line.className = 'ip-detail ip-timber-kind';
+            const label = document.createElement('span');
+            label.className = 'ip-detail-label';
+            label.textContent = this.t('viewer.selection.timberKind');
+            line.append(label, ` ${summary.kind}`);
+            body.appendChild(line);
         }
 
         // Measuring from what is focused. Present while a measurement is being
