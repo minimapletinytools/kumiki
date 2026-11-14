@@ -13,6 +13,7 @@ from kumiki.ticket import TimberTicket
 from typing import Dict, Any
 # TODO switch to warnings.deprecated when upgrading to Python 3.13
 from typing_extensions import deprecated
+from kumiki.user_warnings import warn_user
 
 
 # ============================================================================
@@ -174,7 +175,7 @@ def create_axis_aligned_timber(bottom_position: V3, length: Numeric, size: V2,
     
     if length_direction == TimberFace.BOTTOM:
         # print a warning, this is usually not what you want
-        warnings.warn("Creating an axis-aligned timber with length_direction == BOTTOM. This is usually not what you want. Consider using length_direction == TOP instead.")
+        warn_user("Creating an axis-aligned timber with length_direction == BOTTOM. This is usually not what you want. Consider using length_direction == TOP instead.")
     
     width_vec = width_direction.get_direction()
     
@@ -905,7 +906,7 @@ def attach_plane_aligned_timber(
         else:
             attached_timber_length = attached_timber_length_or_target
             if attached_timber_stickout.stickout2 != scalar(0) or attached_timber_stickout.stickoutReference2 != StickoutReference.CENTER_LINE:
-                warnings.warn("attached_timber_stickout.stickout2 is ignored when attached_timber_length_or_target is a numeric length; pass a target timber to use it")
+                warn_user("attached_timber_stickout.stickout2 is ignored when attached_timber_length_or_target is a numeric length; pass a target timber to use it")
 
         attached_total_length = attached_timber_length + opposite_length
         if not safe_compare(attached_total_length, scalar(0), Comparison.GT):
@@ -1107,10 +1108,10 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     if _are_directions_parallel(reference_direction, length_direction):
         # If parallel, cannot project - use a perpendicular fallback
         if orientation_width_vector is not None:
-            warnings.warn(f"orientation_width_vector {orientation_width_vector} is parallel to the joining direction {length_direction}. Using timber1's width direction instead.")
+            warn_user(f"orientation_width_vector {orientation_width_vector} is parallel to the joining direction {length_direction}. Using timber1's width direction instead.")
             reference_direction = timber1.get_width_direction_global()
         else:
-            warnings.warn("timber1's length direction is parallel to the joining direction. Using timber1's width direction instead.")
+            warn_user("timber1's length direction is parallel to the joining direction. Using timber1's width direction instead.")
             reference_direction = timber1.get_width_direction_global()
     
     # Project reference direction onto the plane perpendicular to the joining direction

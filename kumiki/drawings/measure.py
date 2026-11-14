@@ -6,7 +6,6 @@ JSON) are converted at the edge; see VectorLike. Viewports and Drawing are in dr
 """
 
 import math
-import warnings
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Dict, Mapping, Optional, Sequence, Tuple, Union
@@ -20,6 +19,7 @@ from ..rule import (Matrix, V3, are_vectors_parallel,
                    are_vectors_perpendicular, create_v3, cross_product,
                    safe_dot_product, safe_norm, safe_zero_test_sq)
 from .sheet_shape import SheetPoint, sheet_shape
+from kumiki.user_warnings import warn_user
 
 
 class MeasurementSpace(Enum):
@@ -113,7 +113,7 @@ class MeasurementKind:
         try:
             return cls.parse(str(value))
         except ValueError:
-            warnings.warn(f"Ignoring an unreadable measurement kind: {value!r}")
+            warn_user(f"Ignoring an unreadable measurement kind: {value!r}")
             return None
 
     @classmethod

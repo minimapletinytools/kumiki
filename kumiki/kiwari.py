@@ -37,7 +37,6 @@ which one a key is.
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from types import MappingProxyType
@@ -54,6 +53,7 @@ from .rule import (
     parse_length,
     scalar,
 )
+from kumiki.user_warnings import warn_user
 
 # Deliberately only three names. The declaration helpers hang off ``kiwari``
 # rather than standing on their own, because ``length`` is a local variable in
@@ -403,7 +403,7 @@ class Kiwari:
 
         stale = [key for key in arriving if key not in self.declarations]
         if stale:
-            warnings.warn(
+            warn_user(
                 f"{', '.join(sorted(stale))} {'is' if len(stale) == 1 else 'are'} no longer "
                 f"declared by this kiwari, so {'it was' if len(stale) == 1 else 'they were'} "
                 f"ignored. Declares: {', '.join(self.declarations) or 'nothing'}."

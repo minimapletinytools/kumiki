@@ -3,7 +3,6 @@ Kumiki - Lapped gooseneck joint (Koshikake Kama Tsugi) construction functions
 """
 
 from kumiki.construction import arrangement_error
-import warnings
 from typing import Optional
 
 from kumiki.timber import *
@@ -24,6 +23,7 @@ from ..shavings.shavings import (
     check_timber_overlap_for_splice_joint_is_sensible,
 )
 from ..shavings.relief import warn_if_arrangement_timbers_imperfect
+from kumiki.user_warnings import warn_user
 
 
 # TODO rename this half_lapped_japanese_splice_joints or osmething
@@ -100,7 +100,8 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
         gooseneck_timber, receiving_timber, gooseneck_timber_end, receiving_timber_end
     )
     if overlap_error:
-        warnings.warn(f"Gooseneck joint configuration may not be sensible: {overlap_error}")
+        warn_user(f"The gooseneck joint between {gooseneck_timber.ticket.path} and "
+                  f"{receiving_timber.ticket.path} may not be sensible: {overlap_error}", FrameWarning)
 
     gooseneck_direction_global = -receiving_timber.get_face_direction_global(receiving_timber_end)
     gooseneck_lateral_offset_direction_global = receiving_timber.get_face_direction_global(gooseneck_timber_face.rotate_right())
