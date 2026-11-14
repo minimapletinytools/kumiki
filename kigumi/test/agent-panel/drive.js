@@ -91,6 +91,14 @@ app.whenReady().then(async () => {
         await run(`document.querySelector('.mcp-setup-all').click()`);
         result.copyMcpAll = await posted('agent:copyMcpSetup', from);
         result.mcpNextAll = await run('document.querySelector(".mcp-next").textContent');
+        result.mcpNextAfterReopen = await run(`(() => {
+            const toggle = document.getElementById('settings-toggle');
+            const open = () => toggle.getAttribute('aria-expanded') === 'true';
+            if (!open()) toggle.click();
+            toggle.click();
+            toggle.click();
+            return { open: open(), noteShown: !document.querySelector('.mcp-next').hidden };
+        })()`);
 
         from = await count();
         await run(`(() => { window.confirm = () => true; document.getElementById('clear-conversations').click(); })()`);

@@ -71,6 +71,8 @@ export class Menus {
     showRow() {
         const open = this.rowOpen || !this.agentOn;
         this.settingsMenu.hidden = !open;
+        // What to do with a copied setup was for then: closing the settings puts it away.
+        if (!open) for (const next of this.mcpDetails.querySelectorAll('.mcp-next')) next.hidden = true;
         // With the agent off there is nothing to collapse to.
         this.settingsCollapse.hidden = !this.agentOn;
         this.settingsToggle.setAttribute('aria-expanded', String(open));

@@ -343,7 +343,6 @@ textarea::placeholder {
 .route-note {
     color: var(--ka-muted);
     font-size: 11px;
-    margin-top: 6px;
 }
 
 .route-note:empty {
@@ -654,11 +653,12 @@ body.agent-off #btn-clear {
     content: "⚠ ";
 }
 
+/* The menus, then who requests go as, then how full: on one line while they fit, else wrapped. */
 .footer-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    gap: 4px 8px;
     margin-top: 6px;
 }
 
@@ -687,6 +687,7 @@ body.agent-off #btn-clear {
     color: var(--ka-muted);
     font-size: 11px;
     white-space: nowrap;
+    margin-left: auto;
 }
 
 .context-meter.is-high {

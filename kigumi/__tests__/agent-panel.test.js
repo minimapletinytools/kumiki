@@ -52,6 +52,8 @@ const canRun = typeof electron === 'string' && fs.existsSync(electron) && (proce
         expect(result.mcpNext).toBeTruthy();
         expect(result.copyMcpAll).toEqual({ type: 'agent:copyMcpSetup', client: 'all' });
         expect(result.mcpNextAll).not.toBe(result.mcpNext);
+        // Closing the settings puts it away: open again, it is gone.
+        expect(result.mcpNextAfterReopen).toEqual({ open: true, noteShown: false });
         expect(result.clearConversations).toEqual({ type: 'agent:clearConversations' });
     });
 
