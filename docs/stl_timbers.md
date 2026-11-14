@@ -27,7 +27,9 @@ Move, Rotate, and Scale select a gizmo; numeric fields allow precise placement. 
 turn buttons rotate around the reference timber's axes. Scale handles follow the mesh's
 rotated axes and resize only that axis. Drag the center box to scale all three axes together. Right-drag orbits and the wheel zooms.
 **Fit to reference** resets rotation and uniformly fits and centers the mesh in the
-reference prism. **Reset** restores the placement present when the editor opened.
+reference prism. **Reset transform** clears translation and rotation and sets all scales to 1.
+**Restore saved placement** restores the placement present when the editor opened.
+Neither action writes to the source until **Update configuration**.
 
 ```python
 leg = create_stl_timber(reference, 'assets/leg.stl', placement={

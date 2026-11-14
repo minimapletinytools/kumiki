@@ -2,12 +2,27 @@
 
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Optional
+import heapq
+import math
+from typing import NamedTuple, Optional
 
 import numpy as np
 
 from .cutcsg import AxisAlignedBoundingBox, CutCSG, HasFeatures, face_plane_carriers
 from ..rule import Numeric, Transform, V3, create_v3
+
+
+class _BoundsCandidate(NamedTuple):
+    distance: float
+    index: int
+
+
+@dataclass(frozen=True)
+class _MeshBounds:
+    low: np.ndarray
+    high: np.ndarray
+    indices: Optional[np.ndarray] = None
+    children: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -33,12 +48,58 @@ class TriangleSolid(HasFeatures, CutCSG):
         ])
         return trimesh.Trimesh(vertices=vertices, faces=np.asarray(self.faces), process=False)
 
-    def _nearest(self, point: V3):
-        from trimesh.proximity import closest_point_naive
-        return closest_point_naive(self.mesh, [list(point)])
+    @cached_property
+    def _bounds_tree(self) -> tuple[_MeshBounds, ...]:
+        triangles = self.mesh.triangles
+        lows, highs = triangles.min(axis=1), triangles.max(axis=1)
+        centers = (lows + highs) / 2
+        nodes: list[_MeshBounds] = []
+
+        def build(indices):
+            low, high = lows[indices].min(axis=0), highs[indices].max(axis=0)
+            index = len(nodes)
+            nodes.append(_MeshBounds(low, high, indices))
+            if len(indices) > 32:
+                axis = int(np.argmax(high - low))
+                ordered = indices[np.argsort(centers[indices, axis])]
+                mid = len(ordered) // 2
+                children = (build(ordered[:mid]), build(ordered[mid:]))
+                nodes[index] = _MeshBounds(low, high, children=children)
+            return index
+
+        build(np.arange(len(triangles)))
+        return tuple(nodes)
+
+    def _nearest(self, point: V3, max_distance: Optional[float] = None) -> tuple[float, int]:
+        """Return distance and face index; index is -1 when no face lies within max_distance."""
+        from trimesh.triangles import closest_point
+        position = np.asarray(list(point), dtype=float)
+        best = math.inf if max_distance is None else max_distance ** 2
+        nearest = -1
+        pending = [_BoundsCandidate(0.0, 0)]
+        while pending:
+            distance, index = heapq.heappop(pending)
+            if distance > best:
+                continue
+            node = self._bounds_tree[index]
+            if node.indices is not None:
+                triangles = self.mesh.triangles[node.indices]
+                points = closest_point(triangles, np.broadcast_to(position, (len(triangles), 3)))
+                distances = np.sum((points - position) ** 2, axis=1)
+                candidate = int(np.argmin(distances))
+                if distances[candidate] <= best:
+                    best, nearest = float(distances[candidate]), int(node.indices[candidate])
+            else:
+                for child_index in node.children:
+                    child = self._bounds_tree[child_index]
+                    delta = np.maximum(np.maximum(child.low - position, position - child.high), 0)
+                    bound = float(delta @ delta)
+                    if bound <= best:
+                        heapq.heappush(pending, _BoundsCandidate(bound, child_index))
+        return math.sqrt(best), nearest
 
     def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        return bool(self._nearest(point)[1][0] <= (1e-8 if eps is None else float(eps)))
+        return self._nearest(point, 1e-8 if eps is None else float(eps))[1] >= 0
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         if self.is_point_on_boundary(point, eps):
@@ -52,10 +113,8 @@ class TriangleSolid(HasFeatures, CutCSG):
         return bool(abs(np.sum(2 * np.arctan2(numerator, denominator))) > 2 * np.pi)
 
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[V3]:
-        _, distance, index = self._nearest(point)
-        if distance[0] > (1e-8 if eps is None else float(eps)):
-            return None
-        return create_v3(*self.mesh.face_normals[index[0]])
+        _, index = self._nearest(point, 1e-8 if eps is None else float(eps))
+        return None if index < 0 else create_v3(*self.mesh.face_normals[index])
 
     def get_aabb(self) -> AxisAlignedBoundingBox:
         low, high = self.mesh.bounds

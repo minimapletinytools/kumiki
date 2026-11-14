@@ -18,7 +18,16 @@ module.exports = {
             await inShell(`${viewDoc}.querySelector('#layers-view .lp-row-timber').click()`);
             await sleep(200);
             check('selecting a placeholder stays in the ordinary viewer', await inShell(`!${viewDoc}.querySelector('kigumi-app').stlEditor`));
-            await inShell(`[...${viewDoc}.querySelectorAll('#info-panel button')].find(b => b.textContent === 'Edit STL placement').click()`);
+            const buttonPoint = await inShell(`(() => {
+                const button = [...${viewDoc}.querySelectorAll('#info-panel button')].find(b => b.textContent === 'Edit STL placement');
+                const rect = button.getBoundingClientRect();
+                const frame = document.querySelector('#slot-center iframe:not([hidden])').getBoundingClientRect();
+                return { x: Math.round(frame.left + rect.left + rect.width / 2), y: Math.round(frame.top + rect.top + rect.height / 2) };
+            })()`);
+            window().webContents.sendInputEvent({ type: 'mouseMove', ...buttonPoint });
+            await sleep(200);
+            window().webContents.sendInputEvent({ type: 'mouseDown', button: 'left', clickCount: 1, ...buttonPoint });
+            window().webContents.sendInputEvent({ type: 'mouseUp', button: 'left', clickCount: 1, ...buttonPoint });
             await waitFor(() => inShell(`!!${viewDoc}.querySelector('[data-stl-placement-editor] canvas')`));
             check('edit button enters isolated placement', await inShell(`${viewDoc}.querySelector('kigumi-app').stlEditor.suspended.every(([element]) => element.inert)`));
             await capture('stl-placement-editor');
@@ -50,7 +59,7 @@ module.exports = {
             await waitFor(() => inShell(`${viewDoc}.querySelector('kigumi-app').stlEditor.value.translation[0] !== 0`));
             check('translation gizmo responds to a pointer drag', true);
             for (const mode of ['Rotate', 'Scale', 'Uniform']) {
-                await inShell(`[...${viewDoc}.querySelectorAll('[data-stl-placement-editor] button')].find(b => b.textContent === 'Reset').click()`);
+                await inShell(`[...${viewDoc}.querySelectorAll('[data-stl-placement-editor] button')].find(b => b.textContent === 'Reset transform').click()`);
                 await inShell(`[...${viewDoc}.querySelectorAll('[data-stl-placement-editor] button')].find(b => b.textContent === '${mode === 'Uniform' ? 'Scale' : mode}').click()`);
                 const points = await inShell(`(() => {
                     const e = ${viewDoc}.querySelector('kigumi-app').stlEditor;
@@ -75,7 +84,7 @@ module.exports = {
                 if (mode === 'Uniform') { await sleep(100); await capture('stl-center-scale'); }
             }
 
-            await inShell(`[...${viewDoc}.querySelectorAll('[data-stl-placement-editor] button')].find(b => b.textContent === 'Reset').click()`);
+            await inShell(`[...${viewDoc}.querySelectorAll('[data-stl-placement-editor] button')].find(b => b.textContent === 'Reset transform').click()`);
             await inShell(`[...${viewDoc}.querySelectorAll('[data-stl-placement-editor] button')].find(b => b.textContent === 'Update configuration').click()`);
             await waitFor(() => fs.readFileSync(file, 'utf8').includes('placement='));
             await waitFor(() => inShell(`!${viewDoc}.querySelector('[data-stl-placement-editor]') && !${viewDoc}.querySelector('#layers-view .lp-row-timber')?.textContent.includes('(needs stl placement)')`));
@@ -84,6 +93,17 @@ module.exports = {
             await openFrame(path.join(REPO, 'patterns', 'structures', 'cabriole_table.py'));
             await waitFor(() => inShell(`${viewDoc}.querySelector('kigumi-app').memberMetadataByKey.size >= 6`));
             await capture('cabriole-table');
+            await inShell(`${viewDoc}.querySelector('#layers-view .lp-row-timber').click()`);
+            await inShell(`[...${viewDoc}.querySelectorAll('#info-panel button')].find(b => b.textContent === 'Edit STL placement').click()`);
+            await waitFor(() => inShell(`!!${viewDoc}.querySelector('[data-stl-placement-editor] canvas')`));
+            check('configured leg in a joined multi-frame example opens for editing', true);
+            await inShell(`[...${viewDoc}.querySelectorAll('[data-stl-placement-editor] button')].find(b => b.textContent === 'Reset transform').click()`);
+            check('reset clears a configured transform without saving', await inShell(`(() => {
+                const e = ${viewDoc}.querySelector('kigumi-app').stlEditor;
+                return e.value.translation.every(v => v === 0) && e.value.rotation.every(v => v === 0) && e.value.scale.every(v => v === 1);
+            })()`));
+            await inShell(`[...${viewDoc}.querySelectorAll('[data-stl-placement-editor] button')].find(b => b.textContent === 'Restore saved placement').click()`);
+            check('restore recovers the saved placement', await inShell(`${viewDoc}.querySelector('kigumi-app').stlEditor.value.rotation[2] === 180`));
         } finally { fs.rmSync(file, { force: true }); }
     },
 };

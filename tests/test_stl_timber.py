@@ -179,3 +179,49 @@ def test_mesh_end_cuts_trim_stock_without_extending_it(stl):
     mesh = triangulate_cutcsg(beyond.render_timber_with_cuts_csg_local()).mesh
     assert mesh.volume == pytest.approx(.006)
     assert mesh.bounds[1, 2] == pytest.approx(.3)
+
+
+def test_mesh_boundary_search_matches_full_triangle_search(monkeypatch):
+    mesh = trimesh.creation.icosphere(subdivisions=4)
+    solid = TriangleSolid(tuple(map(tuple, mesh.vertices)), tuple(map(tuple, mesh.faces)))
+    points = np.vstack([mesh.triangles_center[::257], [[0, 0, 0], [2, 3, 4]]])
+    expected = trimesh.proximity.closest_point_naive(mesh, points)[1]
+    for point, distance in zip(points, expected):
+        actual, index = solid._nearest(create_v3(*point))
+        assert actual == pytest.approx(distance, abs=1e-12)
+        assert index >= 0
+        assert solid.is_point_on_boundary(create_v3(*point)) == (distance <= 1e-8)
+
+    examined = 0
+    closest_point = trimesh.triangles.closest_point
+
+    def counted(triangles, points):
+        nonlocal examined
+        examined += len(triangles)
+        return closest_point(triangles, points)
+
+    monkeypatch.setattr(trimesh.triangles, 'closest_point', counted)
+    assert solid.is_point_on_boundary(create_v3(*mesh.triangles_center[100]))
+    assert examined < len(mesh.faces) // 10
+
+
+def test_curved_mesh_pick_highlight_uses_local_triangle_search(monkeypatch):
+    from kumiki.viewer.picking import extract_highlight_mesh
+    from kumiki.viewer.rule_at_home import LocalFrame
+
+    mesh = trimesh.creation.icosphere(subdivisions=3)
+    solid = TriangleSolid(tuple(map(tuple, mesh.vertices)), tuple(map(tuple, mesh.faces)))
+    examined = 0
+    closest_point = trimesh.triangles.closest_point
+
+    def counted(triangles, points):
+        nonlocal examined
+        examined += len(triangles)
+        return closest_point(triangles, points)
+
+    monkeypatch.setattr(trimesh.triangles, 'closest_point', counted)
+    _, _, matched, total = extract_highlight_mesh(
+        mesh.vertices.ravel().tolist(), mesh.faces.ravel().tolist(),
+        solid, LocalFrame.of(Transform.identity()))
+    assert matched == total == len(mesh.faces)
+    assert examined < total * total // 10

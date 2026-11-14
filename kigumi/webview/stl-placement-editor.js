@@ -60,6 +60,8 @@ export class STLPlacementEditor {
         this.text('p', 'STL placement · isolated mode');
         this.text('p', 'Only this STL can be edited. Right-drag to orbit; scroll to zoom. Escape cancels.');
         this.text('h3', 'Transform');
+        this.button('Reset transform', () => { this.value = placement(); this.update(); });
+        this.button('Restore saved placement', () => { this.value = placement(this.data.placement); this.update(); });
         const modes = this.text('div', 'Gizmo: ');
         this.modeButtons = [];
         for (const [name, label] of [['translation', 'Move'], ['rotation', 'Rotate'], ['scale', 'Scale']]) {
@@ -95,7 +97,6 @@ export class STLPlacementEditor {
                 -(box.min.x + box.max.x) * factor / 2,
                 -(box.min.y + box.max.y) * factor / 2, -box.min.z * factor] }); this.update();
         });
-        this.button('Reset', () => { this.value = placement(this.data.placement); this.update(); });
         this.text('hr', '');
         this.saveButton = this.button('Update configuration', () => {
             this.saveButton.disabled = true; this.status.textContent = 'Updating source…';
