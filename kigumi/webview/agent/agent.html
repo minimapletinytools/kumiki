@@ -77,19 +77,25 @@
                 <div class="agent-welcome" id="welcome">
                     <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
                     <p class="welcome-body" data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
-                    <!-- The browser version's ways to run the agent, shown signed in or out (main.js, ?host=web). -->
+                    <!-- The browser version's notice (main.js, ?host=web). -->
                     <div class="web-agent-notice">
                         <div class="web-agent-warning" role="note">
                             <p class="web-agent-warning-title" data-i18n="agent.web.warningTitle">Important</p>
                             <p data-i18n="agent.web.warning" data-i18n-link="agent.web.appLink" data-href="https://kumiki.build/install">The web agent is just for trying out Kumiki with low overhead. You'll get much better results with your own agent and with the <a href="https://kumiki.build/install" target="_blank" rel="noopener noreferrer">standalone app</a>.</p>
+                            <p class="web-agent-promo" data-i18n="agent.web.promo">You will get $1 in free promo tokens and there is no way to buy more.</p>
                         </div>
-                        <p class="web-agent-notice-lead" data-i18n="agent.web.signIn">Sign in to get $1 in promo tokens. You can also connect your own agent to the MCP (above).</p>
+                    </div>
+                    <!-- Up to the settings, where the MCP server is turned on (shown where there is one: body.has-mcp). -->
+                    <p class="welcome-pointer welcome-mcp"><span class="codicon codicon-arrow-up"></span> <span data-i18n="agent.welcome.mcp">Enable the MCP to connect your own agent</span></p>
+                    <!-- The browser version, signed out: down to the ways to sign in. -->
+                    <div class="web-agent-sign-in-block">
+                        <p class="welcome-pointer"><span data-i18n="agent.web.signIn">Sign in to use the agent</span> <span class="codicon codicon-arrow-down"></span></p>
                         <span class="web-agent-sign-in">
                             <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
                             <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
                         </span>
                     </div>
-                    <!-- Shown instead of the suggestions until the agent has a way to send requests (status.js). -->
+                    <!-- Shown instead of the examples until the agent has a way to send requests (status.js). -->
                     <div class="welcome-sign-in">
                         <p class="welcome-sign-in-needed" data-i18n="agent.welcome.signIn">Please sign in to use the agent.</p>
                         <p class="welcome-sign-in-buttons">
@@ -98,10 +104,13 @@
                         </p>
                         <p class="welcome-set-key" data-i18n="agent.welcome.setKey">Please add an OpenRouter key in the agent's settings to use the agent.</p>
                     </div>
+                    <!-- Once it can send: one prompt to try, two to show what can be asked (they need a frame of yours), then down to the box. -->
                     <div class="suggestions">
-                        <button class="suggestion-chip" data-i18n="agent.suggest.mudsills">Create 4 mudsills on the inside of a 10'x8' footprint</button>
-                        <button class="suggestion-chip" data-i18n="agent.suggest.posts">Adjust the size of all posts to be 5"x6"</button>
-                        <button class="suggestion-chip" data-i18n="agent.suggest.drawings">Generate drawings for my frame</button>
+                        <p class="welcome-pointer" data-i18n="agent.welcome.examples">Some example prompts</p>
+                        <button class="suggestion-chip is-try"><span class="suggestion-text" data-i18n="agent.suggest.mudsills">Create 4 mudsills on the inside of a 10'x8' footprint</span> <span class="try-me" data-i18n="agent.welcome.tryMe">try me</span></button>
+                        <div class="suggestion-example" data-i18n="agent.suggest.posts">Adjust the size of all posts to be 5"x6"</div>
+                        <div class="suggestion-example" data-i18n="agent.suggest.drawings">Generate drawings for my frame</div>
+                        <p class="welcome-pointer welcome-write"><span data-i18n="agent.welcome.writeOwn">Write your own prompt</span> <span class="codicon codicon-arrow-down"></span></p>
                     </div>
                 </div>
             </div>

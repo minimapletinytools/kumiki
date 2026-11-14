@@ -59,8 +59,10 @@ $('btn-clear').addEventListener('click', () => {
 if (new URLSearchParams(location.search).get('host') === 'web') document.body.classList.add('host-web');
 
 $('messages').addEventListener('click', (event) => {
-    if (event.target.classList.contains('sign-in-chip')) post({ type: 'agent:signIn', provider: event.target.dataset.provider });
-    else if (event.target.classList.contains('suggestion-chip')) composer.send(event.target.textContent);
+    const chip = event.target.closest('.suggestion-chip');
+    if (!chip) return;
+    if (chip.classList.contains('sign-in-chip')) post({ type: 'agent:signIn', provider: chip.dataset.provider });
+    else composer.send(chip.querySelector('.suggestion-text').textContent);
 });
 
 // A reopened conversation: drawn again from what the panel showed.
@@ -85,6 +87,8 @@ const HANDLERS = {
     },
     'agent:mcp': (message) => {
         mcpState = message.state || null;
+        // Where there is an MCP server, the welcome points up to it.
+        document.body.classList.toggle('has-mcp', Boolean(mcpState));
         menus.showMcp(mcpState, { signedIn });
     },
     'agent:busy': (message) => {

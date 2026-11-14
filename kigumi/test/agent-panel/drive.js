@@ -53,7 +53,15 @@ app.whenReady().then(async () => {
         result.ready = Boolean(await posted('agent:ready'));
         await send(STATE);
 
+        // Read before trying it: sending clears the welcome.
+        result.triedShown = await run(`document.querySelector('.suggestion-chip.is-try .suggestion-text').textContent`);
+        result.examples = await run(`[...document.querySelectorAll('.suggestion-example')].map((one) => one.tagName)`);
         let from = await count();
+        await run(`document.querySelector('.suggestion-chip.is-try').click()`);
+        result.tried = await posted('agent:prompt', from);
+        await send({ type: 'agent:replay', events: [] });
+
+        from = await count();
         await run(`(() => {
             const input = document.getElementById('prompt-input');
             input.value = 'make it taller';
@@ -81,6 +89,7 @@ app.whenReady().then(async () => {
         result.setModel = await posted('agent:setModel', from);
 
         await send(MCP);
+        result.mcpPointer = await run(`document.body.classList.contains('has-mcp')`);
         from = await count();
         await run(`document.querySelector('.mcp-setup[data-client="claude-code"]').click()`);
         result.mcpShown = await run('document.getElementById("mcp-details").textContent');

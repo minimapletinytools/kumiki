@@ -72,6 +72,13 @@ const canRun = typeof electron === 'string' && fs.existsSync(electron) && (proce
         expect(result.unansweredLeft).toBe(0);
     });
 
+    test('of the example prompts only the first is sent, without its "try me"; the welcome points up to the MCP', () => {
+        expect(result.tried).toMatchObject({ type: 'agent:prompt', text: result.triedShown });
+        expect(result.tried.text).not.toMatch(/try me/);
+        expect(result.examples).toEqual(['DIV', 'DIV']);
+        expect(result.mcpPointer).toBe(true);
+    });
+
     test("a tool call says what it is doing, not the tool's name", () => {
         expect(result.toolSaid).toBe('Building sawhorse.py to check it');
     });

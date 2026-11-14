@@ -128,6 +128,52 @@ body {
     border-color: var(--ka-focus);
 }
 
+/* The welcome's arrows: up to the settings, down to signing in, down to the box. */
+.welcome-pointer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin: 14px 0 6px;
+    color: var(--ka-fg);
+    font-weight: 600;
+}
+.welcome-mcp {
+    display: none;
+}
+body.has-mcp .welcome-mcp {
+    display: flex;
+}
+.suggestions .welcome-pointer:first-child {
+    margin-top: 0;
+}
+
+/* The one prompt to try, marked so; the others are shown, not sent: they need a frame of yours. */
+.suggestion-chip.is-try {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border-color: var(--ka-accent);
+}
+.try-me {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: var(--ka-accent);
+    color: var(--ka-accent-fg);
+    font-size: 10px;
+    font-weight: 600;
+}
+.suggestion-example {
+    border: 1px dashed var(--ka-border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    text-align: left;
+    font-size: 12px;
+    color: var(--ka-muted);
+}
+
 .message-bubble {
     padding: 8px 12px;
     border-radius: 8px;
@@ -1188,23 +1234,23 @@ body.host-web .welcome-sign-in {
     font-weight: 700;
     color: var(--ka-warning);
 }
-.web-agent-notice-lead {
-    margin: 0 0 6px;
+.web-agent-warning .web-agent-promo {
+    margin-top: 6px;
 }
 body.host-web .welcome-body {
     display: none;
 }
-.web-agent-sign-in {
+/* The browser version, signed out: the way in. */
+.web-agent-sign-in-block {
+    display: none;
+}
+body.host-web:not(.signed-in) .web-agent-sign-in-block {
     display: block;
-    margin-top: 4px;
 }
 .web-agent-sign-in .sign-in-chip {
     display: inline-block;
     width: auto;
-    margin-right: 4px;
-}
-body.signed-in .web-agent-sign-in {
-    display: none;
+    margin: 0 4px;
 }
 .web-agent-notice a,
 .agent-error a {
