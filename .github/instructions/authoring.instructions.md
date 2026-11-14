@@ -113,6 +113,15 @@ Joints involve creating CSG cuts on one or more timbers. A typical joint impleme
 8. If the joint is at the end of any one of the timbers, set `maybe_top/bottom_end_cut_distance_from_bottom` for that timber to allow the proper rough end cuts to be generated
 9. Return a joint object containing the cuts
 
+## Coding practices for Authoring Geometry
+
+We have our own inhouse CSG representation. Follow these best practices.
+
+1. keep code simple and avoid adding features we don't yet need
+2. We MUST support coincident features. Develop comprehensive solutions to address the issue this raises.
+3. AVOID pixel pushing (adding small offsets) to address Z fighting and other issues, always solve such problems at the underlying level
+5. AVOID ad-hoc fixes to issues in general. Always look for comprehensive solutions
+
 ### Joint Style Guide
 
 Function naming rules:

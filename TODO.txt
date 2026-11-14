@@ -324,28 +324,28 @@ DONE-add to default context file/project currentyl in focus etc, so its more cle
 DONE-add basic joint patterns
 DONE-please folder the basic butt joint stuffp roperyl if there are multiple variants, ege mortise_and_tenon/... cuzi t's conufisg that there is both a folder and a pattern named basic_morties_and_tenon
 DONE-remove the basic_ prefix from all teh basic pattern,s for decorative cuts, add the decorative_ prefix to it so we know it's ad ecorative cut
+DONE-update double spline joint to include mini tenons
+DONE-angled corner lap joint doesn't have end cuts
+DONE/IGNORE-investigate adding to app store
 
 -triangulation is producing edge artifacts on basic_splice_lap_joint pattern and basic_dropin_dovetali_butt_joint_pattern. there's al ine across the shoulder line smh
 
-
+-create hotkey config page?
+-from source view tehre should be a button easily preview your source in the viewer, or a hotkeey!
 
 
 -see if you can make use of ButtJointCSGParts
--update double spline joint to include mini tenons
-
--angled corner lap joint doesn't have end cuts
-
-
 -test agent created drawings
 -agent benchmarking examples
 -consider doing multiple agent sessions...
 
--investigate adding to app store
+
+
 
 -add report crash feature?
--add give feedback button?
--create hotkey config page?
--from source view tehre should be a button easily preview your source in the viewer, or a hotkeey!
+-add give feedbac/report issue button?
+
+
 
 -application nav changes  
   -add more info to about page, link to website, dsicord and discussion
