@@ -1224,6 +1224,29 @@
       "sha256": "0e706214ae723038caf3b823a28eda8a5f53a2802091ececba25da6f9a978329",
       "warnings": []
     },
+    "patterns/structures/cabriole_table.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "cabriole_placement",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 26,
+          "name": "cabriole_table"
+        },
+        {
+          "kind": "function",
+          "lineno": 43,
+          "name": "cabriole_placement"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_cabriole_table",
+      "multiple_frames": true,
+      "patternbook": null,
+      "relative_path": "structures/cabriole_table.py",
+      "sha256": "4d546835dc9a5c7d3caffe3aa5e77947ab029d187f935d07fd6bd4bc25235203",
+      "warnings": []
+    },
     "patterns/structures/coffee_table.py": {
       "chosen_frame_kind": "function",
       "chosen_frame_name": "coffee_table",
@@ -1438,7 +1461,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-13T18:40:18.378388+00:00",
+  "generated_at": "2026-11-14T04:21:34.645437+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

@@ -1,4 +1,6 @@
 import { LitElement, html } from 'lit';
+import { STLPlacementEditor } from './stl-placement-editor.js';
+import { STL_PLACEMENT_STYLE } from './viewer-shared.js';
 import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
@@ -53,6 +55,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.sceneStore = new SceneStore();
         // Before the viewports: the selection is kept in one of them.
         this.selectionManager = new SelectionStore();
+        this.stlEditor = null;
+        this.stlRequestSequence = 0;
+        this.stlRequestId = null;
         this.viewports = [];
         this.activeViewportId = null;
         // Built here rather than in setupScene: a viewport is cameras and data,
@@ -406,6 +411,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     }
 
     disconnectedCallback() {
+        this.closeSTLPlacement();
         super.disconnectedCallback();
         window.removeEventListener('message', this.onWindowMessage);
         window.removeEventListener('scroll', this.onWindowScroll);
@@ -1371,9 +1377,42 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         vscode.postMessage({ type: 'requestRefresh', kiwari: values });
     }
 
+    sendSTLPlacement(message) {
+        if (message.type === 'copySTLPlacement') { vscode.postMessage(message); return; }
+        this.stlRequestId = `stl-${++this.stlRequestSequence}`;
+        vscode.postMessage({ ...message, requestId: this.stlRequestId });
+    }
+
+    startSTLPlacement(memberKey) {
+        if (this.stlEditor || this.stlRequestId) return;
+        this.sendSTLPlacement({ type: 'requestSTLPlacement', memberKey });
+    }
+
+    closeSTLPlacement() {
+        this.stlRequestId = null;
+        this.stlEditor?.dispose();
+        this.stlEditor = null;
+    }
+
     onWindowMessage(event) {
         const message = event.data || {};
+        if (message.type === 'stlPlacementResult') {
+            if (message.requestId !== this.stlRequestId) return;
+            this.stlRequestId = null;
+            if (message.error) {
+                if (this.stlEditor) this.stlEditor.failed(message.error);
+                return;
+            }
+            if (message.updated) { this.closeSTLPlacement(); return; }
+            this._endAllPointerGestures();
+            this._setShiftHeld(false);
+            this.stlEditor = new STLPlacementEditor({ parent: this.renderRoot, data: message.result,
+                style: STL_PLACEMENT_STYLE, background: this.style.background, material: this.renderProfileMaterialSpecs(this.resolveRenderProfile(this.resolveRenderProfileIdForMemberType('timber'))).solid, send: request => this.sendSTLPlacement(request),
+                close: () => this.closeSTLPlacement() });
+            return;
+        }
         if (message.type === 'viewerState') {
+            if (Object.prototype.hasOwnProperty.call(message, 'frame') || Object.prototype.hasOwnProperty.call(message, 'geometry')) this.closeSTLPlacement();
             const uiState = this.normalizeUiState(message.uiState || null);
             if (message.viewerSettings && typeof message.viewerSettings === 'object') {
                 this.applyPersistedViewerSettings(message.viewerSettings);
@@ -1927,6 +1966,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     }
 
     onWindowKeyUp(event) {
+        if (this.stlEditor) return;
         if (event.key === 'Shift') {
             this._setShiftHeld(false);
         }
@@ -1938,6 +1978,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     }
 
     onWindowKeyDown(event) {
+        if (this.stlEditor) return;
         if (event.key === 'Shift') {
             this._setShiftHeld(true);
         }
@@ -2531,7 +2572,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             geometry.computeBoundingSphere();
             indexedGeometry.dispose();
 
-            const materialSet = this.createMaterialSetForMemberType(memberType);
+            const materialSet = this.createMaterialSetForMemberType(memberType, mesh.stlPlacement?.needed);
 
             const solidMesh = new THREE.Mesh(geometry, materialSet.solid);
             // EdgesGeometry gives a flat, non-indexed position array (every

@@ -29,6 +29,7 @@ from .cutcsg import (
     SolidUnion,
 )
 from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
+from .meshcsg import TriangleSolid
 from ..rule import Matrix, Numeric, Transform, V2, V3
 
 
@@ -184,6 +185,8 @@ def raw_raycast_all(target: MeshableTarget, origin: V3, direction: V3) -> list[R
 
 
 def _triangulate_with_label(csg: CutCSG, label: str) -> TriangleMesh:
+    if isinstance(csg, TriangleSolid):
+        return TriangleMesh(mesh=csg.mesh.copy())
     if isinstance(csg, EmptyCSG):
         mesh = trimesh.Trimesh(vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64))
         return TriangleMesh(mesh=mesh, face_sources=tuple())

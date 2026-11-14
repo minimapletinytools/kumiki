@@ -78,3 +78,6 @@ except ModuleNotFoundError as exc:
     if exc.name != "trimesh":
         raise
 
+
+from .stl import STLTimber, STLPlacement, create_stl_timber
+from .csg.meshcsg import TriangleSolid

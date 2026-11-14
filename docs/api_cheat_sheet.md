@@ -54,6 +54,9 @@ create_timber(length: Numeric, size: V2, bottom_position: V3,
 - `length_direction` and `width_direction` are `TimberFace`s naming world directions: `TOP` is +Z, `RIGHT` +X, `FRONT` +Y.
 - `ticket` is the timber's name (a string), or a `TimberTicket(path, material=None, reference_features=(), tags=())`.
 
+For imported stock, use `create_stl_timber(reference, stl_path, *, units='mm', placement=None)`.
+Omit placement for an editable placeholder; see [STL timbers](stl_timbers.md).
+
 ## Joints
 
 ### Arrangements
@@ -175,6 +178,7 @@ purpose, a short concept list, and implementation details. Public examples live 
 
 | Example | Good reference for | Kiwari controls |
 |---|---|---|
+| [Cabriole table and STL placement](../patterns/structures/cabriole_table.py) | Furniture with four imported cabriole legs; separate placeholder for interactive STL alignment | None; source dimensions and STL placement |
 | [Starter frame](../patterns/structures/my_cute_frame.py) | Simple four-member frame; face-aligned and axis-oriented construction; pegged tenons | None; source dimensions |
 | [Simple sawhorse](../patterns/structures/horsey_example.py) | Small furniture; orthogonal feet, posts, stretcher, and top beam | None; source dimensions |
 | [Double-sawhorse workbench](../patterns/structures/doublesawhorseworkbench.py) | Furniture; through/stopped tenons; cross-lapped stretcher and tool tray | None; source dimensions |
