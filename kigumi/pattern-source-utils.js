@@ -87,6 +87,32 @@ async function viewShippedPatternSource(sourceFile, workspaceRoot) {
 }
 
 /**
+ * The 1-based line a pattern is declared on in `filePath`, or null. A pattern's path is written
+ * out where it is declared (@pattern("corner_joints/plain_miter_joint")), so that is looked for
+ * first; then its last segment as a string; then a function of that name.
+ * @param {string} filePath
+ * @param {string} patternPath - e.g. "corner_joints/plain_miter_joint"
+ * @returns {Promise<number|null>}
+ */
+async function findPatternLine(filePath, patternPath) {
+    if (!patternPath) return null;
+    let lines;
+    try {
+        lines = (await fs.promises.readFile(filePath, 'utf-8')).split('\n');
+    } catch (_error) {
+        return null;
+    }
+    const name = patternPath.split('/').pop();
+    const quoted = (text) => (line) => line.includes(`"${text}"`) || line.includes(`'${text}'`);
+    const defined = new RegExp(`^\\s*(async\\s+)?def\\s+${name.replace(/[^\w]/g, '')}\\s*\\(`);
+    for (const test of [quoted(patternPath), quoted(name), (line) => defined.test(line)]) {
+        const index = lines.findIndex(test);
+        if (index !== -1) return index + 1;
+    }
+    return null;
+}
+
+/**
  * Extracts patterns from a patternbook file.
  * For now, we group patterns by patternbook name.
  * @param {Array} patterns - Array of pattern items
@@ -109,6 +135,7 @@ function groupPatternsByPatternbook(patterns) {
 }
 
 module.exports = {
+    findPatternLine,
     duplicatePatternToWorkspace,
     duplicateFrameToWorkspace,
     viewShippedPatternSource,

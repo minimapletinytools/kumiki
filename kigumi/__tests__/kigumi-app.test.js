@@ -24,6 +24,7 @@ function fakeHost(overrides = {}) {
     watchFiles: () => ({ dispose() {} }),
     activeFile: () => null,
     showFile: jest.fn(async () => {}),
+    openFileAt: jest.fn(async () => {}),
     showSourceBesideViewer: jest.fn(async () => {}),
     openExternal: jest.fn(async () => {}),
     pickOne: jest.fn(async () => undefined),
@@ -90,6 +91,35 @@ test('a workspace pattern source opens directly', async () => {
   expect(host.showFile).toHaveBeenCalledWith(source);
   await app.dispose();
   fs.rmSync(workspace, { recursive: true, force: true });
+});
+
+test("a pattern's source opens at its declaration, and so does its duplicate", async () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-app-test-'));
+  const library = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-app-lib-'));
+  const book = 'from kumiki import *\n\n@pattern("corner/miter")\ndef miter(c):\n    pass\n';
+  const mine = path.join(workspace, 'book.py');
+  const shipped = path.join(library, 'joints.py');
+  fs.writeFileSync(mine, book);
+  fs.writeFileSync(shipped, book);
+  const host = fakeHost({ workspaceRoots: () => [workspace] });
+  const app = newApp(host);
+
+  await app.commands['kigumi.viewPatternSource']({ type: 'patternItem', data: { sourceFile: mine, patternName: 'corner/miter' } });
+  expect(host.openFileAt).toHaveBeenLastCalledWith(mine, 3);
+
+  // A shipped pattern opens as a read-only copy, with a header above it.
+  await app.commands['kigumi.viewPatternSource']({ type: 'patternItem', data: { sourceFile: shipped, patternName: 'corner/miter' } });
+  expect(host.openFileAt).toHaveBeenLastCalledWith(path.join(workspace, 'patterns', 'joints.py'), 6);
+
+  await app.commands['kigumi.duplicatePatternToWorkspace']({
+    type: 'patternItem', data: { sourceFile: shipped, patternName: 'corner/miter', sectionKey: 'shipped-patterns' },
+  });
+  expect(host.openFileAt).toHaveBeenLastCalledWith(path.join(workspace, 'patterns', 'joints_1.py'), 3);
+  expect(host.showFile).not.toHaveBeenCalled();
+
+  await app.dispose();
+  fs.rmSync(workspace, { recursive: true, force: true });
+  fs.rmSync(library, { recursive: true, force: true });
 });
 
 test('duplicating is refused for a workspace pattern', async () => {

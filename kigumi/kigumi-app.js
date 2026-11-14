@@ -28,11 +28,20 @@ const {
 } = require('./project-initializer');
 const { configureToolchain, UV_VERSION } = require('./python-toolchain');
 const { getHost } = require('./host');
+const { findPatternLine } = require('./pattern-source-utils');
 const { createTranslator } = require('./i18n');
 
 const KUMIKI_WEBSITE = 'https://github.com/minimapletinytools/kumiki';
 
 const t = (key, params) => createTranslator(getHost().locale)(key, params);
+
+/** Opens `filePath` at the sidebar pattern's declaration, or at the top for anything else. */
+async function showPatternSource(filePath, element) {
+    const patternName = element && element.data && element.data.patternName;
+    const line = patternName ? await findPatternLine(filePath, patternName) : null;
+    if (line) await getHost().openFileAt(filePath, line);
+    else await getHost().showFile(filePath);
+}
 
 function _extractSourcePathFromSidebarElement(element) {
     if (!element || !element.data) {
@@ -517,10 +526,10 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             try {
                 const { viewShippedPatternSource } = require('./pattern-source-utils');
                 if (sourcePath.startsWith(workspaceRoot)) {
-                    await host.showFile(sourcePath);
+                    await showPatternSource(sourcePath, selectedElement);
                 } else {
                     // Library files open as a read-only copy in the workspace.
-                    await host.showFile(await viewShippedPatternSource(sourcePath, workspaceRoot));
+                    await showPatternSource(await viewShippedPatternSource(sourcePath, workspaceRoot), selectedElement);
                     host.showMessage('info', t('message.openedReadOnlyPatternCopy'));
                 }
             } catch (error) {
@@ -549,7 +558,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                 const { duplicatePatternToWorkspace, duplicateFrameToWorkspace } = require('./pattern-source-utils');
                 const frame = _isLibraryFrameElement(selectedElement);
                 const newPath = await (frame ? duplicateFrameToWorkspace : duplicatePatternToWorkspace)(sourcePath, workspaceRoot);
-                await host.showFile(newPath);
+                await showPatternSource(newPath, selectedElement);
                 host.showMessage('info', t(frame ? 'message.frameDuplicatedTo' : 'message.patternDuplicatedTo',
                     { path: path.relative(workspaceRoot, newPath) }));
                 await sidebarModel.refresh(true);
