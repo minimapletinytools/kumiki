@@ -859,6 +859,16 @@ def log_stderr(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
+def log_warning(message: str) -> None:
+    """A warning in the view's log: the "[warn] " tag gives the line its level there."""
+    log_stderr(f"[warn] {message}")
+
+
+def log_error(message: str) -> None:
+    """An error in the view's log, which fails an agent's build report."""
+    log_stderr(f"[error] {message}")
+
+
 # Serializes protocol writes from the main loop and job threads, so lines don't interleave.
 _stdout_lock = threading.Lock()
 # Where protocol messages go. main() keeps the real stdout here and sends sys.stdout to stderr,
@@ -1091,7 +1101,7 @@ def _cut_length(cut_timber: 'CutTimber') -> Optional[float]:
             return None
         return round(float(prism.end_distance - prism.start_distance), 6)
     except Exception as exc:
-        log_stderr(f"Warning: could not measure cut length: {exc}")
+        log_warning(f"could not measure cut length: {exc}")
         return None
 
 
@@ -1156,8 +1166,8 @@ def _cut_timber_to_triangle_mesh_payload(
             payload["perfectTimberWithinIndices"] = perfect["indices"]
             payload["hasActualGeometryDifferentFromPerfect"] = True
         except Exception as exc:  # noqa: BLE001 — best-effort optional payload
-            log_stderr(
-                f"Warning: failed to build perfect-AABB mesh for "
+            log_warning(
+                f"failed to build perfect-AABB mesh for "
                 f"{get_timber_display_name(timber)}: {exc}"
             )
             payload["hasActualGeometryDifferentFromPerfect"] = False
@@ -1172,8 +1182,8 @@ def _cut_timber_to_triangle_mesh_payload(
         payload["perfectBoxNoJointsVertices"] = perfect_box_mesh["vertices"]
         payload["perfectBoxNoJointsIndices"] = perfect_box_mesh["indices"]
     except Exception as exc:  # noqa: BLE001 — best-effort optional payload
-        log_stderr(
-            f"Warning: failed to build perfect-box-no-joints mesh for "
+        log_warning(
+            f"failed to build perfect-box-no-joints mesh for "
             f"{get_timber_display_name(timber)}: {exc}"
         )
 
@@ -1182,8 +1192,8 @@ def _cut_timber_to_triangle_mesh_payload(
         payload["roughBoxNoJointsVertices"] = rough_box_mesh["vertices"]
         payload["roughBoxNoJointsIndices"] = rough_box_mesh["indices"]
     except Exception as exc:  # noqa: BLE001 — best-effort optional payload
-        log_stderr(
-            f"Warning: failed to build rough-box-no-joints mesh for "
+        log_warning(
+            f"failed to build rough-box-no-joints mesh for "
             f"{get_timber_display_name(timber)}: {exc}"
         )
 
@@ -1377,17 +1387,17 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
 
                     meshes.append(mesh_payload)
                     seen_keys.add(timber_key)
-                    log_stderr(
-                        "Warning: triangulation produced empty/invalid mesh; "
+                    log_warning(
+                        "triangulation produced empty/invalid mesh; "
                         f"rendered fallback bounding prism for {get_timber_display_name(cut_timber.timber)}"
                     )
                     continue
                 except Exception as fallback_exc:
-                    log_stderr(
-                        f"Warning: fallback geometry failed for {get_timber_display_name(cut_timber.timber)}: {fallback_exc}"
+                    log_warning(
+                        f"fallback geometry failed for {get_timber_display_name(cut_timber.timber)}: {fallback_exc}"
                     )
 
-            log_stderr(f"Warning: skipping geometry for {get_timber_display_name(cut_timber.timber)}: {exc}")
+            log_error(f"skipping geometry for {get_timber_display_name(cut_timber.timber)}: {exc}")
 
     accessories = list(frame.accessories) if hasattr(frame, "accessories") and frame.accessories else []
     for accessory in accessories:
@@ -1427,7 +1437,7 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
             meshes.append(mesh_payload)
             seen_keys.add(accessory_key)
         except Exception as exc:
-            log_stderr(f"Warning: skipping geometry for accessory {type(accessory).__name__}: {exc}")
+            log_warning(f"skipping geometry for accessory {type(accessory).__name__}: {exc}")
 
     removed_keys: List[str] = []
     for cached_key in list(ss.mesh_cache.keys()):
@@ -1449,7 +1459,7 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
                 "corners": corners,
             })
         except Exception as exc:
-            log_stderr(f"Warning: skipping footprint {index}: {exc}")
+            log_warning(f"skipping footprint {index}: {exc}")
 
     return {
         "kind": "triangle-geometry",
@@ -1576,7 +1586,7 @@ def _serialize_timber_tags(ticket: Optional['Ticket']) -> List[TagWire]:
         else:
             kind = next((wire for cls, wire in kinds if isinstance(tag, cls)), "")
             if not kind:
-                log_stderr(f"Warning: skipping tag of unknown kind {type(tag).__name__}")
+                log_warning(f"skipping tag of unknown kind {type(tag).__name__}")
                 continue
             name = getattr(tag, "name", "")
         if not isinstance(name, str):
@@ -2155,7 +2165,7 @@ def _placement_wire(placement: 'MeasurementPlacement') -> PlacementWire:
 def _serialize_code_measure(measure: Any, frame: 'Frame') -> Optional[MeasureWire]:
     anchors = measure.wire_anchors(frame)
     if anchors is None:
-        log_stderr("Warning: a measurement's feature is not in this frame, so it is left out.")
+        log_warning("a measurement's feature is not in this frame, so it is left out.")
         return None
     first, second, placement = anchors
     plane = getattr(measure, "plane", None)
@@ -2188,8 +2198,8 @@ def merge_measurements(
     for measure in file_measures:
         identity = _measure_identity(measure)
         if identity in from_file and not _duplicate_warning_given:
-            log_stderr(
-                "Warning: two measurements share an identity; the later one wins. "
+            log_warning(
+                "two measurements share an identity; the later one wins. "
                 "Give one of them a measureId to tell them apart."
             )
             _duplicate_warning_given = True
@@ -2272,7 +2282,7 @@ def _read_drawings_file(path: Path) -> List[DrawingWire]:
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        log_stderr(f"Warning: could not read {path}: {exc}")
+        log_warning(f"could not read {path}: {exc}")
         return []
     if not isinstance(loaded, dict):
         return []
@@ -2566,8 +2576,8 @@ def collect_drawings(
             # rather than dropped, and shown as what it is, so it can be pointed
             # somewhere else or deleted on purpose.
             scene["dangling"] = True
-            log_stderr(
-                f"Warning: drawing {scene['id']!r} overrides {target!r}, "
+            log_warning(
+                f"drawing {scene['id']!r} overrides {target!r}, "
                 "which the frame no longer declares."
             )
         scene["origin"] = ORIGIN_FILE
@@ -2674,8 +2684,8 @@ def _unplaceable_measurement(
         reason, why = "no-span", (
             f"end {' and '.join(missing)} has no extent -- the timber's CSG did "
             f"not render, or a face would not crop")
-    log_stderr(
-        f"Warning: not drawing the measurement between "
+    log_warning(
+        f"not drawing the measurement between "
         f"{_measure_end_name(measure, 'a')} and {_measure_end_name(measure, 'b')}: "
         f"{why}.")
     settled = unplaceable(has_plane=plane is not None)
@@ -2729,8 +2739,8 @@ def _attach_measurements(
         viewport: measures for viewport, measures in remaining.items() if measures
     }
     for viewport in unplaceable:
-        log_stderr(
-            f"Warning: drawing {drawing_name!r} has measurements for viewport "
+        log_warning(
+            f"drawing {drawing_name!r} has measurements for viewport "
             f"{viewport!r}, which it does not have. They are kept but not shown."
         )
     scene["unplaceableMeasurements"] = unplaceable
@@ -3266,7 +3276,7 @@ def _build_assembly_payload(
     try:
         solution = solve_frame_assembly(frame, should_cancel=should_cancel)
     except Exception as exc:  # noqa: BLE001 — assembly must never break the layers tree
-        log_stderr(f"[assembly] solve failed: {exc}")
+        log_error(f"[assembly] solve failed: {exc}")
         return {
             "steps": [],
             "warnings": [],
@@ -3515,7 +3525,7 @@ def _module_patterns(module: ModuleType) -> List[Any]:
         return []
     patterns, rejected = decorators.module_patterns(module)
     for entry in rejected:
-        log_stderr(f"Warning: @{entry.kind} {entry.name} is not used: {entry.reason}")
+        log_warning(f"@{entry.kind} {entry.name} is not used: {entry.reason}")
     return patterns
 
 
@@ -3567,9 +3577,8 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> ModuleType:
             log_stderr("[reload] No project module changed since it was imported; keeping them")
     else:
         if verbose:
-            log_stderr("[reload] WARNING: _project_root is None — project module purge skipped!")
-            log_stderr(f"[reload]   sys.argv = {sys.argv}")
-            log_stderr("[reload]   Module changes to kumiki/ will NOT be picked up until runner restarts.")
+            log_warning(f"[reload] no project root (sys.argv={sys.argv}), so changed project "
+                        "modules are not re-imported until the runner restarts")
 
     # Step 3: Ensure target module doesn't exist in sys.modules
     module_name = _module_name_for_path(file_path)
@@ -3687,7 +3696,7 @@ def _read_parameters_file(
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        log_stderr(f"[parameters] Ignoring {path.name}: {exc}")
+        log_warning(f"[parameters] ignoring {path.name}: {exc}")
         return [], None
     if not isinstance(data, dict):
         return [], path
@@ -3849,13 +3858,13 @@ def resolve_frame_from_module(
     pattern_list = _module_patterns(module)
     if pattern_list:
         if entries is not None and entries.frames:
-            log_stderr("Warning: this file has @pattern functions, so it is a pattern book and its "
-                       f"@frame functions are not shown: {', '.join(e.name for e in entries.frames)}")
+            log_warning("this file has @pattern functions, so it is a pattern book and its "
+                        f"@frame functions are not shown: {', '.join(e.name for e in entries.frames)}")
         frame, patternbook = _frame_from_pattern_list(pattern_list)
         return frame, patternbook, (), ()
 
     for rejected in (entries.rejected if entries is not None else ()):
-        log_stderr(f"Warning: @{rejected.kind} {rejected.name} is not used: {rejected.reason}")
+        log_warning(f"@{rejected.kind} {rejected.name} is not used: {rejected.reason}")
     if decorators is not None and entries is not None and entries.frames:
         built = {entry.name: _build_frame_entry(entry.function, entry.name, incoming.get(entry.name))
                  for entry in entries.frames}
@@ -3900,8 +3909,8 @@ def resolve_frame_from_module(
 
 
 def _warn_legacy_entry(name: str) -> None:
-    log_stderr(f"Warning: picking up the frame by the name '{name}' is deprecated and will be removed. "
-               f"Mark it with @frame instead: @frame def {name}(k: Kiwari) -> Frame")
+    log_warning(f"picking up the frame by the name '{name}' is deprecated and will be removed. "
+                f"Mark it with @frame instead: @frame def {name}(k: Kiwari) -> Frame")
 
 
 def _incoming_from_groups(
@@ -4963,7 +4972,7 @@ def _list_available_patterns(force_rescan: bool = False) -> PatternListWire:
             if patterns_list:
                 sources.append({"source": "shipped", "folder": str(shipped_patterns_dir), "patterns": patterns_list})
     except Exception as exc:
-        log_stderr(f"[patterns] Error scanning shipped patterns: {exc}")
+        log_error(f"[patterns] could not scan the shipped patterns: {exc}")
 
     # Local project patterns
     if _project_root is not None:
@@ -4976,7 +4985,7 @@ def _list_available_patterns(force_rescan: bool = False) -> PatternListWire:
                 if patterns_list:
                     sources.append({"source": "local", "folder": str(local_patterns_dir), "patterns": patterns_list})
             except Exception as exc:
-                log_stderr(f"[patterns] Error scanning local patterns: {exc}")
+                log_error(f"[patterns] could not scan the project's patterns: {exc}")
 
     scan_s = time.monotonic() - t0
     total_patterns = sum(len(s["patterns"]) for s in sources)
@@ -5693,7 +5702,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> Tuple[RunnerS
                 try:
                     candidate.unlink()
                 except OSError as exc:
-                    log_stderr(f"Warning: failed to remove individual export '{candidate}': {exc}")
+                    log_warning(f"failed to remove individual export '{candidate}': {exc}")
 
             combined_path = output_dir / combined_name
             written = [combined_path] if combined_path.exists() else []

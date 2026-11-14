@@ -55,7 +55,7 @@ async function exportFrame(session, format, includeCombined = true, includeIndiv
     } catch (error) {
         const details = extractRunnerErrorDetails(error);
         const formatLabel = normalizedFormat.toUpperCase();
-        session.log(`[export] ${formatLabel} export failed: ${details.message}`);
+        session.log(`[export] ${formatLabel} export failed: ${details.message}`, 'error');
 
         const openOutputAction = t('message.action.openKigumiOutput');
         const installHint = normalizedFormat === 'step' && details.message.includes('cadquery-ocp')
@@ -138,7 +138,7 @@ async function exportMember(session, message) {
     // buttons plus whichever member was right-clicked), so a malformed message here
     // indicates a webview bug, not a user mistake -- log rather than prompt.
     if (!memberKey || (format !== 'stl' && format !== 'step')) {
-        session.log(`[export] requestExportMember ignored malformed message: ${JSON.stringify(message)}`);
+        session.log(`[export] requestExportMember ignored malformed message: ${JSON.stringify(message)}`, 'warn');
         return;
     }
 
@@ -164,7 +164,7 @@ async function exportMember(session, message) {
         return { format, memberKey, writtenFiles, outputDir };
     } catch (error) {
         const details = extractRunnerErrorDetails(error);
-        session.log(`[export] ${formatLabel} export of '${memberKey}' failed: ${details.message}`);
+        session.log(`[export] ${formatLabel} export of '${memberKey}' failed: ${details.message}`, 'error');
 
         const openOutputAction = t('message.action.openKigumiOutput');
         const installHint = format === 'step' && details.message.includes('cadquery-ocp')
@@ -192,7 +192,7 @@ async function pushCadqueryStatus(session) {
     try {
         installed = await session.runnerSession.isCadqueryOcpInstalled();
     } catch (error) {
-        session.log(`[export] Failed to detect cadquery-ocp: ${error.message || error}`);
+        session.log(`[export] Failed to detect cadquery-ocp: ${error.message || error}`, 'warn');
     }
 
     session.panel.postMessage({
@@ -201,7 +201,7 @@ async function pushCadqueryStatus(session) {
             cadqueryOcpInstalled: installed,
         },
     }).catch((error) => {
-        session.log(`[webview] Failed to post dependency status: ${error.message || error}`);
+        session.log(`[webview] Failed to post dependency status: ${error.message || error}`, 'warn');
     });
 }
 
@@ -227,7 +227,7 @@ async function installCadqueryOcp(session) {
         void getHost().showMessage('info', t('message.cadqueryInstalled'));
     } catch (error) {
         const details = extractRunnerErrorDetails(error);
-        session.log(`[export] cadquery-ocp install failed: ${details.message}`);
+        session.log(`[export] cadquery-ocp install failed: ${details.message}`, 'error');
         const openOutputAction = t('message.action.openKigumiOutput');
         const choice = await getHost().showMessage(
             'error',
@@ -253,7 +253,7 @@ function postCadqueryInstallStatus(session, isInstalling) {
             installingCadqueryOcp: Boolean(isInstalling),
         },
     }).catch((error) => {
-        session.log(`[webview] Failed to post dependency install status: ${error.message || error}`);
+        session.log(`[webview] Failed to post dependency install status: ${error.message || error}`, 'warn');
     });
 }
 

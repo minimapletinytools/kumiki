@@ -112,7 +112,7 @@ class SidebarController {
             options: sidebarOptions(getHost()),
             groupByPatternbook: this.model.getGroupByPatternbook(),
             isScanning: this.model.state.isScanning,
-        }).catch((error) => this.log(`[sidebar] post failed: ${error.message || error}`));
+        }).catch((error) => this.log(`[sidebar] post failed: ${error.message || error}`, 'error'));
     }
 
     /**
@@ -123,7 +123,7 @@ class SidebarController {
         const known = keys.filter((key) => this._nodes.has(key));
         if (known.length > 0 && this.surface) {
             this.surface.postMessage({ type: 'sidebarReveal', keys: known })
-                .catch((error) => this.log(`[sidebar] reveal failed: ${error.message || error}`));
+                .catch((error) => this.log(`[sidebar] reveal failed: ${error.message || error}`, 'error'));
         }
         return known;
     }
@@ -156,7 +156,7 @@ class SidebarController {
                 }
             }
         } catch (error) {
-            this.log(`[sidebar] ${message.type} failed: ${error.message || error}`);
+            this.log(`[sidebar] ${message.type} failed: ${error.message || error}`, 'error');
         }
     }
 
