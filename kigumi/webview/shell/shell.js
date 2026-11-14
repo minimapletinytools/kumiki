@@ -9,7 +9,8 @@
     const core = window.kigumiShell;
     const $ = (id) => document.getElementById(id);
     const isMac = navigator.platform.toUpperCase().includes('MAC');
-    const SIDE_LIMITS = { left: [180, 600], right: [240, 800], bottom: [80, 800] };
+    // The right side's least width is the agent panel's (agent.css, .agent-panel).
+    const SIDE_LIMITS = { left: [180, 600], right: [280, 800], bottom: [80, 800] };
 
     let state = { panels: [], activeId: null };
     const frames = new Map(); // panel id -> { iframe, url, loaded, queue }
@@ -318,25 +319,41 @@
         }
     }
 
+    // The drag in progress, if any: ends it. While one is in progress the panels take no clicks
+    // (.is-resizing), so every way a drag can end has to end it.
+    let endDrag = null;
+
     function setupSplitter(side) {
         const splitter = $(`splitter-${side}`);
         splitter.addEventListener('pointerdown', (event) => {
+            if (endDrag) endDrag();
             splitter.setPointerCapture(event.pointerId);
             splitter.classList.add('is-dragging');
             $('shell').classList.add('is-resizing');
-            const move = (moveEvent) => setSideWidth(side, {
-                left: () => moveEvent.clientX,
-                right: () => window.innerWidth - moveEvent.clientX,
-                bottom: () => document.querySelector('.main').getBoundingClientRect().bottom - moveEvent.clientY,
-            }[side]());
-            const up = () => {
+            const move = (moveEvent) => {
+                // The button came up somewhere this never heard about.
+                if (moveEvent.buttons === 0) return end();
+                setSideWidth(side, {
+                    left: () => moveEvent.clientX,
+                    right: () => window.innerWidth - moveEvent.clientX,
+                    bottom: () => document.querySelector('.main').getBoundingClientRect().bottom - moveEvent.clientY,
+                }[side]());
+            };
+            const ends = ['pointerup', 'pointercancel', 'lostpointercapture'];
+            const end = () => {
+                endDrag = null;
                 splitter.classList.remove('is-dragging');
                 $('shell').classList.remove('is-resizing');
                 splitter.removeEventListener('pointermove', move);
-                splitter.removeEventListener('pointerup', up);
+                for (const name of ends) splitter.removeEventListener(name, end);
+                window.removeEventListener('blur', end);
+                if (splitter.hasPointerCapture(event.pointerId)) splitter.releasePointerCapture(event.pointerId);
             };
+            endDrag = end;
             splitter.addEventListener('pointermove', move);
-            splitter.addEventListener('pointerup', up);
+            for (const name of ends) splitter.addEventListener(name, end);
+            // Switching away mid-drag: the release goes to another window.
+            window.addEventListener('blur', end);
         });
         let saved = null;
         try {

@@ -3,7 +3,9 @@ body {
     margin: 0;
     padding: 0;
     height: 100%;
-    overflow: hidden;
+    overflow-y: hidden;
+    /* Sideways only below the panel's least width (.agent-panel), which the shell keeps it above. */
+    overflow-x: auto;
     background: var(--ka-bg);
     color: var(--ka-fg);
     font-family: var(--ka-font);
@@ -14,6 +16,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-width: 280px;
 }
 
 .agent-header {
@@ -78,9 +81,12 @@ body {
     display: none;
 }
 
+/* Long paths and words wrap rather than widen the conversation; code and diffs scroll in their own box. */
 .agent-messages {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
+    overflow-wrap: anywhere;
     padding: 12px;
     display: flex;
     flex-direction: column;
@@ -317,9 +323,13 @@ textarea::placeholder {
     display: flex;
     align-items: center;
     gap: 4px;
+    min-width: 0;
 }
 
+/* Gives way to the buttons beside it when the panel is narrow. */
 .model-select {
+    min-width: 60px;
+    flex: 0 1 auto;
     background: var(--ka-bg);
     color: var(--ka-fg);
     border: 1px solid var(--ka-border);
@@ -940,6 +950,7 @@ body.agent-off #btn-clear {
 .todos {
     margin-bottom: 6px;
     font-size: 12px;
+    overflow-wrap: anywhere;
     border: 1px solid var(--ka-border);
     border-radius: 6px;
     padding: 4px 8px;

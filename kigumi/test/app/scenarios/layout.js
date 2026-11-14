@@ -18,6 +18,41 @@ module.exports = {
         const agentFrame = await waitFor(() => inShell(`!!document.querySelector('#slot-right:not([hidden]) iframe')`), { timeoutMs: 10000 })
             .then(() => true, () => false);
         check('clicking toggle-right opens the agent sidebar', agentFrame && connection().findPanel((p) => p.type === 'agent') !== undefined);
+
+        // A drag of the divider ends however the button comes up: elsewhere, with the capture lost,
+        // or with the window left. Stuck, the panels took no clicks (.is-resizing) and the app seemed broken.
+        const dragEnds = await inShell(`(async () => {
+            const splitter = document.getElementById('splitter-right');
+            const shell = document.getElementById('shell');
+            const box = splitter.getBoundingClientRect();
+            const at = { bubbles: true, pointerId: 1, clientX: box.left + 2, clientY: box.top + 50 };
+            const out = {};
+            for (const [name, finish] of [
+                ['capture lost', () => splitter.dispatchEvent(new PointerEvent('lostpointercapture', at))],
+                ['moved with no button', () => splitter.dispatchEvent(new PointerEvent('pointermove', { ...at, buttons: 0 }))],
+                ['window left', () => window.dispatchEvent(new Event('blur'))],
+                ['released', () => splitter.dispatchEvent(new PointerEvent('pointerup', at))],
+            ]) {
+                splitter.dispatchEvent(new PointerEvent('pointerdown', { ...at, buttons: 1 }));
+                const during = shell.classList.contains('is-resizing');
+                finish();
+                out[name] = during && !shell.classList.contains('is-resizing') && !splitter.classList.contains('is-dragging');
+            }
+            return out;
+        })()`);
+        check('a divider drag ends however the button comes up, so the panels take clicks again',
+            Object.values(dragEnds).every(Boolean), JSON.stringify(dragEnds));
+        const narrowest = await inShell(`(() => {
+            document.documentElement.style.setProperty('--right-width', '100px');
+            const splitter = document.getElementById('splitter-right');
+            const box = splitter.getBoundingClientRect();
+            const at = { bubbles: true, pointerId: 1, clientY: box.top + 50 };
+            splitter.dispatchEvent(new PointerEvent('pointerdown', { ...at, clientX: box.left, buttons: 1 }));
+            splitter.dispatchEvent(new PointerEvent('pointermove', { ...at, clientX: window.innerWidth - 50, buttons: 1 }));
+            splitter.dispatchEvent(new PointerEvent('pointerup', at));
+            return document.querySelector('#slot-right').getBoundingClientRect().width;
+        })()`);
+        check("the agent side can't be dragged narrower than the agent panel's least width", narrowest >= 279, String(narrowest));
         await inShell(`document.querySelector('#toggle-right').click()`);
         check('clicking toggle-right again hides the agent and keeps it',
             await slot('right', false) && connection().findPanel((p) => p.type === 'agent') !== undefined);
