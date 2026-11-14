@@ -133,7 +133,26 @@ export const CameraMixin = (Base) => class extends Base {
         if (this.activePage) {
             return;
         }
-        const bounds = this.getSelectionBounds();
+        this._focusBounds(this.getSelectionBounds());
+    }
+
+    /** Frame one member, as focusSelection frames what is selected. */
+    focusMember(memberKey) {
+        if (this.activePage) {
+            return;
+        }
+        const bundle = this.sceneManager.get(memberKey);
+        if (!bundle || !bundle.mesh || !bundle.mesh.geometry) {
+            return;
+        }
+        const acc = createBoundsAccumulator();
+        accumulateBounds(acc, bundle.mesh.geometry.getAttribute('position').array);
+        if (acc.hasAny) {
+            this._focusBounds(boundsFromAccumulator(acc));
+        }
+    }
+
+    _focusBounds(bounds) {
         this.lastBounds = bounds;
         this.focusedCx = (bounds.minX + bounds.maxX) / 2;
         this.focusedCy = (bounds.minY + bounds.maxY) / 2;

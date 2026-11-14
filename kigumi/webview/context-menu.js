@@ -35,7 +35,8 @@ class ContextMenu {
     /**
      * Offer a menu at a point.
      *
-     * `items` are { id, label, disabled?, checked? }. `onChoose` is called
+     * `items` are { id, label, disabled?, checked? }, or { id, heading: true, label } and
+     * { id, divider: true }, which are shown and never chosen. `onChoose` is called
      * with the id of whatever is picked, and the menu closes either way --
      * a menu that stays open after a choice is one nobody dismissed.
      *
@@ -84,7 +85,7 @@ class ContextMenu {
             return false;
         }
         const item = this._open.items.find((one) => one.id === id);
-        if (!item || item.disabled) {
+        if (!item || item.disabled || item.heading || item.divider) {
             return false;
         }
         const { onChoose } = this._open;

@@ -32,13 +32,23 @@
     color: var(--hv-title);
 }
 
-.context-menu-hint {
+/* A heading over the rows it names ("export Post A"), never chosen. */
+.context-menu-heading {
     color: var(--hv-dim);
-    font: 10px 'Segoe UI', sans-serif;
+    font: 11px 'Segoe UI', sans-serif;
     padding: 6px 8px 2px;
-    border-top: 1px solid var(--hv-panel-border);
-    margin-top: 4px;
     white-space: nowrap;
+}
+.context-menu-divider {
+    border-top: 1px solid var(--hv-panel-border);
+    margin: 4px 0;
+}
+.context-menu-item.context-menu-indent {
+    padding-left: 18px;
+}
+/* A timber's name, as it was written. */
+.context-menu-item.context-menu-keep-case {
+    text-transform: none;
 }
 
 .context-menu-note {

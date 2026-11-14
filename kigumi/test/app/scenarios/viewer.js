@@ -69,6 +69,58 @@ module.exports = {
         await inShell(`${viewDoc}.querySelector('kigumi-app').selectMembers([], false)`);
         check('a selected timber shows its type in the selection panel', kind === 'type rectangular', JSON.stringify(kind));
 
+        // A right click on a timber in the view: focus on it, the features lit under the pointer, export it.
+        const rightClick = await inShell(`(async () => {
+            const doc = ${viewDoc};
+            const app = doc.querySelector('kigumi-app');
+            const canvas = app.renderRoot.querySelector('#c');
+            const box = canvas.getBoundingClientRect();
+            let at = null;
+            for (let fy = 0.3; fy <= 0.7 && !at; fy += 0.05) {
+                for (let fx = 0.3; fx <= 0.7 && !at; fx += 0.05) {
+                    const x = box.left + box.width * fx, y = box.top + box.height * fy;
+                    const hit = app._findMemberAtClientPoint(x, y);
+                    if (hit) at = { x, y, key: hit.memberKey };
+                }
+            }
+            if (!at) return { error: 'no timber under the canvas middle' };
+            // Features light on a timber that is selected, as a first click selects it.
+            app.selectMembers([at.key], false);
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            const pointer = { bubbles: true, clientX: at.x, clientY: at.y };
+            canvas.dispatchEvent(new doc.defaultView.PointerEvent('pointermove', pointer));
+            for (let i = 0; i < 40 && !(app._hover && app._hover.drawn); i += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+            canvas.dispatchEvent(new doc.defaultView.MouseEvent('mousedown', { ...pointer, button: 2 }));
+            doc.defaultView.dispatchEvent(new doc.defaultView.MouseEvent('mouseup', { ...pointer, button: 2 }));
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            const menu = doc.querySelector('#member-context-menu');
+            return {
+                rows: menu ? Array.from(menu.children).map((row) => row.className.includes('divider') ? '---'
+                    : (row.className.includes('heading') ? '# ' : '') + row.textContent.trim()) : [],
+            };
+        })()`);
+        await capture('02e-timber-menu');
+        const rows = rightClick.rows || [];
+        const exportAt = rows.findIndex((row) => row.startsWith('# export '));
+        await inShell(`${viewDoc}.querySelector('kigumi-app').selectMembers([], false)`);
+        check('a right click on a timber offers to focus on it, the features under the pointer, then export',
+            /^focus camera on \S/.test(rows[0] || '') && rows[1] && rows[1].startsWith('# features here')
+                && rows[exportAt - 1] === '---' && rows[exportAt + 1] === 'stl' && rows[exportAt + 2] === 'step'
+                && !rows.includes('copy for ai'),
+            JSON.stringify(rightClick));
+        const focused = await inShell(`(async () => {
+            const app = ${viewDoc}.querySelector('kigumi-app');
+            const before = app.cameraController.orbitDist;
+            const row = ${viewDoc}.querySelector('#member-context-menu .context-menu-item');
+            if (row) row.click();
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            return { before, after: app.cameraController.orbitDist, open: Boolean(${viewDoc}.querySelector('#member-context-menu')) };
+        })()`);
+        check('choosing "focus camera on" frames that timber and closes the menu',
+            focused.after < focused.before && !focused.open, JSON.stringify(focused));
+
         // A right click on a row of the layers tree offers to copy it for an assistant, not the
         // browser's cut/copy/paste.
         clipboard.writeText('');

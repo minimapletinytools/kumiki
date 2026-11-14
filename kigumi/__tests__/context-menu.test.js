@@ -178,3 +178,19 @@ describe('what chose', () => {
         expect(seen).toEqual([null]);
     });
 });
+
+describe('a heading or a divider', () => {
+    test('is shown but cannot be chosen, and the menu stays open', () => {
+        const menu = new ContextMenu();
+        const chosen = [];
+        menu.open({ x: 0, y: 0, items: [
+            { id: 'export', heading: true, label: 'export Post A' }, ...items, { id: 'divider', divider: true },
+        ], onChoose: (id) => chosen.push(id) });
+
+        expect(menu.choose('export')).toBe(false);
+        expect(menu.choose('divider')).toBe(false);
+        expect(menu.isOpen).toBe(true);
+        expect(menu.state.items.map((item) => item.id)).toEqual(['export', 'stl', 'step', 'divider']);
+        expect(chosen).toEqual([]);
+    });
+});

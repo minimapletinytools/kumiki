@@ -1920,16 +1920,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             && mouseDownTarget === canvas
             && !mouseActionMoved
         ) {
-            // While a feature is under the pointer, the useful question is
-            // which feature you meant -- the same choice Tab steps through,
-            // said out loud, since a face seen edge-on is never the best answer
-            // where it lies and there is no reason to expect it is on offer.
-            // Exporting the member is the answer when there is no such choice.
-            if (!this.showFeatureContextMenu(event.clientX, event.clientY)) {
-                const found = this._findMemberAtClientPoint(event.clientX, event.clientY);
-                if (found) {
-                    this.showMemberContextMenu(found.memberKey, event.clientX, event.clientY);
-                }
+            // The timber's menu, listing the features under the pointer too.
+            const found = this._findMemberAtClientPoint(event.clientX, event.clientY);
+            if (found) {
+                this.showMemberContextMenu(found.memberKey, event.clientX, event.clientY, { features: true });
             }
         }
     }

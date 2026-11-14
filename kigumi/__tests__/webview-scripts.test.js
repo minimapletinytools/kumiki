@@ -507,11 +507,9 @@ describe('a pointer gesture owns its listeners', () => {
 describe('the feature menu holds the hover still', () => {
     const app = viewerSource();
 
-    test('opening the menu pins, and a menu that did not open does not', () => {
-        const body = methodBody(app, 'showFeatureContextMenu');
-
-        expect(body).toMatch(/if \(!this\._hover\.pin\(\)\) \{\s*return false;/);
-        expect(body).toContain('this._hover.unpin()');
+    test('listing the features pins, and a menu that did not open does not', () => {
+        expect(methodBody(app, '_featureMenuRows')).toMatch(/!this\._hover\.pin\(\)\) \{\s*return \[\];/);
+        expect(methodBody(app, 'showMemberContextMenu')).toMatch(/if \(!opened && this\._hover\) \{\s*this\._hover\.unpin\(\);/);
     });
 
     test('closing it unpins, whether or not anything was open', () => {
@@ -555,7 +553,7 @@ describe('the feature menu holds the hover still', () => {
     test('which row is marked is derived, not stored on the items', () => {
         // Stored, it would be a second opinion about which feature is lit, and
         // Tab moves it without the pointer moving.
-        const body = methodBody(app, 'showFeatureContextMenu');
+        const body = methodBody(app, '_featureMenuRows');
 
         expect(body).not.toMatch(/checked:/);
         expect(methodBody(app, '_featureMenuActiveId')).toContain('drawn.candidateIndex');

@@ -7,33 +7,63 @@
 import { html } from 'lit';
 import { t, vscode } from './viewer-shared.js';
 
+/** The id of a feature row starts with this, then its candidate's index. */
+const FEATURE_ROW = 'feature:';
+
 export const MenusMixin = (Base) => class extends Base {
     onMemberContextMenuRequest(event) {
         const detail = event && event.detail;
         if (!detail || typeof detail.memberKey !== 'string') {
             return;
         }
-        this.showMemberContextMenu(detail.memberKey, detail.clientX, detail.clientY);
+        // A row of the layers tree or member list: copying it for an assistant is on offer there.
+        this.showMemberContextMenu(detail.memberKey, detail.clientX, detail.clientY, { copy: true });
     }
 
-    showMemberContextMenu(memberKey, clientX, clientY) {
+    /**
+     * A timber's menu: focus the camera on it, the features under the pointer (`features`, from a
+     * right click in the view), then export it. `copy` adds the copy-for-AI rows.
+     */
+    showMemberContextMenu(memberKey, clientX, clientY, { features = false, copy = false } = {}) {
         if (!memberKey) {
-            return;
+            return false;
         }
         const meta = this.memberMetadataByKey.get(memberKey);
+        const name = (meta && meta.name) || memberKey;
         const item = { kind: 'member', member: this.selectionPanel.memberForCopy(memberKey) };
-        this.contextMenu.open({
+        const featureRows = features ? this._featureMenuRows() : [];
+        const opened = this.contextMenu.open({
             x: clientX,
             y: clientY,
-            title: (meta && meta.name) || memberKey,
+            kind: 'member',
             items: [
-                ...this._copyMenuItems(),
-                { id: 'stl', label: t('viewer.contextMenu.exportStl') },
-                { id: 'step', label: t('viewer.contextMenu.exportStep') },
+                { id: 'focus', label: t('viewer.contextMenu.focusOn', { name }), keepCase: true },
+                ...(featureRows.length > 0 ? [{
+                    id: 'features',
+                    heading: true,
+                    label: t(featureRows.length > 1 ? 'viewer.contextMenu.featuresTabToCycle' : 'viewer.contextMenu.features'),
+                }, ...featureRows] : []),
+                ...(copy ? this._copyMenuItems() : []),
+                { id: 'divider', divider: true },
+                { id: 'export', heading: true, label: t('viewer.contextMenu.exportNamed', { name }) },
+                { id: 'stl', label: 'stl', indent: true },
+                { id: 'step', label: 'step', indent: true },
             ],
-            onChoose: (id) => (this._copyFromMenu(id, item) || this.exportMember(memberKey, id)),
+            onChoose: (id, _row, event) => {
+                if (id === 'focus') {
+                    this.focusMember(memberKey);
+                } else if (id.startsWith(FEATURE_ROW)) {
+                    this._takeFeatureFromMenu(id, event);
+                } else if (!this._copyFromMenu(id, item)) {
+                    this.exportMember(memberKey, id);
+                }
+            },
         });
+        if (!opened && this._hover) {
+            this._hover.unpin();
+        }
         this.requestUpdate();
+        return opened;
     }
 
     onLayerContextMenuRequest(event) {
@@ -89,58 +119,40 @@ export const MenusMixin = (Base) => class extends Base {
     }
 
     /**
-     * Offer the features under the pointer, by name.
+     * The features under the pointer, by name, as rows of a timber's menu: none when there are none.
      *
      * The same choice Tab steps through, said out loud. Tab is quicker once you
      * know what is there; this is how you find out -- a face seen edge-on is
      * never the best answer where it lies, so without being told it is on offer
      * there is no reason to expect it.
      */
-    showFeatureContextMenu(clientX, clientY) {
+    _featureMenuRows() {
         const hovered = this._hover && this._hover.feature;
         const candidates = (hovered && hovered.candidates) || [];
-        if (candidates.length < 2) {
-            // One feature under the pointer is not a choice.
-            return false;
-        }
         // Held where it is for as long as the menu is up. Reaching a row means
         // moving the pointer off the canvas, which would otherwise clear the
         // hover and forget the cycled choice -- so the menu would be naming
         // features of something that was no longer there, which is exactly what
-        // it did: every row did nothing at all.
-        if (!this._hover.pin()) {
-            return false;
+        // it did: every row did nothing at all. Unpinned by closeMemberContextMenu.
+        if (candidates.length === 0 || !this._hover.pin()) {
+            return [];
         }
-        const opened = this.contextMenu.open({
-            x: clientX,
-            y: clientY,
-            kind: 'feature',
-            title: t('viewer.contextMenu.features'),
-            // No `checked`: which row is current is not a fact to copy in here
-            // and then keep up to date. It is derived at render time from the
-            // answer on screen, so the row marked and the feature lit cannot
-            // come to disagree. See _featureMenuActiveId.
-            items: candidates.map((candidate, index) => ({
-                id: String(index),
-                label: candidate.label,
-                // Under the pointer but not seen there: listed, so you know it is there, not taken.
-                disabled: Boolean(candidate.hidden),
-                // Where it is declared, so two named alike (a dovetail_wide_face on each of two
-                // dovetails) can be told apart.
-                note: [(candidate.type || '').toLowerCase(), ...(candidate.path || []).slice(-2),
-                    candidate.hidden ? t('viewer.contextMenu.hidden') : null]
-                    .filter(Boolean).join(' \u00b7 '),
-            })),
-            // A row is the feature it names: choosing one is the click that
-            // would have taken it in the view.
-            onChoose: (id, item, event) => this._takeFeatureFromMenu(id, event),
-        });
-        if (!opened) {
-            this._hover.unpin();
-            return false;
-        }
-        this.requestUpdate();
-        return true;
+        // No `checked`: which row is current is not a fact to copy in here
+        // and then keep up to date. It is derived at render time from the
+        // answer on screen, so the row marked and the feature lit cannot
+        // come to disagree. See _featureMenuActiveId.
+        return candidates.map((candidate, index) => ({
+            id: `${FEATURE_ROW}${index}`,
+            label: candidate.label,
+            indent: true,
+            // Under the pointer but not seen there: listed, so you know it is there, not taken.
+            disabled: Boolean(candidate.hidden),
+            // Where it is declared, so two named alike (a dovetail_wide_face on each of two
+            // dovetails) can be told apart.
+            note: [(candidate.type || '').toLowerCase(), ...(candidate.path || []).slice(-2),
+                candidate.hidden ? t('viewer.contextMenu.hidden') : null]
+                .filter(Boolean).join(' \u00b7 '),
+        }));
     }
 
     /**
@@ -151,10 +163,10 @@ export const MenusMixin = (Base) => class extends Base {
      * and the menu marks the row that answer came from.
      */
     _showFeatureFromMenu(id) {
-        if (!this._hover || !this._hover.pinned) {
+        if (!this._hover || !this._hover.pinned || !String(id).startsWith(FEATURE_ROW)) {
             return;
         }
-        const index = Number(id);
+        const index = Number(id.slice(FEATURE_ROW.length));
         if (this._hover.asking === index) {
             return;
         }
@@ -175,7 +187,7 @@ export const MenusMixin = (Base) => class extends Base {
         if (!at) {
             return;
         }
-        const index = Number(id);
+        const index = Number(id.slice(FEATURE_ROW.length));
         this._hover.choose(index);
         this.emitViewerLog('measure-cycle', {
             index, of: (this._hover.feature && this._hover.feature.candidateCount) || 0,
@@ -197,7 +209,7 @@ export const MenusMixin = (Base) => class extends Base {
      * Which row the menu should mark: the one the view is lighting.
      *
      * Read off the answer on screen rather than off what was asked for, and
-     * only for the feature menu. The runner says which candidate it settled on
+     * only while the menu lists features (it holds the hover pinned). The runner says which candidate it settled on
      * -- it does not always get one named, since with nothing cycled it picks
      * whichever can finish the measurement in hand -- so this is the only way
      * to mark the right row before anything has been cycled.
@@ -206,13 +218,12 @@ export const MenusMixin = (Base) => class extends Base {
      * one fact, read twice, rather than two copies kept in agreement.
      */
     _featureMenuActiveId() {
-        const state = this.contextMenu.state;
-        if (!state || state.kind !== 'feature') {
+        if (!this.contextMenu.state || !this._hover || !this._hover.pinned) {
             return null;
         }
-        const drawn = this._hover && this._hover.drawn;
+        const drawn = this._hover.drawn;
         const index = drawn ? drawn.candidateIndex : null;
-        return index === null || index === undefined ? null : String(index);
+        return index === null || index === undefined ? null : `${FEATURE_ROW}${index}`;
     }
 
     closeMemberContextMenu() {
@@ -262,11 +273,9 @@ export const MenusMixin = (Base) => class extends Base {
         // Which row the view is lighting, asked every render rather than stored
         // when it changed. Tab moves it without the pointer moving, so the mark
         // cannot ride on a mouseover.
-        const isFeatureMenu = state.kind === 'feature';
         // Bound on every row of every menu: _showFeatureFromMenu answers only
-        // for a PINNED hover, which only the feature menu takes -- so exporting
-        // a member cannot reach it, and there is no conditional listener to get
-        // wrong.
+        // for a feature row of a PINNED hover -- so exporting a member cannot
+        // reach it, and there is no conditional listener to get wrong.
         const activeId = this._featureMenuActiveId();
         return html`
             <div
@@ -280,12 +289,18 @@ export const MenusMixin = (Base) => class extends Base {
                 ${state.title
                     ? html`<div class="context-menu-title">${state.title}</div>`
                     : ''}
-                ${state.items.map((item) => html`
+                ${state.items.map((item) => item.divider
+                    ? html`<div class="context-menu-divider"></div>`
+                    : item.heading
+                        ? html`<div class="context-menu-heading">${item.label}</div>`
+                        : html`
                     <button
                         type="button"
                         class="context-menu-item${
                             item.checked || item.id === activeId
-                                ? ' context-menu-checked' : ''}"
+                                ? ' context-menu-checked' : ''}${
+                            item.indent ? ' context-menu-indent' : ''}${
+                            item.keepCase ? ' context-menu-keep-case' : ''}"
                         ?disabled=${Boolean(item.disabled)}
                         @mouseenter=${() => {
                             // A disabled button still gets mouseenter; a hidden feature is not shown.
@@ -301,9 +316,6 @@ export const MenusMixin = (Base) => class extends Base {
                         ? html`<span class="context-menu-note">${item.note}</span>`
                         : ''}</button>
                 `)}
-                ${isFeatureMenu
-                    ? html`<div class="context-menu-hint">${t('viewer.contextMenu.tabToCycle')}</div>`
-                    : ''}
             </div>
         `;
     }
