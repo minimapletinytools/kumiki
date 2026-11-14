@@ -37,6 +37,7 @@
                 for (const message of frame.queue.splice(0)) {
                     iframe.contentWindow.postMessage(message, '*');
                 }
+                sendKeysTo(iframe);
                 core.send({ type: 'panel:loaded', id: panel.id });
             });
             frames.set(panel.id, frame);
@@ -74,7 +75,10 @@
         if (!data || data.kigumiPanel !== true) return;
         const id = panelForSource(event.source);
         if (!id) return;
-        if (data.type === 'message') {
+        if (data.type === 'keyCommand' && typeof data.command === 'string') {
+            // A key pressed in a panel (panel-bridge.js), for one of the app's shortcuts.
+            command('keyCommand', data.command);
+        } else if (data.type === 'message') {
             core.send({ type: 'panel:message', id, message: data.message });
         } else if (data.type === 'state') {
             core.send({ type: 'panel:state', id, state: data.state });
@@ -243,7 +247,56 @@
         renderTabs();
         renderWelcome();
         renderStatus();
+        renderKeys();
     }
+
+    // ---------------------------------------------------------------------
+    // Keyboard shortcuts
+    // ---------------------------------------------------------------------
+
+    // The app's shortcuts, from the core (app-shell/keyboard-shortcuts.js shellKeys). Where the core says
+    // to (the browser version, which has no menus), the shell runs them: those pressed here, and those
+    // pressed in a panel, which panel-bridge.js matches and sends on.
+    let keys = null;
+    let keysSent = '';
+
+    function sendKeysTo(iframe) {
+        if (!keys || !keys.dispatch || !iframe.contentWindow) return;
+        iframe.contentWindow.postMessage({ kigumiShellKeys: keys.bindings }, '*');
+    }
+
+    function renderKeys() {
+        keys = state.keys || null;
+        const labels = (keys && keys.labels) || {};
+        for (const element of document.querySelectorAll('.welcome-keys [data-command]')) {
+            const label = labels[element.dataset.command];
+            element.hidden = keys !== null && !label;
+            const kbd = element.querySelector('kbd');
+            if (kbd && label) kbd.textContent = label;
+        }
+        const sent = JSON.stringify(keys && keys.dispatch ? keys.bindings : null);
+        if (sent === keysSent) return;
+        keysSent = sent;
+        for (const frame of frames.values()) {
+            if (frame.loaded) sendKeysTo(frame.iframe);
+        }
+    }
+
+    function isTyping(target) {
+        return Boolean(target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || '')));
+    }
+
+    window.addEventListener('keydown', (event) => {
+        if (!keys || !keys.dispatch || typeof window.kigumiKeyFromEvent !== 'function') return;
+        const pressed = window.kigumiKeyFromEvent(event);
+        // While typing, only keys held with ctrl, alt or cmd are shortcuts.
+        if (isTyping(event.target) && !/(^|\+)(ctrl|alt|cmd)\+/.test(pressed)) return;
+        const binding = pressed && keys.bindings.find((one) => one.keys.includes(pressed));
+        if (!binding) return;
+        event.preventDefault();
+        event.stopPropagation();
+        command('keyCommand', binding.command);
+    }, true);
 
     // ---------------------------------------------------------------------
     // Splitters

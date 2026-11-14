@@ -124,13 +124,36 @@ app.whenReady().then(async () => {
         // Saved in the code editor: the frame file changes, which reaches the browser's copy.
         const filePath = frameRow.replace(/^frame-file:workspace:/, '');
         await js(`window.kigumiShell.send({ type: 'shell:command', command: 'run', args: ['kigumi.openFileSource', ${JSON.stringify(filePath)}] })`);
+        // The editor's contents, not its lines on screen: the file opens on its docstring.
         const editorText = await wait(`(() => {
             const doc = ${view};
-            const lines = doc && doc.querySelector('.monaco-editor .view-lines');
-            return lines && lines.textContent.includes('my_cute_frame') ? lines.textContent.length : null;
+            const model = doc && doc.defaultView.monaco && doc.defaultView.monaco.editor.getModels()[0];
+            return model && model.getValue().includes('my_cute_frame') ? model.getValue().length : null;
         })()`, 60000);
         check('the frame file opens in the code editor', Boolean(editorText));
         await shot('editor');
+
+        // The browser has no menus, so the shell runs the shortcuts: one pressed in the editor (a panel)
+        // goes to the shell through panel-bridge.js. Open Current File in Viewer brings the file's view.
+        const mac = process.platform === 'darwin';
+        // A view's tab is titled "Kigumi: …"; the editor's by its file.
+        const viewShown = `(document.querySelector('#slot-center iframe:not([hidden])')?.title || '').startsWith('Kigumi:')`;
+        const shownBefore = await js(viewShown);
+        const caught = await js(`(() => {
+            const win = ${view}.defaultView;
+            const target = win.document.querySelector('.monaco-editor textarea') || win.document.body;
+            // dispatchEvent is false when a listener took the key (panel-bridge.js).
+            return !target.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'O', code: 'KeyO', shiftKey: true,
+                metaKey: ${mac}, ctrlKey: ${!mac}, bubbles: true, cancelable: true }));
+        })()`);
+        const viewBrought = await wait(`${viewShown} || null`, 30000);
+        const status = await js(`document.getElementById('status-message')?.textContent || ''`);
+        check('a shortcut pressed in the editor runs in the browser: Open Current File in Viewer brings its view',
+            shownBefore === false && caught === true && viewBrought === true, JSON.stringify({ shownBefore, caught, viewBrought, status }));
+        await js(`window.kigumiShell.send({ type: 'shell:command', command: 'run', args: ['kigumi.openFileSource', ${JSON.stringify(filePath)}] })`);
+        await wait(`(() => { const doc = ${view}; return doc && doc.querySelector('.monaco-editor .view-lines') ? true : null; })()`, 30000);
+        const welcomeKey = await js(`document.getElementById('key-open-current-in-viewer')?.textContent`);
+        check('the welcome page shows the shortcut as this system writes it', welcomeKey === (mac ? '⇧⌘O' : 'Ctrl+Shift+O'), welcomeKey);
         await js(`(() => {
             const model = ${view}.defaultView.monaco.editor.getModels()[0];
             model.setValue(model.getValue() + '\\n# unsaved buffer rendered\\n');

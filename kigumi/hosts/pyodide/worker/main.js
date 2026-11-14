@@ -26,6 +26,11 @@ const { SettingsStore, defaultsFromPackageJson } = require('../../../app-shell/s
 const { LogChannel } = require('../../../app-shell/log-channel');
 const { createBrowserHost } = require('../browser-host');
 const { LANGUAGE_SETTING, LANGUAGE_CHOICES, chooseLanguage } = require('../../../i18n');
+const { KEYBINDINGS_SETTING } = require('../../../keybindings');
+const { createKeyboardShortcutsPanel, shellKeys, runKeyCommand } = require('../../../app-shell/keyboard-shortcuts');
+
+// The keys as written for the browser's system: ⌘ on a Mac, Ctrl elsewhere.
+const PLATFORM = /Mac/i.test((self.navigator && (self.navigator.platform || self.navigator.userAgent)) || '') ? 'darwin' : 'linux';
 const { writeProjectFiles, readProjectFiles, watchProjectFiles } = require('../project-files');
 const { createAgentPanel } = require('../../../agent/agent-panel');
 const { createAccount } = require('../../../agent/account');
@@ -131,6 +136,8 @@ async function start() {
         'agent.enabled': true,
         // Kigumi's language: default (the browser's), en or ja.
         [LANGUAGE_SETTING]: 'default',
+        // Keyboard shortcuts that differ from the defaults (keybindings.js).
+        [KEYBINDINGS_SETTING]: {},
     });
     // This browser's settings, which the page sent while Python loaded: in force before anything
     // starts, so Kigumi starts in its language.
@@ -202,6 +209,8 @@ async function start() {
             progress,
             version: `${packageJson.version} · browser`,
             autoRefresh: settings.get('viewer.autoRefreshOnFileChange', true),
+            // No menus here: the shell runs the keys itself, and tells the panels them.
+            keys: shellKeys(settings, { platform: PLATFORM, desktop: false, dispatch: true }),
         }),
         onCommand: (id, ...args) => {
             void onCommand(id, ...args).catch((error) => {
@@ -225,6 +234,8 @@ async function start() {
 
     const openLog = createLogPanel({ connection, channel, pageUrl: `${BASE}/webview/shell/log.html`,
         openLocation: (filePath, line) => editors.open(filePath, line) });
+    const openKeyboardShortcuts = createKeyboardShortcutsPanel({ connection, settings,
+        pageUrl: `${BASE}/webview/shell/keyboard-shortcuts.html`, platform: PLATFORM, desktop: false });
 
     function sendProjectFiles(update) {
         if (project) post({ type: 'web:files', id: project.id, name: project.name, ...update });
@@ -311,8 +322,11 @@ async function start() {
             { label: `Auto refresh on file change: ${onOff('viewer.autoRefreshOnFileChange', true)}`, value: 'viewer.autoRefreshOnFileChange' },
             { label: `Drawings (beta): ${onOff('viewer.drawingBeta')}`, value: 'viewer.drawingBeta' },
             { label: `Language: ${languageLabel}`, value: LANGUAGE_SETTING },
+            { label: 'Keyboard shortcuts…', value: KEYBINDINGS_SETTING },
         ], 'Change a setting (kept in this browser)');
-        if (picked && picked.value === LANGUAGE_SETTING) {
+        if (picked && picked.value === KEYBINDINGS_SETTING) {
+            openKeyboardShortcuts();
+        } else if (picked && picked.value === LANGUAGE_SETTING) {
             await chooseLanguageSetting();
         } else if (picked && picked.value) {
             settings.set(picked.value, settings.get(picked.value, picked.value === 'viewer.autoRefreshOnFileChange') !== true);
@@ -501,6 +515,15 @@ async function start() {
             openLog();
         } else if (id === 'openSettings') {
             await chooseSetting();
+        } else if (id === 'openKeyboardShortcuts') {
+            openKeyboardShortcuts();
+        } else if (id === 'keyCommand') {
+            await runKeyCommand(args[0], { runCommand, actions: {
+                toggleAgent: () => agentPanel.toggle(),
+                showLog: () => openLog(),
+                openSettings: () => chooseSetting(),
+                keyboardShortcuts: () => openKeyboardShortcuts(),
+            } });
         }
     }
 

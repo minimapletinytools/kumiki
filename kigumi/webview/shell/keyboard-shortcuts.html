@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self';">
+    <script src="panel-bridge.js"></script>
+    <title>Keyboard Shortcuts</title>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="keyboard-shortcuts.css">
+</head>
+<body>
+    <header class="keys-header">
+        <input id="filter" type="search" placeholder="Search shortcuts" aria-label="Search shortcuts">
+        <span id="note" class="keys-note"></span>
+        <button id="reset-all" type="button">Reset All</button>
+    </header>
+    <main id="sections" class="keys-sections"></main>
+    <script type="module" src="keyboard-shortcuts.js"></script>
+</body>
+</html>

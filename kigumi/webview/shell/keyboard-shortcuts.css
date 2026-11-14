@@ -1,0 +1,121 @@
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.keys-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: none;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--ka-border);
+    background: var(--ka-chrome-bg);
+}
+
+.keys-header input[type="search"] {
+    flex: 1;
+    max-width: 320px;
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid var(--ka-border);
+    border-radius: 3px;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font: inherit;
+}
+
+.keys-note {
+    flex: 1;
+    color: var(--ka-muted);
+}
+
+.keys-sections {
+    flex: 1;
+    overflow: auto;
+    padding: 4px 10px 16px;
+}
+
+.keys-section h2 {
+    margin: 14px 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ka-muted);
+}
+
+.keys-table {
+    width: 100%;
+    max-width: 760px;
+    border-collapse: collapse;
+}
+
+.keys-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--ka-border);
+    vertical-align: middle;
+}
+
+.keys-table tr[hidden] {
+    display: none;
+}
+
+.keys-title {
+    width: 45%;
+}
+
+.keys-title .is-changed::after {
+    content: " (changed)";
+    color: var(--ka-muted);
+    font-size: 11px;
+}
+
+.keys-clash {
+    display: block;
+    color: var(--ka-warning);
+    font-size: 11px;
+}
+
+kbd {
+    display: inline-block;
+    margin-right: 4px;
+    padding: 1px 6px;
+    border: 1px solid var(--ka-border);
+    border-radius: 3px;
+    background: var(--ka-chrome-bg);
+    font-family: var(--ka-mono);
+    font-size: 12px;
+}
+
+.keys-none {
+    color: var(--ka-muted);
+}
+
+.keys-recording {
+    color: var(--ka-accent);
+    font-style: italic;
+}
+
+.keys-actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+button {
+    padding: 2px 8px;
+    border: 1px solid var(--ka-border);
+    border-radius: 3px;
+    background: transparent;
+    color: var(--ka-fg);
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover {
+    background: var(--ka-hover);
+}
+
+button:focus-visible {
+    outline: 2px solid var(--ka-focus);
+    outline-offset: 1px;
+}

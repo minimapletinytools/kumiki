@@ -147,7 +147,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             outputChannel.appendLine(`[kigumi] Auto refresh on file change: ${autoRefreshOnFileChange ? 'enabled' : 'disabled'}`);
         }
         // Read when a view's page is built, so the open views are built again.
-        if (affects('viewer.assemblyPreview') || affects('viewer.drawingBeta')) {
+        if (affects('viewer.assemblyPreview') || affects('viewer.drawingBeta') || affects('app.keybindings')) {
             for (const session of allSessions()) {
                 session.reloadPage();
             }

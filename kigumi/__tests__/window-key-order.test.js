@@ -40,8 +40,8 @@ describe('what the keydown handler decides, and in what order', () => {
     const at = (needle) => body.indexOf(needle);
 
     const guard = at('if (event.defaultPrevented)');
-    const undo = at("event.key === 'z'");
-    const redo = at("event.key === 'y'");
+    const undo = at("this._pressed(event, 'undo')");
+    const redo = at("this._pressed(event, 'redo')");
     const typing = at('_isTypingTarget(event.target)');
     const tab = at("event.key === 'Tab'");
     const del = at("event.key === 'Delete'");

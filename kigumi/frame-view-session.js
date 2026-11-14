@@ -918,6 +918,8 @@ class FrameViewSession {
                 milestones: this.profiler.getMilestones(),
                 stats_path: statsPath,
             };
+            // The view may have closed while it built: nothing to draw into, and nothing wrong.
+            if (this.isDisposed || !this.panel) return;
             renderFrameViewer(this.panel, this.filePath, frameData, geometryData, profiling, {
                 phase: 'ready',
                 refreshToken,

@@ -11,7 +11,8 @@ const { app, net, protocol, Menu, dialog, safeStorage, shell: electronShell } = 
 const { setHost } = require('../../host');
 const { createKigumiApp } = require('../../kigumi-app');
 const { DEFAULT_FILES_EXCLUDE } = require('../../sidebar-files');
-const { acceleratorFor } = require('./keybindings');
+const { KEYBINDINGS_SETTING, resolveKeybindings, acceleratorFor } = require('../../keybindings');
+const { createKeyboardShortcutsPanel, shellKeys, runKeyCommand } = require('../../app-shell/keyboard-shortcuts');
 const { webviewDir } = require('../../webview-html');
 const { ShellConnection } = require('../../app-shell/shell-connection');
 const { PageStore } = require('../../app-shell/page-store');
@@ -64,6 +65,8 @@ const APP_DEFAULTS = {
     'app.updatePrereleases': false,
     // Kigumi's language: default (the system's), en or ja.
     [LANGUAGE_SETTING]: 'default',
+    // Keyboard shortcuts that differ from the defaults: { command: key }, "" for none (keybindings.js).
+    [KEYBINDINGS_SETTING]: {},
 };
 
 const CONTENT_TYPES = {
@@ -165,6 +168,8 @@ function shellStatus() {
         autoRefresh: settings ? settings.get('viewer.autoRefreshOnFileChange', false) : false,
         update: updates && updates.available ? { version: updates.available.version } : null,
         recentFolders: recentFolders().map((one) => ({ ...one, shown: tildePath(one.path) })),
+        // The menus run the keys; the shell shows them on the welcome page.
+        keys: settings ? shellKeys(settings, { platform: process.platform, desktop: true, dispatch: false }) : null,
     };
 }
 
@@ -526,6 +531,8 @@ function onShellCommand(id, ...args) {
     if (id === 'clearRecentFolders') return clearRecentFolders();
     if (id === 'openLog') return openLogTab();
     if (id === 'openSettings') return openSettingsFile();
+    if (id === 'openKeyboardShortcuts') return openKeyboardShortcuts();
+    if (id === 'keyCommand') return runKeyCommand(args[0], { runCommand: runAppCommand, actions: keyActions });
     if (id === 'toggleAgent') return toggleAgentPanel();
     if (id === 'copyMcpSetup') return copyMcpSetup();
     if (id === 'showUpdate') return showUpdate();
@@ -645,9 +652,33 @@ function recentFoldersMenu() {
     ];
 }
 
+// The Keyboard Shortcuts tab (app-shell/keyboard-shortcuts.js), made once the window is; and whether
+// it is waiting for a new key, when the menus let keys through to it.
+let openKeyboardShortcuts = () => {};
+let recordingKeys = false;
+
+/** Close the active tab, asking first about an editor's unsaved changes. */
+async function closeActiveTab() {
+    const active = connection.activePanel;
+    if (active && await confirmCloseEditor(active.id)) active.dispose();
+}
+
+// What the app's own keys run (keybindings.js app.*).
+const keyActions = {
+    closeTab: () => closeActiveTab(),
+    toggleAgent: () => toggleAgentPanel(),
+    showLog: () => openLogTab(),
+    openSettings: () => openSettingsFile(),
+    keyboardShortcuts: () => openKeyboardShortcuts(),
+};
+
 function buildMenu() {
     const isMac = process.platform === 'darwin';
-    const command = (label, id, accelerator) => ({ label, accelerator, click: () => runAppCommand(id) });
+    // Each item's key from the keyboard shortcuts; while the Keyboard Shortcuts tab waits for a new key,
+    // the keys go to it instead of running their items.
+    const keys = resolveKeybindings({ overrides: settings.get(KEYBINDINGS_SETTING, {}) });
+    const keyed = (id) => ({ accelerator: acceleratorFor(id, keys), registerAccelerator: !recordingKeys });
+    const command = (label, id) => ({ label, ...keyed(id), click: () => runAppCommand(id) });
     // On macOS the edit keys (⌘C, ⌘V, …) in text boxes need menu items; these are hidden but keep their keys.
     const editKeys = isMac ? [{ type: 'separator', visible: false },
         ...['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll'].map((role) => ({ role, visible: false }))] : [];
@@ -655,8 +686,9 @@ function buildMenu() {
         {
             label: 'File',
             submenu: [
-                command('Go to File…', 'kigumi.quickOpenFile', acceleratorFor('kigumi.quickOpenFile')),
-                command('Open in Viewer…', 'kigumi.quickOpenInViewer', acceleratorFor('kigumi.quickOpenInViewer')),
+                command('Go to File…', 'kigumi.quickOpenFile'),
+                command('Open in Viewer…', 'kigumi.quickOpenInViewer'),
+                command('Open Current File in Viewer', 'kigumi.openCurrentFileInViewer'),
                 { type: 'separator' },
                 { label: 'New Project…', click: () => chooseNewProjectFolder() },
                 { label: 'Open Project…', click: () => chooseWorkspaceFolder() },
@@ -665,11 +697,8 @@ function buildMenu() {
                 { type: 'separator' },
                 {
                     label: 'Close Tab',
-                    accelerator: 'CmdOrCtrl+W',
-                    click: async () => {
-                        const active = connection.activePanel;
-                        if (active && await confirmCloseEditor(active.id)) active.dispose();
-                    },
+                    ...keyed('app.closeTab'),
+                    click: () => closeActiveTab(),
                 },
                 ...(isMac ? [] : [{ type: 'separator' }, { role: 'quit' }]),
                 ...editKeys,
@@ -680,7 +709,7 @@ function buildMenu() {
             label: 'Kigumi',
             submenu: [
                 ...(isMac ? [{ role: 'about' }, { type: 'separator' }] : []),
-                command('Refresh Active Viewer', 'kigumi.render', 'CmdOrCtrl+R'),
+                command('Refresh Active Viewer', 'kigumi.render'),
                 command('Refresh Explorer', 'kigumi.refreshSidebar'),
                 {
                     label: 'Auto Refresh on File Change',
@@ -703,7 +732,7 @@ function buildMenu() {
                     checked: agentEnabled(),
                     click: () => settings.set('agent.enabled', !agentEnabled()),
                 },
-                { label: 'Toggle Agent Panel', accelerator: 'CmdOrCtrl+Shift+A', click: () => toggleAgentPanel() },
+                { label: 'Toggle Agent Panel', ...keyed('app.toggleAgent'), click: () => toggleAgentPanel() },
                 { label: 'Copy MCP Setup for Claude Code', enabled: Boolean(mcp && mcp.running), click: () => copyMcpSetup() },
                 { type: 'separator' },
                 {
@@ -715,8 +744,9 @@ function buildMenu() {
                         click: () => settings.set(LANGUAGE_SETTING, id),
                     })),
                 },
-                { label: 'Open Settings File', accelerator: 'CmdOrCtrl+,', click: () => openSettingsFile() },
-                { label: 'Show Log', accelerator: 'CmdOrCtrl+Shift+U', click: () => openLogTab() },
+                { label: 'Open Settings File', ...keyed('app.openSettings'), click: () => openSettingsFile() },
+                { label: 'Keyboard Shortcuts…', ...keyed('app.keyboardShortcuts'), click: () => openKeyboardShortcuts() },
+                { label: 'Show Log', ...keyed('app.showLog'), click: () => openLogTab() },
                 { label: 'Open Logs Folder', click: () => electronShell.openPath(path.dirname(logChannel.filePath)) },
                 {
                     label: 'Toggle Developer Tools',
@@ -780,6 +810,13 @@ async function start() {
         closeRequest: confirmCloseEditor,
     });
     editors = createEditorTabs({ connection, editorUrl: `${ORIGIN}/webview/editor/editor.html`, log, setStatus, askToSave });
+    openKeyboardShortcuts = createKeyboardShortcutsPanel({ connection, settings, pageUrl: `${ORIGIN}/webview/shell/keyboard-shortcuts.html`,
+        platform: process.platform, desktop: true,
+        onRecording: (on) => {
+            if (recordingKeys === on) return;
+            recordingKeys = on;
+            buildMenu();
+        } });
     openLogTab = createLogPanel({ connection, channel: logChannel, pageUrl: `${ORIGIN}/webview/shell/log.html`,
         filePath: logChannel.filePath, openFile: () => electronShell.openPath(logChannel.filePath),
         openLocation: openEditorTab, onShow: () => { status.logBadge = false; } });

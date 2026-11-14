@@ -25,6 +25,8 @@ function createBrowserHost({ connection, workspaceFolder, settings, locale = 'en
     showLog = null, log = () => {}, agentPanel = false, mcp = null, closeProject = null, projects = null }) {
     return {
         locale,
+        // The keys as written for the browser's system (keybindings.js).
+        platform: /Mac/i.test((self.navigator && (self.navigator.platform || self.navigator.userAgent)) || '') ? 'darwin' : 'linux',
         ...createShellHostServices({ connection, settings, workspaceFolder, documents: editors, setProgress, log }),
         showsFileBrowser: true,
         agentPanel,

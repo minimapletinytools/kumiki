@@ -27,6 +27,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 #### Added
 
+- Keyboard shortcuts you can change, in the standalone app and the browser version: a Keyboard Shortcuts tab (Kigumi > Keyboard Shortcuts…, or the settings gear in the browser) lists every command with its keys, to change, remove or reset, and warns when two share a key. They're kept in the `app.keybindings` setting. The app's menus follow them; in the browser the shell runs them, from any panel. The viewer's own keys (measure, undo, redo, frame the selection) are among them.
+- Open Current File in Viewer, on ⇧⌘O (Ctrl+Shift+O): the file in the focused editor, in a view. In the File menu, and on the welcome page.
 - Example frames in the explorer have Duplicate To Workspace, as library patterns do: it copies the frame into the project's top folder, beside its own frames, and opens it.
 - A `kumiki_source` tool for the agent and for agents over MCP: it lists, reads and searches the kumiki library the project uses (in its .venv) and kumiki's example frames, read-only and a page at a time. `kumiki_api` now says when it cut a long source short, and where to read on.
 - The website and Kigumi in the browser (kumiki.build/try) count visits with Cloudflare Web Analytics, which uses no cookies. The privacy policy says so.

@@ -6,6 +6,7 @@ const path = require('path');
 const { requestWebviewRoundTrip } = require('./webview-request');
 const { resolveLocale, loadCatalog, createTranslator } = require('./i18n');
 const { getHost } = require('./host');
+const { KEYBINDINGS_SETTING, resolveKeybindings } = require('./keybindings');
 const { webviewDir, buildWebviewPage } = require('./webview-html');
 
 const initializedPanels = new WeakSet();
@@ -158,8 +159,20 @@ function getWebviewContent(surface, frameData, geometryData, profiling, uiState 
             agentAvailable: getHost().agentPanel === true,
             agentEnabled: getHost().getConfig('agent.enabled', false) === true,
             i18n: { locale, strings: loadCatalog(locale) },
+            keybindings: viewerKeybindings(),
         },
     });
+}
+
+/**
+ * The viewer's own keys, by what they do ({ measure: ['m'], undo: [...], ... }): the app's keyboard
+ * shortcuts where it has them (app.keybindings), the defaults in VS Code.
+ */
+function viewerKeybindings() {
+    const host = getHost();
+    const keys = resolveKeybindings({ platform: host.platform || process.platform, overrides: host.getConfig(KEYBINDINGS_SETTING, {}) });
+    return Object.fromEntries(keys.filter((entry) => entry.scope === 'viewer')
+        .map((entry) => [entry.command.slice('viewer.'.length), entry.keys]));
 }
 
 function requestViewerScreenshot(panel, options = {}) {

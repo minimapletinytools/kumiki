@@ -5,6 +5,15 @@ import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
 import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPanel, ViewerToolsPanel, usePanelRuntime } from './viewer-panels.js';
 import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DRAWING_BETA_ENABLED, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, VIEWER_APP_VERSION, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
 import { PickingMixin } from './viewer-picking.js';
+import { isKey } from './key-match.js';
+
+// The viewer's keys where the page brings none (kigumi/keybindings.js has the same).
+const DEFAULT_VIEWER_KEYS = Object.freeze({
+    measure: ['m'],
+    undo: /Mac/i.test(navigator.platform || '') ? ['cmd+z'] : ['ctrl+z'],
+    redo: /Mac/i.test(navigator.platform || '') ? ['cmd+shift+z', 'cmd+y'] : ['ctrl+shift+z', 'ctrl+y'],
+    focusSelection: ['f'],
+});
 import { MeasuringMixin } from './viewer-measuring.js';
 import { MenusMixin } from './viewer-menus.js';
 import { SelectionVisualsMixin } from './viewer-selection-visuals.js';
@@ -1967,17 +1976,13 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         // by. Refused while a measurement is half-made: there is nothing on the
         // stack for it, so undo would reach past the thing you are looking at
         // to something you are not.
-        const accel = event.metaKey || event.ctrlKey;
-        if (accel && (event.key === 'z' || event.key === 'Z')) {
+        // The keys are the keyboard shortcuts' (kigumi/keybindings.js, viewer.*), from the page's payload.
+        if (this._pressed(event, 'undo')) {
             event.preventDefault();
-            if (event.shiftKey) {
-                this.redoMeasurementChange();
-            } else {
-                this.undoMeasurementChange();
-            }
+            this.undoMeasurementChange();
             return;
         }
-        if (accel && (event.key === 'y' || event.key === 'Y')) {
+        if (this._pressed(event, 'redo')) {
             event.preventDefault();
             this.redoMeasurementChange();
             return;
@@ -2007,7 +2012,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             }
             return;
         }
-        if ((event.key === 'm' || event.key === 'M') && !accel && !event.altKey) {
+        if (this._pressed(event, 'measure')) {
             // Measure from this: the same as the button, when it would be offered.
             if (!this.measureDraft.isActive && this.canStartMeasurement) {
                 event.preventDefault();
@@ -2015,7 +2020,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             }
             return;
         }
-        if (event.key !== 'f' && event.key !== 'F') {
+        if (!this._pressed(event, 'focusSelection')) {
             return;
         }
         const activeTag = document.activeElement && document.activeElement.tagName;
@@ -2024,6 +2029,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         }
         event.preventDefault();
         this.focusSelection();
+    }
+
+    /** Whether `event` is one of the keys for the viewer's `action` (measure, undo, redo, focusSelection). */
+    _pressed(event, action) {
+        const keys = (INITIAL_PAYLOAD.keybindings || {})[action] || DEFAULT_VIEWER_KEYS[action] || [];
+        return isKey(event, keys);
     }
 
     onWindowResize() {

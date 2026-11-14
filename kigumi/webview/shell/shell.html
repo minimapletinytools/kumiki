@@ -37,8 +37,9 @@
                         <ul id="welcome-recent-list"></ul>
                     </section>
                     <dl class="welcome-keys">
-                        <dt><kbd id="key-go-to-file">⌘P</kbd></dt><dd>Go to file</dd>
-                        <dt><kbd id="key-open-in-viewer">⌘O</kbd></dt><dd>Open in viewer</dd>
+                        <dt data-command="kigumi.quickOpenFile"><kbd id="key-go-to-file">⌘P</kbd></dt><dd data-command="kigumi.quickOpenFile">Go to file</dd>
+                        <dt data-command="kigumi.quickOpenInViewer"><kbd id="key-open-in-viewer">⌘O</kbd></dt><dd data-command="kigumi.quickOpenInViewer">Open in viewer</dd>
+                        <dt data-command="kigumi.openCurrentFileInViewer"><kbd id="key-open-current-in-viewer">⇧⌘O</kbd></dt><dd data-command="kigumi.openCurrentFileInViewer">Open current file in viewer</dd>
                     </dl>
                 </div>
             </section>
@@ -64,6 +65,7 @@
             <div id="quickpick-list" class="list" role="listbox"></div>
         </div>
     </div>
+    <script type="module" src="shell-keys.js"></script>
     <script src="shell.js"></script>
 </body>
 </html>
