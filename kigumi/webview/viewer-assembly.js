@@ -47,20 +47,10 @@ export const AssemblyMixin = (Base) => class extends Base {
         this.requestUpdate();
     }
 
-    setShowAssemblyTimeline(enabled) {
-        const normalized = Boolean(enabled);
-        if (this.showAssemblyTimeline === normalized) {
-            return;
-        }
-        this.showAssemblyTimeline = normalized;
-        this.applyAssemblyOffsets();
-        this.requestUpdate();
-    }
-
     // Recompute per-member displacement from the current scrub position and
     // apply it to every mesh bundle. The continuous rAF loop repaints.
     applyAssemblyOffsets() {
-        const active = this.assemblyData && this.showAssemblyTimeline;
+        const active = ASSEMBLY_PREVIEW_ENABLED && this.assemblyData;
         this._assemblyOffsetsByKey = active
             ? AssemblyTimeline.computeAssemblyOffsets(
                 this.assemblyData.steps, this.assemblyScrubValue, this.disassemblyMultiplier)
@@ -96,7 +86,7 @@ export const AssemblyMixin = (Base) => class extends Base {
     }
 
     renderAssemblyTimeline() {
-        if (!ASSEMBLY_PREVIEW_ENABLED || !this.showAssemblyTimeline || this.isInDrawing) {
+        if (!ASSEMBLY_PREVIEW_ENABLED || this.isInDrawing) {
             return '';
         }
         if (this.assemblySolving) {

@@ -100,7 +100,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         // What a right-click is offering. One menu for every kind of menu --
         // dismissing, choosing and where it sits are solved once.
         this.contextMenu = new KigumiContextMenu.ContextMenu();
-        this.showAssemblyTimeline = true;
         this.disassemblyMultiplier = 1.5;
         this.assemblyData = null;
         this.assemblySolving = false;
@@ -1156,7 +1155,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 // Everything the display options store owns, by its own account.
                 ...this.displayOptions.toPayload(),
                 showCenterGizmo: Boolean(this.showCenterGizmo),
-                showAssemblyTimeline: Boolean(this.showAssemblyTimeline),
                 disassemblyMultiplier: Number(this.disassemblyMultiplier),
                 debugEnabled: Boolean(this.debugEnabled),
                 leftClickDragRotatesCamera: Boolean(this.leftClickDragRotatesCamera),
@@ -1226,9 +1224,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             // Back-compat for settings saved before footprintColor replaced
             // the footprintsEnabled boolean.
             this.setFootprintColor(ui.footprintsEnabled ? DEFAULT_FOOTPRINT_COLOR : 'transparent');
-        }
-        if (ASSEMBLY_PREVIEW_ENABLED && typeof ui.showAssemblyTimeline === 'boolean') {
-            this.setShowAssemblyTimeline(ui.showAssemblyTimeline);
         }
         if (ASSEMBLY_PREVIEW_ENABLED && Number.isFinite(ui.disassemblyMultiplier)) {
             this.setDisassemblyMultiplier(Number(ui.disassemblyMultiplier));

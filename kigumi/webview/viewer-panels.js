@@ -185,10 +185,6 @@ export class ViewerSettingsPanel {
                 </span>
                 ${this.app.panelFlags.assemblyPreview ? html`
                 <label>
-                    <input id="assembly-timeline-toggle" type="checkbox" .checked=${this.app.showAssemblyTimeline}>
-                    ${t('viewer.options.assemblyTimeline')}
-                </label>
-                <label>
                     ${t('viewer.options.disassemblySpacing.label', { multiplier: this.app.disassemblyMultiplier })}
                     <input
                         id="disassembly-multiplier-slider"
@@ -361,11 +357,6 @@ export class ViewerSettingsPanel {
                 id: 'left-click-rotate-toggle', on: 'change',
                 apply: (el) => app.setLeftClickDragRotatesCameraEnabled(el.checked),
                 sync: (el) => { el.checked = app.leftClickDragRotatesCamera; },
-            },
-            {
-                id: 'assembly-timeline-toggle', on: 'change',
-                apply: (el) => app.setShowAssemblyTimeline(el.checked),
-                sync: (el) => { el.checked = app.showAssemblyTimeline; },
             },
             {
                 id: 'export-combined-toggle', on: 'change',

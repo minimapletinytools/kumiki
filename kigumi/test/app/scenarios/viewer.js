@@ -57,17 +57,32 @@ module.exports = {
                 && cubeWidth > 50,
             `${JSON.stringify(before)} -> ${JSON.stringify(toggled)}, cube ${cubeWidth}px`);
 
-        // A selected timber's panel says what kind of timber it is.
-        const kind = await inShell(`(async () => {
-            const app = ${viewDoc}.querySelector('kigumi-app');
-            app.selectMembers([Array.from(app.sceneManager.keys())[0]], false);
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            const line = ${viewDoc}.querySelector('#info-panel .ip-timber-kind');
-            return line ? line.textContent : null;
+        const kinds = await inShell(`(() => {
+            const doc = ${viewDoc}, app = doc.querySelector('kigumi-app');
+            const key = Array.from(app.sceneManager.keys())[0];
+            const metadata = app.memberMetadataByKey.get(key);
+            const originalClass = metadata.mesh.timberClass;
+            const titles = {};
+            try {
+                for (const kind of ['Timber', 'Board', 'RoundTimber', 'RegularPolygonTimber', 'MeshTimber', 'STLTimber']) {
+                    metadata.mesh.timberClass = kind;
+                    app.selectMembers([key], false);
+                    app.selectionPanel.updateInfo(app.currentFrameData);
+                    titles[kind] = doc.querySelector('#info-panel .ip-breadcrumb').textContent;
+                }
+            } finally {
+                metadata.mesh.timberClass = originalClass;
+                app.selectMembers([], false);
+            }
+            return { titles, name: metadata.name };
         })()`);
-        await capture('02d-timber-kind');
-        await inShell(`${viewDoc}.querySelector('kigumi-app').selectMembers([], false)`);
-        check('a selected timber shows its type in the selection panel', kind === 'type rectangular', JSON.stringify(kind));
+        for (const [kind, suffix] of Object.entries({Timber:'', Board:'', RoundTimber:' (round)', RegularPolygonTimber:' (polygon)', MeshTimber:' (mesh)', STLTimber:' (mesh)'})) {
+            check('selection title labels ' + kind, kinds.titles[kind] === 'Selected: ' + kinds.name + suffix, kinds.titles[kind]);
+        }
+        check('assembly preview has one beta option and no separate timeline toggle', await inShell(`(() => {
+            const doc = ${viewDoc};
+            return !!doc.querySelector('#beta-assembly-toggle') && !doc.querySelector('#assembly-timeline-toggle');
+        })()`));
 
         // A right click on a timber in the view: focus on it, the features lit under the pointer, export it.
         const rightClick = await inShell(`(async () => {

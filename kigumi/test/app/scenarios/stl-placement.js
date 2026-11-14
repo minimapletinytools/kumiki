@@ -17,6 +17,7 @@ module.exports = {
             await waitFor(() => inShell(`[...${viewDoc}.querySelector('kigumi-app').memberMetadataByKey.values()].some(m => m.mesh?.stlPlacement)`));
             await inShell(`${viewDoc}.querySelector('#layers-view .lp-row-timber').click()`);
             await sleep(200);
+            check('STL selection title identifies mesh stock', await inShell(`${viewDoc}.querySelector('#info-panel .ip-breadcrumb').textContent.endsWith(' (mesh)')`));
             check('selecting a placeholder stays in the ordinary viewer', await inShell(`!${viewDoc}.querySelector('kigumi-app').stlEditor`));
             const buttonPoint = await inShell(`(() => {
                 const button = [...${viewDoc}.querySelectorAll('#info-panel button')].find(b => b.textContent === 'Edit STL placement');
