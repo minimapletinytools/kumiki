@@ -375,10 +375,11 @@ def _mesh_rectangular_prism(prism: RectangularPrism) -> trimesh.Trimesh:
     extents = [
         _numeric_to_float(prism.size[0]),
         _numeric_to_float(prism.size[1]),
-        length,
+        1.0,
     ]
     mesh = trimesh.creation.box(extents=extents)
-    mesh.apply_translation([0.0, 0.0, (start_distance + end_distance) / 2.0])
+    # Keep cap coordinates at the declared ends instead of reconstructing them from a midpoint.
+    mesh.vertices[:, 2] = np.where(mesh.vertices[:, 2] < 0, start_distance, end_distance)
     mesh.apply_transform(_transform_to_numpy(prism.transform))
     return _finalize_mesh(mesh)
 
@@ -424,15 +425,16 @@ def _mesh_half_space(half_space: HalfSpace) -> trimesh.Trimesh:
     else:
         # Centred under the reach, deep enough to pass it: it covers all of the reach on its side.
         height = float(np.dot(reach.center - plane_point, unit_normal))
-        plane_point = reach.center - unit_normal * height
+        plane_point = plane_point + ((reach.center - plane_point) - unit_normal * height)
         width = 2.0 * reach.radius
         depth = max(height + reach.radius, TRIANGLES_REACH_MIN)
 
     transform = np.eye(4)
     transform[:3, :3] = _basis_from_z_axis(unit_normal)
-    transform[:3, 3] = plane_point + unit_normal * (depth / 2.0)
+    transform[:3, 3] = plane_point
 
-    mesh = trimesh.creation.box(extents=[width, width, depth])
+    mesh = trimesh.creation.box(extents=[width, width, 1.0])
+    mesh.vertices[:, 2] = np.where(mesh.vertices[:, 2] < 0, 0.0, depth)
     mesh.apply_transform(transform)
     return _finalize_mesh(mesh)
 
