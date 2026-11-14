@@ -1,14 +1,16 @@
 /**
  * RefreshProfiler — Centralises timing, milestone tracking, and stats I/O
- * for Kigumi refresh cycles.
+ * for Kigumi refresh cycles. The steps go in .kigumi/refresh-stats.json; the log
+ * gets them too only with KIGUMI_REFRESH_TIMING set.
  */
 
 const fs = require('fs');
 const path = require('path');
 
 class RefreshProfiler {
-    constructor({ log }) {
+    constructor({ log, logSteps = Boolean(process.env.KIGUMI_REFRESH_TIMING) }) {
         this.log = log;
+        this.logSteps = logSteps;
         this.milestones = [];
         this._milestoneStartNs = null;
     }
@@ -33,7 +35,7 @@ class RefreshProfiler {
         const deltaMs = elapsedMs - previousMs;
 
         this.milestones.push({ name, elapsed_ms: elapsedMs, delta_ms: deltaMs });
-        this.log(`[refresh][milestone] ${name} elapsed=${elapsedMs.toFixed(1)}ms delta=${deltaMs.toFixed(1)}ms`);
+        if (this.logSteps) this.log(`[refresh][milestone] ${name} elapsed=${elapsedMs.toFixed(1)}ms delta=${deltaMs.toFixed(1)}ms`);
     }
 
     getMilestones() {
@@ -74,7 +76,7 @@ class RefreshProfiler {
         tracker.steps.push(entry);
 
         const extraJson = entry.extra ? ` extra=${JSON.stringify(entry.extra)}` : '';
-        this.log(`[refresh][timing] ${stampIso} step=${step} elapsed=${elapsedMs.toFixed(1)}ms delta=${deltaMs.toFixed(1)}ms${extraJson}`);
+        if (this.logSteps) this.log(`[refresh][timing] ${stampIso} step=${step} elapsed=${elapsedMs.toFixed(1)}ms delta=${deltaMs.toFixed(1)}ms${extraJson}`);
     }
 
     buildTimingSummary(tracker, reloadResult, geometryData) {

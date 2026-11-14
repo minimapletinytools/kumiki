@@ -92,7 +92,6 @@ export const INITIAL_PAYLOAD = window.__KIGUMI_INITIAL_PAYLOAD__ || {
 // that throws on evaluation. acquireVsCodeApi() may only be called once.
 export const vscode = window.__kigumiVsCode
     || (typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null);
-export const VIEWER_APP_VERSION = '2026.03.17.4';
 export const t = KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
 /**
