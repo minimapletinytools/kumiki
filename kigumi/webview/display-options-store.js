@@ -58,6 +58,8 @@ function optionSpecs(themeIds) {
         showDrawingPerfectFaces: { value: true, normalize: bool },
         showDrawingCenterplanes: { value: true, normalize: bool },
         showDrawingReferenceFeatures: { value: true, normalize: bool },
+        // A scale ruler at the bottom right of the 3D view and drawings (scale-ruler.js).
+        showScaleRuler: { value: false, normalize: bool },
         // Light a selected feature's parent (the CSG node it is on) as well as the feature.
         showFeatureParent: { value: false, normalize: bool },
         // Where timbers' reference features are lit: in drawings only, everywhere, or nowhere.

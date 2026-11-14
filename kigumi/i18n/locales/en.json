@@ -14,6 +14,7 @@
   "viewer.options.drawingCenterplanes": "show centerplanes",
   "viewer.options.drawingReferenceFeatures": "highlight reference features",
   "viewer.options.centerGizmo": "center gizmo",
+  "viewer.options.scaleRuler": "scale ruler",
   "viewer.options.units.label": "units",
   "viewer.options.units.metric": "mm",
   "viewer.options.units.imperial": "inches",

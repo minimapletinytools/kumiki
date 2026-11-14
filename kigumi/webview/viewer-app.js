@@ -294,6 +294,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                     </div>
                 </div>
                 <div id="debug"></div>
+                <div id="scale-ruler" hidden aria-hidden="true">
+                    <span class="scale-ruler-label"></span>
+                    <div class="scale-ruler-bar"></div>
+                </div>
                 <div id="hint">${navigationHint}</div>
                 ${this.renderAssemblyTimeline()}
                 ${this.renderMemberContextMenu()}
@@ -917,6 +921,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         }
         // After the scene, so dimensions sit over what they measure.
         this.renderMeasurements();
+        this.updateScaleRuler(pageRect, size.y);
     }
 
     /**

@@ -143,6 +143,31 @@ canvas { display: block; width: 100%; height: 100%; }
     backdrop-filter: blur(4px);
 }
 #debug strong { color: var(--hv-strong); font-size: 13px; }
+/* The scale ruler (viewer-rendering.js updateScaleRuler): a length, and a bar that long on screen. */
+#scale-ruler {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 4px 8px 6px;
+    background: var(--hv-panel-bg);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 4px;
+    color: var(--hv-text);
+    font: 11px 'Segoe UI', sans-serif;
+    pointer-events: none;
+    user-select: none;
+}
+#scale-ruler[hidden] { display: none; }
+/* Ticks at both ends, down from a line along the bottom: a ruler's edge. */
+.scale-ruler-bar {
+    height: 6px;
+    border: 1.5px solid currentColor;
+    border-top: none;
+}
 #hint {
     position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
     color: var(--hv-hint); font: 11px 'Segoe UI', sans-serif;

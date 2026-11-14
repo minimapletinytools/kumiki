@@ -14,6 +14,7 @@
   "viewer.options.drawingCenterplanes": "中心面を表示",
   "viewer.options.drawingReferenceFeatures": "基準特徴を強調表示",
   "viewer.options.centerGizmo": "中心ギズモ",
+  "viewer.options.scaleRuler": "スケールバー",
   "viewer.options.units.label": "単位",
   "viewer.options.units.metric": "mm",
   "viewer.options.units.imperial": "インチ",
