@@ -1,11 +1,31 @@
 // The conversation as the panel draws it: requests, streamed replies (Markdown) and reasoning, tool
 // chips that open to what went in and came out, permission cards, undo notes, and requests waiting
 // their turn.
-import { t, translatePage, withLink } from './i18n.js';
+import { t, textOf, translatePage, withLink } from './i18n.js';
 import { render } from './markdown.js';
 import { pre, toolInputView } from './diff.js';
 
 const shownName = (name) => name.replace(/^mcp__kigumi__/, '');
+
+const baseName = (value) => String(value).replace(/^[a-z]+:/, '').split(/[\\/]/).pop();
+
+/** What a tool's input names: a file, a view's file, an API name or what is searched for. */
+function targetOf(input) {
+    if (!input || typeof input !== 'object') return '';
+    for (const key of ['file_path', 'panel_id', 'path']) {
+        if (typeof input[key] === 'string' && input[key]) return baseName(input[key]);
+    }
+    for (const key of ['name', 'search', 'pattern']) {
+        if (typeof input[key] === 'string' && input[key]) return input[key];
+    }
+    return '';
+}
+
+/** What a tool call is doing, in words ("Working on shed.py"), or the tool's name for one without any. */
+export function describeTool(name, input) {
+    const target = targetOf(input) || t('agent.tool.say.default');
+    return textOf(`agent.tool.say.${name}`, { target }, name);
+}
 
 /** The first string the tool was given, for the chip's one-line summary. */
 function summarise(input) {
@@ -19,10 +39,18 @@ export class Conversation {
      * @param {HTMLElement} element  where messages go
      * @param {{post: (message: object) => void, setActivity: (label: string) => void}} deps
      */
-    constructor(element, { post, setActivity }) {
+    constructor(element, { post, setActivity, scrollDown }) {
         this.element = element;
         this.post = post;
         this.setActivity = setActivity;
+        // Whether new output keeps the view at the end: not while the user has scrolled up to read.
+        this.following = true;
+        this.scrollDown = scrollDown;
+        element.addEventListener('scroll', () => {
+            this.following = element.scrollHeight - element.scrollTop - element.clientHeight < 40;
+            scrollDown.hidden = this.following;
+        });
+        scrollDown.addEventListener('click', () => this.scrollToEnd(true));
         this.welcomeHtml = element.querySelector('#welcome').outerHTML;
         this.toolChips = new Map();
         this.queued = new Map();
@@ -30,8 +58,12 @@ export class Conversation {
         this.thinking = null;
     }
 
-    scrollToEnd() {
+    /** To the end, if following it (or `force`). */
+    scrollToEnd(force = false) {
+        if (force) this.following = true;
+        if (!this.following) return;
         this.element.scrollTop = this.element.scrollHeight;
+        this.scrollDown.hidden = true;
     }
 
     add(className, text) {
@@ -49,6 +81,8 @@ export class Conversation {
         this.undoNotes.clear();
         this.queued.clear();
         this.thinking = null;
+        this.following = true;
+        this.scrollDown.hidden = true;
         this.element.innerHTML = this.welcomeHtml;
         translatePage(this.element);
     }
@@ -64,6 +98,8 @@ export class Conversation {
     /** A request as the user sees it: its text, and thumbnails of images sent with it (or how many). */
     userBubble(text, imageUrls = [], imageCount = 0) {
         this.endThinking();
+        // A new request: back to the end, to follow its answer.
+        this.following = true;
         const bubble = this.add('message-bubble user', text);
         if (imageUrls.length) {
             const row = Object.assign(document.createElement('div'), { className: 'bubble-images' });
@@ -130,14 +166,17 @@ export class Conversation {
         const chip = this.add('tool-chip is-running');
         const details = document.createElement('details');
         const summary = document.createElement('summary');
-        summary.append(Object.assign(document.createElement('span'), { className: 'tool-name', textContent: shown }),
-            Object.assign(document.createElement('span'), { className: 'tool-detail', textContent: summarise(input) }));
+        const said = describeTool(shown, input);
+        summary.appendChild(Object.assign(document.createElement('span'), { className: 'tool-name', textContent: said }));
+        // The tool's own name and the start of its input, opened, for anyone who wants them.
         const body = Object.assign(document.createElement('div'), { className: 'tool-body' });
+        body.appendChild(Object.assign(document.createElement('div'), { className: 'tool-detail',
+            textContent: [shown, summarise(input)].filter(Boolean).join(' · ') }));
         body.appendChild(toolInputView(shown, input));
         details.append(summary, body);
         chip.appendChild(details);
         this.toolChips.set(id, chip);
-        this.setActivity(t('agent.activity.running', { tool: shown }));
+        this.setActivity(said);
     }
 
     finishTool(id, isError, text) {

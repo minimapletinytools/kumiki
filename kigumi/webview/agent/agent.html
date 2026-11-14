@@ -24,13 +24,13 @@
         <section id="settings-row" class="settings-row">
             <button id="settings-toggle" class="settings-toggle" aria-expanded="false" aria-controls="settings-menu">
                 <span class="codicon codicon-chevron-right"></span>
-                <span data-i18n="agent.settings.row">MCP and agent settings</span>
+                <span data-i18n="agent.settings.row">Agent Settings and MCP</span>
             </button>
             <div id="settings-menu" class="settings-menu" hidden>
                 <div id="mcp-settings" class="settings-group" hidden>
                     <div class="settings-heading" data-i18n="agent.mcp.heading">MCP server for your own agent</div>
                     <div class="settings-hint-block" data-i18n="agent.mcp.intro">Let your own agent (Claude Code, Codex, Cursor…) see your frames, rebuild them and read their errors.</div>
-                    <label><input id="setting-mcp" type="checkbox"> <span data-i18n="agent.mcp.enable">Turn on the MCP server</span></label>
+                    <label><input id="setting-mcp" type="checkbox"> <span data-i18n="agent.mcp.enable">Enable MCP server</span></label>
                     <div id="mcp-details" class="mcp-details"></div>
                 </div>
                 <div class="settings-group">
@@ -64,6 +64,7 @@
                         </div>
                     </div>
                 </div>
+                <button id="settings-collapse" class="settings-collapse" type="button"><span data-i18n="agent.settings.collapse">Collapse</span> <span class="codicon codicon-chevron-up"></span></button>
             </div>
         </section>
         <div id="history-menu" class="history-menu" hidden>
@@ -71,37 +72,40 @@
         </div>
         <div id="bypass-banner" class="bypass-banner" hidden>Not asking before changes</div>
         <div class="agent-off-note" data-i18n="agent.off">The built-in agent is off. Turn it on in MCP and agent settings, above.</div>
-        <div id="messages" class="agent-messages">
-            <div class="agent-welcome" id="welcome">
-                <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
-                <p class="welcome-body" data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
-                <!-- The browser version's ways to run the agent, shown signed in or out (main.js, ?host=web). -->
-                <div class="web-agent-notice">
-                    <div class="web-agent-warning" role="note">
-                        <p class="web-agent-warning-title" data-i18n="agent.web.warningTitle">Important</p>
-                        <p data-i18n="agent.web.warning" data-i18n-link="agent.web.appLink" data-href="https://kumiki.build/install">The web agent is just for trying out Kumiki with low overhead. You'll get much better results with your own agent and with the <a href="https://kumiki.build/install" target="_blank" rel="noopener noreferrer">standalone app</a>.</p>
+        <div class="messages-wrap">
+            <div id="messages" class="agent-messages">
+                <div class="agent-welcome" id="welcome">
+                    <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
+                    <p class="welcome-body" data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
+                    <!-- The browser version's ways to run the agent, shown signed in or out (main.js, ?host=web). -->
+                    <div class="web-agent-notice">
+                        <div class="web-agent-warning" role="note">
+                            <p class="web-agent-warning-title" data-i18n="agent.web.warningTitle">Important</p>
+                            <p data-i18n="agent.web.warning" data-i18n-link="agent.web.appLink" data-href="https://kumiki.build/install">The web agent is just for trying out Kumiki with low overhead. You'll get much better results with your own agent and with the <a href="https://kumiki.build/install" target="_blank" rel="noopener noreferrer">standalone app</a>.</p>
+                        </div>
+                        <p class="web-agent-notice-lead" data-i18n="agent.web.signIn">Sign in to get $1 in promo tokens. You can also connect your own agent to the MCP (above).</p>
+                        <span class="web-agent-sign-in">
+                            <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
+                            <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
+                        </span>
                     </div>
-                    <p class="web-agent-notice-lead" data-i18n="agent.web.signIn">Sign in to get $1 in promo tokens. You can also connect your own agent to the MCP (above).</p>
-                    <span class="web-agent-sign-in">
-                        <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
-                        <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
-                    </span>
-                </div>
-                <!-- Shown instead of the suggestions until the agent has a way to send requests (status.js). -->
-                <div class="welcome-sign-in">
-                    <p class="welcome-sign-in-needed" data-i18n="agent.welcome.signIn">Please sign in to use the agent.</p>
-                    <p class="welcome-sign-in-buttons">
-                        <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
-                        <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
-                    </p>
-                    <p class="welcome-set-key" data-i18n="agent.welcome.setKey">Please add an OpenRouter key in the agent's settings to use the agent.</p>
-                </div>
-                <div class="suggestions">
-                    <button class="suggestion-chip" data-i18n="agent.suggest.mudsills">Create 4 mudsills on the inside of a 10'x8' footprint</button>
-                    <button class="suggestion-chip" data-i18n="agent.suggest.posts">Adjust the size of all posts to be 5"x6"</button>
-                    <button class="suggestion-chip" data-i18n="agent.suggest.drawings">Generate drawings for my frame</button>
+                    <!-- Shown instead of the suggestions until the agent has a way to send requests (status.js). -->
+                    <div class="welcome-sign-in">
+                        <p class="welcome-sign-in-needed" data-i18n="agent.welcome.signIn">Please sign in to use the agent.</p>
+                        <p class="welcome-sign-in-buttons">
+                            <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
+                            <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
+                        </p>
+                        <p class="welcome-set-key" data-i18n="agent.welcome.setKey">Please add an OpenRouter key in the agent's settings to use the agent.</p>
+                    </div>
+                    <div class="suggestions">
+                        <button class="suggestion-chip" data-i18n="agent.suggest.mudsills">Create 4 mudsills on the inside of a 10'x8' footprint</button>
+                        <button class="suggestion-chip" data-i18n="agent.suggest.posts">Adjust the size of all posts to be 5"x6"</button>
+                        <button class="suggestion-chip" data-i18n="agent.suggest.drawings">Generate drawings for my frame</button>
+                    </div>
                 </div>
             </div>
+            <button id="scroll-down" class="scroll-down" type="button" title="Jump to the latest" data-i18n-title="agent.scrollDown" hidden><span class="codicon codicon-arrow-down"></span></button>
         </div>
         <footer class="agent-footer">
             <div id="activity" class="activity" hidden>
@@ -111,14 +115,23 @@
             <div id="mentions" class="mentions" hidden></div>
             <div id="attachments" class="attachments" hidden></div>
             <div class="input-box">
-                <textarea id="prompt-input" placeholder="Ask about your frame… (@ for a file, paste an image)" data-i18n-placeholder="agent.placeholder" rows="1"></textarea>
-                <button id="plan-toggle" class="plan-toggle" title="Plan mode: the agent looks and proposes, and changes nothing" data-i18n-title="agent.plan.title" aria-pressed="false" data-i18n="agent.plan">Plan</button>
+                <textarea id="prompt-input" placeholder="Prompt here… (drag and drop images, paste content, or @ to reference a file)" data-i18n-placeholder="agent.placeholder" rows="2"></textarea>
                 <button id="send-btn" class="send-btn" title="Send message" data-i18n-title="agent.send"><span class="codicon codicon-send"></span></button>
             </div>
             <div class="footer-row">
-                <div id="route-note" class="route-note"></div>
+                <div class="mode-selects">
+                    <select id="permission-select" class="mode-select" title="Before the agent changes something" data-i18n-title="agent.settings.heading">
+                        <option value="auto" data-i18n="agent.mode.auto">Don't ask</option>
+                        <option value="ask" data-i18n="agent.mode.ask">Ask before edits</option>
+                    </select>
+                    <select id="plan-select" class="mode-select" title="Plan mode: the agent looks and proposes, and changes nothing" data-i18n-title="agent.plan.title">
+                        <option value="edit" data-i18n="agent.mode.edit">Edit</option>
+                        <option value="plan" data-i18n="agent.mode.plan">Plan</option>
+                    </select>
+                </div>
                 <div id="context-meter" class="context-meter"></div>
             </div>
+            <div id="route-note" class="route-note"></div>
         </footer>
     </div>
     <script type="module" src="main.js"></script>

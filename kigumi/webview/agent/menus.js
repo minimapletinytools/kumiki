@@ -1,9 +1,8 @@
-// The panel's settings row (MCP and agent settings: the MCP server, the built-in agent on or off,
+// The panel's settings row (Agent Settings and MCP: the MCP server, the built-in agent on or off,
 // how freely it changes things, tools always allowed, the longest step, opening at startup, the key,
-// how long past conversations are kept) and past conversations; and the banner saying when it isn't asking.
+// how long past conversations are kept), past conversations, the banner saying plan mode is on, and
+// the permission menu under the box.
 import { t } from './i18n.js';
-
-const MODE_BANNERS = { auto: 'agent.banner.auto' };
 
 function ago(time) {
     const minutes = Math.round((Date.now() - new Date(time).getTime()) / 60000);
@@ -25,16 +24,22 @@ export class Menus {
     /** `saved` and `save` keep whether the settings row is open, across reloads. */
     constructor(elements, { post, saved = {}, save = () => {} }) {
         Object.assign(this, elements, { post, save });
-        const { settingsToggle, historyButton, historyMenu, startupToggle, outputLimit, retention, keyInput,
-            mcpToggle, agentToggle, clearButton } = elements;
+        const { settingsToggle, settingsCollapse, historyButton, historyMenu, startupToggle, outputLimit, retention, keyInput,
+            mcpToggle, agentToggle, clearButton, permissionSelect } = elements;
         this.modeRadios = [...this.settingsMenu.querySelectorAll('input[name="permission-mode"]')];
         this.allowedTools = [];
         this.agentOn = true;
         this.rowOpen = saved.settingsOpen === true;
-        settingsToggle.addEventListener('click', () => {
-            this.rowOpen = !this.rowOpen;
-            this.save({ settingsOpen: this.rowOpen });
+        const setOpen = (open) => {
+            this.rowOpen = open;
+            this.save({ settingsOpen: open });
             this.showRow();
+        };
+        settingsToggle.addEventListener('click', () => setOpen(!this.rowOpen));
+        // At the bottom too: once the settings are open, their top can be a long way up.
+        settingsCollapse.addEventListener('click', () => {
+            setOpen(false);
+            settingsToggle.scrollIntoView({ block: 'nearest' });
         });
         historyButton.addEventListener('click', () => {
             historyMenu.hidden = !historyMenu.hidden;
@@ -42,6 +47,7 @@ export class Menus {
         });
         const setSetting = (key, value) => post({ type: 'agent:setSetting', key, value });
         for (const radio of this.modeRadios) radio.addEventListener('change', () => setSetting('agent.permissionMode', radio.value));
+        permissionSelect.addEventListener('change', () => setSetting('agent.permissionMode', permissionSelect.value));
         startupToggle.addEventListener('change', () => setSetting('agent.showOnStartup', startupToggle.checked));
         outputLimit.addEventListener('change', () => setSetting('agent.maxOutputTokens', Number(outputLimit.value)));
         retention.addEventListener('change', () => setSetting('agent.conversationRetentionDays', Number(retention.value)));
@@ -65,6 +71,8 @@ export class Menus {
     showRow() {
         const open = this.rowOpen || !this.agentOn;
         this.settingsMenu.hidden = !open;
+        // With the agent off there is nothing to collapse to.
+        this.settingsCollapse.hidden = !this.agentOn;
         this.settingsToggle.setAttribute('aria-expanded', String(open));
         const chevron = this.settingsToggle.querySelector('.codicon');
         chevron.classList.toggle('codicon-chevron-down', open);
@@ -83,8 +91,9 @@ export class Menus {
         this.agentSettings.hidden = !this.agentOn;
         if (!this.agentOn) this.closeHistory();
         this.showRow();
-        const mode = settings['agent.permissionMode'] || 'ask';
+        const mode = settings['agent.permissionMode'] || 'auto';
         for (const radio of this.modeRadios) radio.checked = radio.value === mode;
+        this.permissionSelect.value = mode;
         this.startupToggle.checked = settings['agent.showOnStartup'] !== false;
         this.outputLimit.value = String(settings['agent.maxOutputTokens'] || 16000);
         this.retention.value = String(settings['agent.conversationRetentionDays'] ?? 30);
@@ -98,9 +107,10 @@ export class Menus {
             clear.addEventListener('click', () => this.post({ type: 'agent:setSetting', key: 'agent.openrouterApiKey', value: '' }));
             this.keyNote.append(' ', clear);
         }
+        // Whether it asks is shown under the box; plan mode, which refuses edits, also up here.
         const planning = settings['agent.planMode'] === true;
-        this.banner.hidden = !this.agentOn || (!planning && mode === 'ask');
-        this.banner.textContent = planning ? t('agent.banner.plan') : MODE_BANNERS[mode] ? t(MODE_BANNERS[mode]) : '';
+        this.banner.hidden = !this.agentOn || !planning;
+        this.banner.textContent = planning ? t('agent.banner.plan') : '';
         this.banner.classList.toggle('is-plan', planning);
         // Tools allowed for good from a permission card, each with a way to take it back.
         this.allowedTools = settings['agent.alwaysAllow'] || [];
@@ -130,18 +140,28 @@ export class Menus {
         const clients = state.clients || [];
         const count = clients.length === 0 ? t('agent.mcp.agents.none')
             : clients.length === 1 ? t('agent.mcp.agents.one') : t('agent.mcp.agents.many', { count: clients.length });
+        // What to do with what was just copied, under the buttons until another is copied.
+        const next = el('div', 'settings-hint-block mcp-next');
+        next.hidden = true;
+        const copy = (clientId) => {
+            this.post({ type: 'agent:copyMcpSetup', client: clientId });
+            next.textContent = t(`agent.mcp.next.${clientId}`);
+            next.hidden = false;
+        };
+        const all = Object.assign(el('button', 'mcp-setup-all', t('agent.mcp.copyAll')), { type: 'button' });
+        all.addEventListener('click', () => copy('all'));
         const setups = el('div', 'mcp-setups');
         setups.append(...(state.setups || []).map((setup) => {
             const button = Object.assign(el('button', 'mcp-setup', setup.label), { type: 'button' });
             button.dataset.client = setup.id;
-            button.addEventListener('click', () => this.post({ type: 'agent:copyMcpSetup', client: setup.id }));
+            button.addEventListener('click', () => copy(setup.id));
             return button;
         }));
         const agents = el('div', 'settings-hint-block', count);
         agents.title = clients.map((client) => client.name || client.id || '').join(', ');
-        this.mcpDetails.replaceChildren(
-            el('div', 'settings-hint-block mcp-url', t('agent.mcp.serving', { url: state.url })),
-            el('div', 'settings-hint-block', t('agent.mcp.copyFor')), setups, agents);
+        const serving = el('div', 'settings-hint-block mcp-url', t('agent.mcp.serving'));
+        serving.title = state.url;
+        this.mcpDetails.replaceChildren(serving, all, el('div', 'settings-hint-block', t('agent.mcp.copyFor')), setups, next, agents);
     }
 
     showConversations({ items = [], current }) {

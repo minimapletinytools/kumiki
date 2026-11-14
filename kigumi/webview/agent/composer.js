@@ -1,15 +1,15 @@
 // The box requests are written in: sending (or queueing, while the agent works), images pasted or
-// dropped in, @-mentions picked from a list, plan mode, and the keys: Enter sends, Escape stops,
+// dropped in, @-mentions picked from a list, edit or plan mode, and the keys: Enter sends, Escape stops,
 // Up in an empty box brings back the last request.
 import { t } from './i18n.js';
 
 export class Composer {
     /**
-     * @param {object} elements  input, sendButton, attachments, mentions, planToggle
+     * @param {object} elements  input, sendButton, attachments, mentions, planSelect
      * @param {{post, isBusy: () => boolean, onSent: (text: string, imageUrls: string[]) => void}} deps
      */
-    constructor({ input, sendButton, attachments, mentions, planToggle }, { post, isBusy, onSent }) {
-        Object.assign(this, { input, sendButton, attachmentsEl: attachments, mentionsEl: mentions, planToggle, post, isBusy, onSent });
+    constructor({ input, sendButton, attachments, mentions, planSelect }, { post, isBusy, onSent }) {
+        Object.assign(this, { input, sendButton, attachmentsEl: attachments, mentionsEl: mentions, planSelect, post, isBusy, onSent });
         this.attachments = [];
         this.lastSent = '';
         this.projectFiles = null;
@@ -22,8 +22,8 @@ export class Composer {
         const { input } = this;
         input.addEventListener('keydown', (event) => this.onKey(event));
         input.addEventListener('input', () => {
-            input.style.height = 'auto';
-            input.style.height = `${Math.min(input.scrollHeight, 200)}px`;
+            // Grows with what is written, up to a point; never shrinks below the size it was dragged to.
+            if (input.scrollHeight > input.clientHeight) input.style.height = `${Math.min(input.scrollHeight + 2, 240)}px`;
             this.mentionIndex = 0;
             this.showMentions();
         });
@@ -42,8 +42,8 @@ export class Composer {
             this.attach([...event.dataTransfer.files]);
         });
         this.sendButton.addEventListener('click', () => (this.isBusy() ? this.post({ type: 'agent:stop' }) : this.send()));
-        this.planToggle.addEventListener('click', () => this.post({
-            type: 'agent:setSetting', key: 'agent.planMode', value: this.planToggle.getAttribute('aria-pressed') !== 'true',
+        this.planSelect.addEventListener('change', () => this.post({
+            type: 'agent:setSetting', key: 'agent.planMode', value: this.planSelect.value === 'plan',
         }));
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && this.isBusy() && event.target !== input) this.post({ type: 'agent:stop' });
@@ -58,7 +58,6 @@ export class Composer {
         if (!this.isBusy()) this.onSent(prompt, images.map((image) => image.url));
         this.lastSent = prompt;
         this.input.value = '';
-        this.input.style.height = 'auto';
         this.showAttachments();
         this.hideMentions();
         this.post({ type: 'agent:prompt', text: prompt, images: images.map(({ mediaType, data }) => ({ mediaType, data })) });
@@ -192,7 +191,7 @@ export class Composer {
     }
 
     setPlanMode(planning) {
-        this.planToggle.setAttribute('aria-pressed', String(planning));
-        this.planToggle.classList.toggle('is-on', planning);
+        this.planSelect.value = planning ? 'plan' : 'edit';
+        this.planSelect.classList.toggle('is-plan', planning);
     }
 }

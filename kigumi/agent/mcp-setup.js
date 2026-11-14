@@ -16,10 +16,40 @@ const MCP_CLIENTS = Object.freeze([
 
 const json = (value) => JSON.stringify(value, null, 2);
 
-/** Returns the setup text for agent `clientId`, or null for an unknown one. */
+/** Where each agent's setup goes, for the prompt that sets up any of them. */
+const WHERE = {
+    'claude-code': 'Claude Code: run this command',
+    codex: 'Codex: add this to ~/.codex/config.toml',
+    antigravity: 'Antigravity (agy): run this command',
+    'claude-desktop': "Claude Desktop: merge this into claude_desktop_config.json (Settings > Developer > Edit Config)",
+    cursor: 'Cursor: merge this into ~/.cursor/mcp.json',
+    vscode: 'VS Code: merge this into the user mcp.json (Command Palette > "MCP: Open User Configuration")',
+};
+
+/** A prompt for any agent to add the server to itself: the server, then each agent's way to add it. */
+function setupPrompt(url, token) {
+    const ways = Object.keys(WHERE).map((id) => `${WHERE[id]}:\n\n${mcpSetupText(id, url, token)}\n`);
+    return [
+        "Please add Kigumi's MCP server to yourself, so you can see, build and check my timber frames.",
+        '',
+        'Name: kigumi',
+        'Transport: HTTP (streamable)',
+        `URL: ${url}`,
+        `Header: Authorization: Bearer ${token}`,
+        '',
+        'Use whichever of these is how you add an MCP server. Add it for this user, not just this folder, if you can.',
+        '',
+        ...ways,
+        'Then tell me whether I need to restart you before the kigumi tools show up.',
+    ].join('\n');
+}
+
+/** Returns the setup text for agent `clientId` ('all': a prompt any of them can follow), or null for an unknown one. */
 function mcpSetupText(clientId, url, token) {
     const authorization = `Bearer ${token}`;
     switch (clientId) {
+        case 'all':
+            return setupPrompt(url, token);
         case 'claude-code':
             return `claude mcp add --transport http kigumi ${url} --header "Authorization: ${authorization}"`;
         case 'codex':

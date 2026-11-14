@@ -14,7 +14,7 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 protocol.registerSchemesAsPrivileged([{ scheme: 'kigumi', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 const STATE = {
-    type: 'agent:state', model: 'm1', via: 'openrouter', account: { configured: false }, strings: { 'agent.mcp.serving': 'Serving at {url}' }, conversationBytes: 2048,
+    type: 'agent:state', model: 'm1', via: 'openrouter', account: { configured: false }, strings: { 'agent.mcp.serving': 'Now serving', 'agent.tool.say.check_frame': 'Building {target} to check it' }, conversationBytes: 2048,
     models: [{ id: 'm1', label: 'Model one' }, { id: 'm2', label: 'Model two' }],
     settings: { 'agent.enabled': true, 'mcp.enabled': true, 'agent.conversationRetentionDays': 30,
         'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
@@ -84,7 +84,13 @@ app.whenReady().then(async () => {
         from = await count();
         await run(`document.querySelector('.mcp-setup[data-client="claude-code"]').click()`);
         result.mcpShown = await run('document.getElementById("mcp-details").textContent');
+        result.mcpUrl = await run('document.querySelector(".mcp-url").title');
         result.copyMcp = await posted('agent:copyMcpSetup', from);
+        result.mcpNext = await run('(() => { const next = document.querySelector(".mcp-next"); return next.hidden ? null : next.textContent; })()');
+        from = await count();
+        await run(`document.querySelector('.mcp-setup-all').click()`);
+        result.copyMcpAll = await posted('agent:copyMcpSetup', from);
+        result.mcpNextAll = await run('document.querySelector(".mcp-next").textContent');
 
         from = await count();
         await run(`(() => { window.confirm = () => true; document.getElementById('clear-conversations').click(); })()`);
@@ -107,6 +113,23 @@ app.whenReady().then(async () => {
         ] });
         await new Promise((resolve) => setTimeout(resolve, 100));
         result.drawn = await run('document.getElementById("messages").textContent');
+        result.toolSaid = await run('document.querySelector(".tool-chip .tool-name").textContent');
+
+        // Scrolled up to read, the newest is a button away; following again, the button goes.
+        result.scrolling = await run(`(async () => {
+            const messages = document.getElementById('messages');
+            const button = document.getElementById('scroll-down');
+            const tall = Object.assign(document.createElement('div'), { style: 'height: 3000px' });
+            messages.appendChild(tall);
+            messages.scrollTop = 0;
+            messages.dispatchEvent(new Event('scroll'));
+            const shown = !button.hidden;
+            button.click();
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            const atEnd = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 2;
+            tall.remove();
+            return { shown, atEnd, hiddenAfter: button.hidden };
+        })()`);
 
         await send({ type: 'agent:permission', requestId: 7, toolName: 'edit_file', input: { file_path: 'a.py' } });
         from = await count();

@@ -17,20 +17,23 @@ const status = new Status({
     activity: $('activity'), activityLabel: $('activity-label'), modelSelect: $('model-select'),
     routeNote: $('route-note'), contextMeter: $('context-meter'), todos: $('todos'),
 }, { post });
-const conversation = new Conversation($('messages'), { post, setActivity: (label) => status.setActivity(label) });
+const conversation = new Conversation($('messages'), {
+    post, setActivity: (label) => status.setActivity(label), scrollDown: $('scroll-down'),
+});
 const composer = new Composer({
-    input: $('prompt-input'), sendButton: $('send-btn'), attachments: $('attachments'), mentions: $('mentions'), planToggle: $('plan-toggle'),
+    input: $('prompt-input'), sendButton: $('send-btn'), attachments: $('attachments'), mentions: $('mentions'), planSelect: $('plan-select'),
 }, { post, isBusy: () => busy, onSent: (text, imageUrls) => {
     status.hideFinishedTodos();
     conversation.userBubble(text, imageUrls);
 } });
 const menus = new Menus({
-    settingsToggle: $('settings-toggle'), settingsMenu: $('settings-menu'), historyButton: $('btn-history'), historyMenu: $('history-menu'),
+    settingsToggle: $('settings-toggle'), settingsCollapse: $('settings-collapse'), settingsMenu: $('settings-menu'), historyButton: $('btn-history'), historyMenu: $('history-menu'),
     historyList: $('history-list'), alwaysAllowed: $('always-allowed'), startupToggle: $('setting-startup'), outputLimit: $('setting-output-limit'),
     retention: $('setting-retention'), usage: $('conversation-usage'), clearButton: $('clear-conversations'),
     mcpSettings: $('mcp-settings'), mcpToggle: $('setting-mcp'), mcpDetails: $('mcp-details'),
     agentToggle: $('setting-agent-enabled'), agentSettings: $('agent-settings'),
     keyInput: $('setting-openrouter-key'), keyNote: $('setting-openrouter-key-note'), banner: $('bypass-banner'),
+    permissionSelect: $('permission-select'),
 }, {
     post,
     saved: vscode.getState() || {},

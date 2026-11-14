@@ -44,8 +44,14 @@ const canRun = typeof electron === 'string' && fs.existsSync(electron) && (proce
     });
 
     test('the settings row shows the MCP server, copies a setup, and deletes past conversations', () => {
-        expect(result.mcpShown).toContain('http://127.0.0.1:7345/mcp');
+        // Serving, with its address on hover rather than in the way.
+        expect(result.mcpUrl).toBe('http://127.0.0.1:7345/mcp');
+        expect(result.mcpShown).not.toContain('http://127.0.0.1:7345/mcp');
         expect(result.copyMcp).toEqual({ type: 'agent:copyMcpSetup', client: 'claude-code' });
+        // Each copy says what to do next, under the buttons.
+        expect(result.mcpNext).toBeTruthy();
+        expect(result.copyMcpAll).toEqual({ type: 'agent:copyMcpSetup', client: 'all' });
+        expect(result.mcpNextAll).not.toBe(result.mcpNext);
         expect(result.clearConversations).toEqual({ type: 'agent:clearConversations' });
     });
 
@@ -62,6 +68,14 @@ const canRun = typeof electron === 'string' && fs.existsSync(electron) && (proce
     test('a permission card answers its question; one left when the turn ends can no longer be answered', () => {
         expect(result.answer).toEqual({ type: 'agent:permissionAnswer', requestId: 7, allow: true, always: false });
         expect(result.unansweredLeft).toBe(0);
+    });
+
+    test("a tool call says what it is doing, not the tool's name", () => {
+        expect(result.toolSaid).toBe('Building sawhorse.py to check it');
+    });
+
+    test('scrolled up, a button brings the newest back', () => {
+        expect(result.scrolling).toEqual({ shown: true, atEnd: true, hiddenAfter: true });
     });
 
     test('a replayed conversation is drawn', () => {

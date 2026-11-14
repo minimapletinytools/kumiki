@@ -37,7 +37,7 @@ const PANEL_SETTINGS = {
     'agent.enabled': { fallback: false, valid: (value) => typeof value === 'boolean' },
     'mcp.enabled': { fallback: false, valid: (value) => typeof value === 'boolean' },
     'agent.conversationRetentionDays': CONVERSATION_RETENTION,
-    'agent.permissionMode': { fallback: 'ask', valid: (value) => PERMISSION_MODES.includes(value) },
+    'agent.permissionMode': { fallback: 'auto', valid: (value) => PERMISSION_MODES.includes(value) },
     'agent.alwaysAllow': { fallback: [], valid: (value) => Array.isArray(value) && value.every((name) => typeof name === 'string') },
     'agent.showOnStartup': { fallback: true, valid: (value) => typeof value === 'boolean' },
     'agent.planMode': { fallback: false, valid: (value) => typeof value === 'boolean' },

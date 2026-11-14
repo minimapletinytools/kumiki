@@ -709,7 +709,7 @@ describe('the agent session', () => {
             account: { configured: false },
             // The key is set from the panel, which only learns that there is one.
             settings: { 'agent.enabled': false, 'mcp.enabled': false, 'agent.conversationRetentionDays': 30,
-                'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
+                'agent.permissionMode': 'auto', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
                 'agent.maxOutputTokens': 16000, 'agent.openrouterApiKey': true },
             conversationBytes: null,
             strings: {},
@@ -1050,8 +1050,11 @@ describe('the agent session', () => {
         expect(describeFailure({ statusCode: 402, message: 'Payment Required' })).toEqual({ key: 'agent.error.noCredit', text: 'Out of credit.' });
     });
 
-    test('permission modes: ask before edits, or never ask', async () => {
+    test('permission modes: never ask unless set to, then ask before edits', async () => {
         const { agent, posted, values } = session();
+        // Not asking is the default.
+        await expect(agent.permissions.ask('edit_file', {})).resolves.toBe(true);
+        agent.handle({ type: 'agent:setSetting', key: 'agent.permissionMode', value: 'ask' });
         const asked = () => posted.filter((message) => message.type === 'agent:permission').length;
 
         void agent.permissions.ask('edit_file', {});
@@ -1080,7 +1083,7 @@ describe('the agent session', () => {
     test('asking, building a file runs freely when a view shows it or the agent wrote it, else asks', async () => {
         const viewed = { ...panels, list: () => [{ kind: 'viewer', filePath: '/project/shown.py' }] };
         const agent = new AgentSession({ host: hostOf({ panels: viewed, files: fakeFiles('/project') }), post: () => {},
-            setting: (key, fallback) => fallback });
+            setting: (key, fallback) => (key === 'agent.permissionMode' ? 'ask' : fallback) });
         agent.conversation.checkpoints.begin(1);
         await agent.conversation.checkpoints.beforeWrite('/project/written.py');
 
@@ -1091,7 +1094,7 @@ describe('the agent session', () => {
     });
 
     test('"always allow" from a permission card holds for that tool from then on', async () => {
-        const { agent, posted, values } = session();
+        const { agent, posted, values } = session({ settings: { 'agent.permissionMode': 'ask' } });
         const first = agent.permissions.ask('check_frame', { file_path: 'a.py' });
         const { requestId } = posted.find((message) => message.type === 'agent:permission');
         agent.handle({ type: 'agent:permissionAnswer', requestId, allow: true, always: true });
@@ -1103,7 +1106,7 @@ describe('the agent session', () => {
     });
 
     test('a tool waiting for the user is answered from the panel, and stopping says no', async () => {
-        const { agent, posted } = session();
+        const { agent, posted } = session({ settings: { 'agent.permissionMode': 'ask' } });
 
         const first = agent.permissions.ask('edit_file', { file_path: 'a.py' });
         const { requestId } = posted.find((message) => message.type === 'agent:permission');

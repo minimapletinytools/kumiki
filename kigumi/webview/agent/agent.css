@@ -48,6 +48,36 @@ body {
     color: var(--ka-fg);
 }
 
+/* The conversation, with the jump-to-the-latest button over its bottom right. */
+.messages-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.scroll-down {
+    position: absolute;
+    right: 14px;
+    bottom: 10px;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: var(--ka-accent);
+    color: var(--ka-accent-fg);
+    box-shadow: 0 2px 8px var(--ka-shadow, rgba(0, 0, 0, 0.3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.scroll-down[hidden] {
+    display: none;
+}
+
 .agent-messages {
     flex: 1;
     overflow-y: auto;
@@ -119,18 +149,20 @@ body {
     flex: none;
 }
 
+/* Where to write: set apart from the conversation by an accent border, so it reads as the place to start. */
 .input-box {
     display: flex;
     align-items: flex-end;
     gap: 6px;
     background: var(--ka-bg);
-    border: 1px solid var(--ka-border);
-    border-radius: 6px;
-    padding: 6px 8px;
+    border: 1.5px solid color-mix(in srgb, var(--ka-accent) 55%, var(--ka-border));
+    border-radius: 8px;
+    padding: 8px 10px;
+    box-shadow: 0 1px 4px var(--ka-shadow, rgba(0, 0, 0, 0.15));
 }
 
 .input-box:focus-within {
-    border-color: var(--ka-focus);
+    border-color: var(--ka-accent);
 }
 
 textarea {
@@ -140,9 +172,14 @@ textarea {
     color: var(--ka-fg);
     font-family: inherit;
     font-size: 13px;
-    resize: none;
+    resize: vertical;
     outline: none;
-    max-height: 120px;
+    min-height: 2.6em;
+    max-height: 50vh;
+}
+
+textarea::placeholder {
+    color: var(--ka-muted);
 }
 
 .send-btn {
@@ -182,14 +219,16 @@ textarea {
 }
 
 .tool-chip .tool-name {
-    font-family: var(--ka-mono);
     color: var(--ka-fg);
 }
 
+/* Inside a chip, opened: the tool's own name and the start of its input. */
 .tool-chip .tool-detail {
+    font-family: var(--ka-mono);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    margin-bottom: 4px;
 }
 
 .tool-chip.is-running .tool-name::before {
@@ -487,6 +526,52 @@ textarea {
 .mcp-setup:hover {
     background: var(--ka-hover);
 }
+/* The one most people want: a prompt any agent can follow. */
+.mcp-setup-all {
+    align-self: flex-start;
+    margin: 4px 0;
+    padding: 5px 12px;
+    border: none;
+    border-radius: 4px;
+    background: var(--ka-accent);
+    color: var(--ka-accent-fg);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.mcp-setup-all:hover {
+    opacity: 0.9;
+}
+/* What to do with what was just copied. */
+.mcp-next {
+    color: var(--ka-fg);
+    border-left: 2px solid var(--ka-accent);
+    padding: 2px 0 2px 8px;
+}
+.mcp-next[hidden] {
+    display: none;
+}
+.settings-collapse {
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--ka-border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ka-muted);
+    font: inherit;
+    font-size: 11px;
+    padding: 1px 10px;
+    cursor: pointer;
+}
+.settings-collapse:hover {
+    color: var(--ka-fg);
+    background: var(--ka-hover);
+}
+.settings-collapse[hidden] {
+    display: none;
+}
 .settings-storage {
     display: flex;
     flex-wrap: wrap;
@@ -561,16 +646,37 @@ body.agent-off #btn-clear {
 
 .footer-row {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
+    margin-top: 6px;
+}
+
+/* Whether it asks, and edit or plan: under the box, bottom left. */
+.mode-selects {
+    display: flex;
+    gap: 6px;
+}
+
+.mode-select {
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font: inherit;
+    font-size: 11px;
+    padding: 1px 4px;
+}
+
+.mode-select.is-plan {
+    border-color: var(--ka-accent);
+    color: var(--ka-accent);
 }
 
 .context-meter {
     color: var(--ka-muted);
     font-size: 11px;
     white-space: nowrap;
-    margin-top: 6px;
 }
 
 .context-meter.is-high {
@@ -821,24 +927,6 @@ body.agent-off #btn-clear {
 
 .checkpoint-note.is-undone {
     text-decoration: line-through;
-}
-
-.plan-toggle {
-    align-self: center;
-    border: 1px solid var(--ka-border);
-    border-radius: 10px;
-    background: transparent;
-    color: var(--ka-muted);
-    font: inherit;
-    font-size: 11px;
-    padding: 1px 8px;
-    cursor: pointer;
-}
-
-.plan-toggle.is-on {
-    background: var(--ka-accent);
-    border-color: var(--ka-accent);
-    color: var(--ka-accent-fg);
 }
 
 .bypass-banner.is-plan {
