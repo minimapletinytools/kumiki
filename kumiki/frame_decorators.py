@@ -28,7 +28,7 @@ A frame is admitted only if its annotations say exactly `(k: Kiwari) -> Frame`;
 A pattern book marks each of its patterns instead, with a path and, if it takes parameters,
 its own kiwari::
 
-    @pattern("basic_joints/basic_mortise_and_tenon", tags=["main"], kiwari=MORTISE_AND_TENON_OPTIONS)
+    @pattern("basic_joints/mortise_and_tenon/face_aligned", tags=["main"], kiwari=MORTISE_AND_TENON_OPTIONS)
     def basic_mortise_and_tenon(k: Optional[Kiwari] = None) -> Joint:
         ...
 
