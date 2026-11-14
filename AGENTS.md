@@ -11,6 +11,13 @@ This is the canonical instruction entry point for AI coding agents in this repos
     - this file is the same one our end users will use, however we also author examples and patterns internally so it's useful for kumiki development as well.
 
 
+## After merging a PR
+
+Always update the local `main` branch from `origin/main` after merging a PR.
+Preserve local commits and uncommitted changes, including work by other agents;
+never reset or discard them to update the branch. If `main` is checked out in
+another worktree, update it there.
+
 ## Skills
 
 - Repository-local Claude skills folder: `.claude/skills/`
