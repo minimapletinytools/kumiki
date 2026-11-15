@@ -255,39 +255,50 @@ DONE-sliding dovetail (maybe you want tapered variants)
 :: TODO
 
 
--assembly timeline should just combine with assembly preview beta option so there is just the beta option
--selected panel should show timber type (e.g. Select: Cabriole Leg (mesh)) the regular rectangular dtimebrs don't eed it, just the other types, it shoul dsay (mesh, round, polygon)
+DONE-assembly timeline should just combine with assembly preview beta option so there is just the beta option
+DONE-selected panel should show timber type (e.g. Select: Cabriole Leg (mesh)) the regular rectangular dtimebrs don't eed it, just the other types, it shoul dsay (mesh, round, polygon)
+DONE-improve default prompts to not be clickable or whatever
+DONE-simple function for creating the default drawing and solving it (full frame, 3 views, only measure what's visible)
 
 
-
--improve default prompts to not be clickable or whatever
-
-
--improve agent panel visual clarity
-  -maybe do highligh tutorial tips thingy
-  -add buttno that says "prompt below"
-  
-  -summary should be highlighted
--make sure trackpad scrolling in agent panel is working
--remove undo prompt or allow undo for the undo
--add some jokes into the ouptut
-
-
-
-
-
--create 3d measurement tool (guess itneeds to save to file), code measurement sstillp refrered
--add skill to explain to users how things are working ,maybe add an option to toggle "explain how it works"
--refresh seems slow again, check perf on web?
 -drawing beta nedes to be on by default and or explaini n prompts
 -ad options for MCP to read and write options
 -back to 3d. vie button needs to be bigger
 -the measurement viewport list view is maybe a little useless, make it less prnompnent
 
 
+-refine centerline, refreence edge and PTW highlighting in drawings view
+-add option to color refreences arris/face differently maybe
+-add legend to drawings view
+-add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
+-if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
+  -either add it as a separate menu after a divider
+  -get rid of it in 2d drawing view
+  -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
+-update shed example to include board
 
 
--see if you can make use of ButtJointCSGParts
+-maybe do drawing prettifier pass
+  -viewport optimization?
+  -spread out mesaurements
+  -smarter about which features to place measurements
+
+
+
+
+-improve agent panel visual clarity
+  -maybe do highligh tutorial tips thingy
+  -add buttno that says "prompt below"
+  -summary should be highlighted
+-make sure trackpad scrolling in agent panel is working
+-remove undo prompt or allow undo for the undo
+-add some jokes into the ouptut
+-create 3d measurement tool (guess itneeds to save to file), code measurement sstillp refrered
+-add skill to explain to users how things are working ,maybe add an option to toggle "explain how it works"
+-refresh seems slow again, check perf on web?
+
+
+
 
 
 -add shouder to cross lap joint
@@ -298,8 +309,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
-
-
 
 -update wedged half dovtail to support shoulder shapes and peg
   -see if you can make use of ButtJointCSGParts
@@ -343,19 +352,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
   -msg mods on r/woodworking if they will allow promo
 
 
-  DONE-simple function for creating the default drawing and solving it (full frame, 3 views, only measure what's visible)
-  -refine centerline, refreence edge and PTW highlighting in drawings view
-  -add option to color refreences arris/face differently maybe
-  -add legend to drawings view
-  
-  -maybe do drawing prettifier pass
-  -add legend to drawing view. so it's clear what is referenc, what is PTw and hat is centerline
-  -if there is only 1 choice, right clicing will still show export stl/step which is a littl eweird
-    -either add it as a separate menu after a divider
-    -get rid of it in 2d drawing view
-    -or get rid of it entirely when selecting second featurre (but it will still show on selecting the first feature...)
-    
--update shed example to include board
 
 
 
