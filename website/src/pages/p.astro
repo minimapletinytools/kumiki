@@ -1,0 +1,91 @@
+---
+// Where a shared frame's link lands (kumiki.build/p/#<id>): what it is, and where to open it.
+// The id is after the #, so it never reaches the server, and one static page serves every link.
+import Layout from '../layouts/Layout.astro';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const tryKigumi = import.meta.env.PUBLIC_KIGUMI_TRY === 'true';
+const backend = 'https://kigumi-backend.kigumi-backend.workers.dev';
+---
+<Layout title="Shared frame — Kigumi" description="A timber frame shared from Kigumi." canonicalPath="/p/">
+  <article class="shared" data-backend={backend} data-try={tryKigumi ? `${base}/try/` : ''}>
+    <p class="kicker">Shared frame</p>
+    <h1 id="shared-title">Opening a shared frame…</h1>
+    <p id="shared-detail" class="detail"></p>
+    <div id="shared-actions" class="actions" hidden>
+      {tryKigumi && <a id="open-browser" class="btn btn-primary" href="#">Open in the browser</a>}
+      <a id="open-app" class="btn btn-secondary" href="#">Open in the Kigumi app</a>
+    </div>
+    <p class="note">
+      Don't have the app? <a href={`${base}/install`}>Install Kigumi</a>. A shared frame opens read-only; copy it to a project to change it.
+    </p>
+  </article>
+
+  <script>
+    const page = document.querySelector('.shared') as HTMLElement;
+    const title = document.getElementById('shared-title')!;
+    const detail = document.getElementById('shared-detail')!;
+    const actions = document.getElementById('shared-actions')!;
+    const match = /^#([A-Za-z0-9]{22})$/.exec(window.location.hash);
+
+    async function show() {
+      if (!match) {
+        title.textContent = 'This link is not a shared frame.';
+        return;
+      }
+      const id = match[1];
+      const browser = document.getElementById('open-browser') as HTMLAnchorElement | null;
+      if (browser && page.dataset.try) browser.href = `${page.dataset.try}#publish=${id}`;
+      (document.getElementById('open-app') as HTMLAnchorElement).href = `kigumi://publish/${id}`;
+      try {
+        const response = await fetch(`${page.dataset.backend}/publishes/${id}`);
+        if (response.status === 404) {
+          title.textContent = 'Nothing is shared at this link.';
+          detail.textContent = 'It may have been taken down.';
+          return;
+        }
+        if (!response.ok) throw new Error(String(response.status));
+        const manifest = await response.json();
+        title.textContent = manifest.title;
+        const date = new Date(manifest.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+        detail.textContent = `Shared ${date}, built with kumiki ${manifest.kumikiVersion}.`;
+      } catch {
+        title.textContent = 'A shared frame';
+        detail.textContent = "Couldn't look it up just now, but you can still open it.";
+      }
+      actions.hidden = false;
+    }
+    void show();
+  </script>
+</Layout>
+
+<style>
+  .shared {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 4rem 0 3rem;
+  }
+  .kicker {
+    color: var(--ink-faint);
+    margin: 0 0 0.5rem;
+  }
+  h1 {
+    font-family: var(--serif);
+    margin: 0 0 0.75rem;
+    overflow-wrap: anywhere;
+  }
+  .detail {
+    color: var(--ink-soft);
+    min-height: 1.5em;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 1.75rem 0;
+  }
+  .note {
+    color: var(--ink-faint);
+    font-size: 0.95rem;
+  }
+</style>

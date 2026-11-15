@@ -6,6 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { isReadOnly } = require('../read-only');
 
 /**
  * @param {object} options
@@ -97,7 +98,7 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
         surface.onMessage(async (message) => {
             if (!message) return;
             if (message.type === 'editorReady') {
-                void surface.postMessage({ type: 'init', filePath, content: fileContent, line });
+                void surface.postMessage({ type: 'init', filePath, content: fileContent, line, readOnly: isReadOnly(filePath) });
             } else if (message.type === 'editorDirty') {
                 tab.isDirty = !!message.isDirty;
                 changed(filePath, tab, false);
@@ -107,6 +108,7 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
                 pendingContent.delete(message.requestId);
                 if (resolve) resolve(message.content);
             } else if (message.type === 'editorSave') {
+                if (isReadOnly(filePath)) return;
                 try {
                     tab.save(message.content);
                 } catch (error) {

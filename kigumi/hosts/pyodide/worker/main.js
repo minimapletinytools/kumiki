@@ -106,6 +106,7 @@ async function start() {
     const queued = [];
     let receive = (message) => queued.push(message);
     let onAuthLink = (url) => queued.push({ authLink: url });
+    let onPublishLink = (id) => queued.push({ publishLink: id });
     let runTestTool = null;
     self.onmessage = (event) => {
         // For the browser test (test/browser-smoke.cjs): a file changed as an editor save would.
@@ -121,6 +122,11 @@ async function start() {
         // Sign-in came back (page/auth.html): finish it.
         if (event.data && event.data.type === 'web:authLink') {
             onAuthLink(String(event.data.url));
+            return;
+        }
+        // A shared frame's link the page was opened with.
+        if (event.data && event.data.type === 'web:openPublish') {
+            onPublishLink(String(event.data.id));
             return;
         }
         receive(event.data);
@@ -245,6 +251,7 @@ async function start() {
         setHost(createBrowserHost({
             connection, workspaceFolder: project ? project.dir : null, settings, locale: locale(), runCommand, setStatus, setProgress,
             editors, showLog: openLog, log, mcp: mcp.controls, closeProject: () => switchProject(null), agentPanel: true,
+            publishing: { backendUrl: browserBackend.backendUrl, account: () => prepareAgent().account },
             projects: {
                 open: () => pickProject(),
                 recent: () => knownProjects.map((one) => ({ id: one.id, label: one.name, description: 'In this browser' })),
@@ -547,8 +554,13 @@ async function start() {
         connection.pushState();
     });
     post({ type: 'web:ready' });
+    onPublishLink = (id) => {
+        if (!kigumiApp) return;
+        void Promise.resolve(kigumiApp.commands['kigumi.openPublish'](id)).catch((error) => log(`[share] [error] ${error.message}`));
+    };
     for (const message of queued.splice(0)) {
         if (message.authLink) onAuthLink(message.authLink);
+        else if (message.publishLink) onPublishLink(message.publishLink);
         else receive(message);
     }
     mcpReady = true;

@@ -22,7 +22,7 @@ const { createShellHostServices } = require('../../app-shell/host-services');
  * @param {object} [options.projects]  opening a project (host.js `projects`)
  */
 function createBrowserHost({ connection, workspaceFolder, settings, locale = 'en', runCommand, setStatus, setProgress, editors,
-    showLog = null, log = () => {}, agentPanel = false, mcp = null, closeProject = null, projects = null }) {
+    showLog = null, log = () => {}, agentPanel = false, mcp = null, closeProject = null, projects = null, publishing = null }) {
     return {
         locale,
         // The keys as written for the browser's system (keybindings.js).
@@ -36,6 +36,8 @@ function createBrowserHost({ connection, workspaceFolder, settings, locale = 'en
         ...(closeProject ? { closeProject } : {}),
         // Project status's Open Project and recent projects, with none open.
         ...(projects ? { projects } : {}),
+        // Sharing frames at a link: the backend, and the account to publish with.
+        ...(publishing ? { publishing } : {}),
         ...(showLog ? { showLog } : {}),
         async showMessage(level, text, ...actions) {
             setStatus(level, text);

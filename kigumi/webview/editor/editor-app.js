@@ -34,7 +34,7 @@
         return 'plaintext';
     }
 
-    function initMonaco({ filePath, content, line = 1 }) {
+    function initMonaco({ filePath, content, line = 1, readOnly = false }) {
         currentFilePath = filePath;
         originalContent = content;
         isDirty = false;
@@ -45,6 +45,7 @@
 
             editor = monaco.editor.create(container, {
                 model,
+                readOnly,
                 theme: themeNow(),
                 automaticLayout: true,
                 fontSize: 13,

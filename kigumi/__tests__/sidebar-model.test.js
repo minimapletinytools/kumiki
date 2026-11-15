@@ -175,7 +175,8 @@ describe('status rows', () => {
     const model = new SidebarModel();
     await model.refresh(true);
     const tree = model.getTree();
-    expect(tree.find((row) => row.type === 'projectStatusAction')).toBeUndefined();
+    // Only the hint that a project is needed to edit frames, in place of Initialize Project.
+    expect(tree.filter((row) => row.type === 'projectStatusAction').map((row) => row.key)).toEqual(['no-project-hint']);
     const rows = tree.filter((row) => row.type === 'openProjectAction');
     expect(rows[0].action).toEqual({ command: 'kigumi.openProject', arguments: [] });
     expect(rows.slice(1).map((row) => row.label)).toEqual(['Project 1', 'Project 2', 'Project 3', 'Project 4', 'Project 5']);

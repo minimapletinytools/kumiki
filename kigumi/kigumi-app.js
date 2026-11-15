@@ -29,6 +29,10 @@ const {
 const { configureToolchain, UV_VERSION } = require('./python-toolchain');
 const { getHost } = require('./host');
 const { findPatternLine } = require('./pattern-source-utils');
+const { createPublishes, parsePublishLink, findLocalDependencies } = require('./publishes');
+const { createLibrary } = require('./library');
+const { addReadOnlyRoot } = require('./read-only');
+const { getKigumiVersion, isOlderVersion } = require('./python-env');
 const { createTranslator } = require('./i18n');
 
 const KUMIKI_WEBSITE = 'https://github.com/minimapletinytools/kumiki';
@@ -195,7 +199,23 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         }
     }));
 
+    // With no project open, kumiki's examples and patterns and shared frames run in the library.
+    const library = createLibrary({ root: path.join(storagePath, 'library') });
+    // Shared frames, where the host has a backend (host.publishing): opened ones are read-only.
+    // For the app tests: a stand-in backend (kigumi.testSetPublishBackend).
+    let testPublishBackend = null;
+    const publishes = host.publishing && host.publishing.backendUrl ? createPublishes({
+        backendUrl: () => testPublishBackend || host.publishing.backendUrl,
+        account: host.publishing.account || (() => null),
+        libraryRoot: library.root,
+        getConfig: (key, fallback) => host.getConfig(key, fallback),
+        updateConfig: (key, value) => host.updateConfig(key, value),
+    }) : null;
+    if (publishes) disposables.push(addReadOnlyRoot(path.join(library.root, 'publishes')));
+
     const sidebarModel = new SidebarModel({
+        library,
+        publishes: publishes ? () => publishes.list() : null,
         getPythonCommand: () => {
             const mainSession = _findAnyAliveMainSession();
             if (!mainSession || !mainSession.runnerSession || !mainSession.runnerSession.isAlive()) {
@@ -298,6 +318,26 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         },
         'kigumi.refreshSidebar': () => sidebarModel.refresh(true),
         'kigumi.refreshPatterns': () => sidebarModel.refresh(true),
+        'kigumi.prepareLibrary': () => prepareLibrary(),
+        'kigumi.publishFrame': (target) => publishFrame(_extractSourcePathFromSidebarElement(target) || target),
+        'kigumi.openPublish': (idOrLink) => openPublish(idOrLink),
+        'kigumi.addPublishFromLink': async () => {
+            const text = await host.askText({ prompt: t('message.openPublishPrompt'), value: '' });
+            if (text) await openPublish(text);
+        },
+        'kigumi.copyPublishLink': async (target) => {
+            const id = publishIdOf(target);
+            if (!publishes || !id) return;
+            await host.copyText(publishes.link(id));
+            host.showMessage('info', t('message.linkCopied', { link: publishes.link(id) }));
+        },
+        'kigumi.removePublish': async (target) => {
+            const id = publishIdOf(target);
+            if (!publishes || !id) return;
+            await publishes.remove(id);
+            sidebarModel.changed();
+        },
+        'kigumi.copyPublishToProject': (target) => copyPublishToProject(publishIdOf(target)),
         'kigumi.toggleGroupByPatternbook': () => sidebarModel.toggleGroupByPatternbook(),
 
         'kigumi.toggleAutoRefreshOnFileChange': async () => {
@@ -750,6 +790,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
     if (enableTestCommands) {
         commands['kigumi.testGetSidebarSnapshot'] = async (options = {}) => sidebarModel.getTestSnapshot(options);
 
+        commands['kigumi.testSetPublishBackend'] = (url) => { testPublishBackend = url || null; };
         commands['kigumi.testGetSessionSnapshot'] = async (options = {}) => {
             const active = host.activeFile();
             const targetFilePath = typeof options.filePath === 'string' && options.filePath
@@ -920,6 +961,128 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         const session = await getOrCreateSession(filePath);
         session.reveal();
         await session.refresh(options.reason || 'open current file in viewer');
+    }
+
+    const publishIdOf = (target) => (target && target.data && target.data.publishId) || (typeof target === 'string' ? target : null);
+
+    async function prepareLibrary() {
+        const preparing = library.prepare();
+        sidebarModel.changed();
+        try {
+            await host.withProgress(t('message.preparingLibrary'), () => preparing);
+        } catch (error) {
+            outputChannel.appendLine(`[library] [error] ${error.stack || error}`);
+            host.showMessage('error', t('message.prepareLibraryFailed', { error: error.message }));
+            sidebarModel.changed();
+            return false;
+        }
+        await sidebarModel.refresh(true);
+        return true;
+    }
+
+    /** "Share Publicly…": a frozen copy of a frame at a link, once the user says so. */
+    async function publishFrame(filePath) {
+        if (!publishes || !publishes.canPublish) {
+            host.showMessage('error', t('message.publishUnavailable'));
+            return null;
+        }
+        if (typeof filePath !== 'string' || !filePath) {
+            host.showMessage('error', t('message.selectPatternOrFrameFirst'));
+            return null;
+        }
+        const name = path.basename(filePath);
+        const projectRoot = getWorkspaceRoot() || path.dirname(filePath);
+        const dependencies = findLocalDependencies(filePath, projectRoot);
+        if (dependencies.length > 0) {
+            host.showMessage('warning', t('message.publishUsesProjectFiles', { name, files: dependencies.map((one) => one.name).join(', ') }));
+            return null;
+        }
+        const ok = await host.confirm({ message: t('message.publishConfirm', { name }),
+            detail: t('message.publishConfirmDetail'), action: t('message.publishConfirmAction') });
+        if (!ok) return null;
+        const { installedVersion } = await getWorkspaceKumikiVersionInfo(projectRoot, filePath).catch(() => ({}));
+        if (!installedVersion || installedVersion === 'unknown') {
+            host.showMessage('error', t('message.publishNoKumikiVersion', { name }));
+            return null;
+        }
+        try {
+            const { link } = await host.withProgress(t('message.publishProgress', { name }), () => publishes.publish(filePath, {
+                projectRoot, kumikiVersion: installedVersion, kigumiVersion: getKigumiVersion(),
+            }));
+            await host.copyText(link);
+            host.showMessage('info', t('message.published', { name, link }));
+            outputChannel.appendLine(`[share] Shared ${name}: ${link}`);
+            return link;
+        } catch (error) {
+            if (error.code === 'SIGN_IN') {
+                const account = host.publishing.account();
+                const github = t('message.signInGitHub');
+                const google = t('message.signInGoogle');
+                const picked = await host.showMessage('info', t('message.signInToPublish'), github, google);
+                if (picked && account) await account.signIn(picked === github ? 'github' : 'google');
+                return null;
+            }
+            outputChannel.appendLine(`[share] [error] Sharing ${name} failed: ${error.stack || error}`);
+            host.showMessage('error', t('message.publishFailed', { name, error: error.message }));
+            return null;
+        }
+    }
+
+    /** Open a shared frame from its link (or id): downloaded once, then shown read-only. */
+    async function openPublish(idOrLink) {
+        if (!publishes) {
+            host.showMessage('error', t('message.publishUnavailable'));
+            return null;
+        }
+        const id = parsePublishLink(idOrLink);
+        if (!id) {
+            host.showMessage('error', t('message.notAPublishLink'));
+            return null;
+        }
+        if (!getWorkspaceRoot() && !library.ready() && !(await prepareLibrary())) return null;
+        let opened;
+        try {
+            opened = await host.withProgress(t('message.openingPublish'), () => publishes.open(id));
+        } catch (error) {
+            outputChannel.appendLine(`[share] [error] Opening ${id} failed: ${error.stack || error}`);
+            host.showMessage('error', t('message.openPublishFailed', { error: error.message }));
+            return null;
+        }
+        sidebarModel.changed();
+        const { manifest, entryPath } = opened;
+        await openFileInViewer(entryPath);
+        const root = getWorkspaceRoot() || library.root;
+        const { installedVersion } = await getWorkspaceKumikiVersionInfo(root, entryPath).catch(() => ({}));
+        const args = { title: manifest.title, version: manifest.kumikiVersion, installed: installedVersion };
+        host.showMessage(installedVersion && installedVersion !== 'unknown' && isOlderVersion(installedVersion, manifest.kumikiVersion)
+            ? 'warning' : 'info',
+        t(installedVersion && installedVersion !== 'unknown' && isOlderVersion(installedVersion, manifest.kumikiVersion)
+            ? 'message.publishNewerKumiki' : 'message.openedPublish', args));
+        return entryPath;
+    }
+
+    /** A shared frame copied into the open project, where it can be changed. */
+    async function copyPublishToProject(id) {
+        const workspaceRoot = getWorkspaceRoot();
+        if (!workspaceRoot) {
+            const openLabel = t('sidebar.openProject');
+            const picked = await host.showMessage('info', t('message.openProjectToCopy'), ...(host.projects ? [openLabel] : []));
+            if (picked === openLabel) void host.projects.open();
+            return null;
+        }
+        if (!publishes || !id) return null;
+        let entryPath = publishes.entryPath(id);
+        if (!entryPath || !fs.existsSync(entryPath)) {
+            entryPath = (await publishes.open(id)).entryPath;
+        }
+        const { duplicateFrameToWorkspace } = require('./pattern-source-utils');
+        const copied = await duplicateFrameToWorkspace(entryPath, workspaceRoot);
+        const entry = publishes.list().find((one) => one.id === id);
+        host.showMessage('info', t('message.copiedPublishToProject', { title: entry ? entry.title : path.basename(entryPath),
+            path: path.relative(workspaceRoot, copied) }));
+        await sidebarModel.refreshWorkspace();
+        await openFileInViewer(copied);
+        return copied;
     }
 
     async function openFileInViewer(filePath) {

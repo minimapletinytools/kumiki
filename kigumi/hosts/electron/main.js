@@ -345,6 +345,13 @@ function openProject() {
         mcp: mcpControls,
         closeProject: () => closeWorkspaceFolder(),
         // Project status's Open Project and recent folders, with none open.
+        publishing: backendConfig(process.env).supabaseUrl ? {
+            backendUrl: backendConfig(process.env).backendUrl,
+            account: () => {
+                if (!account) createAppAccount();
+                return account;
+            },
+        } : null,
         projects: {
             open: () => chooseWorkspaceFolder(),
             recent: () => recentFolders().map((one) => ({ id: one.path, label: one.name, description: tildePath(one.path) })),
@@ -358,6 +365,11 @@ function openProject() {
         enableTestCommands: process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1',
         bundledUv: bundledUvPath(),
     });
+    if (pendingPublishLink) {
+        const link = pendingPublishLink;
+        pendingPublishLink = null;
+        handlePublishLink(link);
+    }
     kigumiApp.sidebarController.attach(connection.createPanel('explorer', { title: 'Explorer' }));
 }
 
@@ -449,6 +461,25 @@ function handleAuthLink(url) {
     account.completeSignIn(url).then(() => logChannel.appendLine('[account] signed in')).catch((error) => {
         logChannel.appendLine(`[account] sign-in failed: ${error.message}`);
         setStatus('error', `Could not sign in: ${error.message}`);
+    });
+}
+
+// A kigumi://publish/<id> link (a shared frame) that came before the app was ready.
+let pendingPublishLink = process.argv.find((arg) => arg.startsWith('kigumi://publish/')) || null;
+
+/** A shared frame's link from the browser: open it here. */
+function handlePublishLink(url) {
+    if (!kigumiApp) {
+        pendingPublishLink = url;
+        return;
+    }
+    logChannel.appendLine(`[share] Opening ${url}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+    }
+    void Promise.resolve(kigumiApp.commands['kigumi.openPublish'](url)).catch((error) => {
+        logChannel.appendLine(`[share] [error] ${error.message}`);
     });
 }
 
@@ -1022,6 +1053,7 @@ if (backendConfig(process.env).supabaseUrl) {
 app.on('open-url', (event, url) => {
     event.preventDefault();
     if (url.startsWith('kigumi://auth')) handleAuthLink(url);
+    else if (url.startsWith('kigumi://publish/')) handlePublishLink(url);
 });
 
 // One Kigumi at a time: a second launch focuses the running window.
@@ -1033,6 +1065,11 @@ if (!app.requestSingleInstanceLock()) {
         const link = argv.find((arg) => arg.startsWith('kigumi://auth'));
         if (link) {
             handleAuthLink(link);
+            return;
+        }
+        const shared = argv.find((arg) => arg.startsWith('kigumi://publish/'));
+        if (shared) {
+            handlePublishLink(shared);
             return;
         }
         if (!mainWindow || mainWindow.isDestroyed()) return;
