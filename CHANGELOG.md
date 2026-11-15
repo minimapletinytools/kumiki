@@ -8,6 +8,33 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-11-14
+
+### kumiki
+
+#### Added
+
+- STL timbers: `create_stl_timber(reference, stl_path, *, units='mm', placement=None)` imports a watertight STL as stock, taking its joinery coordinates, size and ticket from a reference timber, and takes ordinary CSG cuts. A cabriole table example shows one. See `docs/stl_timbers.md`.
+
+### kigumi
+
+#### Added
+
+- An STL placement editor: select an STL timber (one without a placement shows amber, marked "needs stl placement") and click **Edit STL placement** to move, rotate and scale its mesh in the reference timber, then **Update configuration** writes the placement into the source.
+- Right-clicking a timber in the 3D view gives one menu: focus the camera on it, the features under the pointer (Tab cycles them), then export it as STL or STEP.
+- The selection panel says what type a selected timber is (round, polygon, mesh).
+- View Source and Duplicate open a pattern's file at that pattern.
+
+#### Changed
+
+- A new logo, used by the app, the extension and the website.
+- The agent panel: clearer MCP setup, with one button that copies the setup prompt for every agent; tool calls described in words; a set-apart, resizable prompt box with the permission mode and plan/edit choices beneath it; a button back down to the newest message; and a welcome that points to the MCP, to signing in, and to one example prompt to try.
+- The assembly preview has one beta option, in place of separate preview and timeline toggles.
+
+#### Fixed
+
+- The agent panel never scrolls sideways, and dragging the panel divider can no longer get stuck.
+
 ## [0.9.5] - 2026-11-13
 
 ### kumiki

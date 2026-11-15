@@ -551,7 +551,7 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             maybe_bottom_end_cut_distance_from_bottom=end_cut_from_bottom if end == TimberEnd.BOTTOM else None,
             negative_csg=parts[0] if len(parts) == 1 else CSGUnion(children=parts),
             # Without pegs or stubby tenons the cut is the slot alone, named as such.
-            **({"label": CutCSGLabel("spline_slot_cut")} if len(parts) == 1 else {}),
+            label=CutCSGLabel("spline_slot_cut") if len(parts) == 1 else CutCSGLabel.NoLabel(),
         )
 
     butt_1_cut = _butt_cut(butt_timber_1, arrangement.butt_timber_1_end, butt_1_end_cut_from_bottom, butt_1_negative_parts)
