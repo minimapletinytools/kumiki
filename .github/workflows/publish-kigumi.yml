@@ -167,6 +167,27 @@ jobs:
           name: kigumi-vsix
           path: .
 
+      - name: Check out the Marketplace icon
+        uses: actions/checkout@v4
+        with:
+          path: repo
+          sparse-checkout: .github/marketplace-icon.png
+          sparse-checkout-cone-mode: false
+
+      # The Marketplace allows 3 icon changes a year, so it keeps the icon it has; Open VSX gets the new one.
+      - name: Use the Marketplace icon
+        shell: bash
+        run: |
+          python3 - "${{ needs.build.outputs.vsix_name }}" repo/.github/marketplace-icon.png <<'PY'
+          import shutil, sys, zipfile
+          vsix, icon = sys.argv[1:]
+          with zipfile.ZipFile(vsix) as src, zipfile.ZipFile(vsix + '.tmp', 'w', zipfile.ZIP_DEFLATED) as out:
+              for item in src.infolist():
+                  data = open(icon, 'rb').read() if item.filename == 'extension/extension-icon.png' else src.read(item)
+                  out.writestr(item, data)
+          shutil.move(vsix + '.tmp', vsix)
+          PY
+
       - name: Publish extension
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
