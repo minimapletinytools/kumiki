@@ -32,8 +32,8 @@ export function fill(template: string, values: Record<string, string>): string {
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-/** A page's link in `lang`: /install, or /ja/install. */
+/** Return a page link in `lang` with a trailing slash. */
 export function localePath(lang: Lang, path: string): string {
-  if (lang === 'en') return `${base}${path}`;
-  return `${base}/ja${path === '/' ? '/' : path}`;
+  const page = `${path.replace(/\/$/, '')}/`;
+  return `${base}${lang === 'en' ? '' : '/ja'}${page}`;
 }

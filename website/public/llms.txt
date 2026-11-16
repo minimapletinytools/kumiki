@@ -57,8 +57,8 @@ Kumiki is purpose-built for AI agent-assisted design workflows. The Kigumi deskt
 
 ## Core Documentation
 
-- [Getting Started & Installation](https://kumiki.build/install): Download the Kigumi desktop app for Mac or Windows, try it in the browser, or install the VS Code / OpenVSX extension; Kigumi sets up Python and Kumiki automatically.
-- [Joints & Pattern Catalog](https://kumiki.build/joints): Visual guide to Kumiki's parametric Japanese and Western joinery functions and how they compare to generic CSG CAD.
+- [Getting Started & Installation](https://kumiki.build/install/): Download the Kigumi desktop app for Mac or Windows, try it in the browser, or install the VS Code / OpenVSX extension; Kigumi sets up Python and Kumiki automatically.
+- [Joints & Pattern Catalog](https://kumiki.build/joints/): Visual guide to Kumiki's parametric Japanese and Western joinery functions and how they compare to generic CSG CAD.
 - [Documentation Index](https://kumiki.build/docs/): Overview of documentation, tutorials, and library structure.
 - [Concepts & Design Theory](https://kumiki.build/docs/concepts/): Coordinate systems, local transforms, the Perfect Timber Within model, reference features, and tolerance rules.
 - [AI Agent Usage Instructions](https://github.com/minimapletinytools/kumiki/blob/main/docs/agent_usage_instructions.md): Canonical authoring rules, structural patterns, Kiwari parameterization, drawings, and validation workflows for coding agents.
@@ -69,9 +69,9 @@ Kumiki is purpose-built for AI agent-assisted design workflows. The Kigumi deskt
 
 ## Ecosystem & Links
 
-- [About Kumiki](https://kumiki.build/about): Background, philosophy, and history of Kumiki and Japanese carpentry.
+- [About Kumiki](https://kumiki.build/about/): Background, philosophy, and history of Kumiki and Japanese carpentry.
 - [GitHub Repository](https://github.com/minimapletinytools/kumiki): Source code, issue tracker, release notes, and community contributions.
-- [Kigumi Desktop App Downloads](https://kumiki.build/install): Mac (Apple silicon & Intel) and Windows installers with built-in AI agent and MCP server.
+- [Kigumi Desktop App Downloads](https://kumiki.build/install/): Mac (Apple silicon & Intel) and Windows installers with built-in AI agent and MCP server.
 - [Kigumi in the Browser](https://kumiki.build/try/): Zero-install browser environment running Kigumi and Python via WebAssembly.
 - [Kigumi VS Code Extension](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi): Visual Studio Code Marketplace extension.
 - [Kigumi on OpenVSX](https://open-vsx.org/extension/minimaple/kigumi): OpenVSX package for Cursor, VSCodium, and Windsurf.

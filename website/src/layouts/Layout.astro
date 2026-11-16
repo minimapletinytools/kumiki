@@ -42,7 +42,7 @@ const tryKigumi = import.meta.env.PUBLIC_KIGUMI_TRY === 'true';
 const siteUrl = 'https://kumiki.build';
 const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
 const urlFor = (one: Lang, path: string) => `${siteUrl}${localePath(one, path).slice(base.length)}`;
-const canonicalUrl = canonicalPath ? urlFor(lang, canonicalPath) : `${siteUrl}${pathname === '/' ? '' : pathname}`;
+const canonicalUrl = canonicalPath ? urlFor(lang, canonicalPath) : `${siteUrl}${pathname === '/' ? '/' : `${pathname}/`}`;
 const imageUrl = image.startsWith('http') ? image : `${siteUrl}${image.startsWith('/') ? '' : '/'}${image}`;
 
 const graphNodes: any[] = [
@@ -57,7 +57,7 @@ const graphNodes: any[] = [
     publisher: {
       '@type': 'Organization',
       name: 'minimaple',
-      url: 'https://kumiki.build',
+      url: 'https://kumiki.build/',
     },
     sameAs: [
       'https://github.com/minimapletinytools/kumiki',
@@ -90,7 +90,7 @@ const graphNodes: any[] = [
       'STEP, STL, OBJ, and 3MF export',
     ],
     screenshot: `${siteUrl}/photos/tinyhouse120_angle.png`,
-    url: 'https://kumiki.build',
+    url: 'https://kumiki.build/',
     downloadUrl: 'https://pypi.org/project/kumiki/',
     codeRepository: 'https://github.com/minimapletinytools/kumiki',
     license: 'https://www.mozilla.org/MPL/2.0/',
@@ -120,9 +120,9 @@ const graphNodes: any[] = [
     },
     description:
       'Interactive 3D timber frame viewer and editor for Kumiki: a desktop app for macOS and Windows, an extension for Visual Studio Code and Cursor, and a browser version with a built-in AI agent and MCP server.',
-    url: 'https://kumiki.build/install',
-    installUrl: 'https://kumiki.build/install',
-    downloadUrl: 'https://kumiki.build/install',
+    url: 'https://kumiki.build/install/',
+    installUrl: 'https://kumiki.build/install/',
+    downloadUrl: 'https://kumiki.build/install/',
     releaseNotes: releasePage,
     screenshot: `${siteUrl}/photos/double_sawhorse_xray.png`,
   },
@@ -137,7 +137,7 @@ if (effectivePath && effectivePath !== '/') {
         '@type': 'ListItem',
         position: 1,
         name: 'Kumiki',
-        item: siteUrl,
+        item: `${siteUrl}/`,
       },
       {
         '@type': 'ListItem',
@@ -297,7 +297,7 @@ const structuredData = {
       </div>
       <div class="footer-bottom">
         <span set:html={s.footer.copyright} />
-        <span class="footer-legal"><a href={`${base}/privacy`}>{s.footer.privacy}</a> <a href={`${base}/terms`}>{s.footer.terms}</a></span>
+        <span class="footer-legal"><a href={`${base}/privacy/`}>{s.footer.privacy}</a> <a href={`${base}/terms/`}>{s.footer.terms}</a></span>
       </div>
     </footer>
     <script>

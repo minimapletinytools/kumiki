@@ -4,5 +4,5 @@ import { defineConfig } from 'astro/config';
 // drop `base` (or set it to '/') and add `public/CNAME` containing the domain.
 export default defineConfig({
   site: 'https://kumiki.build',
-  trailingSlash: 'ignore',
+  trailingSlash: 'always',
 });
