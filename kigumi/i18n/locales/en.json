@@ -593,7 +593,7 @@
   "sidebar.libraryPrepare.desc": "sets up kumiki to view them",
   "sidebar.libraryPreparing": "Setting up kumiki…",
   "message.publishConfirm": "Share {name} publicly?",
-  "message.publishConfirmDetail": "Anyone with the link can view it. A shared frame can't be changed: sharing it again makes a new link.",
+  "message.publishConfirmDetail": "Beta preview: this makes a public link anyone can view. Shared files may be deleted, so don't count on this for long-term sharing. A shared frame can't be changed: sharing it again makes a new link.",
   "message.publishConfirmAction": "Share Publicly",
   "message.publishUsesProjectFiles": "{name} can't be shared: it uses other files in its project ({files}), and sharing those isn't supported yet.",
   "message.publishProgress": "Sharing {name}…",

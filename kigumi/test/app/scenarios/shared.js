@@ -59,13 +59,13 @@ module.exports = {
                 const box = document.getElementById('confirm');
                 if (!box || box.hidden) return null;
                 const warning = document.getElementById('confirm-warning');
-                return { message: document.getElementById('confirm-message').textContent, warning: warning.hidden ? null : warning.textContent,
+                return { message: document.getElementById('confirm-message').textContent, detail: document.getElementById('confirm-detail').textContent, warning: warning.hidden ? null : warning.textContent,
                     color: getComputedStyle(warning).color, error: getComputedStyle(document.documentElement).getPropertyValue('--ka-error').trim() };
             })()`), { timeoutMs: 10000 }).catch(() => null);
             await new Promise((resolve) => setTimeout(resolve, 300));
             await capture('shared-00-share-dialog');
-            check('sharing asks first, saying in red that the mesh file and measurements won\'t be shared',
-                dialog && dialog.message.includes('frame.py') && dialog.warning && dialog.warning.includes('leg.stl')
+            check('sharing asks first, as a beta preview, saying in red that the mesh file and measurements won\'t be shared',
+                dialog && dialog.message.includes('frame.py') && dialog.detail.startsWith('Beta preview') && dialog.warning && dialog.warning.includes('leg.stl')
                     && dialog.warning.includes('measurements') && dialog.color !== 'rgb(0, 0, 0)' && Boolean(dialog.error),
                 JSON.stringify(dialog));
             await inShell(`document.getElementById('confirm-ok').click()`);

@@ -593,7 +593,7 @@
   "sidebar.libraryPrepare.desc": "表示用に kumiki を準備します",
   "sidebar.libraryPreparing": "kumiki を準備中…",
   "message.publishConfirm": "{name} を公開して共有しますか？",
-  "message.publishConfirmDetail": "リンクを知っている人は誰でも閲覧できます。共有したフレームは変更できません。もう一度共有すると新しいリンクになります。",
+  "message.publishConfirmDetail": "ベータ版プレビュー：誰でも閲覧できる公開リンクを作成します。共有したファイルは削除される場合があるため、長期の共有には使わないでください。共有したフレームは変更できません。もう一度共有すると新しいリンクになります。",
   "message.publishConfirmAction": "公開して共有",
   "message.publishUsesProjectFiles": "{name} は共有できません：プロジェクト内の他のファイル（{files}）を使っており、それらの共有にはまだ対応していません。",
   "message.publishProgress": "{name} を共有中…",
