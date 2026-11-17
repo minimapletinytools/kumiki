@@ -1,3 +1,5 @@
+// Sharing a frame asks first, saying in red what it goes without (a mesh file, its measurements),
+// then uploads it to a stand-in backend and copies the link.
 // A shared frame's link opens the frame in a viewer, from a stand-in backend: it is listed under
 // Shared with the kumiki version it was built with, its source opens read-only, and it can be
 // copied into the project or taken off the list.
@@ -11,13 +13,24 @@ const SHA = 'f'.repeat(64);
 
 module.exports = {
     name: 'shared',
-    async run({ check, inShell, waitFor, runAppCommand, connection, capture, FRAME, REPO }) {
+    async run({ check, inShell, waitFor, runAppCommand, connection, capture, clipboard, FRAME, REPO }) {
         const text = fs.readFileSync(FRAME, 'utf8');
         const manifest = { id: ID, title: 'Little shared frame', entry: 'little_shared_frame.py', kumikiVersion: '0.9.6',
             kigumiVersion: '0.9.6', createdAt: '2026-11-15T00:00:00.000Z', role: 'view',
             files: [{ path: 'little_shared_frame.py', sha256: SHA, size: text.length }] };
         const requests = [];
+        const posted = [];
         const server = http.createServer((request, response) => {
+            if (request.method === 'POST' && request.url === '/publishes') {
+                let body = '';
+                request.on('data', (chunk) => { body += chunk; });
+                request.on('end', () => {
+                    posted.push(JSON.parse(body));
+                    response.statusCode = 201;
+                    response.end(JSON.stringify({ ...manifest, id: 'PostedSharedFrameAbcde1' }));
+                });
+                return;
+            }
             requests.push(request.url);
             if (request.url === `/publishes/${ID}`) response.end(JSON.stringify(manifest));
             else if (request.url === `/publishes/${ID}/files/${SHA}`) response.end(text);
@@ -30,8 +43,39 @@ module.exports = {
             return row ? row.textContent.replace(/\\s+/g, ' ').trim() : null;
         })()`);
         let copied = null;
+        const sharing = path.join(REPO, '.kigumi', `share-smoke-${process.pid}`);
         try {
             await runAppCommand('kigumi.testSetPublishBackend', `http://127.0.0.1:${server.address().port}`);
+
+            // A frame that names an STL and has measurements saved: shared, without them.
+            fs.mkdirSync(path.join(sharing, '.kigumi', 'drawings'), { recursive: true });
+            const framePath = path.join(sharing, 'frame.py');
+            fs.writeFileSync(framePath, `${text}\nLEG_MESH = 'leg.stl'\n`);
+            fs.writeFileSync(path.join(sharing, 'leg.stl'), 'solid leg\nendsolid leg\n');
+            fs.writeFileSync(path.join(sharing, '.kigumi', 'drawings', 'frame.json'), '{}');
+            clipboard.writeText('');
+            const publishing = runAppCommand('kigumi.publishFrame', framePath);
+            const dialog = await waitFor(() => inShell(`(() => {
+                const box = document.getElementById('confirm');
+                if (!box || box.hidden) return null;
+                const warning = document.getElementById('confirm-warning');
+                return { message: document.getElementById('confirm-message').textContent, warning: warning.hidden ? null : warning.textContent,
+                    color: getComputedStyle(warning).color, error: getComputedStyle(document.documentElement).getPropertyValue('--ka-error').trim() };
+            })()`), { timeoutMs: 10000 }).catch(() => null);
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            await capture('shared-00-share-dialog');
+            check('sharing asks first, saying in red that the mesh file and measurements won\'t be shared',
+                dialog && dialog.message.includes('frame.py') && dialog.warning && dialog.warning.includes('leg.stl')
+                    && dialog.warning.includes('measurements') && dialog.color !== 'rgb(0, 0, 0)' && Boolean(dialog.error),
+                JSON.stringify(dialog));
+            await inShell(`document.getElementById('confirm-ok').click()`);
+            const link = await publishing;
+            const pasted = await clipboard.readText();
+            check('then uploads the frame alone, with its kumiki version, and copies the link',
+                link === 'https://kumiki.build/p/#PostedSharedFrameAbcde1' && pasted === link
+                    && posted.length === 1 && posted[0].files.map((file) => file.path).join() === 'frame.py'
+                    && /^\d+\.\d+\.\d+/.test(posted[0].kumikiVersion),
+                `${link} ${JSON.stringify(posted.map((one) => ({ files: one.files.map((file) => file.path), kumiki: one.kumikiVersion })))}`);
             const entryPath = await runAppCommand('kigumi.openPublish', `https://kumiki.build/p/#${ID}`);
             check('a share link downloads the frame', typeof entryPath === 'string' && fs.readFileSync(entryPath, 'utf8') === text,
                 `${entryPath} ${JSON.stringify(requests)}`);
@@ -69,6 +113,7 @@ module.exports = {
         } finally {
             await runAppCommand('kigumi.testSetPublishBackend', null);
             server.close();
+            fs.rmSync(sharing, { recursive: true, force: true });
             if (copied && copied.startsWith(REPO)) fs.rmSync(copied, { force: true });
         }
     },

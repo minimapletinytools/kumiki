@@ -258,6 +258,16 @@ class ShellConnection {
         });
     }
 
+    // Asks a yes/no question in the shell, with an optional warning in red; resolves true for yes.
+    confirm({ message, detail, warning, action, cancel } = {}) {
+        const requestId = this.nextPick++;
+        return new Promise((resolve) => {
+            this.pendingPicks.set(requestId, { confirm: true, resolve });
+            this.send({ type: 'confirm:show', requestId, message: message || '', detail: detail || '', warning: warning || '',
+                action: action || 'OK', cancel: cancel || 'Cancel' });
+        });
+    }
+
     // Shows the quick pick as a text box; resolves with what was typed, or undefined.
     ask({ prompt, value } = {}) {
         const requestId = this.nextPick++;
@@ -303,6 +313,14 @@ class ShellConnection {
             case 'panel:loaded':
                 if (panel) panel._loaded();
                 break;
+            case 'confirm:result': {
+                const pending = this.pendingPicks.get(message.requestId);
+                if (pending) {
+                    this.pendingPicks.delete(message.requestId);
+                    pending.resolve(message.ok === true);
+                }
+                break;
+            }
             case 'quickpick:result': {
                 const pending = this.pendingPicks.get(message.requestId);
                 if (pending) {

@@ -599,9 +599,6 @@
   "message.publishProgress": "{name} を共有中…",
   "message.published": "{name} を共有しました。リンクをコピーしました：{link}",
   "message.publishFailed": "{name} を共有できませんでした：{error}",
-  "message.signInToPublish": "フレームを共有するにはサインインしてください。",
-  "message.signInGitHub": "GitHub でサインイン",
-  "message.signInGoogle": "Google でサインイン",
   "message.publishUnavailable": "ここでは共有できません。",
   "message.publishNoKumikiVersion": "{name} がどの kumiki バージョンで作られたか分かりませんでした。",
   "message.openPublishPrompt": "Kigumi の共有リンクを貼り付けてください",
@@ -614,5 +611,9 @@
   "message.copiedPublishToProject": "{title} を {path} にコピーしました",
   "message.linkCopied": "リンクをコピーしました：{link}",
   "message.preparingLibrary": "プロジェクトなしでフレームを表示するため kumiki を準備しています…",
-  "message.prepareLibraryFailed": "kumiki を準備できませんでした：{error}"
+  "message.prepareLibraryFailed": "kumiki を準備できませんでした：{error}",
+  "message.publishNotShared": "次のものは共有されないため、閲覧する人には表示されません：{files}。",
+  "message.publishNotShared.mesh": "{name}（メッシュ材）",
+  "message.publishNotShared.measurements": "寸法と図面",
+  "message.publishNotShared.parameters": "保存したパラメータ値"
 }

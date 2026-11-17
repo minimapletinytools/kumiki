@@ -599,9 +599,6 @@
   "message.publishProgress": "Sharing {name}…",
   "message.published": "Shared {name}. The link is copied: {link}",
   "message.publishFailed": "Couldn't share {name}: {error}",
-  "message.signInToPublish": "Sign in to share frames.",
-  "message.signInGitHub": "Sign in with GitHub",
-  "message.signInGoogle": "Sign in with Google",
   "message.publishUnavailable": "Sharing isn't available here.",
   "message.publishNoKumikiVersion": "Couldn't tell which kumiki version {name} is built with.",
   "message.openPublishPrompt": "Paste a Kigumi share link",
@@ -614,5 +611,9 @@
   "message.copiedPublishToProject": "Copied {title} to {path}",
   "message.linkCopied": "Link copied: {link}",
   "message.preparingLibrary": "Setting up kumiki to view frames without a project…",
-  "message.prepareLibraryFailed": "Couldn't set up kumiki: {error}"
+  "message.prepareLibraryFailed": "Couldn't set up kumiki: {error}",
+  "message.publishNotShared": "These won't be shared, so people viewing it won't see them: {files}.",
+  "message.publishNotShared.mesh": "{name} (mesh timbers)",
+  "message.publishNotShared.measurements": "its measurements and drawings",
+  "message.publishNotShared.parameters": "its saved parameter values"
 }

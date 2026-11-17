@@ -2,7 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { createPublishes, parsePublishLink, findLocalDependencies } = require('../publishes');
+const { createPublishes, parsePublishLink, findLocalDependencies, checkSharing } = require('../publishes');
 const { SidebarModel } = require('../sidebar-model');
 const { setHost } = require('../host');
 
@@ -73,48 +73,70 @@ describe('what a frame uses from its project', () => {
 });
 
 describe('publishing', () => {
-    function account(signedIn = true) {
+    // The backend, which anyone may publish to: no token is sent.
+    function backend() {
         const calls = [];
-        return {
-            calls,
-            state: () => ({ signedIn }),
-            fetchWithToken: async (url, init) => {
-                calls.push({ url, body: JSON.parse(init.body) });
-                return new Response(JSON.stringify({ id: ID, title: 'frame', entry: 'frame.py', kumikiVersion: '0.9.6', files: [] }), { status: 201 });
-            },
+        const fetch = async (url, init) => {
+            calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+            return new Response(JSON.stringify({ id: ID, title: 'frame', entry: 'frame.py', kumikiVersion: '0.9.6', files: [] }), { status: 201 });
         };
+        return { calls, fetch };
     }
 
-    test('sends the frame and the kumiki version it is built with, and gives the link', async () => {
+    test('sends the frame and the kumiki version it is built with, signed in or not, and gives the link', async () => {
         const root = tempDir();
         const frame = path.join(root, 'frame.py');
         fs.writeFileSync(frame, FRAME);
-        const signedIn = account();
-        const publishes = createPublishes({ backendUrl: 'https://backend.test/', libraryRoot: tempDir(), account: () => signedIn, ...settings() });
+        const server = backend();
+        const publishes = createPublishes({ backendUrl: 'https://backend.test/', libraryRoot: tempDir(), fetch: server.fetch, ...settings() });
+        expect(publishes.canPublish).toBe(true);
         const { link } = await publishes.publish(frame, { projectRoot: root, kumikiVersion: '0.9.6', kigumiVersion: '0.9.7' });
         expect(link).toBe(`https://kumiki.build/p/#${ID}`);
-        expect(signedIn.calls).toEqual([{ url: 'https://backend.test/publishes', body: {
+        expect(server.calls).toEqual([{ url: 'https://backend.test/publishes', headers: { 'Content-Type': 'application/json' }, body: {
             title: 'frame', entry: 'frame.py', kumikiVersion: '0.9.6', kigumiVersion: '0.9.7', files: [{ path: 'frame.py', text: FRAME }],
         } }]);
     });
 
-    test('refuses a frame that uses other project files, before asking anything of the server', async () => {
+    test('refuses a frame that imports other project files, before asking anything of the server', async () => {
         const root = tempDir();
         fs.writeFileSync(path.join(root, 'parts.py'), '');
         fs.writeFileSync(path.join(root, 'frame.py'), `import parts\n${FRAME}`);
-        const signedIn = account();
-        const publishes = createPublishes({ backendUrl: 'https://backend.test', libraryRoot: tempDir(), account: () => signedIn, ...settings() });
+        const server = backend();
+        const publishes = createPublishes({ backendUrl: 'https://backend.test', libraryRoot: tempDir(), fetch: server.fetch, ...settings() });
         await expect(publishes.publish(path.join(root, 'frame.py'), { projectRoot: root, kumikiVersion: '0.9.6' }))
             .rejects.toMatchObject({ dependencies: [{ kind: 'import', name: 'parts' }] });
-        expect(signedIn.calls).toEqual([]);
+        expect(server.calls).toEqual([]);
     });
 
-    test('asks to sign in first', async () => {
+    test('shares a frame with mesh timbers, measurements and parameter values without them', async () => {
         const root = tempDir();
-        fs.writeFileSync(path.join(root, 'frame.py'), FRAME);
-        const publishes = createPublishes({ backendUrl: 'https://backend.test', libraryRoot: tempDir(), account: () => account(false), ...settings() });
-        await expect(publishes.publish(path.join(root, 'frame.py'), { projectRoot: root, kumikiVersion: '0.9.6' }))
-            .rejects.toMatchObject({ code: 'SIGN_IN' });
+        fs.writeFileSync(path.join(root, 'leg.stl'), 'solid');
+        fs.mkdirSync(path.join(root, '.kigumi', 'drawings'), { recursive: true });
+        fs.writeFileSync(path.join(root, '.kigumi', 'drawings', 'frame.json'), '{}');
+        fs.writeFileSync(path.join(root, 'frame.parameters.json'), '{}');
+        fs.writeFileSync(path.join(root, 'frame.py'), `${FRAME}leg = create_stl_timber(ref, 'leg.stl')\n`);
+        expect(checkSharing(path.join(root, 'frame.py'), root)).toEqual({ refused: [], notShared: [
+            { kind: 'mesh', name: 'leg.stl' },
+            { kind: 'measurements', name: path.join('.kigumi', 'drawings', 'frame.json') },
+            { kind: 'parameters', name: 'frame.parameters.json' },
+        ] });
+        const server = backend();
+        const publishes = createPublishes({ backendUrl: 'https://backend.test', libraryRoot: tempDir(), fetch: server.fetch, ...settings() });
+        await publishes.publish(path.join(root, 'frame.py'), { projectRoot: root, kumikiVersion: '0.9.6' });
+        expect(server.calls[0].body.files.map((file) => file.path)).toEqual(['frame.py']);
+    });
+
+    test('a mesh timber whose file it doesn\'t name is still said', () => {
+        const root = tempDir();
+        fs.writeFileSync(path.join(root, 'frame.py'), `${FRAME}leg = MeshTimber(mesh=make_mesh())\n`);
+        expect(checkSharing(path.join(root, 'frame.py'), root).notShared).toEqual([{ kind: 'mesh', name: 'mesh timbers' }]);
+    });
+
+    test('a file it reads that isn\'t a mesh is refused', () => {
+        const root = tempDir();
+        fs.writeFileSync(path.join(root, 'sizes.csv'), '1,2');
+        fs.writeFileSync(path.join(root, 'frame.py'), `${FRAME}sizes = open('sizes.csv').read()\n`);
+        expect(checkSharing(path.join(root, 'frame.py'), root).refused).toEqual([{ kind: 'file', name: 'sizes.csv' }]);
     });
 });
 

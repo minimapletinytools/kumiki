@@ -3,7 +3,8 @@
  * copy that never changes; opening one downloads it into the library folder and shows it read-only.
  * The links opened are kept in the `shared.publishes` setting, for the explorer's Shared section.
  *
- * Host-neutral: the host gives the backend's URL and, where it can sign in, the account.
+ * Host-neutral: the host gives the backend's URL. Anyone may publish, signed in or not; the backend
+ * limits how often, and records no one.
  */
 
 const fs = require('fs');
@@ -67,16 +68,46 @@ function findLocalDependencies(filePath, projectRoot) {
     return found;
 }
 
+// Mesh files a mesh timber loads (kumiki/stl.py).
+const MESH_FILE = /\.(stl|obj|ply|off|3mf|glb|gltf)$/i;
+
+/**
+ * What sharing a frame would leave behind. `refused`: what it can't run without (modules it imports
+ * from the project, files it reads), so it isn't shared. `notShared`: what it is shared without,
+ * which viewers won't see: mesh files and mesh timbers, its measurements and drawings, and its saved
+ * parameter values.
+ * @returns {{refused: {kind, name}[], notShared: {kind: 'mesh'|'measurements'|'parameters', name: string}[]}}
+ */
+function checkSharing(filePath, projectRoot) {
+    const refused = [];
+    const notShared = [];
+    for (const one of findLocalDependencies(filePath, projectRoot)) {
+        if (one.kind === 'file' && MESH_FILE.test(one.name)) notShared.push({ kind: 'mesh', name: one.name });
+        else refused.push(one);
+    }
+    const source = fs.readFileSync(filePath, 'utf8');
+    if (notShared.length === 0 && /\b(create_stl_timber|STLTimber|MeshTimber)\b/.test(source)) {
+        notShared.push({ kind: 'mesh', name: 'mesh timbers' });
+    }
+    const dir = path.dirname(filePath);
+    const stem = path.basename(filePath, '.py');
+    // Where runner.py keeps them: measurements and drawings, and parameter values.
+    const drawings = path.join('.kigumi', 'drawings', `${stem}.json`);
+    if (fs.existsSync(path.join(dir, drawings))) notShared.push({ kind: 'measurements', name: drawings });
+    const parameters = `${stem}.parameters.json`;
+    if (fs.existsSync(path.join(dir, parameters))) notShared.push({ kind: 'parameters', name: parameters });
+    return { refused, notShared };
+}
+
 /**
  * @param {object} options
  * @param {string|(() => string)} options.backendUrl
  * @param {string} options.libraryRoot  where opened publishes are kept: <libraryRoot>/publishes/<id>/
- * @param {() => object|null} [options.account]  agent/account.js, where the host can sign in
  * @param {(key: string, fallback: any) => any} options.getConfig
  * @param {(key: string, value: any) => Promise<void>} options.updateConfig
  * @param {typeof fetch} [options.fetch]
  */
-function createPublishes({ backendUrl, libraryRoot, account = () => null, getConfig, updateConfig,
+function createPublishes({ backendUrl, libraryRoot, getConfig, updateConfig,
     fetch: fetcher = (...args) => fetch(...args) }) {
     const apiOf = () => String((typeof backendUrl === 'function' ? backendUrl() : backendUrl) || '').replace(/\/$/, '');
     const publishesDir = path.join(libraryRoot, 'publishes');
@@ -102,9 +133,9 @@ function createPublishes({ backendUrl, libraryRoot, account = () => null, getCon
         link: publishLink,
         list,
 
-        /** Whether this host can publish: it has a backend and an account to sign in with. */
+        /** Whether this host can publish: it has a backend. */
         get canPublish() {
-            return Boolean(apiOf() && account());
+            return Boolean(apiOf());
         },
 
         /** The publish a path is part of, or null: its files are read-only. */
@@ -120,20 +151,14 @@ function createPublishes({ backendUrl, libraryRoot, account = () => null, getCon
          * @returns {Promise<{manifest: object, link: string}>}
          */
         async publish(filePath, { projectRoot, title, kumikiVersion, kigumiVersion }) {
-            const dependencies = findLocalDependencies(filePath, projectRoot);
+            const dependencies = checkSharing(filePath, projectRoot).refused;
             if (dependencies.length > 0) {
                 const error = new Error('This frame uses other files in its project, which can\'t be published yet.');
                 error.dependencies = dependencies;
                 throw error;
             }
-            const signedIn = account();
-            if (!signedIn || !signedIn.state().signedIn) {
-                const error = new Error('Sign in to publish.');
-                error.code = 'SIGN_IN';
-                throw error;
-            }
             const name = path.basename(filePath);
-            const response = await signedIn.fetchWithToken(`${apiOf()}/publishes`, {
+            const response = await fetcher(`${apiOf()}/publishes`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: title || name.replace(/\.py$/, ''), entry: name, kumikiVersion, kigumiVersion,
@@ -190,4 +215,4 @@ function createPublishes({ backendUrl, libraryRoot, account = () => null, getCon
     };
 }
 
-module.exports = { createPublishes, parsePublishLink, publishLink, findLocalDependencies, LINK_BASE, SETTING };
+module.exports = { createPublishes, parsePublishLink, publishLink, findLocalDependencies, checkSharing, LINK_BASE, SETTING };

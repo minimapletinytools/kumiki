@@ -345,13 +345,7 @@ function openProject() {
         mcp: mcpControls,
         closeProject: () => closeWorkspaceFolder(),
         // Project status's Open Project and recent folders, with none open.
-        publishing: backendConfig(process.env).supabaseUrl ? {
-            backendUrl: backendConfig(process.env).backendUrl,
-            account: () => {
-                if (!account) createAppAccount();
-                return account;
-            },
-        } : null,
+        publishing: { backendUrl: backendConfig(process.env).backendUrl },
         projects: {
             open: () => chooseWorkspaceFolder(),
             recent: () => recentFolders().map((one) => ({ id: one.path, label: one.name, description: tildePath(one.path) })),

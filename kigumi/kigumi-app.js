@@ -29,7 +29,7 @@ const {
 const { configureToolchain, UV_VERSION } = require('./python-toolchain');
 const { getHost } = require('./host');
 const { findPatternLine } = require('./pattern-source-utils');
-const { createPublishes, parsePublishLink, findLocalDependencies } = require('./publishes');
+const { createPublishes, parsePublishLink, checkSharing } = require('./publishes');
 const { createLibrary } = require('./library');
 const { addReadOnlyRoot } = require('./read-only');
 const { getKigumiVersion, isOlderVersion } = require('./python-env');
@@ -206,7 +206,6 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
     let testPublishBackend = null;
     const publishes = host.publishing && host.publishing.backendUrl ? createPublishes({
         backendUrl: () => testPublishBackend || host.publishing.backendUrl,
-        account: host.publishing.account || (() => null),
         libraryRoot: library.root,
         getConfig: (key, fallback) => host.getConfig(key, fallback),
         updateConfig: (key, value) => host.updateConfig(key, value),
@@ -992,13 +991,17 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         }
         const name = path.basename(filePath);
         const projectRoot = getWorkspaceRoot() || path.dirname(filePath);
-        const dependencies = findLocalDependencies(filePath, projectRoot);
-        if (dependencies.length > 0) {
-            host.showMessage('warning', t('message.publishUsesProjectFiles', { name, files: dependencies.map((one) => one.name).join(', ') }));
+        const { refused, notShared } = checkSharing(filePath, projectRoot);
+        if (refused.length > 0) {
+            host.showMessage('warning', t('message.publishUsesProjectFiles', { name, files: refused.map((one) => one.name).join(', ') }));
             return null;
         }
+        // What the copy goes without, in red in the dialog: mesh files, measurements, parameter values.
+        const warning = notShared.length > 0 ? t('message.publishNotShared', {
+            files: notShared.map((one) => t(`message.publishNotShared.${one.kind}`, { name: one.name })).join(', '),
+        }) : null;
         const ok = await host.confirm({ message: t('message.publishConfirm', { name }),
-            detail: t('message.publishConfirmDetail'), action: t('message.publishConfirmAction') });
+            detail: t('message.publishConfirmDetail'), action: t('message.publishConfirmAction'), warning });
         if (!ok) return null;
         const { installedVersion } = await getWorkspaceKumikiVersionInfo(projectRoot, filePath).catch(() => ({}));
         if (!installedVersion || installedVersion === 'unknown') {
@@ -1014,14 +1017,6 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             outputChannel.appendLine(`[share] Shared ${name}: ${link}`);
             return link;
         } catch (error) {
-            if (error.code === 'SIGN_IN') {
-                const account = host.publishing.account();
-                const github = t('message.signInGitHub');
-                const google = t('message.signInGoogle');
-                const picked = await host.showMessage('info', t('message.signInToPublish'), github, google);
-                if (picked && account) await account.signIn(picked === github ? 'github' : 'google');
-                return null;
-            }
             outputChannel.appendLine(`[share] [error] Sharing ${name} failed: ${error.stack || error}`);
             host.showMessage('error', t('message.publishFailed', { name, error: error.message }));
             return null;

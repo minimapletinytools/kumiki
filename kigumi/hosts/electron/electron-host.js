@@ -102,7 +102,9 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
             return actions[response];
         },
 
-        async confirm({ message, detail, action }) {
+        async confirm({ message, detail, action, warning }) {
+            // A warning has to stand out (in red), which the system's dialog can't do: the shell's.
+            if (warning) return connection.confirm({ message, detail, warning, action });
             const { response } = await dialog.showMessageBox(window, {
                 type: 'question',
                 message,

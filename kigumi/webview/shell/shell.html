@@ -59,6 +59,17 @@
             <span class="status-item status-version" id="status-version"></span>
         </footer>
     </div>
+    <div class="quickpick-overlay" id="confirm" hidden>
+        <div class="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message" aria-describedby="confirm-detail">
+            <p id="confirm-message" class="confirm-message"></p>
+            <p id="confirm-detail" class="confirm-detail"></p>
+            <p id="confirm-warning" class="confirm-warning" hidden></p>
+            <div class="confirm-actions">
+                <button id="confirm-cancel" type="button"></button>
+                <button id="confirm-ok" type="button" class="is-primary"></button>
+            </div>
+        </div>
+    </div>
     <div class="quickpick-overlay" id="quickpick" hidden>
         <div class="picker" role="dialog" aria-modal="true" aria-label="Quick pick">
             <input id="quickpick-filter" type="text" autocomplete="off" spellcheck="false" aria-controls="quickpick-list">

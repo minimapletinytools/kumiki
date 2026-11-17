@@ -251,7 +251,7 @@ async function start() {
         setHost(createBrowserHost({
             connection, workspaceFolder: project ? project.dir : null, settings, locale: locale(), runCommand, setStatus, setProgress,
             editors, showLog: openLog, log, mcp: mcp.controls, closeProject: () => switchProject(null), agentPanel: true,
-            publishing: { backendUrl: browserBackend.backendUrl, account: () => prepareAgent().account },
+            publishing: { backendUrl: browserBackend.backendUrl },
             projects: {
                 open: () => pickProject(),
                 recent: () => knownProjects.map((one) => ({ id: one.id, label: one.name, description: 'In this browser' })),
