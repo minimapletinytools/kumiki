@@ -22,6 +22,8 @@ app.whenReady().then(async () => {
                 if (match) { clearTimeout(timer); resolve(JSON.parse(match[1])); }
             });
             fixture.once('exit', code => { clearTimeout(timer); reject(new Error(`Backend exited: ${code}`)); });
+            // A missing kigumi-backend checkout (set KIGUMI_BACKEND_DIR) fails here, not at the timeout.
+            fixture.once('error', error => { clearTimeout(timer); reject(new Error(`Backend not started from ${backend}: ${error.message}`)); });
         });
         window = new BrowserWindow({ show: false, webPreferences: { backgroundThrottling: false } });
         const js = code => window.webContents.executeJavaScript(code);
@@ -79,6 +81,11 @@ app.whenReady().then(async () => {
         assert.match((await tool('read_file', { file_path: 'src/frame.py' })).content[0].text, /width = 2/);
         assert.match((await tool('list_files', {})).content[0].text, /src\/frame.py/);
         assert.match((await tool('search_files', { pattern: 'width' })).content[0].text, /width = 2/);
+        // kumiki's docs and source, as agents ask for them: a search in one file, and the cheat sheet.
+        const inFile = await tool('kumiki_source', { path: 'kumiki/timber.py', search: 'class CutTimber' });
+        assert.ok(!inFile.isError, JSON.stringify(inFile));
+        assert.match(inFile.content[0].text, /^kumiki\/timber\.py:\d+: class CutTimber/m);
+        assert.match((await tool('kumiki_source', { path: 'docs/api_cheat_sheet.md' })).content[0].text, /^docs\/api_cheat_sheet\.md\n1\t/);
         assert.ok((await tool('write_file', { file_path: '../outside.py', content: 'no' })).isError);
         assert.ok(!(await tool('write_file', { file_path: 'notes/occupied.txt', content: '' })).isError);
         assert.ok((await tool('rename_file', { file_path: 'notes/a.txt', new_path: 'notes/occupied.txt' })).isError);
