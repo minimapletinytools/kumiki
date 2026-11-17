@@ -77,6 +77,7 @@
                 <div class="agent-welcome" id="welcome">
                     <!-- Up to the settings, where the MCP server is turned on (shown where there is one: body.has-mcp). -->
                     <p class="welcome-pointer welcome-mcp"><span class="codicon codicon-arrow-up"></span> <span data-i18n="agent.welcome.mcp">Enable the MCP to connect your own agent</span></p>
+                    <p class="welcome-safety" data-i18n="agent.welcome.safety">Kigumi doesn't check that a design is structurally sound or up to code. Have anything people will rely on checked by a qualified engineer or builder.</p>
                     <p class="welcome-body" data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
                     <!-- The browser version's notice (main.js, ?host=web). -->
                     <div class="web-agent-notice">
@@ -93,6 +94,7 @@
                             <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
                             <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
                         </span>
+                        <p class="welcome-legal" data-i18n="agent.signIn.agree" data-i18n-link="agent.signIn.terms" data-href="https://kumiki.build/terms/" data-i18n-link2="agent.signIn.privacy" data-href2="https://kumiki.build/privacy/">By signing in, you agree to the Terms of Service and the Privacy Policy.</p>
                     </div>
                     <!-- Shown instead of the examples until the agent has a way to send requests (status.js). -->
                     <div class="welcome-sign-in">
@@ -101,6 +103,7 @@
                             <button class="suggestion-chip sign-in-chip" data-provider="github">GitHub</button>
                             <button class="suggestion-chip sign-in-chip" data-provider="google">Google</button>
                         </p>
+                        <p class="welcome-legal" data-i18n="agent.signIn.agree" data-i18n-link="agent.signIn.terms" data-href="https://kumiki.build/terms/" data-i18n-link2="agent.signIn.privacy" data-href2="https://kumiki.build/privacy/">By signing in, you agree to the Terms of Service and the Privacy Policy.</p>
                         <p class="welcome-set-key" data-i18n="agent.welcome.setKey">Please add an OpenRouter key in the agent's settings to use the agent.</p>
                     </div>
                     <!-- Once it can send: one prompt to try, two to show what can be asked (they need a frame of yours), then down to the box. -->

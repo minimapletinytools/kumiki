@@ -1001,7 +1001,7 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             files: notShared.map((one) => t(`message.publishNotShared.${one.kind}`, { name: one.name })).join(', '),
         }) : null;
         const ok = await host.confirm({ message: t('message.publishConfirm', { name }),
-            detail: t('message.publishConfirmDetail'), action: t('message.publishConfirmAction'), warning });
+            detail: `${t('message.publishConfirmDetail')} ${t('message.publishAgree')}`, action: t('message.publishConfirmAction'), warning });
         if (!ok) return null;
         const { installedVersion } = await getWorkspaceKumikiVersionInfo(projectRoot, filePath).catch(() => ({}));
         if (!installedVersion || installedVersion === 'unknown') {

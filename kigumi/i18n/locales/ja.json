@@ -415,7 +415,7 @@
   "message.installingUvProgress": "Kigumi: uv をインストールしています...",
   "message.action.openKigumiOutput": "Kigumiの出力を開く",
   "message.action.goToError": "エラー箇所へ移動",
-  "message.drawingExported": "Kigumiは図面を{path}に書き出しました",
+  "message.drawingExported": "Kigumiは図面を{path}に書き出しました（構造の確認ではありません。施工前に確認してもらってください。）",
   "message.drawingExportFailed": "Kigumiは図面を書き出せませんでした: {error}",
   "message.parametersSaved": "パラメーターを {file} に保存しました",
   "message.saveParametersFailed": "パラメーターを保存できませんでした: {error}",
@@ -613,5 +613,10 @@
   "message.publishNotShared.mesh": "{name}（メッシュ材）",
   "message.publishNotShared.measurements": "寸法と図面",
   "message.publishNotShared.parameters": "保存したパラメータ値",
-  "agent.suggest.stool": "2x6材でスツールを作って。脚は15度に開いて蟻で天板に留め、脚の間の1本の貫は鼻栓ほぞで留める。"
+  "agent.suggest.stool": "2x6材でスツールを作って。脚は15度に開いて蟻で天板に留め、脚の間の1本の貫は鼻栓ほぞで留める。",
+  "agent.signIn.agree": "サインインすると、{link}と{link2}に同意したことになります。",
+  "agent.signIn.terms": "利用規約",
+  "agent.signIn.privacy": "プライバシーポリシー",
+  "agent.welcome.safety": "Kigumi は設計が構造的に安全か、基準に合っているかを確認しません。人が頼りにするものは、資格のある構造技術者や大工に確認してもらってください。",
+  "message.publishAgree": "共有すると、利用規約（kumiki.build/terms）に同意し、このフレームを共有する権利があることを確認したことになります。"
 }
