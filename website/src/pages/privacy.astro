@@ -7,7 +7,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   description="What the Kumiki website, the Kigumi app and the Kigumi account collect, why, who processes it, and how long it's kept."
   canonicalPath="/privacy"
   heading="Privacy Policy"
-  updated="November 12, 2026"
+  updated="November 16, 2026"
 >
   <p>
     Kumiki and Kigumi are made by minimaple ("we", "us"). This policy covers the website at
@@ -19,7 +19,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   <h2>The short version</h2>
   <ul>
     <li>The website uses no cookies. It counts visits with Cloudflare Web Analytics, which doesn't identify you or follow you to other sites.</li>
-    <li>Your projects stay on your computer. The app doesn't send them to us.</li>
+    <li>Your projects stay on your computer. The app doesn't send them to us, except a frame you choose to share publicly.</li>
     <li>
       Only if you sign in to a Kigumi account do we hold anything about you: your email, name,
       credit balance and a record of what your requests cost.
@@ -51,7 +51,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   <h2>The Kigumi app</h2>
   <p>
     Kigumi runs on your computer. Your projects, files, designs and agent conversations are kept
-    there and are not sent to us. To set up a project, the app downloads Python packages, including
+    there and are not sent to us, except a frame you share (see Sharing a frame, below). To set up a project, the app downloads Python packages, including
     Kumiki, from the Python Package Index (PyPI). It can also check PyPI for newer versions.
   </p>
   <p>
@@ -62,6 +62,24 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   <p>
     The app's MCP server, if you turn it on, listens only on your own computer, for agents you run
     there.
+  </p>
+
+  <h2>Sharing a frame</h2>
+  <p>
+    Sharing is a beta preview, and needs no account. When you choose Share Publicly on a frame, the
+    app sends us that frame's file, its name, and the versions of Kumiki and Kigumi you have. We
+    store them and give you a link. Anyone with the link can view the frame. A shared frame isn't
+    linked to your account, name or email.
+  </p>
+  <p>
+    To limit how many frames one place can share in a day, we count shares by IP address. We keep
+    only a one-way hash of the address, and delete it after two days. Our server's operational logs
+    may also record your IP address.
+  </p>
+  <p>
+    Shared frames are kept until we delete them, and while sharing is in beta we may delete them at
+    any time. To have one taken down, email us its link. Opening a shared link downloads a copy of
+    the frame to your computer.
   </p>
 
   <h2>The Kigumi account</h2>
@@ -100,7 +118,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     and some may keep them for a limited time.
   </p>
   <p>
-    Our server passes requests through and does not store their content. It keeps short-lived
+    Each request carries your account's identifier (not your email or name), so OpenRouter can show
+    us usage by account. Our server passes requests through and does not store their content. It keeps short-lived
     operational logs of request details (your account identifier, the model, the size of the
     request, how long it took and what it cost) to run the service, charge credit and fix problems.
   </p>
@@ -124,10 +143,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   </p>
 
   <h2>Service providers</h2>
-  <p>These services run parts of the Kigumi account for us, and process data only for that:</p>
+  <p>These services run parts of the Kigumi account and sharing for us, and process data only for that:</p>
   <ul>
     <li><strong>Supabase:</strong> sign-in, and the database holding accounts, balances and usage records.</li>
-    <li><strong>Cloudflare:</strong> the server that carries agent requests, and its logs.</li>
+    <li><strong>Cloudflare:</strong> the server that carries agent requests and stores shared frames, and its logs.</li>
     <li><strong>OpenRouter and the model providers it routes to:</strong> running the AI models.</li>
     <li><strong>Google and GitHub:</strong> signing in, if you choose them.</li>
   </ul>
