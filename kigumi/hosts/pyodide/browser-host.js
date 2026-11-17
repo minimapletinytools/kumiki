@@ -47,8 +47,8 @@ function createBrowserHost({ connection, workspaceFolder, settings, locale = 'en
             }
             return undefined;
         },
-        confirm({ message, detail, action, warning }) {
-            return connection.confirm({ message, detail, warning, action });
+        confirm({ message, detail, action, warning, cancel }) {
+            return connection.confirm({ message, detail, warning, action, cancel });
         },
         async openExternal(url) {
             if (!/^https?:\/\//i.test(url)) throw new Error('Only web links can be opened.');

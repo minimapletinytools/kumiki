@@ -107,6 +107,9 @@
 
 .confirm-detail {
     color: var(--ka-muted);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    user-select: text;
 }
 
 .confirm-warning {

@@ -594,7 +594,6 @@
   "message.publishConfirmAction": "Share Publicly",
   "message.publishUsesProjectFiles": "{name} can't be shared: it uses other files in its project ({files}), and sharing those isn't supported yet.",
   "message.publishProgress": "Sharing {name}…",
-  "message.published": "Shared {name}. The link is copied: {link}",
   "message.publishFailed": "Couldn't share {name}: {error}",
   "message.publishUnavailable": "Sharing isn't available here.",
   "message.publishNoKumikiVersion": "Couldn't tell which kumiki version {name} is built with.",
@@ -618,5 +617,9 @@
   "agent.signIn.terms": "Terms of Service",
   "agent.signIn.privacy": "Privacy Policy",
   "agent.welcome.safety": "Kigumi doesn't check that a design is structurally sound or up to code. Have anything people will rely on checked by a qualified engineer or builder.",
-  "message.publishAgree": "By sharing, you agree to the Terms of Service (kumiki.build/terms) and confirm you have the right to share this frame."
+  "message.publishAgree": "By sharing, you agree to the Terms of Service (kumiki.build/terms) and confirm you have the right to share this frame.",
+  "message.publishedTitle": "Shared {name}",
+  "message.publishedDetail": "Anyone with this link can view it. The link is copied to your clipboard:\n\n{link}",
+  "message.publishedOpen": "Open Link",
+  "message.publishedDone": "Done"
 }
