@@ -8,6 +8,19 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [kigumi 0.9.9] - 2026-11-17
+
+### kigumi
+
+#### Changed
+
+- Sharing a frame shows its link in a pop-up, with a button to open it, instead of a message that was easy to miss.
+
+#### Fixed
+
+- The agent's `kumiki_source` search works when given a single file, rather than failing with ENOTDIR.
+- The agent looks for kumiki's docs with `kumiki_source` instead of in the project's `.kigumi/docs` folder, which doesn't exist.
+
 ## [kigumi 0.9.8] - 2026-11-16
 
 ### kigumi
