@@ -142,6 +142,8 @@
 
     function renderTabs() {
         const tabs = state.panels.filter((panel) => panel.slot === 'center');
+        // No tabs, no strip: the welcome page fills the space.
+        $('tabs').parentElement.hidden = tabs.length === 0;
         $('tabs').replaceChildren(...tabs.map((tab) => {
             const active = tab.id === state.activeId;
             const element = el('div', `tab${active ? ' is-active' : ''}`);
@@ -231,6 +233,8 @@
         );
         $('status-log-badge').hidden = !state.logBadge;
         $('status-version').textContent = state.version ? `v${state.version}` : '';
+        // The browser version: what it is, and where to find out more.
+        $('status-about').hidden = !state.web;
     }
 
     function renderTitlebar() {
@@ -526,6 +530,7 @@
         }
         $('status-workspace').addEventListener('click', () => command('openFolder'));
         $('status-log').addEventListener('click', () => command('openLog'));
+        $('status-about').addEventListener('click', () => command('web:about'));
         $('status-settings').addEventListener('click', () => command('openSettings'));
         $('status-autorefresh').addEventListener('click', () => command('run', 'kigumi.toggleAutoRefreshOnFileChange'));
         // The window is frameless only on macOS (hiddenInset); elsewhere the native title bar stays.

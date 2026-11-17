@@ -154,7 +154,6 @@ function getWebviewContent(surface, frameData, geometryData, profiling, uiState 
             // User setting for the assembly preview timeline; the webview combines
             // it with the package-time FEATURE_FLAGS.assemblyPreview master switch.
             assemblyPreviewSetting: getHost().getConfig('viewer.assemblyPreview', false) === true,
-            drawingBetaSetting: getHost().getConfig('viewer.drawingBeta', false) === true,
             // The host runs Kigumi's MCP server (the standalone app): the options show it.
             agentAvailable: getHost().agentPanel === true,
             agentEnabled: getHost().getConfig('agent.enabled', false) === true,

@@ -5,7 +5,7 @@ import { MemberListPanel } from './member-list-panel.js';
 import { SelectionPanel } from './selection-panel.js';
 import { ViewSidebar, useSidebarRuntime } from './view-sidebar.js';
 import { EXPORT_FORMATS, EXPORT_FORMAT_PROP, ViewerKiwariPanel, ViewerSettingsPanel, ViewerToolsPanel, usePanelRuntime } from './viewer-panels.js';
-import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DRAWING_BETA_ENABLED, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, VIEWER_APP_VERSION, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
+import { ASSEMBLY_PREVIEW_ENABLED, AssemblyTimeline, CameraController, CsgTreeView, DEFAULT_AXIS_ORBIT_SPEED, DEFAULT_FOOTPRINT_COLOR, DisplayOptionsStore, FEATURE_FLAGS, FEATURE_TYPE_NOUNS, FOOTPRINT_COLOR_IDS, GeometryMode, INITIAL_PAYLOAD, KigumiTags, MAX_TILT_RADIANS, PAINT_WAIT_FALLBACK_MS, PAPER_COLOR, PointerDrag, RENDER_PROFILES, SELECTION_ECHO_OPACITY, SceneManager, SceneStore, SelectionStore, THEMES, TILT_ORBIT_SPEED, VIEWER_APP_VERSION, ViewerPhase, ViewerViewport, _isTypingTarget, accumulateBounds, actionForButton, boundsFromAccumulator, choosePickAction, createBoundsAccumulator, createInitialViewState, firstLoadCameraPlan, normalizeViewerOptions, resolvePointers, t, vscode } from './viewer-shared.js';
 import { PickingMixin } from './viewer-picking.js';
 import { isKey } from './key-match.js';
 
@@ -394,12 +394,9 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 this.setMeasurementsHidden(event.detail && event.detail.hidden);
                 this._layersDrawingsChanged();
             });
-            this._layersView.setDrawingsEnabled(this.drawingBetaEnabled);
-            if (this.drawingBetaEnabled) {
-                // The list is python's; ask for it once there is somewhere to
-                // show it.
-                this.requestDrawings();
-            }
+            this._layersView.setDrawingsEnabled(true);
+            // The list is python's; ask for it once there is somewhere to show it.
+            this.requestDrawings();
         }
         // Layers tree (and any background assembly solve) data arrives
         // unprompted, pushed by the extension host once it's actually ready
@@ -1751,7 +1748,6 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     get panelFlags() {
         return {
             assemblyPreview: ASSEMBLY_PREVIEW_ENABLED,
-            drawingBeta: DRAWING_BETA_ENABLED,
             // Whether the package lets assembly preview be turned on at all (feature-flags.js).
             assemblyPreviewAvailable: Boolean(FEATURE_FLAGS.assemblyPreview),
             agentAvailable: INITIAL_PAYLOAD.agentAvailable === true,
@@ -1768,7 +1764,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.requestUpdate();
     }
 
-    /** Turn a beta feature ('assemblyPreview' or 'drawingBeta') on or off: a setting, so the host reloads the views. */
+    /** Turn a beta feature ('assemblyPreview') on or off: a setting, so the host reloads the views. */
     setBetaFeature(feature, enabled) {
         if (vscode) {
             vscode.postMessage({ type: 'setBetaFeature', feature, enabled: Boolean(enabled) });

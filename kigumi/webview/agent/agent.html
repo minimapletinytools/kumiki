@@ -75,7 +75,8 @@
         <div class="messages-wrap">
             <div id="messages" class="agent-messages">
                 <div class="agent-welcome" id="welcome">
-                    <h3 data-i18n="agent.welcome.title">Kigumi Agent</h3>
+                    <!-- Up to the settings, where the MCP server is turned on (shown where there is one: body.has-mcp). -->
+                    <p class="welcome-pointer welcome-mcp"><span class="codicon codicon-arrow-up"></span> <span data-i18n="agent.welcome.mcp">Enable the MCP to connect your own agent</span></p>
                     <p class="welcome-body" data-i18n="agent.welcome.body">Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.</p>
                     <!-- The browser version's notice (main.js, ?host=web). -->
                     <div class="web-agent-notice">
@@ -85,8 +86,6 @@
                             <p class="web-agent-promo" data-i18n="agent.web.promo">You will get $1 in free promo tokens and there is no way to buy more.</p>
                         </div>
                     </div>
-                    <!-- Up to the settings, where the MCP server is turned on (shown where there is one: body.has-mcp). -->
-                    <p class="welcome-pointer welcome-mcp"><span class="codicon codicon-arrow-up"></span> <span data-i18n="agent.welcome.mcp">Enable the MCP to connect your own agent</span></p>
                     <!-- The browser version, signed out: down to the ways to sign in. -->
                     <div class="web-agent-sign-in-block">
                         <p class="welcome-pointer"><span data-i18n="agent.web.signIn">Sign in to use the agent</span> <span class="codicon codicon-arrow-down"></span></p>
@@ -108,6 +107,7 @@
                     <div class="suggestions">
                         <p class="welcome-pointer" data-i18n="agent.welcome.examples">Some example prompts</p>
                         <button class="suggestion-chip is-try"><span class="suggestion-text" data-i18n="agent.suggest.mudsills">Create 4 mudsills on the inside of a 10'x8' footprint</span> <span class="try-me" data-i18n="agent.welcome.tryMe">try me</span></button>
+                        <button class="suggestion-chip is-try"><span class="suggestion-text" data-i18n="agent.suggest.stool">Build a stool from 2x6s. The legs splay at 15 degrees and are dovetailed into the top, and a single stretcher between the legs is held by tusked tenons.</span> <span class="try-me" data-i18n="agent.welcome.tryMe">try me</span></button>
                         <div class="suggestion-example" data-i18n="agent.suggest.posts">Adjust the size of all posts to be 5"x6"</div>
                         <div class="suggestion-example" data-i18n="agent.suggest.drawings">Generate drawings for my frame</div>
                         <p class="welcome-pointer welcome-write"><span data-i18n="agent.welcome.writeOwn">Write your own prompt</span> <span class="codicon codicon-arrow-down"></span></p>

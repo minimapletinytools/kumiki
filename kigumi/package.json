@@ -236,11 +236,6 @@
           "default": false,
           "description": "%config.assemblyPreview.description%"
         },
-        "kigumi.viewer.drawingBeta": {
-          "type": "boolean",
-          "default": false,
-          "description": "%config.drawingBeta.description%"
-        },
         "kigumi.viewer.logRetentionDays": {
           "type": "number",
           "default": 15,

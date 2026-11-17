@@ -297,7 +297,7 @@ export const DrawingsMixin = (Base) => class extends Base {
             return;
         }
         const scene = this.sceneStore.activeScene();
-        if (!this.drawingBetaEnabled || !this.isInDrawing) {
+        if (!this.isInDrawing) {
             if (this._drawingPanel) {
                 this._drawingPanel.unmount();
                 this._drawingPanel = null;

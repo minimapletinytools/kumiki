@@ -15,6 +15,17 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 - Share a frame publicly: right-click it in the explorer, Share Publicly…, and its link is copied (kumiki.build/p/#…). The link holds a copy that never changes, with the kumiki version it was built with. No account is needed. A frame that imports other files in its project can't be shared yet; one with mesh timbers, measurements or saved parameter values is shared without them, and the dialog says so in red.
 - Opening a share link (in the browser, the app, or pasted into Shared > Add from Link…) shows the frame read-only and lists it under Shared; Copy to Project makes a copy you can change.
 - With no project open, the explorer shows kumiki's examples and patterns and your shared frames, and says a project is needed to edit frames.
+- The browser version has an info button in its status bar: what it is, and a way to kumiki.build.
+- A second "try me" example prompt in the agent panel: a stool with splayed, dovetailed legs and a tusked-tenon stretcher.
+
+#### Changed
+
+- Drawings are no longer a beta: drawing mode is always on, and its setting and switches are gone.
+- The agent panel's welcome starts with where to turn on the MCP, and has no title.
+
+#### Fixed
+
+- No empty tab strip above the welcome page when no tabs are open.
 
 ## [0.9.6] - 2026-11-14
 

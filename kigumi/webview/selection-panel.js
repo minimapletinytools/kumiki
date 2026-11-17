@@ -411,12 +411,8 @@ export class SelectionPanel {
         });
 
         // Getting into and out of a drawing lives in the header rather than the
-        // body: a way out of a drawing that can be collapsed is a trap. Absent
-        // entirely while drawing mode is off, which is what keeps the viewer in
-        // the 3D scene.
-        if (this.app.drawingBetaEnabled) {
-            header.appendChild(this._drawingButton());
-        }
+        // body: a way out of a drawing that can be collapsed is a trap.
+        header.appendChild(this._drawingButton());
         panel.appendChild(header);
 
         const body = document.createElement('div');

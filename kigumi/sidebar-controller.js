@@ -20,7 +20,6 @@ function sidebarOptions(host) {
     return [
         option('viewer.autoRefreshOnFileChange', 'sidebar.options.autoRefresh'),
         ...(host.agentPanel === true ? [option('agent.enabled', 'sidebar.options.agent')] : []),
-        option('viewer.drawingBeta', 'sidebar.options.drawings'),
         ...(FEATURE_FLAGS.assemblyPreview ? [option('viewer.assemblyPreview', 'sidebar.options.assemblyPreview')] : []),
     ];
 }

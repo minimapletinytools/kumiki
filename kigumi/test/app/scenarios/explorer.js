@@ -93,14 +93,14 @@ module.exports = {
         const noMcpSwitch = await waitFor(() => inExplorer(`return !!doc.querySelector('.ks-option')
             && !doc.querySelector('input[data-option="mcp.enabled"]') || null;`), { timeoutMs: 5000 }).catch(() => false);
         check('the explorer has no MCP switch: it is in the agent panel', noMcpSwitch === true);
-        const drawingsBefore = settings.get('viewer.drawingBeta', false);
-        const toggled = await waitFor(() => inExplorer(`const box = doc.querySelector('.ks-option input[data-option="viewer.drawingBeta"]');
+        const drawingsBefore = settings.get('viewer.autoRefreshOnFileChange', true);
+        const toggled = await waitFor(() => inExplorer(`const box = doc.querySelector('.ks-option input[data-option="viewer.autoRefreshOnFileChange"]');
             if (!box) return false; box.click(); return true;`), { timeoutMs: 5000 }).catch(() => false);
-        const changed = await waitFor(() => settings.get('viewer.drawingBeta', false) !== drawingsBefore, { timeoutMs: 5000 })
+        const changed = await waitFor(() => settings.get('viewer.autoRefreshOnFileChange', true) !== drawingsBefore, { timeoutMs: 5000 })
             .then(() => true, () => false);
         await capture('01b-explorer-options');
-        settings.set('viewer.drawingBeta', drawingsBefore);
-        const shownBack = await waitFor(() => inExplorer(`return doc.querySelector('.ks-option input[data-option="viewer.drawingBeta"]').checked === ${drawingsBefore};`),
+        settings.set('viewer.autoRefreshOnFileChange', drawingsBefore);
+        const shownBack = await waitFor(() => inExplorer(`return doc.querySelector('.ks-option input[data-option="viewer.autoRefreshOnFileChange"]').checked === ${drawingsBefore};`),
             { timeoutMs: 5000 }).then(() => true, () => false);
         await inExplorer(`doc.querySelector('.ks-section[data-section="options"] .ks-section-header').click(); return true;`);
         check('Kigumi options switches a setting, and shows one changed elsewhere', toggled && changed && shownBack);

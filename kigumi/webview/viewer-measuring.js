@@ -10,8 +10,7 @@ import * as KigumiFeatureStates from './feature-states.js';
 export const MeasuringMixin = (Base) => class extends Base {
 
     get canStartMeasurement() {
-        return Boolean(this.drawingBetaEnabled
-            && this.selectionManager.csgFocus
+        return Boolean(this.selectionManager.csgFocus
             && this._lastPickAnchor
             && this._lastPickAnchor.reference
             && this._lastPickAnchor.geometry);

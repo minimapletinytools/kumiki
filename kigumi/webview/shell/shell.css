@@ -153,6 +153,10 @@ body:not(.is-mac) .titlebar-drag-region {
     flex: none;
 }
 
+.tabs-bar[hidden] {
+    display: none;
+}
+
 .layout-toggle {
     display: inline-flex;
     align-items: center;
