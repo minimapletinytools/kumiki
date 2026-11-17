@@ -8,6 +8,14 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kigumi
+
+#### Added
+
+- Share a frame publicly: right-click it in the explorer, Share Publicly…, and its link is copied (kumiki.build/p/#…). The link holds a copy that never changes, with the kumiki version it was built with. No account is needed. A frame that imports other files in its project can't be shared yet; one with mesh timbers, measurements or saved parameter values is shared without them, and the dialog says so in red.
+- Opening a share link (in the browser, the app, or pasted into Shared > Add from Link…) shows the frame read-only and lists it under Shared; Copy to Project makes a copy you can change.
+- With no project open, the explorer shows kumiki's examples and patterns and your shared frames, and says a project is needed to edit frames.
+
 ## [0.9.6] - 2026-11-14
 
 ### kumiki

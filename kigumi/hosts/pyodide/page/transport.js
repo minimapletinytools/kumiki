@@ -122,6 +122,17 @@
         worker.postMessage(message);
     }
 
+    // A shared frame's link (kumiki.build/p/ sends here with #publish=<id>): open it, and take it
+    // out of the address so a reload doesn't open it again.
+    function deliverPublishLink() {
+        const match = /[#&]publish=([A-Za-z0-9]{22})/.exec(window.location.hash);
+        if (!match) return;
+        worker.postMessage({ type: 'web:openPublish', id: match[1] });
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+    deliverPublishLink();
+    window.addEventListener('hashchange', deliverPublishLink);
+
     window.kigumiShell = Object.freeze({
         onMessage: (listener) => listeners.add(listener),
         send,

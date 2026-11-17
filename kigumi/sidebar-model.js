@@ -33,6 +33,10 @@ const ROW_ACTIONS = Object.freeze({
     revealInFileManager: { command: 'kigumi.revealInFileManager', icon: 'folder-opened', labelKey: REVEAL_LABEL_KEY, inline: false },
     newFile: { command: 'kigumi.newFile', icon: 'new-file', labelKey: 'sidebar.action.newFile', inline: false },
     deleteFile: { command: 'kigumi.deleteFile', icon: 'trash', labelKey: 'sidebar.action.deleteFile', inline: false },
+    sharePublicly: { command: 'kigumi.publishFrame', icon: 'link', labelKey: 'sidebar.action.sharePublicly', inline: false },
+    copyToProject: { command: 'kigumi.copyPublishToProject', icon: 'copy', labelKey: 'sidebar.action.copyToProject', inline: true },
+    copyShareLink: { command: 'kigumi.copyPublishLink', icon: 'link', labelKey: 'sidebar.action.copyShareLink', inline: false },
+    removeShared: { command: 'kigumi.removePublish', icon: 'close', labelKey: 'sidebar.action.removeShared', inline: false },
 });
 
 const LIBRARY_SECTIONS = new Set(['shipped-patterns', 'dependency-patterns']);
@@ -106,6 +110,11 @@ class SidebarModel {
         for (const listener of [...this._listeners]) {
             listener();
         }
+    }
+
+    /** Draw the tree again, for a change outside the scan (the Shared list, the library). */
+    changed() {
+        this._fire();
     }
 
     dispose() {
@@ -220,6 +229,20 @@ class SidebarModel {
 
     async _runFullScan({ workspaceOnly = false } = {}) {
         const workspaceRoot = getHost().workspaceRoots()[0] || null;
+        const library = this.options.library;
+        if (!workspaceRoot && getHost().projects && library && library.ready()) {
+            // No project open: kumiki's examples and patterns, from the library.
+            this._state = emptyState({ isScanning: true });
+            this._fire();
+            const timeoutMs = Math.max(1000, Number(getHost().getConfig('explorer.scanTimeoutSeconds', 15)) * 1000);
+            const shipped = await this._scanShipped(library.root, timeoutMs).catch((error) => {
+                this._state = emptyState({ discoveryErrors: [`Dependency discovery failed: ${error?.message || error}`] });
+                return null;
+            });
+            this._state = { ...emptyState(), ...(shipped || {}), discoveryErrors: this._state.discoveryErrors || [], isScanning: false };
+            this._fire();
+            return;
+        }
         if (!workspaceRoot) {
             this._state = emptyState({
                 discoveryErrors: ['Open a workspace folder to use Kigumi Explorer.'],
@@ -399,6 +422,10 @@ class SidebarModel {
     getTree() {
         const nodes = [...this._statusNodes()];
         const state = this._state;
+        // No project open, where the host can open one (the app and the browser; VS Code has its own).
+        if (!getHost().workspaceRoots()[0] && getHost().projects) {
+            return [...nodes, ...this._noProjectNodes()];
+        }
 
         const filesRoot = this._filesRoot();
         if (filesRoot) {
@@ -416,6 +443,10 @@ class SidebarModel {
             expanded: true,
             children: this._workspaceFrameNodes(),
         }));
+
+        // Under the project's own frames: frames opened from share links.
+        const shared = this._sharedNode();
+        if (shared) nodes.push(shared);
 
         if (state.shippedExamples.length + state.dependencyExamples.length > 0) {
             nodes.push(node({
@@ -453,6 +484,82 @@ class SidebarModel {
         return nodes;
     }
 
+    // With no project open: what is shared, and kumiki's examples and patterns from the library.
+    _noProjectNodes() {
+        const nodes = [];
+        const shared = this._sharedNode();
+        if (shared) nodes.push(shared);
+        const library = this.options.library;
+        const state = this._state;
+        if (!library) return nodes;
+        if (!library.ready() || library.preparing) {
+            nodes.push(node({
+                key: 'library-prepare',
+                type: 'libraryPrepareAction',
+                label: library.preparing ? t('sidebar.libraryPreparing') : t('sidebar.libraryPrepare'),
+                description: library.preparing ? '' : t('sidebar.libraryPrepare.desc'),
+                icon: library.preparing ? 'loading' : 'package',
+                spin: library.preparing,
+                action: library.preparing ? undefined : open('kigumi.prepareLibrary'),
+            }));
+            return nodes;
+        }
+        if (state.isScanning || state.shippedExamples.length + state.dependencyExamples.length > 0) {
+            nodes.push(node({
+                key: 'example-frames-root',
+                type: 'exampleFramesRoot',
+                label: t('sidebar.exampleFrames'),
+                icon: state.isScanning ? 'loading' : 'symbol-folder',
+                spin: state.isScanning,
+                expanded: true,
+                children: this._libraryFrameNodes(),
+            }));
+        }
+        nodes.push(node({
+            key: 'patterns-root',
+            type: 'patternsRoot',
+            label: state.isScanning ? t('sidebar.patternsScanning') : t('sidebar.patterns'),
+            icon: state.isScanning ? 'loading' : 'book',
+            spin: state.isScanning,
+            expanded: true,
+            children: this._patternSectionNodes().filter((section) => section.key !== 'pattern-section:workspace-patternbooks'),
+        }));
+        return nodes;
+    }
+
+    // Frames opened from share links, and a row to add one.
+    _sharedNode() {
+        const list = this.options.publishes ? this.options.publishes() : null;
+        if (!list) return null;
+        return node({
+            key: 'shared-root',
+            type: 'sharedRoot',
+            label: t('sidebar.shared', { count: list.length }),
+            icon: 'link',
+            expanded: list.length > 0,
+            children: [
+                ...list.map((entry) => node({
+                    key: `shared:${entry.id}`,
+                    type: 'sharedFrame',
+                    label: entry.title,
+                    description: t('sidebar.shared.kumikiVersion', { version: entry.kumikiVersion }),
+                    tooltip: t('sidebar.shared.tooltip', { date: String(entry.createdAt || '').slice(0, 10), version: entry.kumikiVersion }),
+                    icon: 'eye',
+                    action: open('kigumi.openPublish', entry.id),
+                    rowActions: ['copyToProject', 'copyShareLink', 'removeShared'],
+                    data: { publishId: entry.id },
+                })),
+                node({
+                    key: 'shared-add',
+                    type: 'sharedAddAction',
+                    label: t('sidebar.shared.add'),
+                    icon: 'add',
+                    action: open('kigumi.addPublishFromLink'),
+                }),
+            ],
+        });
+    }
+
     // With no project open: Open Project and the recent ones, where the host has them.
     _openProjectNodes() {
         const { projects } = getHost();
@@ -483,7 +590,14 @@ class SidebarModel {
         const nodes = [];
         const { initStatus } = this._state;
         if (getHost().workspaceRoots().length === 0 && getHost().projects) {
-            return [...this._openProjectNodes(), this._websiteNode()];
+            const hint = node({
+                key: 'no-project-hint',
+                type: 'projectStatusAction',
+                label: t('sidebar.noProject'),
+                description: t('sidebar.noProject.desc'),
+                icon: 'info',
+            });
+            return [hint, ...this._openProjectNodes(), this._websiteNode()];
         }
         const isLocalDev = !!(initStatus && initStatus.projectStatus === 'local-dev');
         const hasProject = !!(initStatus && (initStatus.hasExistingProject || initStatus.isInitialized));
@@ -659,7 +773,7 @@ class SidebarModel {
             frameFile.relativePath,
             frameFile.filePath,
             frameFile,
-            ['viewSource', 'openInViewer', 'deleteFile'],
+            this.options.publishes ? ['viewSource', 'openInViewer', 'sharePublicly', 'deleteFile'] : ['viewSource', 'openInViewer', 'deleteFile'],
         )));
         // Last in the list: a row that makes a new frame file.
         if (this._state.workspaceRoot) {

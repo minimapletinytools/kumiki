@@ -85,3 +85,62 @@
     padding: 8px;
     color: var(--ka-muted);
 }
+
+/* A yes/no question (connection.confirm), with an optional warning in red. */
+.confirm {
+    width: min(440px, calc(100vw - 32px));
+    margin: 96px auto 0;
+    padding: 16px 18px 14px;
+    border: 1px solid var(--ka-border);
+    border-radius: 8px;
+    background: var(--ka-overlay-bg);
+    box-shadow: 0 4px 20px var(--ka-shadow);
+}
+
+.confirm p {
+    margin: 0 0 10px;
+}
+
+.confirm-message {
+    font-weight: 600;
+}
+
+.confirm-detail {
+    color: var(--ka-muted);
+}
+
+.confirm-warning {
+    color: var(--ka-error);
+}
+
+.confirm-warning[hidden] {
+    display: none;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.confirm-actions button {
+    padding: 4px 12px;
+    border: 1px solid var(--ka-border);
+    border-radius: 4px;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font: inherit;
+    cursor: pointer;
+}
+
+.confirm-actions button.is-primary {
+    border-color: var(--ka-focus);
+    background: var(--ka-focus);
+    color: #fff;
+}
+
+.confirm-actions button:focus-visible {
+    outline: 2px solid var(--ka-focus);
+    outline-offset: 2px;
+}

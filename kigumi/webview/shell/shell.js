@@ -365,6 +365,48 @@
     }
 
     // ---------------------------------------------------------------------
+    // Confirm (connection.confirm)
+    // ---------------------------------------------------------------------
+
+    let confirmRequest = null;
+
+    function closeConfirm(ok) {
+        if (confirmRequest === null) return;
+        core.send({ type: 'confirm:result', requestId: confirmRequest, ok });
+        confirmRequest = null;
+        $('confirm').hidden = true;
+    }
+
+    function showConfirm({ requestId, message, detail, warning, action, cancel }) {
+        closeConfirm(false);
+        confirmRequest = requestId;
+        $('confirm-message').textContent = message || '';
+        $('confirm-detail').textContent = detail || '';
+        $('confirm-detail').hidden = !detail;
+        $('confirm-warning').textContent = warning || '';
+        $('confirm-warning').hidden = !warning;
+        $('confirm-ok').textContent = action || 'OK';
+        $('confirm-cancel').textContent = cancel || 'Cancel';
+        $('confirm').hidden = false;
+        $('confirm-ok').focus();
+    }
+
+    function setupConfirm() {
+        $('confirm-ok').addEventListener('click', () => closeConfirm(true));
+        $('confirm-cancel').addEventListener('click', () => closeConfirm(false));
+        $('confirm').addEventListener('mousedown', (event) => {
+            if (event.target === $('confirm')) closeConfirm(false);
+        });
+        $('confirm').addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                closeConfirm(false);
+            }
+        });
+    }
+
+    // ---------------------------------------------------------------------
     // Quick pick
     // ---------------------------------------------------------------------
 
@@ -506,8 +548,11 @@
                 toPanel(message.id, message.message);
             } else if (message.type === 'quickpick:show') {
                 showQuickPick(message);
+            } else if (message.type === 'confirm:show') {
+                showConfirm(message);
             }
         });
+        setupConfirm();
         render();
         core.send({ type: 'shell:ready' });
     }

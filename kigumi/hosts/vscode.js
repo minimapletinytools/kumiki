@@ -153,8 +153,10 @@ function createVscodeHost() {
             return picked ? picked.item : undefined;
         },
 
-        async confirm({ message, detail, action }) {
-            const choice = await vscode.window.showInformationMessage(message, { modal: true, detail }, action);
+        async confirm({ message, detail, action, warning }) {
+            const text = warning ? `${detail ? `${detail}\n\n` : ''}⚠ ${warning}` : detail;
+            const choice = await (warning ? vscode.window.showWarningMessage : vscode.window.showInformationMessage)(
+                message, { modal: true, detail: text }, action);
             return choice === action;
         },
 

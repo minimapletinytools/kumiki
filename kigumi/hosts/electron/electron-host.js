@@ -39,7 +39,7 @@ function onPath(command) {
  * @param {(level: string, text: string) => void} options.setStatus
  * @param {(title: string|null) => void} options.setProgress
  */
-function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress, openEditor = null, documents, showLog = null, mcp = null, closeProject = null, projects = null }) {
+function createElectronHost({ window, connection, settings, workspaceFolder, locale, log, runCommand, setStatus, setProgress, openEditor = null, documents, showLog = null, mcp = null, closeProject = null, projects = null, publishing = null }) {
     function openExternalEditor(filePath, line = 1) {
         const template = settings.get('app.editorCommand', '');
         if (template) {
@@ -78,6 +78,8 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
         // Project status's Close Project, as File > Close Project.
         ...(closeProject ? { closeProject } : {}),
         ...(projects ? { projects } : {}),
+        // Sharing frames at a link: the backend, and the account to publish with.
+        ...(publishing ? { publishing } : {}),
 
         // The Log tab, all of it or one view's: what a view's "view log" opens.
         ...(showLog ? { showLog } : {}),
@@ -100,7 +102,9 @@ function createElectronHost({ window, connection, settings, workspaceFolder, loc
             return actions[response];
         },
 
-        async confirm({ message, detail, action }) {
+        async confirm({ message, detail, action, warning }) {
+            // A warning has to stand out (in red), which the system's dialog can't do: the shell's.
+            if (warning) return connection.confirm({ message, detail, warning, action });
             const { response } = await dialog.showMessageBox(window, {
                 type: 'question',
                 message,

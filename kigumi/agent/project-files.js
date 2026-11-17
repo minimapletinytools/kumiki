@@ -62,7 +62,7 @@ function realPath(file) {
 function createProjectFiles({ root, readOnly = () => [] }) {
     function base() {
         const folder = root();
-        if (!folder) throw new Error('No project folder is open.');
+        if (!folder) throw new Error('No project is open, so there is nowhere to write or read project files. Tell the user they need to open or create a project to make or edit frames (open_project, new_project).');
         return fs.realpathSync(folder);
     }
 

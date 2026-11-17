@@ -251,6 +251,11 @@
           "type": "boolean",
           "default": true,
           "description": "%config.autoRefreshSidebarOnNewFile.description%"
+        },
+        "kigumi.shared.publishes": {
+          "type": "array",
+          "default": [],
+          "description": "%config.sharedPublishes.description%"
         }
       }
     }
