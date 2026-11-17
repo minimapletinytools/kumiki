@@ -415,7 +415,7 @@
   "message.installingUvProgress": "Kigumi: installing uv...",
   "message.action.openKigumiOutput": "Open Kigumi Output",
   "message.action.goToError": "Go to Error",
-  "message.drawingExported": "Kigumi exported the drawing to {path}",
+  "message.drawingExported": "Kigumi exported the drawing to {path}. It isn't an engineering review: have it checked before you build.",
   "message.drawingExportFailed": "Kigumi couldn't export the drawing: {error}",
   "message.parametersSaved": "Parameters saved to {file}",
   "message.saveParametersFailed": "Could not save parameters: {error}",
@@ -613,5 +613,10 @@
   "message.publishNotShared.mesh": "{name} (mesh timbers)",
   "message.publishNotShared.measurements": "its measurements and drawings",
   "message.publishNotShared.parameters": "its saved parameter values",
-  "agent.suggest.stool": "Build a stool from 2x6s. The legs splay at 15 degrees and are dovetailed into the top, and a single stretcher between the legs is held by tusked tenons."
+  "agent.suggest.stool": "Build a stool from 2x6s. The legs splay at 15 degrees and are dovetailed into the top, and a single stretcher between the legs is held by tusked tenons.",
+  "agent.signIn.agree": "By signing in, you agree to the {link} and the {link2}.",
+  "agent.signIn.terms": "Terms of Service",
+  "agent.signIn.privacy": "Privacy Policy",
+  "agent.welcome.safety": "Kigumi doesn't check that a design is structurally sound or up to code. Have anything people will rely on checked by a qualified engineer or builder.",
+  "message.publishAgree": "By sharing, you agree to the Terms of Service (kumiki.build/terms) and confirm you have the right to share this frame."
 }

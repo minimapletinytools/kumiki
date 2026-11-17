@@ -8,6 +8,13 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kigumi
+
+#### Added
+
+- Signing in to the agent says that it means agreeing to the Terms of Service and the Privacy Policy, with links; sharing a frame says the same of the terms.
+- The agent's welcome, and the message for an exported drawing, say that Kigumi doesn't check a design is structurally sound: have it checked before building.
+
 ## [kigumi 0.9.7] - 2026-11-16
 
 ### kigumi

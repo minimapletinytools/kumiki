@@ -1256,3 +1256,16 @@ body.host-web:not(.signed-in) .web-agent-sign-in-block {
 .agent-error a {
     color: var(--ka-accent);
 }
+
+/* Under the sign-in buttons: agreeing to the terms. */
+.welcome-legal {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--ka-muted);
+}
+
+/* Structural safety, at the top of the welcome. */
+.welcome-safety {
+    font-size: 11px;
+    color: var(--ka-muted);
+}
