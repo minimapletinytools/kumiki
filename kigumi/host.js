@@ -35,7 +35,9 @@
  * @property {(items: Array<{label, description?, detail?, separator?, value?}>, options?: {placeholder?}) => Promise<object|undefined>} pickOne
  * @property {(options: {prompt: string, value?: string}) => Promise<string|undefined>} askText  a line of text, such as a
  *   file name: `value` is filled in, with its name before the extension selected; undefined if cancelled
- * @property {(options: {message: string, detail?: string, action: string}) => Promise<boolean>} confirm  modal yes/no
+ * @property {(options: {message: string, detail?: string, action: string, warning?: string, cancel?: string}) => Promise<boolean>} confirm
+ *   modal yes/no: `warning` in red where the host can, `cancel` the no button's label, `inApp` in Kigumi's own
+ *   dialog where the host has one (its text can be selected)
  * @property {(title: string, task: () => Promise<any>) => Promise<any>} withProgress
  * @property {(url: string) => Promise<void>} openExternal
  * @property {(text: string) => Promise<void>} copyText  to the system clipboard

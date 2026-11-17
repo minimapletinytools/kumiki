@@ -1013,7 +1013,10 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                 projectRoot, kumikiVersion: installedVersion, kigumiVersion: getKigumiVersion(),
             }));
             await host.copyText(link);
-            host.showMessage('info', t('message.published', { name, link }));
+            // A popup, so it is plain the frame was shared, with its link.
+            const open = await host.confirm({ message: t('message.publishedTitle', { name }), detail: t('message.publishedDetail', { link }),
+                action: t('message.publishedOpen'), cancel: t('message.publishedDone'), inApp: true });
+            if (open) await host.openExternal(link);
             outputChannel.appendLine(`[share] Shared ${name}: ${link}`);
             return link;
         } catch (error) {

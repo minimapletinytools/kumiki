@@ -69,6 +69,19 @@ module.exports = {
                     && dialog.warning.includes('measurements') && dialog.color !== 'rgb(0, 0, 0)' && Boolean(dialog.error),
                 JSON.stringify(dialog));
             await inShell(`document.getElementById('confirm-ok').click()`);
+            // Then a popup says it is shared, with the link.
+            const shared = await waitFor(() => inShell(`(() => {
+                const box = document.getElementById('confirm');
+                const message = document.getElementById('confirm-message').textContent;
+                return !box.hidden && message.startsWith('Shared ') ? { message, detail: document.getElementById('confirm-detail').textContent,
+                    action: document.getElementById('confirm-ok').textContent, cancel: document.getElementById('confirm-cancel').textContent } : null;
+            })()`), { timeoutMs: 15000 }).catch(() => null);
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            await capture('shared-00b-shared-popup');
+            await inShell(`document.getElementById('confirm-cancel').click()`);
+            check('a popup says the frame is shared, with its link, and offers to open it',
+                shared && shared.message === 'Shared frame.py' && shared.detail.includes('https://kumiki.build/p/#PostedSharedFrameAbcde1')
+                    && shared.action === 'Open Link' && shared.cancel === 'Done', JSON.stringify(shared));
             const link = await publishing;
             const pasted = await clipboard.readText();
             check('then uploads the frame alone, with its kumiki version, and copies the link',

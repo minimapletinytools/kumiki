@@ -594,7 +594,6 @@
   "message.publishConfirmAction": "公開して共有",
   "message.publishUsesProjectFiles": "{name} は共有できません：プロジェクト内の他のファイル（{files}）を使っており、それらの共有にはまだ対応していません。",
   "message.publishProgress": "{name} を共有中…",
-  "message.published": "{name} を共有しました。リンクをコピーしました：{link}",
   "message.publishFailed": "{name} を共有できませんでした：{error}",
   "message.publishUnavailable": "ここでは共有できません。",
   "message.publishNoKumikiVersion": "{name} がどの kumiki バージョンで作られたか分かりませんでした。",
@@ -618,5 +617,9 @@
   "agent.signIn.terms": "利用規約",
   "agent.signIn.privacy": "プライバシーポリシー",
   "agent.welcome.safety": "Kigumi は設計が構造的に安全か、基準に合っているかを確認しません。人が頼りにするものは、資格のある構造技術者や大工に確認してもらってください。",
-  "message.publishAgree": "共有すると、利用規約（kumiki.build/terms）に同意し、このフレームを共有する権利があることを確認したことになります。"
+  "message.publishAgree": "共有すると、利用規約（kumiki.build/terms）に同意し、このフレームを共有する権利があることを確認したことになります。",
+  "message.publishedTitle": "{name} を共有しました",
+  "message.publishedDetail": "このリンクを知っている人は誰でも閲覧できます。リンクはクリップボードにコピーしました：\n\n{link}",
+  "message.publishedOpen": "リンクを開く",
+  "message.publishedDone": "閉じる"
 }

@@ -58,6 +58,9 @@ describe('kumiki_source', () => {
         ]);
         expect(await run({ search: 'scarf', path: 'examples' })).toBe('examples/structures/shed.py:2: # a scarf in a shed');
         expect(await run({ search: 'no such thing' })).toBe('No matches.');
+        // In one file, by path or module name, as an agent asks for it.
+        expect(await run({ search: 'cut_|line_3\\b', path: 'kumiki/csg/cutcsg.py' })).toBe('kumiki/csg/cutcsg.py:1: def cut_scarf():');
+        expect(await run({ search: 'line_3\\b', path: 'kumiki.rule' })).toBe('kumiki/rule.py:3: line_3 = 3');
     });
 
     test('reads nothing outside kumiki, and says when kumiki is not found', async () => {

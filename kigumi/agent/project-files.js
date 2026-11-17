@@ -83,6 +83,8 @@ function createProjectFiles({ root, readOnly = () => [] }) {
     /** Files under `folder`, up to `limit`, whose names `accept` takes. */
     async function list(folder, limit, accept = () => true) {
         const start = resolve(folder);
+        // A file named where a folder is asked for (a search "in" timber.py): that file alone.
+        if (fs.existsSync(start) && fs.statSync(start).isFile()) return [start];
         const found = [];
         const walk = async (dir) => {
             for (const entry of await fs.promises.readdir(dir, { withFileTypes: true })) {
