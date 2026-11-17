@@ -31,7 +31,6 @@ const VIEWER_LOG_LEVEL_ORDER = {
 // The settings behind the options panel's beta features (viewer-app.js, setBetaFeature).
 const BETA_FEATURE_SETTINGS = Object.freeze({
     assemblyPreview: 'viewer.assemblyPreview',
-    drawingBeta: 'viewer.drawingBeta',
     agent: 'agent.enabled',
 });
 
@@ -983,11 +982,9 @@ class FrameViewSession {
             }
             this._runFinishingInBackground();
             // The drawings again, measured on the frame just built.
-            if (getHost().getConfig(BETA_FEATURE_SETTINGS.drawingBeta, false) === true) {
-                this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
-                    if (!this.isDisposed) this.log(`[drawing] get_drawings after refresh failed: ${err.message || err}`);
-                });
-            }
+            this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
+                if (!this.isDisposed) this.log(`[drawing] get_drawings after refresh failed: ${err.message || err}`);
+            });
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
             this.profiler.markTiming(timing, 'refresh.end', { refresh_total_ms: Math.round(refresh_total_s * 1000) });
             await pushCadqueryStatus(this);
@@ -1379,9 +1376,6 @@ class FrameViewSession {
 
     /** Fetch the drawings again shortly, once a burst of added drawings settles. */
     _refreshDrawingsSoon() {
-        if (getHost().getConfig(BETA_FEATURE_SETTINGS.drawingBeta, false) !== true) {
-            return;
-        }
         clearTimeout(this._drawingsRefreshTimer);
         this._drawingsRefreshTimer = setTimeout(() => {
             if (this.isDisposed) {

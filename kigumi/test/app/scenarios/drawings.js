@@ -11,13 +11,11 @@ module.exports = {
     async run({ check, inShell, waitFor, capture, settings, runAppCommand, openFrame, viewDoc, showTab, FRAME, DRAWING_FRAME, PARAMETER_FRAME, REPO, ARTIFACTS }) {
         await openFrame(FRAME);
         await showTab('options');
-        await inShell(`${viewDoc}.getElementById('beta-drawing-toggle').click()`);
-        const betaSaved = await waitFor(() => settings.get('viewer.drawingBeta') === true, { timeoutMs: 5000 }).catch(() => false);
-        const betaShown = await waitFor(() => inShell(`(() => {
-            const app = document.querySelector("#slot-center iframe:not([hidden])")?.contentDocument?.querySelector("kigumi-app");
-            return !!(app && app.drawingBetaEnabled);
+        const drawingsOn = await waitFor(() => inShell(`(() => {
+            const doc = ${viewDoc};
+            return !doc.getElementById('beta-drawing-toggle') && !!doc.getElementById('debug-drawing-btn');
         })()`), { timeoutMs: 20000 }).catch(() => false);
-        check('turning drawings on in the beta section saves it, and the open view reloads with them', betaSaved && betaShown);
+        check('drawings are on with no setting: the options have their section, and no beta switch for them', drawingsOn);
 
         // The scale ruler: off until the options turn it on, then at the bottom right with a round length.
         const ruler = () => inShell(`(() => {

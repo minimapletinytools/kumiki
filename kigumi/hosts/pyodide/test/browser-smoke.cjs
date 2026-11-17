@@ -79,6 +79,33 @@ app.whenReady().then(async () => {
         check('with no project open, Project status offers Open Project, not Initialize Project',
             Boolean(startStatus && !startStatus.includes('Initialize Project')));
         check('the agent panel is open from the start', await wait(`!!document.querySelector('#slot-right iframe') && !document.querySelector('#slot-right').hidden`, 30000) === true);
+        // The status bar's info button: what this is, and where to find out more.
+        await js(`document.getElementById('status-about').click()`);
+        const about = await wait(`(() => {
+            const box = document.getElementById('confirm');
+            if (!box || box.hidden) return null;
+            return { message: document.getElementById('confirm-message').textContent,
+                detail: document.getElementById('confirm-detail').textContent, action: document.getElementById('confirm-ok').textContent };
+        })()`, 10000);
+        await shot('about');
+        await js(`document.getElementById('confirm-cancel').click()`);
+        check('the info button says this is the web viewer for Kumiki, with a way to kumiki.build',
+            about && about.message === 'Kigumi in the browser' && about.detail.includes('viewer for Kumiki') && about.action === 'Go to kumiki.build'
+                && await wait(`document.getElementById('confirm').hidden`, 5000) === true, JSON.stringify(about));
+
+        // A share link (#publish=<id>) opens the frame read-only, with no project open. Needs a real
+        // publish on the backend: KIGUMI_TEST_PUBLISH_ID.
+        if (process.env.KIGUMI_TEST_PUBLISH_ID) {
+            await js(`location.hash = 'publish=${process.env.KIGUMI_TEST_PUBLISH_ID}'`);
+            const sharedCanvas = await wait(`(() => { const c = ${view}?.querySelector('canvas'); return c && c.width > 100 ? c.width : null; })()`, 120000);
+            const sharedRow = await wait(`(${explorer}?.body?.innerText || '').match(/Shared \\(1\\)/) ? true : null`, 20000);
+            await shot('shared-link');
+            check('a share link opens the frame in a view with no project open, and lists it under Shared',
+                Boolean(sharedCanvas) && sharedRow === true && !(await js('location.hash')), `canvas ${sharedCanvas}, shared ${sharedRow}`);
+            // Back to the welcome page, which the next checks look at.
+            await js(`document.querySelectorAll('#tabs .tab-close').forEach((close) => close.click()); true`);
+            await wait(`document.querySelectorAll('#tabs .tab').length === 0 || null`, 10000);
+        }
         const welcomeParts = await js(`(() => {
             const shown = (id) => { const e = document.getElementById(id); return !!e && !e.hidden && e.offsetParent !== null; };
             const logo = document.getElementById('web-welcome-logo');
@@ -227,14 +254,8 @@ app.whenReady().then(async () => {
         })()`);
         const deleteItem = await wait(`[...(${explorer}?.querySelectorAll('.ks-menu-item') || [])].some((item) => item.textContent.includes('Delete File')) || null`, 10000);
         await js(`[...${explorer}.querySelectorAll('.ks-menu-item')].find((item) => item.textContent.includes('Delete File')).click(); true`);
-        const asked = await wait(`!document.querySelector('#quickpick').hidden || null`, 15000);
-        await js(`(() => {
-            const input = document.querySelector('#quickpick-filter');
-            input.value = 'Delete';
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-            return true;
-        })()`);
+        const asked = await wait(`(!document.querySelector('#confirm').hidden && document.querySelector('#confirm-ok').textContent.includes('Delete')) || null`, 15000);
+        await js(`document.querySelector('#confirm-ok').click(); true`);
         const deleted = await wait(`(async () => (await ${savedFile('garden_shed.py')}) === null || null)()`, 30000);
         const unlisted = await wait(`!${shedRow} || null`, 60000);
         check('a frame\'s right-click menu has Delete File, which asks, then removes the frame', deleteItem === true

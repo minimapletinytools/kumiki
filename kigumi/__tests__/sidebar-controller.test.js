@@ -199,7 +199,8 @@ test('Kigumi options lists the switches the host has, and sets one from the page
   const { surface } = await attached();
   const options = () => surface.posted.filter((m) => m.type === 'sidebarState').pop().options;
 
-  expect(options().map((o) => o.key)).toEqual(expect.arrayContaining(['viewer.autoRefreshOnFileChange', 'agent.enabled', 'viewer.drawingBeta']));
+  expect(options().map((o) => o.key)).toEqual(expect.arrayContaining(['viewer.autoRefreshOnFileChange', 'agent.enabled']));
+  expect(options().map((o) => o.key)).not.toContain('viewer.drawingBeta');
   expect(options().map((o) => o.key)).not.toContain('mcp.enabled');
   expect(options().find((o) => o.key === 'agent.enabled').value).toBe(false);
 
@@ -208,9 +209,9 @@ test('Kigumi options lists the switches the host has, and sets one from the page
   expect(options().find((o) => o.key === 'agent.enabled').value).toBe(true);
 
   await surface.send({ type: 'sidebarSetOption', key: 'agent.openrouterApiKey', value: true });
-  await surface.send({ type: 'sidebarSetOption', key: 'viewer.drawingBeta', value: 'yes' });
+  await surface.send({ type: 'sidebarSetOption', key: 'viewer.autoRefreshOnFileChange', value: 'yes' });
   expect(config).not.toHaveProperty('agent.openrouterApiKey');
-  expect(config).not.toHaveProperty('viewer.drawingBeta');
+  expect(config).not.toHaveProperty('viewer.autoRefreshOnFileChange');
 });
 
 test('MCP is set up in the agent panel: the sidebar has no switch or state for it', async () => {

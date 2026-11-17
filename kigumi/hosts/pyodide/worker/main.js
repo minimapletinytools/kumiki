@@ -506,6 +506,15 @@ async function start() {
             settings.replace((args[0] || {}).values);
         } else if (id === 'web:store') {
             Object.assign(stored, (args[0] || {}).values);
+        } else if (id === 'web:about') {
+            const more = await connection.confirm({
+                message: 'Kigumi in the browser',
+                detail: 'This is the web-based viewer for Kumiki, the Python library for timber framing and joinery. '
+                    + 'Your projects are kept in this browser. Go to kumiki.build for more info, and to get the Kigumi app.',
+                action: 'Go to kumiki.build',
+                cancel: 'Close',
+            });
+            if (more) post({ type: 'browser:external', url: 'https://kumiki.build' });
         } else if (id === 'web:conversations') {
             restoreConversations((args[0] || {}).files);
         } else if (id === 'toggleAgent') {

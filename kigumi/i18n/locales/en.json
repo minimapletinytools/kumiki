@@ -7,7 +7,6 @@
   "viewer.options.section.drawing": "drawing view",
   "viewer.options.section.beta": "beta features",
   "viewer.options.beta.assemblyPreview": "assembly preview",
-  "viewer.options.beta.drawings": "drawings",
   "viewer.options.beta.agent": "Agent panel",
   "viewer.options.drawingGhosts": "show timbers not in the drawing",
   "viewer.options.drawingPerfectFaces": "show the perfect timber's faces",
@@ -340,7 +339,6 @@
   "sidebar.section.options": "Kigumi options",
   "sidebar.options.autoRefresh": "Auto refresh on file change",
   "sidebar.options.agent": "Agent panel",
-  "sidebar.options.drawings": "Drawings (beta)",
   "sidebar.options.assemblyPreview": "Assembly preview (beta)",
   "sidebar.openProject": "Open Project…",
   "sidebar.openProject.desc": "Choose a project to open",
@@ -467,7 +465,6 @@
   "agent.web.promo": "You will get $1 in free promo tokens and there is no way to buy more.",
   "agent.web.appLink": "standalone app",
   "agent.web.signIn": "Sign in to use the agent",
-  "agent.welcome.title": "Kigumi Agent",
   "agent.welcome.body": "Ask about the frame you have open, or what you have selected in it. The agent can read and edit your project's files, rebuild views and look at them.",
   "agent.welcome.signIn": "Please sign in to use the agent.",
   "agent.welcome.setKey": "Please add an OpenRouter key in the agent's settings (the gear above) to use the agent.",
@@ -615,5 +612,6 @@
   "message.publishNotShared": "These won't be shared, so people viewing it won't see them: {files}.",
   "message.publishNotShared.mesh": "{name} (mesh timbers)",
   "message.publishNotShared.measurements": "its measurements and drawings",
-  "message.publishNotShared.parameters": "its saved parameter values"
+  "message.publishNotShared.parameters": "its saved parameter values",
+  "agent.suggest.stool": "Build a stool from 2x6s. The legs splay at 15 degrees and are dovetailed into the top, and a single stretcher between the legs is held by tusked tenons."
 }

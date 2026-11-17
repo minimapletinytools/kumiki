@@ -15,7 +15,6 @@ const ARTIFACTS = process.env.KIGUMI_TEST_ARTIFACTS || null;
 
 // The settings a scenario may change, as every scenario starts with them.
 const SETTINGS_AT_START = {
-    'viewer.drawingBeta': false,
     'mcp.enabled': false,
     'viewer.autoRefreshOnFileChange': true,
     'agent.model': '',

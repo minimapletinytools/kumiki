@@ -194,7 +194,6 @@ export class ViewerSettingsPanel {
                         step="0.1"
                         .value=${String(this.app.disassemblyMultiplier)}>
                 </label>` : ''}
-                ${this.app.panelFlags.drawingBeta ? html`
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.drawing')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.section.drawing')}</div>
                 <label>
@@ -217,7 +216,7 @@ export class ViewerSettingsPanel {
                     id="debug-drawing-btn"
                     type="button"
                     title=${t('viewer.options.debugDrawing.title')}
-                    @click=${() => this.app.openDebugDrawing()}>${t('viewer.options.debugDrawing')}</button>` : ''}
+                    @click=${() => this.app.openDebugDrawing()}>${t('viewer.options.debugDrawing')}</button>
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.export.ariaLabel')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.export.subtitle')}</div>
                 <label>
@@ -272,11 +271,6 @@ export class ViewerSettingsPanel {
                         @change=${(event) => this.app.setBetaFeature('assemblyPreview', event.target.checked)}>
                     ${t('viewer.options.beta.assemblyPreview')}
                 </label>` : ''}
-                <label>
-                    <input id="beta-drawing-toggle" type="checkbox" .checked=${this.app.panelFlags.drawingBeta}
-                        @change=${(event) => this.app.setBetaFeature('drawingBeta', event.target.checked)}>
-                    ${t('viewer.options.beta.drawings')}
-                </label>
                 ${this.app.panelFlags.agentAvailable ? html`
                 <label>
                     <input id="beta-agent-toggle" type="checkbox" .checked=${this.app.panelFlags.agentEnabled}

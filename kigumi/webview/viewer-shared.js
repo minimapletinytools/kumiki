@@ -665,12 +665,6 @@ export const FEATURE_FLAGS = window.FEATURE_FLAGS || {};
 export const ASSEMBLY_PREVIEW_ENABLED = Boolean(FEATURE_FLAGS.assemblyPreview)
     && INITIAL_PAYLOAD.assemblyPreviewSetting === true;
 
-// Drawing mode, off unless asked for (kigumi.viewer.drawingBeta). It hides the
-// ways in rather than the machinery: with no draw button, no drawings section
-// and no drawing options, the viewer never leaves the 3D scene, and everything
-// that only matters on a sheet is unreachable rather than disabled.
-export const DRAWING_BETA_ENABLED = INITIAL_PAYLOAD.drawingBetaSetting === true;
-
 // Axis-aligned bounds accumulation over flat [x,y,z,...] position arrays.
 export function createBoundsAccumulator() {
     return {

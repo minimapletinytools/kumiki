@@ -7,7 +7,6 @@
   "viewer.options.section.drawing": "図面ビュー",
   "viewer.options.section.beta": "ベータ機能",
   "viewer.options.beta.assemblyPreview": "組み立てプレビュー",
-  "viewer.options.beta.drawings": "図面",
   "viewer.options.beta.agent": "エージェントパネル",
   "viewer.options.drawingGhosts": "図面外の木材を表示",
   "viewer.options.drawingPerfectFaces": "基準材の面を表示",
@@ -340,7 +339,6 @@
   "sidebar.section.options": "Kigumiの設定",
   "sidebar.options.autoRefresh": "ファイル変更時に自動更新",
   "sidebar.options.agent": "エージェントパネル",
-  "sidebar.options.drawings": "図面(ベータ)",
   "sidebar.options.assemblyPreview": "組立プレビュー(ベータ)",
   "sidebar.openProject": "プロジェクトを開く…",
   "sidebar.openProject.desc": "開くプロジェクトを選びます",
@@ -467,7 +465,6 @@
   "agent.web.promo": "$1分の無料プロモトークンがもらえます。追加で購入することはできません。",
   "agent.web.appLink": "スタンドアロンアプリ",
   "agent.web.signIn": "エージェントを使うにはサインイン",
-  "agent.welcome.title": "Kigumi エージェント",
   "agent.welcome.body": "開いている架構や、その中で選択しているものについて質問できます。エージェントはプロジェクトのファイルを読み書きし、ビューを再構築して確認できます。",
   "agent.welcome.signIn": "エージェントを使うにはサインインしてください。",
   "agent.welcome.setKey": "エージェントを使うには、エージェントの設定でOpenRouterのキーを追加してください。",
@@ -615,5 +612,6 @@
   "message.publishNotShared": "次のものは共有されないため、閲覧する人には表示されません：{files}。",
   "message.publishNotShared.mesh": "{name}（メッシュ材）",
   "message.publishNotShared.measurements": "寸法と図面",
-  "message.publishNotShared.parameters": "保存したパラメータ値"
+  "message.publishNotShared.parameters": "保存したパラメータ値",
+  "agent.suggest.stool": "2x6材でスツールを作って。脚は15度に開いて蟻で天板に留め、脚の間の1本の貫は鼻栓ほぞで留める。"
 }

@@ -4,7 +4,7 @@
  * A mixin of the viewer (viewer-app.js): its methods run as the viewer's.
  */
 
-import { DRAWING_BETA_ENABLED, accumulateBounds, boundsFromAccumulator, createBoundsAccumulator } from './viewer-shared.js';
+import { accumulateBounds, boundsFromAccumulator, createBoundsAccumulator } from './viewer-shared.js';
 
 export const CameraMixin = (Base) => class extends Base {
     onGizmoPointerMove(event) {
@@ -309,16 +309,5 @@ export const CameraMixin = (Base) => class extends Base {
         camera.top = halfHeight;
         camera.bottom = -halfHeight;
         camera.updateProjectionMatrix();
-    }
-
-    /**
-     * Whether drawing mode is offered at all (kigumi.viewer.drawingBeta).
-     *
-     * Read by everything that is a way in: the draw button, the drawings
-     * section of the layers panel, and the drawing options. Off, the viewer
-     * never leaves the 3D scene.
-     */
-    get drawingBetaEnabled() {
-        return DRAWING_BETA_ENABLED;
     }
 };
