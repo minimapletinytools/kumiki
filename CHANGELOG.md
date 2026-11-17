@@ -8,6 +8,8 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [kigumi 0.9.8] - 2026-11-16
+
 ### kigumi
 
 #### Added
