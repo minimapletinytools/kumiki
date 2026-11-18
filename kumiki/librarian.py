@@ -102,6 +102,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .rule import scalar
 from .patternbook import Pattern
+from .user_warnings import warn_user
 
 
 _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
@@ -1093,9 +1094,9 @@ def build_pattern_grid_frame(pattern_list: List[Any], padding: float = 0.5) -> A
             if hasattr(result, "cut_timbers") and hasattr(result, "accessories"):
                 frames.append(result)
             else:
-                print(f"[grid] skipping pattern '{getattr(p, 'name', '?')}': lambda returned {type(result).__name__}, expected Frame", file=sys.stderr)
+                warn_user(f"Skipping pattern '{getattr(p, 'name', '?')}': it returned a {type(result).__name__}, not a Frame")
         except Exception as exc:
-            print(f"[grid] skipping pattern '{getattr(p, 'name', '?')}': {exc}", file=sys.stderr)
+            warn_user(f"Skipping pattern '{getattr(p, 'name', '?')}': {exc}")
 
     if not frames:
         raise ValueError("No patterns produced a renderable Frame")

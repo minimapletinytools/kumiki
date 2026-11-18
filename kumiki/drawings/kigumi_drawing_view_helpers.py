@@ -1,11 +1,11 @@
 """Camera helpers for kigumi's drawing views: which way each view looks and how much of the model it shows. World space, as float lists."""
 
 import math
-import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, NamedTuple, Sequence, Tuple
 
 from ..viewer.rule_at_home import FloatList3
+from kumiki.user_warnings import warn_user
 
 if TYPE_CHECKING:
     from ..timber import CutTimber
@@ -79,7 +79,7 @@ def cut_extent(cut_timber: 'CutTimber', stock_length: float) -> Tuple[float, flo
         end = float(prism.end_distance) if prism.end_distance is not None else stock_length
         return start, end
     except Exception as exc:
-        warnings.warn(f"could not measure cut extent: {exc}")
+        warn_user(f"could not measure cut extent: {exc}")
         return 0.0, stock_length
 
 

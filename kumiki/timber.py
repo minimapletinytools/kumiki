@@ -64,6 +64,7 @@ OFFSET_TEST_POINT = scalar(1, 1000)  # Small offset (0.001) for testing inward d
 # ticket.py can use it without importing this one. Re-exported here because
 # `from kumiki.timber import TimberLongFace` is how every caller reaches it.
 from .timber_features import *
+from kumiki.user_warnings import warn_user
 
 
 # ============================================================================
@@ -243,7 +244,7 @@ class PerfectTimberWithin(ABC):
             # both were required is the half that says why.
             shortfall = ("It does not." if len(imperfect) == len(faces)
                          else f"It does not on {', '.join(f.name for f in imperfect)}.")
-            warnings.warn(
+            warn_user(
                 f"Reference feature {feature.name} on timber "
                 f"'{self.ticket.path}' rests on "
                 f"{' and '.join(face.name for face in faces)}, so the rough "
@@ -1891,7 +1892,7 @@ class CutTimber:
             )
         ]
         if len(matches) > 1:
-            warnings.warn(
+            warn_user(
                 f"{len(matches)} joints on this timber share the name {wanted!r}. They can "
                 "only be told apart by the order they were cut in, so adding another before "
                 "them will move anything that refers to them -- a drawing, or a measurement."
@@ -2828,7 +2829,7 @@ class Frame:
             )
         ]
         if len(matches) > 1:
-            warnings.warn(
+            warn_user(
                 f"{len(matches)} timbers share the path {wanted!r}. They can only be told "
                 "apart by the order they were built in, so adding another above them will "
                 "move anything that refers to them -- a drawing, or a measurement. Give "
@@ -2943,8 +2944,8 @@ class Frame:
                             )
                         else:
                             # Different timber data with the same name - just a warning
-                            warnings.warn(
-                                f"Warning: Found multiple timbers with the same name '{timber_name}' "
+                            warn_user(
+                                f"Found multiple timbers with the same name '{timber_name}' "
                                 f"but different properties (length, size, position, or orientation). "
                                 f"This may indicate an error in timber naming. "
                                 f"Timber 1: length={timber_i.length}, size={timber_i.size}, "

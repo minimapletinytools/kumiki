@@ -6,7 +6,6 @@ e.g. "posts/frontleft" or "door/boards/1". Folders are implicit in the path and
 will be rendered as actual folders in the layer view.
 """
 
-import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from enum import Enum
@@ -20,6 +19,7 @@ from typing_extensions import Self, deprecated
 from .timber_features import (LONG_TIMBER_FEATURES, LongEdgeOrCenterline,
                               SomeTimberFeature, TimberFeature, TimberLongEdge,
                               TimberLongFaceCenterline)
+from kumiki.user_warnings import warn_user
 
 # The path a Ticket has when nobody gave it one. Code that displays a name
 # needs to recognise it, since it is a placeholder rather than a name; it was
@@ -378,7 +378,7 @@ class JointTicket(Ticket):
 
     def __post_init__(self) -> None:
         if self.tags:
-            warnings.warn(
+            warn_user(
                 f"JointTicket({self.path!r}) was given tags {tuple(self.tags)!r}. Joints do "
                 "not carry tags yet, so these are discarded. Move them to the timbers the "
                 "joint is cut on, or drop them."

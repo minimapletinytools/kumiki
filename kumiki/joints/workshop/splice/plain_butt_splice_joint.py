@@ -2,13 +2,13 @@
 Kumiki - Plain butt splice joint construction function
 """
 
-import warnings
 from typing import Optional
 
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from kumiki.measuring import locate_top_center_position, locate_bottom_center_position
+from kumiki.user_warnings import warn_user
 
 
 def cut_plain_butt_splice_joint_on_aligned_timbers(
@@ -64,9 +64,9 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(
 
         distance_from_centerline = safe_magnitude(splice_point - projected_point)
         if not safe_zero_test(distance_from_centerline):
-            warnings.warn(
-                f"Splice point was not on timberA's centerline (distance: {float(distance_from_centerline)}). "
-                f"Projecting onto centerline."
+            warn_user(
+                f"The splice point is {float(distance_from_centerline) * 1000:.1f} mm off "
+                f"{timberA.ticket.path}'s centerline, so the nearest point on it is used."
             )
             splice_point = projected_point
 
@@ -79,9 +79,10 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(
 
     max_dimension = max(timberA.size[0], timberA.size[1], timberB.size[0], timberB.size[1])
     if centerline_distance > max_dimension / scalar(2):
-        warnings.warn(
-            f"Timber cross sections may not overlap (centerline distance: {float(centerline_distance)}). "
-            f"Check joint geometry."
+        warn_user(
+            f"{timberA.ticket.path} and {timberB.ticket.path} may not overlap: their centerlines "
+            f"are {float(centerline_distance) * 1000:.1f} mm apart. Check the joint's geometry.",
+            FrameWarning,
         )
 
     distance_A_from_bottom = safe_dot_product(splice_point - timberA.get_bottom_position_global(), timberA.get_length_direction_global())

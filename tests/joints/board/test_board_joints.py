@@ -8,7 +8,7 @@ from kumiki.joints.workshop.board import (
 )
 from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.rule import safe_equality_test, scalar, Matrix
-from kumiki.timber import Board, Orientation, Timber, Transform, create_v3
+from kumiki.timber import Board, FrameWarning, Orientation, Timber, Transform, create_v3
 from kumiki.csg.cutcsg import RectangularPrism, SolidUnion
 from kumiki.construction import ExtendedTimberArrangement, PanelBoardArrangement
 
@@ -159,7 +159,7 @@ class TestTongueAndGrooveJoint:
     def test_insufficient_overlap_warns(self):
         # Boards only overlap by 1 but tongue_depth is 3 → warning expected.
         tongue_board, groove_board = _make_boards(overlap=scalar(1))
-        with pytest.warns(UserWarning, match="does not overlap tongue board enough"):
+        with pytest.warns(FrameWarning, match="by the tongue.s depth"):
             cut_tongue_and_groove_joint(
                 tongue_board=tongue_board,
                 groove_board=groove_board,
