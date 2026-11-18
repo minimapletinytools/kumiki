@@ -621,5 +621,7 @@
   "message.publishedTitle": "{name} を共有しました",
   "message.publishedDetail": "このリンクを知っている人は誰でも閲覧できます。リンクはクリップボードにコピーしました：\n\n{link}",
   "message.publishedOpen": "リンクを開く",
-  "message.publishedDone": "閉じる"
+  "message.publishedDone": "閉じる",
+  "editor.readOnly.shared": "読み取り専用です。変更するにはコピーを作成してください。",
+  "editor.readOnly.makeCopy": "コピーを作成"
 }

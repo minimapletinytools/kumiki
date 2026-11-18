@@ -34,7 +34,20 @@
         return 'plaintext';
     }
 
-    function initMonaco({ filePath, content, line = 1, readOnly = false }) {
+    /** The bar over a read-only file: what it is, and a button to copy it where it can be changed. */
+    function showReadOnlyBar(notice, canCopy) {
+        const bar = document.getElementById('read-only-bar');
+        if (!notice) return;
+        document.getElementById('read-only-text').textContent = notice.text;
+        const copy = document.getElementById('read-only-copy');
+        copy.textContent = notice.action;
+        copy.hidden = !canCopy;
+        copy.onclick = () => vscode.postMessage({ type: 'editorMakeCopy' });
+        bar.hidden = false;
+    }
+
+    function initMonaco({ filePath, content, line = 1, readOnly = false, readOnlyNotice = null, canCopy = false }) {
+        if (readOnly) showReadOnlyBar(readOnlyNotice, canCopy);
         currentFilePath = filePath;
         originalContent = content;
         isDirty = false;

@@ -621,5 +621,7 @@
   "message.publishedTitle": "Shared {name}",
   "message.publishedDetail": "Anyone with this link can view it. The link is copied to your clipboard:\n\n{link}",
   "message.publishedOpen": "Open Link",
-  "message.publishedDone": "Done"
+  "message.publishedDone": "Done",
+  "editor.readOnly.shared": "Read only. Make a copy to make changes.",
+  "editor.readOnly.makeCopy": "Make a Copy"
 }
