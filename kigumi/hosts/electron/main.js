@@ -1038,9 +1038,10 @@ async function start() {
     }
 }
 
-// kigumi:// links from the browser (sign-in) open this app, once there is a backend to sign in to;
-// until then the system's handler is left alone. Run from source, Electron is told which app it is.
-if (backendConfig(process.env).supabaseUrl) {
+// kigumi:// links from the browser (sign-in, share links) open this app, once there is a backend to
+// sign in to. Only an installed Kigumi takes them: run from source (and in every app test), macOS
+// would hand them to the bare Electron app instead. KIGUMI_REGISTER_PROTOCOL=1 takes them from source.
+if (backendConfig(process.env).supabaseUrl && (app.isPackaged || process.env.KIGUMI_REGISTER_PROTOCOL === '1')) {
     const fromSource = process.defaultApp && process.argv.length >= 2;
     app.setAsDefaultProtocolClient('kigumi', ...(fromSource ? [process.execPath, [path.resolve(process.argv[1])]] : []));
 }
