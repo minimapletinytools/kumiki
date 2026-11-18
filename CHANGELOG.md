@@ -8,6 +8,30 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [kumiki 0.9.7 / kigumi 0.9.10] - 2026-11-17
+
+### kumiki
+
+#### Changed
+
+- Warnings point at the line in your frame that caused them, and name the timber, instead of a line inside kumiki.
+
+### kigumi
+
+#### Added
+
+- Agents (built-in and over MCP) can list shared frames and read their code (`shared_frames`), open a share link (`open_shared`), and copy a shared frame into the project (`copy_shared_to_project`). `list_panels` marks read-only files.
+- A shared frame's code says at the top that it is read only, with a Make a Copy button. Shared frames in the explorer have View Source.
+
+#### Changed
+
+- The Log tab gives warnings and errors their level instead of guessing it from the text.
+- A build writes one line to the log, with its timings, instead of about twenty-five.
+
+#### Removed
+
+- The browser version's settings no longer offer the drawings beta, which was already on for everyone.
+
 ## [kigumi 0.9.9] - 2026-11-17
 
 ### kigumi
