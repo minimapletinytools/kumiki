@@ -110,10 +110,6 @@ async function callLibrarian(workspaceRoot, options) {
 
 async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
     const logLine = typeof options.logLine === 'function' ? options.logLine : null;
-    if (logLine) {
-        logLine(`[workspace-scan] delegating to librarian_cli root=${workspaceRoot}`);
-    }
-
     const scanErrors = [];
     let index;
     try {
@@ -121,7 +117,7 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
     } catch (error) {
         const msg = (error && error.message) ? error.message : String(error);
         scanErrors.push({ filePath: workspaceRoot, reason: `librarian scan failed: ${msg}` });
-        if (logLine) logLine(`[workspace-scan] failed: ${msg}`);
+        if (logLine) logLine(`[workspace-scan] failed: ${msg}`, 'error');
         return { frameFiles: [], patternbookFiles: [], scanErrors };
     }
 
@@ -139,9 +135,6 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
             patterns: sidebarPatterns,
             loadError: rec.load_error || null,
         });
-        if (logLine) {
-            logLine(`[workspace-scan] patternbook=${relPath} patterns=${sidebarPatterns.length}`);
-        }
     }
 
     const frameFiles = [];
@@ -156,19 +149,13 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
             multipleFrames: !!rec.multiple_frames,
             loadError: rec.load_error || null,
         });
-        if (logLine) {
-            logLine(
-                `[workspace-scan] frame=${relPath} chosen=${rec.chosen_frame_name}` +
-                ` kind=${rec.chosen_frame_kind} multiple=${!!rec.multiple_frames}`
-            );
-        }
     }
 
     patternbookFiles.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
     frameFiles.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 
     if (logLine) {
-        logLine(`[workspace-scan] done patternbooks=${patternbookFiles.length} frames=${frameFiles.length}`);
+        logLine(`[workspace-scan] ${workspaceRoot}: ${patternbookFiles.length} pattern book(s), ${frameFiles.length} frame file(s)`);
     }
     return { frameFiles, patternbookFiles, scanErrors };
 }
