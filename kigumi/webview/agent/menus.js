@@ -97,7 +97,7 @@ export class Menus {
         for (const radio of this.modeRadios) radio.checked = radio.value === mode;
         this.permissionSelect.value = mode;
         this.startupToggle.checked = settings['agent.showOnStartup'] !== false;
-        this.outputLimit.value = String(settings['agent.maxOutputTokens'] || 16000);
+        this.outputLimit.value = String(settings['agent.maxOutputTokens'] ?? 32000);
         this.retention.value = String(settings['agent.conversationRetentionDays'] ?? 30);
         this.usage.textContent = typeof conversationBytes === 'number' && conversationBytes > 0
             ? t('agent.settings.usage', { size: size(conversationBytes) }) : '';

@@ -17,8 +17,8 @@ const { HARNESS } = require('./models');
 
 /** Steps in one turn, each a model call and the tools it asks for. */
 const MAX_STEPS = 40;
-/** Per step, unless the user's setting says otherwise. Reasoning counts toward it: 8k ran out at medium effort. Unset, a provider may reserve its maximum (64k for Haiku) against the balance. */
-const MAX_OUTPUT_TOKENS = 16000;
+/** Per step, unless the user's setting says otherwise; 0 sends no limit. Reasoning counts toward it: 8k ran out at medium effort. Unset, a provider may reserve its maximum (64k for Haiku) against the balance. */
+const MAX_OUTPUT_TOKENS = 32000;
 /** Continuations after a stream closes without a completion signal, within the turn's step limit. */
 const MAX_STREAM_CONTINUATIONS = 2;
 /** Retries after a step spends its whole output on reasoning and does nothing. */
@@ -198,7 +198,7 @@ function earlyEnd(steps, maxSteps = MAX_STEPS) {
  * @param {boolean} [options.cacheMarks] whether to mark where its prompt cache should hold (models.js)
  * @param {object} [options.harness]     how the loop treats the model (models.js harnessOf)
  * @param {number} [options.contextWindow] the model's, for the panel's context meter
- * @param {number} [options.maxOutputTokens] the most one step may write
+ * @param {number} [options.maxOutputTokens] the most one step may write; 0 for no limit
  * @param {number} [options.maxSteps]    the most steps in the turn
  * @param {object[]} options.tools       Kigumi tools
  * @param {object} [options.files]       the project's files (project-files.js), for a summary to carry changed ones
@@ -235,7 +235,7 @@ async function runTurn({ model, images, cacheMarks = false, harness = HARNESS, c
             messages: request(),
             tools: toolSet,
             stopWhen: stepCountIs(maxSteps - steps.length),
-            maxOutputTokens,
+            maxOutputTokens: maxOutputTokens || undefined,
             abortSignal,
             // Retry transient request failures before streaming begins.
             maxRetries: 2,

@@ -18,7 +18,7 @@ const STATE = {
     models: [{ id: 'm1', label: 'Model one' }, { id: 'm2', label: 'Model two' }],
     settings: { 'agent.enabled': true, 'mcp.enabled': true, 'agent.conversationRetentionDays': 30,
         'agent.permissionMode': 'ask', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
-        'agent.maxOutputTokens': 8000 },
+        'agent.maxOutputTokens': 16000 },
 };
 const MCP = { type: 'agent:mcp', state: { enabled: true, running: true, url: 'http://127.0.0.1:7345/mcp', error: null,
     clients: [{ name: 'smoke-agent' }], setups: [{ id: 'claude-code', label: 'Claude Code' }] } };

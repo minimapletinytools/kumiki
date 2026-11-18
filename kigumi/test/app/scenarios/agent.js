@@ -28,13 +28,13 @@ module.exports = {
 
         await read(`doc.getElementById('settings-toggle').click()`);
         const shown = await read(`doc.getElementById('setting-output-limit').value`);
-        await read(`(() => { const select = doc.getElementById('setting-output-limit'); select.value = '32000';
+        await read(`(() => { const select = doc.getElementById('setting-output-limit'); select.value = '0';
             select.dispatchEvent(new Event('change')); })()`);
-        const limit = await waitFor(() => settings.get('agent.maxOutputTokens') === 32000, { timeoutMs: 5000 }).catch(() => false);
+        const limit = await waitFor(() => settings.get('agent.maxOutputTokens') === 0, { timeoutMs: 5000 }).catch(() => false);
         await capture('agent-settings');
         await read(`doc.getElementById('settings-toggle').click()`);
-        settings.set('agent.maxOutputTokens', 16000);
-        check('the settings menu sets the longest step', shown === '16000' && limit, `shown ${shown}, now ${settings.get('agent.maxOutputTokens')}`);
+        settings.set('agent.maxOutputTokens', 32000);
+        check('the settings menu sets the longest step', shown === '32000' && limit, `shown ${shown}, now ${settings.get('agent.maxOutputTokens')}`);
 
         // The agent's to-do list: its × hides it, and the agent's next change to it shows it again.
         const agentSurface = connection().findPanel((panel) => panel.type === 'agent');
