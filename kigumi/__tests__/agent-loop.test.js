@@ -710,7 +710,7 @@ describe('the agent session', () => {
             // The key is set from the panel, which only learns that there is one.
             settings: { 'agent.enabled': false, 'mcp.enabled': false, 'agent.conversationRetentionDays': 30,
                 'agent.permissionMode': 'auto', 'agent.alwaysAllow': [], 'agent.showOnStartup': true, 'agent.planMode': false,
-                'agent.maxOutputTokens': 16000, 'agent.openrouterApiKey': true },
+                'agent.maxOutputTokens': 32000, 'agent.openrouterApiKey': true },
             conversationBytes: null,
             strings: {},
         });
@@ -952,8 +952,8 @@ describe('the agent session', () => {
         expect(agent.conversation.log.at(-1).event.type).toBe('agent:todos');
     });
 
-    test('the longest step is the setting, if it is one offered; else 16k', async () => {
-        for (const [setting, sent] of [[32000, 32000], [8000, 8000], [999999, 16000]]) {
+    test('the longest step is the setting, if it is one offered; else 32k; no limit sends none', async () => {
+        for (const [setting, sent] of [[64000, 64000], [16000, 16000], [0, undefined], [8000, 32000], [999999, 32000]]) {
             const model = scripted([...say('1', 'ok'), finish('stop')]);
             const { agent } = session({ settings: { 'agent.openrouterApiKey': 'sk-or', 'agent.maxOutputTokens': setting }, model });
             await agent.prompt('hi');
