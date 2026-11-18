@@ -730,7 +730,7 @@ class TestAMeasurementTheRunnerCannotWorkOut:
     def test_the_runner_warns_about_it(self):
         _, warned = self._resolve_without_a_plane()
 
-        assert "Warning" in warned
+        assert "[warn]" in warned
         assert "no plane" in warned
 
     def test_and_names_the_two_ends_so_it_can_be_found(self):
