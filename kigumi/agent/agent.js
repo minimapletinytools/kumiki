@@ -21,14 +21,17 @@ const { createFileTools } = require('./file-tools');
 const { viewFrames, checkFrameTool, describeFrameTool } = require('./frames');
 const { kumikiApiTool } = require('./kumiki-api');
 const { kumikiSourceTool } = require('./kumiki-source-tool');
+const { createSharedTools } = require('./shared-tools');
 const { todoTool, withBuildCheck, withCheckpoints } = require('./session-tools');
 const { PLAN_MODE_NOTE } = require('./permissions');
 
 /** A host over the app's views. */
 function viewHost({ panels, run, files, workspaceFolders = () => [files.root()].filter(Boolean), kumikiApi = null,
-    kumikiSource = () => null, kumikiExamples = () => null, kumikiDocs = () => null, systemPrompt = () => '', projects = null }) {
+    kumikiSource = () => null, kumikiExamples = () => null, kumikiDocs = () => null, systemPrompt = () => '', projects = null,
+    sharing = false }) {
     return { files, frames: viewFrames({ panels, run, files }), view: { panels, run, workspaceFolders, resolve: (file) => files.resolve(file) },
-        kumikiApi, kumikiSource, kumikiExamples, kumikiDocs, systemPrompt, projects };
+        kumikiApi, kumikiSource, kumikiExamples, kumikiDocs, systemPrompt, projects,
+        shared: sharing ? createSharedTools({ run, root: () => files.root() }) : [] };
 }
 
 /** The tools any agent gets: the built-in one, and others over MCP. */
@@ -37,6 +40,7 @@ function sharedTools(host) {
         // Where list_projects names the open project, get_workspace_folder would only repeat it.
         ...(host.view ? createKigumiTools({ ...host.view, workspaceTool: !host.projects }) : []),
         ...(host.projects ? createProjectTools(host.projects) : []),
+        ...(host.shared || []),
         checkFrameTool(host.frames),
         ...(host.frames.describe ? [describeFrameTool(host.frames)] : []),
         // Both read the project's kumiki: its names, and its docs and files.

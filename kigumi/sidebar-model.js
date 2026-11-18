@@ -34,6 +34,7 @@ const ROW_ACTIONS = Object.freeze({
     newFile: { command: 'kigumi.newFile', icon: 'new-file', labelKey: 'sidebar.action.newFile', inline: false },
     deleteFile: { command: 'kigumi.deleteFile', icon: 'trash', labelKey: 'sidebar.action.deleteFile', inline: false },
     sharePublicly: { command: 'kigumi.publishFrame', icon: 'link', labelKey: 'sidebar.action.sharePublicly', inline: false },
+    viewSharedSource: { command: 'kigumi.viewSharedSource', icon: 'go-to-file', labelKey: 'sidebar.action.viewSource', inline: true },
     copyToProject: { command: 'kigumi.copyPublishToProject', icon: 'copy', labelKey: 'sidebar.action.copyToProject', inline: true },
     copyShareLink: { command: 'kigumi.copyPublishLink', icon: 'link', labelKey: 'sidebar.action.copyShareLink', inline: false },
     removeShared: { command: 'kigumi.removePublish', icon: 'close', labelKey: 'sidebar.action.removeShared', inline: false },
@@ -546,7 +547,7 @@ class SidebarModel {
                     tooltip: t('sidebar.shared.tooltip', { date: String(entry.createdAt || '').slice(0, 10), version: entry.kumikiVersion }),
                     icon: 'eye',
                     action: open('kigumi.openPublish', entry.id),
-                    rowActions: ['copyToProject', 'copyShareLink', 'removeShared'],
+                    rowActions: ['viewSharedSource', 'copyToProject', 'copyShareLink', 'removeShared'],
                     data: { publishId: entry.id },
                 })),
                 node({

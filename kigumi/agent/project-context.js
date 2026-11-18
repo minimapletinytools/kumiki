@@ -42,6 +42,8 @@ function createProjectContext({ root, panels, run, projects }) {
             kumikiDocs: () => kumikiDocsFolder(knownSource(), root()),
             systemPrompt: loadSystemPrompt(),
             projects: projects(),
+            // Both hosts that use this (the app and the browser) can open share links.
+            sharing: true,
         });
     };
 }

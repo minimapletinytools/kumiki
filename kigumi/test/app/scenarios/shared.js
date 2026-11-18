@@ -1,8 +1,8 @@
 // Sharing a frame asks first, saying in red what it goes without (a mesh file, its measurements),
 // then uploads it to a stand-in backend and copies the link.
 // A shared frame's link opens the frame in a viewer, from a stand-in backend: it is listed under
-// Shared with the kumiki version it was built with, its source opens read-only, and it can be
-// copied into the project or taken off the list.
+// Shared with the kumiki version it was built with, its source opens read-only with a bar and a
+// button to make a copy, and it can be copied into the project or taken off the list.
 
 const fs = require('fs');
 const http = require('http');
@@ -103,15 +103,31 @@ module.exports = {
                 row && row.includes('Little shared frame') && row.includes('kumiki 0.9.6'), row);
             await capture('shared-01-opened');
 
-            await runAppCommand('kigumi.openFileSource', entryPath);
+            const listed = await runAppCommand('kigumi.listShared');
+            check('agents are told what is shared, and where', Array.isArray(listed) && listed.length === 1
+                && listed[0].id === ID && listed[0].downloaded === true && listed[0].file === entryPath, JSON.stringify(listed));
+
+            // View Source, from its row: read-only, with a bar saying so and a button to make a copy.
+            const opened = await runAppCommand('kigumi.viewSharedSource', { data: { publishId: ID } });
             const readOnly = await waitFor(() => inShell(`(() => {
                 const frame = document.querySelector('#slot-center iframe:not([hidden])');
                 const win = frame && frame.contentWindow;
                 const editor = win && win.monaco && win.monaco.editor.getEditors()[0];
                 if (!editor) return null;
-                return editor.getOption(win.monaco.editor.EditorOption.readOnly) ? 'read-only' : 'editable';
+                const bar = win.document.getElementById('read-only-bar');
+                return { readOnly: editor.getOption(win.monaco.editor.EditorOption.readOnly), bar: bar.hidden ? null : bar.textContent.replace(/\\s+/g, ' ').trim(),
+                    button: win.document.getElementById('read-only-copy').hidden ? null : win.document.getElementById('read-only-copy').textContent };
             })()`), { timeoutMs: 15000 }).catch(() => null);
-            check('its source opens read-only', readOnly === 'read-only', String(readOnly));
+            await capture('shared-01b-source');
+            check('its source opens read-only, with a bar saying to make a copy to make changes',
+                opened === entryPath && readOnly && readOnly.readOnly && readOnly.bar && readOnly.bar.startsWith('Read only. Make a copy to make changes.')
+                    && readOnly.button === 'Make a Copy', JSON.stringify(readOnly));
+            const copies = () => fs.readdirSync(REPO).filter((name) => /^little_shared_frame.*\.py$/.test(name));
+            const before = copies();
+            await inShell(`document.querySelector('#slot-center iframe:not([hidden])').contentWindow.document.getElementById('read-only-copy').click()`);
+            const made = await waitFor(() => copies().find((name) => !before.includes(name)) || null, { timeoutMs: 15000 }).catch(() => null);
+            check('Make a Copy copies it into the project', Boolean(made) && fs.readFileSync(path.join(REPO, made), 'utf8') === text, String(made));
+            if (made) fs.rmSync(path.join(REPO, made), { force: true });
 
             await runAppCommand('kigumi.openPublish', ID);
             check('opening it again uses the copy already downloaded', requests.length === 2, JSON.stringify(requests));

@@ -48,6 +48,27 @@ test('shell documents save buffers, version dirty edits, and expose editor selec
     expect(await describing).toMatchObject({ selection: { text: 'buffer' } });
   } finally { subscription.dispose(); connection.dispose(); fs.rmSync(root, { recursive: true, force: true }); }
 });
+test('a read-only file opens with its bar, and its button makes a copy', async () => {
+  const { addReadOnlyRoot } = require('../read-only');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-shared-'));
+  const file = path.join(root, 'shed.py');
+  fs.writeFileSync(file, 'width = 3');
+  const makeCopy = jest.fn(async () => {});
+  const registration = addReadOnlyRoot(root, { notice: () => ({ text: 'Read only.', action: 'Make a Copy' }), makeCopy });
+  const { connection, message, sent } = shell();
+  const editors = createEditorTabs({ connection, editorUrl: '/editor', log: () => {}, setStatus: () => {}, askToSave: async () => 'save' });
+  try {
+    const panel = editors.open(file);
+    message(panel, { type: 'editorReady' });
+    const init = sent.findLast((m) => m.type === 'panel:message' && m.message.type === 'init').message;
+    expect(init).toMatchObject({ readOnly: true, readOnlyNotice: { text: 'Read only.', action: 'Make a Copy' }, canCopy: true });
+    message(panel, { type: 'editorSave', content: 'changed' });
+    expect(fs.readFileSync(file, 'utf8')).toBe('width = 3');
+    message(panel, { type: 'editorMakeCopy' });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(makeCopy).toHaveBeenCalledWith(file);
+  } finally { registration.dispose(); connection.dispose(); fs.rmSync(root, { recursive: true, force: true }); }
+});
 test('cancel keeps project tabs; successful switching keeps application panels', async () => {
   const { connection } = shell();
   const editor = connection.createPanel('editor', { filePath: 'frame.py' });

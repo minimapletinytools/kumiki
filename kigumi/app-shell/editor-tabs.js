@@ -6,7 +6,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { isReadOnly } = require('../read-only');
+const { isReadOnly, readOnlyInfo } = require('../read-only');
 
 /**
  * @param {object} options
@@ -98,7 +98,9 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
         surface.onMessage(async (message) => {
             if (!message) return;
             if (message.type === 'editorReady') {
-                void surface.postMessage({ type: 'init', filePath, content: fileContent, line, readOnly: isReadOnly(filePath) });
+                const info = readOnlyInfo(filePath);
+                void surface.postMessage({ type: 'init', filePath, content: fileContent, line, readOnly: Boolean(info),
+                    readOnlyNotice: info && info.notice ? info.notice() : null, canCopy: Boolean(info && info.makeCopy) });
             } else if (message.type === 'editorDirty') {
                 tab.isDirty = !!message.isDirty;
                 changed(filePath, tab, false);
@@ -107,6 +109,14 @@ function createEditorTabs({ connection, editorUrl, log, setStatus, askToSave }) 
                 const resolve = pendingContent.get(message.requestId);
                 pendingContent.delete(message.requestId);
                 if (resolve) resolve(message.content);
+            } else if (message.type === 'editorMakeCopy') {
+                const info = readOnlyInfo(filePath);
+                if (!info || !info.makeCopy) return;
+                try {
+                    await info.makeCopy(filePath);
+                } catch (error) {
+                    setStatus('error', `Couldn't copy ${baseName}: ${error.message}`);
+                }
             } else if (message.type === 'editorSave') {
                 if (isReadOnly(filePath)) return;
                 try {

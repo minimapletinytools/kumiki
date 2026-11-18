@@ -210,7 +210,12 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
         getConfig: (key, fallback) => host.getConfig(key, fallback),
         updateConfig: (key, value) => host.updateConfig(key, value),
     }) : null;
-    if (publishes) disposables.push(addReadOnlyRoot(path.join(library.root, 'publishes')));
+    if (publishes) {
+        disposables.push(addReadOnlyRoot(path.join(library.root, 'publishes'), {
+            notice: () => ({ text: t('editor.readOnly.shared'), action: t('editor.readOnly.makeCopy') }),
+            makeCopy: (filePath) => copyPublishToProject(publishes.idForPath(filePath)),
+        }));
+    }
 
     const sidebarModel = new SidebarModel({
         library,
@@ -335,6 +340,20 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
             sidebarModel.changed();
         },
         'kigumi.copyPublishToProject': (target) => copyPublishToProject(publishIdOf(target)),
+        // A shared frame's code, in a read-only editor.
+        'kigumi.viewSharedSource': async (target) => {
+            const id = publishIdOf(target);
+            if (!publishes || !id) return null;
+            let entryPath = publishes.entryPath(id);
+            if (!entryPath || !fs.existsSync(entryPath)) entryPath = (await publishes.open(id)).entryPath;
+            await host.showFile(entryPath);
+            return entryPath;
+        },
+        // For agents (agent/shared-tools.js): the frames opened from share links; null where there is no sharing.
+        'kigumi.listShared': () => (publishes ? publishes.list().map((entry) => {
+            const file = publishes.entryPath(entry.id);
+            return { ...entry, link: publishes.link(entry.id), file, downloaded: Boolean(file && fs.existsSync(file)) };
+        }) : null),
         'kigumi.toggleGroupByPatternbook': () => sidebarModel.toggleGroupByPatternbook(),
 
         'kigumi.toggleAutoRefreshOnFileChange': async () => {

@@ -327,7 +327,6 @@ async function start() {
         const languageLabel = (LANGUAGE_CHOICES.find((one) => one.id === language) || LANGUAGE_CHOICES[0]).label;
         const picked = await connection.pick([
             { label: `Auto refresh on file change: ${onOff('viewer.autoRefreshOnFileChange', true)}`, value: 'viewer.autoRefreshOnFileChange' },
-            { label: `Drawings (beta): ${onOff('viewer.drawingBeta')}`, value: 'viewer.drawingBeta' },
             { label: `Language: ${languageLabel}`, value: LANGUAGE_SETTING },
             { label: 'Keyboard shortcuts…', value: KEYBINDINGS_SETTING },
         ], 'Change a setting (kept in this browser)');

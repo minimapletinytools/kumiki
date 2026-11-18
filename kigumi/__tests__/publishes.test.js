@@ -196,7 +196,7 @@ describe('the explorer\'s Shared section', () => {
         const shared = tree.find((row) => row.key === 'shared-root');
         expect(shared.children.map((row) => [row.label, row.description])).toEqual([['Little shed', 'kumiki 0.9.6'], ['Add from Link…', undefined]]);
         expect(shared.children[0].action).toEqual({ command: 'kigumi.openPublish', arguments: [ID] });
-        expect(shared.children[0].rowActions).toEqual(['copyToProject', 'copyShareLink', 'removeShared']);
+        expect(shared.children[0].rowActions).toEqual(['viewSharedSource', 'copyToProject', 'copyShareLink', 'removeShared']);
         // With no project and no library yet: a row that sets it up.
         expect(tree.find((row) => row.key === 'library-prepare').action).toEqual({ command: 'kigumi.prepareLibrary', arguments: [] });
     });

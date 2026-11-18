@@ -14,6 +14,7 @@
  */
 
 const path = require('path');
+const { isReadOnly } = require('../read-only');
 
 /**
  * @param {object} options
@@ -55,6 +56,8 @@ function createPanelDirectory({ views, host, selectionHistory = null }) {
             ...panel,
             fileName: path.basename(panel.filePath),
             relativePath: root ? path.relative(root, panel.filePath) : null,
+            // A shared frame: shared_frames reads it, copy_shared_to_project makes a copy to change.
+            ...(isReadOnly(panel.filePath) ? { readOnly: true } : {}),
         };
     }
 
