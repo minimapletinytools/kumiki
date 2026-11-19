@@ -1,297 +1,60 @@
-// The app shell: a fixed layout (left panel, center tabs, bottom panel, right
-// panel, status bar) whose panels are iframes. Everything it shows comes from the core as
-// `shell:state`; it talks to the core only through window.kigumiShell
-// ({ send, onMessage }), which the host provides. See app-shell/.
+// The app shell: panels as iframes, laid out for a desktop (desktop-layout.js) or a phone
+// (phone-layout.js). Everything it shows comes from the core as `shell:state`; it talks to the
+// core only through window.kigumiShell ({ send, onMessage, layouts? }), which the host provides.
+// See app-shell/.
+//
+// The layout is chosen here, once, and told to the core in shell:ready: nothing else looks at the
+// screen to decide.
 
-(function () {
-    'use strict';
+import { createPanelFrames } from './panel-frames.js';
+import { setupDialogs } from './dialogs.js';
+import { createDesktopLayout } from './desktop-layout.js';
+import { createPhoneLayout } from './phone-layout.js';
 
-    const core = window.kigumiShell;
-    const $ = (id) => document.getElementById(id);
-    const isMac = navigator.platform.toUpperCase().includes('MAC');
-    // The right side's least width is the agent panel's (agent.css, .agent-panel).
-    const SIDE_LIMITS = { left: [180, 600], right: [280, 800], bottom: [80, 800] };
+const core = window.kigumiShell;
+
+/** 'phone' on a small touch screen where the host offers it, else 'desktop'; `?layout=` overrides. */
+export function chooseLayout({ offered, asked, coarsePointer, shortestSide }) {
+    if (asked && offered.includes(asked)) return asked;
+    return offered.includes('phone') && coarsePointer && shortestSide <= 600 ? 'phone' : 'desktop';
+}
+
+function command(name, ...args) {
+    core.send({ type: 'shell:command', command: name, args });
+}
+
+function isTyping(target) {
+    return Boolean(target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || '')));
+}
+
+function init() {
+    const layoutName = chooseLayout({
+        offered: core.layouts || ['desktop'],
+        asked: new URLSearchParams(window.location.search).get('layout'),
+        coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+        shortestSide: Math.min(window.screen.width, window.screen.height),
+    });
+    document.body.dataset.layout = layoutName;
 
     let state = { panels: [], activeId: null };
-    const frames = new Map(); // panel id -> { iframe, url, loaded, queue }
-
-    // ---------------------------------------------------------------------
-    // Panels as iframes
-    // ---------------------------------------------------------------------
-
-    function frameSource(panel) {
-        const hash = panel.state === undefined ? '' : `#${encodeURIComponent(JSON.stringify(panel.state))}`;
-        return panel.url + hash;
-    }
-
-    function ensureFrame(panel) {
-        let frame = frames.get(panel.id);
-        if (!frame) {
-            const iframe = document.createElement('iframe');
-            iframe.className = 'panel-frame';
-            iframe.name = panel.id;
-            iframe.title = panel.title || panel.type;
-            frame = { iframe, url: null, loaded: false, queue: [] };
-            iframe.addEventListener('load', () => {
-                if (!frame.url) return;
-                frame.loaded = true;
-                for (const message of frame.queue.splice(0)) {
-                    iframe.contentWindow.postMessage(message, '*');
-                }
-                sendKeysTo(iframe);
-                core.send({ type: 'panel:loaded', id: panel.id });
-            });
-            frames.set(panel.id, frame);
-            $(`slot-${panel.slot}`).append(iframe);
-        }
-        if (panel.url && panel.url !== frame.url) {
-            frame.url = panel.url;
-            frame.loaded = false;
-            frame.queue = [];
-            frame.iframe.src = frameSource(panel);
-        }
-        frame.iframe.title = panel.title || panel.type;
-        return frame;
-    }
-
-    function toPanel(id, message) {
-        const frame = frames.get(id);
-        if (!frame) return;
-        if (frame.loaded) {
-            frame.iframe.contentWindow.postMessage(message, '*');
-        } else {
-            frame.queue.push(message);
-        }
-    }
-
-    function panelForSource(source) {
-        for (const [id, frame] of frames) {
-            if (frame.iframe.contentWindow === source) return id;
-        }
-        return null;
-    }
-
-    window.addEventListener('message', (event) => {
-        const data = event.data;
-        if (!data || data.kigumiPanel !== true) return;
-        const id = panelForSource(event.source);
-        if (!id) return;
-        if (data.type === 'keyCommand' && typeof data.command === 'string') {
-            // A key pressed in a panel (panel-bridge.js), for one of the app's shortcuts.
-            command('keyCommand', data.command);
-        } else if (data.type === 'message') {
-            core.send({ type: 'panel:message', id, message: data.message });
-        } else if (data.type === 'state') {
-            core.send({ type: 'panel:state', id, state: data.state });
-        }
+    // Built before the frames, which ask it where each panel goes.
+    let layout = null;
+    const frames = createPanelFrames({
+        core,
+        place: (panel, iframe) => layout.place(panel, iframe),
+        intercept: (type, message) => Boolean(layout.intercept && layout.intercept(type, message)),
+        onKeyCommand: (name) => command('keyCommand', name),
     });
+    layout = layoutName === 'phone'
+        ? createPhoneLayout({ core, command, frames })
+        : createDesktopLayout({ core, command });
+    const dialogs = setupDialogs(core);
 
-    function renderPanels() {
-        const live = new Set(state.panels.map((panel) => panel.id));
-        for (const [id, frame] of frames) {
-            if (!live.has(id)) {
-                frame.iframe.remove();
-                frames.delete(id);
-            }
-        }
-        for (const panel of state.panels) {
-            const frame = ensureFrame(panel);
-            frame.iframe.hidden = panel.slot === 'center' && panel.id !== state.activeId;
-        }
-        const hasLeft = state.panels.some((panel) => panel.slot === 'left');
-        const layout = state.layout || { left: true, bottom: true, right: true };
-        const showLeft = hasLeft && layout.left;
-        $('slot-left').hidden = !showLeft;
-        $('splitter-left').hidden = !showLeft;
-        $('shell').classList.toggle('is-left-hidden', !showLeft);
-        $('toggle-left').classList.toggle('is-active', showLeft);
-
-        const showRight = state.panels.some((panel) => panel.slot === 'right') && layout.right;
-        $('slot-right').hidden = !showRight;
-        $('splitter-right').hidden = !showRight;
-        $('toggle-right').classList.toggle('is-active', showRight);
-        $('update-available').hidden = !state.update;
-        $('update-available').title = state.update ? `Kigumi ${state.update.version} is available` : '';
-
-        const hasBottom = state.panels.some((panel) => panel.slot === 'bottom');
-        const showBottom = hasBottom && layout.bottom;
-        $('slot-bottom').hidden = !showBottom;
-        $('splitter-bottom').hidden = !showBottom;
-        $('toggle-bottom').hidden = !hasBottom;
-        $('toggle-bottom').classList.toggle('is-active', showBottom);
-    }
-
-    // ---------------------------------------------------------------------
-    // Chrome
-    // ---------------------------------------------------------------------
-
-    function el(tag, className, text) {
-        const element = document.createElement(tag);
-        if (className) element.className = className;
-        if (text !== undefined) element.textContent = text;
-        return element;
-    }
-
-    function icon(name) {
-        return el('span', `codicon codicon-${name}`);
-    }
-
-    function command(name, ...args) {
-        core.send({ type: 'shell:command', command: name, args });
-    }
-
-    function renderTabs() {
-        const tabs = state.panels.filter((panel) => panel.slot === 'center');
-        // No tabs, no strip: the welcome page fills the space.
-        $('tabs').parentElement.hidden = tabs.length === 0;
-        $('tabs').replaceChildren(...tabs.map((tab) => {
-            const active = tab.id === state.activeId;
-            const element = el('div', `tab${active ? ' is-active' : ''}`);
-            element.setAttribute('role', 'tab');
-            element.setAttribute('tabindex', '0');
-            element.setAttribute('aria-selected', active ? 'true' : 'false');
-            element.title = tab.title;
-            element.append(icon(tab.icon || 'file'), el('span', 'tab-title', tab.title || 'Kigumi'));
-            const close = el('span', 'tab-close');
-            close.setAttribute('role', 'button');
-            close.setAttribute('aria-label', `Close ${tab.title}`);
-            close.append(icon('close'));
-            close.addEventListener('click', (event) => {
-                event.stopPropagation();
-                core.send({ type: 'tab:close', id: tab.id });
-            });
-            element.append(close);
-            element.addEventListener('click', () => core.send({ type: 'tab:activate', id: tab.id }));
-            element.addEventListener('auxclick', (event) => {
-                if (event.button === 1) core.send({ type: 'tab:close', id: tab.id });
-            });
-            element.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    core.send({ type: 'tab:activate', id: tab.id });
-                }
-            });
-            return element;
-        }));
-    }
-
-    function renderWelcome() {
-        const hasTabs = state.panels.some((panel) => panel.slot === 'center');
-        $('welcome').hidden = hasTabs;
-        // A host may draw its own page here: the browser version's projects (hosts/pyodide/page/web-projects.js).
-        if (core.renderWelcome && core.renderWelcome(state, { el, command })) {
-            return;
-        }
-        const button = (label, onClick, secondary) => {
-            const element = el('button', secondary ? 'secondary' : '', label);
-            element.addEventListener('click', onClick);
-            return element;
-        };
-        if (state.workspace) {
-            $('welcome-lead').textContent = `Open a frame or pattern from the explorer to view it. Project: ${state.workspace.name}`;
-            $('welcome-actions').replaceChildren(
-                button('Browse Patterns', () => command('browsePatterns')),
-                button('Browse Examples', () => command('browseExamples'), true),
-            );
-        } else {
-            $('welcome-lead').textContent = 'Make a new project, or open one, to find its frames and patterns.';
-            $('welcome-actions').replaceChildren(
-                button('New Project…', () => command('newProject')),
-                button('Open Project…', () => command('openFolder'), true),
-            );
-        }
-        const recent = state.recentFolders || [];
-        $('welcome-recent').hidden = recent.length === 0;
-        $('welcome-recent-list').replaceChildren(...recent.map((folder) => {
-            const item = el('li');
-            const link = el('button', 'welcome-recent-folder', folder.name);
-            link.title = folder.path;
-            link.addEventListener('click', () => command('openRecentFolder', folder.path));
-            item.append(link, el('span', 'welcome-recent-path', folder.shown || folder.path));
-            return item;
-        }));
-    }
-
-    function renderStatus() {
-        const workspace = $('status-workspace');
-        workspace.replaceChildren(icon('folder'), document.createTextNode(state.workspace ? state.workspace.name : 'Open Project…'));
-        workspace.title = state.workspace ? state.workspace.path : 'Open project';
-
-        const progress = $('status-progress');
-        progress.hidden = !state.progress;
-        progress.replaceChildren(icon('loading codicon-modifier-spin'), document.createTextNode(state.progress || ''));
-
-        const message = $('status-message');
-        message.hidden = !state.status;
-        message.className = `status-item status-message${state.status ? ` is-${state.status.level}` : ''}`;
-        message.textContent = state.status ? state.status.message : '';
-        message.title = message.textContent;
-
-        $('status-autorefresh').replaceChildren(
-            icon(state.autoRefresh ? 'sync' : 'sync-ignored'),
-            document.createTextNode(state.autoRefresh ? 'Auto refresh' : 'Manual refresh'),
-        );
-        $('status-log-badge').hidden = !state.logBadge;
-        $('status-version').textContent = state.version ? `v${state.version}` : '';
-        // The browser version: what it is, and where to find out more.
-        $('status-about').hidden = !state.web;
-    }
-
-    function renderTitlebar() {
-        const active = state.panels.find((panel) => panel.slot === 'center' && panel.id === state.activeId);
-        const parts = [];
-        if (active && active.title) parts.push(active.title);
-        if (state.workspace && state.workspace.name) parts.push(state.workspace.name);
-        parts.push('Kigumi');
-        $('titlebar-title').textContent = parts.join(' — ');
-    }
-
-    function render() {
-        renderTitlebar();
-        renderPanels();
-        renderTabs();
-        renderWelcome();
-        renderStatus();
-        renderKeys();
-    }
-
-    // ---------------------------------------------------------------------
-    // Keyboard shortcuts
-    // ---------------------------------------------------------------------
-
-    // The app's shortcuts, from the core (app-shell/keyboard-shortcuts.js shellKeys). Where the core says
-    // to (the browser version, which has no menus), the shell runs them: those pressed here, and those
-    // pressed in a panel, which panel-bridge.js matches and sends on.
-    let keys = null;
-    let keysSent = '';
-
-    function sendKeysTo(iframe) {
-        if (!keys || !keys.dispatch || !iframe.contentWindow) return;
-        iframe.contentWindow.postMessage({ kigumiShellKeys: keys.bindings }, '*');
-    }
-
-    function renderKeys() {
-        keys = state.keys || null;
-        const labels = (keys && keys.labels) || {};
-        for (const element of document.querySelectorAll('.welcome-keys [data-command]')) {
-            const label = labels[element.dataset.command];
-            element.hidden = keys !== null && !label;
-            const kbd = element.querySelector('kbd');
-            if (kbd && label) kbd.textContent = label;
-        }
-        const sent = JSON.stringify(keys && keys.dispatch ? keys.bindings : null);
-        if (sent === keysSent) return;
-        keysSent = sent;
-        for (const frame of frames.values()) {
-            if (frame.loaded) sendKeysTo(frame.iframe);
-        }
-    }
-
-    function isTyping(target) {
-        return Boolean(target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || '')));
-    }
-
+    // The app's shortcuts, from the core (app-shell/keyboard-shortcuts.js shellKeys). Where the core
+    // says to (the browser version, which has no menus), the shell runs them: those pressed here, and
+    // those pressed in a panel, which panel-bridge.js matches and sends on.
     window.addEventListener('keydown', (event) => {
+        const keys = state.keys;
         if (!keys || !keys.dispatch || typeof window.kigumiKeyFromEvent !== 'function') return;
         const pressed = window.kigumiKeyFromEvent(event);
         // While typing, only keys held with ctrl, alt or cmd are shortcuts.
@@ -303,264 +66,27 @@
         command('keyCommand', binding.command);
     }, true);
 
-    // ---------------------------------------------------------------------
-    // Splitters
-    // ---------------------------------------------------------------------
-
-    // The bottom panel's size is its height; a side's, its width.
-    function sizeKey(side) {
-        return side === 'bottom' ? 'Height' : 'Width';
+    function render() {
+        frames.render(state.panels, (panel) => layout.shown(panel, state));
+        layout.render(state);
+        frames.setKeyBindings(state.keys && state.keys.dispatch ? state.keys.bindings : null);
     }
 
-    function setSideWidth(side, width) {
-        const [min, max] = SIDE_LIMITS[side];
-        const clamped = Math.max(min, Math.min(max, Math.round(width)));
-        document.documentElement.style.setProperty(`--${side}-${sizeKey(side).toLowerCase()}`, `${clamped}px`);
-        try {
-            localStorage.setItem(`kigumi.${side}${sizeKey(side)}`, String(clamped));
-        } catch (_error) {
-            // Width just isn't remembered.
+    core.onMessage((message) => {
+        if (!message) return;
+        if (message.type === 'shell:state') {
+            state = message;
+            render();
+        } else if (message.type === 'panel:message') {
+            frames.send(message.id, message.message);
+        } else if (message.type === 'quickpick:show') {
+            dialogs.showQuickPick(message);
+        } else if (message.type === 'confirm:show') {
+            dialogs.showConfirm(message);
         }
-    }
+    });
+    render();
+    core.send({ type: 'shell:ready', layout: layoutName });
+}
 
-    // The drag in progress, if any: ends it. While one is in progress the panels take no clicks
-    // (.is-resizing), so every way a drag can end has to end it.
-    let endDrag = null;
-
-    function setupSplitter(side) {
-        const splitter = $(`splitter-${side}`);
-        splitter.addEventListener('pointerdown', (event) => {
-            if (endDrag) endDrag();
-            splitter.setPointerCapture(event.pointerId);
-            splitter.classList.add('is-dragging');
-            $('shell').classList.add('is-resizing');
-            const move = (moveEvent) => {
-                // The button came up somewhere this never heard about.
-                if (moveEvent.buttons === 0) return end();
-                setSideWidth(side, {
-                    left: () => moveEvent.clientX,
-                    right: () => window.innerWidth - moveEvent.clientX,
-                    bottom: () => document.querySelector('.main').getBoundingClientRect().bottom - moveEvent.clientY,
-                }[side]());
-            };
-            const ends = ['pointerup', 'pointercancel', 'lostpointercapture'];
-            const end = () => {
-                endDrag = null;
-                splitter.classList.remove('is-dragging');
-                $('shell').classList.remove('is-resizing');
-                splitter.removeEventListener('pointermove', move);
-                for (const name of ends) splitter.removeEventListener(name, end);
-                window.removeEventListener('blur', end);
-                if (splitter.hasPointerCapture(event.pointerId)) splitter.releasePointerCapture(event.pointerId);
-            };
-            endDrag = end;
-            splitter.addEventListener('pointermove', move);
-            for (const name of ends) splitter.addEventListener(name, end);
-            // Switching away mid-drag: the release goes to another window.
-            window.addEventListener('blur', end);
-        });
-        let saved = null;
-        try {
-            saved = Number(localStorage.getItem(`kigumi.${side}${sizeKey(side)}`));
-        } catch (_error) {
-            saved = null;
-        }
-        if (saved) setSideWidth(side, saved);
-    }
-
-    // ---------------------------------------------------------------------
-    // Confirm (connection.confirm)
-    // ---------------------------------------------------------------------
-
-    let confirmRequest = null;
-
-    function closeConfirm(ok) {
-        if (confirmRequest === null) return;
-        core.send({ type: 'confirm:result', requestId: confirmRequest, ok });
-        confirmRequest = null;
-        $('confirm').hidden = true;
-    }
-
-    function showConfirm({ requestId, message, detail, warning, action, cancel }) {
-        closeConfirm(false);
-        confirmRequest = requestId;
-        $('confirm-message').textContent = message || '';
-        $('confirm-detail').textContent = detail || '';
-        $('confirm-detail').hidden = !detail;
-        $('confirm-warning').textContent = warning || '';
-        $('confirm-warning').hidden = !warning;
-        $('confirm-ok').textContent = action || 'OK';
-        $('confirm-cancel').textContent = cancel || 'Cancel';
-        $('confirm').hidden = false;
-        $('confirm-ok').focus();
-    }
-
-    function setupConfirm() {
-        $('confirm-ok').addEventListener('click', () => closeConfirm(true));
-        $('confirm-cancel').addEventListener('click', () => closeConfirm(false));
-        $('confirm').addEventListener('mousedown', (event) => {
-            if (event.target === $('confirm')) closeConfirm(false);
-        });
-        $('confirm').addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                event.stopPropagation();
-                closeConfirm(false);
-            }
-        });
-    }
-
-    // ---------------------------------------------------------------------
-    // Quick pick
-    // ---------------------------------------------------------------------
-
-    // `input`: a text box (connection.ask) rather than a list to choose from.
-    const quickpick = { requestId: null, items: [], visible: [], selected: 0, input: false, prompt: '' };
-    const QUICKPICK_SHOWN = 300;
-
-    function closeQuickPick(index, text) {
-        if (quickpick.requestId === null) return;
-        core.send({ type: 'quickpick:result', requestId: quickpick.requestId, index, ...(typeof text === 'string' ? { text } : {}) });
-        quickpick.requestId = null;
-        $('quickpick').hidden = true;
-    }
-
-    function renderQuickPick() {
-        if (quickpick.input) {
-            quickpick.visible = [];
-            $('quickpick-list').replaceChildren(el('div', 'empty', quickpick.prompt));
-            return;
-        }
-        const needle = $('quickpick-filter').value.trim().toLowerCase();
-        quickpick.visible = [];
-        let pendingSeparator = null;
-        // Drawn up to a limit: a workspace's files can number in the thousands.
-        let matched = 0;
-        quickpick.items.forEach((item, index) => {
-            if (item.separator) {
-                pendingSeparator = item;
-                return;
-            }
-            const text = `${item.label} ${item.description || ''} ${item.detail || ''}`.toLowerCase();
-            if (needle && !text.includes(needle)) return;
-            matched += 1;
-            if (matched > QUICKPICK_SHOWN) return;
-            if (pendingSeparator) {
-                quickpick.visible.push({ separator: pendingSeparator });
-                pendingSeparator = null;
-            }
-            quickpick.visible.push({ item, index });
-        });
-        const choices = quickpick.visible.filter((row) => !row.separator);
-        quickpick.selected = Math.max(0, Math.min(quickpick.selected, choices.length - 1));
-
-        let choice = 0;
-        const list = $('quickpick-list');
-        list.replaceChildren(...quickpick.visible.map((row) => {
-            if (row.separator) return el('div', 'separator', row.separator.label);
-            const current = choice;
-            choice += 1;
-            const element = el('div', `item${current === quickpick.selected ? ' is-selected' : ''}`);
-            element.setAttribute('role', 'option');
-            element.setAttribute('aria-selected', current === quickpick.selected ? 'true' : 'false');
-            element.append(el('span', 'item-label', row.item.label), el('span', 'item-description', row.item.description || ''));
-            if (row.item.detail) element.append(el('span', 'item-detail', row.item.detail));
-            element.addEventListener('click', () => closeQuickPick(row.index));
-            return element;
-        }));
-        if (choices.length === 0) list.append(el('div', 'empty', 'No matching items'));
-        if (matched > QUICKPICK_SHOWN) list.append(el('div', 'empty', `${matched - QUICKPICK_SHOWN} more: type to narrow`));
-        const selected = list.querySelector('.is-selected');
-        if (selected) selected.scrollIntoView({ block: 'nearest' });
-    }
-
-    function showQuickPick({ requestId, placeholder, items, input, prompt, value }) {
-        if (quickpick.requestId !== null) closeQuickPick(null);
-        Object.assign(quickpick, { requestId, items: items || [], selected: 0, input: Boolean(input), prompt: prompt || '' });
-        const filter = $('quickpick-filter');
-        filter.placeholder = input ? '' : placeholder || '';
-        filter.value = input ? value || '' : '';
-        $('quickpick').hidden = false;
-        renderQuickPick();
-        filter.focus();
-        if (input) {
-            // The name selected without its extension, ready to type over.
-            const dot = filter.value.lastIndexOf('.');
-            filter.setSelectionRange(0, dot > 0 ? dot : filter.value.length);
-        }
-    }
-
-    function setupQuickPick() {
-        const filter = $('quickpick-filter');
-        filter.addEventListener('input', () => {
-            quickpick.selected = 0;
-            renderQuickPick();
-        });
-        filter.addEventListener('keydown', (event) => {
-            const choices = quickpick.visible.filter((row) => !row.separator);
-            if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                quickpick.selected = Math.min(choices.length - 1, quickpick.selected + 1);
-                renderQuickPick();
-            } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                quickpick.selected = Math.max(0, quickpick.selected - 1);
-                renderQuickPick();
-            } else if (event.key === 'Enter') {
-                event.preventDefault();
-                if (quickpick.input) closeQuickPick(null, filter.value);
-                else if (choices[quickpick.selected]) closeQuickPick(choices[quickpick.selected].index);
-            } else if (event.key === 'Escape') {
-                event.preventDefault();
-                closeQuickPick(null);
-            }
-        });
-        $('quickpick').addEventListener('pointerdown', (event) => {
-            if (!event.target.closest('.picker')) closeQuickPick(null);
-        });
-    }
-
-    // ---------------------------------------------------------------------
-
-    function init() {
-        if (!isMac) {
-            $('key-go-to-file').textContent = 'Ctrl+P';
-            $('key-open-in-viewer').textContent = 'Ctrl+Shift+O';
-            $('key-open-current-in-viewer').textContent = 'Ctrl+O';
-        }
-        $('status-workspace').addEventListener('click', () => command('openFolder'));
-        $('status-log').addEventListener('click', () => command('openLog'));
-        $('status-about').addEventListener('click', () => command('web:about'));
-        $('status-settings').addEventListener('click', () => command('openSettings'));
-        $('status-autorefresh').addEventListener('click', () => command('run', 'kigumi.toggleAutoRefreshOnFileChange'));
-        // The window is frameless only on macOS (hiddenInset); elsewhere the native title bar stays.
-        document.body.classList.toggle('is-mac', /Mac/i.test(navigator.platform || navigator.userAgent));
-        $('toggle-left').addEventListener('click', () => core.send({ type: 'layout:toggle', side: 'left' }));
-        $('toggle-right').addEventListener('click', () => command('toggleAgent'));
-        $('toggle-bottom').addEventListener('click', () => core.send({ type: 'layout:toggle', side: 'bottom' }));
-        $('update-available').addEventListener('click', () => command('showUpdate'));
-        setupSplitter('left');
-        setupSplitter('right');
-        setupSplitter('bottom');
-        setupQuickPick();
-
-        core.onMessage((message) => {
-            if (!message) return;
-            if (message.type === 'shell:state') {
-                state = message;
-                render();
-            } else if (message.type === 'panel:message') {
-                toPanel(message.id, message.message);
-            } else if (message.type === 'quickpick:show') {
-                showQuickPick(message);
-            } else if (message.type === 'confirm:show') {
-                showConfirm(message);
-            }
-        });
-        setupConfirm();
-        render();
-        core.send({ type: 'shell:ready' });
-    }
-
-    init();
-})();
+if (core) init();
