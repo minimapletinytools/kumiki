@@ -5533,10 +5533,10 @@
       "multiple_frames": false,
       "patternbook": null,
       "relative_path": "structures/oscarshed.py",
-      "sha256": "87ce79493b4a7a4353e2e66a1e48cd18d9d0d86f7d6f40ff20ab9241800c3585",
+      "sha256": "421d62144040518026e8e62d021421ac82619038bf44c545da0d019e5332b380",
       "title": {
         "en": "Oscar's shed",
-        "ja": "Oscar's Shed\uff08\u5c0f\u5c4b\uff09"
+        "ja": "\u30aa\u30b9\u30ab\u30fc\u306e\u5c0f\u5c4b"
       },
       "warnings": []
     },
@@ -5563,7 +5563,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-11-19T04:13:57.243975+00:00",
+  "generated_at": "2026-11-19T04:22:20.733224+00:00",
   "root_folder": "patterns",
   "schema_version": 2
 }
