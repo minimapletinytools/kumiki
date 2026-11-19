@@ -10,14 +10,9 @@ import { createPanelFrames } from './panel-frames.js';
 import { setupDialogs } from './dialogs.js';
 import { createDesktopLayout } from './desktop-layout.js';
 import { createPhoneLayout } from './phone-layout.js';
+import { chooseLayout } from './choose-layout.js';
 
 const core = window.kigumiShell;
-
-/** 'phone' on a small touch screen where the host offers it, else 'desktop'; `?layout=` overrides. */
-export function chooseLayout({ offered, asked, coarsePointer, shortestSide }) {
-    if (asked && offered.includes(asked)) return asked;
-    return offered.includes('phone') && coarsePointer && shortestSide <= 600 ? 'phone' : 'desktop';
-}
 
 function command(name, ...args) {
     core.send({ type: 'shell:command', command: name, args });

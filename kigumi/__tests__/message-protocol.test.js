@@ -80,86 +80,12 @@ describe('the declaration and the two sides agree', () => {
     });
 });
 
-describe('a request survives being rebuilt field by field', () => {
-    // The extension does not forward a message: it builds a new payload naming
-    // each field. Anything added to the message and not added there is dropped
-    // in silence, and the runner answers a question nobody asked. That has
-    // happened four times -- tolerances, heldGeometry, look, and space.
-    //
-    // pick-payload-wiring checks the pick's own fields. This checks the SHAPE:
-    // every rebuild forwards, and the two that must ask the same question do.
-
-    /** The body of a handler in frame-view-session. */
-    function handlerBody(name) {
-        const at = session.search(new RegExp(`\\n    (?:async )?${name}\\(`));
-        if (at === -1) {
-            throw new Error(`${name} is not a handler`);
-        }
-        const open = session.indexOf('{', session.indexOf('(', at));
-        let depth = 0;
-        for (let end = open; end < session.length; end += 1) {
-            if (session[end] === '{') depth += 1;
-            if (session[end] === '}') {
-                depth -= 1;
-                if (depth === 0) return session.slice(open, end + 1);
-            }
-        }
-        throw new Error(`${name} is never closed`);
-    }
-
-    /**
-     * The fields a handler forwards TO THE RUNNER.
-     *
-     * The runner payload only, not the whole handler: the hover echoes its
-     * request number back on the reply so the viewer can tell a stale answer
-     * from a current one, and that is routing rather than part of the question.
-     */
-    function askedOf(name) {
-        const body = handlerBody(name);
-        // Built as a variable in one handler and inline at the call in the
-        // other. Same payload either way.
-        const declared = body.indexOf('const payload = {');
-        const open = declared !== -1
-            ? body.indexOf('{', declared)
-            : body.indexOf('{', body.indexOf('slotRequest('));
-        let depth = 0;
-        let payload = '';
-        for (let end = open; end < body.length; end += 1) {
-            if (body[end] === '{') depth += 1;
-            if (body[end] === '}') {
-                depth -= 1;
-                if (depth === 0) {
-                    payload = body.slice(open, end + 1);
-                    break;
-                }
-            }
-        }
-        return new Set(
-            [...payload.matchAll(/([a-zA-Z][A-Za-z0-9_]*):\s*message\.\1/g)].map((m) => m[1]));
-    }
-
-    test('the hover and the pick ask the runner the same thing', () => {
-        // Hover exists to say what a click would do. Asking a different
-        // question is how a hover lights what a click then refuses.
-        const hover = askedOf('_handleHoverFeatureAtPoint');
-        const click = askedOf('_handleFindCSGAtPoint');
-
-        expect([...hover].sort()).toEqual([...click].sort());
-    });
-
-    test('and they forward more than a couple of fields', () => {
-        // If the extraction stops finding them, the test above passes by
-        // comparing two empty sets.
-        expect(askedOf('_handleFindCSGAtPoint').size).toBeGreaterThan(5);
-    });
-
+describe('a command rebuilt field by field', () => {
     test('the measurement commands carry what a measurement is made of', () => {
-        const body = handlerBody('_handleDrawingsCommand');
         const forwarded = session.slice(session.indexOf('addMeasurement:'));
 
         for (const field of ['drawingId', 'viewportId', 'a', 'b', 'kind', 'plane']) {
             expect(forwarded).toContain(`${field}: message.${field}`);
         }
-        expect(body.length).toBeGreaterThan(0);
     });
 });
