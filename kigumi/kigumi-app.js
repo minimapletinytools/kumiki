@@ -1298,7 +1298,13 @@ function createKigumiApp({ extensionPath, storagePath, channel, enableTestComman
                     frameSessions.delete(disposedFilePath);
                 }
             },
-            { slotName: 'main', sessionType: 'main', openInSplitView, autoRefreshOnFileChange, onSelection: recordSelection }
+            { slotName: 'main', sessionType: 'main', openInSplitView, autoRefreshOnFileChange, onSelection: recordSelection,
+                // A pattern view borrowing this runner keeps it: it becomes a standalone runner.
+                handOnRunner: (runner) => {
+                    const borrowed = [...patternSessions.values()].some((one) => !one.isDisposed && one.runnerSession === runner);
+                    if (borrowed) standaloneRunners.add(runner);
+                    return borrowed;
+                } }
         );
         frameSessions.set(normalizedFilePath || filePath, session);
         await session.initialize();

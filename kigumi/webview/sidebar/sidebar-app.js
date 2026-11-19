@@ -2,6 +2,7 @@ import { LitElement, html, nothing } from 'lit';
 import * as KigumiContextMenu from '../context-menu.js';
 import * as KigumiI18n from '../i18n.js';
 import * as KigumiSidebarTree from './sidebar-tree.js';
+import { SHELL_UI, listenForForm } from '../shell-ui.js';
 
 // The Kigumi explorer page. Renders the tree the host posts (sidebar-model.js)
 // and sends back what the user does. Row logic lives in sidebar-tree.js.
@@ -12,6 +13,10 @@ const payload = window.__KIGUMI_INITIAL_PAYLOAD__ || {};
 const t = KigumiI18n.createTranslator(payload.i18n && payload.i18n.strings);
 const ROW_ACTIONS = payload.rowActions || {};
 const STATUS_TYPES = new Set(['projectStatusAction', 'kumikiVersionAction', 'kumikiWebsiteAction', 'closeProjectAction', 'openProjectAction']);
+// The phone menu's home page lists this many of the project's frames; the rest are a page of their own.
+const PHONE_FRAMES_SHOWN = 5;
+// The phone menu's pages beyond home, each a top-level row of the tree (sidebar-model.js).
+const PHONE_PAGES = { frames: 'frames-root', examples: 'example-frames-root', patterns: 'patterns-root' };
 
 const hostApi = window.__kigumiVsCode
     || (typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null);
@@ -46,6 +51,8 @@ class KigumiSidebar extends LitElement {
         menuState: { state: true },
         options: { state: true },
         sections: { state: true },
+        form: { state: true },
+        phonePage: { state: true },
     };
 
     constructor() {
@@ -66,6 +73,9 @@ class KigumiSidebar extends LitElement {
         // Keys of unlisted folders already asked for (sidebarExpand).
         this.requestedFolders = new Set();
         this.contextMenu = new ContextMenu();
+        // 'phone' in the phone layout (shell-ui.js): a menu of frames, examples and patterns instead.
+        this.form = 'desktop';
+        this.phonePage = 'home';
         this.onWindowMessage = this.onWindowMessage.bind(this);
         this.onWindowPointerDown = this.onWindowPointerDown.bind(this);
     }
@@ -79,6 +89,7 @@ class KigumiSidebar extends LitElement {
         window.addEventListener('message', this.onWindowMessage);
         window.addEventListener('pointerdown', this.onWindowPointerDown);
         post({ type: 'sidebarReady' });
+        listenForForm((form) => { this.form = form; });
     }
 
     disconnectedCallback() {
@@ -409,7 +420,86 @@ class KigumiSidebar extends LitElement {
             </div>`;
     }
 
+    /** A row chosen on the phone menu: open it, and close the menu if it opens something. */
+    phoneOpen(node) {
+        if (node.action) {
+            post({ type: 'sidebarRun', key: node.key });
+            post({ type: SHELL_UI.closeMenu });
+        }
+    }
+
+    renderPhoneButton(label, iconName, onClick, className = '') {
+        return html`<button class="ks-phone-button ${className}" type="button" @click=${onClick}>
+            ${icon(iconName)}<span>${label}</span></button>`;
+    }
+
+    renderPhoneHome() {
+        const top = (key) => this.tree.find((node) => node.key === key) || null;
+        const framesRoot = top('frames-root');
+        const frames = framesRoot ? (framesRoot.children || []).filter((node) => node.type === 'frameFile') : [];
+        const closeProject = this.statusNodes.find((node) => node.type === 'closeProjectAction');
+        return html`
+            <div class="ks-phone">
+                ${framesRoot ? html`
+                    <div class="ks-phone-heading">${framesRoot.label}</div>
+                    ${this.renderPhoneList(frames.slice(0, PHONE_FRAMES_SHOWN))}
+                    ${frames.length > PHONE_FRAMES_SHOWN
+                        ? this.renderPhoneButton(t('sidebar.phone.moreFrames', { count: frames.length - PHONE_FRAMES_SHOWN }),
+                            'ellipsis', () => { this.phonePage = 'frames'; }, 'is-quiet')
+                        : nothing}`
+                : nothing}
+                <div class="ks-phone-heading">${t('sidebar.phone.browse')}</div>
+                ${top('example-frames-root')
+                    ? this.renderPhoneButton(t('sidebar.exampleFrames'), 'symbol-folder', () => { this.phonePage = 'examples'; })
+                    : nothing}
+                ${top('patterns-root')
+                    ? this.renderPhoneButton(t('sidebar.patterns'), 'book', () => { this.phonePage = 'patterns'; })
+                    : nothing}
+                ${closeProject ? html`
+                    <div class="ks-phone-heading"></div>
+                    ${this.renderPhoneButton(closeProject.label, closeProject.icon, () => this.phoneOpen(closeProject), 'is-quiet')}`
+                : nothing}
+            </div>`;
+    }
+
+    renderPhoneRow({ node, depth, isContainer, isExpanded }) {
+        const toggle = () => {
+            this.overrides = new Map(this.overrides).set(node.key, !isExpanded);
+            this.saveState();
+        };
+        const chevron = icon(isExpanded ? 'chevron-down' : 'chevron-right');
+        const label = html`${icon(node.icon)}<span class="ks-label">${node.label}</span>`;
+        return html`<li .style=${`--ks-depth: ${depth}`}>
+            ${isContainer ? html`
+                <button type="button" aria-label=${node.label} aria-expanded=${String(isExpanded)}
+                    data-key=${node.key} @click=${toggle}>${chevron}${node.action ? nothing : label}</button>` : nothing}
+            ${node.action ? html`<button type="button" data-key=${node.key}
+                @click=${() => this.phoneOpen(node)}>${label}</button>` : nothing}
+            ${!isContainer && !node.action ? html`<span class="ks-description">${node.label}</span>` : nothing}
+        </li>`;
+    }
+
+    renderPhoneList(nodes) {
+        const rows = visibleRows(nodes, { overrides: this.overrides });
+        return html`<ul class="ks-phone-list">${rows.map((row) => this.renderPhoneRow(row))}</ul>`;
+    }
+
+    renderPhonePage(page) {
+        const root = this.tree.find((node) => node.key === PHONE_PAGES[page]);
+        const children = (root?.children || []).filter((node) => node.type !== 'newFrameAction');
+        return html`
+            <div class="ks-phone">
+                ${this.renderPhoneButton(t('sidebar.phone.back'), 'arrow-left', () => { this.phonePage = 'home'; }, 'is-quiet')}
+                <div class="ks-phone-heading">${root ? root.label : ''}</div>
+                ${this.renderPhoneList(children)}
+            </div>`;
+    }
+
     render() {
+        if (this.form === 'phone') {
+            return this.phonePage === 'home' || !PHONE_PAGES[this.phonePage]
+                ? this.renderPhoneHome() : this.renderPhonePage(this.phonePage);
+        }
         const rows = this.rows();
         const focusedIndex = rows.findIndex((row) => row.node.key === this.focusedKey);
         return html`

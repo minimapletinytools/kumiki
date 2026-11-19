@@ -104,6 +104,9 @@ class FrameViewSession {
         this.panel = null;
         this.runnerSession = options.sharedRunner || null;
         this.ownsRunner = !options.sharedRunner;
+        // Asked when this session closes, if it owns its runner: true if another session still uses
+        // the runner and it has been handed on, so it is left running.
+        this.handOnRunner = options.handOnRunner || (() => false);
         this.fileWatcher = null;
         this.isDisposed = false;
         this.isRefreshing = false;
@@ -1036,6 +1039,11 @@ class FrameViewSession {
         }
 
         if (refreshError) {
+            // Closed while it built (on a phone, opening another file closes this one): nothing to report.
+            if (this.isDisposed) {
+                this.log(`[refresh] ${path.basename(this.filePath)} was closed while it built`, 'debug');
+                return;
+            }
             await this.reportRunnerError(refreshError, `[refresh] ${path.basename(this.filePath)} (${reason})`);
             throw refreshError;
         }
@@ -1632,8 +1640,10 @@ class FrameViewSession {
         }
 
         if (this.runnerSession) {
-            if (this.ownsRunner) {
+            if (this.ownsRunner && !this.handOnRunner(this.runnerSession)) {
                 await this.runnerSession.dispose();
+            } else if (this.ownsRunner) {
+                this.log(`[slot] Leaving the runner running: a pattern view still uses it`);
             } else {
                 // Unload our slot from the shared runner, but don't kill the process
                 try {

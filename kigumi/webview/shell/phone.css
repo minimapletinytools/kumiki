@@ -1,0 +1,198 @@
+/* The phone layout (phone-layout.js). Only used with body[data-layout="phone"]. */
+
+body[data-layout="phone"] .shell {
+    display: none;
+}
+
+.phone {
+    --phone-agent-collapsed: 64px;
+    --phone-keyboard: 0px;
+    --phone-top: max(8px, env(safe-area-inset-top));
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--ka-bg);
+    color: var(--ka-fg);
+    font: var(--ka-font-size) var(--ka-font);
+}
+
+.phone iframe.panel-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.phone iframe[hidden] {
+    display: none;
+}
+
+/* The file, or with none open, the projects page. Above the agent's sheet. */
+.phone-main {
+    position: absolute;
+    inset: 0 0 calc(var(--phone-agent-collapsed) + var(--phone-keyboard)) 0;
+}
+
+.phone-main .welcome {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    padding: calc(var(--phone-top) + 8px) 16px 24px;
+}
+
+/* The project menu: the explorer. With no file open it is the page itself. */
+.phone-menu {
+    display: none;
+    flex-direction: column;
+    background: var(--ka-bg);
+}
+
+.phone.is-home .phone-menu {
+    display: flex;
+    position: absolute;
+    inset: 0 0 calc(var(--phone-agent-collapsed) + var(--phone-keyboard)) 0;
+}
+
+.phone.is-menu-open .phone-menu {
+    display: flex;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: calc(var(--phone-agent-collapsed) + var(--phone-keyboard));
+    width: min(88vw, 400px);
+    z-index: 30;
+    box-shadow: -4px 0 18px var(--ka-shadow);
+    padding-top: calc(var(--phone-top) + 52px);
+}
+
+.phone-menu iframe.panel-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.phone-close-file {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    min-height: 44px;
+    border: 1px solid var(--ka-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ka-fg);
+    font: inherit;
+    font-size: 15px;
+}
+
+.phone-close-file[hidden] {
+    display: none;
+}
+
+/* Back (from a file outside the project) and the menu button, top right over the file. */
+.phone-controls {
+    position: absolute;
+    top: var(--phone-top);
+    right: max(8px, env(safe-area-inset-right));
+    z-index: 40;
+    display: flex;
+    gap: 8px;
+}
+
+.phone-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--ka-border);
+    border-radius: 10px;
+    background: var(--ka-overlay-bg);
+    color: var(--ka-fg);
+    font: inherit;
+    font-size: 15px;
+    box-shadow: 0 1px 4px var(--ka-shadow);
+}
+
+.phone-button[hidden] {
+    display: none;
+}
+
+.phone-button .codicon {
+    font-size: 18px;
+}
+
+.phone-back {
+    background: var(--ka-accent);
+    border-color: var(--ka-accent);
+    color: var(--ka-accent-fg);
+    font-weight: 700;
+}
+
+/* Over the file while the menu or the agent is open: a tap on it closes them. */
+.phone-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.phone-backdrop[hidden] {
+    display: none;
+}
+
+/* The agent: just its text box, or most of the screen once tapped. */
+.phone-agent {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: var(--phone-keyboard);
+    height: var(--phone-agent-collapsed);
+    z-index: 25;
+    border-top: 1px solid var(--ka-border);
+    background: var(--ka-bg);
+    transition: height 0.18s ease;
+}
+
+.phone.is-agent-expanded .phone-agent {
+    height: min(62%, calc(100% - var(--phone-keyboard) - 120px));
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -4px 18px var(--ka-shadow);
+}
+
+.phone-status {
+    position: absolute;
+    top: calc(var(--phone-top) + 52px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 35;
+    max-width: calc(100% - 32px);
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--ka-overlay-bg);
+    box-shadow: 0 1px 4px var(--ka-shadow);
+    width: max-content;
+    box-sizing: border-box;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+}
+
+.phone-status[hidden] {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .phone-agent {
+        transition: none;
+    }
+}
+
+body[data-layout="phone"] :is(button, input, select) {
+    touch-action: manipulation;
+}
+
+body[data-layout="phone"] :is(input, select) {
+    font-size: 16px;
+}

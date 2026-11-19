@@ -136,6 +136,8 @@
     window.kigumiShell = Object.freeze({
         onMessage: (listener) => listeners.add(listener),
         send,
+        // The browser version can be laid out for a phone (webview/shell/phone-layout.js).
+        layouts: ['desktop', 'phone'],
         // The projects page, drawn in the shell's welcome area when no project is open.
         renderWelcome: (state, tools) => window.kigumiWeb.renderWelcome(state, tools),
     });

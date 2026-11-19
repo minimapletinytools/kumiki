@@ -18,6 +18,15 @@ module.exports = {
             && [...doc.querySelectorAll('.suggestions')].every((one) => one.offsetParent === null)`);
         check('with no key, the chat area says to sign in, in place of the suggestions', askToSignIn === true);
 
+        const prompted = await read(`(() => {
+            const input = doc.getElementById('prompt-input');
+            input.value = 'Create a frame';
+            doc.getElementById('send-btn').click();
+            const notice = doc.getElementById('prompt-sign-in');
+            return !notice.hidden && notice.textContent.includes('MCP') && input.value === 'Create a frame';
+        })()`);
+        check('a signed-out prompt keeps the draft and offers sign-in and MCP', prompted);
+
         settings.set('agent.openrouterApiKey', 'sk-or-test');
         await read(`(() => { const select = doc.getElementById('model-select'); select.value = 'claude-haiku-4.5';
             select.dispatchEvent(new Event('change')); })()`);

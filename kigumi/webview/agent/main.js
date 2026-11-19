@@ -2,6 +2,7 @@
 // conversation itself lives in the app (agent/agent-session.js); this only draws it and sends what
 // the user does. Messages each way are listed in protocol.js; HANDLERS handles each one the session sends.
 import { setStrings, t, textOf, translatePage } from './i18n.js';
+import { SHELL_UI, listenForForm } from '../shell-ui.js';
 import { Conversation } from './conversation.js';
 import { Composer } from './composer.js';
 import { Menus } from './menus.js';
@@ -22,7 +23,12 @@ const conversation = new Conversation($('messages'), {
 });
 const composer = new Composer({
     input: $('prompt-input'), sendButton: $('send-btn'), attachments: $('attachments'), mentions: $('mentions'), planSelect: $('plan-select'),
-}, { post, isBusy: () => busy, onSent: (text, imageUrls) => {
+}, { post, isBusy: () => busy, canSend: () => {
+    if (!document.body.classList.contains('needs-sign-in')) return true;
+    openSheet();
+    $('prompt-sign-in').hidden = false;
+    return false;
+}, onSent: (text, imageUrls) => {
     status.hideFinishedTodos();
     conversation.userBubble(text, imageUrls);
 } });
@@ -58,7 +64,7 @@ $('btn-clear').addEventListener('click', () => {
 // In the browser version the panel says how the agent can be run there (agent.html, .web-agent-notice).
 if (new URLSearchParams(location.search).get('host') === 'web') document.body.classList.add('host-web');
 
-$('messages').addEventListener('click', (event) => {
+document.addEventListener('click', (event) => {
     const chip = event.target.closest('.suggestion-chip');
     if (!chip) return;
     if (chip.classList.contains('sign-in-chip')) post({ type: 'agent:signIn', provider: chip.dataset.provider });
@@ -81,6 +87,7 @@ const HANDLERS = {
         composer.setPlanMode((message.settings || {})['agent.planMode'] === true);
         status.showModels(message.models || [], message.model);
         status.showRoute(message.via, message.account || { configured: false });
+        if (!document.body.classList.contains('needs-sign-in')) $('prompt-sign-in').hidden = true;
         signedIn = Boolean(message.account && message.account.signedIn);
         via = message.via;
         menus.showMcp(mcpState, { signedIn });
@@ -130,7 +137,31 @@ function handle(message) {
 
 window.addEventListener('message', (event) => {
     const message = event.data;
-    if (message && typeof message.type === 'string') handle(message);
+    if (message && message.type === SHELL_UI.agentSheet) {
+        document.body.classList.toggle('is-sheet-open', message.expanded === true);
+    } else if (message && typeof message.type === 'string') {
+        handle(message);
+    }
 });
+
+// On a phone the panel is a sheet along the bottom (webview/shell/phone-layout.js): folded, just the
+// text box; a tap on it, or on the bar while the agent is off, opens it.
+listenForForm((form) => {
+    document.body.classList.toggle('is-phone', form === 'phone');
+    // Shorter, for the folded sheet; kept when the page is translated again.
+    if (form === 'phone') {
+        $('prompt-input').dataset.i18nPlaceholder = 'agent.phone.placeholder';
+        $('prompt-input').placeholder = t('agent.phone.placeholder');
+    }
+});
+function openSheet() {
+    if (document.body.classList.contains('is-phone') && !document.body.classList.contains('is-sheet-open')) {
+        post({ type: SHELL_UI.agentExpand });
+    }
+}
+$('prompt-input').addEventListener('focus', openSheet);
+$('prompt-input').addEventListener('pointerdown', openSheet);
+$('phone-agent-bar').addEventListener('click', openSheet);
+$('phone-collapse').addEventListener('click', () => post({ type: SHELL_UI.agentCollapse }));
 
 post({ type: 'agent:ready' });

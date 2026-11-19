@@ -136,6 +136,9 @@ class ShellConnection {
         // The layout, as data: whether each side slot is shown. A hidden side keeps its panel,
         // and what that panel holds (the agent's conversation, the explorer's state).
         this.layout = { left: true, bottom: true, right: true };
+        // What the shell is laid out for, from its shell:ready: 'desktop', or 'phone', which shows one
+        // file at a time.
+        this.formFactor = 'desktop';
         this._changeListeners = new Set();
         this.nextPanel = 1;
         this.pendingPicks = new Map();
@@ -152,6 +155,9 @@ class ShellConnection {
         const panel = new PanelSurface(this, { id, type, title, filePath });
         this.panels.set(id, panel);
         if (panel.slot === 'center') {
+            if (this.formFactor === 'phone') {
+                for (const tab of [...this.tabs.tabs]) this.closePanel(tab.id);
+            }
             this.tabs.add(id, { title: panel.title, kind: type });
         } else {
             const previous = this.sides[panel.slot];
@@ -234,6 +240,7 @@ class ShellConnection {
                 slot: panel.slot,
                 icon: panelType(panel.type).icon,
                 title: panel.title,
+                filePath: panel.filePath,
                 url: panel.url,
                 state: panel.state,
             })),
@@ -284,6 +291,7 @@ class ShellConnection {
         const panel = message.id ? this.panels.get(message.id) : null;
         switch (message.type) {
             case 'shell:ready':
+                this.formFactor = message.layout === 'phone' ? 'phone' : 'desktop';
                 this.pushState();
                 break;
             case 'shell:command':

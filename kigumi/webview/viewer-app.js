@@ -33,6 +33,8 @@ import * as KigumiRenderMode from './render-mode.js';
 import * as KigumiUndoStacks from './undo-stacks.js';
 import * as KigumiUnits from './units.js';
 import { TouchGestures, wheelGesture, LONG_PRESS_MS } from './touch-navigation.js';
+import { CompactChrome } from './viewer-compact.js';
+import { SHELL_UI, listenForForm } from './shell-ui.js';
 
 // A touchscreen is the main pointer: the hint describes touch gestures.
 const COARSE_POINTER = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
@@ -105,6 +107,12 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         // A trackpad's two-finger scroll orbits (shift pans) instead of zooming; a pinch always zooms.
         this.trackpadScrollOrbits = false;
         this.touchGestures = new TouchGestures();
+        // 'phone' once the shell says so (shell-ui.js): no sidebar, and viewer-compact.js's menu instead.
+        this.formFactor = 'desktop';
+        this.pageZoomed = false;
+        this.errorDismissed = false;
+        this.fileName = INITIAL_PAYLOAD.fileName || null;
+        this.compactChrome = new CompactChrome(this, { html, nothing, t });
         // What a right-click is offering. One menu for every kind of menu --
         // dismissing, choosing and where it sits are solved once.
         this.contextMenu = new KigumiContextMenu.ContextMenu();
@@ -256,11 +264,15 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             : this.trackpadScrollOrbits ? t('viewer.chrome.navHint.trackpad')
                 : this.leftClickDragRotatesCamera ? t('viewer.chrome.navHint.leftClick')
                     : t('viewer.chrome.navHint.rightClick');
+        const compact = this.formFactor === 'phone';
+        this.sidebar.sheet = compact;
+        const layoutClass = compact ? `is-compact${this.compactChrome.sheet ? ' has-sheet' : ''}` : '';
         return html`
             <button id="to-v3d" title=${t('viewer.chrome.toV3d.title')}>${t('viewer.chrome.toV3d')}</button>
-            <div id="view-layout">
+            <div id="view-layout" class=${layoutClass}>
             ${this.sidebar.render(this.sidebarPages())}
-            <div id="viewport">
+            <div id="viewport" class=${compact && this.pageZoomed ? 'page-zoomed' : ''}>
+                ${compact ? this.compactChrome.render() : nothing}
                 ${this.isInDrawing
                     ? html`<button id="back-to-3d-btn" type="button" title=${t('viewer.selection.leaveDrawing.title')}
                         @click=${() => this.leaveDrawing()}>← ${t('viewer.drawing.backTo3d')}</button>`
@@ -315,7 +327,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                     <span class="scale-ruler-label"></span>
                     <div class="scale-ruler-bar"></div>
                 </div>
-                ${this.showNavigationHint ? html`<div id="hint">${navigationHint}</div>` : nothing}
+                ${this.showNavigationHint && !compact ? html`<div id="hint">${navigationHint}</div>` : nothing}
                 ${this.renderAssemblyTimeline()}
                 ${this.renderMemberContextMenu()}
             </div>
@@ -358,6 +370,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         this.setupUiEvents();
         this.setupThreeScene();
         window.addEventListener('message', this.onWindowMessage);
+        listenForForm((form) => this.setFormFactor(form));
         this.applyPersistedViewerSettings(INITIAL_PAYLOAD.viewerSettings || null);
         this.setViewerOptions(INITIAL_PAYLOAD.viewerOptions);
         this.setViewPhase(ViewerPhase.WAITING_FOR_RUNNER, t('viewer.chrome.loading.raisingFrame'), { refreshToken: 0 });
@@ -381,6 +394,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             this.selectionPanel.updateInfo(this.currentFrameData);
             this.memberListPanel.syncSelection();
             this.reportSelectionSoon();
+            // The phone layout names what is selected in a chip (viewer-compact.js).
+            if (this.formFactor === 'phone') this.requestUpdate();
         });
 
         // Attach Layers panel to selection store + extension messaging.
@@ -571,7 +586,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
         });
 
         viewport.addEventListener('wheel', (event) => {
-            if (window.scrollY > 0) {
+            if (window.scrollY > 0 || this.pageZoomed) {
                 return;
             }
             event.preventDefault();
@@ -1430,6 +1445,13 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
 
     onWindowMessage(event) {
         const message = event.data || {};
+        if (message.type === SHELL_UI.pageZoom && this.formFactor === 'phone') {
+            this.pageZoomed = message.zoomed === true;
+            this.touchGestures.cancel();
+            clearTimeout(this.longPressTimer);
+            this.requestUpdate();
+            return;
+        }
         if (message.type === 'stlPlacementResult') {
             if (message.requestId !== this.stlRequestId) return;
             this.stlRequestId = null;
@@ -1959,6 +1981,16 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
                 this.showMemberContextMenu(found.memberKey, event.clientX, event.clientY, { features: true });
             }
         }
+    }
+
+    /** Lay the view out for `form` ('desktop' or 'phone'). On a phone the camera panel starts closed. */
+    setFormFactor(form) {
+        const next = form === 'phone' ? 'phone' : 'desktop';
+        if (next === this.formFactor) return;
+        this.formFactor = next;
+        if (next === 'phone') this.cameraPanelCollapsed = true;
+        this.requestUpdate();
+        this.updateComplete.then(() => this.onWindowResize());
     }
 
     /** A finger on the view: the first one makes its viewport active and may become a long press. */
@@ -2847,6 +2879,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     renderErrorActions() {
         const location = this.viewState.errorLocation;
         return html`<div class="error-actions">
+            ${this.formFactor === 'phone' ? html`<button type="button" aria-label=${t('viewer.compact.close')}
+                @click=${() => { this.errorDismissed = true; this.requestUpdate(); }}>×</button>` : nothing}
             ${location ? html`<button id="go-to-error-btn" type="button"
                 title=${t('viewer.chrome.goToError.title', { file: location.filePath.split(/[\\/]/).pop(), line: location.lineNumber })}
                 @click=${() => vscode && vscode.postMessage({ type: 'openLogLocation', ...location })}>${t('viewer.chrome.goToError')}</button>` : ''}
@@ -2856,7 +2890,8 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     }
 
     isOverlayVisible() {
-        return this.viewState.phase !== ViewerPhase.READY;
+        return this.viewState.phase !== ViewerPhase.READY
+            && !(this.formFactor === 'phone' && this.viewState.phase === ViewerPhase.ERROR && this.errorDismissed);
     }
 
     overlayClasses() {
@@ -2867,6 +2902,10 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
     }
 
     setViewState(nextPartial) {
+        if (nextPartial.phase && (nextPartial.phase !== this.viewState.phase
+                || nextPartial.error !== this.viewState.error || nextPartial.refreshToken !== this.viewState.refreshToken)) {
+            this.errorDismissed = false;
+        }
         this.viewState = {
             ...this.viewState,
             ...nextPartial,
@@ -3013,6 +3052,7 @@ class KigumiViewerApp extends DrawingsMixin(AssemblyMixin(RenderingMixin(CameraM
             center: { x: this.focusedCx, y: this.focusedCy, z: this.focusedCz },
             radius,
             fovDegrees: this.perspectiveCamera.fov,
+            aspect: this.perspectiveCamera.aspect,
         });
         this.viewports.forEach((viewport, index) => {
             const entry = plan[index];

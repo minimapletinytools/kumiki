@@ -693,7 +693,14 @@ describe('the agent session', () => {
     test('says what to do when nothing can carry a request, and keeps none of it in the conversation', async () => {
         const { agent, posted } = session();
         await agent.prompt('hi');
-        expect(posted).toEqual([{ type: 'agent:error', key: 'agent.route.setKey', message: expect.stringContaining('Sign in') }]);
+        expect(posted).toEqual([{ type: 'agent:error', key: 'agent.route.setKey', message: expect.stringContaining('OpenRouter') }]);
+        expect(agent.conversation.log).toEqual([]);
+    });
+
+    test('offers sign-in and MCP when a signed-out user prompts the agent', async () => {
+        const { agent, posted } = session({ account: { state: () => ({ configured: true, signedIn: false }), backend: () => null } });
+        await agent.prompt('hi');
+        expect(posted).toEqual([{ type: 'agent:error', key: 'agent.prompt.signIn', message: expect.stringContaining('MCP') }]);
         expect(agent.conversation.log).toEqual([]);
     });
 

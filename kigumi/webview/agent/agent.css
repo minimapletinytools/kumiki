@@ -1269,3 +1269,84 @@ body.host-web:not(.signed-in) .web-agent-sign-in-block {
     font-size: 11px;
     color: var(--ka-muted);
 }
+
+/* ---- On a phone: a sheet along the bottom (webview/shell/phone-layout.js) ---- */
+.phone-agent-bar,
+.phone-collapse {
+    display: none;
+}
+
+body.is-phone .phone-collapse {
+    display: inline-flex;
+}
+
+/* Folded: only the text box, or the bar that opens the sheet while the agent is off. */
+body.is-phone:not(.is-sheet-open) .agent-header,
+body.is-phone:not(.is-sheet-open) .settings-row,
+body.is-phone:not(.is-sheet-open) .history-menu,
+body.is-phone:not(.is-sheet-open) .bypass-banner,
+body.is-phone:not(.is-sheet-open) .agent-off-note,
+body.is-phone:not(.is-sheet-open) .messages-wrap,
+body.is-phone:not(.is-sheet-open) .footer-row,
+body.is-phone:not(.is-sheet-open) .todos,
+body.is-phone:not(.is-sheet-open) .mentions,
+body.is-phone:not(.is-sheet-open) .attachments {
+    display: none !important;
+}
+
+body.is-phone:not(.is-sheet-open) .agent-footer {
+    padding: 8px 10px;
+}
+
+body.is-phone:not(.is-sheet-open).agent-off .agent-footer {
+    display: none;
+}
+
+body.is-phone:not(.is-sheet-open).agent-off .phone-agent-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: calc(100% - 20px);
+    height: 44px;
+    margin: 10px;
+    border: 1px solid var(--ka-border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ka-fg);
+    font: inherit;
+    font-size: 15px;
+}
+
+/* 16px or more, or a phone zooms the page when the box is tapped. */
+body.is-phone #prompt-input {
+    font-size: 16px;
+}
+
+body.is-phone:not(.is-sheet-open) #prompt-input {
+    min-height: 0;
+    height: 44px;
+}
+
+#prompt-sign-in p {
+    margin: 0 0 6px;
+}
+
+#prompt-sign-in .sign-in-chip {
+    display: inline-block;
+    width: auto;
+    margin: 0 6px 6px 0;
+}
+
+.agent-footer:has(#prompt-sign-in:not([hidden])) #route-note,
+body.is-phone:not(.is-sheet-open) #prompt-sign-in {
+    display: none;
+}
+
+body.is-phone :is(button, input, textarea, select) {
+    touch-action: manipulation;
+}
+
+body.is-phone :is(input, select) {
+    font-size: 16px;
+}

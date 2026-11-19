@@ -401,3 +401,83 @@ button {
 .ks-menu-item:focus-visible .codicon {
     color: inherit;
 }
+
+/* ---- The phone menu (sidebar-app.js renderPhoneHome): big rows to tap ---- */
+.ks-phone {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px 16px;
+    overflow: auto;
+    height: 100%;
+    box-sizing: border-box;
+    font-size: 15px;
+}
+
+.ks-phone-heading {
+    padding: 12px 4px 2px;
+    color: var(--vscode-descriptionForeground, #717171);
+    font-size: 12px;
+}
+
+.ks-phone-button {
+    touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.ks-phone-button > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ks-phone-button.is-quiet {
+    border-color: transparent;
+    color: var(--vscode-textLink-foreground, #005fb8);
+}
+
+.ks-phone-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ks-phone-list li {
+    display: flex;
+    align-items: center;
+    padding-inline-start: calc(var(--ks-depth) * var(--ks-indent));
+}
+
+.ks-phone-list button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    touch-action: manipulation;
+}
+
+.ks-phone-list button:has(+ button) {
+    flex: 0 0 44px;
+    justify-content: center;
+}
+
+.ks-phone-list button:active {
+    background: var(--ks-hover);
+}

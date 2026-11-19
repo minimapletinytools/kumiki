@@ -227,7 +227,9 @@ describe('shell connection', () => {
 });
 
 describe('the shell page and the connection speak the same protocol', () => {
-  const shellSource = fs.readFileSync(path.join(WEBVIEW_DIR, 'shell', 'shell.js'), 'utf8');
+  // Every module of the shell page: what one sends, another may handle.
+  const shellSource = ['shell.js', 'panel-frames.js', 'dialogs.js', 'desktop-layout.js', 'phone-layout.js']
+    .map((name) => fs.readFileSync(path.join(WEBVIEW_DIR, 'shell', name), 'utf8')).join('\n');
   const connectionSource = fs.readFileSync(path.join(__dirname, '..', 'app-shell', 'shell-connection.js'), 'utf8');
 
   const sentByShell = new Set([...shellSource.matchAll(/core\.send\(\{\s*type:\s*'([a-z:]+)'/gi)].map((m) => m[1]));

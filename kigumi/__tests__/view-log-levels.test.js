@@ -38,3 +38,23 @@ describe("the level of the runner's lines", () => {
         expect(pythonLineLevel(line)).toBe(level);
     });
 });
+
+describe('closing a view that owns its runner', () => {
+    function owner(handOnRunner) {
+        const runner = { dispose: jest.fn(), isAlive: () => true, request: jest.fn() };
+        const fake = { ...fakeSession(), isDisposed: false, ownsRunner: true, runnerSession: runner, fileWatcher: null,
+            panel: null, onDispose: null, handOnRunner };
+        return { fake, runner };
+    }
+
+    test('stops the runner, unless a pattern view still uses it', async () => {
+        const alone = owner(() => false);
+        await FrameViewSession.prototype.dispose.call(alone.fake);
+        expect(alone.runner.dispose).toHaveBeenCalled();
+
+        const shared = owner(() => true);
+        await FrameViewSession.prototype.dispose.call(shared.fake);
+        expect(shared.runner.dispose).not.toHaveBeenCalled();
+        expect(shared.fake.runnerSession).toBeNull();
+    });
+});

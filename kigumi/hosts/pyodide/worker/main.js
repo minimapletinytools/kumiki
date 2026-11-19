@@ -209,7 +209,8 @@ async function start() {
         transport: { send: post, onMessage: (callback) => { receive = callback; } },
         pages,
         status: () => ({
-            workspace: project ? { name: project.name, path: project.name } : null,
+            // `path` is what the status bar shows; `root`, where its files are.
+            workspace: project ? { name: project.name, path: project.name, root: project.dir } : null,
             web: { projectId: project ? project.id : null },
             status: shown,
             progress,
